@@ -1,0 +1,173 @@
+# IRoad Super Admin Control Panel - Cursor AI Rules
+
+## Project Overview
+- Django-based Super Admin Control Panel for IRoad SaaS platform
+- PostgreSQL database (no SQLite ever)
+- Multi-app structure: one app per module domain
+- Designer HTML files are in D:\iroad\designerDesign\IRoad\ — always use these as base for templates, never create new HTML from scratch
+
+## Coding Standards
+- Always use Django class-based views (CBV) unless a function view is explicitly requested
+- Always use Django forms or ModelForms for all form handling
+- Never hardcode credentials — always use environment variables via python-decouple
+- All models must have created_at, updated_at auto timestamps
+- All models must have created_by, updated_by FK to AdminUser where applicable
+- Use UUID as primary key for all models unless doc specifies auto-integer
+- All database migrations must be created after every model change
+- Never use SQLite — PostgreSQL only
+
+## Template Rules
+- base.html must be the master layout extended by every page
+- sidebar.html, navbar.html, footer.html must be separate partials included in base.html
+- Every template extends base.html using {% extends 'base.html' %}
+- Static files (CSS/JS/images) must be loaded using {% load static %} and {% static %}
+- Designer CSS and JS must never be modified — only referenced
+
+## Security Rules
+- Never store passwords in plain text
+- Always use Django's built-in password hashing
+- Login required decorator or LoginRequiredMixin on every view except login page
+- CSRF protection must always be enabled (never disable)
+- Debug must be False in production settings
+
+## App Structure Rules
+- superadmin/ app handles: auth, roles, admin users, dashboard
+- Each future module gets its own app
+- Never mix module logic across apps
+- Always register new apps in INSTALLED_APPS in settings
+
+## Database Rules
+- PostgreSQL only
+- Always define __str__ method on every model
+- Always define Meta class with verbose_name and verbose_name_plural
+- Use select_related and prefetch_related to avoid N+1 queries
+- Never use raw SQL unless absolutely necessary
+
+## Business Rules from PCS Document
+- Root Admin (first superuser) can never be suspended or have role changed
+- Admin status values: Pending_Activation, Active, Suspended only
+- Passwords are never set by Super Admin — invite link flow only (Phase 2)
+- All audit-sensitive actions must be logged (Phase 10)
+
+## Phase 1 — Roles & Admin Users Business Rules
+
+### Roles Master Rules (FRM-CP-01-02)
+- role_id must be UUID primary key
+- role_name_en must be UNIQUE
+- role_name_ar must be UNIQUE
+- status values: Active, Inactive ONLY
+- is_system_default = True means: cannot be deleted, cannot be set to Inactive, core properties cannot be modified
+- A Role cannot be deleted if any active AdminUser is assigned to it — set Inactive instead
+- Roles with is_system_default = True are seeded automatically — never created from UI
+- Only Active roles appear in AdminUser creation dropdown
+- created_by and updated_by must always be set to the currently logged-in admin
+
+### Admin Users Master Rules (FRM-CP-01-01)
+- admin_id must be UUID primary key
+- email must be UNIQUE across entire control panel DB
+- status values: Pending_Activation, Active, Suspended ONLY
+- Default status on creation: Pending_Activation
+- Super Admin never sets password — invite link flow handles it
+- Root Admin (is_root = True) can NEVER be suspended
+- Root Admin role can NEVER be changed
+- Changing status to Suspended must immediately invalidate that user's session
+- two_factor_enabled is read-only flag — only changed by auth system
+- last_login_at is read-only — only updated by login system
+- created_by and updated_by must always be set
+
+### General Rules
+- No hard delete on any record — use status changes only
+- All list pages must have search, filter, and pagination
+- All forms must show validation errors inline
+- All sensitive actions (create, update, suspend) must be restricted to is_root = True users only in Phase 1
+
+## Phase 2 — Full Auth Hardening Business Rules
+
+### Admin Security Settings Rules (FRM-CP-11-01)
+- Only ONE record ever exists in DB — fixed ID: "ADMIN-SEC-CONF"
+- session_timeout_minutes: default 240 (4 hours)
+- max_failed_logins: default 3
+- lockout_duration_minutes: default 30
+- updated_by must always be set to currently logged-in admin
+- These values are read dynamically by auth system — never hardcoded
+
+### Brute Force Protection Rules
+- Failed attempts tracked per email in DB
+- Counter increments on every failed login
+- When counter reaches max_failed_logins → status becomes Blocked
+- Blocked accounts cannot login until lockout_duration_minutes passes
+- Successful login resets failed attempt counter to 0
+- Lockout expiry is calculated: locked_at + lockout_duration_minutes
+- Show remaining lockout time on login page
+
+### Session Security Rules
+- Session expiry is read from AdminSecuritySettings.session_timeout_minutes
+- Every request checks if session is still valid
+- If expired → clear session → redirect to login with message
+- Session last activity timestamp updated on every request
+- Middleware handles this — not views
+
+### Invite Token Rules
+- Token generated using Django secrets.token_urlsafe(32)
+- Token stored in DB with created_at and expires_at (24 hours)
+- Token is single-use — mark as used after password set
+- Expired tokens show error page — cannot be reused
+- Invalid tokens show error page
+- In Phase 2: link is displayed on screen — no email sent yet
+- TODO comment added everywhere email should be sent in Phase 7
+
+### Password Reset Token Rules
+- Same token mechanism as invite
+- Expiry: 1 hour (shorter than invite)
+- Single use only
+- Only works for Active or Pending_Activation accounts
+- Suspended accounts cannot reset password
+
+### Access Log Rules (FRM-CP-11-04)
+- Strictly append-only — no update, no delete ever
+- Records: Login, Logout, Token_Refresh attempt types
+- Records: Success, Failed, Blocked statuses
+- Always captures email_used even if user does not exist
+- Always captures IP address
+- Always captures timestamp
+- User domain: Admin only in Phase 2
+
+## Phase 3 — Global Master Data Business Rules
+
+### Countries Master Rules (FRM-CP-08-01)
+- country_code is Primary Key — ISO format (e.g., SA, US, AE) — UPPERCASE only
+- country_code is IMMUTABLE once saved — never allow edit of PK
+- name_en: required, unique
+- name_ar: required, unique
+- is_active: default True
+- NO hard delete ever — only deactivate (is_active = False)
+- created_by: FK to AdminUser, set on creation only
+- updated_at: auto timestamp on every save
+- No created_at field — updated_at serves as audit timestamp
+- Only active countries appear in any dropdown across the system
+- Phase 3 note: Redis caching is deferred — add TODO comment where
+  cache invalidation should happen when Redis is implemented in Phase 10
+
+### Currencies Master Rules (FRM-CP-08-02)
+- currency_code is Primary Key — ISO format (e.g., SAR, USD) — UPPERCASE only
+- currency_code is IMMUTABLE once saved — block edit of PK at view level
+- name_en: required
+- name_ar: required
+- currency_symbol: required (e.g., $, ريال)
+- decimal_places: optional, default 2
+- is_active: default True
+- NO hard delete ever — only deactivate
+- created_by: FK to AdminUser, set on creation only
+- updated_at: auto timestamp
+- Only active currencies appear in Subscription Plans, 
+  Payment Methods, and any financial dropdowns
+- currency_code immutability enforced in form clean() method —
+  if editing and currency_code changed → raise ValidationError
+
+### Seeding Rules
+- Phase 3 seed must include common countries and currencies
+- Saudi Arabia (SA) and USD/SAR must always be seeded
+- Seed is idempotent — get_or_create pattern always
+- seed_superadmin.py must be updated with seed_countries() 
+  and seed_currencies() functions
+

@@ -1,0 +1,130 @@
+import secrets
+from datetime import timedelta
+
+from django.utils import timezone
+
+
+def get_security_settings():
+    from superadmin.models import AdminSecuritySettings
+
+    try:
+        return AdminSecuritySettings.objects.get(setting_id="ADMIN-SEC-CONF")
+    except AdminSecuritySettings.DoesNotExist:
+
+        class Defaults:
+            session_timeout_minutes = 240
+            max_failed_logins = 3
+            lockout_duration_minutes = 30
+
+        return Defaults()
+
+
+def check_brute_force(email):
+    """
+    Returns dict:
+    {
+      'is_locked': True/False,
+      'remaining_minutes': int,
+      'failed_count': int
+    }
+    """
+    from superadmin.models import LoginAttempt
+
+    settings = get_security_settings()
+
+    try:
+        attempt = LoginAttempt.objects.get(email=email)
+    except LoginAttempt.DoesNotExist:
+        return {
+            "is_locked": False,
+            "remaining_minutes": 0,
+            "failed_count": 0,
+        }
+
+    if attempt.locked_at:
+        lockout_end = attempt.locked_at + timedelta(
+            minutes=settings.lockout_duration_minutes
+        )
+        if timezone.now() < lockout_end:
+            remaining = (
+                int((lockout_end - timezone.now()).total_seconds() / 60) + 1
+            )
+            return {
+                "is_locked": True,
+                "remaining_minutes": remaining,
+                "failed_count": attempt.failed_count,
+            }
+        else:
+            # Lockout expired — reset
+            attempt.failed_count = 0
+            attempt.locked_at = None
+            attempt.save()
+
+    return {
+        "is_locked": False,
+        "remaining_minutes": 0,
+        "failed_count": attempt.failed_count,
+    }
+
+
+def record_failed_attempt(email):
+    """Increment failed count. Lock if max reached."""
+    from superadmin.models import LoginAttempt
+
+    settings = get_security_settings()
+
+    attempt, _ = LoginAttempt.objects.get_or_create(email=email)
+    attempt.failed_count += 1
+
+    if attempt.failed_count >= settings.max_failed_logins:
+        attempt.locked_at = timezone.now()
+
+    attempt.save()
+
+
+def reset_failed_attempts(email):
+    """Call this on successful login."""
+    from superadmin.models import LoginAttempt
+
+    LoginAttempt.objects.filter(email=email).update(
+        failed_count=0,
+        locked_at=None,
+    )
+
+
+def create_auth_token(admin_user, token_type):
+    """
+    Creates and returns a new token.
+    token_type: 'invite' or 'password_reset'
+    """
+    from superadmin.models import AdminAuthToken
+
+    expiry_hours = 24 if token_type == "invite" else 1
+
+    # Invalidate any existing unused tokens of same type
+    AdminAuthToken.objects.filter(
+        admin_user=admin_user,
+        token_type=token_type,
+        is_used=False,
+    ).update(is_used=True)
+
+    token = AdminAuthToken.objects.create(
+        admin_user=admin_user,
+        token=secrets.token_urlsafe(32),
+        token_type=token_type,
+        expires_at=timezone.now() + timedelta(hours=expiry_hours),
+    )
+    return token
+
+
+def log_access(attempt_type, status, email_used, ip_address=None):
+    """Create immutable access log entry."""
+    from superadmin.models import AccessLog
+
+    AccessLog(
+        attempt_type=attempt_type,
+        status=status,
+        user_domain="Admin",
+        email_used=email_used,
+        ip_address=ip_address,
+    ).save()

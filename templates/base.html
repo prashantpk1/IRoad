@@ -1,0 +1,169 @@
+{% load static %}
+<!doctype html>
+<html lang="en" data-sidebar-active="server">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="iRoad Admin Dashboard" />
+    <title>{% block title %}Dashboard | iRoad Admin{% endblock %}</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Bootstrap 5 CSS -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+
+    <!-- Bootstrap Icons -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css"
+      rel="stylesheet"
+    />
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{% static 'css/style.css' %}" />
+    <link rel="stylesheet" href="{% static 'css/dashboard.css' %}" />
+    <link rel="stylesheet" href="{% static 'css/responsive.css' %}" />
+  </head>
+
+  <body>
+    <!-- Mobile Menu Toggle -->
+    <button class="mobile-menu-toggle" aria-label="Toggle menu">
+      <i class="bi bi-list"></i>
+    </button>
+
+    <!-- Sidebar Overlay -->
+    <div class="sidebar-overlay"></div>
+
+    {% include 'partials/sidebar.html' %}
+
+    <!-- Notification Panel -->
+    <div class="notification-panel" id="notificationPanel">
+      <!-- Panel Header -->
+      <div class="notification-header">
+        <h3 class="notification-title">Notifications</h3>
+        <button
+          class="notification-close"
+          id="notificationClose"
+          aria-label="Close"
+        >
+          <i class="bi bi-x-lg"></i>
+        </button>
+      </div>
+
+      <!-- Panel Content -->
+      <div class="notification-content">
+        <!-- Settings Button -->
+        <div class="notification-settings">
+          <button
+            class="settings-btn"
+            id="notificationSettingsBtn"
+            aria-label="Settings"
+          >
+            <i class="bi bi-gear"></i>
+          </button>
+        </div>
+
+        <!-- Preferences Popup -->
+        <div class="preferences-popup" id="preferencesPopup">
+          <h4 class="preferences-title">Preferences</h4>
+          <div class="ce-item">
+            <div class="preference-label">
+              <span>Allow Notifications</span>
+              <i
+                class="bi bi-info-circle"
+                title="Enable or disable all notifications"
+              ></i>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="allowNotifications" checked />
+              <span class="toggle-slider">
+                <span class="toggle-text-on">Enable</span>
+                <span class="toggle-text-off">Disable</span>
+              </span>
+            </label>
+          </div>
+          <div class="preference-item">
+            <label class="preference-checkbox">
+              <input type="checkbox" checked />
+              <span class="checkmark"></span>
+              <span>Record Comments</span>
+            </label>
+          </div>
+          <div class="preference-item">
+            <label class="preference-checkbox">
+              <input type="checkbox" checked />
+              <span class="checkmark"></span>
+              <span>Blueprint Transitions</span>
+            </label>
+          </div>
+          <button class="btn btn-primary preferences-done" id="preferencesDone">
+            Done
+          </button>
+        </div>
+
+        <!-- Empty State -->
+        <div class="notification-empty">
+          <div class="empty-icon">
+            <i class="bi bi-bell"></i>
+            <span class="sparkle sparkle-1">&#10022;</span>
+            <span class="sparkle sparkle-2">&#10023;</span>
+            <span class="sparkle sparkle-3">&#176;</span>
+          </div>
+          <h4 class="empty-title">No notifications</h4>
+          <p class="empty-text">You are yet to receive notifications</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notification Panel Overlay -->
+    <div class="notification-overlay" id="notificationOverlay"></div>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- Top Header -->
+      <header class="top-header">
+        <div class="header-left">
+          <button
+            class="header-toggle-btn"
+            id="sidebarCollapseBtn"
+            title="Toggle Sidebar"
+          >
+            <i class="bi bi-list"></i>
+          </button>
+          <div class="page-title">
+            {% block page_title %}Dashboard{% endblock %}
+          </div>
+          <div class="header-search">
+            <i class="bi bi-search"></i>
+            <input
+              type="text"
+              placeholder="Search shipments, clients, addresses..."
+            />
+          </div>
+        </div>
+        {% include 'partials/navbar.html' %}
+      </header>
+
+      <div class="page-content">
+        {% block content %}{% endblock %}
+      </div>
+
+      {% include 'partials/footer.html' %}
+    </main>
+
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Custom JS -->
+    <script src="{% static 'js/main.js' %}"></script>
+    <script src="{% static 'js/dashboard.js' %}"></script>
+  </body>
+</html>

@@ -1,0 +1,96 @@
+<div class="header-datetime">
+  <span class="header-date" id="headerDate"
+    >Tuesday, 28 January 2026</span
+  >
+  <span class="header-time" id="headerTime">3:52 PM</span>
+</div>
+<div class="header-right">
+  <button class="header-icon-btn" title="Switch Language">
+    <i class="bi bi-translate"></i>
+  </button>
+  <button class="header-icon-btn" title="Notifications">
+    <i class="bi bi-bell"></i>
+    <span class="badge">3</span>
+  </button>
+  <div class="header-divider"></div>
+  <div class="header-user-wrapper">
+    <div class="header-user" id="headerUserToggle">
+      <div class="header-user-avatar">
+        {% if request.user.is_authenticated %}
+          <img
+            src="https://ui-avatars.com/api/?name={{ request.user.email|urlencode }}&background=5051f9&color=fff&size=40"
+            alt="User"
+          />
+        {% else %}
+          <img
+            src="https://ui-avatars.com/api/?name=Admin&background=5051f9&color=fff&size=40"
+            alt="User"
+          />
+        {% endif %}
+      </div>
+      <div class="header-user-info">
+        <span class="header-user-name">
+          {% if request.user.is_authenticated %}
+            {{ request.user.first_name }} {{ request.user.last_name }}
+          {% else %}
+            Admin
+          {% endif %}
+        </span>
+        <span class="header-user-role">
+          {% if request.user.is_authenticated and request.user.role %}
+            {{ request.user.role.role_name_en }}
+          {% else %}
+            Super Admin
+          {% endif %}
+        </span>
+      </div>
+      <i class="bi bi-chevron-down header-user-chevron"></i>
+    </div>
+
+    <!-- Header User Dropdown -->
+    <div class="header-user-dropdown" id="headerUserDropdown">
+      <div class="header-dropdown-profile">
+        <div class="header-dropdown-avatar">
+          {% if request.user.is_authenticated %}
+            <img
+              src="https://ui-avatars.com/api/?name={{ request.user.email|urlencode }}&background=e8e8e8&color=888&size=80"
+              alt="User"
+            />
+          {% else %}
+            <img
+              src="https://ui-avatars.com/api/?name=Admin&background=e8e8e8&color=888&size=80"
+              alt="User"
+            />
+          {% endif %}
+        </div>
+        <div class="header-dropdown-name">
+          {% if request.user.is_authenticated %}
+            {{ request.user.first_name }} {{ request.user.last_name }}
+          {% else %}
+            Admin
+          {% endif %}
+        </div>
+        <div class="header-dropdown-email">
+          {% if request.user.is_authenticated %}
+            {{ request.user.email }}
+          {% endif %}
+        </div>
+      </div>
+      <div class="header-dropdown-divider"></div>
+      <ul class="header-dropdown-menu">
+        <li>
+          <a href="#" class="header-dropdown-item">
+            <i class="bi bi-person"></i>
+            <span>My Account</span>
+          </a>
+        </li>
+        <li>
+          <a href="{% url 'logout' %}" class="header-dropdown-item">
+            <i class="bi bi-box-arrow-right"></i>
+            <span>Sign out</span>
+          </a>
+        </li>
+      </ul>
+    </div>
+  </div>
+</div>

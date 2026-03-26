@@ -1,0 +1,119 @@
+{% extends 'base.html' %}
+
+{% block page_title %}Admin User Details{% endblock %}
+
+{% block content %}
+  <div class="content-card" style="background: #ffffff; padding: 20px 30px; border-radius: 12px">
+    <div class="setting-row" style="border-bottom: none; padding-top: 0; margin-bottom: 16px">
+      <div class="setting-row-info">
+        <h2 class="page-title">Admin User Details</h2>
+        <p class="text-muted" style="margin: 6px 0 0 0">
+          {{ target_user.first_name }} {{ target_user.last_name }}
+          {% if target_user.is_root %}
+            <span class="status-badge warning" style="margin-left: 12px">Root</span>
+          {% endif %}
+        </p>
+      </div>
+      <div class="setting-row-control" style="flex: 0 0 auto; display: flex; gap: 10px; align-items: center">
+        <a href="{% url 'admin_user_edit' target_user.pk %}" class="btn" style="padding: 10px 14px; border-width: 1px">
+          <i class="bi bi-pencil"></i>
+          Edit
+        </a>
+        <a href="{% url 'admin_user_list' %}" class="btn" style="padding: 10px 14px; border-width: 1px">
+          <i class="bi bi-arrow-left"></i>
+          Back
+        </a>
+      </div>
+    </div>
+
+    <div class="setting-row">
+      <div class="setting-row-info">
+        <div class="form-label">First Name</div>
+        <div style="font-weight: 700; color: var(--text-dark)">{{ target_user.first_name }}</div>
+      </div>
+    </div>
+    <div class="setting-row">
+      <div class="setting-row-info">
+        <div class="form-label">Last Name</div>
+        <div style="font-weight: 700; color: var(--text-dark)">{{ target_user.last_name }}</div>
+      </div>
+    </div>
+    <div class="setting-row">
+      <div class="setting-row-info">
+        <div class="form-label">Email</div>
+        <div style="font-weight: 700; color: var(--text-dark)">{{ target_user.email }}</div>
+      </div>
+    </div>
+    <div class="setting-row">
+      <div class="setting-row-info">
+        <div class="form-label">Phone Number</div>
+        <div style="font-weight: 700; color: var(--text-dark)">{{ target_user.phone_number|default:"-" }}</div>
+      </div>
+    </div>
+    <div class="setting-row">
+      <div class="setting-row-info">
+        <div class="form-label">Role</div>
+        <div style="font-weight: 700; color: var(--text-dark)">
+          {{ target_user.role.role_name_en|default:"-" }}
+        </div>
+      </div>
+    </div>
+
+    <div class="setting-row">
+      <div class="setting-row-info">
+        <div class="form-label">Status</div>
+        {% if target_user.status == 'Pending_Activation' %}
+          <span class="status-badge pending">Pending</span>
+        {% elif target_user.status == 'Active' %}
+          <span class="status-badge active">Active</span>
+        {% else %}
+          <span class="status-badge disabled">Suspended</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="setting-row">
+      <div class="setting-row-info">
+        <div class="form-label">2FA</div>
+        {% if target_user.two_factor_enabled %}
+          <span class="status-badge enabled">Enabled</span>
+        {% else %}
+          <span class="status-badge warning">Disabled</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="setting-row">
+      <div class="setting-row-info">
+        <div class="form-label">Last Login At</div>
+        <div style="font-weight: 700; color: var(--text-dark)">
+          {{ target_user.last_login_at|default:"-" }}
+        </div>
+      </div>
+    </div>
+
+    <div class="setting-row">
+      <div class="setting-row-info">
+        <div class="form-label">Created By</div>
+        <div style="font-weight: 700; color: var(--text-dark)">
+          {% if target_user.created_by %}
+            {{ target_user.created_by.first_name }} {{ target_user.created_by.last_name }}
+          {% else %}
+            System
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="setting-row">
+      <div class="setting-row-info">
+        <div class="form-label">Created At</div>
+        <div style="font-weight: 700; color: var(--text-dark)">
+          {{ target_user.created_at|default:"-" }}
+        </div>
+      </div>
+    </div>
+
+  </div>
+{% endblock %}
+

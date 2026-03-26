@@ -1,0 +1,177 @@
+{% extends 'base.html' %}
+
+{% block page_title %}Authentication Access Log{% endblock %}
+
+{% block content %}
+  <div class="content-card" style="background: #ffffff; padding: 20px 30px; border-radius: 12px">
+    <div class="setting-row" style="border-bottom: none; padding-top: 0">
+      <div class="setting-row-info">
+        <h2 class="page-title">Authentication Access Log</h2>
+        <p class="text-muted" style="margin: 6px 0 0 0">
+          {% if access_logs.paginator.count %}
+            Showing
+            {{ access_logs.start_index }}–{{ access_logs.end_index }}
+            of
+            {{ total_count }}
+            record{{ total_count|pluralize }}
+          {% else %}
+            Showing 0 of {{ total_count }} records
+          {% endif %}
+        </p>
+      </div>
+    </div>
+
+    <form
+      method="get"
+      action="{% url 'access_log' %}"
+      style="margin-top: 16px"
+    >
+      <div
+        style="
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+          gap: 12px;
+          align-items: flex-end;
+        "
+      >
+        <div>
+          <label class="form-label">Status</label>
+          <select name="status" class="form-select form-select-sm">
+            <option value="All" {% if status_filter == 'All' %}selected{% endif %}>All</option>
+            <option value="Success" {% if status_filter == 'Success' %}selected{% endif %}>Success</option>
+            <option value="Failed" {% if status_filter == 'Failed' %}selected{% endif %}>Failed</option>
+            <option value="Blocked" {% if status_filter == 'Blocked' %}selected{% endif %}>Blocked</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label">Attempt type</label>
+          <select name="attempt_type" class="form-select form-select-sm">
+            <option value="All" {% if attempt_type_filter == 'All' %}selected{% endif %}>All</option>
+            <option value="Login" {% if attempt_type_filter == 'Login' %}selected{% endif %}>Login</option>
+            <option value="Logout" {% if attempt_type_filter == 'Logout' %}selected{% endif %}>Logout</option>
+          </select>
+        </div>
+        <div style="grid-column: span 2; min-width: 220px">
+          <label class="form-label">Search email</label>
+          <input
+            type="text"
+            name="q"
+            class="form-control form-control-sm"
+            placeholder="email_used contains…"
+            value="{{ search_email }}"
+          />
+        </div>
+        <div>
+          <label class="form-label">From date</label>
+          <input
+            type="date"
+            name="from_date"
+            class="form-control form-control-sm"
+            value="{{ from_date }}"
+          />
+        </div>
+        <div>
+          <label class="form-label">To date</label>
+          <input
+            type="date"
+            name="to_date"
+            class="form-control form-control-sm"
+            value="{{ to_date }}"
+          />
+        </div>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; padding-bottom: 2px">
+          <button type="submit" class="btn btn-primary btn-sm" style="padding: 8px 14px">
+            <i class="bi bi-funnel"></i> Apply
+          </button>
+          <a
+            href="{% url 'access_log' %}"
+            class="btn btn-outline-secondary btn-sm"
+            style="padding: 8px 14px"
+          >
+            Clear
+          </a>
+        </div>
+      </div>
+    </form>
+
+    {% if total_count %}
+      <div class="table-responsive" style="margin-top: 20px">
+        <table class="table table-hover align-middle" style="margin-bottom: 0">
+          <thead>
+            <tr>
+              <th>Timestamp</th>
+              <th>Email Used</th>
+              <th>Attempt Type</th>
+              <th>Status</th>
+              <th>IP Address</th>
+              <th>Domain</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in access_logs %}
+              <tr>
+                <td style="white-space: nowrap">{{ row.timestamp }}</td>
+                <td>{{ row.email_used }}</td>
+                <td>
+                  {% if row.attempt_type == 'Login' %}
+                    <span class="badge rounded-pill" style="background: #0d6efd">Login</span>
+                  {% elif row.attempt_type == 'Logout' %}
+                    <span class="badge rounded-pill text-bg-secondary">Logout</span>
+                  {% elif row.attempt_type == 'Token_Refresh' %}
+                    <span class="badge rounded-pill" style="background: #6f42c1">Token_Refresh</span>
+                  {% else %}
+                    <span class="badge rounded-pill text-bg-light text-dark">{{ row.attempt_type }}</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if row.status == 'Success' %}
+                    <span class="badge rounded-pill text-bg-success">Success</span>
+                  {% elif row.status == 'Failed' %}
+                    <span class="badge rounded-pill text-bg-danger">Failed</span>
+                  {% elif row.status == 'Blocked' %}
+                    <span class="badge rounded-pill" style="background: #fd7e14; color: #fff">Blocked</span>
+                  {% else %}
+                    <span class="badge rounded-pill text-bg-light text-dark">{{ row.status }}</span>
+                  {% endif %}
+                </td>
+                <td>{{ row.ip_address|default:"-" }}</td>
+                <td>{{ row.user_domain }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <div style="margin-top: 18px; display: flex; justify-content: center; gap: 12px; flex-wrap: wrap">
+        {% if access_logs.has_previous %}
+          <a
+            href="?{% if filter_query %}{{ filter_query }}&{% endif %}page={{ access_logs.previous_page_number }}"
+            class="btn btn-sm"
+            style="padding: 10px 14px; border-width: 1px"
+          >
+            Previous
+          </a>
+        {% endif %}
+        <span style="align-self: center; color: var(--text-muted); font-weight: 600">
+          Page {{ access_logs.number }} of {{ access_logs.paginator.num_pages }}
+        </span>
+        {% if access_logs.has_next %}
+          <a
+            href="?{% if filter_query %}{{ filter_query }}&{% endif %}page={{ access_logs.next_page_number }}"
+            class="btn btn-sm"
+            style="padding: 10px 14px; border-width: 1px"
+          >
+            Next
+          </a>
+        {% endif %}
+      </div>
+    {% else %}
+      <div class="table-empty-state" style="margin-top: 16px">
+        <div class="empty-icon">
+          <i class="bi bi-journal-x"></i>
+        </div>
+        <p class="empty-text">No access log entries match your filters.</p>
+      </div>
+    {% endif %}
+  </div>
+{% endblock %}

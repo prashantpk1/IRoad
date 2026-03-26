@@ -1,0 +1,192 @@
+{% load static %}
+<!-- Sidebar -->
+<aside class="sidebar" id="appSidebar">
+  <!-- Sidebar Header -->
+  <div class="sidebar-header">
+    <a href="{% url 'dashboard' %}" class="sidebar-logo" aria-label="iRoad Home">
+      <span class="logo-icon">
+        <img
+          src="{% static 'images/logo.png' %}"
+          alt=""
+          width="32"
+          height="32"
+          decoding="async"
+          class="sidebar-logo-img"
+          style="display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 8px;"
+        />
+      </span>
+      <span class="logo-label">Road</span>
+    </a>
+  </div>
+
+  <!-- Navigation -->
+  <nav class="sidebar-nav">
+    <ul class="nav-menu">
+      <!-- Dashboard -->
+      <li class="nav-item">
+        <a
+          href="{% url 'dashboard' %}"
+          class="nav-link{% if request.resolver_match and request.resolver_match.url_name == 'dashboard' %} active{% endif %}"
+          data-tooltip="Dashboard"
+        >
+          <i class="bi bi-speedometer2"></i>
+          <span class="nav-text">Dashboard</span>
+        </a>
+      </li>
+
+      <!-- System Users Management -->
+      <li
+        class="nav-item has-submenu{% if request.resolver_match %}{% if request.resolver_match.url_name == 'users_analytics' or request.resolver_match.url_name == 'role_list' or request.resolver_match.url_name == 'role_create' or request.resolver_match.url_name == 'role_edit' or request.resolver_match.url_name == 'role_toggle_status' or request.resolver_match.url_name == 'role_delete' or request.resolver_match.url_name == 'admin_user_list' or request.resolver_match.url_name == 'admin_user_create' or request.resolver_match.url_name == 'admin_user_detail' or request.resolver_match.url_name == 'admin_user_edit' or request.resolver_match.url_name == 'admin_user_toggle_status' %} open{% endif %}{% endif %}"
+      >
+        <a
+          href="#"
+          class="nav-link{% if request.resolver_match %}{% if request.resolver_match.url_name == 'users_analytics' or request.resolver_match.url_name == 'role_list' or request.resolver_match.url_name == 'role_create' or request.resolver_match.url_name == 'role_edit' or request.resolver_match.url_name == 'role_toggle_status' or request.resolver_match.url_name == 'role_delete' or request.resolver_match.url_name == 'admin_user_list' or request.resolver_match.url_name == 'admin_user_create' or request.resolver_match.url_name == 'admin_user_detail' or request.resolver_match.url_name == 'admin_user_edit' or request.resolver_match.url_name == 'admin_user_toggle_status' %} active{% endif %}{% endif %}"
+          data-tooltip="System Users Management"
+        >
+          <i class="bi bi-people"></i>
+          <span class="nav-text">System Users Management</span>
+          <i class="bi bi-chevron-right arrow"></i>
+        </a>
+        <ul class="submenu">
+          <li class="submenu-item">
+            <a
+              href="{% url 'users_analytics' %}"
+              class="submenu-link{% if request.resolver_match and request.resolver_match.url_name == 'users_analytics' %} active{% endif %}"
+            >
+              <i class="bi bi-file-earmark-bar-graph"></i>
+              <span>Users Analytics Dashboard</span>
+            </a>
+          </li>
+          <li class="submenu-item">
+            <a
+              href="{% url 'role_list' %}"
+              class="submenu-link{% if request.resolver_match %}{% if request.resolver_match.url_name == 'role_list' or request.resolver_match.url_name == 'role_create' or request.resolver_match.url_name == 'role_edit' or request.resolver_match.url_name == 'role_toggle_status' or request.resolver_match.url_name == 'role_delete' %} active{% endif %}{% endif %}"
+            >
+              <i class="bi bi-person-lock"></i>
+              <span>Roles Master</span>
+            </a>
+          </li>
+          <li class="submenu-item">
+            <a
+              href="{% url 'admin_user_list' %}"
+              class="submenu-link{% if request.resolver_match %}{% if request.resolver_match.url_name == 'admin_user_list' or request.resolver_match.url_name == 'admin_user_create' or request.resolver_match.url_name == 'admin_user_detail' or request.resolver_match.url_name == 'admin_user_edit' or request.resolver_match.url_name == 'admin_user_toggle_status' %} active{% endif %}{% endif %}"
+            >
+              <i class="bi bi-person-gear"></i>
+              <span>Admin Users</span>
+            </a>
+          </li>
+        </ul>
+      </li>
+
+      <!-- Subscription Plans -->
+      <li class="nav-item">
+        <a href="#" class="nav-link" data-tooltip="Subscription Plans">
+          <i class="bi bi-card-checklist"></i>
+          <span class="nav-text">Subscription Plans</span>
+        </a>
+      </li>
+
+      <!-- Subscribers CRM & Billing -->
+      <li class="nav-item">
+        <a href="#" class="nav-link" data-tooltip="Subscribers CRM & Billing">
+          <i class="bi bi-receipt"></i>
+          <span class="nav-text">Subscribers CRM &amp; Billing</span>
+        </a>
+      </li>
+
+      <!-- Communication & Alerts -->
+      <li class="nav-item">
+        <a href="#" class="nav-link" data-tooltip="Communication & Alerts">
+          <i class="bi bi-bell"></i>
+          <span class="nav-text">Communication &amp; Alerts</span>
+        </a>
+      </li>
+
+      <!-- Payment Infrastructure -->
+      <li class="nav-item">
+        <a href="#" class="nav-link" data-tooltip="Payment Infrastructure">
+          <i class="bi bi-building"></i>
+          <span class="nav-text">Payment Infrastructure</span>
+        </a>
+      </li>
+
+      <!-- Global Master Data -->
+      <li
+        class="nav-item has-submenu{% if request.resolver_match and request.resolver_match.url_name == 'country_list' %} open{% elif request.resolver_match and request.resolver_match.url_name == 'currency_list' %} open{% endif %}"
+      >
+        <a
+          href="#"
+          class="nav-link{% if request.resolver_match and request.resolver_match.url_name == 'country_list' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'currency_list' %} active{% endif %}"
+          data-tooltip="Global Master Data"
+        >
+          <i class="bi bi-map"></i>
+          <span class="nav-text">Global Master Data</span>
+          <i class="bi bi-chevron-right arrow"></i>
+        </a>
+        <ul class="submenu">
+          <li class="submenu-item">
+            <a
+              href="{% url 'country_list' %}"
+              class="submenu-link{% if request.resolver_match and request.resolver_match.url_name == 'country_list' %} active{% endif %}"
+            >
+              <i class="bi bi-globe"></i>
+              <span>Countries Master</span>
+            </a>
+          </li>
+          <li class="submenu-item">
+            <a
+              href="{% url 'currency_list' %}"
+              class="submenu-link{% if request.resolver_match and request.resolver_match.url_name == 'currency_list' %} active{% endif %}"
+              data-tooltip="Currencies Master"
+            >
+              <i class="bi bi-currency-exchange"></i>
+              <span>Currencies Master</span>
+            </a>
+          </li>
+        </ul>
+      </li>
+
+      <!-- System Configurations & Tax -->
+      <li class="nav-item">
+        <a href="#" class="nav-link" data-tooltip="System Configurations & Tax">
+          <i class="bi bi-gear-wide-connected"></i>
+          <span class="nav-text">System Configurations &amp; Tax</span>
+        </a>
+      </li>
+
+      <!-- Support Management -->
+      <li class="nav-item">
+        <a href="#" class="nav-link" data-tooltip="Support Management">
+          <i class="bi bi-headset"></i>
+          <span class="nav-text">Support Management</span>
+        </a>
+      </li>
+
+      <!-- Security & Audit -->
+      <li
+        class="nav-item has-submenu{% if request.resolver_match and request.resolver_match.url_name == 'access_log' %} open{% endif %}"
+      >
+        <a
+          href="#"
+          class="nav-link{% if request.resolver_match and request.resolver_match.url_name == 'access_log' %} active{% endif %}"
+          data-tooltip="Security & Audit"
+        >
+          <i class="bi bi-shield-lock"></i>
+          <span class="nav-text">Security &amp; Audit</span>
+          <i class="bi bi-chevron-right arrow"></i>
+        </a>
+        <ul class="submenu">
+          <li class="submenu-item">
+            <a
+              href="{% url 'access_log' %}"
+              class="submenu-link{% if request.resolver_match and request.resolver_match.url_name == 'access_log' %} active{% endif %}"
+            >
+              <i class="bi bi-journal-text"></i>
+              <span>Access Log</span>
+            </a>
+          </li>
+        </ul>
+      </li>
+    </ul>
+  </nav>
+</aside>

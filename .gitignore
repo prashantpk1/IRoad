@@ -1,0 +1,75 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+venv/
+pip-log.txt
+pip-delete-this-directory.txt
+status.dat
+*.egg-info/
+.installed.cfg
+*.egg
+.python-version
+.pytest_cache/
+.coverage
+.ipynb_checkpoints/
+.tox/
+.nox/
+
+# Django
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-*
+db.sqlite3-journal
+staticfiles/
+media/
+
+# Environment
+.env
+.env.*
+!.env.example
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-project
+*.sublime-workspace
+
+# Project Specific
+*.bak
+*.tmp
+node_modules/
+*.sql

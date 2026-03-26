@@ -1,0 +1,77 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Invite link problem | iRoad Admin</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css"
+      rel="stylesheet"
+    />
+
+    <link rel="stylesheet" href="{% static 'css/style.css' %}" />
+    <link rel="stylesheet" href="{% static 'css/responsive.css' %}" />
+  </head>
+
+  <body class="auth-body">
+    <div class="auth-container">
+      <div class="auth-left">
+        <div class="auth-left-content">
+          <h2 class="auth-tagline">
+            Something went wrong <br />with this link.
+          </h2>
+        </div>
+        <div class="auth-left-overlay"></div>
+      </div>
+
+      <div class="auth-right">
+        <div class="auth-form-container">
+          <div class="auth-form-header">
+            <div class="auth-brand">
+              <span class="auth-logo">i<span>Road</span></span>
+            </div>
+            <h1 class="auth-title">Invite link</h1>
+          </div>
+
+          <div class="auth-field">
+            <div
+              class="auth-input-wrapper"
+              style="
+                border-color: #ef4444;
+                background: rgba(239, 68, 68, 0.06);
+                align-items: flex-start;
+                padding: 12px 14px;
+              "
+            >
+              <i class="bi bi-exclamation-circle" style="color: #ef4444"></i>
+              <p
+                class="auth-text"
+                style="margin: 0; color: #b91c1c; font-size: 14px"
+              >
+                {{ error_message }}
+              </p>
+            </div>
+          </div>
+
+          <a href="{% url 'login' %}" class="auth-btn auth-btn-primary" style="text-decoration: none; display: inline-flex; justify-content: center; width: 100%; margin-top: 8px">
+            <i class="bi bi-box-arrow-in-right"></i>
+            Back to Sign In
+          </a>
+
+          <div class="auth-footer">
+            <p>&copy; 2026 iRoad. All rights reserved.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
