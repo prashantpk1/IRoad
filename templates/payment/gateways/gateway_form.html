@@ -1,0 +1,96 @@
+{% extends 'base.html' %}
+
+{% block page_title %}{% if is_edit %}Edit Gateway{% else %}Add Gateway{% endif %}{% endblock %}
+
+{% block content %}
+  <div class="content-card" style="background: #ffffff; padding: 20px 30px; border-radius: 12px">
+    <div class="setting-row" style="border-bottom: none; padding-top: 0; margin-bottom: 16px">
+      <div class="setting-row-info">
+        <h2 class="page-title">{% if is_edit %}Edit Gateway{% else %}Add Gateway{% endif %}</h2>
+      </div>
+    </div>
+
+    <div style="margin-bottom: 16px; padding: 12px 14px; border-radius: 10px" class="alert alert-warning">
+      <p style="margin: 0; font-weight: 600">
+        Credentials are sensitive. This data is stored securely and will not be displayed after saving.
+      </p>
+      {% if is_edit %}
+        <p style="margin: 8px 0 0 0; font-weight: 600">
+          Leave credentials field as-is to keep existing credentials. Replace to update.
+        </p>
+      {% endif %}
+    </div>
+
+    {% if form.non_field_errors %}
+      <div style="margin-bottom: 16px; color: #b91c1c; font-weight: 600">
+        {{ form.non_field_errors }}
+      </div>
+    {% endif %}
+
+    <form method="post" action="">
+      {% csrf_token %}
+
+      <div style="margin-bottom: 16px">
+        <label class="form-label">Gateway Name</label>
+        {{ form.gateway_name }}
+        {% for error in form.gateway_name.errors %}
+          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+        {% endfor %}
+      </div>
+
+      <div style="margin-bottom: 16px">
+        <label class="form-label">Environment</label>
+        {{ form.environment }}
+        {% for error in form.environment.errors %}
+          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+        {% endfor %}
+      </div>
+
+      <div style="margin-bottom: 16px">
+        <label class="form-label">Credentials JSON</label>
+        {{ form.credentials_payload }}
+        <style>
+          #id_credentials_payload { min-height: 180px; }
+        </style>
+        <div style="margin-top: 6px; color: #6b7280; font-size: 13px">
+          {{ form.credentials_payload.help_text }}
+        </div>
+        {% for error in form.credentials_payload.errors %}
+          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+        {% endfor %}
+      </div>
+
+      <div style="margin-bottom: 16px">
+        <label class="form-label">Status</label>
+        <div style="display: flex; align-items: center; gap: 10px">
+          {{ form.is_active }}
+        </div>
+        {% for error in form.is_active.errors %}
+          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+        {% endfor %}
+      </div>
+
+      <div style="display: flex; gap: 10px; align-items: center">
+        <a href="{% url 'gateway_list' %}" class="btn" style="padding: 10px 14px; border-width: 1px">
+          <i class="bi bi-arrow-left"></i>
+          Cancel
+        </a>
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-save"></i>
+          Save
+        </button>
+      </div>
+    </form>
+  </div>
+
+  {% if is_edit and masked_placeholder %}
+    <script>
+      (function () {
+        var textarea = document.getElementById('id_credentials_payload');
+        if (textarea) {
+          textarea.value = '{{ masked_placeholder|escapejs }}';
+        }
+      })();
+    </script>
+  {% endif %}
+{% endblock %}

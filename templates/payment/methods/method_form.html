@@ -1,0 +1,147 @@
+{% extends 'base.html' %}
+
+{% block page_title %}{% if is_edit %}Edit Payment Method{% else %}Add Payment Method{% endif %}{% endblock %}
+
+{% block content %}
+  <div class="content-card" style="background: #ffffff; padding: 20px 30px; border-radius: 12px">
+    <div class="setting-row" style="border-bottom: none; padding-top: 0; margin-bottom: 16px">
+      <div class="setting-row-info">
+        <h2 class="page-title">{% if is_edit %}Edit Payment Method{% else %}Add Payment Method{% endif %}</h2>
+      </div>
+    </div>
+
+    {% if form.non_field_errors %}
+      <div style="margin-bottom: 16px; color: #b91c1c; font-weight: 600">
+        {{ form.non_field_errors }}
+      </div>
+    {% endif %}
+
+    <form method="post" action="" enctype="multipart/form-data">
+      {% csrf_token %}
+
+      <div style="margin-bottom: 16px">
+        <label class="form-label">Method Name (EN)</label>
+        {{ form.method_name_en }}
+        {% for error in form.method_name_en.errors %}
+          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+        {% endfor %}
+      </div>
+
+      <div style="margin-bottom: 16px">
+        <label class="form-label">Method Name (AR)</label>
+        {{ form.method_name_ar }}
+        {% for error in form.method_name_ar.errors %}
+          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+        {% endfor %}
+      </div>
+
+      <div style="margin-bottom: 16px">
+        <label class="form-label">Method Type</label>
+        {{ form.method_type }}
+        {% for error in form.method_type.errors %}
+          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+        {% endfor %}
+      </div>
+
+      <div id="gateway-wrapper" style="margin-bottom: 16px">
+        <label class="form-label">Gateway</label>
+        {{ form.gateway }}
+        {% for error in form.gateway.errors %}
+          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+        {% endfor %}
+      </div>
+
+      <div id="bank-wrapper" style="margin-bottom: 16px">
+        <label class="form-label">Dedicated Bank Account</label>
+        {{ form.dedicated_bank_account }}
+        {% for error in form.dedicated_bank_account.errors %}
+          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+        {% endfor %}
+      </div>
+
+      <div style="margin-bottom: 16px">
+        <label class="form-label">Supported Currencies</label>
+        {{ form.supported_currencies }}
+        <div style="margin-top: 6px; color: #6b7280; font-size: 13px">
+          Enter as JSON array: ["SAR", "USD", "AED"]
+        </div>
+        {% for error in form.supported_currencies.errors %}
+          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+        {% endfor %}
+      </div>
+
+      <div style="margin-bottom: 16px">
+        <label class="form-label">Logo</label>
+        {{ form.logo }}
+        {% for error in form.logo.errors %}
+          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+        {% endfor %}
+      </div>
+
+      {% if is_edit and method and method.logo %}
+        <div style="margin-bottom: 16px">
+          <label class="form-label">Current Logo</label>
+          <div>
+            <img src="{{ method.logo.url }}" alt="Current Logo" style="height: 70px; width: 70px; object-fit: cover; border-radius: 8px; border: 1px solid #e5e7eb" />
+          </div>
+        </div>
+      {% endif %}
+
+      <div style="margin-bottom: 16px">
+        <label class="form-label">Display Order</label>
+        {{ form.display_order }}
+        {% for error in form.display_order.errors %}
+          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+        {% endfor %}
+      </div>
+
+      <div style="margin-bottom: 16px">
+        <label class="form-label">Status</label>
+        <div style="display: flex; align-items: center; gap: 10px">
+          {{ form.is_active }}
+        </div>
+        {% for error in form.is_active.errors %}
+          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+        {% endfor %}
+      </div>
+
+      <div style="display: flex; gap: 10px; align-items: center">
+        <a href="{% url 'payment_method_list' %}" class="btn" style="padding: 10px 14px; border-width: 1px">
+          <i class="bi bi-arrow-left"></i>
+          Cancel
+        </a>
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-save"></i>
+          Save
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    (function () {
+      var methodType = document.getElementById('id_method_type');
+      var gatewayWrap = document.getElementById('gateway-wrapper');
+      var bankWrap = document.getElementById('bank-wrapper');
+
+      function toggleFields() {
+        var value = methodType ? methodType.value : '';
+        if (value === 'Online_Gateway') {
+          gatewayWrap.style.display = 'block';
+          bankWrap.style.display = 'none';
+        } else if (value === 'Offline_Bank') {
+          gatewayWrap.style.display = 'none';
+          bankWrap.style.display = 'block';
+        } else {
+          gatewayWrap.style.display = 'block';
+          bankWrap.style.display = 'block';
+        }
+      }
+
+      if (methodType) {
+        methodType.addEventListener('change', toggleFields);
+      }
+      toggleFields();
+    })();
+  </script>
+{% endblock %}

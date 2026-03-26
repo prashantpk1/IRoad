@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% block title %}Internal Alerts Routing{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="mb-0">Internal Alerts Routing</h4>
+  <a href="{% url 'alert_route_create' %}" class="btn btn-primary">Add Alert Route</a>
+</div>
+<div class="card">
+  <div class="table-responsive">
+    <table class="table align-middle mb-0">
+      <thead><tr><th>#</th><th>Trigger Event</th><th>Notify Role</th><th>Custom Email</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody>
+        {% for row in routes %}
+          <tr>
+            <td>{{ forloop.counter0|add:routes.start_index }}</td>
+            <td>{{ row.get_trigger_event_display }}</td>
+            <td>{{ row.notify_role.role_name|default:'-' }}</td>
+            <td>{{ row.notify_custom_email|default:'-' }}</td>
+            <td>{% if row.is_active %}<span class="badge bg-success">Active</span>{% else %}<span class="badge bg-secondary">Inactive</span>{% endif %}</td>
+            <td>
+              <a href="{% url 'alert_route_edit' row.route_id %}" class="btn btn-sm btn-outline-primary">Edit</a>
+              <form method="post" action="{% url 'alert_route_toggle' row.route_id %}" class="d-inline">{% csrf_token %}<button class="btn btn-sm btn-outline-dark">Toggle Status</button></form>
+            </td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="6" class="text-center py-4 text-muted">No routes found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% if routes.paginator.num_pages > 1 %}
+<nav class="mt-3"><ul class="pagination mb-0">{% if routes.has_previous %}<li class="page-item"><a class="page-link" href="?page={{ routes.previous_page_number }}">Previous</a></li>{% endif %}<li class="page-item disabled"><span class="page-link">Page {{ routes.number }} of {{ routes.paginator.num_pages }}</span></li>{% if routes.has_next %}<li class="page-item"><a class="page-link" href="?page={{ routes.next_page_number }}">Next</a></li>{% endif %}</ul></nav>
+{% endif %}
+{% endblock %}

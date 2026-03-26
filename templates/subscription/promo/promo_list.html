@@ -1,0 +1,112 @@
+{% extends 'base.html' %}
+
+{% block page_title %}Promo Codes Master{% endblock %}
+
+{% block content %}
+  <div class="content-card" style="background:#fff; padding:20px 30px; border-radius:12px">
+    <div class="setting-row" style="border-bottom:none; padding-top:0">
+      <div class="setting-row-info"><h2 class="page-title">Promo Codes Master</h2></div>
+      <div class="setting-row-control" style="flex:0 0 auto">
+        {% if request.user.is_root %}
+          <a href="{% url 'promo_code_create' %}" class="btn btn-primary" style="padding:10px 14px">Add Promo Code</a>
+        {% endif %}
+      </div>
+    </div>
+
+    <form method="get" action="{% url 'promo_code_list' %}" style="margin-top:16px">
+      <div style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap">
+        <div style="flex:1; min-width:240px">
+          <label class="form-label">Search</label>
+          <input type="text" name="q" class="form-control" value="{{ search_query }}" placeholder="Search by code" />
+        </div>
+        <div style="width:220px">
+          <label class="form-label">Status</label>
+          <select name="status" class="form-select">
+            <option value="All" {% if status_filter == 'All' %}selected{% endif %}>All</option>
+            <option value="Active" {% if status_filter == 'Active' %}selected{% endif %}>Active</option>
+            <option value="Inactive" {% if status_filter == 'Inactive' %}selected{% endif %}>Inactive</option>
+          </select>
+        </div>
+        <div style="width:160px"><button type="submit" class="btn btn-primary" style="width:100%">Filter</button></div>
+      </div>
+    </form>
+
+    {% if messages %}
+      <div style="margin-top:12px">
+        {% for message in messages %}
+          <p style="margin:0; color:{% if message.tags == 'error' %}#b91c1c{% else %}#15803d{% endif %}; font-weight:600">{{ message }}</p>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    <div style="overflow-x:auto; margin-top:16px">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Code</th>
+            <th>Type</th>
+            <th>Value</th>
+            <th>Duration</th>
+            <th>Valid From</th>
+            <th>Valid Until</th>
+            <th>Uses</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in promo_codes.object_list %}
+            <tr>
+              <td>{{ forloop.counter0|add:promo_codes.start_index }}</td>
+              <td style="font-family:monospace">{{ p.code }}</td>
+              <td>{{ p.discount_type }}</td>
+              <td>{{ p.discount_value }}</td>
+              <td>{{ p.discount_duration }}</td>
+              <td>{{ p.valid_from }}</td>
+              <td>{{ p.valid_until|default:"-" }}</td>
+              <td>{{ p.current_uses }} / {% if p.max_uses %}{{ p.max_uses }}{% else %}&infin;{% endif %}</td>
+              <td>
+                {% if p.valid_until and p.valid_until < now %}
+                  <span class="badge rounded-pill" style="background:#dc2626; color:#fff">Expired</span>
+                {% elif p.valid_from > now %}
+                  <span class="badge rounded-pill" style="background:#eab308; color:#111827">Scheduled</span>
+                {% elif p.is_active %}
+                  <span class="status-badge active">Active</span>
+                {% else %}
+                  <span class="status-badge warning">Inactive</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if request.user.is_root %}
+                  <div class="table-actions">
+                    <a href="{% url 'promo_code_edit' p.promo_code_id %}" class="btn" style="padding:10px 14px; border-width:1px">Edit</a>
+                    <form method="post" action="{% url 'promo_code_toggle' p.promo_code_id %}" style="display:inline">
+                      {% csrf_token %}
+                      <button type="submit" class="btn btn-primary" style="padding:10px 14px">Toggle Status</button>
+                    </form>
+                  </div>
+                {% endif %}
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="10">No promo codes found.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div style="margin-top:18px; display:flex; justify-content:center; gap:12px; flex-wrap:wrap">
+      {% if promo_codes.has_previous %}
+        <a href="?q={{ search_query|urlencode }}&status={{ status_filter }}&page={{ promo_codes.previous_page_number }}" class="btn" style="padding:10px 14px; border-width:1px">Previous</a>
+      {% endif %}
+      <span style="align-self:center; color:var(--text-muted); font-weight:600">
+        Page {{ promo_codes.number }} of {{ promo_codes.paginator.num_pages }}
+      </span>
+      {% if promo_codes.has_next %}
+        <a href="?q={{ search_query|urlencode }}&status={{ status_filter }}&page={{ promo_codes.next_page_number }}" class="btn" style="padding:10px 14px; border-width:1px">Next</a>
+      {% endif %}
+    </div>
+  </div>
+{% endblock %}
+

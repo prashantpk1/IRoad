@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+
+{% block page_title %}{% if is_edit %}Edit Promo Code{% else %}Add Promo Code{% endif %}{% endblock %}
+
+{% block content %}
+  <div class="content-card" style="background:#fff; padding:20px 30px; border-radius:12px">
+    <div class="setting-row" style="border-bottom:none; padding-top:0; margin-bottom:16px">
+      <div class="setting-row-info">
+        <h2 class="page-title">{% if is_edit %}Edit Promo Code{% else %}Add Promo Code{% endif %}</h2>
+      </div>
+      <div class="setting-row-control" style="flex:0 0 auto">
+        <a href="{% url 'promo_code_list' %}" class="btn" style="padding:10px 14px; border-width:1px">Cancel</a>
+      </div>
+    </div>
+
+    {% if is_edit %}
+      <div class="alert alert-info" style="border-radius:10px">
+        Code is immutable and cannot be changed.
+      </div>
+    {% endif %}
+    <div class="alert alert-info" style="border-radius:10px">
+      Percentage max 100. Alphanumeric only. No spaces.
+      Leave applicable plans empty to apply to ALL plans.
+    </div>
+
+    <form method="post" action="">
+      {% csrf_token %}
+      {% if form.non_field_errors %}
+        <div style="color:#b91c1c; font-weight:600; margin-bottom:10px">{{ form.non_field_errors }}</div>
+      {% endif %}
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:12px">
+        {% for field in form %}
+          <div style="{% if field.name == 'applicable_plans' %}grid-column:1 / -1{% endif %}">
+            <label class="form-label">{{ field.label }}</label>
+            {{ field }}
+            {% if field.name == 'applicable_plans' %}
+              <small style="color:#64748b">Leave empty to apply to ALL plans</small>
+            {% endif %}
+            {% for e in field.errors %}
+              <div style="color:#b91c1c; font-weight:600">{{ e }}</div>
+            {% endfor %}
+          </div>
+        {% endfor %}
+      </div>
+
+      {% if is_edit and promo %}
+        <div style="margin-top:12px; padding:10px 12px; border:1px solid #e5e7eb; border-radius:8px; background:#f8fafc">
+          <strong>Current Uses (read-only):</strong> {{ promo.current_uses }}
+        </div>
+      {% endif %}
+
+      <div class="submit-section" style="margin-top:14px">
+        <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Save</button>
+      </div>
+    </form>
+  </div>
+{% endblock %}
+

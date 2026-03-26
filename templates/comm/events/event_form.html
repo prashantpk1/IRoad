@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+{% block title %}{% if is_edit %}Edit Event Mapping{% else %}Add Event Mapping{% endif %}{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="card-body">
+    <h4 class="mb-2">{% if is_edit %}Edit Event Mapping{% else %}Add Event Mapping{% endif %}</h4>
+    <p class="text-muted">Primary and fallback channels must be different.</p>
+    <form method="post">
+      {% csrf_token %}
+      {{ form.non_field_errors }}
+      <div class="row g-3">
+        <div class="col-md-6">{{ form.system_event.label_tag }}{{ form.system_event }}{{ form.system_event.errors }}</div>
+        <div class="col-md-6">{{ form.is_active.label_tag }}{{ form.is_active }}{{ form.is_active.errors }}</div>
+        <div class="col-md-6">{{ form.primary_channel.label_tag }}{{ form.primary_channel }}{{ form.primary_channel.errors }}</div>
+        <div class="col-md-6">{{ form.primary_template.label_tag }}{{ form.primary_template }}{{ form.primary_template.errors }}</div>
+        <div class="col-md-6">{{ form.fallback_channel.label_tag }}{{ form.fallback_channel }}{{ form.fallback_channel.errors }}</div>
+        <div class="col-md-6" id="fallback-template-wrap">{{ form.fallback_template.label_tag }}{{ form.fallback_template }}{{ form.fallback_template.errors }}</div>
+      </div>
+      <div class="mt-3">
+        <a href="{% url 'event_mapping_list' %}" class="btn btn-outline-secondary">Cancel</a>
+        <button type="submit" class="btn btn-primary">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+<script>
+  (function () {
+    const fallbackChannel = document.getElementById('id_fallback_channel');
+    const fallbackWrap = document.getElementById('fallback-template-wrap');
+    function toggleFallbackTemplate() {
+      fallbackWrap.style.display = fallbackChannel && fallbackChannel.value ? '' : 'none';
+    }
+    if (fallbackChannel) {
+      fallbackChannel.addEventListener('change', toggleFallbackTemplate);
+      toggleFallbackTemplate();
+    }
+  })();
+</script>
+{% endblock %}

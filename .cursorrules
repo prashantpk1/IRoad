@@ -171,3 +171,338 @@
 - seed_superadmin.py must be updated with seed_countries() 
   and seed_currencies() functions
 
+## Phase 4 — System Configurations & Tax Business Rules
+
+### Tax Codes Master Rules (FRM-CP-09-01)
+- tax_code is Primary Key — unique (e.g., S-15, Z-0)
+- tax_code is IMMUTABLE once saved — disable on edit
+- rate_percent: Decimal, 0.00 to 100.00 only
+- applicable_country_code: FK to Country, optional (null=True)
+- is_default_for_country: only ONE tax code can be True
+  per applicable_country_code — enforce in clean()
+- is_international_default: only ONE record globally can be True
+  — enforce in clean()
+- Both is_default_for_country and is_international_default
+  cannot both be True on same record
+- is_active: default True
+- No hard delete — deactivate only
+- created_by, updated_by: FK to AdminUser
+- created_at, updated_at: auto timestamps
+
+### General Tax Settings Rules (FRM-CP-09-02)
+- Only ONE record ever — fixed ID: "GLOBAL-TAX-SETTING"
+- prices_include_tax: Boolean, default False
+- location_verification: ENUM choices:
+    Profile_Only, Audit_Only, Enforce_Profile_Match
+- updated_by must always be set on save
+
+### IRoad Legal Identity Rules (FRM-CP-09-03)
+- Only ONE record ever — fixed ID: "GLOBAL-LEGAL-IDENTITY"
+- company_logo: image file upload — store in media/legal/
+- company_country_code: FK to Country (required)
+- commercial_register: required, numeric format
+- tax_number: required
+- support_email: required, valid email
+- updated_by must always be set on save
+
+### Global System Rules (FRM-CP-09-04)
+- Only ONE record ever — fixed ID: "GLOBAL-SYSTEM-RULES"
+- system_timezone: valid Python timezone string
+- default_date_format: ENUM — YYYY-MM-DD or DD/MM/YYYY
+- grace_period_days: Integer, minimum 0
+- standard_billing_cycle: Integer, default 30, minimum 1
+- updated_by must always be set on save
+
+### Base Currency Rules (FRM-CP-09-05)
+- Only ONE record ever — fixed ID: "GLOBAL-BASE-CURRENCY"
+- base_currency_id: FK to Currency (required)
+- IMMUTABILITY RULE: Once set AND first financial transaction
+  exists (Phase 5), base_currency_id becomes read-only
+  In Phase 4: allow setting but show strong warning on change
+  Add TODO: # TODO Phase 5: Block change if transactions exist
+- updated_by must always be set on save
+
+### FX Exchange Rate Rules (FRM-CP-09-06)
+- fx_id: UUID primary key
+- currency_id: FK to Currency — must be Active currency
+- currency_id CANNOT be the Base Currency
+- exchange_rate: Decimal 10,6 precision — must be > 0
+- is_active: default True
+- Only ONE active FX rate record per currency allowed
+- updated_by must always be set on save
+
+### FX Rate Change Log Rules (FRM-CP-09-07)
+- log_id: UUID primary key
+- Strictly append-only — no update, no delete ever
+- Auto-created by backend when FX rate is saved/updated
+- Admin cannot manually create entries from UI
+- changed_by: FK to AdminUser (who made the change)
+- changed_at: auto timestamp
+- Override save() to block updates (same pattern as AccessLog)
+- Override delete() to block deletion
+
+## Phase 5 — Subscription Plans Business Rules
+
+### Subscription Plans Master Rules (FRM-CP-02-01)
+- plan_id: UUID primary key
+- plan_name_en: required, unique
+- plan_name_ar: required, unique
+- base_cycle_days: Integer, default 30, minimum 1
+- is_active: default True
+  If False, plan hidden from new subscriptions
+- Resource limits: max_internal_users, max_internal_trucks,
+  max_external_trucks, max_active_drivers,
+  max_monthly_shipments, max_storage_gb
+  All are IntegerField — entering -1 means Unlimited
+  UI must show "Unlimited" checkbox that sets value to -1
+- has_driver_app: Boolean default False
+- backup_restore_level: ENUM — Standard, Extended, Premium
+  default Standard
+- created_by: FK to AdminUser, set on creation only
+- created_at, updated_at: auto timestamps
+- No hard delete — deactivate only
+- A plan with active tenant subscriptions cannot be deactivated
+  Add TODO: # TODO Phase 6: Check active subscribers before
+  #          deactivating a plan
+
+### Plan Pricing Cycles Rules (Subform)
+- pricing_id: UUID primary key
+- plan_id: FK to SubscriptionPlan (required)
+- number_of_cycles: Integer, minimum 1
+- currency_code: FK to Currency (active only)
+- price: Decimal 10,2 minimum 0.00
+- Combination of plan_id + number_of_cycles + currency_code
+  must be UNIQUE — no duplicate pricing rows
+- At least ONE pricing row required before plan is usable
+- Deleting a pricing row is allowed only if plan has no
+  active subscribers on that cycle
+
+### Global Add-ons Pricing Policy Rules (FRM-CP-02-02)
+- policy_id: UUID primary key
+- policy_name: required, max 50 chars
+- is_active: default False
+- SINGULARITY RULE: When is_active set to True,
+  all other policy records must be set to False automatically
+- Only ONE active policy at any time
+- All price fields: Decimal 10,2 minimum 0.00
+- updated_by: FK to AdminUser
+- updated_at: auto timestamp
+- No hard delete — deactivate only
+
+### Promo Codes Master Rules (FRM-CP-02-03)
+- promo_code_id: UUID primary key
+- code: required, UNIQUE, max 20 chars,
+  alphanumeric only, auto-UPPERCASE
+- discount_type: ENUM — Percentage, Fixed_Amount
+- discount_value: Decimal 10,2
+  If Percentage: max value is 100.00
+  If Fixed_Amount: must be > 0
+- discount_duration: ENUM — Apply_Once, Recurring
+- valid_from: required, default now
+- valid_until: optional, null allowed
+  If set: must be after valid_from
+- max_uses: optional, null means unlimited
+  If set: must be >= 1
+- current_uses: Integer default 0, read-only
+  Only system increments this on successful payment
+- is_active: Boolean default True
+- applicable_plans: ManyToMany to SubscriptionPlan
+  Empty = applies to ALL plans
+- created_by: FK to AdminUser
+- created_at: auto timestamp
+- Validation order when applying to order:
+  1. is_active check
+  2. valid_from/until check
+  3. max_uses > current_uses check
+  4. applicable_plans check
+  If any fails: raise "Invalid or Expired Code" error
+
+## Phase 6 — Payment Infrastructure Business Rules
+
+### Bank Accounts Master Rules (FRM-CP-07-01)
+- account_id: UUID primary key
+- bank_name: required, max 100 chars
+- account_holder_name: required, max 100 chars
+- iban_number: required, must pass IBAN format validation
+  IBAN format: starts with 2 uppercase letters (country code)
+  followed by 2 digits then up to 30 alphanumeric chars
+  Total length: 15 to 34 chars
+  Store in UPPERCASE, strip spaces before saving
+- account_number: required, numeric only
+- swift_code: optional, max 11 chars,
+  format: 8 or 11 alphanumeric chars uppercase
+- currency_code: FK to Currency (active only, required)
+  Determines which orders can use this bank account
+- is_active: default True
+  If False, hidden from tenant checkout
+- created_by, updated_by: FK to AdminUser
+- created_at, updated_at: auto timestamps
+- No hard delete — deactivate only
+
+### Payment Gateway API Rules (FRM-CP-07-02)
+- gateway_id: UUID primary key
+- gateway_name: required, max 50 chars
+- environment: ENUM — Test, Live
+- credentials_payload: JSONField — required
+  Must be valid JSON object (not array, not null)
+  Keys and values stored as-is — backend extracts what it needs
+  Display masked in UI — never show raw values after save
+- is_active: default False (must explicitly activate)
+- No singularity rule — multiple gateways can be active
+  (different gateways for different methods)
+- created_by, updated_by: FK to AdminUser
+- created_at, updated_at: auto timestamps
+- No hard delete — deactivate only
+
+### Payment Methods Configuration Rules (FRM-CP-07-03)
+- method_id: UUID primary key
+- method_name_en: required, max 100 chars
+- method_name_ar: required, max 100 chars
+- method_type: ENUM — Online_Gateway, Offline_Bank
+- supported_currencies: JSONField — array of currency codes
+  e.g. ["SAR", "USD"]
+  Must be valid JSON array
+  Each code must exist in active Currency master
+  Minimum 1 currency required
+- gateway_id: FK to PaymentGateway
+  REQUIRED if method_type = Online_Gateway
+  Must be null if method_type = Offline_Bank
+- dedicated_bank_account_id: FK to BankAccount
+  Optional — only relevant if method_type = Offline_Bank
+  Must be null if method_type = Online_Gateway
+- logo_url: ImageField upload_to='payment_methods/'
+  Optional
+- display_order: IntegerField default=1, min 1
+  Controls sort order in checkout UI
+- is_active: default True
+- created_by, updated_by: FK to AdminUser
+- created_at, updated_at: auto timestamps
+- No hard delete — deactivate only
+
+### Checkout Router Logic (to implement in Phase 8)
+- Fetch methods where is_active=True AND
+  order currency in supported_currencies array
+- Add TODO comments in views where this logic will be used
+
+## Phase 7 — Communication & Alerts Business Rules
+
+### Communication Gateways Rules (FRM-CP-05-01)
+- gateway_id: UUID primary key
+- gateway_type: ENUM — Email, SMS only
+- provider_name: required, max 100 chars
+- host_url: required (SMTP host or SMS API base URL)
+- port: optional Integer (mainly for SMTP: 587, 465)
+- username_key: required (SMTP username or SMS API key)
+- password_secret: required — NEVER display after save
+  Store as-is — encryption handled at infrastructure level
+  Show masked input on form
+- sender_id: required (From email OR SMS sender name)
+- encryption_type: ENUM optional — TLS, SSL, None
+- is_active: default False
+- SINGULARITY RULE: Only ONE gateway per gateway_type
+  can be active at any time
+  When activating one → auto-deactivate all others
+  of same gateway_type
+- updated_by: FK to AdminUser
+- No created_at — only updated_at (settings record)
+- Test Connection button: Phase 7 shows button with
+  TODO comment — actual SMTP/SMS dispatch in Phase 11
+  Add: # TODO Phase 11: Implement actual test connection
+  #               using stored credentials here
+
+### Notification Templates Rules (FRM-CP-05-02)
+- template_id: UUID primary key
+- template_name: required, unique, max 100 chars
+- channel_type: ENUM — Email, SMS
+- category: ENUM — Transactional, Promotional
+- subject_en: required ONLY if channel_type = Email
+- subject_ar: required ONLY if channel_type = Email
+- body_en: required always — supports {{variables}}
+- body_ar: required always — supports {{variables}}
+- is_active: default True
+- created_by: FK to AdminUser
+- No hard delete — deactivate only
+- Available variables list hardcoded:
+  {{client_name}}, {{otp_code}}, {{invoice_amount}},
+  {{invoice_number}}, {{plan_name}}, {{expiry_date}},
+  {{company_name}}, {{support_email}}
+
+### Events Mapping Engine Rules (FRM-CP-05-03)
+- mapping_id: UUID primary key
+- system_event: ENUM — hardcoded list, never dynamic:
+  OTP_Requested, Password_Changed, Invoice_Paid,
+  Subscription_Activated, Subscription_Expired,
+  Subscription_Renewed, Account_Suspended,
+  Welcome_Email, Password_Reset_Requested,
+  Payment_Failed, Support_Ticket_Created,
+  Support_Ticket_Replied
+- primary_channel: ENUM — Email, SMS
+- primary_template_id: FK to NotificationTemplate
+  filtered by primary_channel type
+- fallback_channel: ENUM optional — Email, SMS
+  Cannot be same as primary_channel
+- fallback_template_id: FK to NotificationTemplate
+  Required if fallback_channel is set
+  Filtered by fallback_channel type
+- is_active: default True
+- updated_by: FK to AdminUser
+- ONE mapping per system_event only
+  (unique constraint on system_event)
+
+### Push Notifications Rules (FRM-CP-05-04)
+- notification_id: UUID primary key
+- trigger_mode: ENUM — Manual_Broadcast, System_Event
+- linked_event: ENUM (same hardcoded list as above)
+  Required if trigger_mode = System_Event
+  Hidden if trigger_mode = Manual_Broadcast
+- target_audience: ENUM — All, Tenants, Drivers, Specific
+  Required if trigger_mode = Manual_Broadcast
+  Hidden if trigger_mode = System_Event
+- specific_target_id: optional text FK reference
+  Required if target_audience = Specific
+- dispatch_status: ENUM — Draft, Scheduled, Completed
+  Only for Manual_Broadcast — hidden for System_Event
+- is_active: Boolean
+  Only relevant for System_Event — hidden for Manual_Broadcast
+- scheduled_at: optional DateTime
+  Only for Manual_Broadcast
+- created_by: FK to AdminUser
+
+### System Banners Rules (FRM-CP-05-05)
+- banner_id: UUID primary key
+- severity: ENUM — Info, Warning, Critical
+  Info=Blue, Warning=Yellow, Critical=Red
+- is_dismissible: Boolean default True
+- valid_from: required DateTime default now
+- valid_until: optional DateTime
+  If set: must be after valid_from
+- is_active: Boolean default True
+- Auto-hide logic: banner is considered expired if
+  valid_until is set and current time > valid_until
+  Show "Expired" badge in admin list
+
+### Internal Alerts Routing Rules (FRM-CP-05-06)
+- route_id: UUID primary key
+- trigger_event: ENUM hardcoded list:
+  New_Tenant_Registered, High_Priority_Ticket,
+  Payment_Failed, Subscription_Expired,
+  Bank_Transfer_Pending, System_Error
+- notify_role_id: FK to Role (optional)
+  If set: all admins with this role get notified
+- notify_custom_email: optional email field
+  At least ONE of notify_role_id or
+  notify_custom_email must be provided
+- is_active: default True
+
+### Communication Logs Rules (FRM-CP-05-07)
+- log_id: UUID primary key
+- Strictly append-only — override save() and delete()
+  same pattern as AccessLog
+- client_id: optional text field (not FK — tenant may
+  not exist in this DB yet in Phase 7)
+- channel_type: ENUM — Email, SMS, Push
+- delivery_status: ENUM — Sent, Failed, Bounced
+- dispatched_at: auto timestamp
+- Retention: add TODO comment for 90-day archival
+  # TODO Phase 11: Implement 90-day log archival/cleanup
+

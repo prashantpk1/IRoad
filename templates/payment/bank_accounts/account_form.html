@@ -1,0 +1,98 @@
+{% extends 'base.html' %}
+
+{% block page_title %}{% if is_edit %}Edit Bank Account{% else %}Add Bank Account{% endif %}{% endblock %}
+
+{% block content %}
+  <div class="content-card" style="background: #ffffff; padding: 20px 30px; border-radius: 12px">
+    <div class="setting-row" style="border-bottom: none; padding-top: 0; margin-bottom: 16px">
+      <div class="setting-row-info">
+        <h2 class="page-title">{% if is_edit %}Edit Bank Account{% else %}Add Bank Account{% endif %}</h2>
+      </div>
+    </div>
+
+    <div style="margin-bottom: 16px; padding: 12px 14px; border-radius: 10px" class="alert alert-info">
+      <p style="margin: 0; font-weight: 600">
+        IBAN will be stored in uppercase with spaces removed.
+      </p>
+    </div>
+
+    {% if form.non_field_errors %}
+      <div style="margin-bottom: 16px; color: #b91c1c; font-weight: 600">
+        {{ form.non_field_errors }}
+      </div>
+    {% endif %}
+
+    <form method="post" action="">
+      {% csrf_token %}
+
+      <div style="margin-bottom: 16px">
+        <label class="form-label">Bank Name</label>
+        {{ form.bank_name }}
+        {% for error in form.bank_name.errors %}
+          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+        {% endfor %}
+      </div>
+
+      <div style="margin-bottom: 16px">
+        <label class="form-label">Account Holder Name</label>
+        {{ form.account_holder_name }}
+        {% for error in form.account_holder_name.errors %}
+          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+        {% endfor %}
+      </div>
+
+      <div style="margin-bottom: 16px">
+        <label class="form-label">IBAN Number</label>
+        {{ form.iban_number }}
+        {% for error in form.iban_number.errors %}
+          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+        {% endfor %}
+      </div>
+
+      <div style="margin-bottom: 16px">
+        <label class="form-label">Account Number</label>
+        {{ form.account_number }}
+        {% for error in form.account_number.errors %}
+          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+        {% endfor %}
+      </div>
+
+      <div style="margin-bottom: 16px">
+        <label class="form-label">SWIFT Code</label>
+        {{ form.swift_code }}
+        {% for error in form.swift_code.errors %}
+          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+        {% endfor %}
+      </div>
+
+      <div style="margin-bottom: 16px">
+        <label class="form-label">Currency</label>
+        {{ form.currency }}
+        {% for error in form.currency.errors %}
+          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+        {% endfor %}
+      </div>
+
+      <div style="margin-bottom: 16px">
+        <label class="form-label">Status</label>
+        <div style="display: flex; align-items: center; gap: 10px">
+          {{ form.is_active }}
+        </div>
+        {% for error in form.is_active.errors %}
+          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+        {% endfor %}
+      </div>
+
+      <div style="display: flex; gap: 10px; align-items: center">
+        <a href="{% url 'bank_account_list' %}" class="btn" style="padding: 10px 14px; border-width: 1px">
+          <i class="bi bi-arrow-left"></i>
+          Cancel
+        </a>
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-save"></i>
+          Save
+        </button>
+      </div>
+    </form>
+  </div>
+{% endblock %}

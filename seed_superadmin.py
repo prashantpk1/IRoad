@@ -239,6 +239,114 @@ def seed_currencies():
     print(f"  Total: {created_count} created, {skipped_count} skipped")
 
 
+def seed_tax_codes():
+    print("\n--- Seeding Tax Codes ---")
+    from superadmin.models import TaxCode, Country
+
+    try:
+        sa_country = Country.objects.get(country_code='SA')
+    except Country.DoesNotExist:
+        sa_country = None
+        print("  ⚠️  SA country not found — "
+              "tax codes seeded without country link")
+
+    tax_codes = [
+        {
+            'tax_code': 'S-15',
+            'name_en': 'Standard VAT 15%',
+            'name_ar': 'ضريبة القيمة المضافة 15%',
+            'rate_percent': '15.00',
+            'applicable_country_code': sa_country,
+            'is_default_for_country': True,
+            'is_international_default': False,
+            'is_active': True,
+        },
+        {
+            'tax_code': 'Z-0',
+            'name_en': 'Zero Rate (International)',
+            'name_ar': 'معدل صفري (دولي)',
+            'rate_percent': '0.00',
+            'applicable_country_code': None,
+            'is_default_for_country': False,
+            'is_international_default': True,
+            'is_active': True,
+        },
+    ]
+
+    for data in tax_codes:
+        obj, created = TaxCode.objects.get_or_create(
+            tax_code=data['tax_code'],
+            defaults=data
+        )
+        if created:
+            print(f"  ✅ Tax code created: {obj.name_en}")
+        else:
+            print(f"  ⏭️  Already exists: {obj.name_en}")
+
+
+def seed_general_tax_settings():
+    print("\n--- Seeding General Tax Settings ---")
+    from superadmin.models import GeneralTaxSettings
+
+    obj, created = GeneralTaxSettings.objects.get_or_create(
+        setting_id='GLOBAL-TAX-SETTING',
+        defaults={
+            'prices_include_tax': False,
+            'location_verification': 'Profile_Only',
+        }
+    )
+    if created:
+        print("  ✅ General Tax Settings created")
+        print("  ✅ prices_include_tax: False")
+        print("  ✅ location_verification: Profile_Only")
+    else:
+        print("  ⏭️  General Tax Settings already exists")
+
+
+def seed_global_system_rules():
+    print("\n--- Seeding Global System Rules ---")
+    from superadmin.models import GlobalSystemRules
+
+    obj, created = GlobalSystemRules.objects.get_or_create(
+        rule_id='GLOBAL-SYSTEM-RULES',
+        defaults={
+            'system_timezone': 'Asia/Riyadh',
+            'default_date_format': 'DD/MM/YYYY',
+            'grace_period_days': 3,
+            'standard_billing_cycle': 30,
+        }
+    )
+    if created:
+        print("  ✅ Global System Rules created")
+        print("  ✅ Timezone: Asia/Riyadh")
+        print("  ✅ Grace period: 3 days")
+        print("  ✅ Billing cycle: 30 days")
+    else:
+        print("  ⏭️  Global System Rules already exists")
+
+
+def seed_base_currency():
+    print("\n--- Seeding Base Currency Config ---")
+    from superadmin.models import BaseCurrencyConfig, Currency
+
+    try:
+        sar = Currency.objects.get(currency_code='SAR')
+    except Currency.DoesNotExist:
+        print("  ❌ ERROR: SAR currency not found. "
+              "Run seed_currencies first.")
+        return
+
+    obj, created = BaseCurrencyConfig.objects.get_or_create(
+        setting_id='GLOBAL-BASE-CURRENCY',
+        defaults={'base_currency': sar}
+    )
+    if created:
+        print("  ✅ Base Currency set to: SAR")
+    else:
+        print("  ⏭️  Base Currency already configured: "
+              f"{obj.base_currency_id}")
+
+
 def main():
     print("=" * 50)
     print("  IRoad Super Admin — Master Seed Script")
@@ -250,13 +358,19 @@ def main():
         seed_security_settings()
         seed_countries()
         seed_currencies()
+        seed_tax_codes()
+        seed_general_tax_settings()
+        seed_global_system_rules()
+        seed_base_currency()
 
         # Future phases will add their seed functions here:
         # seed_security_settings()  ← Phase 2 ✅ (called above)
         # seed_countries()         ← Phase 3 ✅ (now active above)
         # seed_currencies()        ← Phase 3 ✅ (now active above)
-        # seed_system_configs()    ← Phase 4
-        # seed_tax_codes()         ← Phase 4
+        # seed_tax_codes()         ← Phase 4 ✅ (now active above)
+        # seed_general_tax_settings() ← Phase 4 ✅ (now active above)
+        # seed_global_system_rules()  ← Phase 4 ✅ (now active above)
+        # seed_base_currency()        ← Phase 4 ✅ (now active above)
         # seed_plans()             ← Phase 5
 
         print("\n" + "=" * 50)

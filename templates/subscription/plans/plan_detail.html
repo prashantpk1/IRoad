@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+
+{% block page_title %}{{ plan.plan_name_en }}{% endblock %}
+
+{% block content %}
+  <div class="content-card" style="background:#fff; padding:20px 30px; border-radius:12px">
+    <div class="setting-row" style="border-bottom:none; padding-top:0; margin-bottom:16px">
+      <div class="setting-row-info">
+        <h2 class="page-title">{{ plan.plan_name_en }}</h2>
+      </div>
+      <div class="setting-row-control" style="flex:0 0 auto; display:flex; gap:10px">
+        {% if request.user.is_root %}
+          <a href="{% url 'plan_edit' plan.plan_id %}" class="btn btn-primary" style="padding:10px 14px">Edit</a>
+        {% endif %}
+        <a href="{% url 'plan_list' %}" class="btn" style="padding:10px 14px; border-width:1px">Back to List</a>
+      </div>
+    </div>
+
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:12px; margin-bottom:18px">
+      <div><strong>Plan Name (EN):</strong> {{ plan.plan_name_en }}</div>
+      <div><strong>Plan Name (AR):</strong> {{ plan.plan_name_ar }}</div>
+      <div><strong>Base Cycle Days:</strong> {{ plan.base_cycle_days }}</div>
+      <div><strong>Status:</strong> {% if plan.is_active %}Active{% else %}Inactive{% endif %}</div>
+      <div><strong>Driver App:</strong> {% if plan.has_driver_app %}Yes{% else %}No{% endif %}</div>
+      <div><strong>Backup Level:</strong> {{ plan.backup_restore_level }}</div>
+      <div><strong>Max Internal Users:</strong> {% if plan.max_internal_users == -1 %}Unlimited{% else %}{{ plan.max_internal_users }}{% endif %}</div>
+      <div><strong>Max Internal Trucks:</strong> {% if plan.max_internal_trucks == -1 %}Unlimited{% else %}{{ plan.max_internal_trucks }}{% endif %}</div>
+      <div><strong>Max External Trucks:</strong> {% if plan.max_external_trucks == -1 %}Unlimited{% else %}{{ plan.max_external_trucks }}{% endif %}</div>
+      <div><strong>Max Active Drivers:</strong> {% if plan.max_active_drivers == -1 %}Unlimited{% else %}{{ plan.max_active_drivers }}{% endif %}</div>
+      <div><strong>Max Monthly Shipments:</strong> {% if plan.max_monthly_shipments == -1 %}Unlimited{% else %}{{ plan.max_monthly_shipments }}{% endif %}</div>
+      <div><strong>Max Storage GB:</strong> {% if plan.max_storage_gb == -1 %}Unlimited{% else %}{{ plan.max_storage_gb }}{% endif %}</div>
+    </div>
+
+    <h3 style="margin:0 0 12px 0">Pricing Cycles</h3>
+    <div style="overflow-x:auto">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Cycles</th>
+            <th>Currency</th>
+            <th>Price</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in pricing_cycles %}
+            <tr>
+              <td>{{ p.number_of_cycles }}</td>
+              <td>{{ p.currency.currency_code }} - {{ p.currency.name_en }}</td>
+              <td>{{ p.price }}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="3">No pricing rows found.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endblock %}
+

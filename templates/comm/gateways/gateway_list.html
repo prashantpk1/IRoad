@@ -1,0 +1,121 @@
+{% extends 'base.html' %}
+
+{% block page_title %}Communication Gateways{% endblock %}
+
+{% block content %}
+  <div class="content-card" style="background: #ffffff; padding: 20px 30px; border-radius: 12px">
+    <div class="setting-row" style="border-bottom: none; padding-top: 0">
+      <div class="setting-row-info">
+        <h2 class="page-title">Communication Gateways</h2>
+        <p class="text-muted" style="margin: 6px 0 0 0">
+          Only one Email and one SMS gateway can be active at a time.
+        </p>
+      </div>
+      <div class="setting-row-control" style="flex: 0 0 auto">
+        {% if request.user.is_root %}
+          <a href="{% url 'comm_gateway_create' %}" class="btn btn-primary" style="padding: 10px 14px">
+            <i class="bi bi-plus-circle"></i>
+            Add Gateway
+          </a>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if messages %}
+      <div style="margin-top: 16px">
+        {% for message in messages %}
+          <p style="margin: 0; color: {% if message.tags == 'error' %}#b91c1c{% else %}#15803d{% endif %}; font-weight: 600">
+            {{ message }}
+          </p>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    {% if gateways.object_list %}
+      <div style="overflow-x: auto; margin-top: 16px">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th style="width: 60px">#</th>
+              <th style="width: 110px">Type</th>
+              <th>Provider</th>
+              <th>Host/URL</th>
+              <th style="width: 90px">Port</th>
+              <th>Sender ID</th>
+              <th style="width: 110px">Encryption</th>
+              <th style="width: 120px">Status</th>
+              <th style="width: 220px">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for gateway in gateways.object_list %}
+              <tr{% if gateway.gateway_type == 'Email' and gateway.gateway_id == active_email_id %} style="background:#f0fdf4"{% elif gateway.gateway_type == 'SMS' and gateway.gateway_id == active_sms_id %} style="background:#f0fdf4"{% endif %}>
+                <td>{{ forloop.counter0|add:gateways.start_index }}</td>
+                <td>
+                  {% if gateway.gateway_type == 'Email' %}
+                    <span class="status-badge" style="background: #dbeafe; color: #1e40af">Email</span>
+                  {% else %}
+                    <span class="status-badge" style="background: #dcfce7; color: #166534">SMS</span>
+                  {% endif %}
+                </td>
+                <td>{{ gateway.provider_name }}</td>
+                <td>{{ gateway.host_url }}</td>
+                <td>{{ gateway.port|default:'-' }}</td>
+                <td>{{ gateway.sender_id }}</td>
+                <td>{{ gateway.encryption_type|default:'-' }}</td>
+                <td>
+                  {% if gateway.is_active %}
+                    <span class="status-badge active">Active</span>
+                  {% else %}
+                    <span class="status-badge warning">Inactive</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if request.user.is_root %}
+                    <div class="table-actions">
+                      <a href="{% url 'comm_gateway_edit' gateway.gateway_id %}" class="btn" style="padding: 10px 14px; border-width: 1px">
+                        <i class="bi bi-pencil"></i>
+                        Edit
+                      </a>
+                      <form method="post" action="{% url 'comm_gateway_toggle' gateway.gateway_id %}" style="display: inline">
+                        {% csrf_token %}
+                        {% if gateway.is_active %}
+                          <button type="submit" class="btn btn-primary" style="padding: 10px 14px">
+                            <i class="bi bi-slash-circle"></i>
+                            Deactivate
+                          </button>
+                        {% else %}
+                          <button type="submit" class="btn btn-primary" style="padding: 10px 14px">
+                            <i class="bi bi-check-circle"></i>
+                            Activate
+                          </button>
+                        {% endif %}
+                      </form>
+                    </div>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <div style="margin-top: 18px; display: flex; justify-content: center; gap: 12px; flex-wrap: wrap">
+        {% if gateways.has_previous %}
+          <a href="?page={{ gateways.previous_page_number }}" class="btn" style="padding: 10px 14px; border-width: 1px">Previous</a>
+        {% endif %}
+        <span style="align-self: center; color: var(--text-muted); font-weight: 600">
+          Page {{ gateways.number }} of {{ gateways.paginator.num_pages }}
+        </span>
+        {% if gateways.has_next %}
+          <a href="?page={{ gateways.next_page_number }}" class="btn" style="padding: 10px 14px; border-width: 1px">Next</a>
+        {% endif %}
+      </div>
+    {% else %}
+      <div class="table-empty-state" style="margin-top: 16px">
+        <div class="empty-icon"><i class="bi bi-broadcast"></i></div>
+        <p class="empty-text">No communication gateways found.</p>
+      </div>
+    {% endif %}
+  </div>
+{% endblock %}

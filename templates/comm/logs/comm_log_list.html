@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+{% block title %}Communication Logs{% endblock %}
+{% block content %}
+<h4 class="mb-3">Communication Logs</h4>
+<form method="get" class="row g-2 mb-3">
+  <div class="col-md-2">
+    <select class="form-select" name="channel">
+      <option value="All" {% if channel_filter == 'All' %}selected{% endif %}>All Channels</option>
+      <option value="Email" {% if channel_filter == 'Email' %}selected{% endif %}>Email</option>
+      <option value="SMS" {% if channel_filter == 'SMS' %}selected{% endif %}>SMS</option>
+      <option value="Push" {% if channel_filter == 'Push' %}selected{% endif %}>Push</option>
+    </select>
+  </div>
+  <div class="col-md-2">
+    <select class="form-select" name="status">
+      <option value="All" {% if status_filter == 'All' %}selected{% endif %}>All Statuses</option>
+      <option value="Sent" {% if status_filter == 'Sent' %}selected{% endif %}>Sent</option>
+      <option value="Failed" {% if status_filter == 'Failed' %}selected{% endif %}>Failed</option>
+      <option value="Bounced" {% if status_filter == 'Bounced' %}selected{% endif %}>Bounced</option>
+    </select>
+  </div>
+  <div class="col-md-2"><input type="date" name="date_from" value="{{ date_from }}" class="form-control"></div>
+  <div class="col-md-2"><input type="date" name="date_to" value="{{ date_to }}" class="form-control"></div>
+  <div class="col-md-3"><input type="text" name="q" value="{{ search_query }}" class="form-control" placeholder="Search recipient"></div>
+  <div class="col-md-1"><button class="btn btn-outline-secondary w-100">Go</button></div>
+</form>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table align-middle mb-0">
+      <thead><tr><th>#</th><th>Recipient</th><th>Channel</th><th>Trigger Source</th><th>Delivery Status</th><th>Error Details</th><th>Dispatched At</th></tr></thead>
+      <tbody>
+        {% for row in logs %}
+          <tr>
+            <td>{{ forloop.counter0|add:logs.start_index }}</td>
+            <td>{{ row.recipient }}</td>
+            <td>{% if row.channel_type == 'Email' %}<span class="badge bg-primary">Email</span>{% elif row.channel_type == 'SMS' %}<span class="badge bg-success">SMS</span>{% else %}<span class="badge bg-purple" style="background:#6f42c1;">Push</span>{% endif %}</td>
+            <td>{{ row.get_trigger_source_display }}</td>
+            <td>{% if row.delivery_status == 'Sent' %}<span class="badge bg-success">Sent</span>{% elif row.delivery_status == 'Failed' %}<span class="badge bg-danger">Failed</span>{% else %}<span class="badge bg-warning text-dark">Bounced</span>{% endif %}</td>
+            <td>{{ row.error_details|default:'-'|truncatechars:70 }}</td>
+            <td>{{ row.dispatched_at|date:'Y-m-d H:i:s' }}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="7" class="text-center py-4 text-muted">No communication logs found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% if logs.paginator.num_pages > 1 %}
+<nav class="mt-3"><ul class="pagination mb-0">{% if logs.has_previous %}<li class="page-item"><a class="page-link" href="?page={{ logs.previous_page_number }}&channel={{ channel_filter }}&status={{ status_filter }}&date_from={{ date_from }}&date_to={{ date_to }}&q={{ search_query|urlencode }}">Previous</a></li>{% endif %}<li class="page-item disabled"><span class="page-link">Page {{ logs.number }} of {{ logs.paginator.num_pages }}</span></li>{% if logs.has_next %}<li class="page-item"><a class="page-link" href="?page={{ logs.next_page_number }}&channel={{ channel_filter }}&status={{ status_filter }}&date_from={{ date_from }}&date_to={{ date_to }}&q={{ search_query|urlencode }}">Next</a></li>{% endif %}</ul></nav>
+{% endif %}
+{% endblock %}
