@@ -1,0 +1,96 @@
+{% extends 'base.html' %}
+{% block title %}Active Sessions Monitor{% endblock %}
+{% block content %}
+<div class="container py-3">
+  <h4 class="mb-3">Active Sessions Monitor</h4>
+
+  <div class="row g-2 mb-3">
+    <div class="col-md-3"><div class="card"><div class="card-body py-2"><strong>Total Active:</strong> {{ total_active }}</div></div></div>
+    <div class="col-md-3"><div class="card"><div class="card-body py-2"><strong>Admin Sessions:</strong> {{ total_admin }}</div></div></div>
+    <div class="col-md-3"><div class="card"><div class="card-body py-2"><strong>Tenant Sessions:</strong> {{ total_tenant }}</div></div></div>
+    <div class="col-md-3"><div class="card"><div class="card-body py-2"><strong>Driver Sessions:</strong> {{ total_driver }}</div></div></div>
+  </div>
+
+  <div class="alert alert-warning">
+    Note: Real-time JWT revocation will be available after Redis integration (Phase 11).
+  </div>
+
+  <form method="get" class="row g-2 mb-3">
+    <div class="col-md-3">
+      <select name="user_domain" class="form-select">
+        <option value="All" {% if domain_filter == 'All' %}selected{% endif %}>All Domains</option>
+        <option value="Admin" {% if domain_filter == 'Admin' %}selected{% endif %}>Admin</option>
+        <option value="Tenant_User" {% if domain_filter == 'Tenant_User' %}selected{% endif %}>Tenant User</option>
+        <option value="Driver" {% if domain_filter == 'Driver' %}selected{% endif %}>Driver</option>
+      </select>
+    </div>
+    <div class="col-md-6">
+      <input type="text" name="q" class="form-control" value="{{ search_query }}" placeholder="Search by user name/reference or IP address">
+    </div>
+    <div class="col-md-3 d-flex gap-2">
+      <button type="submit" class="btn btn-primary">Filter</button>
+      <a href="{% url 'session_mass_revoke' %}" class="btn btn-danger">Mass Revoke</a>
+    </div>
+  </form>
+
+  <div class="table-responsive">
+    <table class="table table-striped align-middle">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Domain</th>
+          <th>User Name/Reference</th>
+          <th>IP Address</th>
+          <th>User Agent</th>
+          <th>Started At</th>
+          <th>Duration</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in sessions %}
+        <tr>
+          <td>{{ forloop.counter0|add:sessions.start_index }}</td>
+          <td>
+            {% if s.user_domain == 'Admin' %}
+              <span class="badge bg-primary">Admin</span>
+            {% elif s.user_domain == 'Tenant_User' %}
+              <span class="badge bg-success">Tenant User</span>
+            {% else %}
+              <span class="badge bg-warning text-dark">Driver</span>
+            {% endif %}
+          </td>
+          <td>{{ s.reference_name|default:s.reference_id }}</td>
+          <td>{{ s.ip_address }}</td>
+          <td>{{ s.user_agent|default:'-'|truncatechars:80 }}</td>
+          <td>{{ s.started_at }}</td>
+          <td>{{ s.started_at|timesince }}</td>
+          <td>
+            <form method="post" action="{% url 'session_revoke' s.session_id %}">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-sm btn-danger">Revoke</button>
+            </form>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="8" class="text-center text-muted">No active sessions found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if sessions.paginator.num_pages > 1 %}
+  <nav>
+    <ul class="pagination">
+      {% if sessions.has_previous %}
+      <li class="page-item"><a class="page-link" href="?page={{ sessions.previous_page_number }}&user_domain={{ domain_filter }}&q={{ search_query }}">Previous</a></li>
+      {% endif %}
+      <li class="page-item disabled"><span class="page-link">Page {{ sessions.number }} of {{ sessions.paginator.num_pages }}</span></li>
+      {% if sessions.has_next %}
+      <li class="page-item"><a class="page-link" href="?page={{ sessions.next_page_number }}&user_domain={{ domain_filter }}&q={{ search_query }}">Next</a></li>
+      {% endif %}
+    </ul>
+  </nav>
+  {% endif %}
+</div>
+{% endblock %}

@@ -148,6 +148,147 @@ class AdminSecuritySettings(models.Model):
         verbose_name = 'Admin Security Settings'
 
 
+class TenantSecuritySettings(models.Model):
+    setting_id = models.CharField(
+        primary_key=True,
+        max_length=50,
+        default='TENANT-SEC-CONF',
+    )
+    tenant_web_timeout_hours = models.IntegerField(
+        default=12,
+        validators=[MinValueValidator(1)],
+    )
+    driver_app_timeout_days = models.IntegerField(
+        default=30,
+        validators=[MinValueValidator(1)],
+    )
+    max_failed_logins = models.IntegerField(
+        default=5,
+        validators=[MinValueValidator(1)],
+    )
+    lockout_duration_minutes = models.IntegerField(
+        default=15,
+        validators=[MinValueValidator(1)],
+    )
+    updated_by = models.ForeignKey(
+        'AdminUser',
+        null=True,
+        on_delete=models.SET_NULL,
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return 'Tenant Security Settings'
+
+    class Meta:
+        db_table = 'security_tenant_settings'
+
+
+class ActiveSession(models.Model):
+    DOMAIN_CHOICES = [
+        ('Admin', 'Admin'),
+        ('Tenant_User', 'Tenant User'),
+        ('Driver', 'Driver'),
+    ]
+
+    # TODO Phase 11 Redis: Replace DB-based session
+    # tracking with Redis cache for real-time JWT
+    # revocation when Redis is implemented.
+    session_id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    user_domain = models.CharField(max_length=20, choices=DOMAIN_CHOICES)
+    reference_id = models.CharField(
+        max_length=100,
+        help_text='User or Driver ID',
+    )
+    reference_name = models.CharField(
+        max_length=200,
+        null=True,
+        blank=True,
+        help_text='Display name for UI',
+    )
+    ip_address = models.CharField(max_length=45)
+    user_agent = models.TextField(null=True, blank=True)
+    started_at = models.DateTimeField(auto_now_add=True)
+    is_active = models.BooleanField(default=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    revoked_by = models.ForeignKey(
+        'AdminUser',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='revoked_sessions',
+    )
+
+    def __str__(self):
+        return f'{self.user_domain} - {self.reference_name or self.reference_id}'
+
+    class Meta:
+        db_table = 'security_active_sessions'
+        ordering = ['-started_at']
+
+
+class AuditLog(models.Model):
+    ACTION_TYPE_CHOICES = [
+        ('Create', 'Create'),
+        ('Update', 'Update'),
+        ('Delete', 'Delete'),
+        ('Status_Change', 'Status Change'),
+    ]
+
+    audit_id = models.AutoField(primary_key=True)
+    admin = models.ForeignKey(
+        'AdminUser',
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name='audit_logs',
+    )
+    action_type = models.CharField(max_length=20, choices=ACTION_TYPE_CHOICES)
+    module_name = models.CharField(
+        max_length=100,
+        help_text='e.g. Tax Settings, Subscription Plans',
+    )
+    record_id = models.CharField(
+        max_length=100,
+        help_text='ID of the modified entity',
+    )
+    old_payload = models.JSONField(
+        null=True,
+        blank=True,
+        help_text='State before update. Null on Create.',
+    )
+    new_payload = models.JSONField(
+        null=True,
+        blank=True,
+        help_text='State after update. Null on Delete.',
+    )
+    ip_address = models.CharField(max_length=45)
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return (
+            f'{self.action_type} on '
+            f'{self.module_name} by '
+            f'{self.admin}'
+        )
+
+    class Meta:
+        db_table = 'security_audit_log'
+        ordering = ['-timestamp']
+
+    def save(self, *args, **kwargs):
+        if self.pk and AuditLog.objects.filter(
+                audit_id=self.audit_id).exists():
+            raise PermissionError(
+                'Audit log entries are immutable.'
+            )
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError(
+            'Audit log entries cannot be deleted.'
+        )
+
+
 class AdminAuthToken(models.Model):
     """Invite and password reset tokens for admin users."""
 
@@ -1213,3 +1354,746 @@ class CommLog(models.Model):
     class Meta:
         db_table = 'comm_logs'
         ordering = ['-dispatched_at']
+
+
+class TenantProfile(models.Model):
+    STATUS_CHOICES = [
+        ('Active', 'Active'),
+        ('Suspended_Billing', 'Suspended - Billing'),
+        ('Suspended_Violation', 'Suspended - Violation'),
+        ('Churned', 'Churned'),
+    ]
+
+    tenant_id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    company_name = models.CharField(max_length=100)
+    registration_number = models.CharField(max_length=50)
+    tax_number = models.CharField(max_length=50, null=True, blank=True)
+    primary_email = models.EmailField(max_length=100)
+    primary_phone = models.CharField(max_length=20)
+    country = models.ForeignKey(
+        'Country',
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='tenant_profiles',
+    )
+    account_status = models.CharField(
+        max_length=30,
+        choices=STATUS_CHOICES,
+        default='Active',
+    )
+    assigned_sales_rep = models.ForeignKey(
+        'AdminUser',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='assigned_tenants',
+    )
+    wallet_balance = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal('0.00'),
+    )
+    registered_at = models.DateTimeField(auto_now_add=True)
+    total_ltv = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal('0.00'),
+    )
+    current_plan = models.ForeignKey(
+        'SubscriptionPlan',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='active_tenants',
+    )
+    subscription_start_date = models.DateField(null=True, blank=True)
+    subscription_expiry_date = models.DateField(null=True, blank=True)
+    active_max_users = models.IntegerField(default=0)
+    active_max_internal_trucks = models.IntegerField(default=0)
+    active_max_external_trucks = models.IntegerField(default=0)
+    active_max_drivers = models.IntegerField(default=0)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.company_name
+
+    class Meta:
+        db_table = 'crm_tenant_profiles'
+        ordering = ['company_name']
+
+
+class CRMNote(models.Model):
+    NOTE_TYPE_CHOICES = [
+        ('General', 'General'),
+        ('Sales_Call', 'Sales Call'),
+        ('Billing_Issue', 'Billing Issue'),
+        ('Complaint', 'Complaint'),
+    ]
+
+    note_id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    tenant = models.ForeignKey(
+        TenantProfile,
+        on_delete=models.CASCADE,
+        related_name='crm_notes',
+    )
+    admin = models.ForeignKey(
+        'AdminUser',
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name='crm_notes',
+    )
+    note_type = models.CharField(
+        max_length=20,
+        choices=NOTE_TYPE_CHOICES,
+        default='General',
+    )
+    note_content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f'{self.note_type} note for {self.tenant.company_name}'
+
+    def save(self, *args, **kwargs):
+        if self.pk and CRMNote.objects.filter(note_id=self.note_id).exists():
+            raise PermissionError(
+                'CRM Notes are immutable after creation.'
+            )
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError('CRM Notes cannot be deleted.')
+
+    class Meta:
+        db_table = 'crm_notes'
+        ordering = ['-created_at']
+
+
+class SubscriptionOrder(models.Model):
+    CLASSIFICATION_CHOICES = [
+        ('New_Subscription', 'New Subscription'),
+        ('Renewal', 'Renewal'),
+        ('Upgrade', 'Upgrade'),
+        ('Downgrade', 'Downgrade'),
+        ('Add_ons', 'Add-ons'),
+    ]
+    STATUS_CHOICES = [
+        ('Draft', 'Draft'),
+        ('Pending_Payment', 'Pending Payment'),
+        ('Paid', 'Paid'),
+        ('Cancelled', 'Cancelled'),
+    ]
+
+    order_id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    tenant = models.ForeignKey(
+        TenantProfile,
+        on_delete=models.PROTECT,
+        related_name='orders',
+    )
+    order_classification = models.CharField(
+        max_length=20,
+        choices=CLASSIFICATION_CHOICES,
+        default='New_Subscription',
+    )
+    promo_code = models.ForeignKey(
+        'PromoCode',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='orders',
+    )
+    tax_code = models.ForeignKey(
+        'TaxCode',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
+    currency = models.ForeignKey(
+        'Currency',
+        on_delete=models.PROTECT,
+        related_name='subscription_orders',
+    )
+    sub_total = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal('0.00'),
+    )
+    discount_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal('0.00'),
+    )
+    tax_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal('0.00'),
+    )
+    grand_total = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal('0.00'),
+    )
+    exchange_rate_snapshot = models.DecimalField(
+        max_digits=10,
+        decimal_places=6,
+        default=Decimal('1.000000'),
+    )
+    base_currency_equivalent = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal('0.00'),
+    )
+    order_status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='Draft',
+    )
+    payment_method = models.ForeignKey(
+        'PaymentMethod',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
+    created_by = models.ForeignKey(
+        'AdminUser',
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name='orders_created',
+    )
+    projected_plan = models.ForeignKey(
+        'SubscriptionPlan',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='projected_orders',
+    )
+    projected_expiry_date = models.DateField(null=True, blank=True)
+    projected_max_users = models.IntegerField(null=True, blank=True)
+    projected_max_internal_trucks = models.IntegerField(null=True, blank=True)
+    projected_max_external_trucks = models.IntegerField(null=True, blank=True)
+    projected_max_drivers = models.IntegerField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return (
+            f'Order {self.order_id} - '
+            f'{self.tenant.company_name} - '
+            f'{self.order_classification}'
+        )
+
+    class Meta:
+        db_table = 'crm_subscription_orders'
+        ordering = ['-created_at']
+
+
+class OrderPlanLine(models.Model):
+    line_id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    order = models.ForeignKey(
+        SubscriptionOrder,
+        on_delete=models.CASCADE,
+        related_name='plan_lines',
+    )
+    plan = models.ForeignKey(
+        'SubscriptionPlan',
+        on_delete=models.PROTECT,
+    )
+    number_of_cycles = models.IntegerField(default=1)
+    plan_price = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal('0.00'),
+    )
+    pro_rata_adjustment = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal('0.00'),
+    )
+    line_total = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal('0.00'),
+    )
+
+    def __str__(self):
+        return f'{self.plan.plan_name_en} x {self.number_of_cycles} cycles'
+
+    class Meta:
+        db_table = 'crm_order_plan_lines'
+
+
+class OrderAddonLine(models.Model):
+    ADDON_TYPE_CHOICES = [
+        ('Extra_User', 'Extra Internal User'),
+        ('Extra_Internal_Truck', 'Extra Internal Truck'),
+        ('Extra_External_Truck', 'Extra External Truck'),
+        ('Extra_Driver', 'Extra Driver'),
+        ('Extra_Shipment', 'Extra Shipment'),
+        ('Extra_Storage_GB', 'Extra Storage (GB)'),
+    ]
+    ACTION_TYPE_CHOICES = [
+        ('Add', 'Add'),
+        ('Reduce', 'Reduce'),
+    ]
+
+    line_id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    order = models.ForeignKey(
+        SubscriptionOrder,
+        on_delete=models.CASCADE,
+        related_name='addon_lines',
+    )
+    action_type = models.CharField(
+        max_length=10,
+        choices=ACTION_TYPE_CHOICES,
+        default='Add',
+    )
+    add_on_type = models.CharField(max_length=30, choices=ADDON_TYPE_CHOICES)
+    quantity = models.IntegerField(
+        default=1,
+        validators=[MinValueValidator(1)],
+    )
+    number_of_cycles = models.DecimalField(
+        max_digits=6,
+        decimal_places=2,
+        default=Decimal('1.00'),
+    )
+    unit_price = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal('0.00'),
+    )
+    pro_rata_adjustment = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal('0.00'),
+    )
+    line_total = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal('0.00'),
+    )
+
+    def __str__(self):
+        return f'{self.add_on_type} x {self.quantity}'
+
+    class Meta:
+        db_table = 'crm_order_addon_lines'
+
+
+class Transaction(models.Model):
+    TYPE_CHOICES = [
+        ('Order_Payment', 'Order Payment'),
+        ('Wallet_TopUp', 'Wallet Top-Up'),
+        ('Refund', 'Refund'),
+    ]
+    STATUS_CHOICES = [
+        ('Pending', 'Pending'),
+        ('Completed', 'Completed'),
+        ('Failed', 'Failed'),
+        ('Rejected', 'Rejected'),
+    ]
+
+    transaction_id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    tenant = models.ForeignKey(
+        TenantProfile,
+        on_delete=models.PROTECT,
+        related_name='transactions',
+    )
+    order = models.ForeignKey(
+        SubscriptionOrder,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='transactions',
+    )
+    transaction_type = models.CharField(
+        max_length=20,
+        choices=TYPE_CHOICES,
+        default='Order_Payment',
+    )
+    payment_method = models.ForeignKey(
+        'PaymentMethod',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
+    currency = models.ForeignKey(
+        'Currency',
+        on_delete=models.PROTECT,
+        related_name='crm_transactions',
+    )
+    amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal('0.01'))],
+    )
+    exchange_rate_snapshot = models.DecimalField(
+        max_digits=10,
+        decimal_places=6,
+        default=Decimal('1.000000'),
+    )
+    base_currency_equivalent_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal('0.00'),
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='Pending',
+    )
+    gateway_ref = models.CharField(max_length=100, null=True, blank=True)
+    attachment = models.FileField(upload_to='receipts/', null=True, blank=True)
+    reviewed_by = models.ForeignKey(
+        'AdminUser',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='reviewed_transactions',
+    )
+    review_notes = models.TextField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return (
+            f'TXN-{str(self.transaction_id)[:8]} '
+            f'- {self.tenant.company_name} - {self.amount} '
+            f'{self.currency_id}'
+        )
+
+    class Meta:
+        db_table = 'crm_transactions'
+        ordering = ['-created_at']
+
+
+class StandardInvoice(models.Model):
+    STATUS_CHOICES = [
+        ('Draft', 'Draft'),
+        ('Issued', 'Issued'),
+        ('Paid', 'Paid'),
+        ('Void', 'Void'),
+    ]
+
+    invoice_id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    invoice_number = models.CharField(max_length=50, unique=True)
+    order = models.ForeignKey(
+        SubscriptionOrder,
+        on_delete=models.PROTECT,
+        related_name='invoices',
+    )
+    tenant = models.ForeignKey(
+        TenantProfile,
+        on_delete=models.PROTECT,
+        related_name='invoices',
+    )
+    tax_code = models.ForeignKey(
+        'TaxCode',
+        null=True,
+        on_delete=models.SET_NULL,
+    )
+    issue_date = models.DateTimeField(auto_now_add=True)
+    due_date = models.DateField(null=True, blank=True)
+    status = models.CharField(
+        max_length=10,
+        choices=STATUS_CHOICES,
+        default='Issued',
+    )
+
+    # Snapshot fields (hard-copied at generation)
+    supplier_name = models.CharField(max_length=100)
+    supplier_tax_number = models.CharField(max_length=50)
+    customer_name = models.CharField(max_length=100)
+    customer_tax_number = models.CharField(
+        max_length=50,
+        null=True,
+        blank=True,
+    )
+    customer_address = models.TextField(null=True, blank=True)
+
+    # Financial fields
+    sub_total = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal('0.00'),
+    )
+    discount_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal('0.00'),
+    )
+    taxable_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal('0.00'),
+    )
+    tax_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal('0.00'),
+    )
+    grand_total = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal('0.00'),
+    )
+    currency = models.ForeignKey(
+        'Currency',
+        on_delete=models.PROTECT,
+        related_name='standard_invoices',
+    )
+    exchange_rate_snapshot = models.DecimalField(
+        max_digits=10,
+        decimal_places=6,
+        default=Decimal('1.000000'),
+    )
+    base_currency_equivalent_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal('0.00'),
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.invoice_number
+
+    def save(self, *args, **kwargs):
+        if self.pk and StandardInvoice.objects.filter(
+                invoice_id=self.invoice_id).exists():
+            if self.status not in ['Void']:
+                raise PermissionError(
+                    'Standard Invoices are immutable after generation. '
+                    'Only status can be changed to Void.'
+                )
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError('Standard Invoices cannot be deleted.')
+
+    class Meta:
+        db_table = 'crm_invoices'
+        ordering = ['-issue_date']
+
+
+class InvoiceLineItem(models.Model):
+    line_id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    invoice = models.ForeignKey(
+        StandardInvoice,
+        on_delete=models.PROTECT,
+        related_name='line_items',
+    )
+    item_description = models.CharField(max_length=255)
+    quantity = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal('1.00'),
+    )
+    unit_price = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal('0.00'),
+    )
+    tax_rate = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal('0.00'),
+    )
+    tax_amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal('0.00'),
+    )
+    line_total = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal('0.00'),
+    )
+
+    def __str__(self):
+        return self.item_description
+
+    def save(self, *args, **kwargs):
+        if self.pk and InvoiceLineItem.objects.filter(
+                line_id=self.line_id).exists():
+            raise PermissionError(
+                'Invoice line items are immutable after creation.'
+            )
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError('Invoice line items cannot be deleted.')
+
+    class Meta:
+        db_table = 'crm_invoice_line_items'
+
+
+class SupportCategory(models.Model):
+    category_id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    name_en = models.CharField(max_length=100, unique=True)
+    name_ar = models.CharField(max_length=100, unique=True)
+    is_active = models.BooleanField(default=True)
+    created_by = models.ForeignKey(
+        'AdminUser',
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name='support_categories_created',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.name_en
+
+    class Meta:
+        db_table = 'support_categories'
+        ordering = ['name_en']
+
+
+class CannedResponse(models.Model):
+    template_id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    title = models.CharField(max_length=100, unique=True)
+    message_body = models.TextField()
+    is_active = models.BooleanField(default=True)
+    created_by = models.ForeignKey(
+        'AdminUser',
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name='canned_responses_created',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.title
+
+    class Meta:
+        db_table = 'support_canned_responses'
+        ordering = ['title']
+
+
+class SupportTicket(models.Model):
+    PRIORITY_CHOICES = [
+        ('Low', 'Low'),
+        ('Medium', 'Medium'),
+        ('High', 'High'),
+        ('Critical', 'Critical'),
+    ]
+    STATUS_CHOICES = [
+        ('New', 'New'),
+        ('In_Progress', 'In Progress'),
+        ('Pending_Client', 'Pending Client'),
+        ('Closed', 'Closed'),
+    ]
+
+    ticket_id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    ticket_no = models.CharField(
+        max_length=20,
+        unique=True,
+        help_text='Auto-generated e.g. TKT-10001',
+    )
+    tenant = models.ForeignKey(
+        TenantProfile,
+        on_delete=models.PROTECT,
+        related_name='support_tickets',
+    )
+    subject = models.CharField(max_length=255)
+    category = models.ForeignKey(
+        SupportCategory,
+        on_delete=models.PROTECT,
+        related_name='tickets',
+    )
+    priority = models.CharField(
+        max_length=10,
+        choices=PRIORITY_CHOICES,
+        default='Medium',
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='New',
+    )
+    assigned_to = models.ForeignKey(
+        'AdminUser',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='assigned_tickets',
+    )
+    created_by = models.CharField(
+        max_length=100,
+        help_text='Tenant User ID who opened the ticket',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    closed_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f'{self.ticket_no} - {self.subject}'
+
+    class Meta:
+        db_table = 'support_tickets'
+        ordering = ['-created_at']
+
+    @classmethod
+    def generate_ticket_no(cls):
+        last = cls.objects.order_by('-created_at').first()
+        if last and last.ticket_no:
+            try:
+                last_num = int(last.ticket_no.split('-')[1])
+                return f"TKT-{str(last_num + 1).zfill(5)}"
+            except Exception:
+                pass
+        return 'TKT-10001'
+
+
+class TicketReply(models.Model):
+    SENDER_TYPE_CHOICES = [
+        ('Tenant_User', 'Tenant User'),
+        ('Admin_Support', 'Admin Support'),
+        ('System_Bot', 'System Bot'),
+    ]
+
+    reply_id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    ticket = models.ForeignKey(
+        SupportTicket,
+        on_delete=models.CASCADE,
+        related_name='replies',
+    )
+    sender_type = models.CharField(
+        max_length=20,
+        choices=SENDER_TYPE_CHOICES,
+    )
+    sender_id = models.CharField(
+        max_length=100,
+        help_text='ID of person or bot who sent this',
+    )
+    message_body = models.TextField()
+    attachment = models.FileField(
+        upload_to='support_attachments/',
+        null=True,
+        blank=True,
+    )
+    is_internal = models.BooleanField(
+        default=False,
+        help_text='If True, hidden from Tenant completely',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Reply on {self.ticket.ticket_no} by {self.sender_type}"
+
+    class Meta:
+        db_table = 'support_ticket_replies'
+        ordering = ['created_at']
+
+    def save(self, *args, **kwargs):
+        if self.pk and TicketReply.objects.filter(
+                reply_id=self.reply_id).exists():
+            raise PermissionError(
+                'Ticket replies are immutable after creation.'
+            )
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError(
+            'Ticket replies cannot be deleted.'
+        )

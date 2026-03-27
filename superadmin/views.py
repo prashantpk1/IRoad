@@ -2,10 +2,12 @@ from django.contrib import messages
 from django.contrib.sessions.models import Session
 from django.contrib.auth import login, logout
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.db import transaction as db_transaction
 from django.db.models import Count, F, Q
 from django.db.models.expressions import ExpressionWrapper
 from django.db.models.fields import DecimalField
 from django.db.models.functions import Abs
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.core.paginator import Paginator
 from django.urls import reverse
@@ -13,9 +15,21 @@ from django.utils import timezone
 from django.utils.dateparse import parse_date
 from django.views import View
 from django.views.generic import TemplateView
+from datetime import date
 from decimal import Decimal
 import json
+import uuid
 
+from .billing_helpers import (
+    calculate_addon_prorata,
+    calculate_promo_discount,
+    calculate_pro_rata_credit,
+    generate_invoice_from_order,
+    get_fx_snapshot,
+    get_tax_code_for_tenant,
+    provision_tenant_from_order,
+    refresh_order_projected_fields,
+)
 from .auth_helpers import (
     check_brute_force,
     create_auth_token,
@@ -24,8 +38,10 @@ from .auth_helpers import (
     record_failed_attempt,
     reset_failed_attempts,
 )
+from .audit_helpers import create_session, close_session, log_audit_action
 from .forms import (
     AddOnsPricingPolicyForm,
+    AdminSecuritySettingsForm,
     AdminUserForm,
     CountryForm,
     CurrencyForm,
@@ -51,34 +67,59 @@ from .forms import (
     SubscriptionPlanForm,
     TaxCodeForm,
     InternalAlertRouteForm,
+    TenantProfileCreateForm,
+    TenantProfileUpdateForm,
+    TenantSecuritySettingsForm,
+    SupportCategoryForm,
+    CannedResponseForm,
+    SupportTicketForm,
+    TicketAssignForm,
+    TicketPriorityForm,
+    AdminReplyForm,
 )
 from .models import (
     AccessLog,
+    ActiveSession,
+    AdminSecuritySettings,
     AddOnsPricingPolicy,
     AdminAuthToken,
     AdminUser,
+    AuditLog,
     BaseCurrencyConfig,
     BankAccount,
     Country,
     CommGateway,
     CommLog,
+    CRMNote,
     Currency,
     EventMapping,
+    InternalAlertRoute,
     GeneralTaxSettings,
     GlobalSystemRules,
     LegalIdentity,
     NotificationTemplate,
+    OrderAddonLine,
+    OrderPlanLine,
     PaymentGateway,
     PaymentMethod,
     PlanPricingCycle,
     PromoCode,
     PushNotification,
     Role,
+    StandardInvoice,
+    SubscriptionOrder,
     SubscriptionPlan,
     SystemBanner,
     TaxCode,
+    TenantProfile,
+    TenantSecuritySettings,
+    Transaction,
     ExchangeRate,
     FXRateChangeLog,
+    SupportCategory,
+    CannedResponse,
+    SupportTicket,
+    TicketReply,
 )
 
 
@@ -222,6 +263,14 @@ class LoginView(View):
 
         login(request, user)
         request.session['last_activity'] = timezone.now().isoformat()
+        create_session(request, user, user_domain='Admin')
+        log_audit_action(
+            request=request,
+            action_type='Create',
+            module_name='Auth - Login',
+            record_id=str(getattr(user, 'admin_id', user.id)),
+            new_instance=None,
+        )
 
         log_access('Login', 'Success', email, ip)
         return redirect('dashboard')
@@ -231,12 +280,14 @@ class LogoutView(View):
     def get(self, request):
         if request.user.is_authenticated:
             log_access('Logout', 'Success', request.user.email, _client_ip(request))
+            close_session(request)
         logout(request)
         return redirect(reverse('login'))
 
     def post(self, request):
         if request.user.is_authenticated:
             log_access('Logout', 'Success', request.user.email, _client_ip(request))
+            close_session(request)
         logout(request)
         return redirect(reverse('login'))
 
@@ -389,7 +440,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
 
 
 class AccessLogListView(LoginRequiredMixin, View):
-    template_name = 'security/access_log.html'
+    template_name = 'security/logs/access_log_list.html'
 
     def _require_root(self, request):
         if not getattr(request.user, 'is_root', False):
@@ -404,6 +455,14 @@ class AccessLogListView(LoginRequiredMixin, View):
 
         qs = AccessLog.objects.all()
 
+        attempt_filter = request.GET.get('attempt_type', 'All')
+        if attempt_filter in [
+            AccessLog.AttemptType.LOGIN,
+            AccessLog.AttemptType.LOGOUT,
+            AccessLog.AttemptType.TOKEN_REFRESH,
+        ]:
+            qs = qs.filter(attempt_type=attempt_filter)
+
         status_filter = request.GET.get('status', 'All')
         if status_filter in [
             AccessLog.Status.SUCCESS,
@@ -412,16 +471,16 @@ class AccessLogListView(LoginRequiredMixin, View):
         ]:
             qs = qs.filter(status=status_filter)
 
-        attempt_filter = request.GET.get('attempt_type', 'All')
-        if attempt_filter in [
-            AccessLog.AttemptType.LOGIN,
-            AccessLog.AttemptType.LOGOUT,
-        ]:
-            qs = qs.filter(attempt_type=attempt_filter)
+        domain_filter = request.GET.get('user_domain', 'All')
+        if domain_filter in ['Admin', 'Tenant_User', 'Driver']:
+            qs = qs.filter(user_domain=domain_filter)
 
-        search_email = request.GET.get('q', '').strip()
-        if search_email:
-            qs = qs.filter(email_used__icontains=search_email)
+        search_query = request.GET.get('q', '').strip()
+        if search_query:
+            qs = qs.filter(
+                Q(email_used__icontains=search_query)
+                | Q(ip_address__icontains=search_query)
+            )
 
         from_date = request.GET.get('from_date', '').strip()
         to_date = request.GET.get('to_date', '').strip()
@@ -435,7 +494,7 @@ class AccessLogListView(LoginRequiredMixin, View):
         qs = qs.order_by('-timestamp')
         total_count = qs.count()
 
-        paginator = Paginator(qs, 20)
+        paginator = Paginator(qs, 25)
         page_number = request.GET.get('page', 1)
         page_obj = paginator.get_page(page_number)
 
@@ -449,12 +508,386 @@ class AccessLogListView(LoginRequiredMixin, View):
             'page_title': 'Authentication Access Log',
             'status_filter': status_filter,
             'attempt_type_filter': attempt_filter,
-            'search_email': search_email,
+            'domain_filter': domain_filter,
+            'search_query': search_query,
             'from_date': from_date,
             'to_date': to_date,
             'filter_query': query_params.urlencode(),
         }
         return render(request, self.template_name, context)
+
+
+class AuditLogListView(LoginRequiredMixin, View):
+    template_name = 'security/logs/audit_log_list.html'
+
+    def _require_root(self, request):
+        if not getattr(request.user, 'is_root', False):
+            messages.error(request, 'Access denied: root admin only.')
+            return redirect(reverse('dashboard'))
+        return None
+
+    def get(self, request):
+        redirect_resp = self._require_root(request)
+        if redirect_resp:
+            return redirect_resp
+
+        qs = AuditLog.objects.select_related('admin').all()
+
+        action_filter = request.GET.get('action_type', 'All')
+        if action_filter in ['Create', 'Update', 'Delete', 'Status_Change']:
+            qs = qs.filter(action_type=action_filter)
+
+        module_filter = request.GET.get('module_name', '').strip()
+        if module_filter:
+            qs = qs.filter(module_name=module_filter)
+
+        admin_filter = request.GET.get('admin', '').strip()
+        if admin_filter:
+            qs = qs.filter(admin_id=admin_filter)
+
+        from_date = request.GET.get('from_date', '').strip()
+        to_date = request.GET.get('to_date', '').strip()
+        fd = parse_date(from_date) if from_date else None
+        td = parse_date(to_date) if to_date else None
+        if fd:
+            qs = qs.filter(timestamp__date__gte=fd)
+        if td:
+            qs = qs.filter(timestamp__date__lte=td)
+
+        search_query = request.GET.get('q', '').strip()
+        if search_query:
+            qs = qs.filter(
+                Q(module_name__icontains=search_query)
+                | Q(record_id__icontains=search_query)
+            )
+
+        qs = qs.order_by('-timestamp')
+        paginator = Paginator(qs, 25)
+        page_number = request.GET.get('page', 1)
+        page_obj = paginator.get_page(page_number)
+
+        query_params = request.GET.copy()
+        if 'page' in query_params:
+            query_params.pop('page', None)
+
+        context = {
+            'audit_logs': page_obj,
+            'action_filter': action_filter,
+            'module_filter': module_filter,
+            'admin_filter': admin_filter,
+            'from_date': from_date,
+            'to_date': to_date,
+            'search_query': search_query,
+            'admins': AdminUser.objects.order_by('first_name', 'last_name'),
+            'modules': AuditLog.objects.values_list(
+                'module_name', flat=True
+            ).distinct().order_by('module_name'),
+            'filter_query': query_params.urlencode(),
+        }
+        return render(request, self.template_name, context)
+
+
+class AuditLogDetailView(LoginRequiredMixin, View):
+    template_name = 'security/logs/audit_log_detail.html'
+
+    def _require_root(self, request):
+        if not getattr(request.user, 'is_root', False):
+            messages.error(request, 'Access denied: root admin only.')
+            return redirect(reverse('dashboard'))
+        return None
+
+    def get(self, request, pk):
+        redirect_resp = self._require_root(request)
+        if redirect_resp:
+            return redirect_resp
+        audit_entry = get_object_or_404(AuditLog, pk=pk)
+        old_payload_pretty = (
+            json.dumps(audit_entry.old_payload, indent=2, ensure_ascii=False)
+            if audit_entry.old_payload is not None
+            else None
+        )
+        new_payload_pretty = (
+            json.dumps(audit_entry.new_payload, indent=2, ensure_ascii=False)
+            if audit_entry.new_payload is not None
+            else None
+        )
+        context = {
+            'audit_entry': audit_entry,
+            'old_payload_pretty': old_payload_pretty,
+            'new_payload_pretty': new_payload_pretty,
+        }
+        return render(request, self.template_name, context)
+
+
+class AdminSecuritySettingsView(LoginRequiredMixin, View):
+    template_name = 'security/admin_security_settings.html'
+
+    def _require_root(self, request):
+        if not getattr(request.user, 'is_root', False):
+            messages.error(request, 'Access denied: root admin only.')
+            return redirect(reverse('dashboard'))
+        return None
+
+    def get(self, request):
+        redirect_resp = self._require_root(request)
+        if redirect_resp:
+            return redirect_resp
+        obj, _created = AdminSecuritySettings.objects.get_or_create(
+            setting_id='ADMIN-SEC-CONF',
+            defaults={
+                'session_timeout_minutes': 240,
+                'max_failed_logins': 3,
+                'lockout_duration_minutes': 30,
+            },
+        )
+        form = AdminSecuritySettingsForm(instance=obj)
+        return render(request, self.template_name, {'form': form, 'obj': obj})
+
+    def post(self, request):
+        redirect_resp = self._require_root(request)
+        if redirect_resp:
+            return redirect_resp
+        obj, _created = AdminSecuritySettings.objects.get_or_create(
+            setting_id='ADMIN-SEC-CONF',
+            defaults={
+                'session_timeout_minutes': 240,
+                'max_failed_logins': 3,
+                'lockout_duration_minutes': 30,
+            },
+        )
+        old_obj = AdminSecuritySettings.objects.get(setting_id=obj.setting_id)
+        form = AdminSecuritySettingsForm(request.POST, instance=obj)
+        if not form.is_valid():
+            return render(request, self.template_name, {'form': form, 'obj': obj})
+        form.instance.updated_by = request.user
+        form.save()
+        log_audit_action(
+            request,
+            'Update',
+            'Admin Security Settings',
+            'ADMIN-SEC-CONF',
+            old_instance=old_obj,
+            new_instance=obj,
+        )
+        messages.success(request, 'Admin security settings saved successfully.')
+        return redirect(reverse('security_settings'))
+
+
+class TenantSecuritySettingsView(LoginRequiredMixin, View):
+    template_name = 'security/tenant_security_settings.html'
+
+    def _require_root(self, request):
+        if not getattr(request.user, 'is_root', False):
+            messages.error(request, 'Access denied: root admin only.')
+            return redirect(reverse('dashboard'))
+        return None
+
+    def get(self, request):
+        redirect_resp = self._require_root(request)
+        if redirect_resp:
+            return redirect_resp
+
+        obj, _created = TenantSecuritySettings.objects.get_or_create(
+            setting_id='TENANT-SEC-CONF',
+            defaults={
+                'tenant_web_timeout_hours': 12,
+                'driver_app_timeout_days': 30,
+                'max_failed_logins': 5,
+                'lockout_duration_minutes': 15,
+            },
+        )
+        form = TenantSecuritySettingsForm(instance=obj)
+        return render(request, self.template_name, {'form': form, 'obj': obj})
+
+    def post(self, request):
+        redirect_resp = self._require_root(request)
+        if redirect_resp:
+            return redirect_resp
+
+        obj, _created = TenantSecuritySettings.objects.get_or_create(
+            setting_id='TENANT-SEC-CONF',
+            defaults={
+                'tenant_web_timeout_hours': 12,
+                'driver_app_timeout_days': 30,
+                'max_failed_logins': 5,
+                'lockout_duration_minutes': 15,
+            },
+        )
+        old_obj = TenantSecuritySettings.objects.get(setting_id=obj.setting_id)
+        form = TenantSecuritySettingsForm(request.POST, instance=obj)
+        if not form.is_valid():
+            return render(request, self.template_name, {'form': form, 'obj': obj})
+
+        form.instance.updated_by = request.user
+        form.save()
+        log_audit_action(
+            request,
+            'Update',
+            'Tenant Security Settings',
+            'TENANT-SEC-CONF',
+            old_instance=old_obj,
+            new_instance=obj,
+        )
+        messages.success(request, 'Tenant security settings saved successfully.')
+        return redirect(reverse('tenant_security_settings'))
+
+
+class ActiveSessionListView(LoginRequiredMixin, View):
+    template_name = 'security/sessions/session_list.html'
+
+    def _require_root(self, request):
+        if not getattr(request.user, 'is_root', False):
+            messages.error(request, 'Access denied: root admin only.')
+            return redirect(reverse('dashboard'))
+        return None
+
+    def get(self, request):
+        redirect_resp = self._require_root(request)
+        if redirect_resp:
+            return redirect_resp
+
+        domain_filter = request.GET.get('user_domain', 'All')
+        search_query = request.GET.get('q', '').strip()
+
+        # TODO Phase 11 Redis: Replace this DB query with
+        # Redis scan for live JWT sessions when Redis
+        # is implemented.
+        qs = ActiveSession.objects.filter(is_active=True)
+        if domain_filter in ['Admin', 'Tenant_User', 'Driver']:
+            qs = qs.filter(user_domain=domain_filter)
+        if search_query:
+            qs = qs.filter(
+                Q(reference_name__icontains=search_query)
+                | Q(ip_address__icontains=search_query)
+            )
+
+        qs = qs.order_by('-started_at')
+        paginator = Paginator(qs, 20)
+        page_number = request.GET.get('page', 1)
+        sessions_page = paginator.get_page(page_number)
+
+        total_active = ActiveSession.objects.filter(is_active=True).count()
+        total_admin = ActiveSession.objects.filter(
+            is_active=True,
+            user_domain='Admin',
+        ).count()
+        total_tenant = ActiveSession.objects.filter(
+            is_active=True,
+            user_domain='Tenant_User',
+        ).count()
+        total_driver = ActiveSession.objects.filter(
+            is_active=True,
+            user_domain='Driver',
+        ).count()
+
+        context = {
+            'sessions': sessions_page,
+            'domain_filter': domain_filter,
+            'search_query': search_query,
+            'total_active': total_active,
+            'total_admin': total_admin,
+            'total_tenant': total_tenant,
+            'total_driver': total_driver,
+        }
+        return render(request, self.template_name, context)
+
+
+class SessionRevokeView(LoginRequiredMixin, View):
+    def _require_root(self, request):
+        if not getattr(request.user, 'is_root', False):
+            messages.error(request, 'Access denied: root admin only.')
+            return redirect(reverse('dashboard'))
+        return None
+
+    def post(self, request, pk):
+        redirect_resp = self._require_root(request)
+        if redirect_resp:
+            return redirect_resp
+
+        session = get_object_or_404(ActiveSession, session_id=pk)
+        old_obj = ActiveSession.objects.get(session_id=pk)
+        if not session.is_active:
+            messages.info(request, 'Session is already revoked.')
+            return redirect(reverse('session_list'))
+
+        session.is_active = False
+        session.revoked_at = timezone.now()
+        session.revoked_by = request.user
+        session.save()
+
+        log_audit_action(
+            request,
+            'Status_Change',
+            'Active Sessions',
+            str(session.session_id),
+            old_instance=old_obj,
+            new_instance=session,
+        )
+        # TODO Phase 11 Redis: Also delete JWT from
+        # Redis cache here to enforce real-time revocation
+        messages.success(request, 'Session revoked successfully.')
+        return redirect(reverse('session_list'))
+
+
+class MassRevokeView(LoginRequiredMixin, View):
+    template_name = 'security/sessions/mass_revoke.html'
+
+    def _require_root(self, request):
+        if not getattr(request.user, 'is_root', False):
+            messages.error(request, 'Access denied: root admin only.')
+            return redirect(reverse('dashboard'))
+        return None
+
+    def get(self, request):
+        redirect_resp = self._require_root(request)
+        if redirect_resp:
+            return redirect_resp
+        tenants = TenantProfile.objects.filter(
+            account_status='Active'
+        ).order_by('company_name')
+        return render(request, self.template_name, {'tenants': tenants})
+
+    def post(self, request):
+        redirect_resp = self._require_root(request)
+        if redirect_resp:
+            return JsonResponse({'error': 'Forbidden'}, status=403)
+
+        tenant_id = request.POST.get('tenant_id', '').strip()
+        if not tenant_id:
+            return JsonResponse({'error': 'tenant_id is required'}, status=400)
+
+        tenant = TenantProfile.objects.filter(tenant_id=tenant_id).first()
+        if tenant is None:
+            return JsonResponse({'error': 'Tenant not found'}, status=404)
+
+        active_qs = ActiveSession.objects.filter(
+            is_active=True,
+            user_domain__in=['Tenant_User', 'Driver'],
+        )
+        # TODO Phase 11: Filter by tenant_id properly
+        # when tenant user model is integrated
+        active_qs = active_qs.filter(reference_id__icontains=str(tenant.tenant_id))
+        revoked_count = active_qs.count()
+        active_qs.update(
+            is_active=False,
+            revoked_at=timezone.now(),
+            revoked_by=request.user,
+        )
+
+        log_audit_action(
+            request,
+            'Status_Change',
+            'Active Sessions - Mass Revoke',
+            str(tenant_id),
+            new_instance=None,
+        )
+        # TODO Phase 11 Redis: Also flush all JWT tokens
+        # for this tenant from Redis here —
+        # this is the actual Kill Switch implementation
+        return JsonResponse(
+            {'message': 'Mass revoke executed.', 'revoked_count': revoked_count},
+            status=200,
+        )
 
 
 class RoleListView(LoginRequiredMixin, View):
@@ -1044,6 +1477,13 @@ class CountryCreateView(LoginRequiredMixin, View):
         country.country_code = country.country_code.upper().strip()
         country.created_by = request.user
         country.save()
+        log_audit_action(
+            request,
+            'Create',
+            'Countries Master',
+            str(country.country_code),
+            new_instance=country,
+        )
 
         messages.success(request, 'Country created successfully.')
         # TODO Phase 10: Invalidate country cache here
@@ -1082,6 +1522,7 @@ class CountryUpdateView(LoginRequiredMixin, View):
             return redirect_resp
 
         country = get_object_or_404(Country, pk=pk)
+        old_obj = Country.objects.get(country_code=country.country_code)
         form = CountryForm(request.POST, instance=country, is_edit=True)
         if not form.is_valid():
             return render(
@@ -1095,6 +1536,14 @@ class CountryUpdateView(LoginRequiredMixin, View):
             )
 
         form.save()
+        log_audit_action(
+            request,
+            'Update',
+            'Countries Master',
+            str(country.country_code),
+            old_instance=old_obj,
+            new_instance=country,
+        )
         messages.success(request, 'Country updated successfully.')
         # TODO Phase 10: Invalidate country cache here
         return redirect(reverse('country_list'))
@@ -1107,6 +1556,7 @@ class CountryToggleStatusView(LoginRequiredMixin, View):
             return redirect(reverse('country_list'))
 
         country = get_object_or_404(Country, pk=pk)
+        old_obj = Country.objects.get(country_code=country.country_code)
 
         if country.is_active:
             # TODO Phase 5: Check if country is linked to active Tenants
@@ -1119,6 +1569,14 @@ class CountryToggleStatusView(LoginRequiredMixin, View):
             messages.success(request, 'Country activated successfully.')
 
         country.save(update_fields=['is_active'])
+        log_audit_action(
+            request,
+            'Status_Change',
+            'Countries Master',
+            str(country.country_code),
+            old_instance=old_obj,
+            new_instance=country,
+        )
         # TODO Phase 10: Invalidate country cache here
         return redirect(reverse('country_list'))
 
@@ -1213,6 +1671,13 @@ class CurrencyCreateView(LoginRequiredMixin, View):
         currency.currency_code = currency.currency_code.upper().strip()
         currency.created_by = request.user
         currency.save()
+        log_audit_action(
+            request,
+            'Create',
+            'Currencies Master',
+            str(currency.currency_code),
+            new_instance=currency,
+        )
 
         messages.success(request, 'Currency created successfully.')
         return redirect(reverse('currency_list'))
@@ -1250,6 +1715,7 @@ class CurrencyUpdateView(LoginRequiredMixin, View):
             return redirect_resp
 
         currency = get_object_or_404(Currency, pk=pk)
+        old_obj = Currency.objects.get(currency_code=currency.currency_code)
         form = CurrencyForm(request.POST, instance=currency, is_edit=True)
         if not form.is_valid():
             return render(
@@ -1265,6 +1731,14 @@ class CurrencyUpdateView(LoginRequiredMixin, View):
         # CRITICAL: Enforce immutable PK even if a client bypasses disabled field.
         form.instance.currency_code = currency.currency_code
         form.save()
+        log_audit_action(
+            request,
+            'Update',
+            'Currencies Master',
+            str(currency.currency_code),
+            old_instance=old_obj,
+            new_instance=currency,
+        )
 
         messages.success(request, 'Currency updated successfully.')
         return redirect(reverse('currency_list'))
@@ -1277,6 +1751,7 @@ class CurrencyToggleStatusView(LoginRequiredMixin, View):
             return redirect(reverse('currency_list'))
 
         currency = get_object_or_404(Currency, pk=pk)
+        old_obj = Currency.objects.get(currency_code=currency.currency_code)
 
         if currency.is_active:
             # TODO Phase 6: Check if currency is linked to active
@@ -1289,6 +1764,14 @@ class CurrencyToggleStatusView(LoginRequiredMixin, View):
             messages.success(request, 'Currency activated successfully.')
 
         currency.save(update_fields=['is_active'])
+        log_audit_action(
+            request,
+            'Status_Change',
+            'Currencies Master',
+            str(currency.currency_code),
+            old_instance=old_obj,
+            new_instance=currency,
+        )
         return redirect(reverse('currency_list'))
 
 
@@ -1339,6 +1822,7 @@ class GeneralTaxSettingsView(LoginRequiredMixin, View):
             },
         )
         form = GeneralTaxSettingsForm(request.POST, instance=obj)
+        old_obj = GeneralTaxSettings.objects.get(setting_id=obj.setting_id)
         if not form.is_valid():
             return render(
                 request,
@@ -1348,6 +1832,14 @@ class GeneralTaxSettingsView(LoginRequiredMixin, View):
 
         form.instance.updated_by = request.user
         form.instance.save(update_fields=['prices_include_tax', 'location_verification', 'updated_by', 'updated_at'])
+        log_audit_action(
+            request,
+            'Update',
+            'General Tax Settings',
+            str(obj.setting_id),
+            old_instance=old_obj,
+            new_instance=obj,
+        )
         messages.success(request, 'General tax settings saved successfully.')
         return redirect(reverse('general_tax_settings'))
 
@@ -1526,6 +2018,7 @@ class BaseCurrencyView(LoginRequiredMixin, View):
         )
 
         form = BaseCurrencyForm(request.POST, instance=obj)
+        old_obj = BaseCurrencyConfig.objects.get(setting_id=obj.setting_id)
         if not form.is_valid():
             return render(
                 request,
@@ -1538,6 +2031,14 @@ class BaseCurrencyView(LoginRequiredMixin, View):
         #               If yes, block change entirely.
         form.instance.updated_by = request.user
         form.instance.save(update_fields=['base_currency', 'updated_by', 'updated_at'])
+        log_audit_action(
+            request,
+            'Update',
+            'Base Currency Config',
+            str(obj.setting_id),
+            old_instance=old_obj,
+            new_instance=obj,
+        )
         messages.success(request, 'Base currency saved successfully.')
         return redirect(reverse('base_currency'))
 
@@ -1655,6 +2156,13 @@ class ExchangeRateCreateView(LoginRequiredMixin, View):
         rate = form.save(commit=False)
         rate.updated_by = request.user
         rate.save()
+        log_audit_action(
+            request,
+            'Create',
+            'Exchange Rates',
+            str(rate.fx_id),
+            new_instance=rate,
+        )
 
         FXRateChangeLog.objects.create(
             currency=rate.currency,
@@ -1678,6 +2186,7 @@ class ExchangeRateUpdateView(LoginRequiredMixin, View):
 
         base_code = _get_base_currency_code()
         rate = get_object_or_404(ExchangeRate, pk=pk)
+        old_obj = ExchangeRate.objects.get(pk=pk)
         form = ExchangeRateForm(instance=rate, base_currency_code=base_code)
         form.fields['currency'].disabled = True
 
@@ -1705,6 +2214,14 @@ class ExchangeRateUpdateView(LoginRequiredMixin, View):
             rate.is_active = new_active
             rate.updated_by = request.user
             rate.save(update_fields=['is_active', 'updated_by', 'updated_at'])
+            log_audit_action(
+                request,
+                'Status_Change',
+                'Exchange Rates',
+                str(rate.fx_id),
+                old_instance=old_obj,
+                new_instance=rate,
+            )
             messages.success(
                 request,
                 'Exchange rate activated successfully.' if new_active else 'Exchange rate deactivated successfully.',
@@ -1730,6 +2247,14 @@ class ExchangeRateUpdateView(LoginRequiredMixin, View):
 
         old_rate = ExchangeRate.objects.get(pk=rate.fx_id).exchange_rate
         form.save()
+        log_audit_action(
+            request,
+            'Update',
+            'Exchange Rates',
+            str(rate.fx_id),
+            old_instance=old_obj,
+            new_instance=rate,
+        )
 
         FXRateChangeLog.objects.create(
             currency=rate.currency,
@@ -2019,6 +2544,13 @@ class PlanCreateView(LoginRequiredMixin, View):
         plan = form.save(commit=False)
         plan.created_by = request.user
         plan.save()
+        log_audit_action(
+            request,
+            'Create',
+            'Subscription Plans',
+            str(plan.plan_id),
+            new_instance=plan,
+        )
 
         for row in valid_rows:
             PlanPricingCycle.objects.create(
@@ -2183,6 +2715,7 @@ class PlanUpdateView(PlanCreateView):
             return redirect_resp
 
         plan = get_object_or_404(SubscriptionPlan, pk=pk)
+        old_obj = SubscriptionPlan.objects.get(pk=pk)
         form = SubscriptionPlanForm(request.POST, instance=plan)
         rows = self._extract_rows(request.POST)
         valid_rows, row_errors, duplicate_error = self._validate_rows(rows)
@@ -2213,6 +2746,14 @@ class PlanUpdateView(PlanCreateView):
             )
 
         plan = form.save()
+        log_audit_action(
+            request,
+            'Update',
+            'Subscription Plans',
+            str(plan.plan_id),
+            old_instance=old_obj,
+            new_instance=plan,
+        )
         existing_map = {
             str(item.pricing_id): item
             for item in plan.pricing_cycles.all()
@@ -2275,6 +2816,7 @@ class PlanToggleStatusView(LoginRequiredMixin, View):
             return redirect_resp
 
         plan = get_object_or_404(SubscriptionPlan, pk=pk)
+        old_obj = SubscriptionPlan.objects.get(pk=pk)
         if plan.is_active:
             # TODO Phase 6: Check active tenant subscriptions
             #               before deactivating this plan
@@ -2284,6 +2826,14 @@ class PlanToggleStatusView(LoginRequiredMixin, View):
             plan.is_active = True
             messages.success(request, 'Plan activated successfully.')
         plan.save(update_fields=['is_active', 'updated_at'])
+        log_audit_action(
+            request,
+            'Status_Change',
+            'Subscription Plans',
+            str(plan.plan_id),
+            old_instance=old_obj,
+            new_instance=plan,
+        )
         return redirect(reverse('plan_list'))
 
 
@@ -3558,3 +4108,1407 @@ class CommLogListView(LoginRequiredMixin, View):
                 'date_to': date_to,
             },
         )
+
+
+_SUSPEND_ACCOUNT_STATUSES = (
+    'Suspended_Billing',
+    'Suspended_Violation',
+)
+
+
+class TenantListView(LoginRequiredMixin, View):
+    template_name = 'crm/tenants/tenant_list.html'
+
+    def get(self, request):
+        qs = TenantProfile.objects.select_related(
+            'country', 'current_plan', 'assigned_sales_rep'
+        ).order_by('company_name')
+        search = request.GET.get('q', '').strip()
+        status_filter = request.GET.get('account_status', 'All')
+        rep_filter = request.GET.get('assigned_sales_rep', '').strip()
+        plan_filter = request.GET.get('current_plan', '').strip()
+
+        if search:
+            qs = qs.filter(
+                Q(company_name__icontains=search)
+                | Q(primary_email__icontains=search)
+            )
+        codes = [c[0] for c in TenantProfile.STATUS_CHOICES]
+        if status_filter in codes:
+            qs = qs.filter(account_status=status_filter)
+        if rep_filter:
+            try:
+                uuid.UUID(str(rep_filter))
+                qs = qs.filter(assigned_sales_rep_id=rep_filter)
+            except ValueError:
+                pass
+        if plan_filter:
+            try:
+                uuid.UUID(str(plan_filter))
+                qs = qs.filter(current_plan_id=plan_filter)
+            except ValueError:
+                pass
+
+        paginator = Paginator(qs, 15)
+        tenants = paginator.get_page(request.GET.get('page', 1))
+        sales_reps = AdminUser.objects.filter(status='Active').order_by(
+            'first_name', 'last_name'
+        )
+        plans = SubscriptionPlan.objects.filter(is_active=True).order_by(
+            'plan_name_en'
+        )
+        return render(
+            request,
+            self.template_name,
+            {
+                'tenants': tenants,
+                'search_query': search,
+                'status_filter': status_filter,
+                'rep_filter': rep_filter,
+                'plan_filter': plan_filter,
+                'sales_reps': sales_reps,
+                'plans': plans,
+                'today': date.today(),
+                'status_choices': TenantProfile.STATUS_CHOICES,
+            },
+        )
+
+
+class TenantCreateView(LoginRequiredMixin, View):
+    template_name = 'crm/tenants/tenant_form.html'
+
+    def get(self, request):
+        redirect_resp = _require_root_or_redirect(request)
+        if redirect_resp:
+            return redirect_resp
+        return render(
+            request,
+            self.template_name,
+            {'form': TenantProfileCreateForm(), 'is_edit': False},
+        )
+
+    def post(self, request):
+        redirect_resp = _require_root_or_redirect(request)
+        if redirect_resp:
+            return redirect_resp
+        form = TenantProfileCreateForm(request.POST)
+        if form.is_valid():
+            tenant = form.save(commit=False)
+            tenant.wallet_balance = Decimal('0.00')
+            tenant.total_ltv = Decimal('0.00')
+            tenant.current_plan = None
+            tenant.subscription_start_date = None
+            tenant.subscription_expiry_date = None
+            tenant.active_max_users = 0
+            tenant.active_max_internal_trucks = 0
+            tenant.active_max_external_trucks = 0
+            tenant.active_max_drivers = 0
+            tenant.save()
+            # TODO Phase 12: Trigger tenant DB provisioning here
+            messages.success(request, 'Subscriber profile created successfully.')
+            return redirect(reverse('tenant_detail', kwargs={'pk': tenant.pk}))
+        return render(
+            request,
+            self.template_name,
+            {'form': form, 'is_edit': False},
+        )
+
+
+class TenantUpdateView(LoginRequiredMixin, View):
+    template_name = 'crm/tenants/tenant_form.html'
+
+    def get(self, request, pk):
+        redirect_resp = _require_root_or_redirect(request)
+        if redirect_resp:
+            return redirect_resp
+        tenant = get_object_or_404(TenantProfile, pk=pk)
+        return render(
+            request,
+            self.template_name,
+            {
+                'form': TenantProfileUpdateForm(instance=tenant),
+                'is_edit': True,
+                'tenant': tenant,
+            },
+        )
+
+    def post(self, request, pk):
+        redirect_resp = _require_root_or_redirect(request)
+        if redirect_resp:
+            return redirect_resp
+        tenant = get_object_or_404(TenantProfile, pk=pk)
+        old_obj = TenantProfile.objects.get(pk=pk)
+        old_status = tenant.account_status
+        form = TenantProfileUpdateForm(request.POST, instance=tenant)
+        if not form.is_valid():
+            return render(
+                request,
+                self.template_name,
+                {
+                    'form': form,
+                    'is_edit': True,
+                    'tenant': tenant,
+                },
+            )
+        new_status = form.cleaned_data['account_status']
+        if (
+            new_status in _SUSPEND_ACCOUNT_STATUSES
+            and old_status not in _SUSPEND_ACCOUNT_STATUSES
+        ):
+            # TODO Phase 10: Trigger Kill Switch here
+            #               Revoke all tenant JWT tokens via Redis
+            pass
+        form.save()
+        if old_status != new_status:
+            log_audit_action(
+                request,
+                'Status_Change',
+                'Tenant Profile',
+                str(tenant.tenant_id),
+                old_instance=old_obj,
+                new_instance=tenant,
+            )
+        messages.success(request, 'Subscriber profile updated successfully.')
+        return redirect(reverse('tenant_detail', kwargs={'pk': tenant.pk}))
+
+
+class TenantDetailView(LoginRequiredMixin, View):
+    template_name = 'crm/tenants/tenant_detail.html'
+
+    def get(self, request, pk):
+        tenant = get_object_or_404(
+            TenantProfile.objects.select_related(
+                'country', 'current_plan', 'assigned_sales_rep'
+            ),
+            pk=pk,
+        )
+        notes = (
+            tenant.crm_notes.select_related('admin')
+            .order_by('-created_at')[:10]
+        )
+        return render(
+            request,
+            self.template_name,
+            {
+                'tenant': tenant,
+                'notes': notes,
+                'today': date.today(),
+                'note_type_choices': CRMNote.NOTE_TYPE_CHOICES,
+            },
+        )
+
+
+class CRMNoteCreateView(LoginRequiredMixin, View):
+    def post(self, request, pk):
+        tenant = get_object_or_404(TenantProfile, pk=pk)
+        note_type = request.POST.get('note_type', 'General')
+        note_content = (request.POST.get('note_content') or '').strip()
+        valid_types = {c[0] for c in CRMNote.NOTE_TYPE_CHOICES}
+        if note_type not in valid_types:
+            note_type = 'General'
+        if not note_content:
+            messages.error(request, 'Note content is required.')
+            return redirect(reverse('tenant_detail', kwargs={'pk': pk}))
+        CRMNote.objects.create(
+            tenant=tenant,
+            admin=request.user,
+            note_type=note_type,
+            note_content=note_content,
+        )
+        messages.success(request, 'CRM note added successfully.')
+        return redirect(reverse('tenant_detail', kwargs={'pk': pk}))
+
+    def get(self, request, pk):
+        return redirect(reverse('tenant_detail', kwargs={'pk': pk}))
+
+
+# --- CRM: subscription orders, transactions, standard invoices ---
+
+
+class RootRequiredMixin(LoginRequiredMixin):
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return self.handle_no_permission()
+        if not getattr(request.user, 'is_root', False):
+            messages.error(
+                request,
+                'You do not have permission to perform this action.',
+            )
+            return redirect('dashboard')
+        return super().dispatch(request, *args, **kwargs)
+
+
+_PLAN_CLASSIFICATIONS = {
+    'New_Subscription',
+    'Renewal',
+    'Upgrade',
+    'Downgrade',
+}
+
+
+def _billing_addon_unit_price(policy, add_on_type):
+    mapping = {
+        'Extra_User': policy.extra_internal_user_price,
+        'Extra_Internal_Truck': policy.extra_internal_truck_price,
+        'Extra_External_Truck': policy.extra_external_truck_price,
+        'Extra_Driver': policy.extra_driver_price,
+        'Extra_Shipment': policy.extra_shipment_price,
+        'Extra_Storage_GB': policy.extra_storage_gb_price,
+    }
+    return mapping.get(add_on_type, Decimal('0.00'))
+
+
+def _billing_one_cycle_plan_price(plan, currency):
+    ppc = PlanPricingCycle.objects.filter(
+        plan=plan,
+        currency=currency,
+        number_of_cycles=1,
+    ).first()
+    return ppc.price if ppc else Decimal('0.00')
+
+
+def _sync_or_create_order_payment_transaction(order):
+    txn = Transaction.objects.filter(
+        order=order,
+        transaction_type='Order_Payment',
+    ).first()
+    if txn:
+        txn.amount = order.grand_total
+        txn.currency = order.currency
+        txn.exchange_rate_snapshot = order.exchange_rate_snapshot
+        txn.base_currency_equivalent_amount = order.base_currency_equivalent
+        txn.payment_method = order.payment_method
+        if txn.status == 'Pending':
+            txn.save(update_fields=[
+                'amount', 'currency', 'exchange_rate_snapshot',
+                'base_currency_equivalent_amount', 'payment_method',
+                'updated_at',
+            ])
+        return txn
+    return Transaction.objects.create(
+        tenant=order.tenant,
+        order=order,
+        transaction_type='Order_Payment',
+        payment_method=order.payment_method,
+        currency=order.currency,
+        amount=order.grand_total,
+        exchange_rate_snapshot=order.exchange_rate_snapshot,
+        base_currency_equivalent_amount=order.base_currency_equivalent,
+        status='Pending',
+    )
+
+
+class OrderListView(LoginRequiredMixin, View):
+    template_name = 'crm/orders/order_list.html'
+
+    def get(self, request):
+        qs = SubscriptionOrder.objects.select_related(
+            'tenant', 'currency', 'created_by',
+        ).order_by('-created_at')
+        q = request.GET.get('q', '').strip()
+        if q:
+            qs = qs.filter(tenant__company_name__icontains=q)
+        oc = request.GET.get('order_classification', '').strip()
+        if oc:
+            qs = qs.filter(order_classification=oc)
+        st = request.GET.get('order_status', '').strip()
+        if st:
+            qs = qs.filter(order_status=st)
+        paginator = Paginator(qs, 15)
+        page = paginator.get_page(request.GET.get('page'))
+        return render(request, self.template_name, {
+            'orders': page,
+            'search_query': q,
+            'classification_filter': oc,
+            'status_filter': st,
+            'classification_choices': SubscriptionOrder.CLASSIFICATION_CHOICES,
+            'status_choices': SubscriptionOrder.STATUS_CHOICES,
+        })
+
+
+class OrderCreateView(RootRequiredMixin, View):
+    template_name = 'crm/orders/order_form.html'
+
+    def get(self, request):
+        tenant_pre = request.GET.get('tenant', '').strip()
+        tenant_obj = None
+        if tenant_pre:
+            tenant_obj = TenantProfile.objects.filter(
+                tenant_id=tenant_pre,
+            ).first()
+
+        plan_qs = SubscriptionPlan.objects.filter(is_active=True).order_by(
+            'plan_name_en')
+        pricing_qs = PlanPricingCycle.objects.filter(
+            plan__is_active=True,
+        ).select_related('plan', 'currency')
+        pricing_json = [
+            {
+                'plan_id': str(r.plan_id),
+                'currency': r.currency_id,
+                'cycles': r.number_of_cycles,
+                'price': str(r.price),
+            }
+            for r in pricing_qs
+        ]
+        policy = AddOnsPricingPolicy.objects.filter(is_active=True).first()
+        addons_json = {}
+        if policy:
+            for choice_code, _label in OrderAddonLine.ADDON_TYPE_CHOICES:
+                addons_json[choice_code] = str(
+                    _billing_addon_unit_price(policy, choice_code))
+
+        upgrade_credit_hint = ''
+        if tenant_obj and tenant_obj.current_plan:
+            op = _billing_one_cycle_plan_price(
+                tenant_obj.current_plan,
+                Currency.objects.filter(is_active=True).first(),
+            )
+            if op:
+                upgrade_credit_hint = str(
+                    calculate_pro_rata_credit(tenant_obj, op))
+
+        return render(request, self.template_name, {
+            'tenants': TenantProfile.objects.order_by('company_name'),
+            'currencies': Currency.objects.filter(is_active=True).order_by(
+                'currency_code'),
+            'plans': plan_qs,
+            'payment_methods': PaymentMethod.objects.filter(
+                is_active=True).order_by('display_order'),
+            'classification_choices': SubscriptionOrder.CLASSIFICATION_CHOICES,
+            'addon_action_choices': OrderAddonLine.ACTION_TYPE_CHOICES,
+            'addon_type_choices': OrderAddonLine.ADDON_TYPE_CHOICES,
+            'tenant_preselect': str(tenant_obj.tenant_id) if tenant_obj else '',
+            'pricing_data': pricing_json,
+            'addons_data': addons_json,
+            'upgrade_credit_hint': upgrade_credit_hint,
+        })
+
+    def post(self, request):
+        tenant_id = request.POST.get('tenant', '').strip()
+        classification = request.POST.get('order_classification', '').strip()
+        currency_id = request.POST.get('currency', '').strip()
+        payment_method_id = request.POST.get('payment_method', '').strip()
+        promo_input = request.POST.get('promo_code', '').strip()
+
+        tenant = TenantProfile.objects.filter(tenant_id=tenant_id).first()
+        if not tenant:
+            messages.error(request, 'Select a valid tenant.')
+            return redirect('order_create')
+
+        currency = Currency.objects.filter(
+            currency_code=currency_id, is_active=True).first()
+        if not currency:
+            messages.error(request, 'Select a valid currency.')
+            return redirect('order_create')
+
+        pm = None
+        if payment_method_id:
+            pm = PaymentMethod.objects.filter(
+                method_id=payment_method_id,
+                is_active=True,
+            ).first()
+        if not pm:
+            messages.error(request, 'Select a valid payment method.')
+            return redirect('order_create')
+
+        if classification not in dict(SubscriptionOrder.CLASSIFICATION_CHOICES):
+            messages.error(request, 'Invalid order classification.')
+            return redirect('order_create')
+
+        tax = get_tax_code_for_tenant(tenant)
+        fx = get_fx_snapshot(currency_id)
+        tax_rate = tax.rate_percent if tax else Decimal('0.00')
+
+        promo_obj = None
+        if promo_input:
+            promo_obj = PromoCode.objects.filter(
+                code__iexact=promo_input).first()
+            ok, err = promo_obj.is_valid_for_use() if promo_obj else (False, '')
+            if not promo_obj or not ok:
+                messages.error(
+                    request,
+                    err or 'Invalid or inactive promo code.',
+                )
+                return redirect('order_create')
+
+        sub_total = Decimal('0.00')
+        plan_line_data = None
+
+        with db_transaction.atomic():
+            order = SubscriptionOrder.objects.create(
+                tenant=tenant,
+                order_classification=classification,
+                currency=currency,
+                payment_method=pm,
+                created_by=request.user,
+                promo_code=None,
+                tax_code=tax,
+                sub_total=Decimal('0.00'),
+                discount_amount=Decimal('0.00'),
+                tax_amount=Decimal('0.00'),
+                grand_total=Decimal('0.00'),
+                exchange_rate_snapshot=fx,
+                base_currency_equivalent=Decimal('0.00'),
+                order_status='Draft',
+            )
+
+            if classification in _PLAN_CLASSIFICATIONS:
+                plan_id = request.POST.get('plan', '').strip()
+                try:
+                    cycles = int(request.POST.get('number_of_cycles', '1'))
+                except ValueError:
+                    cycles = 1
+                plan = SubscriptionPlan.objects.filter(
+                    plan_id=plan_id, is_active=True).first()
+                if not plan:
+                    messages.error(request, 'Select a valid plan.')
+                    order.delete()
+                    return redirect('order_create')
+                ppc = PlanPricingCycle.objects.filter(
+                    plan=plan,
+                    currency=currency,
+                    number_of_cycles=cycles,
+                ).first()
+                if not ppc:
+                    messages.error(
+                        request,
+                        'No pricing found for this plan, currency, and cycle count.',
+                    )
+                    order.delete()
+                    return redirect('order_create')
+                plan_price = ppc.price
+                pro_rata = Decimal('0.00')
+                if classification == 'Upgrade' and tenant.current_plan:
+                    old_px = _billing_one_cycle_plan_price(
+                        tenant.current_plan, currency)
+                    pro_rata = calculate_pro_rata_credit(tenant, old_px)
+                line_total = (plan_price + pro_rata).quantize(Decimal('0.01'))
+                OrderPlanLine.objects.create(
+                    order=order,
+                    plan=plan,
+                    number_of_cycles=cycles,
+                    plan_price=plan_price,
+                    pro_rata_adjustment=pro_rata,
+                    line_total=line_total,
+                )
+                sub_total += line_total
+                plan_line_data = plan
+
+            elif classification == 'Add_ons':
+                policy = AddOnsPricingPolicy.objects.filter(
+                    is_active=True).first()
+                if not policy:
+                    messages.error(
+                        request,
+                        'No active add-ons pricing policy. Configure one first.',
+                    )
+                    order.delete()
+                    return redirect('order_create')
+                actions = request.POST.getlist('addon_action')
+                types = request.POST.getlist('addon_add_on_type')
+                qtys = request.POST.getlist('addon_quantity')
+                base_days = (
+                    tenant.current_plan.base_cycle_days
+                    if tenant.current_plan else 30
+                )
+                expiry = tenant.subscription_expiry_date or timezone.now().date()
+                for action, add_type, qty_s in zip(actions, types, qtys):
+                    if not add_type:
+                        continue
+                    try:
+                        qty = int(qty_s)
+                    except ValueError:
+                        qty = 1
+                    if qty < 1:
+                        qty = 1
+                    if action not in dict(OrderAddonLine.ACTION_TYPE_CHOICES):
+                        action = 'Add'
+                    unit = _billing_addon_unit_price(policy, add_type)
+                    cycles_fr, prorata_unit_total = calculate_addon_prorata(
+                        unit, base_days, expiry)
+                    signed_qty = qty if action == 'Add' else -qty
+                    line_piece = (
+                        Decimal(str(signed_qty)) *
+                        prorata_unit_total).quantize(Decimal('0.01'))
+                    OrderAddonLine.objects.create(
+                        order=order,
+                        action_type=action,
+                        add_on_type=add_type,
+                        quantity=qty,
+                        number_of_cycles=cycles_fr,
+                        unit_price=unit,
+                        pro_rata_adjustment=Decimal('0.00'),
+                        line_total=line_piece,
+                    )
+                    sub_total += line_piece
+            else:
+                messages.error(request, 'Unsupported classification.')
+                order.delete()
+                return redirect('order_create')
+
+            if classification == 'Add_ons' and sub_total == 0:
+                messages.error(
+                    request,
+                    'Add at least one add-on line with quantity.',
+                )
+                order.delete()
+                return redirect('order_create')
+
+            if promo_obj and promo_obj.applicable_plans.exists():
+                if plan_line_data is None:
+                    messages.error(
+                        request,
+                        'This promo code applies only to plan-based orders.',
+                    )
+                    order.delete()
+                    return redirect('order_create')
+                if plan_line_data not in promo_obj.applicable_plans.all():
+                    messages.error(
+                        request,
+                        'This promo code does not apply to the selected plan.',
+                    )
+                    order.delete()
+                    return redirect('order_create')
+
+            discount = calculate_promo_discount(promo_obj, sub_total)
+            taxable_base = (sub_total - discount).quantize(Decimal('0.01'))
+            if taxable_base < 0:
+                taxable_base = Decimal('0.00')
+            tax_amount = (
+                taxable_base * tax_rate / Decimal('100')
+            ).quantize(Decimal('0.01'))
+            grand_total = (taxable_base + tax_amount).quantize(Decimal('0.01'))
+            base_equiv = (grand_total * fx).quantize(Decimal('0.01'))
+
+            order.promo_code = promo_obj
+            order.sub_total = sub_total
+            order.discount_amount = discount
+            order.tax_amount = tax_amount
+            order.grand_total = grand_total
+            order.base_currency_equivalent = base_equiv
+            order.save(update_fields=[
+                'promo_code', 'sub_total', 'discount_amount',
+                'tax_amount', 'grand_total', 'base_currency_equivalent',
+            ])
+
+            refresh_order_projected_fields(order)
+            order.save(update_fields=[
+                'projected_plan', 'projected_expiry_date',
+                'projected_max_users', 'projected_max_internal_trucks',
+                'projected_max_external_trucks', 'projected_max_drivers',
+            ])
+
+        messages.success(request, 'Order saved as draft.')
+        return redirect('order_detail', pk=order.pk)
+
+
+class OrderDetailView(LoginRequiredMixin, View):
+    template_name = 'crm/orders/order_detail.html'
+
+    def get(self, request, pk):
+        order = get_object_or_404(
+            SubscriptionOrder.objects.select_related(
+                'tenant', 'currency', 'payment_method', 'promo_code',
+                'tax_code', 'created_by', 'projected_plan',
+            ).prefetch_related('plan_lines__plan', 'addon_lines'),
+            order_id=pk,
+        )
+        payment_txn = Transaction.objects.filter(
+            order=order,
+            transaction_type='Order_Payment',
+        ).order_by('-created_at').first()
+        invoice = order.invoices.order_by('-issue_date').first()
+        return render(request, self.template_name, {
+            'order': order,
+            'payment_txn': payment_txn,
+            'invoice': invoice,
+        })
+
+
+class OrderStatusUpdateView(RootRequiredMixin, View):
+    def post(self, request, pk):
+        order = get_object_or_404(SubscriptionOrder, order_id=pk)
+        action = request.POST.get('action', '')
+        if action == 'pending_payment':
+            if order.order_status != 'Draft':
+                messages.error(request, 'Only draft orders can be submitted.')
+            else:
+                order.order_status = 'Pending_Payment'
+                order.save(update_fields=['order_status', 'updated_at'])
+                _sync_or_create_order_payment_transaction(order)
+                messages.success(
+                    request,
+                    'Order marked as pending payment.',
+                )
+        elif action == 'cancel':
+            if order.order_status not in ('Draft', 'Pending_Payment'):
+                messages.error(request, 'This order cannot be cancelled.')
+            else:
+                order.order_status = 'Cancelled'
+                order.save(update_fields=['order_status', 'updated_at'])
+                Transaction.objects.filter(
+                    order=order,
+                    transaction_type='Order_Payment',
+                    status='Pending',
+                ).update(status='Failed')
+                messages.success(request, 'Order cancelled.')
+        else:
+            messages.error(request, 'Unknown action.')
+        return redirect('order_detail', pk=order.pk)
+
+
+class TransactionListView(LoginRequiredMixin, View):
+    template_name = 'crm/transactions/txn_list.html'
+
+    def get(self, request):
+        qs = Transaction.objects.select_related(
+            'tenant', 'currency', 'payment_method',
+        ).order_by('-created_at')
+        q = request.GET.get('q', '').strip()
+        if q:
+            qs = qs.filter(
+                Q(tenant__company_name__icontains=q) |
+                Q(gateway_ref__icontains=q)
+            )
+        tt = request.GET.get('transaction_type', '').strip()
+        if tt:
+            qs = qs.filter(transaction_type=tt)
+        st = request.GET.get('status', '').strip()
+        if st:
+            qs = qs.filter(status=st)
+        cur = request.GET.get('currency', '').strip()
+        if cur:
+            qs = qs.filter(currency_id=cur)
+        paginator = Paginator(qs, 15)
+        page = paginator.get_page(request.GET.get('page'))
+        return render(request, self.template_name, {
+            'transactions': page,
+            'search_query': q,
+            'type_filter': tt,
+            'status_filter': st,
+            'currency_filter': cur,
+            'type_choices': Transaction.TYPE_CHOICES,
+            'status_choices': Transaction.STATUS_CHOICES,
+            'currencies': Currency.objects.filter(is_active=True).order_by(
+                'currency_code'),
+        })
+
+
+class TransactionCreateView(RootRequiredMixin, View):
+    template_name = 'crm/transactions/txn_form.html'
+
+    def get(self, request):
+        return render(request, self.template_name, {
+            'tenants': TenantProfile.objects.order_by('company_name'),
+            'currencies': Currency.objects.filter(is_active=True).order_by(
+                'currency_code'),
+        })
+
+    def post(self, request):
+        tenant_id = request.POST.get('tenant', '').strip()
+        currency_id = request.POST.get('currency', '').strip()
+        amount_s = request.POST.get('amount', '').strip()
+        gateway_ref = request.POST.get('gateway_ref', '').strip()
+
+        tenant = TenantProfile.objects.filter(tenant_id=tenant_id).first()
+        if not tenant:
+            messages.error(request, 'Select a valid tenant.')
+            return redirect('transaction_create')
+        currency = Currency.objects.filter(
+            currency_code=currency_id, is_active=True).first()
+        if not currency:
+            messages.error(request, 'Select a valid currency.')
+            return redirect('transaction_create')
+        try:
+            amount = Decimal(amount_s)
+        except Exception:
+            amount = Decimal('0')
+        if amount < Decimal('0.01'):
+            messages.error(request, 'Enter a valid amount.')
+            return redirect('transaction_create')
+
+        fx = get_fx_snapshot(currency_id)
+        base_equiv = (amount * fx).quantize(Decimal('0.01'))
+        attachment = request.FILES.get('attachment')
+
+        with db_transaction.atomic():
+            txn = Transaction.objects.create(
+                tenant=tenant,
+                order=None,
+                transaction_type='Wallet_TopUp',
+                payment_method=None,
+                currency=currency,
+                amount=amount,
+                exchange_rate_snapshot=fx,
+                base_currency_equivalent_amount=base_equiv,
+                status='Completed',
+                gateway_ref=gateway_ref or None,
+                attachment=attachment,
+            )
+            tenant.wallet_balance = (
+                tenant.wallet_balance + amount
+            ).quantize(Decimal('0.01'))
+            tenant.save(update_fields=['wallet_balance', 'updated_at'])
+
+        messages.success(request, 'Wallet top-up recorded.')
+        return redirect('transaction_detail', pk=txn.pk)
+
+
+class TransactionDetailView(LoginRequiredMixin, View):
+    template_name = 'crm/transactions/txn_detail.html'
+
+    def get(self, request, pk):
+        txn = get_object_or_404(
+            Transaction.objects.select_related(
+                'tenant', 'currency', 'payment_method',
+                'order', 'reviewed_by',
+            ),
+            transaction_id=pk,
+        )
+        return render(request, self.template_name, {'txn': txn})
+
+
+class TransactionApproveView(RootRequiredMixin, View):
+    def post(self, request, pk):
+        with db_transaction.atomic():
+            txn = get_object_or_404(
+                Transaction.objects.select_for_update().select_related(
+                    'order', 'tenant',
+                ),
+                transaction_id=pk,
+            )
+            if txn.status != 'Pending':
+                messages.error(request, 'Only pending transactions can be approved.')
+                return redirect('transaction_detail', pk=pk)
+            pm = txn.payment_method
+            if not pm or pm.method_type != 'Offline_Bank':
+                messages.error(
+                    request,
+                    'Only offline bank transfers use manual approval.',
+                )
+                return redirect('transaction_detail', pk=pk)
+            order = txn.order
+            if not order or order.order_status != 'Pending_Payment':
+                messages.error(request, 'Order is not awaiting payment.')
+                return redirect('transaction_detail', pk=pk)
+
+            txn.status = 'Completed'
+            txn.reviewed_by = request.user
+            txn.review_notes = None
+            txn.save(update_fields=[
+                'status', 'reviewed_by', 'review_notes', 'updated_at',
+            ])
+
+            order.order_status = 'Paid'
+            order.save(update_fields=['order_status', 'updated_at'])
+
+            if not StandardInvoice.objects.filter(order=order).exists():
+                generate_invoice_from_order(order, request.user)
+
+            provision_tenant_from_order(order)
+
+            if order.promo_code_id:
+                pc = PromoCode.objects.select_for_update().get(
+                    pk=order.promo_code_id)
+                pc.current_uses = (pc.current_uses or 0) + 1
+                pc.save(update_fields=['current_uses'])
+
+            ten = TenantProfile.objects.select_for_update().get(
+                pk=txn.tenant_id)
+            ten.total_ltv = (
+                ten.total_ltv + txn.amount
+            ).quantize(Decimal('0.01'))
+            ten.save(update_fields=['total_ltv', 'updated_at'])
+            log_audit_action(
+                request,
+                'Status_Change',
+                'Transaction Approval',
+                str(txn.transaction_id),
+                new_instance=txn,
+            )
+
+        messages.success(request, 'Payment approved and order fulfilled.')
+        return redirect('transaction_detail', pk=pk)
+
+
+class TransactionRejectView(RootRequiredMixin, View):
+    def post(self, request, pk):
+        notes = (request.POST.get('review_notes') or '').strip()
+        if not notes:
+            messages.error(request, 'Review notes are required to reject.')
+            return redirect('transaction_detail', pk=pk)
+
+        with db_transaction.atomic():
+            txn = get_object_or_404(
+                Transaction.objects.select_for_update(),
+                transaction_id=pk,
+            )
+            if txn.status != 'Pending':
+                messages.error(request, 'Only pending transactions can be rejected.')
+                return redirect('transaction_detail', pk=pk)
+            txn.status = 'Rejected'
+            txn.reviewed_by = request.user
+            txn.review_notes = notes
+            txn.save(update_fields=[
+                'status', 'reviewed_by', 'review_notes', 'updated_at',
+            ])
+
+        messages.success(request, 'Transaction rejected.')
+        return redirect('transaction_detail', pk=pk)
+
+
+class InvoiceListView(LoginRequiredMixin, View):
+    template_name = 'crm/invoices/invoice_list.html'
+
+    def get(self, request):
+        qs = StandardInvoice.objects.select_related(
+            'tenant', 'currency',
+        ).order_by('-issue_date')
+        st = request.GET.get('status', '').strip()
+        if st:
+            qs = qs.filter(status=st)
+        cur = request.GET.get('currency', '').strip()
+        if cur:
+            qs = qs.filter(currency_id=cur)
+        tenant_id = request.GET.get('tenant', '').strip()
+        if tenant_id:
+            qs = qs.filter(tenant_id=tenant_id)
+        q = request.GET.get('q', '').strip()
+        if q:
+            qs = qs.filter(
+                Q(invoice_number__icontains=q) |
+                Q(customer_name__icontains=q)
+            )
+        paginator = Paginator(qs, 15)
+        page = paginator.get_page(request.GET.get('page'))
+        return render(request, self.template_name, {
+            'invoices': page,
+            'status_filter': st,
+            'currency_filter': cur,
+            'tenant_filter': tenant_id,
+            'search_query': q,
+            'status_choices': StandardInvoice.STATUS_CHOICES,
+            'currencies': Currency.objects.filter(is_active=True).order_by(
+                'currency_code'),
+            'tenants': TenantProfile.objects.order_by('company_name'),
+        })
+
+
+class InvoiceDetailView(LoginRequiredMixin, View):
+    template_name = 'crm/invoices/invoice_detail.html'
+
+    def get(self, request, pk):
+        invoice = get_object_or_404(
+            StandardInvoice.objects.select_related(
+                'tenant', 'currency', 'tax_code', 'order',
+            ).prefetch_related('line_items'),
+            invoice_id=pk,
+        )
+        return render(request, self.template_name, {'invoice': invoice})
+
+
+class InvoiceVoidView(RootRequiredMixin, View):
+    def post(self, request, pk):
+        # TODO: Generate Credit Note for voided invoice
+        invoice = get_object_or_404(StandardInvoice, invoice_id=pk)
+        if invoice.status != 'Issued':
+            messages.error(request, 'Only issued invoices can be voided.')
+            return redirect('invoice_detail', pk=pk)
+        invoice.status = 'Void'
+        invoice.save(update_fields=['status', 'updated_at'])
+        messages.success(request, 'Invoice voided.')
+        return redirect('invoice_detail', pk=pk)
+
+
+class SupportCategoryListView(LoginRequiredMixin, View):
+    template_name = 'support/categories/category_list.html'
+
+    def get(self, request):
+        qs = SupportCategory.objects.order_by('name_en')
+        q = request.GET.get('q', '').strip()
+        status_filter = request.GET.get('is_active', 'All').strip()
+        if q:
+            qs = qs.filter(name_en__icontains=q)
+        if status_filter == 'Active':
+            qs = qs.filter(is_active=True)
+        elif status_filter == 'Inactive':
+            qs = qs.filter(is_active=False)
+        paginator = Paginator(qs, 15)
+        categories = paginator.get_page(request.GET.get('page'))
+        return render(
+            request,
+            self.template_name,
+            {
+                'categories': categories,
+                'search_query': q,
+                'status_filter': status_filter,
+            },
+        )
+
+
+class SupportCategoryCreateView(LoginRequiredMixin, View):
+    template_name = 'support/categories/category_form.html'
+
+    def get(self, request):
+        redirect_resp = _require_root_or_redirect(request)
+        if redirect_resp:
+            return redirect_resp
+        return render(
+            request,
+            self.template_name,
+            {'form': SupportCategoryForm(), 'is_edit': False},
+        )
+
+    def post(self, request):
+        redirect_resp = _require_root_or_redirect(request)
+        if redirect_resp:
+            return redirect_resp
+        form = SupportCategoryForm(request.POST)
+        if form.is_valid():
+            category = form.save(commit=False)
+            category.created_by = request.user
+            category.save()
+            messages.success(request, 'Support category created successfully.')
+            return redirect('support_category_list')
+        return render(
+            request,
+            self.template_name,
+            {'form': form, 'is_edit': False},
+        )
+
+
+class SupportCategoryUpdateView(LoginRequiredMixin, View):
+    template_name = 'support/categories/category_form.html'
+
+    def get(self, request, pk):
+        redirect_resp = _require_root_or_redirect(request)
+        if redirect_resp:
+            return redirect_resp
+        category = get_object_or_404(SupportCategory, pk=pk)
+        return render(
+            request,
+            self.template_name,
+            {'form': SupportCategoryForm(instance=category), 'is_edit': True},
+        )
+
+    def post(self, request, pk):
+        redirect_resp = _require_root_or_redirect(request)
+        if redirect_resp:
+            return redirect_resp
+        category = get_object_or_404(SupportCategory, pk=pk)
+        form = SupportCategoryForm(request.POST, instance=category)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Support category updated successfully.')
+            return redirect('support_category_list')
+        return render(
+            request,
+            self.template_name,
+            {'form': form, 'is_edit': True},
+        )
+
+
+class SupportCategoryToggleStatusView(LoginRequiredMixin, View):
+    def post(self, request, pk):
+        redirect_resp = _require_root_or_redirect(request)
+        if redirect_resp:
+            return redirect_resp
+        category = get_object_or_404(SupportCategory, pk=pk)
+        if category.is_active:
+            # TODO: Check if category has open tickets before
+            #        deactivating — warn but allow
+            category.is_active = False
+            status_text = 'deactivated'
+        else:
+            category.is_active = True
+            status_text = 'activated'
+        category.save(update_fields=['is_active', 'updated_at'])
+        messages.success(
+            request,
+            f"Support category '{category.name_en}' {status_text}.",
+        )
+        return redirect('support_category_list')
+
+
+class SupportCategoryDeleteView(LoginRequiredMixin, View):
+    def post(self, request, pk):
+        redirect_resp = _require_root_or_redirect(request)
+        if redirect_resp:
+            return redirect_resp
+        messages.error(
+            request,
+            'Categories cannot be deleted. Deactivate instead.',
+        )
+        return redirect('support_category_list')
+
+    def get(self, request, pk):
+        return self.post(request, pk)
+
+
+class CannedResponseListView(LoginRequiredMixin, View):
+    template_name = 'support/canned/canned_list.html'
+
+    def get(self, request):
+        qs = CannedResponse.objects.order_by('title')
+        q = request.GET.get('q', '').strip()
+        status_filter = request.GET.get('is_active', 'All').strip()
+        if q:
+            qs = qs.filter(
+                Q(title__icontains=q) |
+                Q(message_body__icontains=q)
+            )
+        if status_filter == 'Active':
+            qs = qs.filter(is_active=True)
+        elif status_filter == 'Inactive':
+            qs = qs.filter(is_active=False)
+        paginator = Paginator(qs, 15)
+        canned_responses = paginator.get_page(request.GET.get('page'))
+        return render(
+            request,
+            self.template_name,
+            {
+                'canned_responses': canned_responses,
+                'search_query': q,
+                'status_filter': status_filter,
+            },
+        )
+
+
+class CannedResponseCreateView(LoginRequiredMixin, View):
+    template_name = 'support/canned/canned_form.html'
+
+    def get(self, request):
+        redirect_resp = _require_root_or_redirect(request)
+        if redirect_resp:
+            return redirect_resp
+        return render(
+            request,
+            self.template_name,
+            {'form': CannedResponseForm(), 'is_edit': False},
+        )
+
+    def post(self, request):
+        redirect_resp = _require_root_or_redirect(request)
+        if redirect_resp:
+            return redirect_resp
+        form = CannedResponseForm(request.POST)
+        if form.is_valid():
+            canned = form.save(commit=False)
+            canned.created_by = request.user
+            canned.save()
+            messages.success(request, 'Canned response created successfully.')
+            return redirect('canned_response_list')
+        return render(
+            request,
+            self.template_name,
+            {'form': form, 'is_edit': False},
+        )
+
+
+class CannedResponseUpdateView(LoginRequiredMixin, View):
+    template_name = 'support/canned/canned_form.html'
+
+    def get(self, request, pk):
+        redirect_resp = _require_root_or_redirect(request)
+        if redirect_resp:
+            return redirect_resp
+        canned = get_object_or_404(CannedResponse, pk=pk)
+        return render(
+            request,
+            self.template_name,
+            {'form': CannedResponseForm(instance=canned), 'is_edit': True},
+        )
+
+    def post(self, request, pk):
+        redirect_resp = _require_root_or_redirect(request)
+        if redirect_resp:
+            return redirect_resp
+        canned = get_object_or_404(CannedResponse, pk=pk)
+        form = CannedResponseForm(request.POST, instance=canned)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Canned response updated successfully.')
+            return redirect('canned_response_list')
+        return render(
+            request,
+            self.template_name,
+            {'form': form, 'is_edit': True},
+        )
+
+
+class CannedResponseToggleStatusView(LoginRequiredMixin, View):
+    def post(self, request, pk):
+        redirect_resp = _require_root_or_redirect(request)
+        if redirect_resp:
+            return redirect_resp
+        canned = get_object_or_404(CannedResponse, pk=pk)
+        canned.is_active = not canned.is_active
+        canned.save(update_fields=['is_active', 'updated_at'])
+        messages.success(request, 'Canned response status updated successfully.')
+        return redirect('canned_response_list')
+
+
+class CannedResponseDeleteView(LoginRequiredMixin, View):
+    def post(self, request, pk):
+        redirect_resp = _require_root_or_redirect(request)
+        if redirect_resp:
+            return redirect_resp
+        messages.error(
+            request,
+            'Canned responses cannot be deleted. Deactivate instead.',
+        )
+        return redirect('canned_response_list')
+
+    def get(self, request, pk):
+        return self.post(request, pk)
+
+
+class TicketListView(LoginRequiredMixin, View):
+    template_name = 'support/tickets/ticket_list.html'
+
+    def get(self, request):
+        tickets_qs = SupportTicket.objects.select_related(
+            'tenant',
+            'category',
+            'assigned_to',
+        ).order_by('-created_at')
+
+        q = request.GET.get('q', '').strip()
+        status_filter = request.GET.get('status', '').strip()
+        priority_filter = request.GET.get('priority', '').strip()
+        category_filter = request.GET.get('category', '').strip()
+        assigned_filter = request.GET.get('assigned_to', '').strip()
+
+        if q:
+            tickets_qs = tickets_qs.filter(
+                Q(ticket_no__icontains=q) |
+                Q(subject__icontains=q) |
+                Q(tenant__company_name__icontains=q)
+            )
+        if status_filter:
+            tickets_qs = tickets_qs.filter(status=status_filter)
+        if priority_filter:
+            tickets_qs = tickets_qs.filter(priority=priority_filter)
+        if category_filter:
+            tickets_qs = tickets_qs.filter(category_id=category_filter)
+        if assigned_filter == 'unassigned':
+            tickets_qs = tickets_qs.filter(assigned_to__isnull=True)
+        elif assigned_filter:
+            tickets_qs = tickets_qs.filter(assigned_to_id=assigned_filter)
+
+        paginator = Paginator(tickets_qs, 15)
+        tickets = paginator.get_page(request.GET.get('page'))
+
+        context = {
+            'tickets': tickets,
+            'search_query': q,
+            'status_filter': status_filter,
+            'priority_filter': priority_filter,
+            'category_filter': category_filter,
+            'assigned_filter': assigned_filter,
+            'categories': SupportCategory.objects.order_by('name_en'),
+            'admins': AdminUser.objects.filter(status='Active').order_by(
+                'first_name', 'last_name'
+            ),
+            'status_choices': SupportTicket.STATUS_CHOICES,
+            'priority_choices': SupportTicket.PRIORITY_CHOICES,
+        }
+        return render(request, self.template_name, context)
+
+
+class TicketCreateView(LoginRequiredMixin, View):
+    template_name = 'support/tickets/ticket_form.html'
+
+    def get(self, request):
+        redirect_resp = _require_root_or_redirect(request)
+        if redirect_resp:
+            return redirect_resp
+        return render(
+            request,
+            self.template_name,
+            {'form': SupportTicketForm()},
+        )
+
+    def post(self, request):
+        redirect_resp = _require_root_or_redirect(request)
+        if redirect_resp:
+            return redirect_resp
+
+        form = SupportTicketForm(request.POST)
+        if not form.is_valid():
+            return render(request, self.template_name, {'form': form})
+
+        ticket = form.save(commit=False)
+        ticket.ticket_no = SupportTicket.generate_ticket_no()
+        ticket.status = 'New'
+        ticket.created_by = str(
+            getattr(request.user, 'admin_id', getattr(request.user, 'id', ''))
+        )
+        ticket.save()
+
+        TicketReply.objects.create(
+            ticket=ticket,
+            sender_type='System_Bot',
+            sender_id='SYSTEM',
+            message_body=(
+                f"Ticket {ticket.ticket_no} has been "
+                f"created. Our support team will review "
+                f"your issue shortly."
+            ),
+            is_internal=False,
+        )
+
+        if ticket.assigned_to:
+            ticket.status = 'In_Progress'
+            ticket.save(update_fields=['status'])
+
+        messages.success(request, 'Support ticket created successfully.')
+        return redirect('ticket_detail', pk=ticket.pk)
+
+
+class TicketDetailView(LoginRequiredMixin, View):
+    template_name = 'support/tickets/ticket_detail.html'
+
+    def get(self, request, pk):
+        ticket = get_object_or_404(
+            SupportTicket.objects.select_related(
+                'tenant',
+                'category',
+                'assigned_to',
+            ),
+            pk=pk,
+        )
+        replies = ticket.replies.select_related('ticket').all()
+
+        context = {
+            'ticket': ticket,
+            'replies': replies,
+            'reply_form': AdminReplyForm(),
+            'assign_form': TicketAssignForm(instance=ticket),
+            'priority_form': TicketPriorityForm(instance=ticket),
+            'canned_responses': CannedResponse.objects.filter(
+                is_active=True
+            ).order_by('title'),
+        }
+        return render(request, self.template_name, context)
+
+
+class TicketAdminReplyView(LoginRequiredMixin, View):
+    def post(self, request, pk):
+        ticket = get_object_or_404(SupportTicket, pk=pk)
+        form = AdminReplyForm(request.POST, request.FILES)
+
+        if not form.is_valid():
+            messages.error(request, 'Please correct the reply form errors.')
+            return redirect('ticket_detail', pk=ticket.pk)
+
+        reply = form.save(commit=False)
+        reply.ticket = ticket
+        reply.sender_type = 'Admin_Support'
+        reply.sender_id = str(
+            getattr(request.user, 'admin_id', getattr(request.user, 'id', ''))
+        )
+        reply.save()
+
+        if not reply.is_internal:
+            ticket.status = 'Pending_Client'
+            ticket.save(update_fields=['status'])
+
+        messages.success(request, 'Reply submitted successfully.')
+        return redirect('ticket_detail', pk=ticket.pk)
+
+    def get(self, request, pk):
+        return redirect('ticket_detail', pk=pk)
+
+
+class TicketAssignView(LoginRequiredMixin, View):
+    def post(self, request, pk):
+        redirect_resp = _require_root_or_redirect(request)
+        if redirect_resp:
+            return redirect_resp
+
+        ticket = get_object_or_404(SupportTicket, pk=pk)
+        form = TicketAssignForm(request.POST, instance=ticket)
+        if not form.is_valid():
+            messages.error(request, 'Please select a valid assignee.')
+            return redirect('ticket_detail', pk=ticket.pk)
+
+        ticket = form.save(commit=False)
+        if ticket.status == 'New':
+            ticket.status = 'In_Progress'
+        ticket.save()
+
+        assignee_display = (
+            f'{ticket.assigned_to.first_name} {ticket.assigned_to.last_name}'.strip()
+            if ticket.assigned_to
+            else 'Unassigned'
+        )
+        TicketReply.objects.create(
+            ticket=ticket,
+            sender_type='System_Bot',
+            sender_id='SYSTEM',
+            message_body=f'Ticket assigned to {assignee_display}.',
+            is_internal=True,
+        )
+        messages.success(request, 'Ticket assignment updated.')
+        return redirect('ticket_detail', pk=ticket.pk)
+
+    def get(self, request, pk):
+        return redirect('ticket_detail', pk=pk)
+
+
+class TicketPriorityOverrideView(LoginRequiredMixin, View):
+    def post(self, request, pk):
+        redirect_resp = _require_root_or_redirect(request)
+        if redirect_resp:
+            return redirect_resp
+
+        ticket = get_object_or_404(SupportTicket, pk=pk)
+        form = TicketPriorityForm(request.POST, instance=ticket)
+        if not form.is_valid():
+            messages.error(request, 'Please select a valid priority.')
+            return redirect('ticket_detail', pk=ticket.pk)
+
+        ticket = form.save()
+        TicketReply.objects.create(
+            ticket=ticket,
+            sender_type='System_Bot',
+            sender_id='SYSTEM',
+            message_body=f'Priority changed to {ticket.priority} by admin.',
+            is_internal=True,
+        )
+        messages.success(request, 'Ticket priority updated.')
+        return redirect('ticket_detail', pk=ticket.pk)
+
+    def get(self, request, pk):
+        return redirect('ticket_detail', pk=pk)
+
+
+class TicketForceCloseView(LoginRequiredMixin, View):
+    def post(self, request, pk):
+        redirect_resp = _require_root_or_redirect(request)
+        if redirect_resp:
+            return redirect_resp
+
+        ticket = get_object_or_404(SupportTicket, pk=pk)
+        ticket.status = 'Closed'
+        ticket.closed_at = timezone.now()
+        ticket.save(update_fields=['status', 'closed_at'])
+
+        TicketReply.objects.create(
+            ticket=ticket,
+            sender_type='System_Bot',
+            sender_id='SYSTEM',
+            message_body=(
+                'This ticket has been closed by the support team. '
+                'If your issue persists, please open a new ticket.'
+            ),
+            is_internal=False,
+        )
+        messages.success(request, 'Ticket has been force closed.')
+        return redirect('ticket_detail', pk=ticket.pk)
+
+    def get(self, request, pk):
+        return redirect('ticket_detail', pk=pk)
+

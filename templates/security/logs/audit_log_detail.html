@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+{% block title %}Audit Log Entry #{{ audit_entry.audit_id }}{% endblock %}
+{% block content %}
+<div class="container py-3">
+  <h4 class="mb-3">Audit Log Entry #{{ audit_entry.audit_id }}</h4>
+
+  <div class="card mb-3">
+    <div class="card-body">
+      <div class="row g-2">
+        <div class="col-md-4"><strong>Admin:</strong> {{ audit_entry.admin|default:'N/A' }}</div>
+        <div class="col-md-4"><strong>Action Type:</strong> {{ audit_entry.action_type }}</div>
+        <div class="col-md-4"><strong>Module:</strong> {{ audit_entry.module_name }}</div>
+        <div class="col-md-4"><strong>Record ID:</strong> {{ audit_entry.record_id }}</div>
+        <div class="col-md-4"><strong>IP Address:</strong> {{ audit_entry.ip_address }}</div>
+        <div class="col-md-4"><strong>Timestamp:</strong> {{ audit_entry.timestamp }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-header"><strong>OLD VALUES</strong></div>
+    <div class="card-body">
+      {% if old_payload_pretty %}
+      <pre class="mb-0">{{ old_payload_pretty }}</pre>
+      {% else %}
+      <p class="mb-0 text-muted">N/A (Create action)</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-header"><strong>NEW VALUES</strong></div>
+    <div class="card-body">
+      {% if new_payload_pretty %}
+      <pre class="mb-0">{{ new_payload_pretty }}</pre>
+      {% else %}
+      <p class="mb-0 text-muted">N/A (Delete action)</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <a href="{% url 'audit_log_list' %}" class="btn btn-secondary">Back to Audit Log</a>
+</div>
+{% endblock %}

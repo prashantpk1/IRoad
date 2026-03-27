@@ -347,6 +347,29 @@ def seed_base_currency():
               f"{obj.base_currency_id}")
 
 
+def seed_tenant_security_settings():
+    print("\n--- Seeding Tenant Security Settings ---")
+    from superadmin.models import TenantSecuritySettings
+
+    obj, created = TenantSecuritySettings.objects.get_or_create(
+        setting_id='TENANT-SEC-CONF',
+        defaults={
+            'tenant_web_timeout_hours': 12,
+            'driver_app_timeout_days': 30,
+            'max_failed_logins': 5,
+            'lockout_duration_minutes': 15,
+        }
+    )
+    if created:
+        print("  ✅ Tenant Security Settings created")
+        print("  ✅ Web timeout: 12 hours")
+        print("  ✅ Driver app timeout: 30 days")
+        print("  ✅ Max failed logins: 5")
+        print("  ✅ Lockout: 15 minutes")
+    else:
+        print("  ⏭️  Tenant Security Settings already exists")
+
+
 def main():
     print("=" * 50)
     print("  IRoad Super Admin — Master Seed Script")
@@ -362,6 +385,7 @@ def main():
         seed_general_tax_settings()
         seed_global_system_rules()
         seed_base_currency()
+        seed_tenant_security_settings()
 
         # Future phases will add their seed functions here:
         # seed_security_settings()  ← Phase 2 ✅ (called above)
@@ -371,6 +395,7 @@ def main():
         # seed_general_tax_settings() ← Phase 4 ✅ (now active above)
         # seed_global_system_rules()  ← Phase 4 ✅ (now active above)
         # seed_base_currency()        ← Phase 4 ✅ (now active above)
+        # seed_tenant_security_settings() ← Phase 10 ✅ (now active above)
         # seed_plans()             ← Phase 5
 
         print("\n" + "=" * 50)

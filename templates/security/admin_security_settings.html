@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+{% block title %}Admin Security Settings{% endblock %}
+{% block content %}
+<div class="container py-3">
+  <h4 class="mb-3">Admin Security Settings</h4>
+  <div class="alert alert-info">
+    Configure session timeout and login lockout policy for admin accounts.
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <form method="post" novalidate>
+        {% csrf_token %}
+        <div class="mb-3">
+          <label class="form-label" for="{{ form.session_timeout_minutes.id_for_label }}">{{ form.session_timeout_minutes.label }}</label>
+          {{ form.session_timeout_minutes }}
+          {% if form.session_timeout_minutes.errors %}
+          <div class="text-danger small mt-1">{{ form.session_timeout_minutes.errors|join:', ' }}</div>
+          {% endif %}
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="{{ form.max_failed_logins.id_for_label }}">{{ form.max_failed_logins.label }}</label>
+          {{ form.max_failed_logins }}
+          {% if form.max_failed_logins.errors %}
+          <div class="text-danger small mt-1">{{ form.max_failed_logins.errors|join:', ' }}</div>
+          {% endif %}
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="{{ form.lockout_duration_minutes.id_for_label }}">{{ form.lockout_duration_minutes.label }}</label>
+          {{ form.lockout_duration_minutes }}
+          {% if form.lockout_duration_minutes.errors %}
+          <div class="text-danger small mt-1">{{ form.lockout_duration_minutes.errors|join:', ' }}</div>
+          {% endif %}
+        </div>
+        <div class="text-muted small mb-3">
+          Last updated by:
+          {% if obj.updated_by %}{{ obj.updated_by.first_name }} {{ obj.updated_by.last_name }}{% else %}N/A{% endif %}
+          {% if obj.updated_at %} | {{ obj.updated_at }}{% endif %}
+        </div>
+        <button type="submit" class="btn btn-primary">Save</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

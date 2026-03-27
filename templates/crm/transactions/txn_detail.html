@@ -1,0 +1,69 @@
+{% extends 'base.html' %}
+{% block title %}Transaction Details | iRoad Admin{% endblock %}
+{% block content %}
+{% if messages %}
+  {% for message in messages %}
+    <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">
+      {{ message }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+  {% endfor %}
+{% endif %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="mb-0">Transaction Details</h4>
+  <a href="{% url 'transaction_list' %}" class="btn btn-outline-secondary btn-sm">Back to ledger</a>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body row g-2 small">
+    <div class="col-md-4"><strong>Tenant</strong><br>{{ txn.tenant.company_name }}</div>
+    <div class="col-md-4"><strong>Type</strong><br>{{ txn.get_transaction_type_display }}</div>
+    <div class="col-md-4"><strong>Status</strong><br>{{ txn.get_status_display }}</div>
+    <div class="col-md-4"><strong>Currency / Amount</strong><br>{{ txn.currency_id }} {{ txn.amount|floatformat:2 }}</div>
+    <div class="col-md-4"><strong>Base equivalent</strong><br>{{ txn.base_currency_equivalent_amount|floatformat:2 }}</div>
+    <div class="col-md-4"><strong>FX snapshot</strong><br>{{ txn.exchange_rate_snapshot }}</div>
+    <div class="col-md-4"><strong>Payment method</strong><br>{% if txn.payment_method %}{{ txn.payment_method.method_name_en }} ({{ txn.payment_method.get_method_type_display }}){% else %}—{% endif %}</div>
+    <div class="col-md-4"><strong>Gateway ref</strong><br>{{ txn.gateway_ref|default:'—' }}</div>
+    <div class="col-md-4"><strong>Linked order</strong><br>{% if txn.order %}<a href="{% url 'order_detail' txn.order.order_id %}">{{ txn.order.order_id }}</a>{% else %}—{% endif %}</div>
+    <div class="col-md-4"><strong>Created</strong><br>{{ txn.created_at|date:'Y-m-d H:i' }}</div>
+  </div>
+</div>
+
+{% if txn.attachment %}
+<div class="card mb-3">
+  <div class="card-header">Receipt / attachment</div>
+  <div class="card-body">
+    <a href="{{ txn.attachment.url }}" target="_blank" rel="noopener">Open attachment</a>
+  </div>
+</div>
+{% endif %}
+
+{% if txn.reviewed_by %}
+<div class="card mb-3">
+  <div class="card-header">Review</div>
+  <div class="card-body small">
+    <p class="mb-1"><strong>Reviewed by:</strong> {{ txn.reviewed_by.email }}</p>
+    {% if txn.review_notes %}<p class="mb-0"><strong>Notes:</strong> {{ txn.review_notes }}</p>{% endif %}
+  </div>
+</div>
+{% endif %}
+
+{% if txn.status == 'Pending' and txn.payment_method and txn.payment_method.method_type == 'Offline_Bank' and request.user.is_root %}
+<div class="card border-success mb-3">
+  <div class="card-header bg-success text-white">Offline bank — manual decision</div>
+  <div class="card-body">
+    <form method="post" action="{% url 'transaction_approve' txn.transaction_id %}" class="mb-3">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-success" onclick="return confirm('Approve this payment?');">Approve</button>
+    </form>
+    <form method="post" action="{% url 'transaction_reject' txn.transaction_id %}">
+      {% csrf_token %}
+      <label class="form-label text-danger">Reject — review notes required</label>
+      <textarea name="review_notes" class="form-control mb-2" rows="3" required placeholder="Reason for rejection"></textarea>
+      <button type="submit" class="btn btn-danger">Reject</button>
+    </form>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

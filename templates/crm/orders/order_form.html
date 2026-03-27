@@ -1,0 +1,276 @@
+{% extends 'base.html' %}
+{% block title %}Create Subscription Order | iRoad Admin{% endblock %}
+{% block content %}
+{% if messages %}
+  {% for message in messages %}
+    <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">
+      {{ message }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+  {% endfor %}
+{% endif %}
+
+<h4 class="mb-3">Create Subscription Order</h4>
+
+<form method="post" action="{% url 'order_create' %}" id="order-form" class="vstack gap-4">
+  {% csrf_token %}
+  <div class="card">
+    <div class="card-header">Section 1 — Order header</div>
+    <div class="card-body row g-3">
+      <div class="col-md-6">
+        <label class="form-label">Tenant</label>
+        <select name="tenant" class="form-select" required id="id_tenant">
+          <option value="">---------</option>
+          {% for t in tenants %}
+            <option value="{{ t.tenant_id }}" {% if tenant_preselect == t.tenant_id|stringformat:"s" %}selected{% endif %}>{{ t.company_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Classification</label>
+        <select name="order_classification" class="form-select" required id="id_classification">
+          {% for code, label in classification_choices %}
+            <option value="{{ code }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Currency</label>
+        <select name="currency" class="form-select" required id="id_currency">
+          {% for c in currencies %}
+            <option value="{{ c.currency_code }}">{{ c.currency_code }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Promo code (optional)</label>
+        <input type="text" name="promo_code" class="form-control" maxlength="40" autocomplete="off">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Payment method</label>
+        <select name="payment_method" class="form-select" required id="id_payment_method">
+          {% for m in payment_methods %}
+            <option value="{{ m.method_id }}">{{ m.method_name_en }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="plan-section" style="display:none;">
+    <div class="card-header">Section 2 — Plan selection</div>
+    <div class="card-body row g-3">
+      <div class="col-md-6">
+        <label class="form-label">Plan</label>
+        <select name="plan" class="form-select" id="id_plan">
+          <option value="">---------</option>
+          {% for p in plans %}
+            <option value="{{ p.plan_id }}">{{ p.plan_name_en }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Cycles</label>
+        <input type="number" name="number_of_cycles" class="form-control" id="id_cycles" value="1" min="1">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Plan price</label>
+        <input type="text" class="form-control" id="preview_plan_price" readonly value="0.00">
+      </div>
+      <div class="col-md-6" id="upgrade-pro-rata-wrap" style="display:none;">
+        <label class="form-label">Pro-rata adjustment (credit)</label>
+        <input type="text" class="form-control" id="preview_pro_rata" readonly value="0.00">
+        <div class="form-text">Server calculates on save; hint: {{ upgrade_credit_hint|default:"—" }}</div>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Line total (preview)</label>
+        <input type="text" class="form-control fw-semibold" id="preview_plan_line_total" readonly value="0.00">
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="addon-section" style="display:none;">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span>Section 3 — Add-ons</span>
+      <button type="button" class="btn btn-sm btn-outline-primary" id="btn-add-addon-row">Add row</button>
+    </div>
+    <div class="card-body">
+      <div id="addon-rows" class="vstack gap-2"></div>
+      <p class="text-muted small mb-0 mt-2">Unit prices follow the active add-ons policy. Line totals use remaining days in the current cycle (server-validated on save).</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">Section 4 — Order totals preview</div>
+    <div class="card-body row g-2">
+      <div class="col-md-4"><strong>Sub total</strong> <span id="pv_sub" class="float-end">0.00</span></div>
+      <div class="col-md-4"><strong>Discount</strong> <span id="pv_disc" class="float-end">0.00</span></div>
+      <div class="col-md-4"><strong>Tax</strong> <span id="pv_tax" class="float-end">0.00</span></div>
+      <div class="col-md-4"><strong>Grand total</strong> <span id="pv_grand" class="float-end fw-bold">0.00</span></div>
+      <div class="col-md-8"><strong>Base currency equivalent</strong> <span id="pv_base" class="float-end">0.00</span></div>
+      <div class="col-12 mt-3">
+        <label class="form-label">Projected state preview</label>
+        <p class="small text-muted mb-0" id="projected_hint">After save, open the order detail to see full projected plan, expiry, and limits from the server.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="d-flex gap-2">
+    <a href="{% url 'order_list' %}" class="btn btn-outline-secondary">Cancel</a>
+    <button type="submit" class="btn btn-primary">Save as draft</button>
+  </div>
+</form>
+
+{{ pricing_data|json_script:"crm-order-pricing" }}
+{{ addons_data|json_script:"crm-order-addons" }}
+
+<template id="addon-row-tpl">
+  <div class="addon-row row g-2 align-items-end border rounded p-2 bg-light">
+    <div class="col-md-3">
+      <label class="form-label small">Action</label>
+      <select name="addon_action" class="form-select form-select-sm addon-action">
+        {% for code, label in addon_action_choices %}
+          <option value="{{ code }}">{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label small">Add-on type</label>
+      <select name="addon_add_on_type" class="form-select form-select-sm addon-type">
+        <option value="">---------</option>
+        {% for code, label in addon_type_choices %}
+          <option value="{{ code }}">{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2">
+      <label class="form-label small">Qty</label>
+      <input type="number" name="addon_quantity" class="form-control form-control-sm addon-qty" value="1" min="1">
+    </div>
+    <div class="col-md-2">
+      <label class="form-label small">Unit</label>
+      <input type="text" class="form-control form-control-sm addon-unit" readonly value="0.00">
+    </div>
+    <div class="col-md-1">
+      <button type="button" class="btn btn-sm btn-outline-danger w-100 btn-remove-addon" title="Remove">&times;</button>
+    </div>
+  </div>
+</template>
+
+<script>
+(function () {
+  const pricing = JSON.parse(document.getElementById('crm-order-pricing').textContent);
+  const addons = JSON.parse(document.getElementById('crm-order-addons').textContent);
+  const clsEl = document.getElementById('id_classification');
+  const planSec = document.getElementById('plan-section');
+  const addonSec = document.getElementById('addon-section');
+  const planIds = ['New_Subscription', 'Renewal', 'Upgrade', 'Downgrade'];
+  const currencyEl = document.getElementById('id_currency');
+  const planEl = document.getElementById('id_plan');
+  const cyclesEl = document.getElementById('id_cycles');
+  const upgradeWrap = document.getElementById('upgrade-pro-rata-wrap');
+  const tpl = document.getElementById('addon-row-tpl');
+  const addonRows = document.getElementById('addon-rows');
+
+  function showSections() {
+    const v = clsEl.value;
+    const showPlan = planIds.includes(v);
+    planSec.style.display = showPlan ? 'block' : 'none';
+    addonSec.style.display = v === 'Add_ons' ? 'block' : 'none';
+    upgradeWrap.style.display = v === 'Upgrade' ? 'block' : 'none';
+    planEl.required = showPlan;
+    if (v === 'Add_ons' && addonRows.children.length === 0) {
+      addAddonRow();
+    }
+  }
+
+  function findPrice() {
+    const pid = planEl.value;
+    const cur = currencyEl.value;
+    const cy = parseInt(cyclesEl.value || '1', 10);
+    const row = pricing.find(function (r) {
+      return r.plan_id === pid && r.currency === cur && parseInt(r.cycles, 10) === cy;
+    });
+    return row ? parseFloat(row.price) : 0;
+  }
+
+  function refreshPlanPreview() {
+    const price = findPrice();
+    document.getElementById('preview_plan_price').value = price.toFixed(2);
+    let proRata = 0;
+    if (clsEl.value === 'Upgrade') {
+      proRata = 0;
+    }
+    document.getElementById('preview_pro_rata').value = proRata.toFixed(2);
+    const line = price + proRata;
+    document.getElementById('preview_plan_line_total').value = line.toFixed(2);
+    refreshTotalsPreview();
+  }
+
+  function addAddonRow() {
+    const node = tpl.content.cloneNode(true);
+    addonRows.appendChild(node);
+    const row = addonRows.lastElementChild;
+    row.querySelector('.btn-remove-addon').addEventListener('click', function () {
+      row.remove();
+      refreshTotalsPreview();
+    });
+    ['addon-type', 'addon-action', 'addon-qty'].forEach(function (cl) {
+      row.querySelector('.' + cl).addEventListener('change', refreshAddonRow);
+      row.querySelector('.' + cl).addEventListener('input', refreshAddonRow);
+    });
+    refreshAddonRow({ target: row.querySelector('.addon-type') });
+  }
+
+  function refreshAddonRow(ev) {
+    const row = ev.target.closest('.addon-row');
+    if (!row) return;
+    const t = row.querySelector('.addon-type').value;
+    const u = t && addons[t] !== undefined ? parseFloat(addons[t]) : 0;
+    row.querySelector('.addon-unit').value = u.toFixed(2);
+    refreshTotalsPreview();
+  }
+
+  function sumAddonPreview() {
+    let s = 0;
+    addonRows.querySelectorAll('.addon-row').forEach(function (row) {
+      const t = row.querySelector('.addon-type').value;
+      const u = t && addons[t] !== undefined ? parseFloat(addons[t]) : 0;
+      let q = parseInt(row.querySelector('.addon-qty').value || '1', 10);
+      const act = row.querySelector('.addon-action').value;
+      if (act === 'Reduce') q = -q;
+      s += q * u;
+    });
+    return s;
+  }
+
+  function refreshTotalsPreview() {
+    let sub = 0;
+    if (planIds.includes(clsEl.value)) {
+      sub += parseFloat(document.getElementById('preview_plan_line_total').value || '0');
+    } else if (clsEl.value === 'Add_ons') {
+      sub += sumAddonPreview();
+    }
+    const disc = 0;
+    const taxRate = 0;
+    const taxable = Math.max(0, sub - disc);
+    const tax = taxable * (taxRate / 100);
+    const grand = taxable + tax;
+    document.getElementById('pv_sub').textContent = sub.toFixed(2);
+    document.getElementById('pv_disc').textContent = disc.toFixed(2);
+    document.getElementById('pv_tax').textContent = tax.toFixed(2);
+    document.getElementById('pv_grand').textContent = grand.toFixed(2);
+    document.getElementById('pv_base').textContent = grand.toFixed(2);
+  }
+
+  clsEl.addEventListener('change', showSections);
+  currencyEl.addEventListener('change', refreshPlanPreview);
+  planEl.addEventListener('change', refreshPlanPreview);
+  cyclesEl.addEventListener('input', refreshPlanPreview);
+  document.getElementById('btn-add-addon-row').addEventListener('click', addAddonRow);
+
+  showSections();
+  refreshPlanPreview();
+})();
+</script>
+{% endblock %}

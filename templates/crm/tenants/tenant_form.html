@@ -1,0 +1,69 @@
+{% extends 'base.html' %}
+{% block title %}{% if is_edit %}Edit Tenant{% else %}Add Tenant{% endif %}{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="card-body">
+    <h4 class="mb-3">{% if is_edit %}Edit Tenant{% else %}Add Tenant{% endif %}</h4>
+
+    {% if is_edit %}
+      <div class="alert alert-secondary py-2 small mb-3">
+        Synced fields are read only in Control Panel (synced from the tenant system via webhook).
+      </div>
+      <div class="mb-3">
+        <!-- Synced from Tenant DB via webhook - read only -->
+        <label class="form-label">Company name</label>
+        <input type="text" class="form-control" value="{{ tenant.company_name }}" disabled>
+        <div class="form-text">Synced from Tenant system - read only</div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Registration number</label>
+        <input type="text" class="form-control" value="{{ tenant.registration_number }}" disabled>
+        <div class="form-text">Synced from Tenant system - read only</div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Tax number</label>
+        <input type="text" class="form-control" value="{{ tenant.tax_number|default:'' }}" disabled>
+        <div class="form-text">Synced from Tenant system - read only</div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Primary email</label>
+        <input type="email" class="form-control" value="{{ tenant.primary_email }}" disabled>
+        <div class="form-text">Synced from Tenant system - read only</div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Primary phone</label>
+        <input type="text" class="form-control" value="{{ tenant.primary_phone }}" disabled>
+        <div class="form-text">Synced from Tenant system - read only</div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Country</label>
+        <input type="text" class="form-control" value="{{ tenant.country.name_en|default:'-' }}" disabled>
+        <div class="form-text">Synced from Tenant system - read only</div>
+      </div>
+
+      <div class="alert alert-warning small mb-3">
+        <strong>Suspension warning:</strong> Choosing a suspended status will trigger the Kill Switch and log out all tenant users (when Phase 10 is implemented).
+      </div>
+
+      <form method="post">
+        {% csrf_token %}
+        {% if form.non_field_errors %}<div class="text-danger mb-2">{{ form.non_field_errors }}</div>{% endif %}
+        <div class="mb-3">{{ form.account_status.label_tag }}{{ form.account_status }}{{ form.account_status.errors }}</div>
+        <div class="mb-3">{{ form.assigned_sales_rep.label_tag }}{{ form.assigned_sales_rep }}{{ form.assigned_sales_rep.errors }}</div>
+        <a href="{% url 'tenant_detail' tenant.tenant_id %}" class="btn btn-outline-secondary">Cancel</a>
+        <button type="submit" class="btn btn-primary">Save</button>
+      </form>
+    {% else %}
+      <form method="post">
+        {% csrf_token %}
+        {% if form.non_field_errors %}<div class="text-danger mb-2">{{ form.non_field_errors }}</div>{% endif %}
+        {% for field in form %}
+          <div class="mb-3">{{ field.label_tag }}{{ field }}{{ field.errors }}</div>
+        {% endfor %}
+        <a href="{% url 'tenant_list' %}" class="btn btn-outline-secondary">Cancel</a>
+        <button type="submit" class="btn btn-primary">Save</button>
+      </form>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

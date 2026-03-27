@@ -506,3 +506,290 @@
 - Retention: add TODO comment for 90-day archival
   # TODO Phase 11: Implement 90-day log archival/cleanup
 
+
+## Phase 8 — Subscribers CRM & Billing Business Rules
+
+### Tenant Profile Rules (FRM-CP-04-01)
+- tenant_id: UUID primary key
+- Synced fields (read-only in admin UI):
+  company_name, registration_number, tax_number,
+  primary_email, primary_phone, country_code
+  These are NEVER edited from CP — only synced via webhook
+  Add TODO: # TODO Phase 12: Implement webhook sync here
+- account_status: ENUM — Active, Suspended_Billing,
+  Suspended_Violation, Churned
+  Default: Active
+- KILL SWITCH: Changing to any Suspended state must:
+  1. Save the status change
+  2. Add TODO: # TODO Phase 10: Revoke all tenant
+  #             JWT tokens via Redis Kill Switch here
+- assigned_sales_rep: FK to AdminUser (optional)
+  Only show Active admin users in dropdown
+- wallet_balance: Decimal read-only
+  Auto-calculated from transactions ledger
+- registered_at: auto timestamp — read-only
+- total_ltv: Decimal read-only
+  Sum of all Paid invoices for this tenant
+- Subscription state fields (all read-only — auto-updated
+  when order_status becomes Paid):
+  current_plan_id, subscription_start_date,
+  subscription_expiry_date, active_max_users,
+  active_max_internal_trucks, active_max_external_trucks,
+  active_max_drivers
+- updated_at: auto timestamp
+- No hard delete of tenant profiles ever
+
+### CRM Notes Rules (FRM-CP-04-02)
+- note_id: UUID primary key
+- Strictly immutable — no edit, no delete ever
+- Override save() to block updates
+- Override delete() to block deletion
+- note_type: ENUM — General, Sales_Call,
+  Billing_Issue, Complaint
+- note_content: required TextField
+- admin_id: FK to AdminUser (who wrote it)
+- created_at: auto timestamp
+
+### Subscription Order Rules (FRM-CP-04-03)
+- order_id: UUID primary key
+- order_classification: ENUM — New_Subscription,
+  Renewal, Upgrade, Downgrade, Add_ons
+- order_status: ENUM — Draft, Pending_Payment,
+  Paid, Cancelled
+  Default: Draft
+- PROVISIONING RULE: Tenant limits and dates ONLY
+  updated when order_status transitions to Paid
+- tax_id: FK to TaxCode — auto-fetched based on
+  tenant country at order creation
+- exchange_rate_snapshot: Decimal 10,6
+  Snapshot of FX rate at order creation time
+  Never changes after creation
+- Projected fields: all read-only, recalculated on
+  each order save based on classification logic
+- promo_code: FK to PromoCode optional
+  Validate using PromoCode.is_valid_for_use()
+  before applying discount
+- payment_method: FK to PaymentMethod optional
+- created_by: FK to AdminUser
+
+### Order Line Rules (Subform 1 — Plan)
+- One row max per order
+- plan: FK to SubscriptionPlan
+- number_of_cycles: from plan pricing cycles
+- plan_price: auto-fetched from PlanPricingCycle
+- pro_rata_adjustment: calculated for Upgrade only
+- line_total: plan_price + pro_rata_adjustment
+
+### Order Line Rules (Subform 2 — Add-ons)
+- Multiple rows allowed
+- add_on_type: ENUM — Extra_User,
+  Extra_Internal_Truck, Extra_External_Truck,
+  Extra_Driver, Extra_Shipment, Extra_Storage_GB
+- unit_price: auto-fetched from active AddOnsPricingPolicy
+- number_of_cycles: fraction of remaining days for
+  co-terming calculation
+- line_total: quantity * unit_price * number_of_cycles
+
+### Pro-Rata Calculation Rules (Hardcoded)
+- Upgrade credit = (days_remaining / base_cycle_days)
+    * current_plan_price
+- Add-on daily rate = add_on_cycle_price / base_cycle_days
+- Add-on charge = daily_rate * days_remaining_in_cycle
+- Downgrade: no credit, deferred to expiry
+
+### Transaction Ledger Rules (FRM-CP-04-04)
+- transaction_id: UUID primary key
+- transaction_type: ENUM — Order_Payment,
+  Wallet_TopUp, Refund
+- status: ENUM — Pending, Completed, Failed, Rejected
+  Default: Pending
+- exchange_rate_snapshot: Decimal 10,6
+  Snapshot at transaction creation time
+- base_currency_equivalent: amount * exchange_rate_snapshot
+- attachment_url: FileField
+  REQUIRED if payment_method is Offline_Bank type
+- reviewed_by: FK to AdminUser read-only
+  Set when admin approves or rejects
+- review_notes: required when rejecting
+- Bank Transfer Approval Flow:
+  Approve → status=Completed → linked order status=Paid
+            → generate Standard Invoice
+            → update tenant subscription limits
+  Reject → status=Rejected → review_notes required
+           → order remains Pending_Payment
+
+### Standard Invoice Rules (FRM-CP-04-05)
+- invoice_id: UUID primary key
+- invoice_number: auto-sequential INV-YYYY-NNNN
+- ABSOLUTE IMMUTABILITY: once generated NO field
+  can be modified
+- Override save() to block any update after creation
+- Override delete() to block deletion
+- Voiding: status can change to Void ONLY
+  Never delete — create Credit Note instead
+- Snapshotting: supplier_name, supplier_tax_number,
+  customer_name, customer_tax_number, customer_address
+  ALL hard-copied at invoice generation time
+- Generation trigger: auto-created when order
+  status transitions to Paid
+- invoice_number format: INV-{YEAR}-{4_digit_sequence}
+  e.g. INV-2026-0001
+
+## Phase 9 — Support Management Business Rules
+
+### Support Categories Rules (FRM-CP-10-01)
+- category_id: UUID primary key
+- name_en: required, unique
+- name_ar: required, unique
+- is_active: default True
+- No hard delete — deactivate only
+- If deactivated: disappears from Tenant dropdown
+- created_by: FK to AdminUser
+- created_at, updated_at: auto timestamps
+
+### Canned Responses Rules (FRM-CP-10-02)
+- template_id: UUID primary key
+- title: required, unique, max 100 chars (internal use)
+- message_body: required LongText
+- is_active: default True
+- No hard delete — deactivate only
+- Admin use only — never exposed to Tenant API
+
+### Support Ticket Master Rules (FRM-CP-10-03)
+- ticket_id: UUID primary key
+- ticket_no: auto-sequential TKT-XXXXX (e.g. TKT-10001)
+  format: TKT- + 5 digit zero-padded sequence
+- tenant_id: FK to TenantProfile (required)
+- subject: required, max 255 chars
+- category_id: FK to SupportCategory (required)
+- priority: ENUM — Low, Medium, High, Critical
+  default: Medium
+- status: ENUM — New, In_Progress, Pending_Client, Closed
+  default: New
+- assigned_to: FK to AdminUser — null allowed
+  INVISIBLE to Tenant API
+- created_by: CharField (Tenant User ID who opened it)
+- created_at: auto timestamp
+- closed_at: DateTimeField null — auto-set when
+  status becomes Closed
+
+### Auto State Machine Rules (Ping-Pong Logic)
+- Trigger 1: New ticket created → status = New
+- Trigger 2: assigned_to is set → status = In_Progress
+- Trigger 3: Admin adds reply (is_internal=False)
+  → status = Pending_Client
+- Trigger 4: Tenant adds reply on open ticket
+  → status = In_Progress
+- Status transitions enforced in view logic — not in model
+
+### Ticket Reply Rules (FRM-CP-10-04)
+- reply_id: UUID primary key
+- ticket_id: FK to SupportTicket (required)
+- sender_type: ENUM — Tenant_User, Admin_Support,
+  System_Bot
+- sender_id: CharField (ID of sender)
+- message_body: LongTextField required
+- attachment: FileField null allowed
+  upload_to='support_attachments/'
+- is_internal: BooleanField default False
+  If True: NEVER returned in Tenant-facing API
+  NEVER visible to Tenant in any view
+- created_at: auto timestamp (determines sort order)
+- Immutable after creation — no edit allowed
+  Override save() to block updates
+  Override delete() to block deletion
+
+### Tenant API Bridge Rules
+- GET /api/v1/support/tickets/ — tenant sees only
+  their own tickets (filter by tenant_id from JWT)
+- GET /api/v1/support/tickets/<id>/ — detail view
+  excludes is_internal=True replies
+- POST /api/v1/support/tickets/ — tenant creates ticket
+- POST /api/v1/support/tickets/<id>/reply/ — tenant replies
+  Blocked if ticket status == Closed
+- Tenant CANNOT: see assigned_to, see internal notes,
+  change priority after creation, change status to Closed
+
+### RBAC Rules
+- Admin: sees all tickets, all replies including internal
+- Admin: can change priority, assigned_to, force close
+- Tenant: limited API access only — no CP access
+
+## Phase 10 — Security & Audit Business Rules
+
+### Admin Security Settings Rules (FRM-CP-11-01)
+- Already exists from Phase 2 — do NOT recreate
+- setting_id: fixed "ADMIN-SEC-CONF"
+- session_timeout_minutes: default 240
+- max_failed_logins: default 3
+- lockout_duration_minutes: default 30
+- updated_by: FK to AdminUser
+- updated_at: auto timestamp
+- Only ONE record ever
+
+### Tenant Security Settings Rules (FRM-CP-11-02)
+- setting_id: fixed "TENANT-SEC-CONF"
+- Only ONE record ever — get_or_create pattern
+- tenant_web_timeout_hours: Integer default 12
+- driver_app_timeout_days: Integer default 30
+- max_failed_logins: Integer default 5
+- lockout_duration_minutes: Integer default 15
+- updated_by: FK to AdminUser
+- updated_at: auto timestamp
+
+### Active Sessions Monitor Rules (FRM-CP-11-03)
+- Sessions stored in Django DB (not Redis in Phase 10)
+- Redis Kill Switch deferred to future phase
+- Add TODO: # TODO Phase 11 Redis: Replace DB session
+  #         store with Redis cache for real-time JWT
+  #         revocation when Redis is implemented
+- session_id: UUID primary key
+- user_domain: ENUM — Admin, Tenant_User, Driver
+- reference_id: CharField (user/driver ID)
+- reference_name: CharField (display name for UI)
+- ip_address: CharField
+- user_agent: TextField
+- started_at: DateTimeField auto_now_add
+- is_active: BooleanField default True
+- revoked_at: DateTimeField null — set when revoked
+- revoked_by: FK to AdminUser null — who revoked it
+
+### Session Revocation Rules
+- Targeted Revocation: set is_active=False on one session
+- Mass Revoke (Kill Switch): set is_active=False on ALL
+  sessions where reference_id belongs to a Tenant
+  Add TODO: # TODO Phase 11 Redis: When Redis is live,
+  #         destroy actual JWT tokens here in addition
+  #         to DB flag
+- Sessions created automatically on login
+  (hook into existing LoginView)
+- Sessions marked inactive on logout
+
+### Access Log Rules (FRM-CP-11-04)
+- Already exists from Phase 2 as AccessLog model
+- Do NOT recreate — just build the read-only view
+- Confirm existing fields match FRM-CP-11-04:
+  attempt_type, status, user_domain,
+  email_used, ip_address, timestamp
+- Strictly append-only — already enforced
+
+### Master System Audit Log Rules (FRM-CP-11-05)
+- audit_id: AutoField primary key (not UUID)
+- admin: FK to AdminUser (required)
+- action_type: ENUM — Create, Update, Delete,
+  Status_Change
+- module_name: CharField max 100
+  e.g. "Tax Settings", "Subscription Plans"
+- record_id: CharField max 100 (ID of modified entity)
+- old_payload: JSONField null=True
+  Null if action_type = Create
+- new_payload: JSONField null=True
+  Null if action_type = Delete
+- ip_address: CharField max 45
+- timestamp: DateTimeField auto_now_add=True
+- Strictly append-only:
+  Override save() to block updates
+  Override delete() to block deletion
+- No admin can modify or delete entries ever
+- Helper function: log_audit_action() utility
+  that other views call to record changes

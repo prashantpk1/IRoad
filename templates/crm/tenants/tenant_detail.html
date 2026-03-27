@@ -1,0 +1,92 @@
+{% extends 'base.html' %}
+{% block title %}{{ tenant.company_name }}{% endblock %}
+{% block content %}
+<h4 class="mb-3">{{ tenant.company_name }}</h4>
+
+<div class="card mb-3">
+  <div class="card-header fw-semibold">Profile</div>
+  <div class="card-body row g-3">
+    <div class="col-md-6"><strong>Registration #</strong><br>{{ tenant.registration_number }}</div>
+    <div class="col-md-6"><strong>Tax number</strong><br>{{ tenant.tax_number|default:'-' }}</div>
+    <div class="col-md-6"><strong>Email</strong><br>{{ tenant.primary_email }}</div>
+    <div class="col-md-6"><strong>Phone</strong><br>{{ tenant.primary_phone }}</div>
+    <div class="col-md-6"><strong>Country</strong><br>{{ tenant.country.name_en|default:'-' }}</div>
+    <div class="col-md-6"><strong>Account status</strong><br>{{ tenant.get_account_status_display }}</div>
+    <div class="col-md-6"><strong>Assigned sales rep</strong><br>{% if tenant.assigned_sales_rep %}{{ tenant.assigned_sales_rep.first_name }} {{ tenant.assigned_sales_rep.last_name }}{% else %}-{% endif %}</div>
+    <div class="col-md-6"><strong>Registered</strong><br>{{ tenant.registered_at|date:'Y-m-d H:i' }}</div>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-header fw-semibold">Subscription state</div>
+  <div class="card-body">
+    <div class="row g-2 mb-3">
+      <div class="col-md-4"><strong>Current plan</strong><br>{{ tenant.current_plan.plan_name_en|default:'-' }}</div>
+      <div class="col-md-4"><strong>Start date</strong><br>{{ tenant.subscription_start_date|default:'-' }}</div>
+      <div class="col-md-4"><strong>Expiry date</strong><br>{{ tenant.subscription_expiry_date|default:'-' }}</div>
+    </div>
+    <div class="mb-2"><strong>Active limits</strong></div>
+    <ul class="list-unstyled small mb-3">
+      <li>Users: {{ tenant.active_max_users }}</li>
+      <li>Internal trucks: {{ tenant.active_max_internal_trucks }}</li>
+      <li>External trucks: {{ tenant.active_max_external_trucks }}</li>
+      <li>Drivers: {{ tenant.active_max_drivers }}</li>
+    </ul>
+    <div class="row g-2">
+      <div class="col-md-6"><strong>Wallet balance</strong><br>{{ tenant.wallet_balance|floatformat:2 }}</div>
+      <div class="col-md-6"><strong>Total LTV</strong><br>{{ tenant.total_ltv|floatformat:2 }}</div>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-header fw-semibold">Quick actions</div>
+  <div class="card-body d-flex flex-wrap gap-2">
+    <a href="{% url 'order_create' %}?tenant={{ tenant.tenant_id }}" class="btn btn-primary">Create Order</a>
+    {% if request.user.is_root %}
+      <a href="{% url 'tenant_edit' tenant.tenant_id %}" class="btn btn-outline-secondary">Edit Status</a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-header fw-semibold">CRM notes</div>
+  <div class="card-body">
+    <form method="post" action="{% url 'crm_note_create' tenant.tenant_id %}" class="mb-4">
+      {% csrf_token %}
+      <div class="row g-2">
+        <div class="col-md-3">
+          <label class="form-label">Type</label>
+          <select name="note_type" class="form-select">
+            {% for code, label in note_type_choices %}
+              <option value="{{ code }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-9">
+          <label class="form-label">Note</label>
+          <textarea name="note_content" class="form-control" rows="3" required placeholder="Enter note content"></textarea>
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary mt-2">Add Note</button>
+    </form>
+
+    {% for note in notes %}
+      <div class="border-bottom py-3 {% if forloop.last %}border-bottom-0{% endif %}">
+        <span class="badge bg-secondary me-2">{{ note.get_note_type_display }}</span>
+        <span class="text-muted small">
+          {% if note.admin %}{{ note.admin.first_name }} {{ note.admin.last_name }}{% else %}—{% endif %}
+          · {{ note.created_at|date:'Y-m-d H:i' }}
+        </span>
+        <p class="mb-0 mt-2">{{ note.note_content|linebreaksbr }}</p>
+      </div>
+    {% empty %}
+      <p class="text-muted mb-0">No notes yet.</p>
+    {% endfor %}
+  </div>
+</div>
+
+<div>
+  <a href="{% url 'tenant_list' %}" class="btn btn-outline-secondary">Back to list</a>
+</div>
+{% endblock %}

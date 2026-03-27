@@ -123,11 +123,56 @@
       </li>
 
       <!-- Subscribers CRM & Billing -->
-      <li class="nav-item">
-        <a href="#" class="nav-link" data-tooltip="Subscribers CRM & Billing">
+      <li
+        class="nav-item has-submenu{% if request.resolver_match and request.resolver_match.url_name == 'tenant_list' %} open{% elif request.resolver_match and request.resolver_match.url_name == 'tenant_create' %} open{% elif request.resolver_match and request.resolver_match.url_name == 'tenant_detail' %} open{% elif request.resolver_match and request.resolver_match.url_name == 'tenant_edit' %} open{% elif request.resolver_match and request.resolver_match.url_name == 'crm_note_create' %} open{% elif request.resolver_match and request.resolver_match.url_name == 'order_create' %} open{% elif request.resolver_match and request.resolver_match.url_name == 'order_list' %} open{% elif request.resolver_match and request.resolver_match.url_name == 'order_detail' %} open{% elif request.resolver_match and request.resolver_match.url_name == 'order_status_update' %} open{% elif request.resolver_match and request.resolver_match.url_name == 'transaction_list' %} open{% elif request.resolver_match and request.resolver_match.url_name == 'transaction_create' %} open{% elif request.resolver_match and request.resolver_match.url_name == 'transaction_detail' %} open{% elif request.resolver_match and request.resolver_match.url_name == 'transaction_approve' %} open{% elif request.resolver_match and request.resolver_match.url_name == 'transaction_reject' %} open{% elif request.resolver_match and request.resolver_match.url_name == 'invoice_list' %} open{% elif request.resolver_match and request.resolver_match.url_name == 'invoice_detail' %} open{% elif request.resolver_match and request.resolver_match.url_name == 'invoice_void' %} open{% endif %}"
+      >
+        <a
+          href="#"
+          class="nav-link{% if request.resolver_match and request.resolver_match.url_name == 'tenant_list' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'tenant_create' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'tenant_detail' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'tenant_edit' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'crm_note_create' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'order_create' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'order_list' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'order_detail' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'order_status_update' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'transaction_list' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'transaction_create' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'transaction_detail' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'transaction_approve' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'transaction_reject' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'invoice_list' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'invoice_detail' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'invoice_void' %} active{% endif %}"
+          data-tooltip="Subscribers CRM & Billing"
+        >
           <i class="bi bi-receipt"></i>
           <span class="nav-text">Subscribers CRM &amp; Billing</span>
+          <i class="bi bi-chevron-right arrow"></i>
         </a>
+        <ul class="submenu">
+          <li class="submenu-item">
+            <a
+              href="{% url 'tenant_list' %}"
+              class="submenu-link{% if request.resolver_match and request.resolver_match.url_name == 'tenant_list' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'tenant_create' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'tenant_detail' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'tenant_edit' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'crm_note_create' %} active{% endif %}"
+            >
+              <i class="bi bi-people"></i>
+              <span>Subscribers List</span>
+            </a>
+          </li>
+          <li class="submenu-item">
+            <a
+              href="{% url 'order_list' %}"
+              class="submenu-link{% if request.resolver_match and request.resolver_match.url_name == 'order_list' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'order_create' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'order_detail' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'order_status_update' %} active{% endif %}"
+            >
+              <i class="bi bi-cart-check"></i>
+              <span>Subscription Orders</span>
+            </a>
+          </li>
+          <li class="submenu-item">
+            <a
+              href="{% url 'transaction_list' %}"
+              class="submenu-link{% if request.resolver_match and request.resolver_match.url_name == 'transaction_list' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'transaction_create' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'transaction_detail' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'transaction_approve' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'transaction_reject' %} active{% endif %}"
+            >
+              <i class="bi bi-journal-text"></i>
+              <span>Transactions Ledger</span>
+            </a>
+          </li>
+          <li class="submenu-item">
+            <a
+              href="{% url 'invoice_list' %}"
+              class="submenu-link{% if request.resolver_match and request.resolver_match.url_name == 'invoice_list' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'invoice_detail' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'invoice_void' %} active{% endif %}"
+            >
+              <i class="bi bi-file-earmark-text"></i>
+              <span>Standard Invoices</span>
+            </a>
+          </li>
+        </ul>
       </li>
 
       <!-- Communication & Alerts -->
@@ -341,20 +386,65 @@
       </li>
 
       <!-- Support Management -->
-      <li class="nav-item">
-        <a href="#" class="nav-link" data-tooltip="Support Management">
+      <li
+        class="nav-item has-submenu{% if request.resolver_match and request.resolver_match.url_name == 'support_category_list' %} open{% elif request.resolver_match and request.resolver_match.url_name == 'support_category_create' %} open{% elif request.resolver_match and request.resolver_match.url_name == 'support_category_edit' %} open{% elif request.resolver_match and request.resolver_match.url_name == 'support_category_toggle' %} open{% elif request.resolver_match and request.resolver_match.url_name == 'support_category_delete' %} open{% elif request.resolver_match and request.resolver_match.url_name == 'canned_response_list' %} open{% elif request.resolver_match and request.resolver_match.url_name == 'canned_response_create' %} open{% elif request.resolver_match and request.resolver_match.url_name == 'canned_response_edit' %} open{% elif request.resolver_match and request.resolver_match.url_name == 'canned_response_toggle' %} open{% elif request.resolver_match and request.resolver_match.url_name == 'canned_response_delete' %} open{% elif request.resolver_match and request.resolver_match.url_name == 'ticket_list' %} open{% elif request.resolver_match and request.resolver_match.url_name == 'ticket_create' %} open{% elif request.resolver_match and request.resolver_match.url_name == 'ticket_detail' %} open{% elif request.resolver_match and request.resolver_match.url_name == 'ticket_reply' %} open{% elif request.resolver_match and request.resolver_match.url_name == 'ticket_assign' %} open{% elif request.resolver_match and request.resolver_match.url_name == 'ticket_priority' %} open{% elif request.resolver_match and request.resolver_match.url_name == 'ticket_close' %} open{% endif %}"
+      >
+        <a
+          href="#"
+          class="nav-link{% if request.resolver_match and request.resolver_match.url_name == 'support_category_list' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'support_category_create' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'support_category_edit' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'support_category_toggle' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'support_category_delete' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'canned_response_list' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'canned_response_create' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'canned_response_edit' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'canned_response_toggle' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'canned_response_delete' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'ticket_list' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'ticket_create' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'ticket_detail' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'ticket_reply' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'ticket_assign' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'ticket_priority' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'ticket_close' %} active{% endif %}"
+          data-tooltip="Support Management"
+        >
           <i class="bi bi-headset"></i>
           <span class="nav-text">Support Management</span>
+          <i class="bi bi-chevron-right arrow"></i>
         </a>
+        <ul class="submenu">
+          <li class="submenu-item">
+            <a
+              href="{% url 'support_category_list' %}"
+              class="submenu-link{% if request.resolver_match and request.resolver_match.url_name == 'support_category_list' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'support_category_create' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'support_category_edit' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'support_category_toggle' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'support_category_delete' %} active{% endif %}"
+            >
+              <i class="bi bi-tags"></i>
+              <span>Support Categories</span>
+            </a>
+          </li>
+          <li class="submenu-item">
+            <a
+              href="{% url 'canned_response_list' %}"
+              class="submenu-link{% if request.resolver_match and request.resolver_match.url_name == 'canned_response_list' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'canned_response_create' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'canned_response_edit' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'canned_response_toggle' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'canned_response_delete' %} active{% endif %}"
+            >
+              <i class="bi bi-chat-square-text"></i>
+              <span>Canned Responses</span>
+            </a>
+          </li>
+          <li class="submenu-item">
+            <a
+              href="{% url 'ticket_list' %}"
+              class="submenu-link{% if request.resolver_match and request.resolver_match.url_name == 'ticket_list' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'ticket_create' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'ticket_detail' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'ticket_reply' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'ticket_assign' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'ticket_priority' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'ticket_close' %} active{% endif %}"
+            >
+              <i class="bi bi-inbox"></i>
+              <span>Support Inbox</span>
+            </a>
+          </li>
+          <li class="submenu-item">
+            <a
+              href="{% url 'ticket_list' %}"
+              class="submenu-link{% if request.resolver_match and request.resolver_match.url_name == 'ticket_list' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'ticket_create' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'ticket_detail' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'ticket_reply' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'ticket_assign' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'ticket_priority' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'ticket_close' %} active{% endif %}"
+            >
+              <i class="bi bi-chat-left-dots"></i>
+              <span>Ticket Thread</span>
+            </a>
+          </li>
+        </ul>
       </li>
 
       <!-- Security & Audit -->
       <li
-        class="nav-item has-submenu{% if request.resolver_match and request.resolver_match.url_name == 'access_log' %} open{% endif %}"
+        class="nav-item has-submenu{% if request.resolver_match and request.resolver_match.url_name == 'security_settings' %} open{% elif request.resolver_match and request.resolver_match.url_name == 'tenant_security_settings' %} open{% elif request.resolver_match and request.resolver_match.url_name == 'session_list' %} open{% elif request.resolver_match and request.resolver_match.url_name == 'session_mass_revoke' %} open{% elif request.resolver_match and request.resolver_match.url_name == 'access_log_list' %} open{% elif request.resolver_match and request.resolver_match.url_name == 'audit_log_list' %} open{% elif request.resolver_match and request.resolver_match.url_name == 'audit_log_detail' %} open{% endif %}"
       >
         <a
           href="#"
-          class="nav-link{% if request.resolver_match and request.resolver_match.url_name == 'access_log' %} active{% endif %}"
+          class="nav-link{% if request.resolver_match and request.resolver_match.url_name == 'security_settings' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'tenant_security_settings' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'session_list' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'session_mass_revoke' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'access_log_list' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'audit_log_list' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'audit_log_detail' %} active{% endif %}"
           data-tooltip="Security & Audit"
         >
           <i class="bi bi-shield-lock"></i>
@@ -364,11 +454,47 @@
         <ul class="submenu">
           <li class="submenu-item">
             <a
-              href="{% url 'access_log' %}"
-              class="submenu-link{% if request.resolver_match and request.resolver_match.url_name == 'access_log' %} active{% endif %}"
+              href="{% url 'security_settings' %}"
+              class="submenu-link{% if request.resolver_match and request.resolver_match.url_name == 'security_settings' %} active{% endif %}"
+            >
+              <i class="bi bi-sliders"></i>
+              <span>Admin Security Settings</span>
+            </a>
+          </li>
+          <li class="submenu-item">
+            <a
+              href="{% url 'tenant_security_settings' %}"
+              class="submenu-link{% if request.resolver_match and request.resolver_match.url_name == 'tenant_security_settings' %} active{% endif %}"
+            >
+              <i class="bi bi-people"></i>
+              <span>Tenant Security Settings</span>
+            </a>
+          </li>
+          <li class="submenu-item">
+            <a
+              href="{% url 'session_list' %}"
+              class="submenu-link{% if request.resolver_match and request.resolver_match.url_name == 'session_list' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'session_mass_revoke' %} active{% endif %}"
+            >
+              <i class="bi bi-activity"></i>
+              <span>Active Sessions</span>
+            </a>
+          </li>
+          <li class="submenu-item">
+            <a
+              href="{% url 'access_log_list' %}"
+              class="submenu-link{% if request.resolver_match and request.resolver_match.url_name == 'access_log_list' %} active{% endif %}"
             >
               <i class="bi bi-journal-text"></i>
               <span>Access Log</span>
+            </a>
+          </li>
+          <li class="submenu-item">
+            <a
+              href="{% url 'audit_log_list' %}"
+              class="submenu-link{% if request.resolver_match and request.resolver_match.url_name == 'audit_log_list' %} active{% elif request.resolver_match and request.resolver_match.url_name == 'audit_log_detail' %} active{% endif %}"
+            >
+              <i class="bi bi-clipboard-data"></i>
+              <span>Audit Log</span>
             </a>
           </li>
         </ul>

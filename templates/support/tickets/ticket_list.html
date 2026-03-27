@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% block title %}Support Inbox{% endblock %}
+{% block content %}
+<div class="container-fluid py-3">
+  <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+    <h1 class="h4 mb-0">Support Inbox</h1>
+    {% if request.user.is_root %}
+      <a href="{% url 'ticket_create' %}" class="btn btn-primary">
+        <i class="bi bi-plus-circle"></i> Create Ticket
+      </a>
+    {% endif %}
+  </div>
+
+  <form method="get" class="card card-body mb-3">
+    <div class="row g-2">
+      <div class="col-md-3">
+        <input type="text" name="q" value="{{ search_query }}" class="form-control"
+               placeholder="Search ticket no, subject, tenant">
+      </div>
+      <div class="col-md-2">
+        <select name="status" class="form-select">
+          <option value="">All Status</option>
+          {% for value, label in status_choices %}
+            <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <select name="priority" class="form-select">
+          <option value="">All Priority</option>
+          {% for value, label in priority_choices %}
+            <option value="{{ value }}" {% if priority_filter == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <select name="category" class="form-select">
+          <option value="">All Categories</option>
+          {% for category in categories %}
+            <option value="{{ category.pk }}" {% if category_filter == category.pk|stringformat:"s" %}selected{% endif %}>{{ category.name_en }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <select name="assigned_to" class="form-select">
+          <option value="">All Assignees</option>
+          <option value="unassigned" {% if assigned_filter == 'unassigned' %}selected{% endif %}>Unassigned</option>
+          {% for admin in admins %}
+            <option value="{{ admin.pk }}" {% if assigned_filter == admin.pk|stringformat:"s" %}selected{% endif %}>{{ admin.first_name }} {{ admin.last_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-1 d-grid">
+        <button class="btn btn-outline-primary" type="submit">Filter</button>
+      </div>
+    </div>
+  </form>
+
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Ticket No</th>
+            <th>Tenant</th>
+            <th>Subject</th>
+            <th>Category</th>
+            <th>Priority</th>
+            <th>Status</th>
+            <th>Assigned To</th>
+            <th>Created At</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ticket in tickets %}
+            <tr>
+              <td>{{ tickets.start_index|add:forloop.counter0 }}</td>
+              <td>{{ ticket.ticket_no }}</td>
+              <td>{{ ticket.tenant.company_name }}</td>
+              <td>{{ ticket.subject }}</td>
+              <td>{{ ticket.category.name_en }}</td>
+              <td>
+                <span class="badge {% if ticket.priority == 'Critical' %}bg-danger{% elif ticket.priority == 'High' %}bg-warning text-dark{% elif ticket.priority == 'Medium' %}bg-primary{% else %}bg-secondary{% endif %}">
+                  {{ ticket.priority }}
+                </span>
+              </td>
+              <td>
+                {% if ticket.status == 'Pending_Client' %}
+                  <span class="badge text-white" style="background-color: #6f42c1;">
+                    {{ ticket.get_status_display }}
+                  </span>
+                {% else %}
+                  <span class="badge {% if ticket.status == 'New' %}bg-danger{% elif ticket.status == 'In_Progress' %}bg-warning text-dark{% elif ticket.status == 'Closed' %}bg-success{% else %}bg-secondary{% endif %}">
+                    {{ ticket.get_status_display }}
+                  </span>
+                {% endif %}
+                {% if ticket.status == 'New' %}
+                  <span class="badge bg-danger ms-1">Unread</span>
+                {% elif ticket.status == 'In_Progress' %}
+                  <span class="badge bg-warning text-dark ms-1">Attention</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if ticket.assigned_to %}
+                  {{ ticket.assigned_to.first_name }} {{ ticket.assigned_to.last_name }}
+                {% else %}
+                  <span class="text-muted">Unassigned</span>
+                {% endif %}
+              </td>
+              <td>{{ ticket.created_at|date:"Y-m-d H:i" }}</td>
+              <td>
+                <a href="{% url 'ticket_detail' ticket.pk %}" class="btn btn-sm btn-outline-primary">View</a>
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="10" class="text-center py-4 text-muted">No tickets found.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {% if tickets.paginator.num_pages > 1 %}
+    <nav class="mt-3">
+      <ul class="pagination mb-0">
+        {% if tickets.has_previous %}
+          <li class="page-item"><a class="page-link" href="?page={{ tickets.previous_page_number }}&q={{ search_query }}&status={{ status_filter }}&priority={{ priority_filter }}&category={{ category_filter }}&assigned_to={{ assigned_filter }}">Previous</a></li>
+        {% endif %}
+        <li class="page-item disabled"><span class="page-link">Page {{ tickets.number }} of {{ tickets.paginator.num_pages }}</span></li>
+        {% if tickets.has_next %}
+          <li class="page-item"><a class="page-link" href="?page={{ tickets.next_page_number }}&q={{ search_query }}&status={{ status_filter }}&priority={{ priority_filter }}&category={{ category_filter }}&assigned_to={{ assigned_filter }}">Next</a></li>
+        {% endif %}
+      </ul>
+    </nav>
+  {% endif %}
+</div>
+{% endblock %}

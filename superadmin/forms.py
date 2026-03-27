@@ -5,6 +5,7 @@ from django.core.exceptions import ValidationError
 import pytz
 
 from .models import (
+    AdminSecuritySettings,
     AddOnsPricingPolicy,
     AdminUser,
     BaseCurrencyConfig,
@@ -26,9 +27,15 @@ from .models import (
     PromoCode,
     Role,
     PushNotification,
+    SupportCategory,
+    SupportTicket,
     SubscriptionPlan,
     SystemBanner,
     TaxCode,
+    TenantProfile,
+    TenantSecuritySettings,
+    TicketReply,
+    CannedResponse,
 )
 
 
@@ -1036,4 +1043,224 @@ class InternalAlertRouteForm(forms.ModelForm):
             )
 
         return cleaned
+
+
+class TenantProfileCreateForm(forms.ModelForm):
+    class Meta:
+        model = TenantProfile
+        fields = [
+            'company_name',
+            'registration_number',
+            'tax_number',
+            'primary_email',
+            'primary_phone',
+            'country',
+            'account_status',
+            'assigned_sales_rep',
+        ]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['country'].queryset = (
+            Country.objects.filter(is_active=True).order_by('name_en')
+        )
+        self.fields['country'].required = False
+        self.fields['tax_number'].required = False
+        self.fields['assigned_sales_rep'].queryset = (
+            AdminUser.objects.filter(status='Active').order_by(
+                'first_name', 'last_name'
+            )
+        )
+        self.fields['assigned_sales_rep'].required = False
+
+
+class TenantProfileUpdateForm(forms.ModelForm):
+    class Meta:
+        model = TenantProfile
+        fields = ['account_status', 'assigned_sales_rep']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        active_reps = AdminUser.objects.filter(status='Active').order_by(
+            'first_name', 'last_name'
+        )
+        current = getattr(self.instance, 'assigned_sales_rep', None)
+        if current and current.pk and current not in active_reps:
+            active_reps = active_reps | AdminUser.objects.filter(pk=current.pk)
+        self.fields['assigned_sales_rep'].queryset = active_reps
+        self.fields['assigned_sales_rep'].required = False
+
+
+class SupportCategoryForm(forms.ModelForm):
+    class Meta:
+        model = SupportCategory
+        fields = ['name_en', 'name_ar', 'is_active']
+
+    def clean_name_en(self):
+        value = self.cleaned_data.get('name_en', '').strip()
+        if not value:
+            raise forms.ValidationError(
+                'English name is required.'
+            )
+        return value
+
+    def clean_name_ar(self):
+        value = self.cleaned_data.get('name_ar', '').strip()
+        if not value:
+            raise forms.ValidationError(
+                'Arabic name is required.'
+            )
+        return value
+
+
+class CannedResponseForm(forms.ModelForm):
+    class Meta:
+        model = CannedResponse
+        fields = ['title', 'message_body', 'is_active']
+        widgets = {
+            'message_body': forms.Textarea(attrs={'rows': 8}),
+        }
+
+
+class SupportTicketForm(forms.ModelForm):
+    class Meta:
+        model = SupportTicket
+        fields = [
+            'tenant',
+            'subject',
+            'category',
+            'priority',
+            'status',
+            'assigned_to',
+        ]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['tenant'].queryset = TenantProfile.objects.filter(
+            account_status='Active'
+        ).order_by('company_name')
+        self.fields['category'].queryset = SupportCategory.objects.filter(
+            is_active=True
+        ).order_by('name_en')
+        self.fields['assigned_to'].queryset = AdminUser.objects.filter(
+            status='Active'
+        ).order_by('first_name')
+
+
+class TicketAssignForm(forms.ModelForm):
+    class Meta:
+        model = SupportTicket
+        fields = ['assigned_to']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['assigned_to'].queryset = AdminUser.objects.filter(
+            status='Active'
+        ).order_by('first_name')
+        self.fields['assigned_to'].required = False
+
+
+class TicketPriorityForm(forms.ModelForm):
+    class Meta:
+        model = SupportTicket
+        fields = ['priority']
+
+
+class AdminReplyForm(forms.ModelForm):
+    class Meta:
+        model = TicketReply
+        fields = ['message_body', 'attachment', 'is_internal']
+        widgets = {
+            'message_body': forms.Textarea(attrs={'rows': 5}),
+        }
+
+
+class TenantReplyForm(forms.ModelForm):
+    class Meta:
+        model = TicketReply
+        fields = ['message_body', 'attachment']
+        widgets = {
+            'message_body': forms.Textarea(attrs={'rows': 5}),
+        }
+
+
+class TenantTicketCreateForm(forms.ModelForm):
+    class Meta:
+        model = SupportTicket
+        fields = ['subject', 'category']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['category'].queryset = SupportCategory.objects.filter(
+            is_active=True
+        ).order_by('name_en')
+
+
+class TenantSecuritySettingsForm(forms.ModelForm):
+    class Meta:
+        model = TenantSecuritySettings
+        fields = [
+            'tenant_web_timeout_hours',
+            'driver_app_timeout_days',
+            'max_failed_logins',
+            'lockout_duration_minutes',
+        ]
+
+    def clean_tenant_web_timeout_hours(self):
+        value = self.cleaned_data.get('tenant_web_timeout_hours')
+        if value and value < 1:
+            raise forms.ValidationError(
+                'Timeout must be at least 1 hour.'
+            )
+        return value
+
+    def clean_driver_app_timeout_days(self):
+        value = self.cleaned_data.get('driver_app_timeout_days')
+        if value and value < 1:
+            raise forms.ValidationError(
+                'Timeout must be at least 1 day.'
+            )
+        return value
+
+    def clean_max_failed_logins(self):
+        value = self.cleaned_data.get('max_failed_logins')
+        if value and value < 1:
+            raise forms.ValidationError(
+                'Must allow at least 1 attempt.'
+            )
+        return value
+
+
+class AdminSecuritySettingsForm(forms.ModelForm):
+    class Meta:
+        model = AdminSecuritySettings
+        fields = [
+            'session_timeout_minutes',
+            'max_failed_logins',
+            'lockout_duration_minutes',
+        ]
+
+    def clean_session_timeout_minutes(self):
+        value = self.cleaned_data.get('session_timeout_minutes')
+        if value and value < 1:
+            raise forms.ValidationError(
+                'Session timeout must be at least 1 minute.'
+            )
+        return value
+
+    def clean_max_failed_logins(self):
+        value = self.cleaned_data.get('max_failed_logins')
+        if value and value < 1:
+            raise forms.ValidationError(
+                'Must allow at least 1 attempt.'
+            )
+        return value
+
+    def clean_lockout_duration_minutes(self):
+        value = self.cleaned_data.get('lockout_duration_minutes')
+        if value and value < 1:
+            raise forms.ValidationError(
+                'Lockout duration must be at least 1 minute.'
+            )
+        return value
 

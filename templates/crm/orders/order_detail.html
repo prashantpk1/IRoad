@@ -1,0 +1,137 @@
+{% extends 'base.html' %}
+{% block title %}Order Details | iRoad Admin{% endblock %}
+{% block content %}
+{% if messages %}
+  {% for message in messages %}
+    <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">
+      {{ message }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+  {% endfor %}
+{% endif %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="mb-0">Order Details</h4>
+  <a href="{% url 'order_list' %}" class="btn btn-outline-secondary btn-sm">Back to list</a>
+</div>
+
+<div class="card mb-3">
+  <div class="card-header">Order header</div>
+  <div class="card-body row g-2 small">
+    <div class="col-md-4"><strong>Tenant</strong><br>{{ order.tenant.company_name }}</div>
+    <div class="col-md-4"><strong>Classification</strong><br>{{ order.get_order_classification_display }}</div>
+    <div class="col-md-4"><strong>Status</strong><br>{{ order.get_order_status_display }}</div>
+    <div class="col-md-4"><strong>Currency</strong><br>{{ order.currency_id }}</div>
+    <div class="col-md-4"><strong>Payment method</strong><br>{% if order.payment_method %}{{ order.payment_method.method_name_en }}{% else %}-{% endif %}</div>
+    <div class="col-md-4"><strong>Promo</strong><br>{% if order.promo_code %}{{ order.promo_code.code }}{% else %}-{% endif %}</div>
+    <div class="col-md-4"><strong>Tax code</strong><br>{% if order.tax_code %}{{ order.tax_code.tax_code }}{% else %}-{% endif %}</div>
+    <div class="col-md-4"><strong>Created</strong><br>{{ order.created_at|date:'Y-m-d H:i' }}</div>
+    <div class="col-md-4"><strong>Created by</strong><br>{% if order.created_by %}{{ order.created_by.email }}{% else %}-{% endif %}</div>
+  </div>
+</div>
+
+{% if order.plan_lines.exists %}
+<div class="card mb-3">
+  <div class="card-header">Plan line</div>
+  <div class="table-responsive">
+    <table class="table mb-0">
+      <thead><tr><th>Plan</th><th>Cycles</th><th>Plan price</th><th>Pro-rata adj.</th><th>Line total</th></tr></thead>
+      <tbody>
+        {% for pl in order.plan_lines.all %}
+          <tr>
+            <td>{{ pl.plan.plan_name_en }}</td>
+            <td>{{ pl.number_of_cycles }}</td>
+            <td>{{ pl.plan_price|floatformat:2 }}</td>
+            <td>{{ pl.pro_rata_adjustment|floatformat:2 }}</td>
+            <td>{{ pl.line_total|floatformat:2 }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{% if order.addon_lines.exists %}
+<div class="card mb-3">
+  <div class="card-header">Add-on lines</div>
+  <div class="table-responsive">
+    <table class="table mb-0">
+      <thead><tr><th>Action</th><th>Type</th><th>Qty</th><th>Cycles (frac)</th><th>Unit price</th><th>Line total</th></tr></thead>
+      <tbody>
+        {% for al in order.addon_lines.all %}
+          <tr>
+            <td>{{ al.get_action_type_display }}</td>
+            <td>{{ al.get_add_on_type_display }}</td>
+            <td>{{ al.quantity }}</td>
+            <td>{{ al.number_of_cycles|floatformat:2 }}</td>
+            <td>{{ al.unit_price|floatformat:2 }}</td>
+            <td>{{ al.line_total|floatformat:2 }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<div class="card mb-3">
+  <div class="card-header">Totals</div>
+  <div class="card-body row g-2 small">
+    <div class="col-6"><strong>Sub total</strong></div><div class="col-6 text-end">{{ order.sub_total|floatformat:2 }} {{ order.currency_id }}</div>
+    <div class="col-6"><strong>Discount</strong></div><div class="col-6 text-end">{{ order.discount_amount|floatformat:2 }}</div>
+    <div class="col-6"><strong>Tax</strong></div><div class="col-6 text-end">{{ order.tax_amount|floatformat:2 }}</div>
+    <div class="col-6"><strong>Grand total</strong></div><div class="col-6 text-end fw-bold">{{ order.grand_total|floatformat:2 }}</div>
+    <div class="col-6"><strong>FX snapshot</strong></div><div class="col-6 text-end">{{ order.exchange_rate_snapshot }}</div>
+    <div class="col-6"><strong>Base currency equivalent</strong></div><div class="col-6 text-end">{{ order.base_currency_equivalent|floatformat:2 }}</div>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-header">Projected state (after payment)</div>
+  <div class="card-body row g-2 small">
+    <div class="col-md-4"><strong>Plan</strong><br>{{ order.projected_plan.plan_name_en|default:'—' }}</div>
+    <div class="col-md-4"><strong>Expiry</strong><br>{{ order.projected_expiry_date|default:'—' }}</div>
+    <div class="col-md-4"><strong>Max users</strong><br>{{ order.projected_max_users|default:'—' }}</div>
+    <div class="col-md-4"><strong>Max int. trucks</strong><br>{{ order.projected_max_internal_trucks|default:'—' }}</div>
+    <div class="col-md-4"><strong>Max ext. trucks</strong><br>{{ order.projected_max_external_trucks|default:'—' }}</div>
+    <div class="col-md-4"><strong>Max drivers</strong><br>{{ order.projected_max_drivers|default:'—' }}</div>
+  </div>
+</div>
+
+{% if request.user.is_root %}
+  {% if order.order_status == 'Draft' %}
+    <div class="d-flex flex-wrap gap-2 mb-4">
+      <form method="post" action="{% url 'order_status_update' order.order_id %}">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="pending_payment">
+        <button type="submit" class="btn btn-warning">Mark as pending payment</button>
+      </form>
+      <form method="post" action="{% url 'order_status_update' order.order_id %}" onsubmit="return confirm('Cancel this order?');">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="cancel">
+        <button type="submit" class="btn btn-danger">Cancel order</button>
+      </form>
+    </div>
+  {% elif order.order_status == 'Pending_Payment' %}
+    <div class="d-flex flex-wrap gap-2 mb-4">
+      {% if payment_txn %}
+        <a href="{% url 'transaction_detail' payment_txn.transaction_id %}" class="btn btn-primary">View transaction</a>
+      {% endif %}
+      <form method="post" action="{% url 'order_status_update' order.order_id %}" onsubmit="return confirm('Cancel this order?');">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="cancel">
+        <button type="submit" class="btn btn-danger">Cancel order</button>
+      </form>
+    </div>
+  {% elif order.order_status == 'Paid' %}
+    <div class="mb-4">
+      {% if invoice %}
+        <a href="{% url 'invoice_detail' invoice.invoice_id %}" class="btn btn-success">View invoice</a>
+      {% else %}
+        <span class="text-muted">No invoice on file.</span>
+      {% endif %}
+    </div>
+  {% endif %}
+{% endif %}
+{% endblock %}

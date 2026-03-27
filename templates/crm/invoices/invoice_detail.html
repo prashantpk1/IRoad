@@ -1,0 +1,94 @@
+{% extends 'base.html' %}
+{% block title %}{{ invoice.invoice_number }} | iRoad Admin{% endblock %}
+{% block content %}
+{% if messages %}
+  {% for message in messages %}
+    <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">
+      {{ message }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+  {% endfor %}
+{% endif %}
+
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <h4 class="mb-0">{{ invoice.invoice_number }}</h4>
+  <div class="d-flex gap-2">
+    <a href="{% url 'invoice_list' %}" class="btn btn-outline-secondary btn-sm">Back to list</a>
+    <button type="button" class="btn btn-outline-primary btn-sm" disabled title="Coming soon">Print / download</button>
+    <!-- TODO Phase 11: Implement PDF generation here -->
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-body">
+    <div class="row">
+      <div class="col-md-6">
+        <h6 class="text-uppercase text-muted small">Supplier</h6>
+        <p class="mb-0 fw-semibold">{{ invoice.supplier_name }}</p>
+        <p class="small mb-0">Tax: {{ invoice.supplier_tax_number|default:'—' }}</p>
+      </div>
+      <div class="col-md-6 text-md-end mt-3 mt-md-0">
+        <h6 class="text-uppercase text-muted small">Bill to</h6>
+        <p class="mb-0 fw-semibold">{{ invoice.customer_name }}</p>
+        <p class="small mb-0">Tax: {{ invoice.customer_tax_number|default:'—' }}</p>
+        {% if invoice.customer_address %}<p class="small mb-0">{{ invoice.customer_address }}</p>{% endif %}
+      </div>
+    </div>
+    <hr>
+    <div class="row small">
+      <div class="col-md-4"><strong>Issue date</strong><br>{{ invoice.issue_date|date:'Y-m-d' }}</div>
+      <div class="col-md-4"><strong>Due date</strong><br>{{ invoice.due_date|default:'—' }}</div>
+      <div class="col-md-4"><strong>Status</strong><br>{{ invoice.get_status_display }}</div>
+      {% if invoice.tax_code %}<div class="col-md-4 mt-2"><strong>Tax code</strong><br>{{ invoice.tax_code.tax_code }} ({{ invoice.tax_code.rate_percent }}%)</div>{% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="table-responsive">
+    <table class="table mb-0">
+      <thead>
+        <tr><th>Description</th><th class="text-end">Qty</th><th class="text-end">Unit price</th><th class="text-end">Tax rate</th><th class="text-end">Tax</th><th class="text-end">Line total</th></tr>
+      </thead>
+      <tbody>
+        {% for line in invoice.line_items.all %}
+          <tr>
+            <td>{{ line.item_description }}</td>
+            <td class="text-end">{{ line.quantity|floatformat:2 }}</td>
+            <td class="text-end">{{ line.unit_price|floatformat:2 }}</td>
+            <td class="text-end">{{ line.tax_rate|floatformat:2 }}%</td>
+            <td class="text-end">{{ line.tax_amount|floatformat:2 }}</td>
+            <td class="text-end">{{ line.line_total|floatformat:2 }}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="6" class="text-center text-muted py-3">No line items.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="row justify-content-end">
+  <div class="col-md-5">
+    <div class="card">
+      <div class="card-body small">
+        <div class="d-flex justify-content-between"><span>Sub total</span><span>{{ invoice.sub_total|floatformat:2 }} {{ invoice.currency_id }}</span></div>
+        <div class="d-flex justify-content-between"><span>Discount</span><span>{{ invoice.discount_amount|floatformat:2 }}</span></div>
+        <div class="d-flex justify-content-between"><span>Taxable</span><span>{{ invoice.taxable_amount|floatformat:2 }}</span></div>
+        <div class="d-flex justify-content-between"><span>Tax amount</span><span>{{ invoice.tax_amount|floatformat:2 }}</span></div>
+        <hr class="my-2">
+        <div class="d-flex justify-content-between fw-bold"><span>Grand total</span><span>{{ invoice.grand_total|floatformat:2 }} {{ invoice.currency_id }}</span></div>
+        <div class="d-flex justify-content-between"><span>Base currency equivalent</span><span>{{ invoice.base_currency_equivalent_amount|floatformat:2 }}</span></div>
+        <div class="d-flex justify-content-between"><span>FX snapshot</span><span>{{ invoice.exchange_rate_snapshot }}</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if invoice.status == 'Issued' and request.user.is_root %}
+<form method="post" action="{% url 'invoice_void' invoice.invoice_id %}" class="mt-4" onsubmit="return confirm('Void this invoice?');">
+  {% csrf_token %}
+  <button type="submit" class="btn btn-outline-secondary">Void invoice</button>
+</form>
+{% endif %}
+{% endblock %}
