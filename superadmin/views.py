@@ -3,7 +3,7 @@ from django.contrib.sessions.models import Session
 from django.contrib.auth import login, logout
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db import transaction as db_transaction
-from django.db.models import Count, F, Q
+from django.db.models import Sum, Count, F, Q
 from django.db.models.expressions import ExpressionWrapper
 from django.db.models.fields import DecimalField
 from django.db.models.functions import Abs
@@ -15,7 +15,7 @@ from django.utils import timezone
 from django.utils.dateparse import parse_date
 from django.views import View
 from django.views.generic import TemplateView
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 import json
 import uuid
@@ -430,13 +430,167 @@ class ResetPasswordConfirmView(View):
         return redirect(reverse('login'))
 
 
-class DashboardView(LoginRequiredMixin, TemplateView):
-    template_name = 'dashboard/index.html'
+class DashboardView(LoginRequiredMixin, View):
+    template_name = 'dashboard/dashboard.html'
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context.setdefault('page_title', 'Dashboard')
-        return context
+    def get(self, request):
+        now = timezone.now()
+        today = now.date()
+
+        # ── IMPORT ALL NEEDED MODELS ──
+        from .models import (
+            TenantProfile, SubscriptionOrder,
+            Transaction, SupportTicket, AdminUser,
+            StandardInvoice, AuditLog, ActiveSession,
+            Role
+        )
+
+        # ── EXECUTIVE KPIs ──
+
+        # MRR: current month paid/issued invoices
+        month_start = now.replace(
+            day=1, hour=0, minute=0,
+            second=0, microsecond=0)
+        mrr = StandardInvoice.objects.filter(
+            status__in=['Issued', 'Paid'],
+            issue_date__gte=month_start
+        ).aggregate(
+            total=Sum('base_currency_equivalent_amount')
+        )['total'] or Decimal('0.00')
+
+        active_tenants = TenantProfile.objects.filter(
+            account_status='Active').count()
+
+        pending_orders = SubscriptionOrder.objects.filter(
+            order_status='Pending_Payment').count()
+
+        pending_bank_txns = Transaction.objects.filter(
+            status='Pending',
+            payment_method__method_type='Offline_Bank'
+        ).count()
+
+        open_tickets = SupportTicket.objects.filter(
+            status__in=['New', 'In_Progress']).count()
+
+        overdue_cutoff = now - timedelta(hours=48)
+        overdue_tickets = SupportTicket.objects.filter(
+            ~Q(status='Closed'),
+            created_at__lt=overdue_cutoff
+        ).count()
+
+        active_admin_sessions = ActiveSession.objects.filter(
+            is_active=True,
+            user_domain='Admin'
+        ).count()
+
+        # ── ATTENTION CENTER ──
+
+        pending_orders_list = SubscriptionOrder.objects.filter(
+            order_status='Pending_Payment'
+        ).select_related('tenant').order_by(
+            'created_at')[:5]
+
+        overdue_tickets_list = SupportTicket.objects.filter(
+            ~Q(status='Closed'),
+            created_at__lt=overdue_cutoff
+        ).select_related('tenant', 'category').order_by(
+            'created_at')[:5]
+
+        failed_transactions = Transaction.objects.filter(
+            status__in=['Failed', 'Rejected']
+        ).select_related('tenant').order_by(
+            '-created_at')[:5]
+
+        suspended_tenants = TenantProfile.objects.filter(
+            ~Q(account_status='Active')
+        ).order_by('-updated_at')[:5]
+
+        # ── STAFF ANALYTICS ──
+
+        role_distribution = Role.objects.filter(
+            status='Active'
+        ).annotate(
+            staff_count=Count('admin_users')
+        ).values('role_name_en', 'staff_count')
+
+        stale_cutoff = now - timedelta(days=30)
+        stale_accounts = AdminUser.objects.filter(
+            Q(last_login_at__lt=stale_cutoff) |
+            Q(last_login_at__isnull=True),
+            status='Active'
+        ).count()
+
+        suspended_admins = AdminUser.objects.filter(
+            status='Suspended').count()
+
+        total_staff = AdminUser.objects.exclude(
+            status='Suspended').count()
+
+        # ── REVENUE CHART (last 6 months) ──
+        revenue_data = []
+        revenue_labels = []
+        for i in range(5, -1, -1):
+            month_date = (now.replace(day=1) -
+                          timedelta(days=i * 30))
+            m_start = month_date.replace(
+                day=1, hour=0, minute=0,
+                second=0, microsecond=0)
+            if m_start.month == 12:
+                m_end = m_start.replace(
+                    year=m_start.year + 1, month=1)
+            else:
+                m_end = m_start.replace(
+                    month=m_start.month + 1)
+
+            total = StandardInvoice.objects.filter(
+                status__in=['Issued', 'Paid'],
+                issue_date__gte=m_start,
+                issue_date__lt=m_end
+            ).aggregate(
+                t=Sum('base_currency_equivalent_amount')
+            )['t'] or Decimal('0.00')
+
+            revenue_data.append(float(total))
+            revenue_labels.append(
+                m_start.strftime('%b %Y'))
+
+        # ── RECENT AUDIT LOG ──
+        recent_audit = AuditLog.objects.select_related(
+            'admin'
+        ).order_by('-timestamp')[:10]
+
+        context = {
+            # KPIs
+            'mrr': mrr,
+            'active_tenants': active_tenants,
+            'pending_orders': pending_orders,
+            'pending_bank_txns': pending_bank_txns,
+            'open_tickets': open_tickets,
+            'overdue_tickets': overdue_tickets,
+            'active_admin_sessions': active_admin_sessions,
+            # Attention
+            'pending_orders_list': pending_orders_list,
+            'overdue_tickets_list': overdue_tickets_list,
+            'failed_transactions': failed_transactions,
+            'suspended_tenants': suspended_tenants,
+            # Staff
+            'role_distribution': list(role_distribution),
+            'stale_accounts': stale_accounts,
+            'suspended_admins': suspended_admins,
+            'total_staff': total_staff,
+            # Chart
+            'revenue_data': revenue_data,
+            'revenue_labels': revenue_labels,
+            # Audit
+            'recent_audit': recent_audit,
+            # Meta
+            'page_title': 'Super Admin Dashboard',
+        }
+
+        return render(
+            request,
+            self.template_name,
+            context)
 
 
 class AccessLogListView(LoginRequiredMixin, View):

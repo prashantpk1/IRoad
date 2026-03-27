@@ -1,0 +1,967 @@
+/* ============================================
+   iRoad Admin Dashboard — Responsive Styles
+   Version: 2.0  (Full tablet & phone overhaul)
+   Contains ALL responsive media queries
+   ============================================ */
+
+/* ============================================
+   Large Desktop & Down (≤1400px)
+   ============================================ */
+@media (max-width: 1400px) {
+  .main-content {
+    padding: 24px;
+  }
+
+  .form-section {
+    padding: 20px 24px;
+  }
+
+  .submit-section {
+    padding: 16px 24px;
+  }
+
+  /* Form card layout */
+  .form-card-header {
+    padding: 18px 22px;
+  }
+
+  .form-card-body {
+    padding: 20px 22px 24px;
+  }
+
+  .form-actions-bar {
+    padding: 18px 22px;
+  }
+}
+
+/* ============================================
+   Laptop & Down (≤1200px)
+   ============================================ */
+@media (max-width: 1200px) {
+  :root {
+    --sidebar-width: 240px;
+  }
+
+  .sidebar-header {
+    padding: 16px 14px;
+  }
+
+  .sidebar-logo .logo-icon,
+  .sidebar-logo .logo-label {
+    font-size: 22px;
+  }
+
+  .nav-menu {
+    padding: 0 8px;
+  }
+
+  .nav-link {
+    padding: 9px 12px;
+    font-size: 13px;
+  }
+}
+
+/* ============================================
+   Tablet & Down (≤992px)
+   ============================================ */
+@media (max-width: 992px) {
+  /* ------ Hide floating mobile toggle — use header-toggle-btn instead ------ */
+  .mobile-menu-toggle {
+    display: none !important;
+  }
+
+  /* Show header toggle on mobile with hamburger styling */
+  .header-toggle-btn {
+    display: flex !important;
+    width: 38px;
+    height: 38px;
+    background: var(--primary-color, #5051f9);
+    color: #fff;
+    border-radius: 8px;
+    font-size: 20px;
+    margin-right: 12px;
+    flex-shrink: 0;
+  }
+
+  .header-toggle-btn:hover {
+    background: #3f40d0;
+  }
+
+  .sidebar-collapse-btn {
+    display: none !important;
+  }
+
+  /* ------ Sidebar off-canvas ------ */
+  .sidebar {
+    transform: translateX(-100%);
+    width: 280px;
+  }
+
+  .sidebar.active {
+    transform: translateX(0);
+  }
+
+  .sidebar-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 999;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(2px);
+  }
+
+  .sidebar-overlay.active {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+  }
+
+  /* ------ Main content — no extra top padding needed ------ */
+  .main-content {
+    margin-left: 0;
+    padding: 20px;
+  }
+
+  /* ------ Top header — clean inline bar, no negative margin hacks ------ */
+  .top-header {
+    padding: 12px 20px;
+    margin: -20px -20px 20px -20px;
+    flex-wrap: nowrap;
+  }
+
+  .header-search {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .header-datetime {
+    display: none;
+  }
+
+  /* ------ Page header ------ */
+  .page-header {
+    margin-bottom: 20px;
+  }
+
+  .page-title {
+    font-size: 22px;
+  }
+
+  .page-header-row {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  /* ------ Forms ------ */
+  .form-section {
+    padding: 20px;
+  }
+
+  .form-row {
+    gap: 16px;
+  }
+
+  .fields-grid.cols-3 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .form-progress-tracker {
+    padding: 16px 20px;
+  }
+
+  /* ------ Dashboard ------ */
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* ------ Entity Accounts List ------ */
+  .eal-page-header {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .eal-header-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .eal-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .eal-toolbar-left {
+    width: 100%;
+  }
+
+  .eal-toolbar-right {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .eal-search {
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* ------ Report tab bar ------ */
+  .report-tab-bar {
+    flex-wrap: wrap;
+    gap: 0;
+  }
+
+  .report-tab-bar .report-tab-btn {
+    padding: 9px 16px;
+    font-size: 12.5px;
+  }
+
+  .eal-filter-select,
+  .eal-filter-date {
+    height: 36px;
+    font-size: 12.5px;
+  }
+
+  /* ------ Detail panel ------ */
+  .detail-panel {
+    width: 100vw;
+  }
+
+  .detail-section {
+    padding: 18px 20px;
+  }
+
+  .detail-panel-header {
+    padding: 14px 16px;
+  }
+
+  .detail-field-label {
+    flex: 0 0 140px;
+    font-size: 13px;
+  }
+
+  /* ------ Notification panel ------ */
+  .notification-panel {
+    width: 100vw;
+    max-width: 100vw;
+    right: 0;
+  }
+}
+
+/* ============================================
+   Mobile & Down (≤768px)
+   ============================================ */
+@media (max-width: 768px) {
+  /* ------ Main content ------ */
+  .main-content {
+    padding: 16px;
+  }
+
+  /* ------ Top header ------ */
+  .top-header {
+    padding: 10px 16px;
+    margin: -16px -16px 16px -16px;
+    gap: 10px;
+  }
+
+  .header-toggle-btn {
+    width: 36px;
+    height: 36px;
+    font-size: 18px;
+    margin-right: 8px;
+  }
+
+  .header-search {
+    display: none;
+  }
+
+  .header-left {
+    gap: 8px;
+  }
+
+  .header-right {
+    gap: 10px;
+  }
+
+  /* ------ Page header ------ */
+  .page-title {
+    font-size: 20px;
+  }
+
+  .page-subtitle {
+    font-size: 13px;
+  }
+
+  .breadcrumb {
+    font-size: 12px;
+    flex-wrap: wrap;
+  }
+
+  .page-header-with-actions {
+    flex-direction: column;
+    gap: 16px;
+    align-items: flex-start;
+  }
+
+  /* ------ Section title ------ */
+  .section-title {
+    font-size: 15px;
+    margin-bottom: 16px;
+  }
+
+  /* ------ Forms ------ */
+  .form-section {
+    padding: 16px;
+  }
+
+  .row > [class*="col-md-"] {
+    flex: 0 0 100%;
+    max-width: 100%;
+  }
+
+  .fields-grid.cols-2,
+  .fields-grid.cols-3 {
+    grid-template-columns: 1fr;
+  }
+
+  .form-card-header {
+    padding: 16px 18px;
+  }
+
+  .form-card-body {
+    padding: 18px;
+  }
+
+  .form-card-icon {
+    width: 38px;
+    height: 38px;
+    font-size: 18px;
+  }
+
+  .form-card-title {
+    font-size: 15px;
+  }
+
+  .form-progress-tracker {
+    padding: 14px 16px;
+    gap: 0;
+  }
+
+  .step-label {
+    display: none;
+  }
+
+  .progress-connector {
+    max-width: 50px;
+  }
+
+  .form-actions-bar {
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px 18px;
+  }
+
+  .form-actions-left,
+  .form-actions-right {
+    width: 100%;
+  }
+
+  .form-actions-right {
+    flex-direction: column;
+  }
+
+  .form-actions-bar .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .form-control,
+  .form-select {
+    padding: 10px 12px;
+    font-size: 16px; /* Prevents zoom on iOS */
+  }
+
+  .phone-input-group {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .phone-input-group .country-code {
+    width: 100%;
+  }
+
+  .working-days-group {
+    gap: 12px;
+  }
+
+  .working-days-group .form-check {
+    flex: 0 0 calc(50% - 6px);
+  }
+
+  .submit-section {
+    padding: 16px;
+    justify-content: stretch;
+  }
+
+  .submit-section .btn {
+    width: 100%;
+  }
+
+  .content-card {
+    border-radius: var(--radius-md);
+  }
+
+  /* ------ Dashboard ------ */
+  .dashboard-stats {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+
+  .stat-card {
+    padding: 1.25rem;
+  }
+
+  .stat-card .stat-value {
+    font-size: 1.5rem;
+  }
+
+  .dashboard-card {
+    padding: 1.25rem;
+  }
+
+  .dashboard-card .card-title {
+    font-size: 1rem;
+  }
+
+  /* ------ Data tables ------ */
+  .table-header {
+    flex-direction: column;
+    gap: 16px;
+    align-items: flex-start;
+  }
+
+  .data-table-card {
+    border-radius: var(--radius-md);
+  }
+
+  .table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .data-table th,
+  .data-table td {
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+
+  /* ------ Activity table ------ */
+  .activity-table th,
+  .activity-table td {
+    padding: 0.625rem 0.75rem;
+    font-size: 0.8125rem;
+  }
+
+  /* ------ Entity Accounts List ------ */
+  .eal-stats-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .eal-search {
+    min-width: 180px;
+  }
+
+  .eal-page-title {
+    font-size: 18px;
+  }
+
+  .eal-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .eal-table tbody td {
+    padding: 10px 12px;
+    font-size: 12.5px;
+  }
+
+  .eal-table thead th {
+    padding: 10px 12px;
+    font-size: 11px;
+  }
+
+  .eal-pagination {
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+  }
+
+  .eal-chip-group {
+    gap: 4px;
+  }
+
+  .eal-chip {
+    padding: 4px 10px;
+    font-size: 11.5px;
+  }
+
+  /* ------ Detail panel ------ */
+  .detail-panel-actions {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .detail-action-btn span {
+    display: none;
+  }
+
+  .detail-field {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .detail-field-label {
+    flex: none;
+    font-size: 12px;
+    color: #94a3b8;
+  }
+
+  .detail-field-value {
+    font-size: 14px;
+  }
+
+  .detail-section {
+    padding: 16px 18px;
+  }
+}
+
+/* ============================================
+   Small Mobile (≤576px)
+   ============================================ */
+@media (max-width: 576px) {
+  /* ------ Main content ------ */
+  .main-content {
+    padding: 12px;
+  }
+
+  /* ------ Top header ------ */
+  .top-header {
+    padding: 8px 12px;
+    margin: -12px -12px 12px -12px;
+    gap: 6px;
+  }
+
+  .header-toggle-btn {
+    width: 34px;
+    height: 34px;
+    font-size: 17px;
+    margin-right: 6px;
+    border-radius: 6px;
+  }
+
+  .header-divider {
+    display: none;
+  }
+
+  .header-icon-btn {
+    width: 32px;
+    height: 32px;
+  }
+
+  .header-icon-btn i {
+    font-size: 15px;
+  }
+
+  .header-right {
+    gap: 8px;
+  }
+
+  .header-user-info {
+    display: none;
+  }
+
+  .header-user {
+    padding: 4px;
+  }
+
+  .header-user-avatar {
+    width: 28px;
+    height: 28px;
+  }
+
+  .header-user-chevron {
+    display: none;
+  }
+
+  /* ------ Page header ------ */
+  .page-header {
+    margin-bottom: 16px;
+  }
+
+  .page-title {
+    font-size: 18px;
+  }
+
+  .section-title {
+    font-size: 14px;
+    gap: 8px;
+  }
+
+  .section-title i {
+    font-size: 16px;
+  }
+
+  /* ------ Breadcrumb ------ */
+  .breadcrumb {
+    font-size: 11px;
+    gap: 2px;
+  }
+
+  .breadcrumb-item + .breadcrumb-item::before {
+    padding-right: 5px;
+    padding-left: 5px;
+    font-size: 10px;
+  }
+
+  /* ------ Forms ------ */
+  .form-section {
+    padding: 14px;
+  }
+
+  .form-card-header {
+    padding: 14px;
+    gap: 12px;
+  }
+
+  .form-card-body {
+    padding: 14px;
+  }
+
+  .form-card-icon {
+    width: 34px;
+    height: 34px;
+    font-size: 16px;
+  }
+
+  .fields-grid {
+    gap: 14px;
+  }
+
+  .field-group-title {
+    font-size: 12px;
+  }
+
+  .header-badge {
+    font-size: 11px;
+    padding: 5px 10px;
+  }
+
+  .form-label {
+    font-size: 12px;
+  }
+
+  .form-control,
+  .form-select {
+    padding: 10px;
+    border-radius: var(--radius-sm);
+  }
+
+  .form-check-label {
+    font-size: 13px;
+  }
+
+  .form-check-input {
+    width: 16px;
+    height: 16px;
+  }
+
+  .working-days-group .form-check {
+    flex: 0 0 100%;
+  }
+
+  .btn {
+    padding: 12px 20px;
+    font-size: 14px;
+  }
+
+  textarea.form-control {
+    min-height: 80px;
+  }
+
+  /* ------ Dashboard ------ */
+  .dashboard-stats {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .stat-card {
+    padding: 1rem;
+  }
+
+  .stat-card .stat-icon {
+    width: 40px;
+    height: 40px;
+    font-size: 1.25rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .stat-card .stat-value {
+    font-size: 1.375rem;
+  }
+
+  .stat-card .stat-label {
+    font-size: 0.8125rem;
+  }
+
+  .dashboard-card {
+    padding: 1rem;
+  }
+
+  .dashboard-card .card-header {
+    margin-bottom: 1rem;
+  }
+
+  .dashboard-card .card-title {
+    font-size: 0.9375rem;
+  }
+
+  /* Quick actions */
+  .quick-action-btn {
+    padding: 0.75rem;
+    font-size: 0.8125rem;
+  }
+
+  /* Fleet items */
+  .fleet-item .fleet-icon {
+    width: 34px;
+    height: 34px;
+  }
+
+  /* ------ Entity Accounts List ------ */
+  .eal-stats-row {
+    grid-template-columns: 1fr;
+  }
+
+  .eal-stat-card {
+    padding: 14px 16px;
+  }
+
+  .eal-stat-icon {
+    width: 38px;
+    height: 38px;
+    font-size: 18px;
+  }
+
+  .eal-stat-value {
+    font-size: 18px;
+  }
+
+  .eal-header-actions {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .eal-btn {
+    padding: 8px 14px;
+    font-size: 12.5px;
+  }
+
+  .eal-toolbar {
+    padding: 12px 14px;
+  }
+
+  .eal-search {
+    min-width: 0;
+    padding: 7px 12px;
+  }
+
+  .eal-icon-btn {
+    width: 34px;
+    height: 34px;
+    font-size: 15px;
+  }
+
+  .eal-pagination {
+    padding: 10px 14px;
+  }
+
+  .eal-page-btn {
+    min-width: 30px;
+    height: 30px;
+    font-size: 12px;
+  }
+
+  /* ------ Detail panel ------ */
+  .detail-panel-header {
+    padding: 12px 14px;
+  }
+
+  .detail-nav-btn {
+    width: 32px;
+    height: 32px;
+    font-size: 13px;
+  }
+
+  .detail-action-btn {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+
+  .detail-section {
+    padding: 14px;
+  }
+
+  .detail-section-title {
+    font-size: 12px;
+  }
+
+  .detail-comment-box {
+    gap: 8px;
+  }
+
+  .detail-comment-avatar {
+    width: 30px;
+    height: 30px;
+    font-size: 12px;
+  }
+}
+
+/* ============================================
+   Extra Small Mobile (≤400px)
+   ============================================ */
+@media (max-width: 400px) {
+  .main-content {
+    padding: 10px;
+  }
+
+  .top-header {
+    margin: -10px -10px 10px -10px;
+    padding: 8px 10px;
+  }
+
+  .form-section {
+    padding: 12px;
+  }
+
+  .section-title {
+    font-size: 13px;
+  }
+
+  .form-label {
+    font-size: 11px;
+  }
+
+  .page-title {
+    font-size: 16px;
+  }
+
+  .breadcrumb {
+    font-size: 10px;
+  }
+
+  /* Dashboard */
+  .stat-card .stat-value {
+    font-size: 1.25rem;
+  }
+}
+
+/* ============================================
+   Landscape Mobile Adjustments
+   ============================================ */
+@media (max-height: 500px) and (orientation: landscape) {
+  .sidebar {
+    overflow-y: auto;
+  }
+
+  .main-content {
+    padding-top: 16px;
+  }
+}
+
+/* ============================================
+   Authentication Pages Responsive Styles
+   ============================================ */
+@media (max-width: 992px) {
+  .auth-left {
+    display: none;
+  }
+
+  .auth-right {
+    padding: 24px;
+  }
+}
+
+@media (max-width: 576px) {
+  .auth-form-container {
+    max-width: 100%;
+  }
+
+  .auth-title {
+    font-size: 24px;
+  }
+
+  .otp-container {
+    gap: 8px;
+  }
+
+  .otp-input {
+    width: 44px;
+    height: 52px;
+    font-size: 20px;
+  }
+
+  .requirements-list {
+    grid-template-columns: 1fr;
+  }
+
+  .auth-back-btn {
+    top: 16px;
+    right: 16px;
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+
+  .auth-modal {
+    margin: 16px;
+    padding: 28px 20px;
+  }
+}
+
+/* ============================================
+   Print Styles
+   ============================================ */
+@media print {
+  .sidebar,
+  .mobile-menu-toggle,
+  .sidebar-overlay {
+    display: none !important;
+  }
+
+  .main-content {
+    margin-left: 0 !important;
+    padding: 0 !important;
+  }
+
+  .content-card {
+    box-shadow: none !important;
+    border: 1px solid #ddd;
+  }
+
+  .submit-section {
+    display: none !important;
+  }
+
+  .top-header {
+    display: none !important;
+  }
+}

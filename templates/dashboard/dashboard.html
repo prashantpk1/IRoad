@@ -1,0 +1,376 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Super Admin Dashboard{% endblock %}
+{% block page_title %}Super Admin Dashboard{% endblock %}
+{% block content %}
+<div class="dashboard-toolbar">
+  <div class="toolbar-left">
+    <h2 class="mb-1">Super Admin Dashboard</h2>
+    <div class="toolbar-subtitle">
+      System overview — real-time platform insights
+    </div>
+  </div>
+  <div class="toolbar-right">
+    <div class="text-end">
+      <div id="dashDate" class="fw-semibold"></div>
+      <div id="dashTime" class="text-muted small"></div>
+    </div>
+  </div>
+</div>
+
+<div class="kpi-grid">
+  <a href="#" class="text-decoration-none">
+    <div class="kpi-card db-fade" data-status="good">
+      <div class="kpi-top">
+        <div class="kpi-icon green"><i class="bi bi-currency-dollar"></i></div>
+      </div>
+      <div class="kpi-title">MRR — This Month</div>
+      <div class="kpi-bottom"><span class="kpi-value">{{ mrr|floatformat:2 }} SAR</span></div>
+    </div>
+  </a>
+
+  <a href="#" class="text-decoration-none">
+    <div class="kpi-card db-fade" data-status="info">
+      <div class="kpi-top">
+        <div class="kpi-icon primary"><i class="bi bi-buildings"></i></div>
+      </div>
+      <div class="kpi-title">Active Subscribers</div>
+      <div class="kpi-bottom"><span class="kpi-value">{{ active_tenants }}</span></div>
+    </div>
+  </a>
+
+  <a href="{% url 'order_list' %}" class="text-decoration-none">
+    <div class="kpi-card db-fade" data-status="warning">
+      <div class="kpi-top">
+        <div class="kpi-icon"><i class="bi bi-hourglass-split" style="color:#f59e0b;"></i></div>
+      </div>
+      <div class="kpi-title">Awaiting Payment</div>
+      <div class="kpi-bottom"><span class="kpi-value">{{ pending_orders }}</span></div>
+    </div>
+  </a>
+
+  <a href="{% url 'transaction_list' %}" class="text-decoration-none">
+    <div class="kpi-card db-fade" data-status="warning">
+      <div class="kpi-top">
+        <div class="kpi-icon"><i class="bi bi-bank" style="color:#f97316;"></i></div>
+      </div>
+      <div class="kpi-title">Needs Approval</div>
+      <div class="kpi-bottom"><span class="kpi-value">{{ pending_bank_txns }}</span></div>
+    </div>
+  </a>
+
+  <a href="{% url 'ticket_list' %}" class="text-decoration-none">
+    <div class="kpi-card db-fade" data-status="warning">
+      <div class="kpi-top">
+        <div class="kpi-icon purple"><i class="bi bi-headset"></i></div>
+      </div>
+      <div class="kpi-title">Support Inbox</div>
+      <div class="kpi-bottom"><span class="kpi-value">{{ open_tickets }}</span></div>
+    </div>
+  </a>
+
+  <a href="#" class="text-decoration-none">
+    <div class="kpi-card db-fade" data-status="critical">
+      <div class="kpi-top">
+        <div class="kpi-icon red"><i class="bi bi-alarm"></i></div>
+      </div>
+      <div class="kpi-title">Over 48 Hours</div>
+      <div class="kpi-bottom"><span class="kpi-value">{{ overdue_tickets }}</span></div>
+    </div>
+  </a>
+
+  <a href="{% url 'session_list' %}" class="text-decoration-none">
+    <div class="kpi-card db-fade" data-status="info">
+      <div class="kpi-top">
+        <div class="kpi-icon"><i class="bi bi-shield-check" style="color:#14b8a6;"></i></div>
+      </div>
+      <div class="kpi-title">Live Sessions</div>
+      <div class="kpi-bottom"><span class="kpi-value">{{ active_admin_sessions }}</span></div>
+    </div>
+  </a>
+</div>
+
+<div class="db-grid-2 mt-3">
+  <div class="db-card db-fade">
+    <div class="db-card-header">
+      <div>
+        <div class="db-card-title">Pending Bank Transfer Orders</div>
+      </div>
+    </div>
+    <div class="table-responsive">
+      <table class="table align-middle">
+        <thead><tr><th>Tenant Name</th><th>Grand Total</th><th>Currency</th><th>Created At</th><th>Actions</th></tr></thead>
+        <tbody>
+          {% for order in pending_orders_list %}
+          <tr>
+            <td>{{ order.tenant.company_name }}</td>
+            <td>{{ order.grand_total|floatformat:2 }}</td>
+            <td>{{ order.currency_id }}</td>
+            <td>{{ order.created_at }}</td>
+            <td><a class="btn btn-sm btn-outline-primary" href="{% url 'order_detail' pk=order.order_id %}">View</a></td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="5" class="text-center text-muted">No pending orders. All clear!</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="db-card db-fade">
+    <div class="db-card-header">
+      <div>
+        <div class="db-card-title">Overdue Support Tickets</div>
+      </div>
+    </div>
+    <div class="table-responsive">
+      <table class="table align-middle">
+        <thead><tr><th>Ticket No</th><th>Tenant</th><th>Subject</th><th>Category</th><th>Hours Old</th><th>Actions</th></tr></thead>
+        <tbody>
+          {% for ticket in overdue_tickets_list %}
+          <tr>
+            <td>{{ ticket.ticket_no }}</td>
+            <td>{{ ticket.tenant.company_name }}</td>
+            <td>{{ ticket.subject|truncatechars:40 }}</td>
+            <td>{{ ticket.category.name_en }}</td>
+            <td><span class="ticket-hours-old" data-created="{{ ticket.created_at|date:'c' }}">-</span></td>
+            <td><a class="btn btn-sm btn-outline-primary" href="{% url 'ticket_detail' pk=ticket.ticket_id %}">View</a></td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="6" class="text-center text-muted">No overdue tickets.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="db-card db-fade mt-3">
+  <div class="db-card-header">
+    <div class="db-card-title">Attention Center Shortcuts</div>
+  </div>
+  <div class="d-flex flex-wrap gap-2">
+    <a class="btn btn-sm btn-outline-primary" href="{% url 'order_list' %}">Pending Orders Queue</a>
+    <a class="btn btn-sm btn-outline-warning" href="{% url 'transaction_list' %}">Pending Bank Transfers</a>
+    <a class="btn btn-sm btn-outline-danger" href="{% url 'ticket_list' %}">Overdue Tickets</a>
+    <a class="btn btn-sm btn-outline-secondary" href="{% url 'transaction_list' %}">Failed Transactions</a>
+    <a class="btn btn-sm btn-outline-dark" href="{% url 'tenant_list' %}">Suspended Tenants</a>
+    <a class="btn btn-sm btn-outline-info" href="{% url 'audit_log_list' %}">Recent Audit Activity</a>
+  </div>
+</div>
+
+<div class="db-grid-2 mt-3">
+  <div class="db-card db-fade">
+    <div class="db-card-header"><div class="db-card-title">Failed / Rejected Transactions</div></div>
+    <div class="table-responsive">
+      <table class="table align-middle">
+        <thead><tr><th>Tenant</th><th>Amount</th><th>Currency</th><th>Status</th><th>Date</th><th>View</th></tr></thead>
+        <tbody>
+          {% for txn in failed_transactions %}
+          <tr>
+            <td>{{ txn.tenant.company_name }}</td>
+            <td>{{ txn.amount|floatformat:2 }}</td>
+            <td>{{ txn.currency_id }}</td>
+            <td>
+              {% if txn.status == 'Failed' %}
+                <span class="badge bg-danger">Failed</span>
+              {% else %}
+                <span class="badge bg-warning text-dark">Rejected</span>
+              {% endif %}
+            </td>
+            <td>{{ txn.created_at }}</td>
+            <td><a class="btn btn-sm btn-outline-primary" href="{% url 'transaction_detail' pk=txn.transaction_id %}">View</a></td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="6" class="text-center text-muted">No failed transactions.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="db-card db-fade">
+    <div class="db-card-header"><div class="db-card-title">Recently Suspended Tenants</div></div>
+    <div class="table-responsive">
+      <table class="table align-middle">
+        <thead><tr><th>Company Name</th><th>Status</th><th>Updated At</th><th>View</th></tr></thead>
+        <tbody>
+          {% for tenant in suspended_tenants %}
+          <tr>
+            <td>{{ tenant.company_name }}</td>
+            <td>
+              {% if tenant.account_status == 'Suspended_Billing' %}
+                <span class="badge bg-warning text-dark">{{ tenant.account_status }}</span>
+              {% elif tenant.account_status == 'Suspended_Violation' %}
+                <span class="badge bg-danger">{{ tenant.account_status }}</span>
+              {% else %}
+                <span class="badge bg-secondary">{{ tenant.account_status }}</span>
+              {% endif %}
+            </td>
+            <td>{{ tenant.updated_at }}</td>
+            <td><a class="btn btn-sm btn-outline-primary" href="{% url 'tenant_detail' pk=tenant.tenant_id %}">View</a></td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4" class="text-center text-muted">No suspended tenants.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="db-grid-2 mt-3">
+  <div class="db-card db-fade">
+    <div class="db-card-header">
+      <div>
+        <div class="db-card-title">Revenue — Last 6 Months</div>
+      </div>
+    </div>
+    <div style="height: 320px;">
+      <canvas id="revenueChart"></canvas>
+    </div>
+  </div>
+
+  <div class="db-card db-fade">
+    <div class="db-card-header">
+      <div>
+        <div class="db-card-title">Staff Analytics</div>
+      </div>
+    </div>
+    <div class="mb-3">
+      <div class="fw-semibold mb-2">Role Distribution</div>
+      {% for role in role_distribution %}
+      <div class="mb-2">
+        <div class="d-flex justify-content-between">
+          <span>{{ role.role_name_en }}</span>
+          <span>{{ role.staff_count }}</span>
+        </div>
+        <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100">
+          <div class="progress-bar" style="width: {% if total_staff %}{% widthratio role.staff_count total_staff 100 %}{% else %}0{% endif %}%"></div>
+        </div>
+      </div>
+      {% empty %}
+      <div class="text-muted">No role distribution data.</div>
+      {% endfor %}
+    </div>
+    <div class="row text-center">
+      <div class="col-4">
+        <div class="small text-muted">Total Staff</div>
+        <div class="h5">{{ total_staff }}</div>
+      </div>
+      <div class="col-4">
+        <div class="small text-muted">Suspended</div>
+        <div class="h5">{{ suspended_admins }}</div>
+      </div>
+      <div class="col-4">
+        <div class="small text-muted">Stale (30d)</div>
+        <div class="h5">{{ stale_accounts }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="db-card db-fade mt-3">
+  <div class="db-card-header">
+    <div>
+      <div class="db-card-title">Recent Admin Actions</div>
+    </div>
+  </div>
+  <div class="table-responsive">
+    <table class="table align-middle">
+      <thead><tr><th>#</th><th>Admin</th><th>Action</th><th>Module</th><th>Record ID</th><th>IP Address</th><th>Timestamp</th></tr></thead>
+      <tbody>
+        {% for item in recent_audit %}
+        <tr>
+          <td>{{ forloop.counter }}</td>
+          <td>{% if item.admin %}{{ item.admin.first_name }} {{ item.admin.last_name }}{% else %}System{% endif %}</td>
+          <td>
+            {% if item.action_type == 'Create' %}
+              <span class="badge bg-success">Create</span>
+            {% elif item.action_type == 'Update' %}
+              <span class="badge bg-primary">Update</span>
+            {% elif item.action_type == 'Delete' %}
+              <span class="badge bg-danger">Delete</span>
+            {% else %}
+              <span class="badge bg-warning text-dark">Status_Change</span>
+            {% endif %}
+          </td>
+          <td>{{ item.module_name }}</td>
+          <td>{{ item.record_id }}</td>
+          <td>{{ item.ip_address }}</td>
+          <td>{{ item.timestamp }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="text-center text-muted">No audit entries yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="mt-2">
+    <a href="{% url 'audit_log_list' %}" class="btn btn-link p-0">View Full Audit Log →</a>
+  </div>
+</div>
+
+<script>
+// Revenue Bar Chart
+const revenueCanvas = document.getElementById('revenueChart');
+if (revenueCanvas && typeof Chart !== 'undefined') {
+    const ctx = revenueCanvas.getContext('2d');
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: {{ revenue_labels|safe }},
+            datasets: [{
+                label: 'Revenue (SAR)',
+                data: {{ revenue_data|safe }},
+                backgroundColor: '#5051f9',
+                borderRadius: 6,
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: v => 'SAR ' +
+                            v.toLocaleString()
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Role Distribution progress bars
+// (rendered from Django template tags — no JS needed)
+
+// Date/time in toolbar (same as designer)
+function updateDateTime() {
+    const now = new Date();
+    const dateEl = document.getElementById('dashDate');
+    const timeEl = document.getElementById('dashTime');
+    if (dateEl) dateEl.textContent =
+        now.toLocaleDateString('en-US', {
+            weekday: 'long', year: 'numeric',
+            month: 'long', day: 'numeric'
+        });
+    if (timeEl) timeEl.textContent =
+        now.toLocaleTimeString('en-US', {
+            hour: '2-digit', minute: '2-digit'
+        });
+}
+updateDateTime();
+setInterval(updateDateTime, 60000);
+
+// Overdue hours calculation
+document.querySelectorAll('.ticket-hours-old').forEach((el) => {
+    const created = new Date(el.dataset.created);
+    if (!Number.isNaN(created.getTime())) {
+        const hours = Math.floor((Date.now() - created.getTime()) / (1000 * 60 * 60));
+        el.textContent = `${hours}h`;
+    }
+});
+</script>
+{% endblock %}

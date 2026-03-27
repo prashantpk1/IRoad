@@ -793,3 +793,65 @@
 - No admin can modify or delete entries ever
 - Helper function: log_audit_action() utility
   that other views call to record changes
+
+## Phase 11 — Super Admin Dashboard Business Rules
+
+### Dashboard Data Sources
+- ALL data is pulled live from existing Phase 3–10 models
+- NO hardcoded dummy data anywhere in views
+- Dashboard is the first page after login — must load fast
+- Use Django ORM aggregations — no raw SQL
+
+### Executive KPIs (Top Row)
+- MRR (Monthly Recurring Revenue):
+  Sum of grand_total from StandardInvoice where
+  status='Issued' OR status='Paid'
+  AND issue_date within current calendar month
+  Display in Base Currency (SAR)
+- Active Tenants:
+  Count of TenantProfile where account_status='Active'
+- Pending Orders:
+  Count of SubscriptionOrder where order_status='Pending_Payment'
+- Failed / Pending Transactions:
+  Count of Transaction where status='Pending'
+  AND payment_method__method_type='Offline_Bank'
+- Open Support Tickets:
+  Count of SupportTicket where status in ['New','In_Progress']
+- Overdue Tickets:
+  Count of SupportTicket where status not in ['Closed']
+  AND created_at < now() - 48 hours
+- Active Admin Sessions:
+  Count of ActiveSession where is_active=True
+  AND user_domain='Admin'
+
+### Attention Center (Action Items)
+- Pending Bank Transfer Orders: list top 5
+  SubscriptionOrder where order_status='Pending_Payment'
+  order by created_at ascending (oldest first)
+- Overdue Support Tickets: list top 5
+  SupportTicket where status != 'Closed'
+  AND created_at < now() - 48 hours
+  order by created_at ascending
+- Failed Transactions: list top 5
+  Transaction where status in ['Failed','Rejected']
+  order by created_at descending
+- Recently Suspended Tenants: list top 5
+  TenantProfile where account_status != 'Active'
+  order by updated_at descending
+
+### Staff Analytics Section
+- Role Distribution: Count of AdminUser grouped by role
+- Stale Accounts: AdminUser where last_login_at < 30 days ago
+  OR last_login_at is null
+- Active Admin Sessions count live from ActiveSession model
+- Suspended Admin Accounts: count where status='Suspended'
+
+### Revenue Chart
+- Last 6 months bar chart
+  Group StandardInvoice by month
+  Sum grand_total per month (base currency equivalent)
+- Data from base_currency_equivalent_amount field
+
+### Recent Activity Feed
+- Last 10 AuditLog entries
+  Show: admin name, action_type, module_name, timestamp

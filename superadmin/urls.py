@@ -160,7 +160,8 @@ urlpatterns = [
         SetPasswordView.as_view(),
         name='set_password',
     ),
-    path('dashboard/', DashboardView.as_view(), name='dashboard'),
+    path('', DashboardView.as_view(), name='dashboard'),
+    path('dashboard/', RedirectView.as_view(url='/', permanent=False)),
     path('roles/', RoleListView.as_view(), name='role_list'),
     path('roles/create/', RoleCreateView.as_view(), name='role_create'),
     path('roles/<uuid:pk>/edit/', RoleUpdateView.as_view(), name='role_edit'),
@@ -789,6 +790,5 @@ urlpatterns = [
         CRMNoteCreateView.as_view(),
         name='crm_note_create',
     ),
-    path('', RedirectView.as_view(url='/dashboard/', permanent=False)),
 ]
 
