@@ -2,11 +2,19 @@
 {% block title %}Audit Log Entry #{{ audit_entry.audit_id }}{% endblock %}
 {% block content %}
 <div class="container py-3">
-  <h4 class="mb-3">Audit Log Entry #{{ audit_entry.audit_id }}</h4>
+  <div class="page-header">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'audit_log_list' %}">Audit Log</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Entry #{{ audit_entry.audit_id }}</li>
+      </ol>
+    </nav>
+    <div class="page-header-row"><div class="page-header-left"><h1 class="page-title">Audit Log Entry #{{ audit_entry.audit_id }}</h1></div></div>
+  </div>
 
-  <div class="card mb-3">
-    <div class="card-body">
-      <div class="row g-2">
+  <div class="form-card mb-3">
+    <div class="form-card-body">
+      <div class="row g-3">
         <div class="col-md-4"><strong>Admin:</strong> {{ audit_entry.admin|default:'N/A' }}</div>
         <div class="col-md-4"><strong>Action Type:</strong> {{ audit_entry.action_type }}</div>
         <div class="col-md-4"><strong>Module:</strong> {{ audit_entry.module_name }}</div>
@@ -23,7 +31,7 @@
       {% if old_payload_pretty %}
       <pre class="mb-0">{{ old_payload_pretty }}</pre>
       {% else %}
-      <p class="mb-0 text-muted">N/A (Create action)</p>
+      <div class="alert alert-secondary mb-0">N/A — Create action</div>
       {% endif %}
     </div>
   </div>
@@ -34,7 +42,7 @@
       {% if new_payload_pretty %}
       <pre class="mb-0">{{ new_payload_pretty }}</pre>
       {% else %}
-      <p class="mb-0 text-muted">N/A (Delete action)</p>
+      <div class="alert alert-secondary mb-0">N/A — Delete action</div>
       {% endif %}
     </div>
   </div>
@@ -42,3 +50,4 @@
   <a href="{% url 'audit_log_list' %}" class="btn btn-secondary">Back to Audit Log</a>
 </div>
 {% endblock %}
+

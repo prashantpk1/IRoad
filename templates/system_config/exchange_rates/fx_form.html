@@ -3,92 +3,118 @@
 {% block page_title %}{% if is_edit %}Edit Exchange Rate{% else %}Add Exchange Rate{% endif %}{% endblock %}
 
 {% block content %}
-  <div class="content-card" style="background: #ffffff; padding: 20px 30px; border-radius: 12px">
-    <div class="setting-row" style="border-bottom: none; padding-top: 0; margin-bottom: 16px">
-      <div class="setting-row-info">
+  <div class="page-header">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'fx_rate_list' %}">Exchange Rates</a></li>
         {% if is_edit %}
-          <h2 class="page-title">Edit Exchange Rate</h2>
+          <li class="breadcrumb-item active" aria-current="page">Edit: {{ form.instance.currency.currency_code }}</li>
         {% else %}
-          <h2 class="page-title">Add Exchange Rate</h2>
+          <li class="breadcrumb-item active" aria-current="page">Add Rate</li>
         {% endif %}
+      </ol>
+    </nav>
+    <div class="page-header-row">
+      <div class="page-header-left">
+        <h1 class="page-title">{% if is_edit %}Edit Exchange Rate{% else %}Add Exchange Rate{% endif %}</h1>
+        <p class="page-subtitle">Set FX values relative to the current base currency</p>
       </div>
-      <div class="setting-row-control" style="flex: 0 0 auto">
-        <a href="{% url 'fx_rate_list' %}" class="btn" style="padding: 10px 14px; border-width: 1px">
+      <div class="page-header-right">
+        <div class="eal-header-actions">
+          <a href="{% url 'fx_rate_list' %}" class="eal-btn eal-btn-outline">
+            <i class="bi bi-arrow-left"></i>
+            <span>Back</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% if is_edit %}
+    <div class="alert alert-info" style="margin-bottom: 16px;">
+      Currency field is disabled while editing an existing rate.
+    </div>
+  {% endif %}
+
+  <div style="margin-bottom: 16px; padding: 12px 14px; border-radius: 10px; background:#eff6ff; border:1px solid #dbeafe">
+    <p style="margin: 0; font-weight: 700; color:#1e3a8a">
+      Rate is relative to base currency
+      <span style="font-family: monospace">{{ base_currency_code|default:'SAR' }}</span>
+    </p>
+  </div>
+
+  {% if messages %}
+    <div style="margin-bottom: 16px">
+      {% for message in messages %}
+        <p style="margin: 0; color: {% if message.tags == 'error' %}#b91c1c{% else %}#15803d{% endif %}; font-weight: 600">
+          {{ message }}
+        </p>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <form method="post" action="">
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+      <div style="margin-bottom: 16px; color: #b91c1c; font-weight: 600">
+        {{ form.non_field_errors }}
+      </div>
+    {% endif %}
+
+    <div class="form-card">
+      <div class="form-card-body">
+        <div class="field-group">
+          <div class="fields-grid cols-2">
+            <div class="field">
+              <label class="form-label">Currency</label>
+              {{ form.currency }}
+              {% for error in form.currency.errors %}
+                <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+              {% endfor %}
+            </div>
+            <div class="field">
+              <label class="form-label">Exchange Rate</label>
+              {{ form.exchange_rate }}
+              {% for error in form.exchange_rate.errors %}
+                <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+              {% endfor %}
+            </div>
+            <div class="field">
+              <label class="form-label">Status</label>
+              <div style="display:flex; align-items:center; gap:10px">
+                {{ form.is_active }}
+              </div>
+              {% for error in form.is_active.errors %}
+                <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+              {% endfor %}
+            </div>
+            <div class="field">
+              <label class="form-label">Reason for Change (optional)</label>
+              <input
+                type="text"
+                name="change_notes"
+                class="form-control"
+                placeholder="e.g. Update due to market movement"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-actions-bar sticky-bottom">
+      <div class="form-actions-left">
+        <a href="{% url 'fx_rate_list' %}" class="btn btn-outline-secondary">
           <i class="bi bi-arrow-left"></i>
           Cancel
         </a>
       </div>
-    </div>
-
-    <div style="margin-bottom: 16px; padding: 12px 14px; border-radius: 10px; background:#eff6ff; border:1px solid #dbeafe">
-      <p style="margin: 0; font-weight: 700; color:#1e3a8a">
-        Rate is relative to base currency
-        <span style="font-family: monospace">{{ base_currency_code|default:'SAR' }}</span>
-      </p>
-    </div>
-
-    {% if messages %}
-      <div style="margin-bottom: 16px">
-        {% for message in messages %}
-          <p style="margin: 0; color: {% if message.tags == 'error' %}#b91c1c{% else %}#15803d{% endif %}; font-weight: 600">
-            {{ message }}
-          </p>
-        {% endfor %}
-      </div>
-    {% endif %}
-
-    <form method="post" action="">
-      {% csrf_token %}
-
-      {% if form.non_field_errors %}
-        <div style="margin-bottom: 16px; color: #b91c1c; font-weight: 600">
-          {{ form.non_field_errors }}
-        </div>
-      {% endif %}
-
-      <div style="margin-bottom: 16px">
-        <label class="form-label">Currency</label>
-        {{ form.currency }}
-        {% for error in form.currency.errors %}
-          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-        {% endfor %}
-      </div>
-
-      <div style="margin-bottom: 16px">
-        <label class="form-label">Exchange Rate</label>
-        {{ form.exchange_rate }}
-        {% for error in form.exchange_rate.errors %}
-          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-        {% endfor %}
-      </div>
-
-      <div style="margin-bottom: 16px">
-        <label class="form-label">Status</label>
-        <div style="display:flex; align-items:center; gap:10px">
-          {{ form.is_active }}
-        </div>
-        {% for error in form.is_active.errors %}
-          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-        {% endfor %}
-      </div>
-
-      <div style="margin-bottom: 16px">
-        <label class="form-label">Reason for Change (optional)</label>
-        <input
-          type="text"
-          name="change_notes"
-          class="form-control"
-          placeholder="e.g. Update due to market movement"
-        />
-      </div>
-
-      <div class="submit-section" style="display:flex; gap:12px; flex-wrap:wrap">
+      <div class="form-actions-right">
         <button type="submit" class="btn btn-primary">
           <i class="bi bi-save"></i>
           Save
         </button>
       </div>
-    </form>
-  </div>
+    </div>
+  </form>
 {% endblock %}
-

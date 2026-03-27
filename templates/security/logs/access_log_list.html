@@ -1,74 +1,58 @@
 {% extends 'base.html' %}
-{% block title %}Authentication & Access Log{% endblock %}
+{% block title %}Authentication Log{% endblock %}
 {% block content %}
 <div class="container py-3">
-  <h4 class="mb-3">Authentication &amp; Access Log</h4>
+  <div class="page-header">
+    <div class="page-header-row">
+      <div class="page-header-left">
+        <h1 class="page-title">Authentication Log</h1>
+        <p class="page-subtitle">Immutable login and logout history</p>
+      </div>
+    </div>
+  </div>
+
   <div class="alert alert-info">
     This log captures every login, logout, and token refresh attempt across all domains. Immutable — cannot be modified or deleted.
   </div>
 
-  <form method="get" class="row g-2 mb-3">
-    <div class="col-md-2">
-      <select name="attempt_type" class="form-select">
-        <option value="All" {% if attempt_type_filter == 'All' %}selected{% endif %}>All Attempts</option>
-        <option value="Login" {% if attempt_type_filter == 'Login' %}selected{% endif %}>Login</option>
-        <option value="Logout" {% if attempt_type_filter == 'Logout' %}selected{% endif %}>Logout</option>
-        <option value="Token_Refresh" {% if attempt_type_filter == 'Token_Refresh' %}selected{% endif %}>Token Refresh</option>
-      </select>
-    </div>
-    <div class="col-md-2">
-      <select name="status" class="form-select">
-        <option value="All" {% if status_filter == 'All' %}selected{% endif %}>All Status</option>
-        <option value="Success" {% if status_filter == 'Success' %}selected{% endif %}>Success</option>
-        <option value="Failed" {% if status_filter == 'Failed' %}selected{% endif %}>Failed</option>
-        <option value="Blocked" {% if status_filter == 'Blocked' %}selected{% endif %}>Blocked</option>
-      </select>
-    </div>
-    <div class="col-md-2">
-      <select name="user_domain" class="form-select">
-        <option value="All" {% if domain_filter == 'All' %}selected{% endif %}>All Domains</option>
-        <option value="Admin" {% if domain_filter == 'Admin' %}selected{% endif %}>Admin</option>
-        <option value="Tenant_User" {% if domain_filter == 'Tenant_User' %}selected{% endif %}>Tenant User</option>
-        <option value="Driver" {% if domain_filter == 'Driver' %}selected{% endif %}>Driver</option>
-      </select>
-    </div>
-    <div class="col-md-2"><input type="date" name="from_date" value="{{ from_date }}" class="form-control"></div>
-    <div class="col-md-2"><input type="date" name="to_date" value="{{ to_date }}" class="form-control"></div>
-    <div class="col-md-2"><input type="text" name="q" value="{{ search_query }}" class="form-control" placeholder="Email or IP"></div>
-    <div class="col-12"><button class="btn btn-primary" type="submit">Filter</button></div>
-  </form>
+  <div class="eal-table-card">
+    <form method="get" class="eal-toolbar">
+      <div class="eal-toolbar-left" style="width:100%;display:flex;gap:8px;flex-wrap:wrap;">
+        <div style="width:170px"><select name="attempt_type" class="form-select form-select-sm"><option value="All" {% if attempt_type_filter == 'All' %}selected{% endif %}>All Attempts</option><option value="Login" {% if attempt_type_filter == 'Login' %}selected{% endif %}>Login</option><option value="Logout" {% if attempt_type_filter == 'Logout' %}selected{% endif %}>Logout</option><option value="Token_Refresh" {% if attempt_type_filter == 'Token_Refresh' %}selected{% endif %}>Token Refresh</option></select></div>
+        <div style="width:170px"><select name="status" class="form-select form-select-sm"><option value="All" {% if status_filter == 'All' %}selected{% endif %}>All Status</option><option value="Success" {% if status_filter == 'Success' %}selected{% endif %}>Success</option><option value="Failed" {% if status_filter == 'Failed' %}selected{% endif %}>Failed</option><option value="Blocked" {% if status_filter == 'Blocked' %}selected{% endif %}>Blocked</option></select></div>
+        <div style="width:170px"><select name="user_domain" class="form-select form-select-sm"><option value="All" {% if domain_filter == 'All' %}selected{% endif %}>All Domains</option><option value="Admin" {% if domain_filter == 'Admin' %}selected{% endif %}>Admin</option><option value="Tenant_User" {% if domain_filter == 'Tenant_User' %}selected{% endif %}>Tenant User</option><option value="Driver" {% if domain_filter == 'Driver' %}selected{% endif %}>Driver</option></select></div>
+        <input type="date" name="from_date" value="{{ from_date }}" class="form-control form-control-sm" style="width:150px">
+        <input type="date" name="to_date" value="{{ to_date }}" class="form-control form-control-sm" style="width:150px">
+        <input type="text" name="q" value="{{ search_query }}" class="form-control form-control-sm" placeholder="Email or IP" style="width:180px">
+        <button class="eal-btn eal-btn-primary" type="submit">Filter</button>
+      </div>
+    </form>
 
-  <div class="table-responsive">
-    <table class="table table-striped align-middle">
-      <thead><tr><th>#</th><th>Attempt Type</th><th>Status</th><th>Domain</th><th>Email Used</th><th>IP Address</th><th>Timestamp</th></tr></thead>
-      <tbody>
-        {% for log in access_logs %}
-        <tr>
-          <td>{{ forloop.counter0|add:access_logs.start_index }}</td>
-          <td>{% if log.attempt_type == 'Login' %}<span class="badge bg-primary">Login</span>{% elif log.attempt_type == 'Logout' %}<span class="badge bg-secondary">Logout</span>{% else %}<span class="badge bg-purple" style="background:#6f42c1;">Token Refresh</span>{% endif %}</td>
-          <td>{% if log.status == 'Success' %}<span class="badge bg-success">Success</span>{% elif log.status == 'Failed' %}<span class="badge bg-danger">Failed</span>{% else %}<span class="badge bg-warning text-dark">Blocked</span>{% endif %}</td>
-          <td>{% if log.user_domain == 'Admin' %}<span class="badge bg-primary">Admin</span>{% elif log.user_domain == 'Tenant_User' %}<span class="badge bg-success">Tenant User</span>{% else %}<span class="badge bg-warning text-dark">Driver</span>{% endif %}</td>
-          <td>{{ log.email_used }}</td>
-          <td>{{ log.ip_address|default:'-' }}</td>
-          <td>{{ log.timestamp }}</td>
-        </tr>
-        {% empty %}
-        <tr><td colspan="7" class="text-center text-muted">No records found.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
+    <div class="eal-table-wrap">
+      <table class="eal-table">
+        <thead><tr><th>#</th><th>Attempt Type badge</th><th>Status badge</th><th>Domain badge</th><th>Email</th><th>IP</th><th>Timestamp</th></tr></thead>
+        <tbody>
+          {% for log in access_logs %}
+          <tr>
+            <td>{{ forloop.counter0|add:access_logs.start_index }}</td>
+            <td>{% if log.attempt_type == 'Login' %}<span class="badge status-badge status-issued">Login</span>{% elif log.attempt_type == 'Logout' %}<span class="badge status-badge status-inactive">Logout</span>{% else %}<span class="badge status-badge status-scheduled">Token Refresh</span>{% endif %}</td>
+            <td>{% if log.status == 'Success' %}<span class="badge status-badge status-active">Success</span>{% elif log.status == 'Failed' %}<span class="badge status-badge status-suspended">Failed</span>{% else %}<span class="badge status-badge status-pending">Blocked</span>{% endif %}</td>
+            <td>{% if log.user_domain == 'Admin' %}<span class="badge status-badge status-issued">Admin</span>{% elif log.user_domain == 'Tenant_User' %}<span class="badge status-badge status-active">Tenant User</span>{% else %}<span class="badge status-badge status-pending">Driver</span>{% endif %}</td>
+            <td>{{ log.email_used }}</td>
+            <td>{{ log.ip_address|default:'-' }}</td>
+            <td>{{ log.timestamp }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="7" class="text-center text-muted">No records found.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   </div>
 
   {% if access_logs.paginator.num_pages > 1 %}
-  <nav><ul class="pagination">
-    {% if access_logs.has_previous %}
-    <li class="page-item"><a class="page-link" href="?{{ filter_query }}&page={{ access_logs.previous_page_number }}">Previous</a></li>
-    {% endif %}
-    <li class="page-item disabled"><span class="page-link">Page {{ access_logs.number }} of {{ access_logs.paginator.num_pages }}</span></li>
-    {% if access_logs.has_next %}
-    <li class="page-item"><a class="page-link" href="?{{ filter_query }}&page={{ access_logs.next_page_number }}">Next</a></li>
-    {% endif %}
-  </ul></nav>
+  <div class="eal-pagination mt-3"><div class="eal-pagination-controls">{% if access_logs.has_previous %}<a class="eal-page-btn" href="?{{ filter_query }}&page={{ access_logs.previous_page_number }}">Previous</a>{% endif %}<span class="eal-page-btn active">Page {{ access_logs.number }} of {{ access_logs.paginator.num_pages }}</span>{% if access_logs.has_next %}<a class="eal-page-btn" href="?{{ filter_query }}&page={{ access_logs.next_page_number }}">Next</a>{% endif %}</div></div>
   {% endif %}
 </div>
 {% endblock %}
+

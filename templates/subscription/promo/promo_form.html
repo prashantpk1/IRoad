@@ -3,56 +3,127 @@
 {% block page_title %}{% if is_edit %}Edit Promo Code{% else %}Add Promo Code{% endif %}{% endblock %}
 
 {% block content %}
-  <div class="content-card" style="background:#fff; padding:20px 30px; border-radius:12px">
-    <div class="setting-row" style="border-bottom:none; padding-top:0; margin-bottom:16px">
-      <div class="setting-row-info">
-        <h2 class="page-title">{% if is_edit %}Edit Promo Code{% else %}Add Promo Code{% endif %}</h2>
+  <div class="page-header">
+    <nav class="page-breadcrumb">
+      <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'promo_code_list' %}">Promo Codes</a></li>
+        {% if is_edit and promo %}
+          <li class="breadcrumb-item active" aria-current="page">Edit: {{ promo.code }}</li>
+        {% else %}
+          <li class="breadcrumb-item active" aria-current="page">Add Code</li>
+        {% endif %}
+      </ol>
+    </nav>
+
+    <div class="page-header-row">
+      <div class="page-header-left">
+        <h1 class="page-title">{% if is_edit %}Edit Promo Code{% else %}Add Promo Code{% endif %}</h1>
       </div>
-      <div class="setting-row-control" style="flex:0 0 auto">
-        <a href="{% url 'promo_code_list' %}" class="btn" style="padding:10px 14px; border-width:1px">Cancel</a>
+      <div class="page-header-right">
+        <div class="eal-header-actions">
+          <a href="{% url 'promo_code_list' %}" class="eal-btn">
+            <i class="bi bi-arrow-left"></i>
+            <span>Back</span>
+          </a>
+        </div>
       </div>
     </div>
+  </div>
 
-    {% if is_edit %}
-      <div class="alert alert-info" style="border-radius:10px">
-        Code is immutable and cannot be changed.
-      </div>
+  {% if is_edit and promo and promo.updated_at %}
+  <div class="edit-info-bar">
+    <i class="bi bi-clock-history"></i>
+    Last updated
+    {% if promo.updated_by %}
+      by <strong>{{ promo.updated_by.first_name }} {{ promo.updated_by.last_name }}</strong>
     {% endif %}
-    <div class="alert alert-info" style="border-radius:10px">
-      Percentage max 100. Alphanumeric only. No spaces.
-      Leave applicable plans empty to apply to ALL plans.
-    </div>
+    at <strong>{{ promo.updated_at|date:"d M Y, H:i" }}</strong>
+  </div>
+  {% endif %}
 
-    <form method="post" action="">
-      {% csrf_token %}
-      {% if form.non_field_errors %}
-        <div style="color:#b91c1c; font-weight:600; margin-bottom:10px">{{ form.non_field_errors }}</div>
-      {% endif %}
-      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:12px">
-        {% for field in form %}
-          <div style="{% if field.name == 'applicable_plans' %}grid-column:1 / -1{% endif %}">
-            <label class="form-label">{{ field.label }}</label>
-            {{ field }}
-            {% if field.name == 'applicable_plans' %}
-              <small style="color:#64748b">Leave empty to apply to ALL plans</small>
-            {% endif %}
-            {% for e in field.errors %}
-              <div style="color:#b91c1c; font-weight:600">{{ e }}</div>
-            {% endfor %}
-          </div>
-        {% endfor %}
-      </div>
-
+  <div class="form-card">
+    <div class="form-card-body">
       {% if is_edit and promo %}
-        <div style="margin-top:12px; padding:10px 12px; border:1px solid #e5e7eb; border-radius:8px; background:#f8fafc">
-          <strong>Current Uses (read-only):</strong> {{ promo.current_uses }}
+        <div class="alert alert-info" style="border-radius:10px">
+          Code is immutable and cannot be changed.
         </div>
       {% endif %}
 
-      <div class="submit-section" style="margin-top:14px">
-        <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Save</button>
+      <div class="alert alert-info" style="border-radius:10px">
+        Percentage max 100. Alphanumeric only. No spaces.
+        Leave applicable plans empty to apply to ALL plans.
       </div>
-    </form>
+
+      {% if messages %}
+        {% for message in messages %}
+          <p style="margin: 12px 0 0; color:{% if message.tags == 'error' %}#b91c1c{% else %}#15803d{% endif %}; font-weight:600">{{ message }}</p>
+        {% endfor %}
+      {% endif %}
+
+      <form method="post" action="">
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+          <div style="color:#b91c1c; font-weight:600; margin-bottom:10px">{{ form.non_field_errors }}</div>
+        {% endif %}
+
+        <h3 style="margin: 18px 0 12px 0">Code Details</h3>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:12px">
+          {% for field in form %}
+            {% if field.name == 'code' or field.name == 'discount_type' or field.name == 'discount_value' or field.name == 'discount_duration' %}
+              <div>
+                <label class="form-label">{{ field.label }}</label>
+                {{ field }}
+                {% for e in field.errors %}
+                  <div style="color:#b91c1c; font-weight:600">{{ e }}</div>
+                {% endfor %}
+              </div>
+            {% endif %}
+          {% endfor %}
+        </div>
+
+        <h3 style="margin: 18px 0 12px 0">Validity & Limits</h3>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:12px">
+          {% for field in form %}
+            {% if field.name == 'valid_from' or field.name == 'valid_until' or field.name == 'max_uses' or field.name == 'is_active' %}
+              <div>
+                <label class="form-label">{{ field.label }}</label>
+                {{ field }}
+                {% for e in field.errors %}
+                  <div style="color:#b91c1c; font-weight:600">{{ e }}</div>
+                {% endfor %}
+              </div>
+            {% endif %}
+          {% endfor %}
+        </div>
+
+        <h3 style="margin: 18px 0 12px 0">Applicable Plans</h3>
+        <div style="display:grid; grid-template-columns:1fr; gap:12px">
+          {% for field in form %}
+            {% if field.name == 'applicable_plans' %}
+              <div>
+                <label class="form-label">{{ field.label }}</label>
+                {{ field }}
+                <small style="color:#64748b">Leave empty to apply to ALL plans</small>
+                {% for e in field.errors %}
+                  <div style="color:#b91c1c; font-weight:600">{{ e }}</div>
+                {% endfor %}
+              </div>
+            {% endif %}
+          {% endfor %}
+        </div>
+
+        {% if is_edit and promo %}
+          <div style="margin-top:12px; padding:10px 12px; border:1px solid #e5e7eb; border-radius:8px; background:#f8fafc">
+            <strong>Current Uses (read-only):</strong> {{ promo.current_uses }}
+          </div>
+        {% endif %}
+
+        <div class="submit-section" style="margin-top:14px">
+          <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Save</button>
+        </div>
+      </form>
+    </div>
   </div>
 {% endblock %}
 

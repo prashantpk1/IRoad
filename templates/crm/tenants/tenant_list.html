@@ -1,58 +1,60 @@
 {% extends 'base.html' %}
-{% block title %}Subscribers CRM{% endblock %}
+{% block title %}Subscribers{% endblock %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-  <h4 class="mb-0">Subscribers CRM</h4>
-  {% if request.user.is_root %}
-    <a href="{% url 'tenant_create' %}" class="btn btn-primary">Add Tenant</a>
-  {% endif %}
+<div class="page-header">
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">Subscribers</h1>
+      <p class="page-subtitle">Tenant profiles and subscription states</p>
+    </div>
+    <div class="page-header-right">
+      {% if request.user.is_root %}
+        <a href="{% url 'tenant_create' %}" class="eal-btn eal-btn-primary">Add Tenant</a>
+      {% endif %}
+    </div>
+  </div>
 </div>
 
-<form method="get" class="row g-2 mb-3">
-  <div class="col-md-3">
-    <input type="text" name="q" class="form-control" placeholder="Search company or email" value="{{ search_query }}">
-  </div>
-  <div class="col-md-2">
-    <select class="form-select" name="account_status">
-      <option value="All" {% if status_filter == 'All' %}selected{% endif %}>All statuses</option>
-      {% for code, label in status_choices %}
-        <option value="{{ code }}" {% if status_filter == code %}selected{% endif %}>{{ label }}</option>
-      {% endfor %}
-    </select>
-  </div>
-  <div class="col-md-2">
-    <select class="form-select" name="assigned_sales_rep">
-      <option value="">All reps</option>
-      {% for rep in sales_reps %}
-        <option value="{{ rep.pk }}" {% if rep_filter == rep.pk|stringformat:"s" %}selected{% endif %}>{{ rep.first_name }} {{ rep.last_name }}</option>
-      {% endfor %}
-    </select>
-  </div>
-  <div class="col-md-2">
-    <select class="form-select" name="current_plan">
-      <option value="">All plans</option>
-      {% for p in plans %}
-        <option value="{{ p.plan_id }}" {% if plan_filter == p.plan_id|stringformat:"s" %}selected{% endif %}>{{ p.plan_name_en }}</option>
-      {% endfor %}
-    </select>
-  </div>
-  <div class="col-md-1"><button type="submit" class="btn btn-outline-secondary w-100">Filter</button></div>
-</form>
+<div class="eal-table-card">
+  <form method="get" class="eal-toolbar">
+    <div class="eal-toolbar-left" style="width:100%;display:flex;gap:8px;flex-wrap:wrap;">
+      <div class="eal-search" style="flex:1;min-width:240px;">
+        <i class="bi bi-search"></i>
+        <input type="text" name="q" class="" placeholder="Search company or email" value="{{ search_query }}">
+      </div>
+      <div style="width:200px">
+        <select class="form-select form-select-sm" name="account_status">
+          <option value="All" {% if status_filter == 'All' %}selected{% endif %}>All statuses</option>
+          {% for code, label in status_choices %}
+            <option value="{{ code }}" {% if status_filter == code %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div style="width:180px">
+        <select class="form-select form-select-sm" name="assigned_sales_rep">
+          <option value="">All reps</option>
+          {% for rep in sales_reps %}
+            <option value="{{ rep.pk }}" {% if rep_filter == rep.pk|stringformat:"s" %}selected{% endif %}>{{ rep.first_name }} {{ rep.last_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div style="width:180px">
+        <select class="form-select form-select-sm" name="current_plan">
+          <option value="">All plans</option>
+          {% for p in plans %}
+            <option value="{{ p.plan_id }}" {% if plan_filter == p.plan_id|stringformat:"s" %}selected{% endif %}>{{ p.plan_name_en }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <button type="submit" class="eal-btn eal-btn-outline">Filter</button>
+    </div>
+  </form>
 
-<div class="card">
-  <div class="table-responsive">
-    <table class="table align-middle mb-0">
+  <div class="eal-table-wrap">
+    <table class="eal-table">
       <thead>
         <tr>
-          <th>#</th>
-          <th>Company Name</th>
-          <th>Email</th>
-          <th>Country</th>
-          <th>Current Plan</th>
-          <th>Expiry Date</th>
-          <th>Status</th>
-          <th>Wallet Balance</th>
-          <th>Actions</th>
+          <th>#</th><th>Company</th><th>Email</th><th>Country</th><th>Current Plan</th><th>Expiry Date</th><th>Status badge</th><th>Wallet Balance</th><th>Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -63,28 +65,26 @@
             <td>{{ t.primary_email }}</td>
             <td>{{ t.country.name_en|default:'-' }}</td>
             <td>{{ t.current_plan.plan_name_en|default:'-' }}</td>
-            <td>
-              {% if t.subscription_expiry_date %}
-                <span class="{% if t.subscription_expiry_date < today %}text-danger fw-semibold{% endif %}">{{ t.subscription_expiry_date }}</span>
-              {% else %}-{% endif %}
-            </td>
+            <td>{% if t.subscription_expiry_date %}<span class="{% if t.subscription_expiry_date < today %}text-danger fw-semibold{% endif %}">{{ t.subscription_expiry_date }}</span>{% else %}-{% endif %}</td>
             <td>
               {% if t.account_status == 'Active' %}
-                <span class="badge bg-success">Active</span>
+                <span class="badge status-badge status-active">Active</span>
               {% elif t.account_status == 'Suspended_Billing' %}
-                <span class="badge bg-warning text-dark">Suspended - Billing</span>
+                <span class="badge status-badge status-suspended">Suspended_Billing</span>
               {% elif t.account_status == 'Suspended_Violation' %}
-                <span class="badge bg-danger">Suspended - Violation</span>
+                <span class="badge status-badge status-suspended">Suspended_Violation</span>
               {% else %}
-                <span class="badge bg-secondary">Churned</span>
+                <span class="badge status-badge status-churned">Churned</span>
               {% endif %}
             </td>
             <td>{{ t.wallet_balance|floatformat:2 }}</td>
             <td class="text-nowrap">
-              <a href="{% url 'tenant_detail' t.tenant_id %}" class="btn btn-sm btn-outline-primary">View</a>
-              {% if request.user.is_root %}
-                <a href="{% url 'tenant_edit' t.tenant_id %}" class="btn btn-sm btn-outline-secondary">Edit</a>
-              {% endif %}
+              <div class="eal-actions-cell">
+                <a href="{% url 'tenant_detail' t.tenant_id %}" class="eal-row-btn"><i class="bi bi-eye"></i></a>
+                {% if request.user.is_root %}
+                  <a href="{% url 'tenant_edit' t.tenant_id %}" class="eal-row-btn"><i class="bi bi-pencil"></i></a>
+                {% endif %}
+              </div>
             </td>
           </tr>
         {% empty %}
@@ -96,16 +96,17 @@
 </div>
 
 {% if tenants.paginator.num_pages > 1 %}
-<nav class="mt-3">
-  <ul class="pagination mb-0">
+<div class="eal-pagination mt-3">
+  <div class="eal-pagination-controls">
     {% if tenants.has_previous %}
-      <li class="page-item"><a class="page-link" href="?page={{ tenants.previous_page_number }}&q={{ search_query|urlencode }}&account_status={{ status_filter }}&assigned_sales_rep={{ rep_filter }}&current_plan={{ plan_filter }}">Previous</a></li>
+      <a class="eal-page-btn" href="?page={{ tenants.previous_page_number }}&q={{ search_query|urlencode }}&account_status={{ status_filter }}&assigned_sales_rep={{ rep_filter }}&current_plan={{ plan_filter }}">Previous</a>
     {% endif %}
-    <li class="page-item disabled"><span class="page-link">Page {{ tenants.number }} of {{ tenants.paginator.num_pages }}</span></li>
+    <span class="eal-page-btn active">Page {{ tenants.number }} of {{ tenants.paginator.num_pages }}</span>
     {% if tenants.has_next %}
-      <li class="page-item"><a class="page-link" href="?page={{ tenants.next_page_number }}&q={{ search_query|urlencode }}&account_status={{ status_filter }}&assigned_sales_rep={{ rep_filter }}&current_plan={{ plan_filter }}">Next</a></li>
+      <a class="eal-page-btn" href="?page={{ tenants.next_page_number }}&q={{ search_query|urlencode }}&account_status={{ status_filter }}&assigned_sales_rep={{ rep_filter }}&current_plan={{ plan_filter }}">Next</a>
     {% endif %}
-  </ul>
-</nav>
+  </div>
+</div>
 {% endif %}
 {% endblock %}
+

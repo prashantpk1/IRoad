@@ -3,48 +3,48 @@
 {% block page_title %}Communication Gateways{% endblock %}
 
 {% block content %}
-  <div class="content-card" style="background: #ffffff; padding: 20px 30px; border-radius: 12px">
-    <div class="setting-row" style="border-bottom: none; padding-top: 0">
-      <div class="setting-row-info">
-        <h2 class="page-title">Communication Gateways</h2>
-        <p class="text-muted" style="margin: 6px 0 0 0">
-          Only one Email and one SMS gateway can be active at a time.
-        </p>
+  <div class="page-header">
+    <div class="page-header-row">
+      <div class="page-header-left">
+        <h1 class="page-title">Communication Gateways</h1>
+        <div class="alert alert-info" style="margin-top: 12px; border-radius: 10px">
+          <p style="margin: 0; font-weight: 600">Only one Email and one SMS gateway can be active at a time.</p>
+        </div>
       </div>
-      <div class="setting-row-control" style="flex: 0 0 auto">
+      <div class="page-header-right">
         {% if request.user.is_root %}
-          <a href="{% url 'comm_gateway_create' %}" class="btn btn-primary" style="padding: 10px 14px">
-            <i class="bi bi-plus-circle"></i>
-            Add Gateway
+          <a href="{% url 'comm_gateway_create' %}" class="eal-btn eal-btn-primary">
+            <i class="bi bi-plus-lg"></i>
+            <span>Add Gateway</span>
           </a>
         {% endif %}
       </div>
     </div>
+  </div>
 
-    {% if messages %}
-      <div style="margin-top: 16px">
-        {% for message in messages %}
-          <p style="margin: 0; color: {% if message.tags == 'error' %}#b91c1c{% else %}#15803d{% endif %}; font-weight: 600">
-            {{ message }}
-          </p>
-        {% endfor %}
-      </div>
-    {% endif %}
+  {% if messages %}
+    <div style="margin-bottom: 16px">
+      {% for message in messages %}
+        <p style="margin: 0; color: {% if message.tags == 'error' %}#b91c1c{% else %}#15803d{% endif %}; font-weight: 600">{{ message }}</p>
+      {% endfor %}
+    </div>
+  {% endif %}
 
+  <div class="eal-table-card">
     {% if gateways.object_list %}
-      <div style="overflow-x: auto; margin-top: 16px">
-        <table class="data-table">
+      <div class="eal-table-wrap">
+        <table class="eal-table">
           <thead>
             <tr>
-              <th style="width: 60px">#</th>
-              <th style="width: 110px">Type</th>
+              <th>#</th>
+              <th>Type badge</th>
               <th>Provider</th>
-              <th>Host/URL</th>
-              <th style="width: 90px">Port</th>
+              <th>Host</th>
+              <th>Port</th>
               <th>Sender ID</th>
-              <th style="width: 110px">Encryption</th>
-              <th style="width: 120px">Status</th>
-              <th style="width: 220px">Actions</th>
+              <th>Encryption</th>
+              <th>Status</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -53,9 +53,9 @@
                 <td>{{ forloop.counter0|add:gateways.start_index }}</td>
                 <td>
                   {% if gateway.gateway_type == 'Email' %}
-                    <span class="status-badge" style="background: #dbeafe; color: #1e40af">Email</span>
+                    <span class="badge status-badge status-issued">Email</span>
                   {% else %}
-                    <span class="status-badge" style="background: #dcfce7; color: #166534">SMS</span>
+                    <span class="badge status-badge status-active">SMS</span>
                   {% endif %}
                 </td>
                 <td>{{ gateway.provider_name }}</td>
@@ -65,31 +65,22 @@
                 <td>{{ gateway.encryption_type|default:'-' }}</td>
                 <td>
                   {% if gateway.is_active %}
-                    <span class="status-badge active">Active</span>
+                    <span class="badge status-badge status-active">Active</span>
                   {% else %}
-                    <span class="status-badge warning">Inactive</span>
+                    <span class="badge status-badge status-inactive">Inactive</span>
                   {% endif %}
                 </td>
                 <td>
                   {% if request.user.is_root %}
-                    <div class="table-actions">
-                      <a href="{% url 'comm_gateway_edit' gateway.gateway_id %}" class="btn" style="padding: 10px 14px; border-width: 1px">
+                    <div class="eal-actions-cell">
+                      <a href="{% url 'comm_gateway_edit' gateway.gateway_id %}" class="eal-row-btn" title="Edit">
                         <i class="bi bi-pencil"></i>
-                        Edit
                       </a>
                       <form method="post" action="{% url 'comm_gateway_toggle' gateway.gateway_id %}" style="display: inline">
                         {% csrf_token %}
-                        {% if gateway.is_active %}
-                          <button type="submit" class="btn btn-primary" style="padding: 10px 14px">
-                            <i class="bi bi-slash-circle"></i>
-                            Deactivate
-                          </button>
-                        {% else %}
-                          <button type="submit" class="btn btn-primary" style="padding: 10px 14px">
-                            <i class="bi bi-check-circle"></i>
-                            Activate
-                          </button>
-                        {% endif %}
+                        <button type="submit" class="eal-row-btn" title="{% if gateway.is_active %}Deactivate{% else %}Activate{% endif %}">
+                          <i class="bi bi-arrow-repeat"></i>
+                        </button>
                       </form>
                     </div>
                   {% endif %}
@@ -100,22 +91,23 @@
         </table>
       </div>
 
-      <div style="margin-top: 18px; display: flex; justify-content: center; gap: 12px; flex-wrap: wrap">
-        {% if gateways.has_previous %}
-          <a href="?page={{ gateways.previous_page_number }}" class="btn" style="padding: 10px 14px; border-width: 1px">Previous</a>
-        {% endif %}
-        <span style="align-self: center; color: var(--text-muted); font-weight: 600">
-          Page {{ gateways.number }} of {{ gateways.paginator.num_pages }}
-        </span>
-        {% if gateways.has_next %}
-          <a href="?page={{ gateways.next_page_number }}" class="btn" style="padding: 10px 14px; border-width: 1px">Next</a>
-        {% endif %}
+      <div class="eal-pagination">
+        <div class="eal-pagination-controls">
+          {% if gateways.has_previous %}
+            <a href="?page={{ gateways.previous_page_number }}" class="eal-page-btn"><i class="bi bi-chevron-left"></i></a>
+          {% endif %}
+          <span class="eal-page-btn active">{{ gateways.number }}</span>
+          {% if gateways.has_next %}
+            <a href="?page={{ gateways.next_page_number }}" class="eal-page-btn"><i class="bi bi-chevron-right"></i></a>
+          {% endif %}
+        </div>
       </div>
     {% else %}
-      <div class="table-empty-state" style="margin-top: 16px">
+      <div class="notification-empty">
         <div class="empty-icon"><i class="bi bi-broadcast"></i></div>
-        <p class="empty-text">No communication gateways found.</p>
+        <h4 class="empty-title">No communication gateways found.</h4>
       </div>
     {% endif %}
   </div>
 {% endblock %}
+

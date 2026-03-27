@@ -1,0 +1,123 @@
+{# STANDARD STATUS BADGES — use these classes everywhere #}
+{# Active / Success:   <span class="badge status-badge status-active">Active</span> #}
+{# Inactive / Disabled:<span class="badge status-badge status-inactive">Inactive</span> #}
+{# Pending / Warning:  <span class="badge status-badge status-pending">Pending</span> #}
+{# Suspended / Danger: <span class="badge status-badge status-suspended">Suspended</span> #}
+{# Expired:            <span class="badge status-badge status-expired">Expired</span> #}
+{# Scheduled:          <span class="badge status-badge status-scheduled">Scheduled</span> #}
+<div class="page-header">
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">{% block page_title %}{% endblock %}</h1>
+      <p class="page-subtitle">{% block page_subtitle %}{% endblock %}</p>
+    </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        {% block page_actions %}{% endblock %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="eal-table-card">
+  <div class="eal-toolbar">
+    <div class="eal-toolbar-left">
+      {% block search_filters %}{% endblock %}
+    </div>
+  </div>
+
+  <div class="eal-pagination-info" style="margin-bottom: 12px;">
+    {% block results_count %}{% endblock %}
+  </div>
+
+  <div class="eal-table-wrap">
+    <table class="eal-table">
+      {% block table_content %}{% endblock %}
+    </table>
+  </div>
+
+  <div class="eal-pagination">
+    {% block pagination %}{% endblock %}
+  </div>
+
+  <div class="notification-empty" style="margin-top: 16px;">
+    <div class="empty-icon">
+      <i class="bi bi-inbox"></i>
+    </div>
+    <h4 class="empty-title">No records found</h4>
+    <p class="empty-text">{% block empty_state %}{% endblock %}</p>
+  </div>
+</div>
+
+{% block delete_modal %}
+  <div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5>Confirm Delete</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p>
+            Are you sure you want to delete
+            "<span id="deleteRecordName"></span>"?
+          </p>
+          <p class="text-danger small">
+            This action cannot be undone.
+          </p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <form id="deleteForm" method="POST">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger">
+              Confirm Delete
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
+<script>
+(function() {
+  'use strict';
+
+  // Delete modal handler
+  var deleteModal = document.getElementById('deleteModal');
+  if (deleteModal) {
+    var modalInstance = new bootstrap.Modal(deleteModal);
+
+    document.querySelectorAll('[data-delete-url]')
+      .forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+          e.preventDefault();
+          var name = this.dataset.deleteName || 'this record';
+          var url  = this.dataset.deleteUrl;
+          var nameEl = document.getElementById(
+              'deleteRecordName');
+          var form = document.getElementById('deleteForm');
+          if (nameEl) nameEl.textContent = name;
+          if (form)   form.action = url;
+          modalInstance.show();
+        });
+      });
+
+    // Show error inside modal if redirected with error
+    var errorMsg = "{{ delete_error|default:'' }}";
+    if (errorMsg && deleteModal) {
+      var body = deleteModal.querySelector('.modal-body');
+      if (body) {
+        var alert = document.createElement('div');
+        alert.className = 'alert alert-danger mt-2';
+        alert.textContent = errorMsg;
+        body.appendChild(alert);
+        modalInstance.show();
+      }
+    }
+  }
+})();
+</script>
+
+{% block extra_js %}{% endblock %}

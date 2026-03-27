@@ -10,12 +10,27 @@
       </div>
     {% endfor %}
   {% endif %}
-  <h4 class="mb-3">Tenant &amp; Driver Security Settings</h4>
+
+  <div class="page-header">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb">
+        <li class="breadcrumb-item">Security</li>
+        <li class="breadcrumb-item active" aria-current="page">Tenant Security Settings</li>
+      </ol>
+    </nav>
+    <div class="page-header-row">
+      <div class="page-header-left">
+        <h1 class="page-title">Tenant &amp; Driver Security Settings</h1>
+      </div>
+    </div>
+  </div>
+
   <div class="alert alert-info">
     These settings control session expiry and lockout policies for Tenant web users and mobile Driver app users.
   </div>
-  <div class="card">
-    <div class="card-body">
+
+  <div class="form-card">
+    <div class="form-card-body">
       <form method="post" novalidate>
         {% csrf_token %}
         <h6 class="mb-2">Section 1: Web Session Settings</h6>
@@ -26,6 +41,7 @@
             <div class="text-danger small mt-1">{{ form.tenant_web_timeout_hours.errors|join:', ' }}</div>
           {% endif %}
         </div>
+
         <h6 class="mb-2">Section 2: Driver App Settings</h6>
         <div class="mb-3">
           <label class="form-label" for="{{ form.driver_app_timeout_days.id_for_label }}">{{ form.driver_app_timeout_days.label }}</label>
@@ -34,6 +50,7 @@
             <div class="text-danger small mt-1">{{ form.driver_app_timeout_days.errors|join:', ' }}</div>
           {% endif %}
         </div>
+
         <h6 class="mb-2">Section 3: Lockout Policy</h6>
         <div class="mb-3">
           <label class="form-label" for="{{ form.max_failed_logins.id_for_label }}">{{ form.max_failed_logins.label }}</label>
@@ -49,14 +66,22 @@
             <div class="text-danger small mt-1">{{ form.lockout_duration_minutes.errors|join:', ' }}</div>
           {% endif %}
         </div>
-        <div class="text-muted small mb-3">
+
+        <div class="alert alert-light border small mb-3">
           Last updated by:
           {% if obj.updated_by %}{{ obj.updated_by.first_name }} {{ obj.updated_by.last_name }}{% else %}N/A{% endif %}
           {% if obj.updated_at %} | {{ obj.updated_at }}{% endif %}
         </div>
-        <button type="submit" class="btn btn-primary">Save</button>
+
+        <div class="form-footer-bar sticky-bottom">
+          <div class="footer-left"></div>
+          <div class="footer-right">
+            <button type="submit" class="btn btn-primary">Save</button>
+          </div>
+        </div>
       </form>
     </div>
   </div>
 </div>
 {% endblock %}
+

@@ -3,135 +3,141 @@
 {% block page_title %}IRoad Legal Identity{% endblock %}
 
 {% block content %}
-  <div class="content-card" style="background: #ffffff; padding: 20px 30px; border-radius: 12px">
-    <div class="setting-row" style="border-bottom: none; padding-top: 0; margin-bottom: 16px">
-      <div class="setting-row-info">
-        <h2 class="page-title">IRoad Legal Identity</h2>
+  <div class="page-header">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb">
+        <li class="breadcrumb-item">System Config</li>
+        <li class="breadcrumb-item active" aria-current="page">IRoad Legal Identity</li>
+      </ol>
+    </nav>
+    <div class="page-header-row">
+      <div class="page-header-left">
+        <h1 class="page-title">IRoad Legal Identity</h1>
+        <p class="page-subtitle">Manage legal profile and public contact details</p>
       </div>
     </div>
+  </div>
 
-    {% if messages %}
-      <div style="margin-bottom: 16px">
-        {% for message in messages %}
-          <p style="margin: 0; color: {% if message.tags == 'error' %}#b91c1c{% else %}#15803d{% endif %}; font-weight: 600">
-            {{ message }}
-          </p>
-        {% endfor %}
+  {% if messages %}
+    <div style="margin-bottom: 16px">
+      {% for message in messages %}
+        <p style="margin: 0; color: {% if message.tags == 'error' %}#b91c1c{% else %}#15803d{% endif %}; font-weight: 600">
+          {{ message }}
+        </p>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <form method="post" action="" enctype="multipart/form-data">
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+      <div style="margin-bottom: 16px; color: #b91c1c; font-weight: 600">
+        {{ form.non_field_errors }}
       </div>
     {% endif %}
 
-    <form method="post" action="" enctype="multipart/form-data">
-      {% csrf_token %}
-
-      {% if form.non_field_errors %}
-        <div style="margin-bottom: 16px; color: #b91c1c; font-weight: 600">
-          {{ form.non_field_errors }}
-        </div>
-      {% endif %}
-
-      <div style="margin-bottom: 16px">
-        <label class="form-label">Company Logo</label>
-
-        {% if obj.company_logo %}
-          <div style="margin-bottom: 12px">
-            <p style="margin: 0 0 8px 0; color:#0f172a; font-weight: 700">Current Logo</p>
-            <img
-              src="{{ obj.company_logo.url }}"
-              alt="Company Logo"
-              style="max-height: 110px; border:1px solid #e5e7eb; border-radius: 10px; padding: 6px; background:#fff"
-            />
+    <div class="form-card">
+      <div class="form-card-body">
+        <div class="field-group">
+          <div class="fields-grid cols-2">
+            <div class="field">
+              <label class="form-label">Company Logo</label>
+              {% if obj.company_logo %}
+                <div style="margin-bottom: 12px">
+                  <p style="margin: 0 0 8px 0; color:#0f172a; font-weight: 700">Current Logo</p>
+                  <img
+                    src="{{ obj.company_logo.url }}"
+                    alt="Company Logo"
+                    style="max-height: 110px; border:1px solid #e5e7eb; border-radius: 10px; padding: 6px; background:#fff"
+                  />
+                </div>
+              {% else %}
+                <p style="margin: 0 0 12px 0; color:#64748b; font-weight: 600">No logo uploaded yet.</p>
+              {% endif %}
+              {{ form.company_logo }}
+              {% for error in form.company_logo.errors %}
+                <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+              {% endfor %}
+            </div>
+            <div class="field">
+              <label class="form-label">Company Name (EN)</label>
+              {{ form.company_name_en }}
+              {% for error in form.company_name_en.errors %}
+                <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+              {% endfor %}
+            </div>
+            <div class="field">
+              <label class="form-label">Company Name (AR)</label>
+              {{ form.company_name_ar }}
+              {% for error in form.company_name_ar.errors %}
+                <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+              {% endfor %}
+            </div>
+            <div class="field">
+              <label class="form-label">Company Country</label>
+              {{ form.company_country_code }}
+              {% for error in form.company_country_code.errors %}
+                <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+              {% endfor %}
+            </div>
+            <div class="field">
+              <label class="form-label">Commercial Register</label>
+              {{ form.commercial_register }}
+              {% for error in form.commercial_register.errors %}
+                <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+              {% endfor %}
+            </div>
+            <div class="field">
+              <label class="form-label">Tax Number</label>
+              {{ form.tax_number }}
+              {% for error in form.tax_number.errors %}
+                <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+              {% endfor %}
+            </div>
+            <div class="field">
+              <label class="form-label">Registered Address</label>
+              {{ form.registered_address }}
+              {% for error in form.registered_address.errors %}
+                <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+              {% endfor %}
+            </div>
+            <div class="field">
+              <label class="form-label">Support Email</label>
+              {{ form.support_email }}
+              {% for error in form.support_email.errors %}
+                <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+              {% endfor %}
+            </div>
+            <div class="field">
+              <label class="form-label">Support Phone</label>
+              {{ form.support_phone }}
+              {% for error in form.support_phone.errors %}
+                <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+              {% endfor %}
+            </div>
           </div>
-        {% else %}
-          <p style="margin: 0 0 12px 0; color:#64748b; font-weight: 600">No logo uploaded yet.</p>
-        {% endif %}
-
-        {{ form.company_logo }}
-        {% for error in form.company_logo.errors %}
-          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-        {% endfor %}
+        </div>
       </div>
+    </div>
 
-      <div style="margin-bottom: 16px">
-        <label class="form-label">Company Name (EN)</label>
-        {{ form.company_name_en }}
-        {% for error in form.company_name_en.errors %}
-          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-        {% endfor %}
-      </div>
-
-      <div style="margin-bottom: 16px">
-        <label class="form-label">Company Name (AR)</label>
-        {{ form.company_name_ar }}
-        {% for error in form.company_name_ar.errors %}
-          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-        {% endfor %}
-      </div>
-
-      <div style="margin-bottom: 16px">
-        <label class="form-label">Company Country</label>
-        {{ form.company_country_code }}
-        {% for error in form.company_country_code.errors %}
-          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-        {% endfor %}
-      </div>
-
-      <div style="margin-bottom: 16px">
-        <label class="form-label">Commercial Register</label>
-        {{ form.commercial_register }}
-        {% for error in form.commercial_register.errors %}
-          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-        {% endfor %}
-      </div>
-
-      <div style="margin-bottom: 16px">
-        <label class="form-label">Tax Number</label>
-        {{ form.tax_number }}
-        {% for error in form.tax_number.errors %}
-          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-        {% endfor %}
-      </div>
-
-      <div style="margin-bottom: 16px">
-        <label class="form-label">Registered Address</label>
-        {{ form.registered_address }}
-        {% for error in form.registered_address.errors %}
-          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-        {% endfor %}
-      </div>
-
-      <div style="margin-bottom: 16px">
-        <label class="form-label">Support Email</label>
-        {{ form.support_email }}
-        {% for error in form.support_email.errors %}
-          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-        {% endfor %}
-      </div>
-
-      <div style="margin-bottom: 16px">
-        <label class="form-label">Support Phone</label>
-        {{ form.support_phone }}
-        {% for error in form.support_phone.errors %}
-          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-        {% endfor %}
-      </div>
-
-      <div class="submit-section">
+    <div class="form-actions-bar sticky-bottom">
+      <div class="form-actions-left"></div>
+      <div class="form-actions-right">
         <button type="submit" class="btn btn-primary">
           <i class="bi bi-save"></i>
           Save
         </button>
       </div>
-    </form>
-
-    <div style="margin-top: 14px; color: #64748b; font-weight: 600">
-      Last updated:
-      {% if obj.updated_by %}
-        {{ obj.updated_by.email }}
-      {% else %}
-        Unknown
-      {% endif %}
-      on {{ obj.updated_at }}
     </div>
+  </form>
+
+  <div style="margin-top: 14px; color: #64748b; font-weight: 600">
+    Last updated by:
+    {% if obj.updated_by %}
+      {{ obj.updated_by.email }}
+    {% else %}
+      Unknown
+    {% endif %}
+    at {{ obj.updated_at }}
   </div>
 {% endblock %}
-

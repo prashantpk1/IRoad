@@ -3,79 +3,95 @@
 {% block page_title %}IRoad Base Currency{% endblock %}
 
 {% block content %}
-  <div class="content-card" style="background: #ffffff; padding: 20px 30px; border-radius: 12px">
-    <div class="setting-row" style="border-bottom: none; padding-top: 0; margin-bottom: 16px">
-      <div class="setting-row-info">
-        <h2 class="page-title">IRoad Base Currency</h2>
+  <div class="page-header">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb">
+        <li class="breadcrumb-item">System Config</li>
+        <li class="breadcrumb-item active" aria-current="page">IRoad Base Currency</li>
+      </ol>
+    </nav>
+    <div class="page-header-row">
+      <div class="page-header-left">
+        <h1 class="page-title">IRoad Base Currency</h1>
+        <p class="page-subtitle">Set the accounting root currency for the platform</p>
       </div>
     </div>
+  </div>
 
-    <div class="alert alert-danger" style="font-weight: 700; border-radius: 12px">
-      <p style="margin: 0">
-        This is the accounting root currency for all financial reports.
-        Once financial transactions are recorded, this cannot be changed.
-      </p>
-      <p style="margin: 10px 0 0 0; font-weight: 600">
-        Changing base currency after transactions are recorded will cause
-        financial reporting corruption. This will be locked permanently in Phase 5.
-      </p>
+  <div class="alert alert-danger" style="font-weight: 700; border-radius: 12px; margin-bottom: 16px;">
+    <p style="margin: 0">
+      This is the accounting root currency for all financial reports.
+      Once financial transactions are recorded, this cannot be changed.
+    </p>
+    <p style="margin: 10px 0 0 0; font-weight: 600">
+      Changing base currency after transactions are recorded will cause
+      financial reporting corruption. This will be locked permanently in Phase 5.
+    </p>
+  </div>
+
+  <div style="margin-bottom: 16px; padding: 12px 14px; border-radius: 10px; background: #fefce8; border: 1px solid #fde68a">
+    <p style="margin: 0; font-weight: 700; color: #3f3f46">
+      Current base currency:
+      {% if obj.base_currency %}
+        {{ obj.base_currency.currency_code }} - {{ obj.base_currency.name_en }}
+      {% else %}
+        Not configured
+      {% endif %}
+    </p>
+  </div>
+
+  {% if messages %}
+    <div style="margin-bottom: 16px">
+      {% for message in messages %}
+        <p style="margin: 0; color: {% if message.tags == 'error' %}#b91c1c{% else %}#15803d{% endif %}; font-weight: 600">
+          {{ message }}
+        </p>
+      {% endfor %}
     </div>
+  {% endif %}
 
-    <div style="margin-bottom: 16px; padding: 12px 14px; border-radius: 10px; background: #fefce8; border: 1px solid #fde68a">
-      <p style="margin: 0; font-weight: 700; color: #3f3f46">
-        Current base currency:
-        {% if obj.base_currency %}
-          {{ obj.base_currency.currency_code }} - {{ obj.base_currency.name_en }}
-        {% else %}
-          Not configured
-        {% endif %}
-      </p>
-    </div>
-
-    {% if messages %}
-      <div style="margin-bottom: 16px">
-        {% for message in messages %}
-          <p style="margin: 0; color: {% if message.tags == 'error' %}#b91c1c{% else %}#15803d{% endif %}; font-weight: 600">
-            {{ message }}
-          </p>
-        {% endfor %}
+  <form method="post" action="">
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+      <div style="margin-bottom: 16px; color: #b91c1c; font-weight: 600">
+        {{ form.non_field_errors }}
       </div>
     {% endif %}
 
-    <form method="post" action="">
-      {% csrf_token %}
-
-      {% if form.non_field_errors %}
-        <div style="margin-bottom: 16px; color: #b91c1c; font-weight: 600">
-          {{ form.non_field_errors }}
+    <div class="form-card">
+      <div class="form-card-body">
+        <div class="field-group">
+          <div class="fields-grid cols-2">
+            <div class="field">
+              <label class="form-label">Base Currency</label>
+              {{ form.base_currency }}
+              {% for error in form.base_currency.errors %}
+                <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+              {% endfor %}
+            </div>
+          </div>
         </div>
-      {% endif %}
-
-      <div style="margin-bottom: 16px">
-        <label class="form-label">Base Currency</label>
-        {{ form.base_currency }}
-        {% for error in form.base_currency.errors %}
-          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-        {% endfor %}
       </div>
+    </div>
 
-      <div class="submit-section">
+    <div class="form-actions-bar sticky-bottom">
+      <div class="form-actions-left"></div>
+      <div class="form-actions-right">
         <button type="submit" class="btn btn-primary">
           <i class="bi bi-save"></i>
           Save
         </button>
       </div>
-    </form>
-
-    <div style="margin-top: 14px; color: #64748b; font-weight: 600">
-      Last updated:
-      {% if obj.updated_by %}
-        {{ obj.updated_by.email }}
-      {% else %}
-        Unknown
-      {% endif %}
-      on {{ obj.updated_at }}
     </div>
+  </form>
+
+  <div style="margin-top: 14px; color: #64748b; font-weight: 600">
+    Last updated by:
+    {% if obj.updated_by %}
+      {{ obj.updated_by.email }}
+    {% else %}
+      Unknown
+    {% endif %}
+    at {{ obj.updated_at }}
   </div>
 {% endblock %}
-

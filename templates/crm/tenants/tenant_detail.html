@@ -1,11 +1,19 @@
 {% extends 'base.html' %}
 {% block title %}{{ tenant.company_name }}{% endblock %}
 {% block content %}
-<h4 class="mb-3">{{ tenant.company_name }}</h4>
+<div class="page-header">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{% url 'tenant_list' %}">Subscribers</a></li>
+      <li class="breadcrumb-item active" aria-current="page">{{ tenant.company_name }}</li>
+    </ol>
+  </nav>
+  <div class="page-header-row"><div class="page-header-left"><h1 class="page-title">{{ tenant.company_name }}</h1></div></div>
+</div>
 
-<div class="card mb-3">
-  <div class="card-header fw-semibold">Profile</div>
-  <div class="card-body row g-3">
+<div class="form-card mb-3">
+  <div class="form-card-header fw-semibold">Profile</div>
+  <div class="form-card-body row g-3">
     <div class="col-md-6"><strong>Registration #</strong><br>{{ tenant.registration_number }}</div>
     <div class="col-md-6"><strong>Tax number</strong><br>{{ tenant.tax_number|default:'-' }}</div>
     <div class="col-md-6"><strong>Email</strong><br>{{ tenant.primary_email }}</div>
@@ -17,9 +25,9 @@
   </div>
 </div>
 
-<div class="card mb-3">
-  <div class="card-header fw-semibold">Subscription state</div>
-  <div class="card-body">
+<div class="form-card mb-3">
+  <div class="form-card-header fw-semibold">Subscription State</div>
+  <div class="form-card-body">
     <div class="row g-2 mb-3">
       <div class="col-md-4"><strong>Current plan</strong><br>{{ tenant.current_plan.plan_name_en|default:'-' }}</div>
       <div class="col-md-4"><strong>Start date</strong><br>{{ tenant.subscription_start_date|default:'-' }}</div>
@@ -39,9 +47,9 @@
   </div>
 </div>
 
-<div class="card mb-3">
-  <div class="card-header fw-semibold">Quick actions</div>
-  <div class="card-body d-flex flex-wrap gap-2">
+<div class="form-card mb-3">
+  <div class="form-card-header fw-semibold">Quick Actions</div>
+  <div class="form-card-body d-flex flex-wrap gap-2">
     <a href="{% url 'order_create' %}?tenant={{ tenant.tenant_id }}" class="btn btn-primary">Create Order</a>
     {% if request.user.is_root %}
       <a href="{% url 'tenant_edit' tenant.tenant_id %}" class="btn btn-outline-secondary">Edit Status</a>
@@ -49,9 +57,9 @@
   </div>
 </div>
 
-<div class="card mb-3">
-  <div class="card-header fw-semibold">CRM notes</div>
-  <div class="card-body">
+<div class="form-card mb-3">
+  <div class="form-card-header fw-semibold">CRM Notes</div>
+  <div class="form-card-body">
     <form method="post" action="{% url 'crm_note_create' tenant.tenant_id %}" class="mb-4">
       {% csrf_token %}
       <div class="row g-2">
@@ -86,7 +94,6 @@
   </div>
 </div>
 
-<div>
-  <a href="{% url 'tenant_list' %}" class="btn btn-outline-secondary">Back to list</a>
-</div>
+<div><a href="{% url 'tenant_list' %}" class="btn btn-outline-secondary">Back to list</a></div>
 {% endblock %}
+

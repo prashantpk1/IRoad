@@ -3,51 +3,105 @@
 {% block page_title %}{% if is_edit %}Edit Policy{% else %}Add Policy{% endif %}{% endblock %}
 
 {% block content %}
-  <div class="content-card" style="background:#fff; padding:20px 30px; border-radius:12px">
-    <div class="setting-row" style="border-bottom:none; padding-top:0; margin-bottom:16px">
-      <div class="setting-row-info">
-        <h2 class="page-title">{% if is_edit %}Edit Policy{% else %}Add Policy{% endif %}</h2>
-      </div>
-      <div class="setting-row-control" style="flex:0 0 auto">
-        <a href="{% url 'addons_policy_list' %}" class="btn" style="padding:10px 14px; border-width:1px">Cancel</a>
-      </div>
-    </div>
+  <div class="page-header">
+    <nav class="page-breadcrumb">
+      <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'addons_policy_list' %}">Add-ons Policy</a></li>
+        {% if is_edit and policy %}
+          <li class="breadcrumb-item active" aria-current="page">Edit: {{ policy.policy_name }}</li>
+        {% else %}
+          <li class="breadcrumb-item active" aria-current="page">Add Policy</li>
+        {% endif %}
+      </ol>
+    </nav>
 
-    <div class="alert alert-info" style="border-radius:10px">
-      All prices are per 1 standard billing cycle.
+    <div class="page-header-row">
+      <div class="page-header-left">
+        <h1 class="page-title">{% if is_edit %}Edit Policy{% else %}Add Policy{% endif %}</h1>
+      </div>
+      <div class="page-header-right">
+        <a href="{% url 'addons_policy_list' %}" class="eal-btn">
+          <i class="bi bi-arrow-left"></i>
+          <span>Cancel</span>
+        </a>
+      </div>
     </div>
-    <div class="alert alert-warning" style="border-radius:10px">
-      Activating this will deactivate all other policies.
-    </div>
+  </div>
 
-    {% if messages %}
-      {% for message in messages %}
-        <p style="margin:0; color:{% if message.tags == 'error' %}#b91c1c{% else %}#15803d{% endif %}; font-weight:600">{{ message }}</p>
-      {% endfor %}
+  {% if is_edit and policy and policy.updated_at %}
+  <div class="edit-info-bar">
+    <i class="bi bi-clock-history"></i>
+    Last updated
+    {% if policy.updated_by %}
+      by <strong>{{ policy.updated_by.first_name }} {{ policy.updated_by.last_name }}</strong>
     {% endif %}
+    at <strong>{{ policy.updated_at|date:"d M Y, H:i" }}</strong>
+  </div>
+  {% endif %}
 
-    <form method="post" action="">
-      {% csrf_token %}
-      {% if form.non_field_errors %}
-        <div style="color:#b91c1c; font-weight:600; margin-bottom:10px">{{ form.non_field_errors }}</div>
+  <div class="form-card">
+    <div class="form-card-body">
+      <div class="alert alert-info" style="border-radius: 10px;">
+        All prices are per 1 standard billing cycle.
+      </div>
+      <div class="alert alert-warning" style="border-radius: 10px;">
+        Activating this will deactivate all other policies.
+      </div>
+
+      {% if messages %}
+        {% for message in messages %}
+          <p style="margin: 12px 0 0; color:{% if message.tags == 'error' %}#b91c1c{% else %}#15803d{% endif %}; font-weight: 600">
+            {{ message }}
+          </p>
+        {% endfor %}
       {% endif %}
 
-      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:12px">
-        {% for field in form %}
-          <div>
-            <label class="form-label">{{ field.label }}</label>
-            {{ field }}
-            {% for e in field.errors %}
-              <div style="color:#b91c1c; font-weight:600">{{ e }}</div>
-            {% endfor %}
+      <form method="post" action="">
+        {% csrf_token %}
+        {% if form.non_field_errors %}
+          <div style="color:#b91c1c; font-weight:600; margin-bottom:10px">
+            {{ form.non_field_errors }}
           </div>
-        {% endfor %}
-      </div>
+        {% endif %}
 
-      <div class="submit-section" style="margin-top:14px">
-        <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Save</button>
-      </div>
-    </form>
+        <h3 style="margin: 18px 0 12px 0">Policy Details</h3>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:12px">
+          {% for field in form %}
+            {% if field.name == 'policy_name' or field.name == 'is_active' %}
+              <div>
+                <label class="form-label">{{ field.label }}</label>
+                {{ field }}
+                {% for e in field.errors %}
+                  <div style="color:#b91c1c; font-weight:600">{{ e }}</div>
+                {% endfor %}
+              </div>
+            {% endif %}
+          {% endfor %}
+        </div>
+
+        <h3 style="margin: 18px 0 12px 0">Pricing Per Resource</h3>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:12px">
+          {% for field in form %}
+            {% if field.name != 'policy_name' and field.name != 'is_active' %}
+              <div>
+                <label class="form-label">{{ field.label }}</label>
+                {{ field }}
+                {% for e in field.errors %}
+                  <div style="color:#b91c1c; font-weight:600">{{ e }}</div>
+                {% endfor %}
+              </div>
+            {% endif %}
+          {% endfor %}
+        </div>
+
+        <div class="submit-section" style="margin-top: 14px">
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-save"></i>
+            Save
+          </button>
+        </div>
+      </form>
+    </div>
   </div>
 {% endblock %}
 

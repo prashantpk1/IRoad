@@ -10,36 +10,59 @@
   {% endfor %}
 {% endif %}
 
-<h4 class="mb-3">{% if is_edit %}Edit Category{% else %}Add Category{% endif %}</h4>
+<div class="page-header">
+  <nav class="page-breadcrumb">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{% url 'support_category_list' %}">Categories</a></li>
+      {% if is_edit %}
+        <li class="breadcrumb-item active" aria-current="page">Edit: {{ form.name_en.value|default:'' }}</li>
+      {% else %}
+        <li class="breadcrumb-item active" aria-current="page">Add Category</li>
+      {% endif %}
+    </ol>
+  </nav>
+  <div class="page-header-row"><div class="page-header-left"><h1 class="page-title">{% if is_edit %}Edit Category{% else %}Add Category{% endif %}</h1></div></div>
+</div>
 
-<form method="post" class="card p-4">
-  {% csrf_token %}
-
-  {% if form.non_field_errors %}
-    <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+{% if form.instance.pk and form.instance.updated_at %}
+<div class="edit-info-bar">
+  <i class="bi bi-clock-history"></i>
+  Last updated
+  {% if form.instance.updated_by %}
+    by <strong>{{ form.instance.updated_by.first_name }} {{ form.instance.updated_by.last_name }}</strong>
   {% endif %}
+  at <strong>{{ form.instance.updated_at|date:"d M Y, H:i" }}</strong>
+</div>
+{% endif %}
 
-  <div class="mb-3">
-    <label class="form-label" for="id_name_en">English name</label>
-    {{ form.name_en }}
-    {% for error in form.name_en.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
-  </div>
+<form method="post" class="form-card">
+  <div class="form-card-body">
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
 
-  <div class="mb-3">
-    <label class="form-label" for="id_name_ar">Arabic name</label>
-    <div dir="rtl">{{ form.name_ar }}</div>
-    {% for error in form.name_ar.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
-  </div>
+    <div class="mb-3">
+      <label class="form-label" for="id_name_en">English name</label>
+      {{ form.name_en }}
+      {% for error in form.name_en.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+    </div>
 
-  <div class="mb-3 form-check">
-    {{ form.is_active }}
-    <label class="form-check-label" for="id_is_active">Active</label>
-    {% for error in form.is_active.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
-  </div>
+    <div class="mb-3">
+      <label class="form-label" for="id_name_ar">Arabic name</label>
+      <div dir="rtl">{{ form.name_ar }}</div>
+      {% for error in form.name_ar.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+    </div>
 
-  <div class="d-flex gap-2">
-    <a href="{% url 'support_category_list' %}" class="btn btn-outline-secondary">Cancel</a>
-    <button type="submit" class="btn btn-primary">Save</button>
+    <div class="mb-3 form-check">
+      {{ form.is_active }}
+      <label class="form-check-label" for="id_is_active">Active</label>
+      {% for error in form.is_active.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+    </div>
+
+    <div class="form-footer-bar sticky-bottom">
+      <div class="footer-left"><a href="{% url 'support_category_list' %}" class="btn btn-outline-secondary">Cancel</a></div>
+      <div class="footer-right"><button type="submit" class="btn btn-primary">Save</button></div>
+    </div>
   </div>
 </form>
 {% endblock %}
+

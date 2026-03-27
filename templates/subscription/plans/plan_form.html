@@ -3,146 +3,179 @@
 {% block page_title %}{% if is_edit %}Edit Plan{% else %}Add Plan{% endif %}{% endblock %}
 
 {% block content %}
-  <div class="content-card" style="background:#fff; padding:20px 30px; border-radius:12px">
-    <div class="setting-row" style="border-bottom:none; padding-top:0; margin-bottom:16px">
-      <div class="setting-row-info">
-        <h2 class="page-title">{% if is_edit %}Edit Plan{% else %}Add Plan{% endif %}</h2>
+  <div class="page-header">
+    <nav class="page-breadcrumb">
+      <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'plan_list' %}">Plans</a></li>
+        {% if is_edit and plan %}
+          <li class="breadcrumb-item active" aria-current="page">
+            Edit: {{ plan.plan_name_en }}
+          </li>
+        {% else %}
+          <li class="breadcrumb-item active" aria-current="page">Add Plan</li>
+        {% endif %}
+      </ol>
+    </nav>
+    <div class="page-header-row">
+      <div class="page-header-left">
+        <h1 class="page-title">{% if is_edit %}Edit Plan{% else %}Add Plan{% endif %}</h1>
       </div>
-      <div class="setting-row-control" style="flex:0 0 auto">
-        <a href="{% if is_edit and plan %}{% url 'plan_detail' plan.plan_id %}{% else %}{% url 'plan_list' %}{% endif %}" class="btn" style="padding:10px 14px; border-width:1px">
-          Cancel
-        </a>
+      <div class="page-header-right">
+        <div class="eal-header-actions"></div>
+      </div>
+    </div>
+  </div>
+
+  {% if is_edit and plan and plan.updated_at %}
+  <div class="edit-info-bar">
+    <i class="bi bi-clock-history"></i>
+    Last updated
+    {% if plan.updated_by %}
+      by <strong>{{ plan.updated_by.first_name }} {{ plan.updated_by.last_name }}</strong>
+    {% endif %}
+    at <strong>{{ plan.updated_at|date:"d M Y, H:i" }}</strong>
+  </div>
+  {% endif %}
+
+  {% if messages %}
+    <div style="margin-bottom:16px">
+      {% for message in messages %}
+        <p style="margin:0; color:{% if message.tags == 'error' %}#b91c1c{% else %}#15803d{% endif %}; font-weight:600">{{ message }}</p>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <form method="post" action="" id="plan-form">
+    {% csrf_token %}
+
+    {% if form.non_field_errors %}
+      <div style="margin-bottom:16px; color:#b91c1c; font-weight:600">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    <div class="form-card">
+      <div class="form-card-body">
+        <h3 style="margin:0 0 12px 0">Plan Details</h3>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:12px; margin-bottom:16px">
+          <div>
+            <label class="form-label">Plan Name (EN)</label>
+            {{ form.plan_name_en }}
+            {% for e in form.plan_name_en.errors %}<div style="color:#b91c1c; font-weight:600">{{ e }}</div>{% endfor %}
+          </div>
+          <div>
+            <label class="form-label">Plan Name (AR)</label>
+            {{ form.plan_name_ar }}
+            {% for e in form.plan_name_ar.errors %}<div style="color:#b91c; font-weight:600">{{ e }}</div>{% endfor %}
+          </div>
+          <div>
+            <label class="form-label">Base Cycle Days</label>
+            {{ form.base_cycle_days }}
+            {% for e in form.base_cycle_days.errors %}<div style="color:#b91c1c; font-weight:600">{{ e }}</div>{% endfor %}
+          </div>
+          <div>
+            <label class="form-label">Backup Restore Level</label>
+            {{ form.backup_restore_level }}
+            {% for e in form.backup_restore_level.errors %}<div style="color:#b91c1c; font-weight:600">{{ e }}</div>{% endfor %}
+          </div>
+          <div>
+            <label class="form-label">Has Driver App</label>
+            <div>{{ form.has_driver_app }}</div>
+          </div>
+          <div>
+            <label class="form-label">Status</label>
+            <div>{{ form.is_active }}</div>
+          </div>
+        </div>
+
+        <h3 style="margin:0 0 12px 0">Resource Limits</h3>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:12px; margin-bottom:16px">
+          {% for f in form %}
+            {% if f.name == 'max_internal_users' or f.name == 'max_internal_trucks' or f.name == 'max_external_trucks' or f.name == 'max_active_drivers' or f.name == 'max_monthly_shipments' or f.name == 'max_storage_gb' %}
+              <div>
+                <label class="form-label">{{ f.label }}</label>
+                {{ f }}
+                <div style="margin-top:6px">
+                  <label style="display:flex; align-items:center; gap:8px">
+                    <input type="checkbox" class="unlimited-toggle" data-target="{{ f.id_for_label }}" {% if f.value == -1 %}checked{% endif %} />
+                    <span>Unlimited</span>
+                  </label>
+                </div>
+                {% if f.help_text %}<small style="color:#64748b">{{ f.help_text }}</small>{% endif %}
+                {% for e in f.errors %}<div style="color:#b91c1c; font-weight:600">{{ e }}</div>{% endfor %}
+              </div>
+            {% endif %}
+          {% endfor %}
+        </div>
+
+        <h3 style="margin:0 0 12px 0">Pricing Cycles</h3>
+        <div style="margin-bottom:12px">
+          <button type="button" id="add-pricing-row" class="btn btn-primary" style="padding:8px 12px">Add Row</button>
+        </div>
+        <div style="overflow-x:auto; margin-bottom:16px">
+          <table class="data-table" id="pricing-table">
+            <thead>
+              <tr>
+                <th>Cycles</th>
+                <th>Currency</th>
+                <th>Price</th>
+                <th>Delete</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in pricing_rows %}
+                <tr class="pricing-row" data-index="{{ row.row_index }}">
+                  <td>
+                    <input type="hidden" name="pricing-{{ row.row_index }}-pricing_id" value="{{ row.pricing_id|default:'' }}" />
+                    <input type="number" min="1" class="form-control" name="pricing-{{ row.row_index }}-number_of_cycles" value="{{ row.number_of_cycles|default:'' }}" />
+                  </td>
+                  <td>
+                    <select class="form-select" name="pricing-{{ row.row_index }}-currency">
+                      <option value="">Select</option>
+                      {% for c in currencies %}
+                        <option value="{{ c.currency_code }}" {% if row.currency == c.currency_code %}selected{% endif %}>
+                          {{ c.name_en }} ({{ c.currency_code }})
+                        </option>
+                      {% endfor %}
+                    </select>
+                  </td>
+                  <td>
+                    <input type="number" min="0" step="0.01" class="form-control" name="pricing-{{ row.row_index }}-price" value="{{ row.price|default:'' }}" />
+                  </td>
+                  <td>
+                    <button type="button" class="btn btn-danger remove-row" style="padding:6px 10px">X</button>
+                    <input type="hidden" name="pricing-{{ row.row_index }}-delete" value="{% if row.delete %}1{% else %}0{% endif %}" class="delete-flag" />
+                  </td>
+                </tr>
+                {% if row.errors %}
+                  <tr>
+                    <td colspan="4">
+                      {% for e in row.errors %}
+                        <div style="color:#b91c1c; font-weight:600">{{ e }}</div>
+                      {% endfor %}
+                    </td>
+                  </tr>
+                {% endif %}
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
 
-    {% if messages %}
-      <div style="margin-bottom:16px">
-        {% for message in messages %}
-          <p style="margin:0; color:{% if message.tags == 'error' %}#b91c1c{% else %}#15803d{% endif %}; font-weight:600">{{ message }}</p>
-        {% endfor %}
+    <div class="form-actions-bar sticky-bottom">
+      <div class="form-actions-left">
+        <a href="{% if is_edit and plan %}{% url 'plan_detail' plan.plan_id %}{% else %}{% url 'plan_list' %}{% endif %}" class="btn btn-outline-secondary">
+          <i class="bi bi-arrow-left"></i>
+          Cancel
+        </a>
       </div>
-    {% endif %}
-
-    <form method="post" action="" id="plan-form">
-      {% csrf_token %}
-
-      {% if form.non_field_errors %}
-        <div style="margin-bottom:16px; color:#b91c1c; font-weight:600">{{ form.non_field_errors }}</div>
-      {% endif %}
-
-      <h3 style="margin:0 0 12px 0">Section 1: Plan Details</h3>
-      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:12px; margin-bottom:16px">
-        <div>
-          <label class="form-label">Plan Name (EN)</label>
-          {{ form.plan_name_en }}
-          {% for e in form.plan_name_en.errors %}<div style="color:#b91c1c; font-weight:600">{{ e }}</div>{% endfor %}
-        </div>
-        <div>
-          <label class="form-label">Plan Name (AR)</label>
-          {{ form.plan_name_ar }}
-          {% for e in form.plan_name_ar.errors %}<div style="color:#b91c1c; font-weight:600">{{ e }}</div>{% endfor %}
-        </div>
-        <div>
-          <label class="form-label">Base Cycle Days</label>
-          {{ form.base_cycle_days }}
-          {% for e in form.base_cycle_days.errors %}<div style="color:#b91c1c; font-weight:600">{{ e }}</div>{% endfor %}
-        </div>
-        <div>
-          <label class="form-label">Backup Restore Level</label>
-          {{ form.backup_restore_level }}
-          {% for e in form.backup_restore_level.errors %}<div style="color:#b91c1c; font-weight:600">{{ e }}</div>{% endfor %}
-        </div>
-        <div>
-          <label class="form-label">Has Driver App</label>
-          <div>{{ form.has_driver_app }}</div>
-        </div>
-        <div>
-          <label class="form-label">Status</label>
-          <div>{{ form.is_active }}</div>
-        </div>
-      </div>
-
-      <h3 style="margin:0 0 12px 0">Section 2: Resource Limits</h3>
-      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:12px; margin-bottom:16px">
-        {% for f in form %}
-          {% if f.name == 'max_internal_users' or f.name == 'max_internal_trucks' or f.name == 'max_external_trucks' or f.name == 'max_active_drivers' or f.name == 'max_monthly_shipments' or f.name == 'max_storage_gb' %}
-            <div>
-              <label class="form-label">{{ f.label }}</label>
-              {{ f }}
-              <div style="margin-top:6px">
-                <label style="display:flex; align-items:center; gap:8px">
-                  <input type="checkbox" class="unlimited-toggle" data-target="{{ f.id_for_label }}" {% if f.value == -1 %}checked{% endif %} />
-                  <span>Unlimited</span>
-                </label>
-              </div>
-              {% if f.help_text %}<small style="color:#64748b">{{ f.help_text }}</small>{% endif %}
-              {% for e in f.errors %}<div style="color:#b91c1c; font-weight:600">{{ e }}</div>{% endfor %}
-            </div>
-          {% endif %}
-        {% endfor %}
-      </div>
-
-      <h3 style="margin:0 0 12px 0">Section 3: Pricing Cycles</h3>
-      <div style="margin-bottom:12px">
-        <button type="button" id="add-pricing-row" class="btn btn-primary" style="padding:8px 12px">Add Row</button>
-      </div>
-      <div style="overflow-x:auto; margin-bottom:16px">
-        <table class="data-table" id="pricing-table">
-          <thead>
-            <tr>
-              <th>Cycles</th>
-              <th>Currency</th>
-              <th>Price</th>
-              <th>Delete</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for row in pricing_rows %}
-              <tr class="pricing-row" data-index="{{ row.row_index }}">
-                <td>
-                  <input type="hidden" name="pricing-{{ row.row_index }}-pricing_id" value="{{ row.pricing_id|default:'' }}" />
-                  <input type="number" min="1" class="form-control" name="pricing-{{ row.row_index }}-number_of_cycles" value="{{ row.number_of_cycles|default:'' }}" />
-                </td>
-                <td>
-                  <select class="form-select" name="pricing-{{ row.row_index }}-currency">
-                    <option value="">Select</option>
-                    {% for c in currencies %}
-                      <option value="{{ c.currency_code }}" {% if row.currency == c.currency_code %}selected{% endif %}>
-                        {{ c.name_en }} ({{ c.currency_code }})
-                      </option>
-                    {% endfor %}
-                  </select>
-                </td>
-                <td>
-                  <input type="number" min="0" step="0.01" class="form-control" name="pricing-{{ row.row_index }}-price" value="{{ row.price|default:'' }}" />
-                </td>
-                <td>
-                  <button type="button" class="btn btn-danger remove-row" style="padding:6px 10px">X</button>
-                  <input type="hidden" name="pricing-{{ row.row_index }}-delete" value="{% if row.delete %}1{% else %}0{% endif %}" class="delete-flag" />
-                </td>
-              </tr>
-              {% if row.errors %}
-                <tr>
-                  <td colspan="4">
-                    {% for e in row.errors %}
-                      <div style="color:#b91c1c; font-weight:600">{{ e }}</div>
-                    {% endfor %}
-                  </td>
-                </tr>
-              {% endif %}
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-
-      <div class="submit-section">
+      <div class="form-actions-right">
         <button type="submit" class="btn btn-primary">
           <i class="bi bi-save"></i>
           Save
         </button>
       </div>
-    </form>
-  </div>
+    </div>
+  </form>
 
   <template id="pricing-row-template">
     <tr class="pricing-row" data-index="__INDEX__">
@@ -218,4 +251,3 @@
     })();
   </script>
 {% endblock %}
-

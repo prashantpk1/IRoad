@@ -1,41 +1,46 @@
 {% extends 'base.html' %}
 
-{% block page_title %}Admin Users Master{% endblock %}
+{% block page_title %}Admin Users{% endblock %}
 
 {% block content %}
-  <div class="content-card" style="background: #ffffff; padding: 20px 30px; border-radius: 12px">
-    <div class="setting-row" style="border-bottom: none; padding-top: 0">
-      <div class="setting-row-info">
-        <h2 class="page-title">Admin Users Master</h2>
-        <p class="text-muted" style="margin: 6px 0 0 0">
-          Total: <strong>{{ total_count }}</strong>
-        </p>
+  <div class="page-header">
+    <div class="page-header-row">
+      <div class="page-header-left">
+        <h2 class="page-title">Admin Users</h2>
+        <p class="page-subtitle">IRoad internal staff accounts</p>
       </div>
-      <div class="setting-row-control" style="flex: 0 0 auto">
+      <div class="page-header-right">
         {% if request.user.is_root %}
-          <a href="{% url 'admin_user_create' %}" class="btn btn-primary" style="padding: 10px 14px">
-            <i class="bi bi-plus-circle"></i>
-            Add New User
+          <a href="{% url 'admin_user_create' %}" class="eal-btn eal-btn-primary">
+            <i class="bi bi-plus-lg"></i>
+            Invite New User
           </a>
         {% endif %}
       </div>
     </div>
+  </div>
 
-    <form method="get" action="{% url 'admin_user_list' %}" style="margin-top: 16px">
-      <div style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap">
-        <div style="flex: 1; min-width: 240px">
-          <label class="form-label">Search</label>
+  <div class="eal-table-card">
+    <div class="eal-toolbar">
+      <div class="eal-toolbar-left">
+        <span class="eal-result-badge">Total: <strong>{{ total_count }}</strong></span>
+      </div>
+    </div>
+
+    <form method="get" action="{% url 'admin_user_list' %}" class="eal-toolbar" style="margin-top: 8px">
+      <div class="eal-toolbar-left" style="width:100%;display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
+        <div class="eal-search" style="flex: 1; min-width: 240px">
+          <i class="bi bi-search"></i>
           <input
             type="text"
             name="q"
-            class="form-control"
+            class=""
             placeholder="Search by name or email"
             value="{{ search_query }}"
           />
         </div>
         <div style="width: 220px">
-          <label class="form-label">Status</label>
-          <select name="status" class="form-select">
+          <select name="status" class="form-select form-select-sm">
             <option value="All" {% if status_filter == 'All' %}selected{% endif %}>All</option>
             <option value="Pending_Activation" {% if status_filter == 'Pending_Activation' %}selected{% endif %}>
               Pending
@@ -45,8 +50,7 @@
           </select>
         </div>
         <div style="width: 220px">
-          <label class="form-label">Role</label>
-          <select name="role" class="form-select">
+          <select name="role" class="form-select form-select-sm">
             <option value="All" {% if role_filter == 'All' %}selected{% endif %}>All</option>
             {% for role in roles %}
               <option value="{{ role.pk }}" {% if role_filter == role.pk|stringformat:"s" %}selected{% endif %}>
@@ -55,10 +59,10 @@
             {% endfor %}
           </select>
         </div>
-        <div style="width: 160px">
-          <button type="submit" class="btn btn-primary" style="width: 100%">
+        <div style="width: 120px">
+          <button type="submit" class="eal-btn eal-btn-primary" style="width: 100%">
             <i class="bi bi-search"></i>
-            Search
+            Filter
           </button>
         </div>
       </div>
@@ -75,19 +79,18 @@
     {% endif %}
 
     {% if admin_users.object_list %}
-      <div style="overflow-x: auto; margin-top: 16px">
-        <table class="data-table">
+      <div class="eal-table-wrap" style="margin-top: 8px">
+        <table class="eal-table">
           <thead>
             <tr>
               <th style="width: 60px">#</th>
               <th>Name</th>
               <th>Email</th>
-              <th>Phone</th>
               <th>Role</th>
-              <th style="width: 140px">Status</th>
+              <th style="width: 140px">Status badge</th>
               <th style="width: 120px">2FA</th>
               <th style="width: 170px">Last Login</th>
-              <th style="width: 250px">Actions</th>
+              <th style="width: 260px">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -100,51 +103,50 @@
                       {{ u.first_name }} {{ u.last_name }}
                     </span>
                     {% if u.is_root %}
-                      <span class="status-badge warning">Root</span>
+                      <i class="bi bi-lock-fill text-warning" title="Root admin"></i>
                     {% endif %}
                   </div>
                 </td>
                 <td>{{ u.email }}</td>
-                <td>{{ u.phone_number|default:"-" }}</td>
                 <td>{{ u.role.role_name_en|default:"-" }}</td>
                 <td>
                   {% if u.status == 'Pending_Activation' %}
-                    <span class="status-badge pending">Pending</span>
+                    <span class="badge status-badge status-pending">Pending</span>
                   {% elif u.status == 'Active' %}
-                    <span class="status-badge active">Active</span>
+                    <span class="badge status-badge status-active">Active</span>
                   {% else %}
-                    <span class="status-badge disabled">Suspended</span>
+                    <span class="badge status-badge status-suspended">Suspended</span>
                   {% endif %}
                 </td>
                 <td>
                   {% if u.two_factor_enabled %}
-                    <span class="status-badge enabled">Enabled</span>
+                    <span class="badge status-badge status-issued">Enabled</span>
                   {% else %}
-                    <span class="status-badge warning">Disabled</span>
+                    <span class="badge status-badge status-inactive">Disabled</span>
                   {% endif %}
                 </td>
                 <td>{{ u.last_login_at|default:"-" }}</td>
                 <td>
-                  <div class="table-actions">
-                    <a href="{% url 'admin_user_detail' u.pk %}" class="btn" style="padding: 10px 14px">
-                      <i class="bi bi-eye"></i>
-                      View
-                    </a>
-                    <a href="{% url 'admin_user_edit' u.pk %}" class="btn" style="padding: 10px 14px">
+                  <div class="d-flex flex-wrap gap-2">
+                    <a href="{% url 'admin_user_edit' u.pk %}" class="eal-row-btn">
                       <i class="bi bi-pencil"></i>
                       Edit
                     </a>
+                    <button type="button" class="eal-row-btn" disabled title="Invite resend flow not available in current logic">
+                      <i class="bi bi-send"></i>
+                      Invite Resend
+                    </button>
 
                     {% if not u.is_root %}
                       <form method="post" action="{% url 'admin_user_toggle_status' u.pk %}">
                         {% csrf_token %}
                         {% if u.status == 'Suspended' %}
-                          <button type="submit" class="btn btn-primary" style="padding: 10px 14px">
+                          <button type="submit" class="eal-row-btn">
                             <i class="bi bi-check-circle"></i>
                             Activate
                           </button>
                         {% else %}
-                          <button type="submit" class="btn btn-primary" style="padding: 10px 14px">
+                          <button type="submit" class="eal-row-btn">
                             <i class="bi bi-slash-circle"></i>
                             Suspend
                           </button>
@@ -159,35 +161,35 @@
         </table>
       </div>
 
-      <div style="margin-top: 18px; display: flex; justify-content: center; gap: 12px; flex-wrap: wrap">
+      <div class="eal-pagination" style="margin-top: 18px">
+        <div class="eal-pagination-controls">
         {% if admin_users.has_previous %}
           <a
             href="?q={{ search_query|urlencode }}&status={{ status_filter }}&role={{ role_filter }}&page={{ admin_users.previous_page_number }}"
-            class="btn"
-            style="padding: 10px 14px; border-width: 1px"
+            class="eal-page-btn"
           >
             Previous
           </a>
         {% endif %}
-        <span style="align-self: center; color: var(--text-muted); font-weight: 600">
+        <span class="eal-page-btn active">
           Page {{ admin_users.number }} of {{ admin_users.paginator.num_pages }}
         </span>
         {% if admin_users.has_next %}
           <a
             href="?q={{ search_query|urlencode }}&status={{ status_filter }}&role={{ role_filter }}&page={{ admin_users.next_page_number }}"
-            class="btn"
-            style="padding: 10px 14px; border-width: 1px"
+            class="eal-page-btn"
           >
             Next
           </a>
         {% endif %}
       </div>
+      </div>
     {% else %}
-      <div class="table-empty-state" style="margin-top: 16px">
-        <div class="empty-icon">
+      <div class="notification-empty" style="margin-top: 16px">
+        <div class="notification-empty-icon">
           <i class="bi bi-collection"></i>
         </div>
-        <p class="empty-text">No admin users found.</p>
+        <p class="notification-empty-text">No admin users found.</p>
       </div>
     {% endif %}
   </div>

@@ -855,3 +855,61 @@
 ### Recent Activity Feed
 - Last 10 AuditLog entries
   Show: admin name, action_type, module_name, timestamp
+
+## Phase 12 — Unified UI Template System Rules
+
+### Golden Rules (NEVER violate)
+- NEVER change any Python view logic
+- NEVER change any URL pattern
+- NEVER change any model or form
+- NEVER remove any permission check (is_root, LoginRequired)
+- NEVER remove any feature (search, filter, toggle, delete)
+- NEVER change any Django template tag that calls a URL
+- NEVER change API structure or JSON responses
+- ONLY refactor the HTML/CSS structure to match unified templates
+- ALL business logic stays 100% identical
+
+### Unified List Page Rules
+- Every list template must follow Client-account.html structure
+- Must have: page toolbar (title + subtitle + action button)
+- Must have: search bar + filter dropdowns in one row
+- Must have: results count badge ("Showing X of Y")
+- Must have: data table with consistent column styling
+- Must have: status badge column (Active=green, Inactive=gray,
+  other statuses use correct colors per module)
+- Must have: actions column (Edit, Toggle, View as applicable)
+- Must have: delete confirmation modal (same structure always)
+- Must have: pagination block at bottom
+- Must have: empty state card when no results
+- Table header: sticky, slightly darker background
+- Table rows: hover highlight, alternating subtle background
+
+### Unified Create/Edit Page Rules
+- Every form template must follow Client-account-new.html structure
+- Must have: page toolbar with breadcrumb
+  (Module List > Create / Module List > Edit: Record Name)
+- Must have: form card with section headers for grouped fields
+- Must have: consistent label + input layout (label above input)
+- Must have: inline validation error display below each field
+- Must have: sticky footer action bar:
+    Left: Cancel button (links back to list)
+    Right: Save button (primary color)
+- Edit mode: show "last updated by + timestamp" info banner
+- Read-only fields: shown as disabled inputs with lock icon
+- Immutable fields (PKs on edit): shown with info alert at top
+
+### Delete Confirmation Modal Rules
+- Triggered by delete button click
+- Shows record name in modal body
+- Two buttons: Cancel (gray) + Confirm Delete (red)
+- On confirm: POST to delete URL
+- Error state: if delete blocked, show error in same modal
+
+### Consistency Rules
+- All page titles follow format: "Module Name" (no "Master" suffix in H1)
+- All subtitles: one-line description of what the page manages
+- All search inputs: same placeholder format "Search by name, code..."
+- All filter dropdowns: same size and alignment
+- All action buttons: same size, icons from Bootstrap Icons only
+- All status badges: pill shape, consistent padding
+- Empty states: always show relevant icon + message + CTA button

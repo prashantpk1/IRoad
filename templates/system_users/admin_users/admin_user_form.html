@@ -1,30 +1,40 @@
 {% extends 'base.html' %}
 
-{% block page_title %}{% if form.instance.pk %}Edit Admin User{% else %}Add Admin User{% endif %}{% endblock %}
+{% block page_title %}{% if form.instance.pk %}Edit Admin User{% else %}Invite New User{% endif %}{% endblock %}
 
 {% block content %}
-  <div class="content-card" style="background: #ffffff; padding: 20px 30px; border-radius: 12px">
-    <div class="setting-row" style="border-bottom: none; padding-top: 0; margin-bottom: 16px">
-      <div class="setting-row-info">
-        {% if form.instance.pk %}
-          <h2 class="page-title">Edit Admin User</h2>
-        {% else %}
-          <h2 class="page-title">Add Admin User</h2>
-        {% endif %}
-      </div>
-      <div class="setting-row-control" style="flex: 0 0 auto">
-        <a href="{% url 'admin_user_list' %}" class="btn" style="padding: 10px 14px; border-width: 1px">
-          <i class="bi bi-arrow-left"></i>
-          Cancel
-        </a>
+  <div class="page-header">
+    <nav class="page-breadcrumb">
+      <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'admin_user_list' %}">Admin Users</a></li>
+        <li class="breadcrumb-item active" aria-current="page">
+          {% if form.instance.pk %}Edit: {{ form.instance.first_name }} {{ form.instance.last_name }}{% else %}Invite New User{% endif %}
+        </li>
+      </ol>
+    </nav>
+    <div class="page-header-row">
+      <div class="page-header-left">
+        <h2 class="page-title">{% if form.instance.pk %}Edit Admin User{% else %}Invite New User{% endif %}</h2>
       </div>
     </div>
+  </div>
 
-    <div style="margin-bottom: 16px; padding: 12px 14px; border: 1px solid var(--border-light); border-radius: 10px; background: #f8fafc">
-      <p style="margin: 0; font-weight: 600; color: var(--text-dark)">
-        Password will be set by the user via invite email
-      </p>
-    </div>
+  {% if form.instance.pk and form.instance.updated_at %}
+  <div class="edit-info-bar">
+    <i class="bi bi-clock-history"></i>
+    Last updated
+    {% if form.instance.updated_by %}
+      by <strong>{{ form.instance.updated_by.first_name }} {{ form.instance.updated_by.last_name }}</strong>
+    {% endif %}
+    at <strong>{{ form.instance.updated_at|date:"d M Y, H:i" }}</strong>
+  </div>
+  {% endif %}
+
+  <div class="form-card">
+    <div class="form-card-body">
+      <div class="alert alert-info mb-3">
+        Password is not set here. User will set password via invite flow.
+      </div>
 
     {% if messages %}
       <div style="margin-bottom: 16px">
@@ -45,6 +55,7 @@
         </div>
       {% endif %}
 
+      <h6 class="mb-2">Section 1: Personal Details</h6>
       <div style="margin-bottom: 16px">
         <label class="form-label">First Name</label>
         {{ form.first_name }}
@@ -77,6 +88,7 @@
         {% endfor %}
       </div>
 
+      <h6 class="mb-2">Section 2: Role &amp; Access</h6>
       <div style="margin-bottom: 16px">
         <label class="form-label">Role</label>
         {{ form.role }}
@@ -93,13 +105,12 @@
         {% endfor %}
       </div>
 
-      <div class="submit-section">
-        <button type="submit" class="btn btn-primary">
-          <i class="bi bi-save"></i>
-          Save
-        </button>
+      <div class="form-actions-bar">
+        <a href="{% url 'admin_user_list' %}" class="btn btn-light border">Cancel</a>
+        <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Save</button>
       </div>
     </form>
+    </div>
   </div>
 {% endblock %}
 

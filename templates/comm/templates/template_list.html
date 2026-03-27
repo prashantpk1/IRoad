@@ -3,47 +3,59 @@
 {% block page_title %}Notification Templates{% endblock %}
 
 {% block content %}
-  <div class="content-card" style="background: #ffffff; padding: 20px 30px; border-radius: 12px">
-    <div class="setting-row" style="border-bottom: none; padding-top: 0">
-      <div class="setting-row-info"><h2 class="page-title">Notification Templates</h2></div>
-      <div class="setting-row-control" style="flex: 0 0 auto">
+  <div class="page-header">
+    <div class="page-header-row">
+      <div class="page-header-left">
+        <h1 class="page-title">Notification Templates</h1>
+      </div>
+      <div class="page-header-right">
         {% if request.user.is_root %}
-          <a href="{% url 'notif_template_create' %}" class="btn btn-primary" style="padding: 10px 14px">
-            <i class="bi bi-plus-circle"></i> Add Template
+          <a href="{% url 'notif_template_create' %}" class="eal-btn eal-btn-primary">
+            <i class="bi bi-plus-lg"></i>
+            <span>Add Template</span>
           </a>
         {% endif %}
       </div>
     </div>
+  </div>
 
-    <form method="get" action="{% url 'notif_template_list' %}" style="margin-top: 16px">
-      <div style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap">
-        <div style="flex: 1; min-width: 240px"><label class="form-label">Search</label><input type="text" name="q" class="form-control" value="{{ search_query }}" placeholder="Template name" /></div>
-        <div style="width: 180px"><label class="form-label">Channel</label><select name="channel" class="form-select"><option value="All" {% if channel_filter == 'All' %}selected{% endif %}>All</option><option value="Email" {% if channel_filter == 'Email' %}selected{% endif %}>Email</option><option value="SMS" {% if channel_filter == 'SMS' %}selected{% endif %}>SMS</option></select></div>
-        <div style="width: 200px"><label class="form-label">Category</label><select name="category" class="form-select"><option value="All" {% if category_filter == 'All' %}selected{% endif %}>All</option><option value="Transactional" {% if category_filter == 'Transactional' %}selected{% endif %}>Transactional</option><option value="Promotional" {% if category_filter == 'Promotional' %}selected{% endif %}>Promotional</option></select></div>
-        <div style="width: 180px"><label class="form-label">Status</label><select name="status" class="form-select"><option value="All" {% if status_filter == 'All' %}selected{% endif %}>All</option><option value="Active" {% if status_filter == 'Active' %}selected{% endif %}>Active</option><option value="Inactive" {% if status_filter == 'Inactive' %}selected{% endif %}>Inactive</option></select></div>
-        <div style="width: 120px"><button type="submit" class="btn btn-primary" style="width: 100%">Filter</button></div>
+  <div class="eal-table-card">
+    <form method="get" action="{% url 'notif_template_list' %}">
+      <div class="eal-toolbar">
+        <div class="eal-toolbar-left" style="width: 100%; gap: 12px; display:flex; flex-wrap:wrap; align-items:end;">
+          <div class="eal-search" style="flex: 1; min-width: 240px;">
+            <i class="bi bi-search"></i>
+            <input type="text" name="q" value="{{ search_query }}" placeholder="Template name" />
+          </div>
+          <div style="width: 180px"><label class="form-label">Channel</label><select name="channel" class="form-select form-select-sm"><option value="All" {% if channel_filter == 'All' %}selected{% endif %}>All</option><option value="Email" {% if channel_filter == 'Email' %}selected{% endif %}>Email</option><option value="SMS" {% if channel_filter == 'SMS' %}selected{% endif %}>SMS</option></select></div>
+          <div style="width: 200px"><label class="form-label">Category</label><select name="category" class="form-select form-select-sm"><option value="All" {% if category_filter == 'All' %}selected{% endif %}>All</option><option value="Transactional" {% if category_filter == 'Transactional' %}selected{% endif %}>Transactional</option><option value="Promotional" {% if category_filter == 'Promotional' %}selected{% endif %}>Promotional</option></select></div>
+          <div style="width: 180px"><label class="form-label">Status</label><select name="status" class="form-select form-select-sm"><option value="All" {% if status_filter == 'All' %}selected{% endif %}>All</option><option value="Active" {% if status_filter == 'Active' %}selected{% endif %}>Active</option><option value="Inactive" {% if status_filter == 'Inactive' %}selected{% endif %}>Inactive</option></select></div>
+          <button type="submit" class="eal-btn eal-btn-primary"><i class="bi bi-funnel"></i><span>Filter</span></button>
+        </div>
       </div>
     </form>
 
     {% if templates_page.object_list %}
-      <div style="overflow-x: auto; margin-top: 16px">
-        <table class="data-table">
-          <thead><tr><th>#</th><th>Template Name</th><th>Channel</th><th>Category</th><th>Subject (EN)</th><th>Status</th><th>Actions</th></tr></thead>
+      <div class="eal-table-wrap">
+        <table class="eal-table">
+          <thead><tr><th>#</th><th>Name</th><th>Channel badge</th><th>Category badge</th><th>Subject EN</th><th>Status</th><th>Actions</th></tr></thead>
           <tbody>
             {% for t in templates_page.object_list %}
               <tr>
                 <td>{{ forloop.counter0|add:templates_page.start_index }}</td>
                 <td>{{ t.template_name }}</td>
-                <td>{% if t.channel_type == 'Email' %}<span class="status-badge" style="background: #dbeafe; color: #1e40af">Email</span>{% else %}<span class="status-badge" style="background: #dcfce7; color: #166534">SMS</span>{% endif %}</td>
-                <td>{% if t.category == 'Transactional' %}<span class="status-badge" style="background: #fee2e2; color: #991b1b">Transactional</span>{% else %}<span class="status-badge" style="background: #f3e8ff; color: #6b21a8">Promotional</span>{% endif %}</td>
+                <td>{% if t.channel_type == 'Email' %}<span class="badge status-badge status-issued">Email</span>{% else %}<span class="badge status-badge status-active">SMS</span>{% endif %}</td>
+                <td>{% if t.category == 'Transactional' %}<span class="badge status-badge status-suspended">Transactional</span>{% else %}<span class="badge status-badge status-scheduled">Promotional</span>{% endif %}</td>
                 <td>{{ t.subject_en|default:'-' }}</td>
-                <td>{% if t.is_active %}<span class="status-badge active">Active</span>{% else %}<span class="status-badge warning">Inactive</span>{% endif %}</td>
+                <td>{% if t.is_active %}<span class="badge status-badge status-active">Active</span>{% else %}<span class="badge status-badge status-inactive">Inactive</span>{% endif %}</td>
                 <td>
                   {% if request.user.is_root %}
-                    <a href="{% url 'notif_template_edit' t.template_id %}" class="btn" style="padding: 8px 12px; border-width: 1px">Edit</a>
-                    <form method="post" action="{% url 'notif_template_toggle' t.template_id %}" style="display:inline">{% csrf_token %}
-                      <button type="submit" class="btn btn-primary" style="padding: 8px 12px">{% if t.is_active %}Deactivate{% else %}Activate{% endif %}</button>
-                    </form>
+                    <div class="eal-actions-cell">
+                      <a href="{% url 'notif_template_edit' t.template_id %}" class="eal-row-btn"><i class="bi bi-pencil"></i></a>
+                      <form method="post" action="{% url 'notif_template_toggle' t.template_id %}" style="display:inline">{% csrf_token %}
+                        <button type="submit" class="eal-row-btn"><i class="bi bi-arrow-repeat"></i></button>
+                      </form>
+                    </div>
                   {% endif %}
                 </td>
               </tr>
@@ -52,7 +64,8 @@
         </table>
       </div>
     {% else %}
-      <div class="table-empty-state" style="margin-top: 16px"><p class="empty-text">No templates found.</p></div>
+      <div class="notification-empty"><h4 class="empty-title">No templates found.</h4></div>
     {% endif %}
   </div>
 {% endblock %}
+

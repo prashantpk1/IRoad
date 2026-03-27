@@ -3,87 +3,100 @@
 {% block page_title %}Global System Rules{% endblock %}
 
 {% block content %}
-  <div class="content-card" style="background: #ffffff; padding: 20px 30px; border-radius: 12px">
-    <div class="setting-row" style="border-bottom: none; padding-top: 0; margin-bottom: 16px">
-      <div class="setting-row-info">
-        <h2 class="page-title">Global System Rules</h2>
+  <div class="page-header">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb">
+        <li class="breadcrumb-item">System Config</li>
+        <li class="breadcrumb-item active" aria-current="page">Global System Rules</li>
+      </ol>
+    </nav>
+    <div class="page-header-row">
+      <div class="page-header-left">
+        <h1 class="page-title">Global System Rules</h1>
+        <p class="page-subtitle">Control platform-wide billing and date behavior</p>
       </div>
     </div>
+  </div>
 
-    <div style="margin-bottom: 16px; padding: 12px 14px; border-radius: 10px; background: #eff6ff; border: 1px solid #dbeafe">
-      <p style="margin: 0; font-weight: 700; color: #1e3a8a">
-        These settings govern billing cycles and subscription expiry calculations.
-      </p>
+  <div style="margin-bottom: 16px; padding: 12px 14px; border-radius: 10px; background: #eff6ff; border: 1px solid #dbeafe">
+    <p style="margin: 0; font-weight: 700; color: #1e3a8a">
+      These settings govern billing cycles and subscription expiry calculations.
+    </p>
+  </div>
+
+  {% if messages %}
+    <div style="margin-bottom: 16px">
+      {% for message in messages %}
+        <p style="margin: 0; color: {% if message.tags == 'error' %}#b91c1c{% else %}#15803d{% endif %}; font-weight: 600">
+          {{ message }}
+        </p>
+      {% endfor %}
     </div>
+  {% endif %}
 
-    {% if messages %}
-      <div style="margin-bottom: 16px">
-        {% for message in messages %}
-          <p style="margin: 0; color: {% if message.tags == 'error' %}#b91c1c{% else %}#15803d{% endif %}; font-weight: 600">
-            {{ message }}
-          </p>
-        {% endfor %}
+  <form method="post" action="">
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+      <div style="margin-bottom: 16px; color: #b91c1c; font-weight: 600">
+        {{ form.non_field_errors }}
       </div>
     {% endif %}
 
-    <form method="post" action="">
-      {% csrf_token %}
-
-      {% if form.non_field_errors %}
-        <div style="margin-bottom: 16px; color: #b91c1c; font-weight: 600">
-          {{ form.non_field_errors }}
+    <div class="form-card">
+      <div class="form-card-body">
+        <div class="field-group">
+          <div class="fields-grid cols-2">
+            <div class="field">
+              <label class="form-label">System Timezone</label>
+              {{ form.system_timezone }}
+              {% for error in form.system_timezone.errors %}
+                <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+              {% endfor %}
+            </div>
+            <div class="field">
+              <label class="form-label">Default Date Format</label>
+              {{ form.default_date_format }}
+              {% for error in form.default_date_format.errors %}
+                <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+              {% endfor %}
+            </div>
+            <div class="field">
+              <label class="form-label">Grace Period Days</label>
+              {{ form.grace_period_days }}
+              {% for error in form.grace_period_days.errors %}
+                <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+              {% endfor %}
+            </div>
+            <div class="field">
+              <label class="form-label">Standard Billing Cycle</label>
+              {{ form.standard_billing_cycle }}
+              {% for error in form.standard_billing_cycle.errors %}
+                <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+              {% endfor %}
+            </div>
+          </div>
         </div>
-      {% endif %}
-
-      <div style="margin-bottom: 16px">
-        <label class="form-label">System Timezone</label>
-        {{ form.system_timezone }}
-        {% for error in form.system_timezone.errors %}
-          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-        {% endfor %}
       </div>
+    </div>
 
-      <div style="margin-bottom: 16px">
-        <label class="form-label">Default Date Format</label>
-        {{ form.default_date_format }}
-        {% for error in form.default_date_format.errors %}
-          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-        {% endfor %}
-      </div>
-
-      <div style="margin-bottom: 16px">
-        <label class="form-label">Grace Period Days</label>
-        {{ form.grace_period_days }}
-        {% for error in form.grace_period_days.errors %}
-          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-        {% endfor %}
-      </div>
-
-      <div style="margin-bottom: 16px">
-        <label class="form-label">Standard Billing Cycle</label>
-        {{ form.standard_billing_cycle }}
-        {% for error in form.standard_billing_cycle.errors %}
-          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-        {% endfor %}
-      </div>
-
-      <div class="submit-section">
+    <div class="form-actions-bar sticky-bottom">
+      <div class="form-actions-left"></div>
+      <div class="form-actions-right">
         <button type="submit" class="btn btn-primary">
           <i class="bi bi-save"></i>
           Save
         </button>
       </div>
-    </form>
-
-    <div style="margin-top: 14px; color: #64748b; font-weight: 600">
-      Last updated:
-      {% if obj.updated_by %}
-        {{ obj.updated_by.email }}
-      {% else %}
-        Unknown
-      {% endif %}
-      on {{ obj.updated_at }}
     </div>
+  </form>
+
+  <div style="margin-top: 14px; color: #64748b; font-weight: 600">
+    Last updated by:
+    {% if obj.updated_by %}
+      {{ obj.updated_by.email }}
+    {% else %}
+      Unknown
+    {% endif %}
+    at {{ obj.updated_at }}
   </div>
 {% endblock %}
-

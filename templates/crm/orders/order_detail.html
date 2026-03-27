@@ -10,14 +10,19 @@
   {% endfor %}
 {% endif %}
 
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <h4 class="mb-0">Order Details</h4>
-  <a href="{% url 'order_list' %}" class="btn btn-outline-secondary btn-sm">Back to list</a>
+<div class="page-header">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{% url 'order_list' %}">Orders</a></li>
+      <li class="breadcrumb-item active" aria-current="page">Order {{ order.order_id|stringformat:"s"|slice:":8" }}</li>
+    </ol>
+  </nav>
+  <div class="page-header-row"><div class="page-header-left"><h1 class="page-title">Order Details</h1></div><div class="page-header-right"><a href="{% url 'order_list' %}" class="btn btn-outline-secondary btn-sm">Back to list</a></div></div>
 </div>
 
-<div class="card mb-3">
-  <div class="card-header">Order header</div>
-  <div class="card-body row g-2 small">
+<div class="form-card mb-3">
+  <div class="form-card-header">Order header</div>
+  <div class="form-card-body row g-2 small">
     <div class="col-md-4"><strong>Tenant</strong><br>{{ order.tenant.company_name }}</div>
     <div class="col-md-4"><strong>Classification</strong><br>{{ order.get_order_classification_display }}</div>
     <div class="col-md-4"><strong>Status</strong><br>{{ order.get_order_status_display }}</div>
@@ -31,53 +36,32 @@
 </div>
 
 {% if order.plan_lines.exists %}
-<div class="card mb-3">
-  <div class="card-header">Plan line</div>
+<div class="form-card mb-3">
+  <div class="form-card-header">Plan line</div>
   <div class="table-responsive">
     <table class="table mb-0">
       <thead><tr><th>Plan</th><th>Cycles</th><th>Plan price</th><th>Pro-rata adj.</th><th>Line total</th></tr></thead>
-      <tbody>
-        {% for pl in order.plan_lines.all %}
-          <tr>
-            <td>{{ pl.plan.plan_name_en }}</td>
-            <td>{{ pl.number_of_cycles }}</td>
-            <td>{{ pl.plan_price|floatformat:2 }}</td>
-            <td>{{ pl.pro_rata_adjustment|floatformat:2 }}</td>
-            <td>{{ pl.line_total|floatformat:2 }}</td>
-          </tr>
-        {% endfor %}
-      </tbody>
+      <tbody>{% for pl in order.plan_lines.all %}<tr><td>{{ pl.plan.plan_name_en }}</td><td>{{ pl.number_of_cycles }}</td><td>{{ pl.plan_price|floatformat:2 }}</td><td>{{ pl.pro_rata_adjustment|floatformat:2 }}</td><td>{{ pl.line_total|floatformat:2 }}</td></tr>{% endfor %}</tbody>
     </table>
   </div>
 </div>
 {% endif %}
 
 {% if order.addon_lines.exists %}
-<div class="card mb-3">
-  <div class="card-header">Add-on lines</div>
+<div class="form-card mb-3">
+  <div class="form-card-header">Add-on lines</div>
   <div class="table-responsive">
     <table class="table mb-0">
       <thead><tr><th>Action</th><th>Type</th><th>Qty</th><th>Cycles (frac)</th><th>Unit price</th><th>Line total</th></tr></thead>
-      <tbody>
-        {% for al in order.addon_lines.all %}
-          <tr>
-            <td>{{ al.get_action_type_display }}</td>
-            <td>{{ al.get_add_on_type_display }}</td>
-            <td>{{ al.quantity }}</td>
-            <td>{{ al.number_of_cycles|floatformat:2 }}</td>
-            <td>{{ al.unit_price|floatformat:2 }}</td>
-            <td>{{ al.line_total|floatformat:2 }}</td>
-          </tr>
-        {% endfor %}
-      </tbody>
+      <tbody>{% for al in order.addon_lines.all %}<tr><td>{{ al.get_action_type_display }}</td><td>{{ al.get_add_on_type_display }}</td><td>{{ al.quantity }}</td><td>{{ al.number_of_cycles|floatformat:2 }}</td><td>{{ al.unit_price|floatformat:2 }}</td><td>{{ al.line_total|floatformat:2 }}</td></tr>{% endfor %}</tbody>
     </table>
   </div>
 </div>
 {% endif %}
 
-<div class="card mb-3">
-  <div class="card-header">Totals</div>
-  <div class="card-body row g-2 small">
+<div class="form-card mb-3">
+  <div class="form-card-header">Totals</div>
+  <div class="form-card-body row g-2 small">
     <div class="col-6"><strong>Sub total</strong></div><div class="col-6 text-end">{{ order.sub_total|floatformat:2 }} {{ order.currency_id }}</div>
     <div class="col-6"><strong>Discount</strong></div><div class="col-6 text-end">{{ order.discount_amount|floatformat:2 }}</div>
     <div class="col-6"><strong>Tax</strong></div><div class="col-6 text-end">{{ order.tax_amount|floatformat:2 }}</div>
@@ -87,9 +71,9 @@
   </div>
 </div>
 
-<div class="card mb-3">
-  <div class="card-header">Projected state (after payment)</div>
-  <div class="card-body row g-2 small">
+<div class="form-card mb-3">
+  <div class="form-card-header">Projected state (after payment)</div>
+  <div class="form-card-body row g-2 small">
     <div class="col-md-4"><strong>Plan</strong><br>{{ order.projected_plan.plan_name_en|default:'—' }}</div>
     <div class="col-md-4"><strong>Expiry</strong><br>{{ order.projected_expiry_date|default:'—' }}</div>
     <div class="col-md-4"><strong>Max users</strong><br>{{ order.projected_max_users|default:'—' }}</div>
@@ -135,3 +119,4 @@
   {% endif %}
 {% endif %}
 {% endblock %}
+

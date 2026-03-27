@@ -3,85 +3,100 @@
 {% block page_title %}General Tax Settings{% endblock %}
 
 {% block content %}
-  <div class="content-card" style="background: #ffffff; padding: 20px 30px; border-radius: 12px">
-    <div class="setting-row" style="border-bottom: none; padding-top: 0; margin-bottom: 16px">
-      <div class="setting-row-info">
-        <h2 class="page-title">General Tax Settings</h2>
+  <div class="page-header">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb">
+        <li class="breadcrumb-item">System Config</li>
+        <li class="breadcrumb-item active" aria-current="page">General Tax Settings</li>
+      </ol>
+    </nav>
+    <div class="page-header-row">
+      <div class="page-header-left">
+        <h1 class="page-title">General Tax Settings</h1>
+        <p class="page-subtitle">Configure tax inclusion and geo-verification behavior</p>
       </div>
     </div>
+  </div>
 
-    {% if messages %}
-      <div style="margin-bottom: 16px">
-        {% for message in messages %}
-          <p style="margin: 0; color: {% if message.tags == 'error' %}#b91c1c{% else %}#15803d{% endif %}; font-weight: 600">
-            {{ message }}
-          </p>
-        {% endfor %}
+  {% if messages %}
+    <div style="margin-bottom: 16px">
+      {% for message in messages %}
+        <p style="margin: 0; color: {% if message.tags == 'error' %}#b91c1c{% else %}#15803d{% endif %}; font-weight: 600">
+          {{ message }}
+        </p>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <form method="post" action="">
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+      <div style="margin-bottom: 16px; color: #b91c1c; font-weight: 600">
+        {{ form.non_field_errors }}
       </div>
     {% endif %}
 
-    <form method="post" action="">
-      {% csrf_token %}
-
-      {% if form.non_field_errors %}
-        <div style="margin-bottom: 16px; color: #b91c1c; font-weight: 600">
-          {{ form.non_field_errors }}
-        </div>
-      {% endif %}
-
-      <div style="margin-bottom: 16px">
-        <label class="form-label">Prices Include Tax</label>
-        <div style="display: flex; align-items: center; gap: 10px">
-          {{ form.prices_include_tax }}
-        </div>
-        {% for error in form.prices_include_tax.errors %}
-          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-        {% endfor %}
-      </div>
-
-      <div style="margin-bottom: 16px">
-        <label class="form-label">Location Verification</label>
-        {{ form.location_verification }}
-        {% for error in form.location_verification.errors %}
-          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-        {% endfor %}
-      </div>
-
-      <div style="margin-bottom: 16px; padding: 12px 14px; border-radius: 10px; background: #f8fafc; border:1px solid #e5e7eb">
-        <p style="margin: 0 0 10px 0; font-weight: 700; color: #0f172a">What each option means</p>
-        <div style="display: grid; gap: 10px">
-          <div>
-            <p style="margin: 0; font-weight: 700; color: #0f172a">Profile Only</p>
-            <p style="margin: 4px 0 0 0; color: #475569">Use the tenant/customer profile country for tax determination.</p>
+    <div class="form-card">
+      <div class="form-card-body">
+        <div class="field-group">
+          <div class="fields-grid cols-2">
+            <div class="field">
+              <label class="form-label">Prices Include Tax</label>
+              <div style="display: flex; align-items: center; gap: 10px">
+                {{ form.prices_include_tax }}
+              </div>
+              {% for error in form.prices_include_tax.errors %}
+                <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+              {% endfor %}
+            </div>
+            <div class="field">
+              <label class="form-label">Location Verification</label>
+              {{ form.location_verification }}
+              {% for error in form.location_verification.errors %}
+                <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+              {% endfor %}
+            </div>
           </div>
-          <div>
-            <p style="margin: 0; font-weight: 700; color: #0f172a">Audit Only</p>
-            <p style="margin: 4px 0 0 0; color: #475569">Use audit/location verification data for tax determination.</p>
-          </div>
-          <div>
-            <p style="margin: 0; font-weight: 700; color: #0f172a">Enforce Profile Match</p>
-            <p style="margin: 4px 0 0 0; color: #475569">Require profile and verification data to match before applying country-specific tax.</p>
+        </div>
+
+        <div style="margin-top: 16px; margin-bottom: 8px; padding: 12px 14px; border-radius: 10px; background: #f8fafc; border:1px solid #e5e7eb">
+          <p style="margin: 0 0 10px 0; font-weight: 700; color: #0f172a">What each option means</p>
+          <div style="display: grid; gap: 10px">
+            <div>
+              <p style="margin: 0; font-weight: 700; color: #0f172a">Profile Only</p>
+              <p style="margin: 4px 0 0 0; color: #475569">Use the tenant/customer profile country for tax determination.</p>
+            </div>
+            <div>
+              <p style="margin: 0; font-weight: 700; color: #0f172a">Audit Only</p>
+              <p style="margin: 4px 0 0 0; color: #475569">Use audit/location verification data for tax determination.</p>
+            </div>
+            <div>
+              <p style="margin: 0; font-weight: 700; color: #0f172a">Enforce Profile Match</p>
+              <p style="margin: 4px 0 0 0; color: #475569">Require profile and verification data to match before applying country-specific tax.</p>
+            </div>
           </div>
         </div>
       </div>
+    </div>
 
-      <div class="submit-section">
+    <div class="form-actions-bar sticky-bottom">
+      <div class="form-actions-left"></div>
+      <div class="form-actions-right">
         <button type="submit" class="btn btn-primary">
           <i class="bi bi-save"></i>
           Save
         </button>
       </div>
-    </form>
-
-    <div style="margin-top: 14px; color: #64748b; font-weight: 600">
-      Last updated:
-      {% if obj.updated_by %}
-        {{ obj.updated_by.email }}
-      {% else %}
-        Unknown
-      {% endif %}
-      on {{ obj.updated_at }}
     </div>
+  </form>
+
+  <div style="margin-top: 14px; color: #64748b; font-weight: 600">
+    Last updated by:
+    {% if obj.updated_by %}
+      {{ obj.updated_by.email }}
+    {% else %}
+      Unknown
+    {% endif %}
+    at {{ obj.updated_at }}
   </div>
 {% endblock %}
-

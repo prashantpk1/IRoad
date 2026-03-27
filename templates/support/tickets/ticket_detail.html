@@ -2,35 +2,42 @@
 {% block title %}{{ ticket.ticket_no }} - {{ ticket.subject }}{% endblock %}
 {% block content %}
 <div class="container-fluid py-3">
-  <h1 class="h4 mb-3">{{ ticket.ticket_no }} - {{ ticket.subject }}</h1>
+  <div class="page-header">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'ticket_list' %}">Support Inbox</a></li>
+        <li class="breadcrumb-item active" aria-current="page">{{ ticket.ticket_no }}</li>
+      </ol>
+    </nav>
+    <div class="page-header-row"><div class="page-header-left"><h1 class="page-title">{{ ticket.ticket_no }} - {{ ticket.subject }}</h1></div></div>
+  </div>
+
   <div class="row g-3">
     <div class="col-lg-8">
-      <div class="card mb-3">
-        <div class="card-header">Ticket Info</div>
-        <div class="card-body">
+      <div class="form-card mb-3">
+        <div class="form-card-header">Ticket Info</div>
+        <div class="form-card-body">
           <div class="row g-2">
             <div class="col-md-6"><strong>Ticket No:</strong> {{ ticket.ticket_no }}</div>
             <div class="col-md-6"><strong>Tenant:</strong> {{ ticket.tenant.company_name }}</div>
             <div class="col-md-6"><strong>Category:</strong> {{ ticket.category.name_en }}</div>
             <div class="col-md-6"><strong>Priority:</strong> {{ ticket.priority }}</div>
             <div class="col-md-6"><strong>Status:</strong> {{ ticket.get_status_display }}</div>
-            <div class="col-md-6">
-              <strong>Assigned To:</strong>
-              {% if ticket.assigned_to %}{{ ticket.assigned_to.first_name }} {{ ticket.assigned_to.last_name }}{% else %}<span class="text-muted">Unassigned</span>{% endif %}
-            </div>
+            <div class="col-md-6"><strong>Assigned To:</strong> {% if ticket.assigned_to %}{{ ticket.assigned_to.first_name }} {{ ticket.assigned_to.last_name }}{% else %}<span class="text-muted">Unassigned</span>{% endif %}</div>
             <div class="col-md-6"><strong>Created At:</strong> {{ ticket.created_at|date:"Y-m-d H:i" }}</div>
           </div>
         </div>
       </div>
 
-      <div class="card mb-3">
-        <div class="card-header">Ticket Thread</div>
-        <div class="card-body">
+      <div class="form-card mb-3">
+        <div class="form-card-header">Ticket Thread</div>
+        <div class="form-card-body">
           {% for reply in replies %}
-            <div class="border rounded p-3 mb-3 {% if reply.is_internal %}bg-warning-subtle border-warning{% endif %}">
+            <div class="border rounded p-3 mb-3 {% if reply.is_internal %}bg-warning-subtle border-warning{% elif reply.sender_type == 'System_Bot' %}bg-light{% else %}bg-white{% endif %}">
               <div class="d-flex flex-wrap gap-2 justify-content-between">
                 <div>
-                  <span class="badge {% if reply.sender_type == 'Admin_Support' %}bg-primary{% elif reply.sender_type == 'System_Bot' %}bg-dark{% else %}bg-secondary{% endif %}">
+                  <span class="badge {% if reply.sender_type == 'Admin_Support' %}bg-primary{% elif reply.sender_type == 'System_Bot' %}bg-secondary{% else %}bg-dark{% endif %}">
+                    {% if reply.sender_type == 'System_Bot' %}<i class="bi bi-robot"></i>{% endif %}
                     {{ reply.get_sender_type_display }}
                   </span>
                   {% if reply.is_internal %}
@@ -51,9 +58,9 @@
         </div>
       </div>
 
-      <div class="card">
-        <div class="card-header">Reply</div>
-        <div class="card-body">
+      <div class="form-card">
+        <div class="form-card-header">Reply</div>
+        <div class="form-card-body">
           <div class="row g-2 mb-3">
             <div class="col-md-10">
               <label class="form-label">Insert Canned Response</label>
@@ -95,9 +102,9 @@
     </div>
 
     <div class="col-lg-4">
-      <div class="card">
-        <div class="card-header">Quick Actions</div>
-        <div class="card-body">
+      <div class="form-card">
+        <div class="form-card-header">Quick Actions</div>
+        <div class="form-card-body">
           <form method="post" action="{% url 'ticket_assign' ticket.pk %}" class="mb-3">
             {% csrf_token %}
             <label class="form-label">Assign To</label>
@@ -147,3 +154,4 @@
   })();
 </script>
 {% endblock %}
+

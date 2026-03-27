@@ -3,119 +3,159 @@
 {% block page_title %}{% if is_edit %}Edit Payment Method{% else %}Add Payment Method{% endif %}{% endblock %}
 
 {% block content %}
-  <div class="content-card" style="background: #ffffff; padding: 20px 30px; border-radius: 12px">
-    <div class="setting-row" style="border-bottom: none; padding-top: 0; margin-bottom: 16px">
-      <div class="setting-row-info">
-        <h2 class="page-title">{% if is_edit %}Edit Payment Method{% else %}Add Payment Method{% endif %}</h2>
+  <div class="page-header">
+    <nav class="page-breadcrumb">
+      <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'payment_method_list' %}">Payment Methods</a></li>
+        {% if is_edit and method %}
+          <li class="breadcrumb-item active" aria-current="page">Edit: {{ method.method_name_en }}</li>
+        {% else %}
+          <li class="breadcrumb-item active" aria-current="page">Add Method</li>
+        {% endif %}
+      </ol>
+    </nav>
+
+    <div class="page-header-row">
+      <div class="page-header-left">
+        <h1 class="page-title">{% if is_edit %}Edit Payment Method{% else %}Add Payment Method{% endif %}</h1>
+      </div>
+      <div class="page-header-right">
+        <a href="{% url 'payment_method_list' %}" class="eal-btn">
+          <i class="bi bi-arrow-left"></i>
+          <span>Cancel</span>
+        </a>
       </div>
     </div>
+  </div>
 
-    {% if form.non_field_errors %}
-      <div style="margin-bottom: 16px; color: #b91c1c; font-weight: 600">
-        {{ form.non_field_errors }}
-      </div>
+  {% if is_edit and method and method.updated_at %}
+  <div class="edit-info-bar">
+    <i class="bi bi-clock-history"></i>
+    Last updated
+    {% if method.updated_by %}
+      by <strong>{{ method.updated_by.first_name }} {{ method.updated_by.last_name }}</strong>
     {% endif %}
+    at <strong>{{ method.updated_at|date:"d M Y, H:i" }}</strong>
+  </div>
+  {% endif %}
 
-    <form method="post" action="" enctype="multipart/form-data">
-      {% csrf_token %}
-
-      <div style="margin-bottom: 16px">
-        <label class="form-label">Method Name (EN)</label>
-        {{ form.method_name_en }}
-        {% for error in form.method_name_en.errors %}
-          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-        {% endfor %}
-      </div>
-
-      <div style="margin-bottom: 16px">
-        <label class="form-label">Method Name (AR)</label>
-        {{ form.method_name_ar }}
-        {% for error in form.method_name_ar.errors %}
-          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-        {% endfor %}
-      </div>
-
-      <div style="margin-bottom: 16px">
-        <label class="form-label">Method Type</label>
-        {{ form.method_type }}
-        {% for error in form.method_type.errors %}
-          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-        {% endfor %}
-      </div>
-
-      <div id="gateway-wrapper" style="margin-bottom: 16px">
-        <label class="form-label">Gateway</label>
-        {{ form.gateway }}
-        {% for error in form.gateway.errors %}
-          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-        {% endfor %}
-      </div>
-
-      <div id="bank-wrapper" style="margin-bottom: 16px">
-        <label class="form-label">Dedicated Bank Account</label>
-        {{ form.dedicated_bank_account }}
-        {% for error in form.dedicated_bank_account.errors %}
-          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-        {% endfor %}
-      </div>
-
-      <div style="margin-bottom: 16px">
-        <label class="form-label">Supported Currencies</label>
-        {{ form.supported_currencies }}
-        <div style="margin-top: 6px; color: #6b7280; font-size: 13px">
-          Enter as JSON array: ["SAR", "USD", "AED"]
-        </div>
-        {% for error in form.supported_currencies.errors %}
-          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-        {% endfor %}
-      </div>
-
-      <div style="margin-bottom: 16px">
-        <label class="form-label">Logo</label>
-        {{ form.logo }}
-        {% for error in form.logo.errors %}
-          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-        {% endfor %}
-      </div>
-
-      {% if is_edit and method and method.logo %}
-        <div style="margin-bottom: 16px">
-          <label class="form-label">Current Logo</label>
-          <div>
-            <img src="{{ method.logo.url }}" alt="Current Logo" style="height: 70px; width: 70px; object-fit: cover; border-radius: 8px; border: 1px solid #e5e7eb" />
-          </div>
+  <div class="form-card">
+    <div class="form-card-body">
+      {% if form.non_field_errors %}
+        <div style="margin-bottom: 16px; color: #b91c1c; font-weight: 600">
+          {{ form.non_field_errors }}
         </div>
       {% endif %}
 
-      <div style="margin-bottom: 16px">
-        <label class="form-label">Display Order</label>
-        {{ form.display_order }}
-        {% for error in form.display_order.errors %}
-          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-        {% endfor %}
-      </div>
+      <h3 style="margin: 0 0 12px 0">Method Details</h3>
 
-      <div style="margin-bottom: 16px">
-        <label class="form-label">Status</label>
-        <div style="display: flex; align-items: center; gap: 10px">
-          {{ form.is_active }}
+      <form method="post" action="" enctype="multipart/form-data">
+        {% csrf_token %}
+
+        <div style="margin-bottom: 16px">
+          <label class="form-label">Method Name (EN)</label>
+          {{ form.method_name_en }}
+          {% for error in form.method_name_en.errors %}
+            <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+          {% endfor %}
         </div>
-        {% for error in form.is_active.errors %}
-          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-        {% endfor %}
-      </div>
 
-      <div style="display: flex; gap: 10px; align-items: center">
-        <a href="{% url 'payment_method_list' %}" class="btn" style="padding: 10px 14px; border-width: 1px">
-          <i class="bi bi-arrow-left"></i>
-          Cancel
-        </a>
-        <button type="submit" class="btn btn-primary">
-          <i class="bi bi-save"></i>
-          Save
-        </button>
-      </div>
-    </form>
+        <div style="margin-bottom: 16px">
+          <label class="form-label">Method Name (AR)</label>
+          {{ form.method_name_ar }}
+          {% for error in form.method_name_ar.errors %}
+            <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+          {% endfor %}
+        </div>
+
+        <div style="margin-bottom: 16px">
+          <label class="form-label">Method Type</label>
+          {{ form.method_type }}
+          {% for error in form.method_type.errors %}
+            <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+          {% endfor %}
+        </div>
+
+        <h3 style="margin: 18px 0 12px 0">Configuration</h3>
+
+        <div id="gateway-wrapper" style="margin-bottom: 16px">
+          <label class="form-label">Gateway</label>
+          {{ form.gateway }}
+          {% for error in form.gateway.errors %}
+            <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+          {% endfor %}
+        </div>
+
+        <div id="bank-wrapper" style="margin-bottom: 16px">
+          <label class="form-label">Dedicated Bank Account</label>
+          {{ form.dedicated_bank_account }}
+          {% for error in form.dedicated_bank_account.errors %}
+            <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+          {% endfor %}
+        </div>
+
+        <div style="margin-bottom: 16px">
+          <label class="form-label">Supported Currencies</label>
+          {{ form.supported_currencies }}
+          <div style="margin-top: 6px; color: #6b7280; font-size: 13px">
+            Enter as JSON array: ["SAR", "USD", "AED"]
+          </div>
+          {% for error in form.supported_currencies.errors %}
+            <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+          {% endfor %}
+        </div>
+
+        <div style="margin-bottom: 16px">
+          <label class="form-label">Logo</label>
+          {{ form.logo }}
+          {% for error in form.logo.errors %}
+            <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+          {% endfor %}
+        </div>
+
+        {% if is_edit and method and method.logo %}
+          <div style="margin-bottom: 16px">
+            <label class="form-label">Current Logo</label>
+            <div>
+              <img src="{{ method.logo.url }}" alt="Current Logo" style="height: 70px; width: 70px; object-fit: cover; border-radius: 8px; border: 1px solid #e5e7eb" />
+            </div>
+          </div>
+        {% endif %}
+
+        <div style="margin-bottom: 16px">
+          <label class="form-label">Display Order</label>
+          {{ form.display_order }}
+          {% for error in form.display_order.errors %}
+            <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+          {% endfor %}
+        </div>
+
+        <div style="margin-bottom: 16px">
+          <label class="form-label">Status</label>
+          <div style="display: flex; align-items: center; gap: 10px">
+            {{ form.is_active }}
+          </div>
+          {% for error in form.is_active.errors %}
+            <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+          {% endfor %}
+        </div>
+
+        <div class="form-footer-bar sticky-bottom">
+          <div class="footer-left">
+            <a href="{% url 'payment_method_list' %}" class="btn btn-outline-secondary">
+              <i class="bi bi-arrow-left"></i>
+              Cancel
+            </a>
+          </div>
+          <div class="footer-right">
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-save"></i>
+              Save
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
   </div>
 
   <script>
@@ -145,3 +185,4 @@
     })();
   </script>
 {% endblock %}
+

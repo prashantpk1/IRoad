@@ -1,0 +1,56 @@
+{# Unified form shell partial/base for create/edit pages #}
+<div class="page-header">
+  {% block breadcrumb %}
+    <nav class="page-breadcrumb">
+      <ol class="breadcrumb"></ol>
+    </nav>
+  {% endblock %}
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">{% block page_title %}{% endblock %}</h1>
+    </div>
+  </div>
+</div>
+
+{% block form_info_alert %}{% endblock %}
+{% block edit_info_bar %}{% endblock %}
+{#
+STANDARD EDIT INFO BAR — paste inside edit form templates:
+
+{% if object and object.updated_at %}
+<div class="edit-info-bar">
+  <i class="bi bi-clock-history"></i>
+  Last updated
+  {% if object.updated_by %}
+    by <strong>{{ object.updated_by.first_name }}
+    {{ object.updated_by.last_name }}</strong>
+  {% endif %}
+  at <strong>
+    {{ object.updated_at|date:"d M Y, H:i" }}
+  </strong>
+</div>
+{% endif %}
+#}
+
+<div class="form-card">
+  <div class="form-card-body">
+    {% block form_content %}{% endblock %}
+  </div>
+</div>
+
+{% block form_footer %}
+  <div class="form-footer-bar sticky-bottom">
+    <div class="footer-left">
+      {% block cancel_url %}{% endblock %}
+    </div>
+    <div class="footer-right">
+      {% block submit_btn %}
+        <button type="submit" class="btn btn-primary">
+          Save
+        </button>
+      {% endblock %}
+    </div>
+  </div>
+{% endblock %}
+
+{% block extra_js %}{% endblock %}

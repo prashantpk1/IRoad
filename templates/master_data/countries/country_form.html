@@ -3,91 +3,130 @@
 {% block page_title %}{% if is_edit %}Edit Country{% else %}Add Country{% endif %}{% endblock %}
 
 {% block content %}
-  <div class="content-card" style="background: #ffffff; padding: 20px 30px; border-radius: 12px">
-    <div class="setting-row" style="border-bottom: none; padding-top: 0; margin-bottom: 16px">
-      <div class="setting-row-info">
+  <div class="page-header">
+    <nav class="page-breadcrumb">
+      <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'country_list' %}">Countries</a></li>
         {% if is_edit %}
-          <h2 class="page-title">Edit Country</h2>
+          <li class="breadcrumb-item active" aria-current="page">Edit: {{ form.instance.country_code }}</li>
         {% else %}
-          <h2 class="page-title">Add Country</h2>
+          <li class="breadcrumb-item active" aria-current="page">Add Country</li>
         {% endif %}
+      </ol>
+    </nav>
+    <div class="page-header-row">
+      <div class="page-header-left">
+        <h1 class="page-title">{% if is_edit %}Edit Country{% else %}Add Country{% endif %}</h1>
+        <p class="page-subtitle">Maintain country code and localization details</p>
       </div>
-      <div class="setting-row-control" style="flex: 0 0 auto">
-        <a href="{% url 'country_list' %}" class="btn" style="padding: 10px 14px; border-width: 1px">
+      <div class="page-header-right">
+        <div class="eal-header-actions">
+          <a href="{% url 'country_list' %}" class="eal-btn eal-btn-outline">
+            <i class="bi bi-arrow-left"></i>
+            <span>Back</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% if form.instance.pk and form.instance.updated_at %}
+  <div class="edit-info-bar">
+    <i class="bi bi-clock-history"></i>
+    Last updated
+    {% if form.instance.updated_by %}
+      by <strong>{{ form.instance.updated_by.first_name }} {{ form.instance.updated_by.last_name }}</strong>
+    {% endif %}
+    at <strong>{{ form.instance.updated_at|date:"d M Y, H:i" }}</strong>
+  </div>
+  {% endif %}
+
+  {% if is_edit %}
+    <div class="alert alert-info" style="margin-bottom: 16px;">
+      Country Code is locked and cannot be changed.
+    </div>
+  {% endif %}
+
+  {% if messages %}
+    <div style="margin-bottom: 16px">
+      {% for message in messages %}
+        <p style="margin: 0; color: {% if message.tags == 'error' %}#b91c1c{% else %}#15803d{% endif %}; font-weight: 600">
+          {{ message }}
+        </p>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <form method="post" action="">
+    {% csrf_token %}
+
+    {% if form.non_field_errors %}
+      <div style="margin-bottom: 16px; color: #b91c1c; font-weight: 600">
+        {{ form.non_field_errors }}
+      </div>
+    {% endif %}
+
+    <div class="form-card">
+      <div class="form-card-header">
+        <div class="form-card-icon blue">
+          <i class="bi bi-globe"></i>
+        </div>
+        <div class="form-card-header-text">
+          <h2 class="form-card-title">Country Information</h2>
+          <p class="form-card-desc">Provide country identity and status details.</p>
+        </div>
+      </div>
+      <div class="form-card-body">
+        <div class="field-group">
+          <div class="fields-grid cols-2">
+            <div class="field">
+              <label class="form-label">Country Code</label>
+              {{ form.country_code }}
+              {% for error in form.country_code.errors %}
+                <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+              {% endfor %}
+            </div>
+            <div class="field">
+              <label class="form-label">English Name</label>
+              {{ form.name_en }}
+              {% for error in form.name_en.errors %}
+                <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+              {% endfor %}
+            </div>
+            <div class="field">
+              <label class="form-label">Arabic Name</label>
+              {{ form.name_ar }}
+              {% for error in form.name_ar.errors %}
+                <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+              {% endfor %}
+            </div>
+            <div class="field">
+              <label class="form-label">Status</label>
+              <div style="display: flex; align-items: center; gap: 10px">
+                {{ form.is_active }}
+              </div>
+              {% for error in form.is_active.errors %}
+                <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-actions-bar sticky-bottom">
+      <div class="form-actions-left">
+        <a href="{% url 'country_list' %}" class="btn btn-outline-secondary">
           <i class="bi bi-arrow-left"></i>
           Cancel
         </a>
       </div>
-    </div>
-
-    {% if is_edit %}
-      <div style="margin-bottom: 16px; padding: 12px 14px; border-radius: 10px" class="alert alert-info">
-        <p style="margin: 0; font-weight: 600">
-          Country Code is locked and cannot be changed once saved.
-        </p>
-      </div>
-    {% endif %}
-
-    {% if messages %}
-      <div style="margin-bottom: 16px">
-        {% for message in messages %}
-          <p style="margin: 0; color: {% if message.tags == 'error' %}#b91c1c{% else %}#15803d{% endif %}; font-weight: 600">
-            {{ message }}
-          </p>
-        {% endfor %}
-      </div>
-    {% endif %}
-
-    <form method="post" action="">
-      {% csrf_token %}
-
-      {% if form.non_field_errors %}
-        <div style="margin-bottom: 16px; color: #b91c1c; font-weight: 600">
-          {{ form.non_field_errors }}
-        </div>
-      {% endif %}
-
-      <div style="margin-bottom: 16px">
-        <label class="form-label">Country Code</label>
-        {{ form.country_code }}
-        {% for error in form.country_code.errors %}
-          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-        {% endfor %}
-      </div>
-
-      <div style="margin-bottom: 16px">
-        <label class="form-label">English Name</label>
-        {{ form.name_en }}
-        {% for error in form.name_en.errors %}
-          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-        {% endfor %}
-      </div>
-
-      <div style="margin-bottom: 16px">
-        <label class="form-label">Arabic Name</label>
-        {{ form.name_ar }}
-        {% for error in form.name_ar.errors %}
-          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-        {% endfor %}
-      </div>
-
-      <div style="margin-bottom: 16px">
-        <label class="form-label">Status</label>
-        <div style="display: flex; align-items: center; gap: 10px">
-          {{ form.is_active }}
-        </div>
-        {% for error in form.is_active.errors %}
-          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-        {% endfor %}
-      </div>
-
-      <div class="submit-section">
+      <div class="form-actions-right">
         <button type="submit" class="btn btn-primary">
           <i class="bi bi-save"></i>
-          Save Country
+          Save
         </button>
       </div>
-    </form>
-  </div>
+    </div>
+  </form>
 {% endblock %}
-

@@ -1,13 +1,15 @@
 {% extends 'base.html' %}
 {% block title %}Internal Alerts Routing{% endblock %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <h4 class="mb-0">Internal Alerts Routing</h4>
-  <a href="{% url 'alert_route_create' %}" class="btn btn-primary">Add Alert Route</a>
+<div class="page-header">
+  <div class="page-header-row">
+    <div class="page-header-left"><h1 class="page-title">Internal Alerts Routing</h1></div>
+    <div class="page-header-right"><a href="{% url 'alert_route_create' %}" class="eal-btn eal-btn-primary">Add Alert Route</a></div>
+  </div>
 </div>
-<div class="card">
-  <div class="table-responsive">
-    <table class="table align-middle mb-0">
+<div class="eal-table-card">
+  <div class="eal-table-wrap">
+    <table class="eal-table">
       <thead><tr><th>#</th><th>Trigger Event</th><th>Notify Role</th><th>Custom Email</th><th>Status</th><th>Actions</th></tr></thead>
       <tbody>
         {% for row in routes %}
@@ -16,10 +18,12 @@
             <td>{{ row.get_trigger_event_display }}</td>
             <td>{{ row.notify_role.role_name|default:'-' }}</td>
             <td>{{ row.notify_custom_email|default:'-' }}</td>
-            <td>{% if row.is_active %}<span class="badge bg-success">Active</span>{% else %}<span class="badge bg-secondary">Inactive</span>{% endif %}</td>
+            <td>{% if row.is_active %}<span class="badge status-badge status-active">Active</span>{% else %}<span class="badge status-badge status-inactive">Inactive</span>{% endif %}</td>
             <td>
-              <a href="{% url 'alert_route_edit' row.route_id %}" class="btn btn-sm btn-outline-primary">Edit</a>
-              <form method="post" action="{% url 'alert_route_toggle' row.route_id %}" class="d-inline">{% csrf_token %}<button class="btn btn-sm btn-outline-dark">Toggle Status</button></form>
+              <div class="eal-actions-cell">
+                <a href="{% url 'alert_route_edit' row.route_id %}" class="eal-row-btn"><i class="bi bi-pencil"></i></a>
+                <form method="post" action="{% url 'alert_route_toggle' row.route_id %}" style="display:inline">{% csrf_token %}<button class="eal-row-btn"><i class="bi bi-arrow-repeat"></i></button></form>
+              </div>
             </td>
           </tr>
         {% empty %}
@@ -30,6 +34,7 @@
   </div>
 </div>
 {% if routes.paginator.num_pages > 1 %}
-<nav class="mt-3"><ul class="pagination mb-0">{% if routes.has_previous %}<li class="page-item"><a class="page-link" href="?page={{ routes.previous_page_number }}">Previous</a></li>{% endif %}<li class="page-item disabled"><span class="page-link">Page {{ routes.number }} of {{ routes.paginator.num_pages }}</span></li>{% if routes.has_next %}<li class="page-item"><a class="page-link" href="?page={{ routes.next_page_number }}">Next</a></li>{% endif %}</ul></nav>
+  <div class="eal-pagination mt-3"><div class="eal-pagination-controls">{% if routes.has_previous %}<a class="eal-page-btn" href="?page={{ routes.previous_page_number }}">Previous</a>{% endif %}<span class="eal-page-btn active">Page {{ routes.number }} of {{ routes.paginator.num_pages }}</span>{% if routes.has_next %}<a class="eal-page-btn" href="?page={{ routes.next_page_number }}">Next</a>{% endif %}</div></div>
 {% endif %}
 {% endblock %}
+

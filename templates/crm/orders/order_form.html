@@ -10,13 +10,21 @@
   {% endfor %}
 {% endif %}
 
-<h4 class="mb-3">Create Subscription Order</h4>
+<div class="page-header">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{% url 'order_list' %}">Orders</a></li>
+      <li class="breadcrumb-item active" aria-current="page">Create Order</li>
+    </ol>
+  </nav>
+  <div class="page-header-row"><div class="page-header-left"><h1 class="page-title">Create Subscription Order</h1></div></div>
+</div>
 
 <form method="post" action="{% url 'order_create' %}" id="order-form" class="vstack gap-4">
   {% csrf_token %}
-  <div class="card">
-    <div class="card-header">Section 1 — Order header</div>
-    <div class="card-body row g-3">
+  <div class="form-card">
+    <div class="form-card-header">Section 1: Order Header</div>
+    <div class="form-card-body row g-3">
       <div class="col-md-6">
         <label class="form-label">Tenant</label>
         <select name="tenant" class="form-select" required id="id_tenant">
@@ -57,9 +65,9 @@
     </div>
   </div>
 
-  <div class="card" id="plan-section" style="display:none;">
-    <div class="card-header">Section 2 — Plan selection</div>
-    <div class="card-body row g-3">
+  <div class="form-card" id="plan-section" style="display:none;">
+    <div class="form-card-header">Section 2: Plan Selection</div>
+    <div class="form-card-body row g-3">
       <div class="col-md-6">
         <label class="form-label">Plan</label>
         <select name="plan" class="form-select" id="id_plan">
@@ -89,20 +97,20 @@
     </div>
   </div>
 
-  <div class="card" id="addon-section" style="display:none;">
-    <div class="card-header d-flex justify-content-between align-items-center">
-      <span>Section 3 — Add-ons</span>
+  <div class="form-card" id="addon-section" style="display:none;">
+    <div class="form-card-header d-flex justify-content-between align-items-center">
+      <span>Section 3: Add-ons</span>
       <button type="button" class="btn btn-sm btn-outline-primary" id="btn-add-addon-row">Add row</button>
     </div>
-    <div class="card-body">
+    <div class="form-card-body">
       <div id="addon-rows" class="vstack gap-2"></div>
       <p class="text-muted small mb-0 mt-2">Unit prices follow the active add-ons policy. Line totals use remaining days in the current cycle (server-validated on save).</p>
     </div>
   </div>
 
-  <div class="card">
-    <div class="card-header">Section 4 — Order totals preview</div>
-    <div class="card-body row g-2">
+  <div class="form-card">
+    <div class="form-card-header">Section 4: Totals Preview card</div>
+    <div class="form-card-body row g-2">
       <div class="col-md-4"><strong>Sub total</strong> <span id="pv_sub" class="float-end">0.00</span></div>
       <div class="col-md-4"><strong>Discount</strong> <span id="pv_disc" class="float-end">0.00</span></div>
       <div class="col-md-4"><strong>Tax</strong> <span id="pv_tax" class="float-end">0.00</span></div>
@@ -115,9 +123,9 @@
     </div>
   </div>
 
-  <div class="d-flex gap-2">
-    <a href="{% url 'order_list' %}" class="btn btn-outline-secondary">Cancel</a>
-    <button type="submit" class="btn btn-primary">Save as draft</button>
+  <div class="form-footer-bar sticky-bottom">
+    <div class="footer-left"><a href="{% url 'order_list' %}" class="btn btn-outline-secondary">Cancel</a></div>
+    <div class="footer-right"><button type="submit" class="btn btn-primary">Save as draft</button></div>
   </div>
 </form>
 
@@ -274,3 +282,4 @@
 })();
 </script>
 {% endblock %}
+

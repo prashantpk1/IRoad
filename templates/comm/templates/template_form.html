@@ -3,37 +3,72 @@
 {% block page_title %}{% if is_edit %}Edit Template{% else %}Add Template{% endif %}{% endblock %}
 
 {% block content %}
-  <div class="content-card" style="background: #ffffff; padding: 20px 30px; border-radius: 12px">
-    <h2 class="page-title">{% if is_edit %}Edit Template{% else %}Add Template{% endif %}</h2>
-    {% if form.non_field_errors %}<div style="margin-bottom: 16px; color:#b91c1c">{{ form.non_field_errors }}</div>{% endif %}
-    <form method="post" action="">
-      {% csrf_token %}
-      <div style="margin-bottom: 16px"><label class="form-label">Template Name</label>{{ form.template_name }}</div>
-      <div style="margin-bottom: 16px"><label class="form-label">Channel</label>{{ form.channel_type }}</div>
-      <div style="margin-bottom: 16px"><label class="form-label">Category</label>{{ form.category }}</div>
-      <div id="subject-en-wrap" style="margin-bottom: 16px"><label class="form-label">Subject (EN)</label>{{ form.subject_en }}</div>
-      <div id="subject-ar-wrap" style="margin-bottom: 16px"><label class="form-label">Subject (AR)</label>{{ form.subject_ar }}</div>
-      <div style="margin-bottom: 16px"><label class="form-label">Body (EN)</label>{{ form.body_en }}</div>
-      <div style="margin-bottom: 16px"><label class="form-label">Body (AR)</label>{{ form.body_ar }}</div>
-      <div style="margin-bottom: 16px"><label class="form-label">Status</label>{{ form.is_active }}</div>
-
-      <div class="alert alert-info" style="padding: 12px 14px; border-radius: 10px; margin-bottom: 16px;">
-        <strong>Available Variables:</strong>
-        <div style="margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap;">
-          <button type="button" class="btn" onclick="copyVar('{% templatetag openvariable %}client_name{% templatetag closevariable %}')">{% templatetag openvariable %}client_name{% templatetag closevariable %}</button>
-          <button type="button" class="btn" onclick="copyVar('{% templatetag openvariable %}otp_code{% templatetag closevariable %}')">{% templatetag openvariable %}otp_code{% templatetag closevariable %}</button>
-          <button type="button" class="btn" onclick="copyVar('{% templatetag openvariable %}invoice_amount{% templatetag closevariable %}')">{% templatetag openvariable %}invoice_amount{% templatetag closevariable %}</button>
-          <button type="button" class="btn" onclick="copyVar('{% templatetag openvariable %}invoice_number{% templatetag closevariable %}')">{% templatetag openvariable %}invoice_number{% templatetag closevariable %}</button>
-          <button type="button" class="btn" onclick="copyVar('{% templatetag openvariable %}plan_name{% templatetag closevariable %}')">{% templatetag openvariable %}plan_name{% templatetag closevariable %}</button>
-          <button type="button" class="btn" onclick="copyVar('{% templatetag openvariable %}expiry_date{% templatetag closevariable %}')">{% templatetag openvariable %}expiry_date{% templatetag closevariable %}</button>
-          <button type="button" class="btn" onclick="copyVar('{% templatetag openvariable %}company_name{% templatetag closevariable %}')">{% templatetag openvariable %}company_name{% templatetag closevariable %}</button>
-          <button type="button" class="btn" onclick="copyVar('{% templatetag openvariable %}support_email{% templatetag closevariable %}')">{% templatetag openvariable %}support_email{% templatetag closevariable %}</button>
-        </div>
+  <div class="page-header">
+    <nav class="page-breadcrumb">
+      <a href="{% url 'notif_template_list' %}">Notification Templates</a>
+      <span class="bc-sep">›</span>
+      {% if form.instance.pk %}
+        <span class="bc-current">Edit: {{ form.instance }}</span>
+      {% else %}
+        <span class="bc-current">Add New</span>
+      {% endif %}
+    </nav>
+    <div class="page-header-row">
+      <div class="page-header-left">
+        <h1 class="page-title">{% if is_edit %}Edit Template{% else %}Add Template{% endif %}</h1>
       </div>
+    </div>
+  </div>
 
-      <a href="{% url 'notif_template_list' %}" class="btn" style="padding: 10px 14px; border-width: 1px"><i class="bi bi-arrow-left"></i> Cancel</a>
-      <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Save</button>
-    </form>
+  {% if form.instance.pk and form.instance.updated_at %}
+  <div class="edit-info-bar">
+    <i class="bi bi-clock-history"></i>
+    Last updated
+    {% if form.instance.updated_by %}
+      by <strong>{{ form.instance.updated_by.first_name }} {{ form.instance.updated_by.last_name }}</strong>
+    {% endif %}
+    at <strong>{{ form.instance.updated_at|date:"d M Y, H:i" }}</strong>
+  </div>
+  {% endif %}
+
+  <div class="form-card">
+    <div class="form-card-body">
+      {% if form.non_field_errors %}<div style="margin-bottom: 16px; color:#b91c1c">{{ form.non_field_errors }}</div>{% endif %}
+      <form method="post" action="">
+        {% csrf_token %}
+        <div style="margin-bottom: 16px"><label class="form-label">Template Name</label>{{ form.template_name }}</div>
+        <div style="margin-bottom: 16px"><label class="form-label">Channel</label>{{ form.channel_type }}</div>
+        <div style="margin-bottom: 16px"><label class="form-label">Category</label>{{ form.category }}</div>
+        <div id="subject-en-wrap" style="margin-bottom: 16px"><label class="form-label">Subject (EN)</label>{{ form.subject_en }}</div>
+        <div id="subject-ar-wrap" style="margin-bottom: 16px" dir="rtl"><label class="form-label">Subject (AR)</label>{{ form.subject_ar }}</div>
+        <div style="margin-bottom: 16px"><label class="form-label">Body (EN)</label>{{ form.body_en }}</div>
+        <div style="margin-bottom: 16px" dir="rtl"><label class="form-label">Body (AR)</label>{{ form.body_ar }}</div>
+        <div style="margin-bottom: 16px"><label class="form-label">Status</label>{{ form.is_active }}</div>
+
+        <div class="alert alert-info" style="padding: 12px 14px; border-radius: 10px; margin-bottom: 16px;">
+          <strong>Available Variables:</strong>
+          <div style="margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap;">
+            <button type="button" class="btn" onclick="copyVar('{% templatetag openvariable %}client_name{% templatetag closevariable %}')">{% templatetag openvariable %}client_name{% templatetag closevariable %}</button>
+            <button type="button" class="btn" onclick="copyVar('{% templatetag openvariable %}otp_code{% templatetag closevariable %}')">{% templatetag openvariable %}otp_code{% templatetag closevariable %}</button>
+            <button type="button" class="btn" onclick="copyVar('{% templatetag openvariable %}invoice_amount{% templatetag closevariable %}')">{% templatetag openvariable %}invoice_amount{% templatetag closevariable %}</button>
+            <button type="button" class="btn" onclick="copyVar('{% templatetag openvariable %}invoice_number{% templatetag closevariable %}')">{% templatetag openvariable %}invoice_number{% templatetag closevariable %}</button>
+            <button type="button" class="btn" onclick="copyVar('{% templatetag openvariable %}plan_name{% templatetag closevariable %}')">{% templatetag openvariable %}plan_name{% templatetag closevariable %}</button>
+            <button type="button" class="btn" onclick="copyVar('{% templatetag openvariable %}expiry_date{% templatetag closevariable %}')">{% templatetag openvariable %}expiry_date{% templatetag closevariable %}</button>
+            <button type="button" class="btn" onclick="copyVar('{% templatetag openvariable %}company_name{% templatetag closevariable %}')">{% templatetag openvariable %}company_name{% templatetag closevariable %}</button>
+            <button type="button" class="btn" onclick="copyVar('{% templatetag openvariable %}support_email{% templatetag closevariable %}')">{% templatetag openvariable %}support_email{% templatetag closevariable %}</button>
+          </div>
+        </div>
+
+        <div class="form-footer-bar sticky-bottom">
+          <div class="footer-left">
+            <a href="{% url 'notif_template_list' %}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Cancel</a>
+          </div>
+          <div class="footer-right">
+            <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Save</button>
+          </div>
+        </div>
+      </form>
+    </div>
   </div>
 
   <script>
@@ -54,3 +89,4 @@
     toggleSubjects();
   </script>
 {% endblock %}
+

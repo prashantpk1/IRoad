@@ -3,84 +3,124 @@
 {% block page_title %}{% if is_edit %}Edit Gateway{% else %}Add Gateway{% endif %}{% endblock %}
 
 {% block content %}
-  <div class="content-card" style="background: #ffffff; padding: 20px 30px; border-radius: 12px">
-    <div class="setting-row" style="border-bottom: none; padding-top: 0; margin-bottom: 16px">
-      <div class="setting-row-info">
-        <h2 class="page-title">{% if is_edit %}Edit Gateway{% else %}Add Gateway{% endif %}</h2>
+  <div class="page-header">
+    <nav class="page-breadcrumb">
+      <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'gateway_list' %}">Gateways</a></li>
+        {% if is_edit and gateway %}
+          <li class="breadcrumb-item active" aria-current="page">Edit: {{ gateway.gateway_name }}</li>
+        {% else %}
+          <li class="breadcrumb-item active" aria-current="page">Add Gateway</li>
+        {% endif %}
+      </ol>
+    </nav>
+
+    <div class="page-header-row">
+      <div class="page-header-left">
+        <h1 class="page-title">{% if is_edit %}Edit Gateway{% else %}Add Gateway{% endif %}</h1>
       </div>
-    </div>
-
-    <div style="margin-bottom: 16px; padding: 12px 14px; border-radius: 10px" class="alert alert-warning">
-      <p style="margin: 0; font-weight: 600">
-        Credentials are sensitive. This data is stored securely and will not be displayed after saving.
-      </p>
-      {% if is_edit %}
-        <p style="margin: 8px 0 0 0; font-weight: 600">
-          Leave credentials field as-is to keep existing credentials. Replace to update.
-        </p>
-      {% endif %}
-    </div>
-
-    {% if form.non_field_errors %}
-      <div style="margin-bottom: 16px; color: #b91c1c; font-weight: 600">
-        {{ form.non_field_errors }}
-      </div>
-    {% endif %}
-
-    <form method="post" action="">
-      {% csrf_token %}
-
-      <div style="margin-bottom: 16px">
-        <label class="form-label">Gateway Name</label>
-        {{ form.gateway_name }}
-        {% for error in form.gateway_name.errors %}
-          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-        {% endfor %}
-      </div>
-
-      <div style="margin-bottom: 16px">
-        <label class="form-label">Environment</label>
-        {{ form.environment }}
-        {% for error in form.environment.errors %}
-          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-        {% endfor %}
-      </div>
-
-      <div style="margin-bottom: 16px">
-        <label class="form-label">Credentials JSON</label>
-        {{ form.credentials_payload }}
-        <style>
-          #id_credentials_payload { min-height: 180px; }
-        </style>
-        <div style="margin-top: 6px; color: #6b7280; font-size: 13px">
-          {{ form.credentials_payload.help_text }}
-        </div>
-        {% for error in form.credentials_payload.errors %}
-          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-        {% endfor %}
-      </div>
-
-      <div style="margin-bottom: 16px">
-        <label class="form-label">Status</label>
-        <div style="display: flex; align-items: center; gap: 10px">
-          {{ form.is_active }}
-        </div>
-        {% for error in form.is_active.errors %}
-          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-        {% endfor %}
-      </div>
-
-      <div style="display: flex; gap: 10px; align-items: center">
-        <a href="{% url 'gateway_list' %}" class="btn" style="padding: 10px 14px; border-width: 1px">
+      <div class="page-header-right">
+        <a href="{% url 'gateway_list' %}" class="eal-btn">
           <i class="bi bi-arrow-left"></i>
-          Cancel
+          <span>Cancel</span>
         </a>
-        <button type="submit" class="btn btn-primary">
-          <i class="bi bi-save"></i>
-          Save
-        </button>
       </div>
-    </form>
+    </div>
+  </div>
+
+  {% if is_edit and gateway and gateway.updated_at %}
+  <div class="edit-info-bar">
+    <i class="bi bi-clock-history"></i>
+    Last updated
+    {% if gateway.updated_by %}
+      by <strong>{{ gateway.updated_by.first_name }} {{ gateway.updated_by.last_name }}</strong>
+    {% endif %}
+    at <strong>{{ gateway.updated_at|date:"d M Y, H:i" }}</strong>
+  </div>
+  {% endif %}
+
+  <div class="form-card">
+    <div class="form-card-body">
+      <div style="margin-bottom: 16px; padding: 12px 14px; border-radius: 10px" class="alert alert-warning">
+        <p style="margin: 0; font-weight: 600">
+          Credentials are sensitive. This data is stored securely and will not be displayed after saving.
+        </p>
+        {% if is_edit %}
+          <p style="margin: 8px 0 0 0; font-weight: 600">
+            Leave credentials field as-is to keep existing credentials. Replace to update.
+          </p>
+        {% endif %}
+      </div>
+
+      {% if form.non_field_errors %}
+        <div style="margin-bottom: 16px; color: #b91c1c; font-weight: 600">
+          {{ form.non_field_errors }}
+        </div>
+      {% endif %}
+
+      <h3 style="margin: 0 0 12px 0">Gateway Details</h3>
+
+      <form method="post" action="">
+        {% csrf_token %}
+
+        <div style="margin-bottom: 16px">
+          <label class="form-label">Gateway Name</label>
+          {{ form.gateway_name }}
+          {% for error in form.gateway_name.errors %}
+            <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+          {% endfor %}
+        </div>
+
+        <div style="margin-bottom: 16px">
+          <label class="form-label">Environment</label>
+          {{ form.environment }}
+          {% for error in form.environment.errors %}
+            <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+          {% endfor %}
+        </div>
+
+        <h3 style="margin: 18px 0 12px 0">API Credentials</h3>
+
+        <div style="margin-bottom: 16px">
+          <label class="form-label">Credentials JSON</label>
+          {{ form.credentials_payload }}
+          <style>
+            #id_credentials_payload { min-height: 180px; }
+          </style>
+          <div style="margin-top: 6px; color: #6b7280; font-size: 13px">
+            {{ form.credentials_payload.help_text }}
+          </div>
+          {% for error in form.credentials_payload.errors %}
+            <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+          {% endfor %}
+        </div>
+
+        <div style="margin-bottom: 16px">
+          <label class="form-label">Status</label>
+          <div style="display: flex; align-items: center; gap: 10px">
+            {{ form.is_active }}
+          </div>
+          {% for error in form.is_active.errors %}
+            <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+          {% endfor %}
+        </div>
+
+        <div class="form-footer-bar sticky-bottom">
+          <div class="footer-left">
+            <a href="{% url 'gateway_list' %}" class="btn btn-outline-secondary">
+              <i class="bi bi-arrow-left"></i>
+              Cancel
+            </a>
+          </div>
+          <div class="footer-right">
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-save"></i>
+              Save
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
   </div>
 
   {% if is_edit and masked_placeholder %}
@@ -94,3 +134,4 @@
     </script>
   {% endif %}
 {% endblock %}
+

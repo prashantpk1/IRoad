@@ -6304,6 +6304,177 @@ textarea.form-control {
   font-weight: 500;
 }
 
+/* Phase 12 — Unified Badges */
+.status-badge {
+  padding: 4px 10px;
+  border-radius: 50px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+.status-active {
+  background: #d1fae5;
+  color: #065f46;
+}
+.status-inactive {
+  background: #f1f5f9;
+  color: #64748b;
+}
+.status-pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+.status-suspended {
+  background: #fee2e2;
+  color: #991b1b;
+}
+.status-expired {
+  background: #fce7f3;
+  color: #9d174d;
+}
+.status-scheduled {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+.status-paid {
+  background: #d1fae5;
+  color: #065f46;
+}
+.status-draft {
+  background: #f1f5f9;
+  color: #64748b;
+}
+.status-cancelled {
+  background: #fee2e2;
+  color: #991b1b;
+}
+.status-issued {
+  background: #dbeafe;
+  color: #1e40af;
+}
+.status-void {
+  background: #f1f5f9;
+  color: #64748b;
+}
+.status-churned {
+  background: #e5e7eb;
+  color: #374151;
+}
+.status-new {
+  background: #fee2e2;
+  color: #991b1b;
+}
+.status-in-progress {
+  background: #fef3c7;
+  color: #92400e;
+}
+.status-pending-client {
+  background: #ede9fe;
+  color: #5b21b6;
+}
+.status-closed {
+  background: #d1fae5;
+  color: #065f46;
+}
+.status-test {
+  background: #fef3c7;
+  color: #92400e;
+}
+.status-live {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.edit-info-bar {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-left: 3px solid #5051f9;
+  border-radius: 6px;
+  padding: 10px 16px;
+  font-size: 13px;
+  color: #64748b;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.edit-info-bar strong {
+  color: #1e293b;
+}
+.edit-info-bar i {
+  color: #5051f9;
+}
+
+/* Phase 12 — Layout Fixes */
+
+/* Prevent sticky footer overlapping last form field */
+.main-content form {
+  padding-bottom: 80px;
+}
+
+/* Sticky footer bar — always above content */
+.form-footer-bar {
+  position: sticky;
+  bottom: 0;
+  background: #ffffff;
+  border-top: 1px solid #e2e8f0;
+  padding: 14px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 100;
+  box-shadow: 0 -2px 8px rgba(0,0,0,0.06);
+  margin-top: 24px;
+}
+
+/* Table responsive wrapper */
+.table-responsive-wrapper {
+  overflow-x: auto;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+/* Breadcrumb styling */
+.page-breadcrumb {
+  font-size: 13px;
+  color: #94a3b8;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.page-breadcrumb a {
+  color: #5051f9;
+  text-decoration: none;
+}
+.page-breadcrumb a:hover {
+  text-decoration: underline;
+}
+.page-breadcrumb .bc-sep {
+  color: #cbd5e1;
+}
+.page-breadcrumb .bc-current {
+  color: #1e293b;
+  font-weight: 500;
+}
+
+/* Empty state card */
+.empty-state-card {
+  text-align: center;
+  padding: 60px 24px;
+  color: #94a3b8;
+}
+.empty-state-card i {
+  font-size: 48px;
+  margin-bottom: 16px;
+  display: block;
+  color: #cbd5e1;
+}
+.empty-state-card h5 {
+  color: #64748b;
+  margin-bottom: 8px;
+}
+
 /* ── Actions ────────────────────────────────── */
 .auto-number-actions {
   margin-top: 32px;
