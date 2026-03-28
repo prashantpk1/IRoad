@@ -1,13 +1,37 @@
 {% extends 'base.html' %}
-{% block title %}Master Audit Log{% endblock %}
+{% load i18n %}
+{% block title %}Master Audit Log{% include 'partials/pagination.html' with page_obj=modules %}
+{% endblock %}
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item active" aria-current="page">{% translate "Master Audit Log" %}</li>
+{% include 'partials/pagination.html' with page_obj=modules %}
+{% endblock %}
+
 {% block content %}
-<div class="container py-3">
-  <div class="page-header">
-    <div class="page-header-row">
-      <div class="page-header-left">
-        <h1 class="page-title">Master Audit Log</h1>
-        <p class="page-subtitle">The Black Box — every admin action</p>
+<div class="page-header">
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">{% translate "Master Audit Log" %}</h1>
+      <p class="page-subtitle">{% translate "Manage your records here" %}</p>
+    </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <!-- Actions here -->
       </div>
+    </div>
+  </div>
+</div>
+
+<div class="container py-3">
+  
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <!-- Actions here -->
+      </div>
+    </div>
+  </div>
+</div>
     </div>
   </div>
   <div class="alert alert-dark">
@@ -43,7 +67,13 @@
             <td><a href="{% url 'audit_log_detail' log.audit_id %}" class="btn btn-sm btn-outline-primary">View</a></td>
           </tr>
           {% empty %}
-          <tr><td colspan="8" class="text-center text-muted">No records found.</td></tr>
+          <tr class="eal-table-empty">
+  <td colspan="20">
+    <div class="eal-empty-icon"><i class="bi bi-inbox"></i></div>
+    <div class="eal-empty-title">{% translate "No Data Found" %}</div>
+    <div class="eal-empty-text">No records found.</div>
+  </td>
+</tr>
           {% endfor %}
         </tbody>
       </table>
@@ -51,8 +81,8 @@
   </div>
 
   {% if audit_logs.paginator.num_pages > 1 %}
-  <div class="eal-pagination mt-3"><div class="eal-pagination-controls">{% if audit_logs.has_previous %}<a class="eal-page-btn" href="?{{ filter_query }}&page={{ audit_logs.previous_page_number }}">Previous</a>{% endif %}<span class="eal-page-btn active">Page {{ audit_logs.number }} of {{ audit_logs.paginator.num_pages }}</span>{% if audit_logs.has_next %}<a class="eal-page-btn" href="?{{ filter_query }}&page={{ audit_logs.next_page_number }}">Next</a>{% endif %}</div></div>
-  {% endif %}
+  
 </div>
+{% include 'partials/pagination.html' with page_obj=modules %}
 {% endblock %}
 

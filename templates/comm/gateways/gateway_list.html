@@ -1,25 +1,61 @@
 {% extends 'base.html' %}
+{% load i18n %}
+{% load i18n %}
 
-{% block page_title %}Communication Gateways{% endblock %}
+{% block page_title %}Communication Gateways{% include 'partials/pagination.html' with page_obj=messages %}
+{% endblock %}
+
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item active" aria-current="page">{% translate "Communication Gateways" %}</li>
+{% include 'partials/pagination.html' with page_obj=messages %}
+{% endblock %}
 
 {% block content %}
-  <div class="page-header">
-    <div class="page-header-row">
-      <div class="page-header-left">
-        <h1 class="page-title">Communication Gateways</h1>
-        <div class="alert alert-info" style="margin-top: 12px; border-radius: 10px">
-          <p style="margin: 0; font-weight: 600">Only one Email and one SMS gateway can be active at a time.</p>
-        </div>
-      </div>
-      <div class="page-header-right">
+<div class="page-header">
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">{% translate "Communication Gateways" %}</h1>
+      <p class="page-subtitle">{% translate "Manage your records here" %}</p>
+    </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
         {% if request.user.is_root %}
-          <a href="{% url 'comm_gateway_create' %}" class="eal-btn eal-btn-primary">
-            <i class="bi bi-plus-lg"></i>
-            <span>Add Gateway</span>
-          </a>
-        {% endif %}
+            <a href="{% url 'comm_gateway_create' %}" class="eal-btn eal-btn-primary">
+              <i class="bi bi-plus-lg"></i>
+              <span>Add Gateway</span>
+            </a>
+          {% endif %}
       </div>
     </div>
+  </div>
+</div>
+
+  
+
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        {% if request.user.is_root %}
+            <a href="{% url 'comm_gateway_create' %}" class="eal-btn eal-btn-primary">
+              <i class="bi bi-plus-lg"></i>
+              <span>Add Gateway</span>
+            </a>
+          {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+  </div>
+  <div class="list-page-actions">
+    <div class="eal-header-actions">
+          {% if request.user.is_root %}
+            <a href="{% url 'comm_gateway_create' %}" class="eal-btn eal-btn-primary">
+              <i class="bi bi-plus-lg"></i>
+              <span>Add Gateway</span>
+            </a>
+          {% endif %}
+  </div>
+</div>
   </div>
 
   {% if messages %}
@@ -44,7 +80,7 @@
               <th>Sender ID</th>
               <th>Encryption</th>
               <th>Status</th>
-              <th>Actions</th>
+              <th>ACTIONS</th>
             </tr>
           </thead>
           <tbody>
@@ -53,9 +89,9 @@
                 <td>{{ forloop.counter0|add:gateways.start_index }}</td>
                 <td>
                   {% if gateway.gateway_type == 'Email' %}
-                    <span class="badge status-badge status-issued">Email</span>
+                    <span class="status-badge inactive">Email</span>
                   {% else %}
-                    <span class="badge status-badge status-active">SMS</span>
+                    <span class="status-badge active">SMS</span>
                   {% endif %}
                 </td>
                 <td>{{ gateway.provider_name }}</td>
@@ -65,22 +101,22 @@
                 <td>{{ gateway.encryption_type|default:'-' }}</td>
                 <td>
                   {% if gateway.is_active %}
-                    <span class="badge status-badge status-active">Active</span>
+                    <span class="status-badge active">Active</span>
                   {% else %}
-                    <span class="badge status-badge status-inactive">Inactive</span>
+                    <span class="status-badge inactive">Inactive</span>
                   {% endif %}
                 </td>
                 <td>
                   {% if request.user.is_root %}
                     <div class="eal-actions-cell">
-                      <a href="{% url 'comm_gateway_edit' gateway.gateway_id %}" class="eal-row-btn" title="Edit">
-                        <i class="bi bi-pencil"></i>
-                      </a>
+                      <a href="{% url 'comm_gateway_edit' gateway.gateway_id %}" class="eal-row-btn icon-only-btn icon-only-btn" title="Edit">
+<i class="bi bi-pencil"></i>
+</a>
                       <form method="post" action="{% url 'comm_gateway_toggle' gateway.gateway_id %}" style="display: inline">
                         {% csrf_token %}
-                        <button type="submit" class="eal-row-btn" title="{% if gateway.is_active %}Deactivate{% else %}Activate{% endif %}">
-                          <i class="bi bi-arrow-repeat"></i>
-                        </button>
+                        <button type="submit" class="eal-row-btn icon-only-btn icon-only-btn" title="{% if gateway.is_active %}Deactivate{% else %}Activate{% endif %}">
+<i class="bi bi-arrow-repeat"></i>
+</button>
                       </form>
                     </div>
                   {% endif %}
@@ -91,23 +127,15 @@
         </table>
       </div>
 
-      <div class="eal-pagination">
-        <div class="eal-pagination-controls">
-          {% if gateways.has_previous %}
-            <a href="?page={{ gateways.previous_page_number }}" class="eal-page-btn"><i class="bi bi-chevron-left"></i></a>
-          {% endif %}
-          <span class="eal-page-btn active">{{ gateways.number }}</span>
-          {% if gateways.has_next %}
-            <a href="?page={{ gateways.next_page_number }}" class="eal-page-btn"><i class="bi bi-chevron-right"></i></a>
-          {% endif %}
-        </div>
-      </div>
+      
     {% else %}
       <div class="notification-empty">
         <div class="empty-icon"><i class="bi bi-broadcast"></i></div>
         <h4 class="empty-title">No communication gateways found.</h4>
+        <p class="empty-text">Add a gateway to send email or SMS.</p>
       </div>
     {% endif %}
   </div>
+{% include 'partials/pagination.html' with page_obj=messages %}
 {% endblock %}
 

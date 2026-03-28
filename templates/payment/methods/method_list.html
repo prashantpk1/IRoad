@@ -1,25 +1,60 @@
 {% extends 'base.html' %}
+{% load i18n %}
+{% load i18n %}
 
-{% block page_title %}Payment Methods{% endblock %}
+{% block page_title %}Payment Methods{% include 'partials/pagination.html' with page_obj=messages %}
+{% endblock %}
+
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item active" aria-current="page">{% translate "Payment Methods" %}</li>
+{% include 'partials/pagination.html' with page_obj=messages %}
+{% endblock %}
 
 {% block content %}
-  <div class="page-header">
-    <div class="page-header-row">
-      <div class="page-header-left">
-        <h1 class="page-title">Payment Methods</h1>
-        <p class="page-subtitle">These methods appear in Tenant checkout based on order currency.</p>
+<div class="page-header">
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">{% translate "Payment Methods" %}</h1>
+      <p class="page-subtitle">{% translate "Manage your records here" %}</p>
+    </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        {% if request.user.is_root %}
+            <a href="{% url 'payment_method_create' %}" class="eal-btn eal-btn-primary">
+              <i class="bi bi-plus-lg"></i>
+              <span>Add Payment Method</span>
+            </a>
+          {% endif %}
       </div>
-      <div class="page-header-right">
-        <div class="eal-header-actions">
+    </div>
+  </div>
+</div>
+
+  
+
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        {% if request.user.is_root %}
+            <a href="{% url 'payment_method_create' %}" class="eal-btn eal-btn-primary">
+              <i class="bi bi-plus-lg"></i>
+              <span>Add Payment Method</span>
+            </a>
+          {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+  <div class="list-page-actions">
+    <div class="eal-header-actions">
           {% if request.user.is_root %}
             <a href="{% url 'payment_method_create' %}" class="eal-btn eal-btn-primary">
               <i class="bi bi-plus-lg"></i>
               <span>Add Payment Method</span>
             </a>
           {% endif %}
-        </div>
-      </div>
-    </div>
+  </div>
+</div>
   </div>
 
   {% if messages %}
@@ -79,7 +114,7 @@
                 <th style="min-width: 220px">Currencies badges</th>
               <th style="min-width: 220px">Gateway/Bank</th>
               <th style="width: 120px">Status</th>
-              <th style="width: 220px">Actions</th>
+              <th style="width: 220px">ACTIONS</th>
             </tr>
           </thead>
           <tbody>
@@ -89,14 +124,14 @@
                 <td>{{ method.method_name_en }}</td>
                 <td>
                   {% if method.method_type == 'Online_Gateway' %}
-                    <span class="badge status-badge status-issued">Online</span>
+                    <span class="status-badge active">Online</span>
                   {% else %}
-                    <span class="badge status-badge status-pending">Offline</span>
+                    <span class="status-badge inactive">Offline</span>
                   {% endif %}
                 </td>
                 <td>
                   {% for code in method.supported_currencies %}
-                    <span class="badge status-badge status-scheduled" style="margin-right: 4px; margin-bottom: 4px; display: inline-block;">
+                    <span class="eal-type-badge org" style="margin-right: 4px; margin-bottom: 4px; display: inline-block;">
                       {{ code }}
                     </span>
                   {% empty %}
@@ -112,27 +147,27 @@
                 </td>
                 <td>
                   {% if method.is_active %}
-                    <span class="badge status-badge status-active">Active</span>
+                    <span class="status-badge active">Active</span>
                   {% else %}
-                    <span class="badge status-badge status-inactive">Inactive</span>
+                    <span class="status-badge inactive">Inactive</span>
                   {% endif %}
                 </td>
                 <td>
                   {% if request.user.is_root %}
                     <div class="eal-actions-cell">
-                      <a href="{% url 'payment_method_edit' method.method_id %}" class="eal-row-btn" title="Edit">
-                        <i class="bi bi-pencil"></i>
-                      </a>
+                      <a href="{% url 'payment_method_edit' method.method_id %}" class="eal-row-btn icon-only-btn icon-only-btn" title="Edit">
+<i class="bi bi-pencil"></i>
+</a>
                       <form method="post" action="{% url 'payment_method_toggle' method.method_id %}" style="display: inline">
                         {% csrf_token %}
                         {% if method.is_active %}
-                          <button type="submit" class="eal-row-btn" title="Deactivate">
-                            <i class="bi bi-slash-circle"></i>
-                          </button>
+                          <button type="submit" class="eal-row-btn icon-only-btn icon-only-btn" title="Deactivate">
+<i class="bi bi-slash-circle"></i>
+</button>
                         {% else %}
-                          <button type="submit" class="eal-row-btn" title="Activate">
-                            <i class="bi bi-check-circle"></i>
-                          </button>
+                          <button type="submit" class="eal-row-btn icon-only-btn icon-only-btn" title="Activate">
+<i class="bi bi-check-circle"></i>
+</button>
                         {% endif %}
                       </form>
                     </div>
@@ -144,36 +179,15 @@
         </table>
       </div>
 
-      <div class="eal-pagination">
-        <div class="eal-pagination-controls">
-          {% if methods.has_previous %}
-            <a
-              href="?method_type={{ type_filter }}&status={{ status_filter }}&page={{ methods.previous_page_number }}"
-              class="eal-page-btn"
-              title="Previous"
-            >
-              <i class="bi bi-chevron-left"></i>
-            </a>
-          {% endif %}
-          <span class="eal-page-btn active">{{ methods.number }}</span>
-          {% if methods.has_next %}
-            <a
-              href="?method_type={{ type_filter }}&status={{ status_filter }}&page={{ methods.next_page_number }}"
-              class="eal-page-btn"
-              title="Next"
-            >
-              <i class="bi bi-chevron-right"></i>
-            </a>
-          {% endif %}
-        </div>
-      </div>
+      
     {% else %}
-      <div class="notification-empty" style="margin-top: 16px">
+      <div class="notification-empty" class="list-filter-wrapper">
         <div class="empty-icon"><i class="bi bi-credit-card"></i></div>
         <h4 class="empty-title">No payment methods found</h4>
         <p class="empty-text">No payment method records match your current filters.</p>
       </div>
     {% endif %}
   </div>
+{% include 'partials/pagination.html' with page_obj=messages %}
 {% endblock %}
 

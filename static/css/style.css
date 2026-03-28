@@ -6493,3 +6493,516 @@ textarea.form-control {
     max-height: 300px;
   }
 }
+
+/* ============================================
+   Redesign Global Tokens & Overrides (Phase 2 Django Integration)
+   ============================================ */
+:root {
+  --form-input-height: 42px;
+  --form-border-color: #dee2e6;
+  --form-focus-glow: 0 0 0 0.2rem rgba(80, 81, 249, 0.25);
+}
+
+/* ============================================
+   Form Layout & Styles
+   ============================================ */
+
+.form-card,
+.content > .card,
+.card-style {
+  background-color: var(--bg-white, #fff);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  border-radius: 10px;
+  padding: 24px;
+  max-width: 860px;
+  margin: 0 auto;
+  border: none;
+}
+
+.form-card label,
+.form-group label,
+.mb-3 label {
+  display: block;
+  font-weight: 500;
+  margin-bottom: 8px; /* 8px base grid */
+  color: var(--text-dark);
+}
+
+.form-card input[type="text"],
+.form-card input[type="email"],
+.form-card input[type="password"],
+.form-card input[type="number"],
+.form-card input[type="date"],
+.form-card select,
+.form-card textarea,
+.form-control,
+.form-select {
+  height: var(--form-input-height);
+  border: 1px solid var(--form-border-color);
+  border-radius: 6px;
+  width: 100%;
+  padding: 8px 12px;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.form-card textarea,
+textarea.form-control {
+  height: auto;
+  min-height: 100px;
+}
+
+.form-card input:focus,
+.form-card select:focus,
+.form-card textarea:focus,
+.form-control:focus,
+.form-select:focus {
+  border-color: var(--primary-color);
+  box-shadow: var(--form-focus-glow);
+  outline: none;
+}
+
+.btn-primary-action, .btn-primary {
+  background-color: var(--primary-color);
+  color: #fff;
+  border: none;
+  height: var(--form-input-height);
+  border-radius: 6px;
+  font-weight: 500;
+  padding: 0 20px;
+  transition: background-color var(--transition-fast);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-primary-action:hover, .btn-primary:hover {
+  background-color: var(--primary-hover);
+  color: #fff;
+}
+
+.btn-secondary-action, .btn-secondary {
+  background-color: transparent;
+  color: var(--primary-color);
+  border: 1px solid var(--primary-color);
+  height: var(--form-input-height);
+  border-radius: 6px;
+  font-weight: 500;
+  padding: 0 20px;
+  transition: all var(--transition-fast);
+  margin-right: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-secondary-action:hover, .btn-secondary:hover {
+  background-color: var(--primary-light);
+  color: var(--primary-color);
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 24px;
+}
+
+/* ============================================
+   Table / List Layout (.eal-table overrides)
+   ============================================ */
+
+.table-card, .eal-table-card {
+  background-color: var(--bg-white, #fff);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  border-radius: 10px;
+  padding: 24px;
+  margin-top: 24px;
+  overflow: hidden;
+}
+
+.table-responsive-wrapper, .eal-table-wrap {
+  overflow-x: auto;
+  width: 100%;
+}
+
+.data-table, .eal-table {
+  width: 100%;
+  border-collapse: collapse;
+  white-space: nowrap;
+}
+
+.data-table th, .eal-table th {
+  background-color: var(--primary-color);
+  color: #fff;
+  font-weight: 600;
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: none;
+}
+
+.data-table th:first-child, .eal-table th:first-child {
+  border-top-left-radius: 6px;
+}
+.data-table th:last-child, .eal-table th:last-child {
+  border-top-right-radius: 6px;
+}
+
+.data-table td, .eal-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-light);
+  color: var(--text-dark);
+}
+
+.data-table tbody tr:hover, .eal-table tbody tr:hover {
+  background-color: var(--bg-gray);
+}
+
+.data-table tbody tr:nth-of-type(even), .eal-table tbody tr:nth-of-type(even) {
+  background-color: rgba(0,0,0,0.02);
+}
+
+/* Action Buttons */
+.action-btn-group {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-icon-small, .eal-table .btn-sm {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  border: 1px solid var(--border-light);
+  background: var(--bg-white);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  padding: 0;
+}
+
+.btn-icon-small:hover, .eal-table .btn-sm:hover {
+  color: var(--primary-color);
+  border-color: var(--primary-color);
+  background: var(--primary-light);
+}
+
+.btn-icon-small.delete:hover, .eal-table .btn-sm.btn-danger:hover {
+  color: #dc3545 !important;
+  border-color: #dc3545 !important;
+  background: #f8d7da !important;
+}
+
+/* Status Badges */
+.status-badge {
+  padding: 4px 12px;
+  border-radius: 50px;
+  font-size: 12px;
+  font-weight: 500;
+  display: inline-block;
+  text-align: center;
+}
+.status-badge.status-active, .status-badge.active, .status-badge.green {
+  background-color: #d1e7dd;
+  color: #0f5132;
+}
+.status-badge.status-inactive, .status-badge.inactive, .status-badge.red, .status-badge.status-suspended {
+  background-color: #f8d7da;
+  color: #842029;
+}
+.status-badge.status-pending, .status-badge.pending, .status-badge.yellow, .status-badge.status-scheduled {
+  background-color: #fff3cd;
+  color: #664d03;
+}
+
+/* ============================================
+   Redesign Global Tokens & Overrides (Phase 2 Django Integration)
+   ============================================ */
+:root {
+  --form-input-height: 42px;
+  --form-border-color: #dee2e6;
+  --form-focus-glow: 0 0 0 0.2rem rgba(80, 81, 249, 0.25);
+}
+
+/* ============================================
+   Form Layout & Styles
+   ============================================ */
+
+.form-card,
+.content > .card,
+.card-style {
+  background-color: var(--bg-white, #fff);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  border-radius: 10px;
+  padding: 24px;
+  max-width: 860px;
+  margin: 0 auto;
+  border: none;
+}
+
+.form-card label,
+.form-group label,
+.mb-3 label {
+  display: block;
+  font-weight: 500;
+  margin-bottom: 8px; /* 8px base grid */
+  color: var(--text-dark);
+}
+
+.form-card input[type="text"],
+.form-card input[type="email"],
+.form-card input[type="password"],
+.form-card input[type="number"],
+.form-card input[type="date"],
+.form-card select,
+.form-card textarea,
+.form-control,
+.form-select {
+  height: var(--form-input-height);
+  border: 1px solid var(--form-border-color);
+  border-radius: 6px;
+  width: 100%;
+  padding: 8px 12px;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.form-card textarea,
+textarea.form-control {
+  height: auto;
+  min-height: 100px;
+}
+
+.form-card input:focus,
+.form-card select:focus,
+.form-card textarea:focus,
+.form-control:focus,
+.form-select:focus {
+  border-color: var(--primary-color);
+  box-shadow: var(--form-focus-glow);
+  outline: none;
+}
+
+.btn-primary-action, .btn-primary {
+  background-color: var(--primary-color);
+  color: #fff;
+  border: none;
+  height: var(--form-input-height);
+  border-radius: 6px;
+  font-weight: 500;
+  padding: 0 20px;
+  transition: background-color var(--transition-fast);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-primary-action:hover, .btn-primary:hover {
+  background-color: var(--primary-hover);
+  color: #fff;
+}
+
+.btn-secondary-action, .btn-secondary {
+  background-color: transparent;
+  color: var(--primary-color);
+  border: 1px solid var(--primary-color);
+  height: var(--form-input-height);
+  border-radius: 6px;
+  font-weight: 500;
+  padding: 0 20px;
+  transition: all var(--transition-fast);
+  margin-right: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-secondary-action:hover, .btn-secondary:hover {
+  background-color: var(--primary-light);
+  color: var(--primary-color);
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 24px;
+}
+
+/* ============================================
+   Table / List Layout (.eal-table overrides)
+   ============================================ */
+
+.table-card, .eal-table-card {
+  background-color: var(--bg-white, #fff);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  border-radius: 10px;
+  padding: 24px;
+  margin-top: 24px;
+  overflow: hidden;
+}
+
+.table-responsive-wrapper, .eal-table-wrap {
+  overflow-x: auto;
+  width: 100%;
+}
+
+.data-table, .eal-table {
+  width: 100%;
+  border-collapse: collapse;
+  white-space: nowrap;
+}
+
+.data-table th, .eal-table th {
+  background-color: var(--primary-color);
+  color: #fff;
+  font-weight: 600;
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: none;
+}
+
+.data-table th:first-child, .eal-table th:first-child {
+  border-top-left-radius: 6px;
+}
+.data-table th:last-child, .eal-table th:last-child {
+  border-top-right-radius: 6px;
+}
+
+.data-table td, .eal-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-light);
+  color: var(--text-dark);
+}
+
+.data-table tbody tr:hover, .eal-table tbody tr:hover {
+  background-color: var(--bg-gray);
+}
+
+.data-table tbody tr:nth-of-type(even), .eal-table tbody tr:nth-of-type(even) {
+  background-color: rgba(0,0,0,0.02);
+}
+
+/* Action Buttons */
+.action-btn-group {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-icon-small, .eal-table .btn-sm {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  border: 1px solid var(--border-light);
+  background: var(--bg-white);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  padding: 0;
+}
+
+.btn-icon-small:hover, .eal-table .btn-sm:hover {
+  color: var(--primary-color);
+  border-color: var(--primary-color);
+  background: var(--primary-light);
+}
+
+.btn-icon-small.delete:hover, .eal-table .btn-sm.btn-danger:hover {
+  color: #dc3545 !important;
+  border-color: #dc3545 !important;
+  background: #f8d7da !important;
+}
+
+/* Status Badges */
+.status-badge {
+  padding: 4px 12px;
+  border-radius: 50px;
+  font-size: 12px;
+  font-weight: 500;
+  display: inline-block;
+  text-align: center;
+}
+.status-badge.status-active, .status-badge.active, .status-badge.green {
+  background-color: #d1e7dd;
+  color: #0f5132;
+}
+.status-badge.status-inactive, .status-badge.inactive, .status-badge.red, .status-badge.status-suspended {
+  background-color: #f8d7da;
+  color: #842029;
+}
+.status-badge.status-pending, .status-badge.pending, .status-badge.yellow, .status-badge.status-scheduled {
+  background-color: #fff3cd;
+  color: #664d03;
+}
+
+.eal-row-btn.icon-only-btn {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+}
+.table-pagination-wrapper {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 18px;
+  padding-top: 12px;
+  border-top: 1px solid #E5E7EB;
+  font-size: 13px;
+  color: #6B7280;
+}
+.pagination-controls {
+  display: flex;
+  gap: 4px;
+}
+.page-link-btn {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  background: white;
+  border: 1px solid #D1D5DB;
+  color: #374151;
+  text-decoration: none;
+  font-weight: 500;
+}
+.page-link-btn:hover:not(.disabled) {
+  background: #F3F4F6;
+  color: #1a1a2e;
+}
+.page-link-btn.active {
+  background: #5051F9;
+  border-color: #5051F9;
+  color: white;
+}
+.page-link-btn.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #F9FAFB;
+}
+.list-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+.list-page-title-area {
+  flex: 1;
+}
+.list-filter-wrapper {
+  margin-bottom: 20px;
+}
+.row-inactive {
+  opacity: 0.7;
+}
+.table-cell-flex {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}

@@ -1,6 +1,29 @@
 {% extends 'base.html' %}
-{% block title %}Support Categories | iRoad Admin{% endblock %}
+{% load i18n %}
+{% load i18n %}
+{% block title %}Support Categories | iRoad Admin{% include 'partials/pagination.html' with page_obj=messages %}
+{% endblock %}
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item active" aria-current="page">{% translate "Support Categories | iRoad Admin" %}</li>
+{% include 'partials/pagination.html' with page_obj=messages %}
+{% endblock %}
+
 {% block content %}
+<div class="page-header">
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">{% translate "Support Categories | iRoad Admin" %}</h1>
+      <p class="page-subtitle">{% translate "Manage your records here" %}</p>
+    </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <!-- Actions here -->
+      </div>
+    </div>
+  </div>
+</div>
+
 {% if messages %}
   {% for message in messages %}
     <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">
@@ -10,14 +33,19 @@
   {% endfor %}
 {% endif %}
 
-<div class="page-header">
-  <div class="page-header-row">
-    <div class="page-header-left"><h1 class="page-title">Support Categories</h1></div>
+
+
     <div class="page-header-right">
-      {% if request.user.is_root %}
+      <div class="eal-header-actions">
+        <!-- Actions here -->
+      </div>
+    </div>
+  </div>
+</div>
+  <div class="list-page-actions">
+    {% if request.user.is_root %}
         <a href="{% url 'support_category_create' %}" class="eal-btn eal-btn-primary">Add Category</a>
       {% endif %}
-    </div>
   </div>
 </div>
 
@@ -55,7 +83,13 @@
             </td>
           </tr>
         {% empty %}
-          <tr><td colspan="5" class="text-center py-4 text-muted">No support categories found.</td></tr>
+          <tr class="eal-table-empty">
+  <td colspan="20">
+    <div class="eal-empty-icon"><i class="bi bi-inbox"></i></div>
+    <div class="eal-empty-title">{% translate "No Data Found" %}</div>
+    <div class="eal-empty-text">No support categories found.</div>
+  </td>
+</tr>
         {% endfor %}
       </tbody>
     </table>
@@ -63,7 +97,7 @@
 </div>
 
 {% if categories.paginator.num_pages > 1 %}
-<div class="eal-pagination mt-3"><div class="eal-pagination-controls">{% if categories.has_previous %}<a class="eal-page-btn" href="?page={{ categories.previous_page_number }}&q={{ search_query|urlencode }}&is_active={{ status_filter|urlencode }}">Previous</a>{% endif %}<span class="eal-page-btn active">{{ categories.number }} / {{ categories.paginator.num_pages }}</span>{% if categories.has_next %}<a class="eal-page-btn" href="?page={{ categories.next_page_number }}&q={{ search_query|urlencode }}&is_active={{ status_filter|urlencode }}">Next</a>{% endif %}</div></div>
-{% endif %}
+
+{% include 'partials/pagination.html' with page_obj=messages %}
 {% endblock %}
 

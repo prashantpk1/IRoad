@@ -1,29 +1,61 @@
 {% extends 'base.html' %}
+{% load i18n %}
+{% load i18n %}
 
-{% block page_title %}Payment Gateways{% endblock %}
+{% block page_title %}Payment Gateways{% include 'partials/pagination.html' with page_obj=messages %}
+{% endblock %}
+
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item active" aria-current="page">{% translate "Payment Gateways" %}</li>
+{% include 'partials/pagination.html' with page_obj=messages %}
+{% endblock %}
 
 {% block content %}
-  <div class="page-header">
-    <div class="page-header-row">
-      <div class="page-header-left">
-        <h1 class="page-title">Payment Gateways</h1>
-        <div class="alert alert-info" style="margin-top: 12px; border-radius: 10px">
-          <p style="margin: 0; font-weight: 600">
-            Credentials are encrypted and never displayed after saving.
-          </p>
-        </div>
+<div class="page-header">
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">{% translate "Payment Gateways" %}</h1>
+      <p class="page-subtitle">{% translate "Manage your records here" %}</p>
+    </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        {% if request.user.is_root %}
+            <a href="{% url 'gateway_create' %}" class="eal-btn eal-btn-primary">
+              <i class="bi bi-plus-lg"></i>
+              <span>Add Gateway</span>
+            </a>
+          {% endif %}
       </div>
-      <div class="page-header-right">
-        <div class="eal-header-actions">
+    </div>
+  </div>
+</div>
+
+  
+
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        {% if request.user.is_root %}
+            <a href="{% url 'gateway_create' %}" class="eal-btn eal-btn-primary">
+              <i class="bi bi-plus-lg"></i>
+              <span>Add Gateway</span>
+            </a>
+          {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+  </div>
+  <div class="list-page-actions">
+    <div class="eal-header-actions">
           {% if request.user.is_root %}
             <a href="{% url 'gateway_create' %}" class="eal-btn eal-btn-primary">
               <i class="bi bi-plus-lg"></i>
               <span>Add Gateway</span>
             </a>
           {% endif %}
-        </div>
-      </div>
-    </div>
+  </div>
+</div>
   </div>
 
   <div class="eal-table-card">
@@ -57,7 +89,7 @@
     </form>
 
     {% if messages %}
-      <div style="margin-top: 16px">
+      <div class="list-filter-wrapper">
         {% for message in messages %}
           <p style="margin: 0; color: {% if message.tags == 'error' %}#b91c1c{% else %}#15803d{% endif %}; font-weight: 600">
             {{ message }}
@@ -76,7 +108,7 @@
               <th style="width: 140px">Environment badge</th>
               <th style="width: 120px">Status</th>
               <th style="width: 180px">Created At</th>
-              <th style="width: 220px">Actions</th>
+              <th style="width: 220px">ACTIONS</th>
             </tr>
           </thead>
           <tbody>
@@ -86,35 +118,35 @@
                 <td>{{ gateway.gateway_name }}</td>
                 <td>
                   {% if gateway.environment == 'Live' %}
-                    <span class="badge status-badge status-live">Live</span>
+                    <span class="status-badge active">Live</span>
                   {% else %}
-                    <span class="badge status-badge status-test">Test</span>
+                    <span class="status-badge warning">Test</span>
                   {% endif %}
                 </td>
                 <td>
                   {% if gateway.is_active %}
-                    <span class="badge status-badge status-active">Active</span>
+                    <span class="status-badge active">Active</span>
                   {% else %}
-                    <span class="badge status-badge status-inactive">Inactive</span>
+                    <span class="status-badge inactive">Inactive</span>
                   {% endif %}
                 </td>
                 <td>{{ gateway.created_at|date:"Y-m-d H:i" }}</td>
                 <td>
                   {% if request.user.is_root %}
                     <div class="eal-actions-cell">
-                      <a href="{% url 'gateway_edit' gateway.gateway_id %}" class="eal-row-btn" title="Edit">
-                        <i class="bi bi-pencil"></i>
-                      </a>
+                      <a href="{% url 'gateway_edit' gateway.gateway_id %}" class="eal-row-btn icon-only-btn icon-only-btn" title="Edit">
+<i class="bi bi-pencil"></i>
+</a>
                       <form method="post" action="{% url 'gateway_toggle' gateway.gateway_id %}" style="display: inline">
                         {% csrf_token %}
                         {% if gateway.is_active %}
-                          <button type="submit" class="eal-row-btn" title="Deactivate">
-                            <i class="bi bi-slash-circle"></i>
-                          </button>
+                          <button type="submit" class="eal-row-btn icon-only-btn icon-only-btn" title="Deactivate">
+<i class="bi bi-slash-circle"></i>
+</button>
                         {% else %}
-                          <button type="submit" class="eal-row-btn" title="Activate">
-                            <i class="bi bi-check-circle"></i>
-                          </button>
+                          <button type="submit" class="eal-row-btn icon-only-btn icon-only-btn" title="Activate">
+<i class="bi bi-check-circle"></i>
+</button>
                         {% endif %}
                       </form>
                     </div>
@@ -126,31 +158,9 @@
         </table>
       </div>
 
-      <div class="eal-pagination">
-        <div class="eal-pagination-controls">
-          {% if gateways.has_previous %}
-            <a
-              href="?environment={{ environment_filter }}&status={{ status_filter }}&page={{ gateways.previous_page_number }}"
-              class="eal-page-btn"
-              title="Previous"
-            >
-              <i class="bi bi-chevron-left"></i>
-            </a>
-          {% endif %}
-          <span class="eal-page-btn active">Page {{ gateways.number }} of {{ gateways.paginator.num_pages }}</span>
-          {% if gateways.has_next %}
-            <a
-              href="?environment={{ environment_filter }}&status={{ status_filter }}&page={{ gateways.next_page_number }}"
-              class="eal-page-btn"
-              title="Next"
-            >
-              <i class="bi bi-chevron-right"></i>
-            </a>
-          {% endif %}
-        </div>
-      </div>
+      
     {% else %}
-      <div class="notification-empty" style="margin-top: 16px">
+      <div class="notification-empty" class="list-filter-wrapper">
         <div class="empty-icon">
           <i class="bi bi-shield-lock"></i>
         </div>
@@ -159,5 +169,6 @@
       </div>
     {% endif %}
   </div>
+{% include 'partials/pagination.html' with page_obj=messages %}
 {% endblock %}
 

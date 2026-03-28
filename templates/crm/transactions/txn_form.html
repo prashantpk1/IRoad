@@ -1,6 +1,35 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% block title %}Manual Wallet Top-Up | iRoad Admin{% endblock %}
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item active" aria-current="page">{% translate "Manual Wallet Top-Up | iRoad Admin" %}</li>
+{% endblock %}
+
 {% block content %}
+<div class="page-header">
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">{% translate "Manual Wallet Top-Up | iRoad Admin" %}</h1>
+      <p class="page-subtitle">{% translate "Manage your records here" %}</p>
+    </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <!-- Actions here -->
+      </div>
+    </div>
+  </div>
+</div>
+
+
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <!-- Actions here -->
+      </div>
+    </div>
+  </div>
+</div>
+
 {% if messages %}
   {% for message in messages %}
     <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">
@@ -13,6 +42,8 @@
 <h4 class="mb-3">Manual Wallet Top-Up</h4>
 <p class="text-muted">This will be marked completed immediately and added to the tenant wallet balance.</p>
 
+<div class="form-card">
+  <div class="form-card-body">
 <form method="post" enctype="multipart/form-data" action="{% url 'transaction_create' %}" class="card p-4">
   {% csrf_token %}
   <div class="row g-3">
@@ -47,8 +78,10 @@
     </div>
   </div>
   <div class="mt-4 d-flex gap-2">
-    <a href="{% url 'transaction_list' %}" class="btn btn-outline-secondary">Cancel</a>
-    <button type="submit" class="btn btn-primary">Save</button>
+    <a href="{% url 'transaction_list' %}" class="eal-btn eal-btn-outline">Cancel</a>
+    <button type="submit" class="eal-btn eal-btn-primary">Save</button>
   </div>
 </form>
+  </div>
+</div>
 {% endblock %}

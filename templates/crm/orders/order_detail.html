@@ -1,4 +1,6 @@
 {% extends 'base.html' %}
+{% load i18n %}
+{% load i18n %}
 {% block title %}Order Details | iRoad Admin{% endblock %}
 {% block content %}
 {% if messages %}
@@ -10,14 +12,19 @@
   {% endfor %}
 {% endif %}
 
-<div class="page-header">
-  <nav aria-label="breadcrumb">
-    <ol class="breadcrumb">
-      <li class="breadcrumb-item"><a href="{% url 'order_list' %}">Orders</a></li>
-      <li class="breadcrumb-item active" aria-current="page">Order {{ order.order_id|stringformat:"s"|slice:":8" }}</li>
-    </ol>
-  </nav>
-  <div class="page-header-row"><div class="page-header-left"><h1 class="page-title">Order Details</h1></div><div class="page-header-right"><a href="{% url 'order_list' %}" class="btn btn-outline-secondary btn-sm">Back to list</a></div></div>
+<div class="breadcrumb-container">
+  <a href="#">System</a> 
+  <span class="separator">/</span> 
+  <span class="current">{% translate "Manage" %}</span>
+</div>
+<div class="list-page-header">
+  <div class="list-page-title-area">
+    <h1 class="page-title-main">Order Details</h1>
+    
+  </div>
+  <div class="list-page-actions">
+    <a href="{% url 'order_list' %}" class="btn btn-outline-secondary btn-sm">Back to list</a>
+  </div>
 </div>
 
 <div class="form-card mb-3">

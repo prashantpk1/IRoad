@@ -1,17 +1,34 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% block title %}{% if is_edit %}Edit Alert Route{% else %}Add Alert Route{% endif %}{% endblock %}
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item active" aria-current="page">{% translate "{% if is_edit %}Edit Alert Route{% else %}Add Alert Route{% endif %}" %}</li>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
-  <nav class="page-breadcrumb">
-    <a href="{% url 'alert_route_list' %}">Internal Alerts Routing</a>
-    <span class="bc-sep">›</span>
-    {% if form.instance.pk %}
-      <span class="bc-current">Edit: {{ form.instance }}</span>
-    {% else %}
-      <span class="bc-current">Add New</span>
-    {% endif %}
-  </nav>
-  <div class="page-header-row"><div class="page-header-left"><h1 class="page-title">Internal Alerts Routing</h1></div></div>
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">{% translate "{% if is_edit %}Edit Alert Route{% else %}Add Alert Route{% endif %}" %}</h1>
+      <p class="page-subtitle">{% translate "Manage your records here" %}</p>
+    </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <!-- Actions here -->
+      </div>
+    </div>
+  </div>
+</div>
+
+
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <!-- Actions here -->
+      </div>
+    </div>
+  </div>
+</div></div>
 </div>
 {% if form.instance.pk and form.instance.updated_at %}
 <div class="edit-info-bar">
@@ -35,9 +52,13 @@
         <div class="col-md-6">{{ form.notify_role.label_tag }}{{ form.notify_role }}{{ form.notify_role.errors }}</div>
         <div class="col-md-6">{{ form.notify_custom_email.label_tag }}{{ form.notify_custom_email }}{{ form.notify_custom_email.errors }}</div>
       </div>
-      <div class="form-footer-bar sticky-bottom mt-3">
-        <div class="footer-left"><a href="{% url 'alert_route_list' %}" class="btn btn-outline-secondary">Cancel</a></div>
-        <div class="footer-right"><button type="submit" class="btn btn-primary">Save</button></div>
+      <div class="form-actions-bar">
+  <div class="eal-header-actions">
+
+        <div class="footer-left"><a href="{% url 'alert_route_list' %}" class="eal-btn eal-btn-outline">Cancel</a>
+  </div>
+</div>
+        <div class="footer-right"><button type="submit" class="eal-btn eal-btn-primary">Save</button></div>
       </div>
     </form>
   </div>

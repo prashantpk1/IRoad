@@ -1,11 +1,42 @@
 {% extends 'base.html' %}
-{% block title %}System Banners{% endblock %}
+{% load i18n %}
+{% load i18n %}
+{% block title %}System Banners{% include 'partials/pagination.html' with page_obj=banners %}
+{% endblock %}
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item active" aria-current="page">{% translate "System Banners" %}</li>
+{% include 'partials/pagination.html' with page_obj=banners %}
+{% endblock %}
+
 {% block content %}
-  <div class="page-header">
-    <div class="page-header-row">
-      <div class="page-header-left"><h1 class="page-title">System Banners</h1></div>
-      <div class="page-header-right"><a href="{% url 'banner_create' %}" class="eal-btn eal-btn-primary">Add Banner</a></div>
+<div class="page-header">
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">{% translate "System Banners" %}</h1>
+      <p class="page-subtitle">{% translate "Manage your records here" %}</p>
     </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <a href="{% url 'banner_create' %}" class="eal-btn eal-btn-primary">Add Banner</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+  
+
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <a href="{% url 'banner_create' %}" class="eal-btn eal-btn-primary">Add Banner</a>
+      </div>
+    </div>
+  </div>
+</div>
+  <div class="list-page-actions">
+    <div class="eal-header-actions"><a href="{% url 'banner_create' %}" class="eal-btn eal-btn-primary">Add Banner</a>
+  </div>
+</div>
   </div>
   <div class="eal-table-card">
     <form method="get" class="eal-toolbar">
@@ -17,21 +48,21 @@
     </form>
     <div class="eal-table-wrap">
       <table class="eal-table">
-        <thead><tr><th>#</th><th>Title (EN)</th><th>Severity</th><th>Dismissible</th><th>Valid From</th><th>Valid Until</th><th>Status</th><th>Actions</th></tr></thead>
+        <thead><tr><th>#</th><th>Title (EN)</th><th>Severity</th><th>Dismissible</th><th>Valid From</th><th>Valid Until</th><th>Status</th><th>ACTIONS</th></tr></thead>
         <tbody>
           {% for row in banners %}
             <tr>
               <td>{{ forloop.counter0|add:banners.start_index }}</td>
               <td>{{ row.title_en }}</td>
               <td>
-                {% if row.severity == 'Info' %}<span class="badge status-badge status-issued">Info</span>{% elif row.severity == 'Warning' %}<span class="badge status-badge status-pending">Warning</span>{% else %}<span class="badge status-badge status-suspended">Critical</span>{% endif %}
+                {% if row.severity == 'Info' %}<span class="status-badge active">Info</span>{% elif row.severity == 'Warning' %}<span class="status-badge warning">Warning</span>{% else %}<span class="status-badge inactive">Critical</span>{% endif %}
               </td>
               <td>{{ row.is_dismissible|yesno:'Yes,No' }}</td>
               <td>{{ row.valid_from|date:'Y-m-d H:i' }}</td>
               <td>{{ row.valid_until|date:'Y-m-d H:i' }}</td>
               <td>
-                {% if row.is_active %}<span class="badge status-badge status-active">Active</span>{% else %}<span class="badge status-badge status-inactive">Inactive</span>{% endif %}
-                {% if row.is_expired %}<span class="badge status-badge status-expired">EXPIRED</span>{% endif %}
+                {% if row.is_active %}<span class="status-badge active">Active</span>{% else %}<span class="status-badge inactive">Inactive</span>{% endif %}
+                {% if row.is_expired %}<span class="status-badge expired">EXPIRED</span>{% endif %}
               </td>
               <td>
                 <div class="eal-actions-cell">
@@ -41,14 +72,20 @@
               </td>
             </tr>
           {% empty %}
-            <tr><td colspan="8" class="text-center py-4 text-muted">No banners found.</td></tr>
+            <tr class="eal-table-empty">
+  <td colspan="20">
+    <div class="eal-empty-icon"><i class="bi bi-inbox"></i></div>
+    <div class="eal-empty-title">{% translate "No Data Found" %}</div>
+    <div class="eal-empty-text">No banners found.</div>
+  </td>
+</tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
   </div>
 {% if banners.paginator.num_pages > 1 %}
-  <div class="eal-pagination mt-3"><div class="eal-pagination-controls">{% if banners.has_previous %}<a class="eal-page-btn" href="?page={{ banners.previous_page_number }}&severity={{ severity_filter }}&status={{ status_filter }}">Previous</a>{% endif %}<span class="eal-page-btn active">Page {{ banners.number }} of {{ banners.paginator.num_pages }}</span>{% if banners.has_next %}<a class="eal-page-btn" href="?page={{ banners.next_page_number }}&severity={{ severity_filter }}&status={{ status_filter }}">Next</a>{% endif %}</div></div>
-{% endif %}
+  
+{% include 'partials/pagination.html' with page_obj=banners %}
 {% endblock %}
 

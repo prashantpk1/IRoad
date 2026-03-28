@@ -1,11 +1,42 @@
 {% extends 'base.html' %}
-{% block title %}Push Notifications{% endblock %}
+{% load i18n %}
+{% load i18n %}
+{% block title %}Push Notifications{% include 'partials/pagination.html' with page_obj=push_items %}
+{% endblock %}
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item active" aria-current="page">{% translate "Push Notifications" %}</li>
+{% include 'partials/pagination.html' with page_obj=push_items %}
+{% endblock %}
+
 {% block content %}
-  <div class="page-header">
-    <div class="page-header-row">
-      <div class="page-header-left"><h1 class="page-title">Push Notifications</h1></div>
-      <div class="page-header-right"><a href="{% url 'push_notif_create' %}" class="eal-btn eal-btn-primary">Add Push Notification</a></div>
+<div class="page-header">
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">{% translate "Push Notifications" %}</h1>
+      <p class="page-subtitle">{% translate "Manage your records here" %}</p>
     </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <a href="{% url 'push_notif_create' %}" class="eal-btn eal-btn-primary">Add Push Notification</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+  
+
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <a href="{% url 'push_notif_create' %}" class="eal-btn eal-btn-primary">Add Push Notification</a>
+      </div>
+    </div>
+  </div>
+</div>
+  <div class="list-page-actions">
+    <div class="eal-header-actions"><a href="{% url 'push_notif_create' %}" class="eal-btn eal-btn-primary">Add Push Notification</a>
+  </div>
+</div>
   </div>
 
   <div class="eal-table-card">
@@ -19,7 +50,7 @@
 
     <div class="eal-table-wrap">
       <table class="eal-table">
-        <thead><tr><th>#</th><th>Name</th><th>Trigger Mode badge</th><th>Audience/Event</th><th>Scheduled At</th><th>Status</th><th>Actions</th></tr></thead>
+        <thead><tr><th>#</th><th>Name</th><th>Trigger Mode badge</th><th>Audience/Event</th><th>Scheduled At</th><th>Status</th><th>ACTIONS</th></tr></thead>
         <tbody>
           {% for row in push_items %}
             <tr>
@@ -27,14 +58,24 @@
               <td>{{ row.internal_name }}</td>
               <td>
                 {% if row.trigger_mode == 'Manual_Broadcast' %}
-                  <span class="badge status-badge status-issued">Manual</span>
+                  <span class="status-badge active">Manual</span>
                 {% else %}
-                  <span class="badge status-badge status-scheduled">System</span>
+                  <span class="status-badge warning">System</span>
                 {% endif %}
               </td>
               <td>{% if row.trigger_mode == 'System_Event' %}{{ row.get_linked_event_display }}{% else %}{{ row.get_target_audience_display }}{% endif %}</td>
               <td>{{ row.scheduled_at|date:'Y-m-d H:i'|default:'-' }}</td>
-              <td>{{ row.dispatch_status }}</td>
+              <td>
+                {% if row.dispatch_status == 'Draft' %}
+                  <span class="status-badge pending">{{ row.dispatch_status }}</span>
+                {% elif row.dispatch_status == 'Scheduled' %}
+                  <span class="status-badge warning">{{ row.dispatch_status }}</span>
+                {% elif row.dispatch_status == 'Completed' %}
+                  <span class="status-badge active">{{ row.dispatch_status }}</span>
+                {% else %}
+                  <span class="status-badge inactive">{{ row.dispatch_status }}</span>
+                {% endif %}
+              </td>
               <td>
                 <div class="eal-actions-cell">
                   {% if row.dispatch_status == 'Completed' %}
@@ -47,7 +88,13 @@
               </td>
             </tr>
           {% empty %}
-            <tr><td colspan="7" class="text-center py-4 text-muted">No push notifications found.</td></tr>
+            <tr class="eal-table-empty">
+  <td colspan="20">
+    <div class="eal-empty-icon"><i class="bi bi-inbox"></i></div>
+    <div class="eal-empty-title">{% translate "No Data Found" %}</div>
+    <div class="eal-empty-text">No push notifications found.</div>
+  </td>
+</tr>
           {% endfor %}
         </tbody>
       </table>
@@ -55,7 +102,7 @@
   </div>
 
   {% if push_items.paginator.num_pages > 1 %}
-    <div class="eal-pagination mt-3"><div class="eal-pagination-controls">{% if push_items.has_previous %}<a class="eal-page-btn" href="?page={{ push_items.previous_page_number }}&trigger_mode={{ trigger_mode_filter }}&dispatch_status={{ dispatch_status_filter }}">Previous</a>{% endif %}<span class="eal-page-btn active">Page {{ push_items.number }} of {{ push_items.paginator.num_pages }}</span>{% if push_items.has_next %}<a class="eal-page-btn" href="?page={{ push_items.next_page_number }}&trigger_mode={{ trigger_mode_filter }}&dispatch_status={{ dispatch_status_filter }}">Next</a>{% endif %}</div></div>
-  {% endif %}
+    
+{% include 'partials/pagination.html' with page_obj=push_items %}
 {% endblock %}
 

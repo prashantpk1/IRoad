@@ -1,25 +1,60 @@
 {% extends 'base.html' %}
+{% load i18n %}
+{% load i18n %}
 
-{% block page_title %}Bank Accounts{% endblock %}
+{% block page_title %}Bank Accounts{% include 'partials/pagination.html' with page_obj=messages %}
+{% endblock %}
+
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item active" aria-current="page">{% translate "Bank Accounts" %}</li>
+{% include 'partials/pagination.html' with page_obj=messages %}
+{% endblock %}
 
 {% block content %}
-  <div class="page-header">
-    <div class="page-header-row">
-      <div class="page-header-left">
-        <h1 class="page-title">Bank Accounts</h1>
-        <p class="page-subtitle">IRoad official bank accounts for transfers</p>
+<div class="page-header">
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">{% translate "Bank Accounts" %}</h1>
+      <p class="page-subtitle">{% translate "Manage your records here" %}</p>
+    </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        {% if request.user.is_root %}
+            <a href="{% url 'bank_account_create' %}" class="eal-btn eal-btn-primary">
+              <i class="bi bi-plus-lg"></i>
+              <span>Add Account</span>
+            </a>
+          {% endif %}
       </div>
-      <div class="page-header-right">
-        <div class="eal-header-actions">
+    </div>
+  </div>
+</div>
+
+  
+
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        {% if request.user.is_root %}
+            <a href="{% url 'bank_account_create' %}" class="eal-btn eal-btn-primary">
+              <i class="bi bi-plus-lg"></i>
+              <span>Add Account</span>
+            </a>
+          {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+  <div class="list-page-actions">
+    <div class="eal-header-actions">
           {% if request.user.is_root %}
             <a href="{% url 'bank_account_create' %}" class="eal-btn eal-btn-primary">
               <i class="bi bi-plus-lg"></i>
               <span>Add Account</span>
             </a>
           {% endif %}
-        </div>
-      </div>
-    </div>
+  </div>
+</div>
   </div>
 
   {% if messages %}
@@ -41,7 +76,6 @@
             <input
               type="text"
               name="q"
-              class=""
               placeholder="Search by bank name or IBAN"
               value="{{ search_query }}"
             />
@@ -94,7 +128,7 @@
               <th>Currency</th>
               <th>SWIFT</th>
               <th style="width: 120px">Status</th>
-              <th style="width: 220px">Actions</th>
+              <th style="width: 220px">ACTIONS</th>
             </tr>
           </thead>
           <tbody>
@@ -109,27 +143,27 @@
                 <td>{{ account.swift_code|default:'-' }}</td>
                 <td>
                   {% if account.is_active %}
-                    <span class="badge status-badge status-active">Active</span>
+                    <span class="status-badge active">Active</span>
                   {% else %}
-                    <span class="badge status-badge status-inactive">Inactive</span>
+                    <span class="status-badge inactive">Inactive</span>
                   {% endif %}
                 </td>
                 <td>
                   {% if request.user.is_root %}
                     <div class="eal-actions-cell">
-                      <a href="{% url 'bank_account_edit' account.account_id %}" class="eal-row-btn" title="Edit">
-                        <i class="bi bi-pencil"></i>
-                      </a>
+                      <a href="{% url 'bank_account_edit' account.account_id %}" class="eal-row-btn icon-only-btn icon-only-btn" title="Edit">
+<i class="bi bi-pencil"></i>
+</a>
                       <form method="post" action="{% url 'bank_account_toggle' account.account_id %}" style="display:inline">
                         {% csrf_token %}
                         {% if account.is_active %}
-                          <button type="submit" class="eal-row-btn" title="Deactivate">
-                            <i class="bi bi-slash-circle"></i>
-                          </button>
+                          <button type="submit" class="eal-row-btn icon-only-btn icon-only-btn" title="Deactivate">
+<i class="bi bi-slash-circle"></i>
+</button>
                         {% else %}
-                          <button type="submit" class="eal-row-btn" title="Activate">
-                            <i class="bi bi-check-circle"></i>
-                          </button>
+                          <button type="submit" class="eal-row-btn icon-only-btn icon-only-btn" title="Activate">
+<i class="bi bi-check-circle"></i>
+</button>
                         {% endif %}
                       </form>
                     </div>
@@ -141,36 +175,15 @@
         </table>
       </div>
 
-      <div class="eal-pagination">
-        <div class="eal-pagination-controls">
-          {% if accounts.has_previous %}
-            <a
-              href="?q={{ search_query|urlencode }}&currency={{ currency_filter|urlencode }}&status={{ status_filter }}&page={{ accounts.previous_page_number }}"
-              class="eal-page-btn"
-              title="Previous"
-            >
-              <i class="bi bi-chevron-left"></i>
-            </a>
-          {% endif %}
-          <span class="eal-page-btn active">Page {{ accounts.number }}</span>
-          {% if accounts.has_next %}
-            <a
-              href="?q={{ search_query|urlencode }}&currency={{ currency_filter|urlencode }}&status={{ status_filter }}&page={{ accounts.next_page_number }}"
-              class="eal-page-btn"
-              title="Next"
-            >
-              <i class="bi bi-chevron-right"></i>
-            </a>
-          {% endif %}
-        </div>
-      </div>
+      
     {% else %}
-      <div class="notification-empty" style="margin-top: 16px">
+      <div class="notification-empty" class="list-filter-wrapper">
         <div class="empty-icon"><i class="bi bi-building"></i></div>
         <h4 class="empty-title">No bank accounts found</h4>
         <p class="empty-text">No bank account records match your current filters.</p>
       </div>
     {% endif %}
   </div>
+{% include 'partials/pagination.html' with page_obj=messages %}
 {% endblock %}
 

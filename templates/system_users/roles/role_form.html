@@ -1,101 +1,102 @@
 {% extends 'base.html' %}
+{% load i18n %}
 
-{% block page_title %}{% if form.instance.pk %}Edit Role{% else %}Add Role{% endif %}{% endblock %}
+{% block title %}{% if form.instance.pk %}{% translate "Edit Role" %}{% else %}{% translate "Add Role" %}{% endif %}{% endblock %}
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item"><a href="{% url 'role_list' %}">{% translate "Roles" %}</a></li>
+<li class="breadcrumb-item active" aria-current="page">{% if form.instance.pk %}{% translate "Edit" %}{% else %}{% translate "Add" %}{% endif %}</li>
+{% endblock %}
 
 {% block content %}
-  <div class="page-header">
-    <nav class="page-breadcrumb">
-      <ol class="breadcrumb">
-        <li class="breadcrumb-item"><a href="{% url 'role_list' %}">Roles</a></li>
-        <li class="breadcrumb-item active" aria-current="page">
-          {% if form.instance.pk %}Edit: {{ form.instance.role_name_en }}{% else %}Add Role{% endif %}
-        </li>
-      </ol>
-    </nav>
-    <div class="page-header-row">
-      <div class="page-header-left">
-        <h2 class="page-title">{% if form.instance.pk %}Edit Role{% else %}Add Role{% endif %}</h2>
+<div class="page-header">
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">{% if form.instance.pk %}{% translate "Edit Role" %}{% else %}{% translate "Add Role" %}{% endif %}</h1>
+      <p class="page-subtitle">{% translate "Define access permissions and role properties" %}</p>
+    </div>
+  </div>
+</div>
+
+{% if form.instance.pk and form.instance.updated_at %}
+<div class="edit-info-bar" style="margin-bottom: 24px;">
+  <i class="bi bi-clock-history"></i>
+  <span>{% translate "Last updated" %}
+  {% if form.instance.updated_by %}
+    {% translate "by" %} <strong>{{ form.instance.updated_by.first_name }} {{ form.instance.updated_by.last_name }}</strong>
+  {% endif %}
+  {% translate "at" %} <strong>{{ form.instance.updated_at|date:"d M Y, H:i" }}</strong></span>
+</div>
+{% endif %}
+
+<div class="form-card">
+  <div class="form-card-header">
+    <div class="form-card-title-box">
+      <div class="form-card-icon"><i class="bi bi-person-lock"></i></div>
+      <div class="form-card-info">
+        <h3 class="form-card-title">{% translate "Role Configuration" %}</h3>
+        <p class="form-card-subtitle">{% translate "Set name, description and operational status" %}</p>
       </div>
     </div>
   </div>
-
-  {% if form.instance.pk and form.instance.updated_at %}
-  <div class="edit-info-bar">
-    <i class="bi bi-clock-history"></i>
-    Last updated
-    {% if form.instance.updated_by %}
-      by <strong>{{ form.instance.updated_by.first_name }} {{ form.instance.updated_by.last_name }}</strong>
-    {% endif %}
-    at <strong>{{ form.instance.updated_at|date:"d M Y, H:i" }}</strong>
-  </div>
-  {% endif %}
-
-  <div class="form-card">
-    <div class="form-card-body">
+  <div class="form-card-body">
     {% if form.instance.pk and form.instance.is_system_default %}
-      <div class="alert alert-info mb-3">
-        This is a system default role and is immutable.
+      <div class="alert alert-warning py-2 small mb-4">
+        <i class="bi bi-exclamation-triangle-fill me-1"></i> {% translate "This is a system default role and is immutable." %}
       </div>
     {% endif %}
 
     {% if messages %}
-      <div style="margin-bottom: 16px">
+      <div class="alert-container mb-4">
         {% for message in messages %}
-          <p style="margin: 0; color: {% if message.tags == 'error' %}#b91c1c{% else %}#15803d{% endif %}; font-weight: 600">
+          <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}success{% endif %} py-2 small">
             {{ message }}
-          </p>
+          </div>
         {% endfor %}
       </div>
     {% endif %}
 
-    <form method="post" action="">
+    <form method="post" novalidate>
       {% csrf_token %}
+      {% if form.non_field_errors %}<div class="alert alert-danger mb-4">{{ form.non_field_errors }}</div>{% endif %}
 
-      {% if form.non_field_errors %}
-        <div style="margin-bottom: 16px; color: #b91c1c; font-weight: 600">
-          {{ form.non_field_errors }}
+      <div class="fields-grid cols-2">
+        <div class="field">
+          <label class="form-label" for="{{ form.role_name_en.id_for_label }}">{% translate "Role Name (EN)" %}</label>
+          {{ form.role_name_en }}
+          {% if form.role_name_en.errors %}<div class="field-error">{{ form.role_name_en.errors.0 }}</div>{% endif %}
         </div>
-      {% endif %}
 
-      <h6 class="mb-2">Section: Role Details</h6>
-      <div style="margin-bottom: 16px">
-        <label class="form-label">Role Name (EN)</label>
-        {{ form.role_name_en }}
-        {% for error in form.role_name_en.errors %}
-          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-        {% endfor %}
+        <div class="field">
+          <label class="form-label" for="{{ form.role_name_ar.id_for_label }}">{% translate "Role Name (AR)" %}</label>
+          {{ form.role_name_ar }}
+          {% if form.role_name_ar.errors %}<div class="field-error">{{ form.role_name_ar.errors.0 }}</div>{% endif %}
+        </div>
+
+        <div class="field span-2">
+          <label class="form-label" for="{{ form.description.id_for_label }}">{% translate "Description" %}</label>
+          {{ form.description }}
+          {% if form.description.errors %}<div class="field-error">{{ form.description.errors.0 }}</div>{% endif %}
+        </div>
+
+        <div class="field">
+          <label class="form-label" for="{{ form.status.id_for_label }}">{% translate "Status" %}</label>
+          {{ form.status }}
+          {% if form.status.errors %}<div class="field-error">{{ form.status.errors.0 }}</div>{% endif %}
+        </div>
       </div>
 
-      <div style="margin-bottom: 16px">
-        <label class="form-label">Role Name (AR)</label>
-        {{ form.role_name_ar }}
-        {% for error in form.role_name_ar.errors %}
-          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-        {% endfor %}
-      </div>
-
-      <div style="margin-bottom: 16px">
-        <label class="form-label">Description</label>
-        {{ form.description }}
-        {% for error in form.description.errors %}
-          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-        {% endfor %}
-      </div>
-
-      <div style="margin-bottom: 16px">
-        <label class="form-label">Status</label>
-        {{ form.status }}
-        {% for error in form.status.errors %}
-          <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-        {% endfor %}
-      </div>
-
-      <div class="form-actions-bar">
-        <a href="{% url 'role_list' %}" class="btn btn-light border">Cancel</a>
-        <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Save Role</button>
+      <div class="form-actions-bar mt-5">
+        <div class="eal-header-actions">
+          <a href="{% url 'role_list' %}" class="eal-btn eal-btn-outline">{% translate "Cancel" %}</a>
+          <button type="submit" class="eal-btn eal-btn-primary">
+            <i class="bi bi-check-lg"></i>
+            <span>{% translate "Save Role" %}</span>
+          </button>
+        </div>
       </div>
     </form>
-    </div>
   </div>
+</div>
 {% endblock %}
 

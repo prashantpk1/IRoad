@@ -1,25 +1,60 @@
 {% extends 'base.html' %}
+{% load i18n %}
+{% load i18n %}
 
-{% block page_title %}Tax Codes{% endblock %}
+{% block page_title %}Tax Codes{% include 'partials/pagination.html' with page_obj=messages %}
+{% endblock %}
+
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item active" aria-current="page">{% translate "Tax Codes" %}</li>
+{% include 'partials/pagination.html' with page_obj=messages %}
+{% endblock %}
 
 {% block content %}
-  <div class="page-header">
-    <div class="page-header-row">
-      <div class="page-header-left">
-        <h1 class="page-title">Tax Codes</h1>
-        <p class="page-subtitle">Geo-routing tax rules</p>
+<div class="page-header">
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">{% translate "Tax Codes" %}</h1>
+      <p class="page-subtitle">{% translate "Manage your records here" %}</p>
+    </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        {% if request.user.is_root %}
+            <a href="{% url 'tax_code_create' %}" class="eal-btn eal-btn-primary">
+              <i class="bi bi-plus-lg"></i>
+              <span>Add Tax Code</span>
+            </a>
+          {% endif %}
       </div>
-      <div class="page-header-right">
-        <div class="eal-header-actions">
+    </div>
+  </div>
+</div>
+
+  
+
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        {% if request.user.is_root %}
+            <a href="{% url 'tax_code_create' %}" class="eal-btn eal-btn-primary">
+              <i class="bi bi-plus-lg"></i>
+              <span>Add Tax Code</span>
+            </a>
+          {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+  <div class="list-page-actions">
+    <div class="eal-header-actions">
           {% if request.user.is_root %}
             <a href="{% url 'tax_code_create' %}" class="eal-btn eal-btn-primary">
               <i class="bi bi-plus-lg"></i>
               <span>Add Tax Code</span>
             </a>
           {% endif %}
-        </div>
-      </div>
-    </div>
+  </div>
+</div>
   </div>
 
   {% if messages %}
@@ -87,7 +122,7 @@
               <th style="width: 130px">Country Default</th>
               <th style="width: 130px">Int. Default</th>
               <th style="width: 100px">Status</th>
-              <th style="width: 220px">Actions</th>
+              <th style="width: 220px">ACTIONS</th>
             </tr>
           </thead>
           <tbody>
@@ -99,36 +134,36 @@
                 <td>{{ tax.applicable_country_code.name_en|default:"-" }}</td>
                 <td>
                   {% if tax.is_default_for_country %}
-                    <span class="badge rounded-pill" style="background:#0d6efd;color:#fff">Yes</span>
+                    <span class="status-badge active">Yes</span>
                   {% else %}
-                    <span class="badge rounded-pill text-bg-secondary">No</span>
+                    <span class="status-badge inactive">No</span>
                   {% endif %}
                 </td>
                 <td>
                   {% if tax.is_international_default %}
-                    <span class="badge rounded-pill" style="background:#6f42c1;color:#fff">Yes</span>
+                    <span class="status-badge active">Yes</span>
                   {% else %}
-                    <span class="badge rounded-pill text-bg-secondary">No</span>
+                    <span class="status-badge inactive">No</span>
                   {% endif %}
                 </td>
                 <td>
                   {% if tax.is_active %}
-                    <span class="badge status-badge status-active">Active</span>
+                    <span class="status-badge active">Active</span>
                   {% else %}
-                    <span class="badge status-badge status-inactive">Inactive</span>
+                    <span class="status-badge inactive">Inactive</span>
                   {% endif %}
                 </td>
                 <td>
                   <div class="eal-actions-cell">
                     {% if request.user.is_root %}
-                      <a href="{% url 'tax_code_edit' tax.tax_code %}" class="eal-row-btn" title="Edit">
-                        <i class="bi bi-pencil"></i>
-                      </a>
+                      <a href="{% url 'tax_code_edit' tax.tax_code %}" class="eal-row-btn icon-only-btn icon-only-btn" title="Edit">
+<i class="bi bi-pencil"></i>
+</a>
                       <form method="post" action="{% url 'tax_code_toggle' tax.tax_code %}" style="display:inline">
                         {% csrf_token %}
-                        <button type="submit" class="eal-row-btn" title="Toggle Status">
-                          <i class="bi bi-arrow-repeat"></i>
-                        </button>
+                        <button type="submit" class="eal-row-btn icon-only-btn icon-only-btn" title="Toggle Status">
+<i class="bi bi-arrow-repeat"></i>
+</button>
                       </form>
                     {% endif %}
                   </div>
@@ -139,23 +174,9 @@
         </table>
       </div>
 
-      <div class="eal-pagination">
-        <div class="eal-pagination-controls">
-          {% if tax_codes.has_previous %}
-            <a href="?q={{ search_query|urlencode }}&status={{ status_filter }}&page={{ tax_codes.previous_page_number }}" class="eal-page-btn" title="Previous">
-              <i class="bi bi-chevron-left"></i>
-            </a>
-          {% endif %}
-          <span class="eal-page-btn active">{{ tax_codes.number }}</span>
-          {% if tax_codes.has_next %}
-            <a href="?q={{ search_query|urlencode }}&status={{ status_filter }}&page={{ tax_codes.next_page_number }}" class="eal-page-btn" title="Next">
-              <i class="bi bi-chevron-right"></i>
-            </a>
-          {% endif %}
-        </div>
-      </div>
+      
     {% else %}
-      <div class="notification-empty" style="margin-top: 16px">
+      <div class="notification-empty" class="list-filter-wrapper">
         <div class="empty-icon">
           <i class="bi bi-percent"></i>
         </div>
@@ -164,4 +185,5 @@
       </div>
     {% endif %}
   </div>
+{% include 'partials/pagination.html' with page_obj=messages %}
 {% endblock %}

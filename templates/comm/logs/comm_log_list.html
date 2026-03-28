@@ -1,7 +1,36 @@
 {% extends 'base.html' %}
-{% block title %}Communication Logs{% endblock %}
+{% load i18n %}
+{% block title %}Communication Logs{% include 'partials/pagination.html' with page_obj=logs %}
+{% endblock %}
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item active" aria-current="page">{% translate "Communication Logs" %}</li>
+{% include 'partials/pagination.html' with page_obj=logs %}
+{% endblock %}
+
 {% block content %}
-<div class="page-header"><div class="page-header-row"><div class="page-header-left"><h1 class="page-title">Communication Logs</h1></div></div></div>
+<div class="page-header">
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">{% translate "Communication Logs" %}</h1>
+      <p class="page-subtitle">{% translate "Manage your records here" %}</p>
+    </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <!-- Actions here -->
+      </div>
+    </div>
+  </div>
+</div>
+
+
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <!-- Actions here -->
+      </div>
+    </div>
+  </div>
+</div></div></div>
 <div class="eal-table-card">
   <form method="get" class="eal-toolbar">
     <div class="eal-toolbar-left" style="width:100%; display:flex; gap:8px; flex-wrap:wrap;">
@@ -9,7 +38,10 @@
       <div style="width:170px"><select class="form-select form-select-sm" name="status"><option value="All" {% if status_filter == 'All' %}selected{% endif %}>All Statuses</option><option value="Sent" {% if status_filter == 'Sent' %}selected{% endif %}>Sent</option><option value="Failed" {% if status_filter == 'Failed' %}selected{% endif %}>Failed</option><option value="Bounced" {% if status_filter == 'Bounced' %}selected{% endif %}>Bounced</option></select></div>
       <input type="date" name="date_from" value="{{ date_from }}" class="form-control form-control-sm" style="width:150px">
       <input type="date" name="date_to" value="{{ date_to }}" class="form-control form-control-sm" style="width:150px">
-      <input type="text" name="q" value="{{ search_query }}" class="form-control form-control-sm" placeholder="Search recipient" style="width:200px">
+      <div class="eal-search" style="flex:1;min-width:200px;max-width:280px">
+        <i class="bi bi-search"></i>
+        <input type="text" name="q" value="{{ search_query }}" placeholder="Search recipient" />
+      </div>
       <button class="eal-btn eal-btn-outline">Go</button>
     </div>
   </form>
@@ -21,21 +53,27 @@
           <tr>
             <td>{{ forloop.counter0|add:logs.start_index }}</td>
             <td>{{ row.recipient }}</td>
-            <td>{% if row.channel_type == 'Email' %}<span class="badge status-badge status-issued">Email</span>{% elif row.channel_type == 'SMS' %}<span class="badge status-badge status-active">SMS</span>{% else %}<span class="badge status-badge status-scheduled">Push</span>{% endif %}</td>
+            <td>{% if row.channel_type == 'Email' %}<span class="status-badge inactive">Email</span>{% elif row.channel_type == 'SMS' %}<span class="status-badge active">SMS</span>{% else %}<span class="status-badge warning">Push</span>{% endif %}</td>
             <td>{{ row.get_trigger_source_display }}</td>
-            <td>{% if row.delivery_status == 'Sent' %}<span class="badge status-badge status-active">Sent</span>{% elif row.delivery_status == 'Failed' %}<span class="badge status-badge status-suspended">Failed</span>{% else %}<span class="badge status-badge status-pending">Bounced</span>{% endif %}</td>
+            <td>{% if row.delivery_status == 'Sent' %}<span class="status-badge active">Sent</span>{% elif row.delivery_status == 'Failed' %}<span class="status-badge warning">Failed</span>{% else %}<span class="status-badge pending">Bounced</span>{% endif %}</td>
             <td>{{ row.error_details|default:'-'|truncatechars:70 }}</td>
             <td>{{ row.dispatched_at|date:'Y-m-d H:i:s' }}</td>
           </tr>
         {% empty %}
-          <tr><td colspan="7" class="text-center py-4 text-muted">No communication logs found.</td></tr>
+          <tr class="eal-table-empty">
+  <td colspan="20">
+    <div class="eal-empty-icon"><i class="bi bi-inbox"></i></div>
+    <div class="eal-empty-title">{% translate "No Data Found" %}</div>
+    <div class="eal-empty-text">No communication logs found.</div>
+  </td>
+</tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 </div>
 {% if logs.paginator.num_pages > 1 %}
-  <div class="eal-pagination mt-3"><div class="eal-pagination-controls">{% if logs.has_previous %}<a class="eal-page-btn" href="?page={{ logs.previous_page_number }}&channel={{ channel_filter }}&status={{ status_filter }}&date_from={{ date_from }}&date_to={{ date_to }}&q={{ search_query|urlencode }}">Previous</a>{% endif %}<span class="eal-page-btn active">Page {{ logs.number }} of {{ logs.paginator.num_pages }}</span>{% if logs.has_next %}<a class="eal-page-btn" href="?page={{ logs.next_page_number }}&channel={{ channel_filter }}&status={{ status_filter }}&date_from={{ date_from }}&date_to={{ date_to }}&q={{ search_query|urlencode }}">Next</a>{% endif %}</div></div>
-{% endif %}
+  
+{% include 'partials/pagination.html' with page_obj=logs %}
 {% endblock %}
 

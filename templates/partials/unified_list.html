@@ -1,3 +1,5 @@
+{% load i18n %}
+{% load i18n %}
 {# STANDARD STATUS BADGES — use these classes everywhere #}
 {# Active / Success:   <span class="badge status-badge status-active">Active</span> #}
 {# Inactive / Disabled:<span class="badge status-badge status-inactive">Inactive</span> #}
@@ -5,39 +7,52 @@
 {# Suspended / Danger: <span class="badge status-badge status-suspended">Suspended</span> #}
 {# Expired:            <span class="badge status-badge status-expired">Expired</span> #}
 {# Scheduled:          <span class="badge status-badge status-scheduled">Scheduled</span> #}
+
 <div class="page-header">
   <div class="page-header-row">
     <div class="page-header-left">
-      <h1 class="page-title">{% block page_title %}{% endblock %}</h1>
-      <p class="page-subtitle">{% block page_subtitle %}{% endblock %}</p>
+      <h1 class="page-title">{% translate "" %}</h1>
+      <p class="page-subtitle">{% translate "Manage your records here" %}</p>
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
-        {% block page_actions %}{% endblock %}
+        {% block page_actions %}{% include 'partials/pagination.html' with page_obj=page_obj %}
+{% endblock %}
       </div>
     </div>
   </div>
+</div>
+  <div class="list-page-actions">
+    <div class="eal-header-actions">
+        {% block page_actions %}{% include 'partials/pagination.html' with page_obj=page_obj %}
+{% endblock %}
+  </div>
+</div>
 </div>
 
 <div class="eal-table-card">
   <div class="eal-toolbar">
     <div class="eal-toolbar-left">
-      {% block search_filters %}{% endblock %}
+      {% block search_filters %}{% include 'partials/pagination.html' with page_obj=page_obj %}
+{% endblock %}
     </div>
   </div>
 
   <div class="eal-pagination-info" style="margin-bottom: 12px;">
-    {% block results_count %}{% endblock %}
+    {% block results_count %}{% include 'partials/pagination.html' with page_obj=page_obj %}
+{% endblock %}
   </div>
 
   <div class="eal-table-wrap">
     <table class="eal-table">
-      {% block table_content %}{% endblock %}
+      {% block table_content %}{% include 'partials/pagination.html' with page_obj=page_obj %}
+{% endblock %}
     </table>
   </div>
 
   <div class="eal-pagination">
-    {% block pagination %}{% endblock %}
+    {% block pagination %}{% include 'partials/pagination.html' with page_obj=page_obj %}
+{% endblock %}
   </div>
 
   <div class="notification-empty" style="margin-top: 16px;">
@@ -45,7 +60,8 @@
       <i class="bi bi-inbox"></i>
     </div>
     <h4 class="empty-title">No records found</h4>
-    <p class="empty-text">{% block empty_state %}{% endblock %}</p>
+    <p class="empty-text">{% block empty_state %}{% include 'partials/pagination.html' with page_obj=page_obj %}
+{% endblock %}</p>
   </div>
 </div>
 
@@ -78,6 +94,7 @@
       </div>
     </div>
   </div>
+{% include 'partials/pagination.html' with page_obj=page_obj %}
 {% endblock %}
 
 <script>
@@ -120,4 +137,5 @@
 })();
 </script>
 
-{% block extra_js %}{% endblock %}
+{% block extra_js %}{% include 'partials/pagination.html' with page_obj=page_obj %}
+{% endblock %}

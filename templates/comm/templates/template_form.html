@@ -1,22 +1,36 @@
 {% extends 'base.html' %}
+{% load i18n %}
 
 {% block page_title %}{% if is_edit %}Edit Template{% else %}Add Template{% endif %}{% endblock %}
 
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item active" aria-current="page">{% translate "{% if is_edit %}Edit Template{% else %}Add Template{% endif %}" %}</li>
+{% endblock %}
+
 {% block content %}
-  <div class="page-header">
-    <nav class="page-breadcrumb">
-      <a href="{% url 'notif_template_list' %}">Notification Templates</a>
-      <span class="bc-sep">›</span>
-      {% if form.instance.pk %}
-        <span class="bc-current">Edit: {{ form.instance }}</span>
-      {% else %}
-        <span class="bc-current">Add New</span>
-      {% endif %}
-    </nav>
-    <div class="page-header-row">
-      <div class="page-header-left">
-        <h1 class="page-title">{% if is_edit %}Edit Template{% else %}Add Template{% endif %}</h1>
+<div class="page-header">
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">{% translate "{% if is_edit %}Edit Template{% else %}Add Template{% endif %}" %}</h1>
+      <p class="page-subtitle">{% translate "Manage your records here" %}</p>
+    </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <!-- Actions here -->
       </div>
+    </div>
+  </div>
+</div>
+
+  
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <!-- Actions here -->
+      </div>
+    </div>
+  </div>
+</div>
     </div>
   </div>
 
@@ -59,12 +73,16 @@
           </div>
         </div>
 
-        <div class="form-footer-bar sticky-bottom">
+        <div class="form-actions-bar">
+  <div class="eal-header-actions">
+
           <div class="footer-left">
-            <a href="{% url 'notif_template_list' %}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Cancel</a>
-          </div>
+            <a href="{% url 'notif_template_list' %}" class="eal-btn eal-btn-outline"><i class="bi bi-arrow-left"></i> Cancel</a>
+          
+  </div>
+</div>
           <div class="footer-right">
-            <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Save</button>
+            <button type="submit" class="eal-btn eal-btn-primary"><i class="bi bi-save"></i> Save</button>
           </div>
         </div>
       </form>

@@ -1,21 +1,36 @@
 {% extends 'base.html' %}
+{% load i18n %}
 
 {% block page_title %}{% if form.instance.pk %}Edit Admin User{% else %}Invite New User{% endif %}{% endblock %}
 
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item active" aria-current="page">{% translate "{% if form.instance.pk %}Edit Admin User{% else %}Invite New User{% endif %}" %}</li>
+{% endblock %}
+
 {% block content %}
-  <div class="page-header">
-    <nav class="page-breadcrumb">
-      <ol class="breadcrumb">
-        <li class="breadcrumb-item"><a href="{% url 'admin_user_list' %}">Admin Users</a></li>
-        <li class="breadcrumb-item active" aria-current="page">
-          {% if form.instance.pk %}Edit: {{ form.instance.first_name }} {{ form.instance.last_name }}{% else %}Invite New User{% endif %}
-        </li>
-      </ol>
-    </nav>
-    <div class="page-header-row">
-      <div class="page-header-left">
-        <h2 class="page-title">{% if form.instance.pk %}Edit Admin User{% else %}Invite New User{% endif %}</h2>
+<div class="page-header">
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">{% translate "{% if form.instance.pk %}Edit Admin User{% else %}Invite New User{% endif %}" %}</h1>
+      <p class="page-subtitle">{% translate "Manage your records here" %}</p>
+    </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <!-- Actions here -->
       </div>
+    </div>
+  </div>
+</div>
+
+  
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <!-- Actions here -->
+      </div>
+    </div>
+  </div>
+</div>
     </div>
   </div>
 
@@ -107,7 +122,7 @@
 
       <div class="form-actions-bar">
         <a href="{% url 'admin_user_list' %}" class="btn btn-light border">Cancel</a>
-        <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Save</button>
+        <button type="submit" class="eal-btn eal-btn-primary"><i class="bi bi-save"></i> Save</button>
       </div>
     </form>
     </div>

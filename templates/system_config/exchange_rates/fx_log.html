@@ -1,23 +1,28 @@
 {% extends 'base.html' %}
+{% load i18n %}
+{% load i18n %}
 
 {% block page_title %}FX Rate Change Log{% endblock %}
 
 {% block content %}
-  <div class="page-header">
-    <div class="page-header-row">
-      <div class="page-header-left">
-        <h1 class="page-title">FX Rate Change Log</h1>
-        <p class="page-subtitle">Read-only history of exchange-rate changes</p>
-      </div>
-      <div class="page-header-right">
-        <div class="eal-header-actions">
+  <div class="breadcrumb-container">
+  <a href="#">System</a> 
+  <span class="separator">/</span> 
+  <span class="current">{% translate "Manage" %}</span>
+</div>
+<div class="list-page-header">
+  <div class="list-page-title-area">
+    <h1 class="page-title-main">FX Rate Change Log</h1>
+    <p class="page-subtitle text-muted font-weight-normal">Read-only history of exchange-rate changes</p>
+  </div>
+  <div class="list-page-actions">
+    <div class="eal-header-actions">
           <a href="{% url 'fx_rate_list' %}" class="eal-btn eal-btn-outline">
             <i class="bi bi-chevron-left"></i>
             <span>Back to Exchange Rates</span>
           </a>
-        </div>
-      </div>
-    </div>
+  </div>
+</div>
   </div>
 
   <div class="eal-table-card">
@@ -39,7 +44,7 @@
             </select>
           </div>
           <div style="display: flex; gap: 8px;">
-            <button type="submit" class="eal-btn eal-btn-primary">
+            <button type="submit" class="btn-solid-indigo">
               <i class="bi bi-funnel"></i>
               <span>Filter</span>
             </button>
@@ -92,31 +97,26 @@
         </table>
       </div>
 
-      <div class="eal-pagination">
-        <div class="eal-pagination-controls">
-          {% if fx_logs.has_previous %}
-            <a
-              href="?currency={{ selected_currency_code }}&page={{ fx_logs.previous_page_number }}"
-              class="eal-page-btn"
-              title="Previous"
-            >
-              <i class="bi bi-chevron-left"></i>
-            </a>
-          {% endif %}
-          <span class="eal-page-btn active">{{ fx_logs.number }}</span>
-          {% if fx_logs.has_next %}
-            <a
-              href="?currency={{ selected_currency_code }}&page={{ fx_logs.next_page_number }}"
-              class="eal-page-btn"
-              title="Next"
-            >
-              <i class="bi bi-chevron-right"></i>
-            </a>
-          {% endif %}
-        </div>
-      </div>
+      <div class="table-pagination-wrapper">
+  <div class="pagination-info">
+    Showing {{ fx_logs.start_index }} to {{ fx_logs.end_index }} of {{ fx_logs.paginator.count }} entries
+  </div>
+  <div class="pagination-controls">
+    {% if fx_logs.has_previous %}
+      <a href="?search={{ search_query|urlencode }}&page={{ fx_logs.previous_page_number }}" class="page-link-btn"><i class="bi bi-chevron-left"></i></a>
     {% else %}
-      <div class="notification-empty" style="margin-top: 16px">
+      <span class="page-link-btn disabled"><i class="bi bi-chevron-left"></i></span>
+    {% endif %}
+    <span class="page-link-btn active">{{ fx_logs.number }}</span>
+    {% if fx_logs.has_next %}
+      <a href="?search={{ search_query|urlencode }}&page={{ fx_logs.next_page_number }}" class="page-link-btn"><i class="bi bi-chevron-right"></i></a>
+    {% else %}
+      <span class="page-link-btn disabled"><i class="bi bi-chevron-right"></i></span>
+    {% endif %}
+  </div>
+</div>
+    {% else %}
+      <div class="notification-empty" class="list-filter-wrapper">
         <div class="empty-icon">
           <i class="bi bi-list-check"></i>
         </div>

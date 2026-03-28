@@ -1,29 +1,42 @@
 {% extends 'base.html' %}
+{% load i18n %}
+{% load i18n %}
 
 {% block page_title %}{% if is_edit %}Edit Plan{% else %}Add Plan{% endif %}{% endblock %}
 
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item active" aria-current="page">{% translate "{% if is_edit %}Edit Plan{% else %}Add Plan{% endif %}" %}</li>
+{% endblock %}
+
 {% block content %}
-  <div class="page-header">
-    <nav class="page-breadcrumb">
-      <ol class="breadcrumb">
-        <li class="breadcrumb-item"><a href="{% url 'plan_list' %}">Plans</a></li>
-        {% if is_edit and plan %}
-          <li class="breadcrumb-item active" aria-current="page">
-            Edit: {{ plan.plan_name_en }}
-          </li>
-        {% else %}
-          <li class="breadcrumb-item active" aria-current="page">Add Plan</li>
-        {% endif %}
-      </ol>
-    </nav>
-    <div class="page-header-row">
-      <div class="page-header-left">
-        <h1 class="page-title">{% if is_edit %}Edit Plan{% else %}Add Plan{% endif %}</h1>
-      </div>
-      <div class="page-header-right">
-        <div class="eal-header-actions"></div>
+<div class="page-header">
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">{% translate "{% if is_edit %}Edit Plan{% else %}Add Plan{% endif %}" %}</h1>
+      <p class="page-subtitle">{% translate "Manage your records here" %}</p>
+    </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        
       </div>
     </div>
+  </div>
+</div>
+
+  
+
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        
+      </div>
+    </div>
+  </div>
+</div>
+  <div class="list-page-actions">
+    <div class="eal-header-actions">
+  </div>
+</div>
   </div>
 
   {% if is_edit and plan and plan.updated_at %}
@@ -108,7 +121,7 @@
 
         <h3 style="margin:0 0 12px 0">Pricing Cycles</h3>
         <div style="margin-bottom:12px">
-          <button type="button" id="add-pricing-row" class="btn btn-primary" style="padding:8px 12px">Add Row</button>
+          <button type="button" id="add-pricing-row" class="eal-btn eal-btn-primary" style="padding:8px 12px">Add Row</button>
         </div>
         <div style="overflow-x:auto; margin-bottom:16px">
           <table class="data-table" id="pricing-table">
@@ -163,13 +176,13 @@
 
     <div class="form-actions-bar sticky-bottom">
       <div class="form-actions-left">
-        <a href="{% if is_edit and plan %}{% url 'plan_detail' plan.plan_id %}{% else %}{% url 'plan_list' %}{% endif %}" class="btn btn-outline-secondary">
+        <a href="{% if is_edit and plan %}{% url 'plan_detail' plan.plan_id %}{% else %}{% url 'plan_list' %}{% endif %}" class="eal-btn eal-btn-outline">
           <i class="bi bi-arrow-left"></i>
           Cancel
         </a>
       </div>
       <div class="form-actions-right">
-        <button type="submit" class="btn btn-primary">
+        <button type="submit" class="eal-btn eal-btn-primary">
           <i class="bi bi-save"></i>
           Save
         </button>

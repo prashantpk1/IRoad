@@ -1,25 +1,24 @@
 {% extends 'base.html' %}
+{% load i18n %}
+{% load i18n %}
 
 {% block page_title %}{{ plan.plan_name_en }}{% endblock %}
 
 {% block content %}
-  <div class="page-header">
-    <nav aria-label="breadcrumb">
-      <ol class="breadcrumb">
-        <li class="breadcrumb-item"><a href="{% url 'plan_list' %}">Plans</a></li>
-        <li class="breadcrumb-item active" aria-current="page">{{ plan.plan_name_en }}</li>
-      </ol>
-    </nav>
-
-    <div class="page-header-row">
-      <div class="page-header-left">
-        <h1 class="page-title">{{ plan.plan_name_en }}</h1>
-      </div>
-
-      <div class="page-header-right">
-        <div class="eal-header-actions">
+  <div class="breadcrumb-container">
+  <a href="#">System</a> 
+  <span class="separator">/</span> 
+  <span class="current">{% translate "Manage" %}</span>
+</div>
+<div class="list-page-header">
+  <div class="list-page-title-area">
+    <h1 class="page-title-main">{{ plan.plan_name_en }}</h1>
+    
+  </div>
+  <div class="list-page-actions">
+    <div class="eal-header-actions">
           {% if request.user.is_root %}
-            <a href="{% url 'plan_edit' plan.plan_id %}" class="eal-btn eal-btn-primary">
+            <a href="{% url 'plan_edit' plan.plan_id %}" class="btn-solid-indigo">
               <i class="bi bi-pencil"></i>
               <span>Edit</span>
             </a>
@@ -28,9 +27,8 @@
             <i class="bi bi-arrow-left"></i>
             <span>Back</span>
           </a>
-        </div>
-      </div>
-    </div>
+  </div>
+</div>
   </div>
 
   <div class="db-grid-2 mt-3">

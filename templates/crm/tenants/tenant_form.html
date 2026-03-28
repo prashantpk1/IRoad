@@ -1,94 +1,156 @@
-{% extends 'base.html' %}
-{% block title %}{% if is_edit %}Edit Tenant{% else %}Add Tenant{% endif %}{% endblock %}
+{% block title %}{% if is_edit %}{% translate "Edit Tenant" %}{% else %}{% translate "Add Tenant" %}{% endif %}{% endblock %}
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item"><a href="{% url 'tenant_list' %}">{% translate "Subscribers" %}</a></li>
+<li class="breadcrumb-item active" aria-current="page">{% if is_edit %}{% translate "Edit" %}: {{ tenant.company_name }}{% else %}{% translate "Add Tenant" %}{% endif %}</li>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
-  <nav class="page-breadcrumb">
-    <ol class="breadcrumb">
-      <li class="breadcrumb-item"><a href="{% url 'tenant_list' %}">Subscribers</a></li>
-      {% if is_edit %}
-        <li class="breadcrumb-item active" aria-current="page">Edit: {{ tenant.company_name }}</li>
-      {% else %}
-        <li class="breadcrumb-item active" aria-current="page">Add Tenant</li>
-      {% endif %}
-    </ol>
-  </nav>
-  <div class="page-header-row"><div class="page-header-left"><h1 class="page-title">{% if is_edit %}Edit Tenant{% else %}Add Tenant{% endif %}</h1></div></div>
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">{% translate "{% if is_edit %}{% translate "Edit Tenant" %}{% else %}{% translate "Add Tenant" %}{% endif %}" %}</h1>
+      <p class="page-subtitle">{% translate "Manage your records here" %}</p>
+    </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <a href="{% url 'tenant_detail' tenant.tenant_id %}" class="eal-btn eal-btn-outline">{% translate "Cancel" %}</a>
+            <button type="submit" class="eal-btn eal-btn-primary"><i class="bi bi-check-lg"></i><span>{% translate "Save Changes" %}</span></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <a href="{% url 'tenant_detail' tenant.tenant_id %}" class="eal-btn eal-btn-outline">{% translate "Cancel" %}</a>
+            <button type="submit" class="eal-btn eal-btn-primary"><i class="bi bi-check-lg"></i><span>{% translate "Save Changes" %}</span></button>
+      </div>
+    </div>
+  </div>
+</div>
+  </div>
 </div>
 
 {% if is_edit and tenant and tenant.updated_at %}
-<div class="edit-info-bar">
+<div class="edit-info-bar" style="margin-bottom: 24px;">
   <i class="bi bi-clock-history"></i>
-  Last updated
+  <span>{% translate "Last updated" %}
   {% if tenant.updated_by %}
-    by <strong>{{ tenant.updated_by.first_name }} {{ tenant.updated_by.last_name }}</strong>
+    {% translate "by" %} <strong>{{ tenant.updated_by.first_name }} {{ tenant.updated_by.last_name }}</strong>
   {% endif %}
-  at <strong>{{ tenant.updated_at|date:"d M Y, H:i" }}</strong>
+  {% translate "at" %} <strong>{{ tenant.updated_at|date:"d M Y, H:i" }}</strong></span>
 </div>
 {% endif %}
 
 <div class="form-card">
+  <div class="form-card-header">
+    <div class="form-card-title-box">
+      <div class="form-card-icon"><i class="bi bi-person-badge"></i></div>
+      <div class="form-card-info">
+        <h3 class="form-card-title">{% translate "Profile & Identity" %}</h3>
+        <p class="form-card-subtitle">{% translate "Subscriber core identity and contact details" %}</p>
+      </div>
+    </div>
+  </div>
   <div class="form-card-body">
     {% if is_edit %}
-      <div class="alert alert-secondary py-2 small mb-3">
-        Synced fields are read only in Control Panel (synced from the tenant system via webhook).
+      <div class="alert alert-info py-2 small mb-4" style="background: rgba(80, 81, 249, 0.05); border: 1px solid rgba(80, 81, 249, 0.1); color: var(--primary-color);">
+        <i class="bi bi-info-circle me-1"></i> {% translate "Synced fields are read only in Control Panel (synced from the tenant system via webhook)." %}
       </div>
-      <h3 class="mb-3">Profile</h3>
-      <div class="mb-3">
-        <label class="form-label"><i class="bi bi-lock"></i> Company name</label>
-        <input type="text" class="form-control" value="{{ tenant.company_name }}" disabled>
-        <div class="form-text">Synced from Tenant system - read only</div>
-      </div>
-      <div class="mb-3">
-        <label class="form-label"><i class="bi bi-lock"></i> Registration number</label>
-        <input type="text" class="form-control" value="{{ tenant.registration_number }}" disabled>
-        <div class="form-text">Synced from Tenant system - read only</div>
-      </div>
-      <div class="mb-3">
-        <label class="form-label"><i class="bi bi-lock"></i> Tax number</label>
-        <input type="text" class="form-control" value="{{ tenant.tax_number|default:'' }}" disabled>
-        <div class="form-text">Synced from Tenant system - read only</div>
-      </div>
-      <div class="mb-3">
-        <label class="form-label"><i class="bi bi-lock"></i> Primary email</label>
-        <input type="email" class="form-control" value="{{ tenant.primary_email }}" disabled>
-        <div class="form-text">Synced from Tenant system - read only</div>
-      </div>
-      <div class="mb-3">
-        <label class="form-label"><i class="bi bi-lock"></i> Primary phone</label>
-        <input type="text" class="form-control" value="{{ tenant.primary_phone }}" disabled>
-        <div class="form-text">Synced from Tenant system - read only</div>
-      </div>
-      <div class="mb-3">
-        <label class="form-label"><i class="bi bi-lock"></i> Country</label>
-        <input type="text" class="form-control" value="{{ tenant.country.name_en|default:'-' }}" disabled>
-        <div class="form-text">Synced from Tenant system - read only</div>
+      
+      <div class="fields-grid cols-2">
+        <div class="field">
+          <label class="form-label"><i class="bi bi-lock me-1"></i> {% translate "Company name" %}</label>
+          <input type="text" class="form-control" value="{{ tenant.company_name }}" disabled style="background: #f8fafc;">
+          <div class="field-hint">{% translate "Synced from Tenant system - read only" %}</div>
+        </div>
+        <div class="field">
+          <label class="form-label"><i class="bi bi-lock me-1"></i> {% translate "Registration number" %}</label>
+          <input type="text" class="form-control" value="{{ tenant.registration_number }}" disabled style="background: #f8fafc;">
+          <div class="field-hint">{% translate "Synced from Tenant system - read only" %}</div>
+        </div>
+        <div class="field">
+          <label class="form-label"><i class="bi bi-lock me-1"></i> {% translate "Tax number" %}</label>
+          <input type="text" class="form-control" value="{{ tenant.tax_number|default:'' }}" disabled style="background: #f8fafc;">
+          <div class="field-hint">{% translate "Synced from Tenant system - read only" %}</div>
+        </div>
+        <div class="field">
+          <label class="form-label"><i class="bi bi-lock me-1"></i> {% translate "Primary email" %}</label>
+          <input type="email" class="form-control" value="{{ tenant.primary_email }}" disabled style="background: #f8fafc;">
+          <div class="field-hint">{% translate "Synced from Tenant system - read only" %}</div>
+        </div>
+        <div class="field">
+          <label class="form-label"><i class="bi bi-lock me-1"></i> {% translate "Primary phone" %}</label>
+          <input type="text" class="form-control" value="{{ tenant.primary_phone }}" disabled style="background: #f8fafc;">
+          <div class="field-hint">{% translate "Synced from Tenant system - read only" %}</div>
+        </div>
+        <div class="field">
+          <label class="form-label"><i class="bi bi-lock me-1"></i> {% translate "Country" %}</label>
+          <input type="text" class="form-control" value="{{ tenant.country.name_en|default:'-' }}" disabled style="background: #f8fafc;">
+          <div class="field-hint">{% translate "Synced from Tenant system - read only" %}</div>
+        </div>
       </div>
 
-      <div class="alert alert-warning small mb-3">
-        <strong>Suspension warning:</strong> Choosing a suspended status will trigger the Kill Switch and log out all tenant users (when Phase 10 is implemented).
+      <div class="form-card-header mt-5" style="border-top: 1px solid var(--border-light); padding-top: 24px;">
+        <div class="form-card-title-box">
+          <div class="form-card-icon" style="background: rgba(245, 158, 11, 0.1); color: var(--warning-color);"><i class="bi bi-gear-wide-connected"></i></div>
+          <div class="form-card-info">
+            <h3 class="form-card-title">{% translate "Account Settings" %}</h3>
+            <p class="form-card-subtitle">{% translate "Control administrative status and account management" %}</p>
+          </div>
+        </div>
       </div>
-      <h3 class="mb-3">Account Settings</h3>
-      <form method="post">
+      
+      <form method="post" novalidate>
         {% csrf_token %}
-        {% if form.non_field_errors %}<div class="text-danger mb-2">{{ form.non_field_errors }}</div>{% endif %}
-        <div class="mb-3">{{ form.account_status.label_tag }}{{ form.account_status }}{{ form.account_status.errors }}</div>
-        <div class="mb-3">{{ form.assigned_sales_rep.label_tag }}{{ form.assigned_sales_rep }}{{ form.assigned_sales_rep.errors }}</div>
-        <div class="form-footer-bar sticky-bottom">
-          <div class="footer-left"><a href="{% url 'tenant_detail' tenant.tenant_id %}" class="btn btn-outline-secondary">Cancel</a></div>
-          <div class="footer-right"><button type="submit" class="btn btn-primary">Save</button></div>
+        {% if form.non_field_errors %}<div class="alert alert-danger mb-4">{{ form.non_field_errors }}</div>{% endif %}
+        
+        <div class="fields-grid cols-2 mt-4">
+          <div class="field">
+            <label class="form-label" for="{{ form.account_status.id_for_label }}">{{ form.account_status.label }}</label>
+            {{ form.account_status }}
+            {% if form.account_status.errors %}<div class="field-error">{{ form.account_status.errors.0 }}</div>{% endif %}
+            <div class="field-hint" style="color: var(--warning-color);">
+              <i class="bi bi-exclamation-triangle"></i> {% translate "Suspension will trigger the Kill Switch for all tenant users." %}
+            </div>
+          </div>
+          <div class="field">
+            <label class="form-label" for="{{ form.assigned_sales_rep.id_for_label }}">{{ form.assigned_sales_rep.label }}</label>
+            {{ form.assigned_sales_rep }}
+            {% if form.assigned_sales_rep.errors %}<div class="field-error">{{ form.assigned_sales_rep.errors.0 }}</div>{% endif %}
+          </div>
+        </div>
+
+        <div class="form-actions-bar mt-5">
+          <div class="eal-header-actions">
+            <a href="{% url 'tenant_detail' tenant.tenant_id %}" class="eal-btn eal-btn-outline">{% translate "Cancel" %}</a>
+            <button type="submit" class="eal-btn eal-btn-primary"><i class="bi bi-check-lg"></i><span>{% translate "Save Changes" %}</span></button>
+          </div>
         </div>
       </form>
     {% else %}
-      <h3 class="mb-3">Profile</h3>
-      <form method="post">
+      <form method="post" novalidate>
         {% csrf_token %}
-        {% if form.non_field_errors %}<div class="text-danger mb-2">{{ form.non_field_errors }}</div>{% endif %}
-        {% for field in form %}
-          <div class="mb-3">{{ field.label_tag }}{{ field }}{{ field.errors }}</div>
-        {% endfor %}
-        <div class="form-footer-bar sticky-bottom">
-          <div class="footer-left"><a href="{% url 'tenant_list' %}" class="btn btn-outline-secondary">Cancel</a></div>
-          <div class="footer-right"><button type="submit" class="btn btn-primary">Save</button></div>
+        {% if form.non_field_errors %}<div class="alert alert-danger mb-4">{{ form.non_field_errors }}</div>{% endif %}
+        
+        <div class="fields-grid cols-2">
+          {% for field in form %}
+            <div class="field">
+              <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+              {{ field }}
+              {% if field.help_text %}<div class="field-hint">{{ field.help_text }}</div>{% endif %}
+              {% if field.errors %}<div class="field-error">{{ field.errors.0 }}</div>{% endif %}
+            </div>
+          {% endfor %}
+        </div>
+
+        <div class="form-actions-bar mt-5">
+          <div class="eal-header-actions">
+            <a href="{% url 'tenant_list' %}" class="eal-btn eal-btn-outline">{% translate "Cancel" %}</a>
+            <button type="submit" class="eal-btn eal-btn-primary"><i class="bi bi-plus-lg"></i><span>{% translate "Create Tenant" %}</span></button>
+          </div>
         </div>
       </form>
     {% endif %}

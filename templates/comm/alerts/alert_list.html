@@ -1,16 +1,47 @@
 {% extends 'base.html' %}
-{% block title %}Internal Alerts Routing{% endblock %}
+{% load i18n %}
+{% load i18n %}
+{% block title %}Internal Alerts Routing{% include 'partials/pagination.html' with page_obj=routes %}
+{% endblock %}
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item active" aria-current="page">{% translate "Internal Alerts Routing" %}</li>
+{% include 'partials/pagination.html' with page_obj=routes %}
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
   <div class="page-header-row">
-    <div class="page-header-left"><h1 class="page-title">Internal Alerts Routing</h1></div>
-    <div class="page-header-right"><a href="{% url 'alert_route_create' %}" class="eal-btn eal-btn-primary">Add Alert Route</a></div>
+    <div class="page-header-left">
+      <h1 class="page-title">{% translate "Internal Alerts Routing" %}</h1>
+      <p class="page-subtitle">{% translate "Manage your records here" %}</p>
+    </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <a href="{% url 'alert_route_create' %}" class="eal-btn eal-btn-primary">Add Alert Route</a>
+      </div>
+    </div>
   </div>
+</div>
+
+
+
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <a href="{% url 'alert_route_create' %}" class="eal-btn eal-btn-primary">Add Alert Route</a>
+      </div>
+    </div>
+  </div>
+</div>
+  <div class="list-page-actions">
+    <div class="eal-header-actions"><a href="{% url 'alert_route_create' %}" class="eal-btn eal-btn-primary">Add Alert Route</a>
+  </div>
+</div>
 </div>
 <div class="eal-table-card">
   <div class="eal-table-wrap">
     <table class="eal-table">
-      <thead><tr><th>#</th><th>Trigger Event</th><th>Notify Role</th><th>Custom Email</th><th>Status</th><th>Actions</th></tr></thead>
+      <thead><tr><th>#</th><th>Trigger Event</th><th>Notify Role</th><th>Custom Email</th><th>Status</th><th>ACTIONS</th></tr></thead>
       <tbody>
         {% for row in routes %}
           <tr>
@@ -18,7 +49,7 @@
             <td>{{ row.get_trigger_event_display }}</td>
             <td>{{ row.notify_role.role_name|default:'-' }}</td>
             <td>{{ row.notify_custom_email|default:'-' }}</td>
-            <td>{% if row.is_active %}<span class="badge status-badge status-active">Active</span>{% else %}<span class="badge status-badge status-inactive">Inactive</span>{% endif %}</td>
+            <td>{% if row.is_active %}<span class="status-badge active">Active</span>{% else %}<span class="status-badge inactive">Inactive</span>{% endif %}</td>
             <td>
               <div class="eal-actions-cell">
                 <a href="{% url 'alert_route_edit' row.route_id %}" class="eal-row-btn"><i class="bi bi-pencil"></i></a>
@@ -27,14 +58,20 @@
             </td>
           </tr>
         {% empty %}
-          <tr><td colspan="6" class="text-center py-4 text-muted">No routes found.</td></tr>
+          <tr class="eal-table-empty">
+  <td colspan="20">
+    <div class="eal-empty-icon"><i class="bi bi-inbox"></i></div>
+    <div class="eal-empty-title">{% translate "No Data Found" %}</div>
+    <div class="eal-empty-text">No routes found.</div>
+  </td>
+</tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 </div>
 {% if routes.paginator.num_pages > 1 %}
-  <div class="eal-pagination mt-3"><div class="eal-pagination-controls">{% if routes.has_previous %}<a class="eal-page-btn" href="?page={{ routes.previous_page_number }}">Previous</a>{% endif %}<span class="eal-page-btn active">Page {{ routes.number }} of {{ routes.paginator.num_pages }}</span>{% if routes.has_next %}<a class="eal-page-btn" href="?page={{ routes.next_page_number }}">Next</a>{% endif %}</div></div>
-{% endif %}
+  
+{% include 'partials/pagination.html' with page_obj=routes %}
 {% endblock %}
 

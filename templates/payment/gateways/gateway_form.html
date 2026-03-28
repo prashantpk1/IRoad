@@ -1,32 +1,45 @@
 {% extends 'base.html' %}
+{% load i18n %}
+{% load i18n %}
 
 {% block page_title %}{% if is_edit %}Edit Gateway{% else %}Add Gateway{% endif %}{% endblock %}
 
-{% block content %}
-  <div class="page-header">
-    <nav class="page-breadcrumb">
-      <ol class="breadcrumb">
-        <li class="breadcrumb-item"><a href="{% url 'gateway_list' %}">Gateways</a></li>
-        {% if is_edit and gateway %}
-          <li class="breadcrumb-item active" aria-current="page">Edit: {{ gateway.gateway_name }}</li>
-        {% else %}
-          <li class="breadcrumb-item active" aria-current="page">Add Gateway</li>
-        {% endif %}
-      </ol>
-    </nav>
 
-    <div class="page-header-row">
-      <div class="page-header-left">
-        <h1 class="page-title">{% if is_edit %}Edit Gateway{% else %}Add Gateway{% endif %}</h1>
-      </div>
-      <div class="page-header-right">
-        <a href="{% url 'gateway_list' %}" class="eal-btn">
-          <i class="bi bi-arrow-left"></i>
-          <span>Cancel</span>
-        </a>
+{% block breadcrumb_items %}
+<li class="breadcrumb-item active" aria-current="page">{% translate "{% if is_edit %}Edit Gateway{% else %}Add Gateway{% endif %}" %}</li>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">{% translate "{% if is_edit %}Edit Gateway{% else %}Add Gateway{% endif %}" %}</h1>
+      <p class="page-subtitle">{% translate "Manage your records here" %}</p>
+    </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <!-- Actions here -->
       </div>
     </div>
   </div>
+</div>
+
+  
+
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <!-- Actions here -->
+      </div>
+    </div>
+  </div>
+</div>
+  <div class="list-page-actions">
+    <a href="{% url 'gateway_list' %}" class="eal-btn">
+          <i class="bi bi-arrow-left"></i>
+          <span>Cancel</span>
+        </a>
+  </div>
+</div>
 
   {% if is_edit and gateway and gateway.updated_at %}
   <div class="edit-info-bar">
@@ -105,15 +118,19 @@
           {% endfor %}
         </div>
 
-        <div class="form-footer-bar sticky-bottom">
+        <div class="form-actions-bar">
+  <div class="eal-header-actions">
+
           <div class="footer-left">
-            <a href="{% url 'gateway_list' %}" class="btn btn-outline-secondary">
+            <a href="{% url 'gateway_list' %}" class="eal-btn eal-btn-outline">
               <i class="bi bi-arrow-left"></i>
               Cancel
             </a>
-          </div>
+          
+  </div>
+</div>
           <div class="footer-right">
-            <button type="submit" class="btn btn-primary">
+            <button type="submit" class="eal-btn eal-btn-primary">
               <i class="bi bi-save"></i>
               Save
             </button>

@@ -1,7 +1,34 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% block title %}{% if is_edit %}Edit Push Notification{% else %}Add Push Notification{% endif %}{% endblock %}
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item active" aria-current="page">{% translate "{% if is_edit %}Edit Push Notification{% else %}Add Push Notification{% endif %}" %}</li>
+{% endblock %}
+
 {% block content %}
-  <div class="page-header"><div class="page-header-row"><div class="page-header-left"><h1 class="page-title">{% if is_edit %}Edit Push Notification{% else %}Add Push Notification{% endif %}</h1></div></div></div>
+<div class="page-header">
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">{% translate "{% if is_edit %}Edit Push Notification{% else %}Add Push Notification{% endif %}" %}</h1>
+      <p class="page-subtitle">{% translate "Manage your records here" %}</p>
+    </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <!-- Actions here -->
+      </div>
+    </div>
+  </div>
+</div>
+
+  
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <!-- Actions here -->
+      </div>
+    </div>
+  </div>
+</div></div></div>
   <div class="form-card">
     <div class="form-card-body">
       <form method="post">
@@ -22,9 +49,13 @@
           <div class="col-md-6" id="wrap-dispatch-status">{{ form.dispatch_status.label_tag }}{{ form.dispatch_status }}{{ form.dispatch_status.errors }}</div>
           <div class="col-md-6" id="wrap-is-active">{{ form.is_active.label_tag }}{{ form.is_active }}{{ form.is_active.errors }}</div>
         </div>
-        <div class="form-footer-bar sticky-bottom mt-3">
-          <div class="footer-left"><a href="{% url 'push_notif_list' %}" class="btn btn-outline-secondary">Cancel</a></div>
-          <div class="footer-right"><button type="submit" class="btn btn-primary">Save</button></div>
+        <div class="form-actions-bar">
+  <div class="eal-header-actions">
+
+          <div class="footer-left"><a href="{% url 'push_notif_list' %}" class="eal-btn eal-btn-outline">Cancel</a>
+  </div>
+</div>
+          <div class="footer-right"><button type="submit" class="eal-btn eal-btn-primary">Save</button></div>
         </div>
       </form>
     </div>

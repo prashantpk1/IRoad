@@ -1,14 +1,17 @@
 {# Unified form shell partial/base for create/edit pages #}
 <div class="page-header">
-  {% block breadcrumb %}
-    <nav class="page-breadcrumb">
-      <ol class="breadcrumb"></ol>
-    </nav>
-  {% endblock %}
   <div class="page-header-row">
     <div class="page-header-left">
-      <h1 class="page-title">{% block page_title %}{% endblock %}</h1>
+      <h1 class="page-title">{% translate "" %}</h1>
+      <p class="page-subtitle">{% translate "Manage your records here" %}</p>
     </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <!-- Actions here -->
+      </div>
+    </div>
+  </div>
+</div>
   </div>
 </div>
 
@@ -39,13 +42,17 @@ STANDARD EDIT INFO BAR — paste inside edit form templates:
 </div>
 
 {% block form_footer %}
-  <div class="form-footer-bar sticky-bottom">
+  <div class="form-actions-bar">
+  <div class="eal-header-actions">
+
     <div class="footer-left">
       {% block cancel_url %}{% endblock %}
-    </div>
+    
+  </div>
+</div>
     <div class="footer-right">
       {% block submit_btn %}
-        <button type="submit" class="btn btn-primary">
+        <button type="submit" class="eal-btn eal-btn-primary">
           Save
         </button>
       {% endblock %}

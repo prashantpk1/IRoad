@@ -1,6 +1,28 @@
 {% extends 'base.html' %}
-{% block title %}Standard Invoices | iRoad Admin{% endblock %}
+{% load i18n %}
+{% block title %}Standard Invoices | iRoad Admin{% include 'partials/pagination.html' with page_obj=messages %}
+{% endblock %}
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item active" aria-current="page">{% translate "Standard Invoices | iRoad Admin" %}</li>
+{% include 'partials/pagination.html' with page_obj=messages %}
+{% endblock %}
+
 {% block content %}
+<div class="page-header">
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">{% translate "Standard Invoices | iRoad Admin" %}</h1>
+      <p class="page-subtitle">{% translate "Manage your records here" %}</p>
+    </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <!-- Actions here -->
+      </div>
+    </div>
+  </div>
+</div>
+
 {% if messages %}
   {% for message in messages %}
     <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">
@@ -10,12 +32,19 @@
   {% endfor %}
 {% endif %}
 
-<div class="page-header"><div class="page-header-row"><div class="page-header-left"><h1 class="page-title">Standard Invoices</h1></div></div></div>
+
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <!-- Actions here -->
+      </div>
+    </div>
+  </div>
+</div></div></div>
 
 <div class="eal-table-card">
   <form method="get" class="eal-toolbar">
     <div class="eal-toolbar-left" style="width:100%;display:flex;gap:8px;flex-wrap:wrap;">
-      <div class="eal-search" style="flex:1;min-width:220px;"><i class="bi bi-search"></i><input type="text" name="q" class="" placeholder="Invoice no. or customer" value="{{ search_query }}"></div>
+      <div class="eal-search" style="flex:1;min-width:220px;"><i class="bi bi-search"></i><input type="text" name="q" placeholder="Invoice no. or customer" value="{{ search_query }}"></div>
       <div style="width:180px"><select class="form-select form-select-sm" name="status"><option value="">All statuses</option>{% for code, label in status_choices %}<option value="{{ code }}" {% if status_filter == code %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
       <div style="width:160px"><select class="form-select form-select-sm" name="currency"><option value="">All currencies</option>{% for c in currencies %}<option value="{{ c.currency_code }}" {% if currency_filter == c.currency_code %}selected{% endif %}>{{ c.currency_code }}</option>{% endfor %}</select></div>
       <div style="width:220px"><select class="form-select form-select-sm" name="tenant"><option value="">All tenants</option>{% for t in tenants %}<option value="{{ t.tenant_id }}" {% if tenant_filter == t.tenant_id|stringformat:"s" %}selected{% endif %}>{{ t.company_name }}</option>{% endfor %}</select></div>
@@ -24,7 +53,7 @@
   </form>
   <div class="eal-table-wrap">
     <table class="eal-table">
-      <thead><tr><th>#</th><th>Invoice no.</th><th>Tenant</th><th>Grand total</th><th>Currency</th><th>Tax amount</th><th>Status</th><th>Issue date</th><th>Actions</th></tr></thead>
+      <thead><tr><th>#</th><th>Invoice no.</th><th>Tenant</th><th>Grand total</th><th>Currency</th><th>Tax amount</th><th>Status</th><th>Issue date</th><th>ACTIONS</th></tr></thead>
       <tbody>
         {% for inv in invoices %}
           <tr>
@@ -34,12 +63,18 @@
             <td>{{ inv.grand_total|floatformat:2 }}</td>
             <td>{{ inv.currency_id }}</td>
             <td>{{ inv.tax_amount|floatformat:2 }}</td>
-            <td>{% if inv.status == 'Issued' %}<span class="badge status-badge status-issued">{{ inv.get_status_display }}</span>{% elif inv.status == 'Paid' %}<span class="badge status-badge status-paid">{{ inv.get_status_display }}</span>{% elif inv.status == 'Void' %}<span class="badge status-badge status-void">{{ inv.get_status_display }}</span>{% else %}<span class="badge status-badge status-pending">{{ inv.get_status_display }}</span>{% endif %}</td>
+            <td>{% if inv.status == 'Issued' %}<span class="status-badge active">{{ inv.get_status_display }}</span>{% elif inv.status == 'Paid' %}<span class="status-badge active">{{ inv.get_status_display }}</span>{% elif inv.status == 'Void' %}<span class="status-badge inactive">{{ inv.get_status_display }}</span>{% else %}<span class="status-badge pending">{{ inv.get_status_display }}</span>{% endif %}</td>
             <td>{{ inv.issue_date|date:'Y-m-d' }}</td>
-            <td><a href="{% url 'invoice_detail' inv.invoice_id %}" class="eal-row-btn"><i class="bi bi-eye"></i></a></td>
+            <td><div class="eal-actions-cell"><a href="{% url 'invoice_detail' inv.invoice_id %}" class="eal-row-btn"><i class="bi bi-eye"></i></a></div></td>
           </tr>
         {% empty %}
-          <tr><td colspan="9" class="text-center py-4 text-muted">No invoices.</td></tr>
+          <tr class="eal-table-empty">
+  <td colspan="20">
+    <div class="eal-empty-icon"><i class="bi bi-inbox"></i></div>
+    <div class="eal-empty-title">{% translate "No Data Found" %}</div>
+    <div class="eal-empty-text">No invoices.</div>
+  </td>
+</tr>
         {% endfor %}
       </tbody>
     </table>
@@ -47,7 +82,7 @@
 </div>
 
 {% if invoices.paginator.num_pages > 1 %}
-<div class="eal-pagination mt-3"><div class="eal-pagination-controls">{% if invoices.has_previous %}<a class="eal-page-btn" href="?page={{ invoices.previous_page_number }}&q={{ search_query|urlencode }}&status={{ status_filter|urlencode }}&currency={{ currency_filter|urlencode }}&tenant={{ tenant_filter|urlencode }}">Previous</a>{% endif %}<span class="eal-page-btn active">{{ invoices.number }} / {{ invoices.paginator.num_pages }}</span>{% if invoices.has_next %}<a class="eal-page-btn" href="?page={{ invoices.next_page_number }}&q={{ search_query|urlencode }}&status={{ status_filter|urlencode }}&currency={{ currency_filter|urlencode }}&tenant={{ tenant_filter|urlencode }}">Next</a>{% endif %}</div></div>
-{% endif %}
+
+{% include 'partials/pagination.html' with page_obj=messages %}
 {% endblock %}
 

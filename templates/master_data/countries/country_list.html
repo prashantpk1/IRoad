@@ -1,25 +1,60 @@
 {% extends 'base.html' %}
+{% load i18n %}
+{% load i18n %}
 
-{% block page_title %}Countries{% endblock %}
+{% block page_title %}Countries{% include 'partials/pagination.html' with page_obj=messages %}
+{% endblock %}
+
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item active" aria-current="page">{% translate "Countries" %}</li>
+{% include 'partials/pagination.html' with page_obj=messages %}
+{% endblock %}
 
 {% block content %}
-  <div class="page-header">
-    <div class="page-header-row">
-      <div class="page-header-left">
-        <h1 class="page-title">Countries</h1>
-        <p class="page-subtitle">Manage ISO country codes and active statuses</p>
+<div class="page-header">
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">{% translate "Countries" %}</h1>
+      <p class="page-subtitle">{% translate "Manage your records here" %}</p>
+    </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        {% if request.user.is_root %}
+            <a href="{% url 'country_create' %}" class="eal-btn eal-btn-primary">
+              <i class="bi bi-plus-lg"></i>
+              <span>Add Country</span>
+            </a>
+          {% endif %}
       </div>
-      <div class="page-header-right">
-        <div class="eal-header-actions">
+    </div>
+  </div>
+</div>
+
+  
+
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        {% if request.user.is_root %}
+            <a href="{% url 'country_create' %}" class="eal-btn eal-btn-primary">
+              <i class="bi bi-plus-lg"></i>
+              <span>Add Country</span>
+            </a>
+          {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+  <div class="list-page-actions">
+    <div class="eal-header-actions">
           {% if request.user.is_root %}
             <a href="{% url 'country_create' %}" class="eal-btn eal-btn-primary">
               <i class="bi bi-plus-lg"></i>
               <span>Add Country</span>
             </a>
           {% endif %}
-        </div>
-      </div>
-    </div>
+  </div>
+</div>
   </div>
 
   {% if messages %}
@@ -85,7 +120,7 @@
               <th>English Name</th>
               <th>Arabic Name</th>
               <th style="width: 120px">Status</th>
-              <th style="width: 220px">Actions</th>
+              <th style="width: 220px">ACTIONS</th>
             </tr>
           </thead>
           <tbody>
@@ -97,27 +132,27 @@
                 <td class="eal-arabic">{{ c.name_ar }}</td>
                 <td>
                   {% if c.is_active %}
-                    <span class="badge status-badge status-active">Active</span>
+                    <span class="status-badge active">Active</span>
                   {% else %}
-                    <span class="badge status-badge status-inactive">Inactive</span>
+                    <span class="status-badge inactive">Inactive</span>
                   {% endif %}
                 </td>
                 <td>
                   <div class="eal-actions-cell">
-                    <a href="{% url 'country_edit' c.country_code %}" class="eal-row-btn" title="Edit">
-                      <i class="bi bi-pencil"></i>
-                    </a>
+                    <a href="{% url 'country_edit' c.country_code %}" class="eal-row-btn icon-only-btn icon-only-btn" title="Edit">
+<i class="bi bi-pencil"></i>
+</a>
                     {% if request.user.is_root %}
                       <form method="post" action="{% url 'country_toggle_status' c.country_code %}" style="display: inline">
                         {% csrf_token %}
                         {% if c.is_active %}
-                          <button type="submit" class="eal-row-btn" title="Deactivate">
-                            <i class="bi bi-slash-circle"></i>
-                          </button>
+                          <button type="submit" class="eal-row-btn icon-only-btn icon-only-btn" title="Deactivate">
+<i class="bi bi-slash-circle"></i>
+</button>
                         {% else %}
-                          <button type="submit" class="eal-row-btn" title="Activate">
-                            <i class="bi bi-check-circle"></i>
-                          </button>
+                          <button type="submit" class="eal-row-btn icon-only-btn icon-only-btn" title="Activate">
+<i class="bi bi-check-circle"></i>
+</button>
                         {% endif %}
                       </form>
                     {% endif %}
@@ -129,31 +164,9 @@
         </table>
       </div>
 
-      <div class="eal-pagination">
-        <div class="eal-pagination-controls">
-          {% if countries.has_previous %}
-            <a
-              href="?q={{ search_query|urlencode }}&status={{ status_filter }}&page={{ countries.previous_page_number }}"
-              class="eal-page-btn"
-              title="Previous"
-            >
-              <i class="bi bi-chevron-left"></i>
-            </a>
-          {% endif %}
-          <span class="eal-page-btn active">{{ countries.number }}</span>
-          {% if countries.has_next %}
-            <a
-              href="?q={{ search_query|urlencode }}&status={{ status_filter }}&page={{ countries.next_page_number }}"
-              class="eal-page-btn"
-              title="Next"
-            >
-              <i class="bi bi-chevron-right"></i>
-            </a>
-          {% endif %}
-        </div>
-      </div>
+      
     {% else %}
-      <div class="notification-empty" style="margin-top: 16px">
+      <div class="notification-empty" class="list-filter-wrapper">
         <div class="empty-icon">
           <i class="bi bi-globe"></i>
         </div>
@@ -207,5 +220,6 @@
         });
       });
   </script>
+{% include 'partials/pagination.html' with page_obj=messages %}
 {% endblock %}
 

@@ -1,24 +1,60 @@
 {% extends 'base.html' %}
+{% load i18n %}
+{% load i18n %}
 
-{% block page_title %}Add-ons Pricing Policy{% endblock %}
+{% block page_title %}Add-ons Pricing Policy{% include 'partials/pagination.html' with page_obj=messages %}
+{% endblock %}
+
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item active" aria-current="page">{% translate "Add-ons Pricing Policy" %}</li>
+{% include 'partials/pagination.html' with page_obj=messages %}
+{% endblock %}
 
 {% block content %}
-  <div class="page-header">
-    <div class="page-header-row">
-      <div class="page-header-left">
-        <h1 class="page-title">Add-ons Pricing Policy</h1>
+<div class="page-header">
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">{% translate "Add-ons Pricing Policy" %}</h1>
+      <p class="page-subtitle">{% translate "Manage your records here" %}</p>
+    </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        {% if request.user.is_root %}
+            <a href="{% url 'addons_policy_create' %}" class="eal-btn eal-btn-primary">
+              <i class="bi bi-plus-lg"></i>
+              <span>Add Policy</span>
+            </a>
+          {% endif %}
       </div>
-      <div class="page-header-right">
-        <div class="eal-header-actions">
+    </div>
+  </div>
+</div>
+
+  
+
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        {% if request.user.is_root %}
+            <a href="{% url 'addons_policy_create' %}" class="eal-btn eal-btn-primary">
+              <i class="bi bi-plus-lg"></i>
+              <span>Add Policy</span>
+            </a>
+          {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+  <div class="list-page-actions">
+    <div class="eal-header-actions">
           {% if request.user.is_root %}
             <a href="{% url 'addons_policy_create' %}" class="eal-btn eal-btn-primary">
               <i class="bi bi-plus-lg"></i>
               <span>Add Policy</span>
             </a>
           {% endif %}
-        </div>
-      </div>
-    </div>
+  </div>
+</div>
   </div>
 
   <div class="eal-table-card">
@@ -50,7 +86,7 @@
               <th>Shipment</th>
               <th>Storage/GB</th>
               <th>Status</th>
-              <th>Actions</th>
+              <th>ACTIONS</th>
             </tr>
           </thead>
           <tbody>
@@ -66,20 +102,20 @@
                 <td>{{ p.extra_storage_gb_price }}</td>
                 <td>
                   {% if p.is_active %}
-                    <span class="badge status-badge status-active">Active</span>
+                    <span class="status-badge active">Active</span>
                   {% else %}
-                    <span class="badge status-badge status-inactive">Inactive</span>
+                    <span class="status-badge inactive">Inactive</span>
                   {% endif %}
                 </td>
                 <td>
                   <div class="eal-actions-cell">
                     {% if request.user.is_root %}
-                      <a href="{% url 'addons_policy_edit' p.policy_id %}" class="eal-row-btn" title="Edit">
-                        <i class="bi bi-pencil"></i>
-                      </a>
-                      <a href="{% url 'addons_policy_edit' p.policy_id %}" class="eal-row-btn btn-toggle" title="{% if p.is_active %}Deactivate{% else %}Activate{% endif %}">
-                        <i class="bi bi-arrow-repeat"></i>
-                      </a>
+                      <a href="{% url 'addons_policy_edit' p.policy_id %}" class="eal-row-btn icon-only-btn icon-only-btn" title="Edit">
+<i class="bi bi-pencil"></i>
+</a>
+                      <a href="{% url 'addons_policy_edit' p.policy_id %}" class="eal-row-btn icon-only-btn icon-only-btn btn-toggle" title="{% if p.is_active %}Deactivate{% else %}Activate{% endif %}">
+<i class="bi bi-arrow-repeat"></i>
+</a>
                     {% endif %}
                   </div>
                 </td>
@@ -92,8 +128,10 @@
       <div class="notification-empty">
         <div class="empty-icon"><i class="bi bi-card-list"></i></div>
         <h4 class="empty-title">No policy records found.</h4>
+        <p class="empty-text">Create a policy to manage add-on pricing.</p>
       </div>
     {% endif %}
   </div>
+{% include 'partials/pagination.html' with page_obj=messages %}
 {% endblock %}
 

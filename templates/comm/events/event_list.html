@@ -1,23 +1,50 @@
 {% extends 'base.html' %}
-{% block title %}Events Mapping Engine{% endblock %}
+{% load i18n %}
+{% load i18n %}
+{% block title %}Events Mapping Engine{% include 'partials/pagination.html' with page_obj=mappings %}
+{% endblock %}
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item active" aria-current="page">{% translate "Events Mapping Engine" %}</li>
+{% include 'partials/pagination.html' with page_obj=mappings %}
+{% endblock %}
+
 {% block content %}
-  <div class="page-header">
-    <div class="page-header-row">
-      <div class="page-header-left">
-        <h1 class="page-title">Events Mapping Engine</h1>
-        <p class="page-subtitle">System events are hardcoded. You can only map them to templates.</p>
-      </div>
-      <div class="page-header-right">
+<div class="page-header">
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">{% translate "Events Mapping Engine" %}</h1>
+      <p class="page-subtitle">{% translate "Manage your records here" %}</p>
+    </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
         <a href="{% url 'event_mapping_create' %}" class="eal-btn eal-btn-primary">Add Mapping</a>
       </div>
     </div>
+  </div>
+</div>
+
+  
+
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <a href="{% url 'event_mapping_create' %}" class="eal-btn eal-btn-primary">Add Mapping</a>
+      </div>
+    </div>
+  </div>
+</div>
+  <div class="list-page-actions">
+    <div class="eal-header-actions">
+          <a href="{% url 'event_mapping_create' %}" class="eal-btn eal-btn-primary">Add Mapping</a>
+  </div>
+</div>
   </div>
 
   <div class="eal-table-card">
     <div class="eal-table-wrap">
       <table class="eal-table">
         <thead>
-          <tr><th>#</th><th>System Event</th><th>Primary Channel</th><th>Primary Template</th><th>Fallback Channel</th><th>Fallback Template</th><th>Status</th><th>Actions</th></tr>
+          <tr><th>#</th><th>System Event</th><th>Primary Channel</th><th>Primary Template</th><th>Fallback Channel</th><th>Fallback Template</th><th>Status</th><th>ACTIONS</th></tr>
         </thead>
         <tbody>
           {% for row in mappings %}
@@ -28,13 +55,15 @@
               <td>{{ row.primary_template.template_name|default:'-' }}</td>
               <td>{{ row.fallback_channel|default:'-' }}</td>
               <td>{{ row.fallback_template.template_name|default:'-' }}</td>
-              <td>{% if row.is_active %}<span class="badge status-badge status-active">Active</span>{% else %}<span class="badge status-badge status-inactive">Inactive</span>{% endif %}</td>
+              <td>{% if row.is_active %}<span class="status-badge active">Active</span>{% else %}<span class="status-badge inactive">Inactive</span>{% endif %}</td>
               <td class="text-nowrap">
-                <a href="{% url 'event_mapping_edit' row.mapping_id %}" class="eal-row-btn"><i class="bi bi-pencil"></i></a>
-                <form method="post" action="{% url 'event_mapping_toggle' row.mapping_id %}" style="display:inline">
-                  {% csrf_token %}
-                  <button type="submit" class="eal-row-btn"><i class="bi bi-arrow-repeat"></i></button>
-                </form>
+                <div class="eal-actions-cell">
+                  <a href="{% url 'event_mapping_edit' row.mapping_id %}" class="eal-row-btn"><i class="bi bi-pencil"></i></a>
+                  <form method="post" action="{% url 'event_mapping_toggle' row.mapping_id %}" style="display:inline">
+                    {% csrf_token %}
+                    <button type="submit" class="eal-row-btn"><i class="bi bi-arrow-repeat"></i></button>
+                  </form>
+                </div>
               </td>
             </tr>
           {% endfor %}
@@ -47,7 +76,13 @@
             </tr>
           {% endfor %}
           {% if not mappings and not unmapped_events %}
-            <tr><td colspan="8" class="text-center py-4 text-muted">No events found.</td></tr>
+            <tr class="eal-table-empty">
+  <td colspan="20">
+    <div class="eal-empty-icon"><i class="bi bi-inbox"></i></div>
+    <div class="eal-empty-title">{% translate "No Data Found" %}</div>
+    <div class="eal-empty-text">No events found.</div>
+  </td>
+</tr>
           {% endif %}
         </tbody>
       </table>
@@ -55,13 +90,7 @@
   </div>
 
   {% if mappings.paginator.num_pages > 1 %}
-    <div class="eal-pagination mt-3">
-      <div class="eal-pagination-controls">
-        {% if mappings.has_previous %}<a class="eal-page-btn" href="?page={{ mappings.previous_page_number }}">Previous</a>{% endif %}
-        <span class="eal-page-btn active">Page {{ mappings.number }} of {{ mappings.paginator.num_pages }}</span>
-        {% if mappings.has_next %}<a class="eal-page-btn" href="?page={{ mappings.next_page_number }}">Next</a>{% endif %}
-      </div>
-    </div>
-  {% endif %}
+    
+{% include 'partials/pagination.html' with page_obj=mappings %}
 {% endblock %}
 

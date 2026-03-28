@@ -1,0 +1,37 @@
+{% load i18n %}
+{% if page_obj.paginator.num_pages > 1 %}
+<div class="eal-pagination-wrapper" style="display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; border-top: 1px solid var(--border-light); background: var(--bg-white); border-radius: 0 0 var(--radius-lg) var(--radius-lg);">
+    <div class="eal-pagination-info" style="font-size: 13px; color: var(--text-muted);">
+        {% blocktranslate with start=page_obj.start_index end=page_obj.end_index count=page_obj.paginator.count %}
+        Showing {{ start }} to {{ end }} of {{ count }} entries
+        {% endblocktranslate %}
+    </div>
+    <div class="eal-pagination-controls" style="display: flex; gap: 8px;">
+        {% if page_obj.has_previous %}
+            <a href="?page={{ page_obj.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" 
+               class="eal-btn eal-btn-outline" style="padding: 6px 14px; font-size: 13px;">
+               <i class="bi {% if request.session.is_rtl or request.session.django_language == 'ar' %}bi-chevron-right{% else %}bi-chevron-left{% endif %}"></i> {% translate "Previous" %}
+            </a>
+        {% else %}
+            <button class="eal-btn eal-btn-outline" disabled style="padding: 6px 14px; font-size: 13px; opacity: 0.5; cursor: not-allowed;">
+               <i class="bi {% if request.session.is_rtl or request.session.django_language == 'ar' %}bi-chevron-right{% else %}bi-chevron-left{% endif %}"></i> {% translate "Previous" %}
+            </button>
+        {% endif %}
+
+        <span class="eal-page-indicator" style="display: flex; align-items: center; padding: 0 12px; font-size: 13px; font-weight: 600; color: var(--text-dark);">
+            {% translate "Page" %} {{ page_obj.number }} {% translate "of" %} {{ page_obj.paginator.num_pages }}
+        </span>
+
+        {% if page_obj.has_next %}
+            <a href="?page={{ page_obj.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" 
+               class="eal-btn eal-btn-outline" style="padding: 6px 14px; font-size: 13px;">
+               {% translate "Next" %} <i class="bi {% if request.session.is_rtl or request.session.django_language == 'ar' %}bi-chevron-left{% else %}bi-chevron-right{% endif %}"></i>
+            </a>
+        {% else %}
+            <button class="eal-btn eal-btn-outline" disabled style="padding: 6px 14px; font-size: 13px; opacity: 0.5; cursor: not-allowed;">
+               {% translate "Next" %} <i class="bi {% if request.session.is_rtl or request.session.django_language == 'ar' %}bi-chevron-left{% else %}bi-chevron-right{% endif %}"></i>
+            </button>
+        {% endif %}
+    </div>
+</div>
+{% endif %}

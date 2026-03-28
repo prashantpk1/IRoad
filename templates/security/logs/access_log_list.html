@@ -1,13 +1,37 @@
 {% extends 'base.html' %}
-{% block title %}Authentication Log{% endblock %}
+{% load i18n %}
+{% block title %}Authentication Log{% include 'partials/pagination.html' with page_obj=access_logs %}
+{% endblock %}
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item active" aria-current="page">{% translate "Authentication Log" %}</li>
+{% include 'partials/pagination.html' with page_obj=access_logs %}
+{% endblock %}
+
 {% block content %}
-<div class="container py-3">
-  <div class="page-header">
-    <div class="page-header-row">
-      <div class="page-header-left">
-        <h1 class="page-title">Authentication Log</h1>
-        <p class="page-subtitle">Immutable login and logout history</p>
+<div class="page-header">
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">{% translate "Authentication Log" %}</h1>
+      <p class="page-subtitle">{% translate "Manage your records here" %}</p>
+    </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <!-- Actions here -->
       </div>
+    </div>
+  </div>
+</div>
+
+<div class="container py-3">
+  
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <!-- Actions here -->
+      </div>
+    </div>
+  </div>
+</div>
     </div>
   </div>
 
@@ -43,7 +67,13 @@
             <td>{{ log.timestamp }}</td>
           </tr>
           {% empty %}
-          <tr><td colspan="7" class="text-center text-muted">No records found.</td></tr>
+          <tr class="eal-table-empty">
+  <td colspan="20">
+    <div class="eal-empty-icon"><i class="bi bi-inbox"></i></div>
+    <div class="eal-empty-title">{% translate "No Data Found" %}</div>
+    <div class="eal-empty-text">No records found.</div>
+  </td>
+</tr>
           {% endfor %}
         </tbody>
       </table>
@@ -51,8 +81,8 @@
   </div>
 
   {% if access_logs.paginator.num_pages > 1 %}
-  <div class="eal-pagination mt-3"><div class="eal-pagination-controls">{% if access_logs.has_previous %}<a class="eal-page-btn" href="?{{ filter_query }}&page={{ access_logs.previous_page_number }}">Previous</a>{% endif %}<span class="eal-page-btn active">Page {{ access_logs.number }} of {{ access_logs.paginator.num_pages }}</span>{% if access_logs.has_next %}<a class="eal-page-btn" href="?{{ filter_query }}&page={{ access_logs.next_page_number }}">Next</a>{% endif %}</div></div>
-  {% endif %}
+  
 </div>
+{% include 'partials/pagination.html' with page_obj=access_logs %}
 {% endblock %}
 

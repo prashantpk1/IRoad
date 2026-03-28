@@ -1,16 +1,60 @@
 {% extends 'base.html' %}
+{% load i18n %}
+{% load i18n %}
 
-{% block page_title %}Exchange Rates{% endblock %}
+{% block page_title %}Exchange Rates{% include 'partials/pagination.html' with page_obj=messages %}
+{% endblock %}
+
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item active" aria-current="page">{% translate "Exchange Rates" %}</li>
+{% include 'partials/pagination.html' with page_obj=messages %}
+{% endblock %}
 
 {% block content %}
-  <div class="page-header">
-    <div class="page-header-row">
-      <div class="page-header-left">
-        <h1 class="page-title">Exchange Rates</h1>
-        <p class="page-subtitle">FX rates vs base currency</p>
+<div class="page-header">
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">{% translate "Exchange Rates" %}</h1>
+      <p class="page-subtitle">{% translate "Manage your records here" %}</p>
+    </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <a href="{% url 'fx_change_log' %}" class="eal-btn eal-btn-outline">
+            <i class="bi bi-journal-bookmark"></i>
+            <span>FX Change Log</span>
+          </a>
+          {% if request.user.is_root %}
+            <a href="{% url 'fx_rate_create' %}" class="eal-btn eal-btn-primary">
+              <i class="bi bi-plus-lg"></i>
+              <span>Add Exchange Rate</span>
+            </a>
+          {% endif %}
       </div>
-      <div class="page-header-right">
-        <div class="eal-header-actions">
+    </div>
+  </div>
+</div>
+
+  
+
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <a href="{% url 'fx_change_log' %}" class="eal-btn eal-btn-outline">
+            <i class="bi bi-journal-bookmark"></i>
+            <span>FX Change Log</span>
+          </a>
+          {% if request.user.is_root %}
+            <a href="{% url 'fx_rate_create' %}" class="eal-btn eal-btn-primary">
+              <i class="bi bi-plus-lg"></i>
+              <span>Add Exchange Rate</span>
+            </a>
+          {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+  <div class="list-page-actions">
+    <div class="eal-header-actions">
           <a href="{% url 'fx_change_log' %}" class="eal-btn eal-btn-outline">
             <i class="bi bi-journal-bookmark"></i>
             <span>FX Change Log</span>
@@ -21,9 +65,8 @@
               <span>Add Exchange Rate</span>
             </a>
           {% endif %}
-        </div>
-      </div>
-    </div>
+  </div>
+</div>
   </div>
 
   <div style="margin-bottom: 16px; padding: 12px 14px; border-radius: 10px; background:#eff6ff; border:1px solid #dbeafe">
@@ -95,7 +138,7 @@
               <th style="width: 170px">Rate</th>
               <th style="width: 120px">Status</th>
               <th style="width: 170px">Last Updated</th>
-              <th style="width: 220px">Actions</th>
+              <th style="width: 220px">ACTIONS</th>
             </tr>
           </thead>
           <tbody>
@@ -108,24 +151,24 @@
                 <td>{{ rate.exchange_rate|floatformat:6 }}</td>
                 <td>
                   {% if rate.is_active %}
-                    <span class="badge status-badge status-active">Active</span>
+                    <span class="status-badge active">Active</span>
                   {% else %}
-                    <span class="badge status-badge status-inactive">Inactive</span>
+                    <span class="status-badge inactive">Inactive</span>
                   {% endif %}
                 </td>
                 <td>{{ rate.updated_at }}</td>
                 <td>
                   <div class="eal-actions-cell">
                     {% if request.user.is_root %}
-                      <a href="{% url 'fx_rate_edit' rate.fx_id %}" class="eal-row-btn" title="Edit">
-                        <i class="bi bi-pencil"></i>
-                      </a>
+                      <a href="{% url 'fx_rate_edit' rate.fx_id %}" class="eal-row-btn icon-only-btn icon-only-btn" title="Edit">
+<i class="bi bi-pencil"></i>
+</a>
                       <form method="post" action="{% url 'fx_rate_edit' rate.fx_id %}" style="display:inline">
                         {% csrf_token %}
                         <input type="hidden" name="action" value="toggle_status" />
-                        <button type="submit" class="eal-row-btn" title="Toggle Active">
-                          <i class="bi bi-arrow-repeat"></i>
-                        </button>
+                        <button type="submit" class="eal-row-btn icon-only-btn icon-only-btn" title="Toggle Active">
+<i class="bi bi-arrow-repeat"></i>
+</button>
                       </form>
                     {% endif %}
                   </div>
@@ -136,23 +179,9 @@
         </table>
       </div>
 
-      <div class="eal-pagination">
-        <div class="eal-pagination-controls">
-          {% if exchange_rates.has_previous %}
-            <a href="?status={{ status_filter }}&page={{ exchange_rates.previous_page_number }}" class="eal-page-btn" title="Previous">
-              <i class="bi bi-chevron-left"></i>
-            </a>
-          {% endif %}
-          <span class="eal-page-btn active">{{ exchange_rates.number }}</span>
-          {% if exchange_rates.has_next %}
-            <a href="?status={{ status_filter }}&page={{ exchange_rates.next_page_number }}" class="eal-page-btn" title="Next">
-              <i class="bi bi-chevron-right"></i>
-            </a>
-          {% endif %}
-        </div>
-      </div>
+      
     {% else %}
-      <div class="notification-empty" style="margin-top: 16px">
+      <div class="notification-empty" class="list-filter-wrapper">
         <div class="empty-icon">
           <i class="bi bi-currency-exchange"></i>
         </div>
@@ -161,4 +190,5 @@
       </div>
     {% endif %}
   </div>
+{% include 'partials/pagination.html' with page_obj=messages %}
 {% endblock %}

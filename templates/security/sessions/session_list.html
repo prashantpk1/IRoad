@@ -1,10 +1,37 @@
 {% extends 'base.html' %}
-{% block title %}Active Sessions Monitor{% endblock %}
+{% load i18n %}
+{% block title %}Active Sessions Monitor{% include 'partials/pagination.html' with page_obj=sessions %}
+{% endblock %}
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item active" aria-current="page">{% translate "Active Sessions Monitor" %}</li>
+{% include 'partials/pagination.html' with page_obj=sessions %}
+{% endblock %}
+
 {% block content %}
+<div class="page-header">
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">{% translate "Active Sessions Monitor" %}</h1>
+      <p class="page-subtitle">{% translate "Manage your records here" %}</p>
+    </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <!-- Actions here -->
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="container py-3">
-  <div class="page-header">
-    <div class="page-header-row">
-      <div class="page-header-left"><h1 class="page-title">Active Sessions Monitor</h1></div>
+  
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <!-- Actions here -->
+      </div>
+    </div>
+  </div>
+</div>
     </div>
   </div>
 
@@ -74,7 +101,13 @@
             </td>
           </tr>
           {% empty %}
-          <tr><td colspan="8" class="text-center text-muted">No active sessions found.</td></tr>
+          <tr class="eal-table-empty">
+  <td colspan="20">
+    <div class="eal-empty-icon"><i class="bi bi-inbox"></i></div>
+    <div class="eal-empty-title">{% translate "No Data Found" %}</div>
+    <div class="eal-empty-text">No active sessions found.</div>
+  </td>
+</tr>
           {% endfor %}
         </tbody>
       </table>
@@ -82,18 +115,8 @@
   </div>
 
   {% if sessions.paginator.num_pages > 1 %}
-  <div class="eal-pagination mt-3">
-    <div class="eal-pagination-controls">
-      {% if sessions.has_previous %}
-      <a class="eal-page-btn" href="?page={{ sessions.previous_page_number }}&user_domain={{ domain_filter }}&q={{ search_query }}">Previous</a>
-      {% endif %}
-      <span class="eal-page-btn active">Page {{ sessions.number }} of {{ sessions.paginator.num_pages }}</span>
-      {% if sessions.has_next %}
-      <a class="eal-page-btn" href="?page={{ sessions.next_page_number }}&user_domain={{ domain_filter }}&q={{ search_query }}">Next</a>
-      {% endif %}
-    </div>
-  </div>
-  {% endif %}
+  
 </div>
+{% include 'partials/pagination.html' with page_obj=sessions %}
 {% endblock %}
 

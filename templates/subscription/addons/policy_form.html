@@ -1,32 +1,45 @@
 {% extends 'base.html' %}
+{% load i18n %}
+{% load i18n %}
 
 {% block page_title %}{% if is_edit %}Edit Policy{% else %}Add Policy{% endif %}{% endblock %}
 
-{% block content %}
-  <div class="page-header">
-    <nav class="page-breadcrumb">
-      <ol class="breadcrumb">
-        <li class="breadcrumb-item"><a href="{% url 'addons_policy_list' %}">Add-ons Policy</a></li>
-        {% if is_edit and policy %}
-          <li class="breadcrumb-item active" aria-current="page">Edit: {{ policy.policy_name }}</li>
-        {% else %}
-          <li class="breadcrumb-item active" aria-current="page">Add Policy</li>
-        {% endif %}
-      </ol>
-    </nav>
 
-    <div class="page-header-row">
-      <div class="page-header-left">
-        <h1 class="page-title">{% if is_edit %}Edit Policy{% else %}Add Policy{% endif %}</h1>
-      </div>
-      <div class="page-header-right">
-        <a href="{% url 'addons_policy_list' %}" class="eal-btn">
-          <i class="bi bi-arrow-left"></i>
-          <span>Cancel</span>
-        </a>
+{% block breadcrumb_items %}
+<li class="breadcrumb-item active" aria-current="page">{% translate "{% if is_edit %}Edit Policy{% else %}Add Policy{% endif %}" %}</li>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">{% translate "{% if is_edit %}Edit Policy{% else %}Add Policy{% endif %}" %}</h1>
+      <p class="page-subtitle">{% translate "Manage your records here" %}</p>
+    </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <!-- Actions here -->
       </div>
     </div>
   </div>
+</div>
+
+  
+
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <!-- Actions here -->
+      </div>
+    </div>
+  </div>
+</div>
+  <div class="list-page-actions">
+    <a href="{% url 'addons_policy_list' %}" class="eal-btn">
+          <i class="bi bi-arrow-left"></i>
+          <span>Cancel</span>
+        </a>
+  </div>
+</div>
 
   {% if is_edit and policy and policy.updated_at %}
   <div class="edit-info-bar">
@@ -95,7 +108,7 @@
         </div>
 
         <div class="submit-section" style="margin-top: 14px">
-          <button type="submit" class="btn btn-primary">
+          <button type="submit" class="eal-btn eal-btn-primary">
             <i class="bi bi-save"></i>
             Save
           </button>

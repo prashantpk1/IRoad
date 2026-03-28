@@ -1,33 +1,52 @@
 {% extends 'base.html' %}
+{% load i18n %}
+{% load i18n %}
 
 {% block page_title %}{% if is_edit %}Edit Country{% else %}Add Country{% endif %}{% endblock %}
 
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item active" aria-current="page">{% translate "{% if is_edit %}Edit Country{% else %}Add Country{% endif %}" %}</li>
+{% endblock %}
+
 {% block content %}
-  <div class="page-header">
-    <nav class="page-breadcrumb">
-      <ol class="breadcrumb">
-        <li class="breadcrumb-item"><a href="{% url 'country_list' %}">Countries</a></li>
-        {% if is_edit %}
-          <li class="breadcrumb-item active" aria-current="page">Edit: {{ form.instance.country_code }}</li>
-        {% else %}
-          <li class="breadcrumb-item active" aria-current="page">Add Country</li>
-        {% endif %}
-      </ol>
-    </nav>
-    <div class="page-header-row">
-      <div class="page-header-left">
-        <h1 class="page-title">{% if is_edit %}Edit Country{% else %}Add Country{% endif %}</h1>
-        <p class="page-subtitle">Maintain country code and localization details</p>
+<div class="page-header">
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">{% translate "{% if is_edit %}Edit Country{% else %}Add Country{% endif %}" %}</h1>
+      <p class="page-subtitle">{% translate "Manage your records here" %}</p>
+    </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <a href="{% url 'country_list' %}" class="eal-btn eal-btn-outline">
+            <i class="bi bi-arrow-left"></i>
+            <span>Back</span>
+          </a>
       </div>
-      <div class="page-header-right">
-        <div class="eal-header-actions">
+    </div>
+  </div>
+</div>
+
+  
+
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <a href="{% url 'country_list' %}" class="eal-btn eal-btn-outline">
+            <i class="bi bi-arrow-left"></i>
+            <span>Back</span>
+          </a>
+      </div>
+    </div>
+  </div>
+</div>
+  <div class="list-page-actions">
+    <div class="eal-header-actions">
           <a href="{% url 'country_list' %}" class="eal-btn eal-btn-outline">
             <i class="bi bi-arrow-left"></i>
             <span>Back</span>
           </a>
-        </div>
-      </div>
-    </div>
+  </div>
+</div>
   </div>
 
   {% if form.instance.pk and form.instance.updated_at %}
@@ -116,13 +135,13 @@
 
     <div class="form-actions-bar sticky-bottom">
       <div class="form-actions-left">
-        <a href="{% url 'country_list' %}" class="btn btn-outline-secondary">
+        <a href="{% url 'country_list' %}" class="eal-btn eal-btn-outline">
           <i class="bi bi-arrow-left"></i>
           Cancel
         </a>
       </div>
       <div class="form-actions-right">
-        <button type="submit" class="btn btn-primary">
+        <button type="submit" class="eal-btn eal-btn-primary">
           <i class="bi bi-save"></i>
           Save
         </button>

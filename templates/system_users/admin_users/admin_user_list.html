@@ -1,23 +1,60 @@
 {% extends 'base.html' %}
+{% load i18n %}
+{% load i18n %}
 
-{% block page_title %}Admin Users{% endblock %}
+{% block page_title %}Admin Users{% include 'partials/pagination.html' with page_obj=roles %}
+{% endblock %}
+
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item active" aria-current="page">{% translate "Admin Users" %}</li>
+{% include 'partials/pagination.html' with page_obj=roles %}
+{% endblock %}
 
 {% block content %}
-  <div class="page-header">
-    <div class="page-header-row">
-      <div class="page-header-left">
-        <h2 class="page-title">Admin Users</h2>
-        <p class="page-subtitle">IRoad internal staff accounts</p>
-      </div>
-      <div class="page-header-right">
+<div class="page-header">
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">{% translate "Admin Users" %}</h1>
+      <p class="page-subtitle">{% translate "Manage your records here" %}</p>
+    </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
         {% if request.user.is_root %}
-          <a href="{% url 'admin_user_create' %}" class="eal-btn eal-btn-primary">
-            <i class="bi bi-plus-lg"></i>
-            Invite New User
-          </a>
-        {% endif %}
+            <a href="{% url 'admin_user_create' %}" class="eal-btn eal-btn-primary">
+              <i class="bi bi-plus-lg"></i>
+              <span>Invite New User</span>
+            </a>
+          {% endif %}
       </div>
     </div>
+  </div>
+</div>
+
+  
+
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        {% if request.user.is_root %}
+            <a href="{% url 'admin_user_create' %}" class="eal-btn eal-btn-primary">
+              <i class="bi bi-plus-lg"></i>
+              <span>Invite New User</span>
+            </a>
+          {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+  <div class="list-page-actions">
+    <div class="eal-header-actions">
+          {% if request.user.is_root %}
+            <a href="{% url 'admin_user_create' %}" class="eal-btn eal-btn-primary">
+              <i class="bi bi-plus-lg"></i>
+              <span>Invite New User</span>
+            </a>
+          {% endif %}
+  </div>
+</div>
   </div>
 
   <div class="eal-table-card">
@@ -34,7 +71,6 @@
           <input
             type="text"
             name="q"
-            class=""
             placeholder="Search by name or email"
             value="{{ search_query }}"
           />
@@ -62,14 +98,14 @@
         <div style="width: 120px">
           <button type="submit" class="eal-btn eal-btn-primary" style="width: 100%">
             <i class="bi bi-search"></i>
-            Filter
+            <span>Filter</span>
           </button>
         </div>
       </div>
     </form>
 
     {% if messages %}
-      <div style="margin-top: 16px">
+      <div class="list-filter-wrapper">
         {% for message in messages %}
           <p style="margin: 0; color: {% if message.tags == 'error' %}#b91c1c{% else %}#15803d{% endif %}; font-weight: 600">
             {{ message }}
@@ -90,7 +126,7 @@
               <th style="width: 140px">Status badge</th>
               <th style="width: 120px">2FA</th>
               <th style="width: 170px">Last Login</th>
-              <th style="width: 260px">Actions</th>
+              <th style="width: 260px">ACTIONS</th>
             </tr>
           </thead>
           <tbody>
@@ -98,8 +134,8 @@
               <tr>
                 <td>{{ forloop.counter0|add:admin_users.start_index }}</td>
                 <td>
-                  <div style="display: flex; align-items: center; gap: 10px">
-                    <span style="font-weight: 700">
+                  <div class="eal-name-cell">
+                    <span class="eal-name-text">
                       {{ u.first_name }} {{ u.last_name }}
                     </span>
                     {% if u.is_root %}
@@ -111,45 +147,41 @@
                 <td>{{ u.role.role_name_en|default:"-" }}</td>
                 <td>
                   {% if u.status == 'Pending_Activation' %}
-                    <span class="badge status-badge status-pending">Pending</span>
+                    <span class="status-badge pending">Pending</span>
                   {% elif u.status == 'Active' %}
-                    <span class="badge status-badge status-active">Active</span>
+                    <span class="status-badge active">Active</span>
                   {% else %}
-                    <span class="badge status-badge status-suspended">Suspended</span>
+                    <span class="status-badge inactive">Suspended</span>
                   {% endif %}
                 </td>
                 <td>
                   {% if u.two_factor_enabled %}
-                    <span class="badge status-badge status-issued">Enabled</span>
+                    <span class="status-badge active">Enabled</span>
                   {% else %}
-                    <span class="badge status-badge status-inactive">Disabled</span>
+                    <span class="status-badge inactive">Disabled</span>
                   {% endif %}
                 </td>
                 <td>{{ u.last_login_at|default:"-" }}</td>
                 <td>
-                  <div class="d-flex flex-wrap gap-2">
-                    <a href="{% url 'admin_user_edit' u.pk %}" class="eal-row-btn">
-                      <i class="bi bi-pencil"></i>
-                      Edit
-                    </a>
-                    <button type="button" class="eal-row-btn" disabled title="Invite resend flow not available in current logic">
-                      <i class="bi bi-send"></i>
-                      Invite Resend
-                    </button>
+                  <div class="eal-actions-cell">
+                    <a href="{% url 'admin_user_edit' u.pk %}" class="eal-row-btn icon-only-btn icon-only-btn">
+<i class="bi bi-pencil"></i>
+</a>
+                    <button type="button" class="eal-row-btn icon-only-btn icon-only-btn" disabled title="Invite resend flow not available in current logic">
+<i class="bi bi-send"></i>
+</button>
 
                     {% if not u.is_root %}
                       <form method="post" action="{% url 'admin_user_toggle_status' u.pk %}">
                         {% csrf_token %}
                         {% if u.status == 'Suspended' %}
-                          <button type="submit" class="eal-row-btn">
-                            <i class="bi bi-check-circle"></i>
-                            Activate
-                          </button>
+                          <button type="submit" class="eal-row-btn icon-only-btn icon-only-btn">
+<i class="bi bi-check-circle"></i>
+</button>
                         {% else %}
-                          <button type="submit" class="eal-row-btn">
-                            <i class="bi bi-slash-circle"></i>
-                            Suspend
-                          </button>
+                          <button type="submit" class="eal-row-btn icon-only-btn icon-only-btn">
+<i class="bi bi-slash-circle"></i>
+</button>
                         {% endif %}
                       </form>
                     {% endif %}
@@ -161,37 +193,16 @@
         </table>
       </div>
 
-      <div class="eal-pagination" style="margin-top: 18px">
-        <div class="eal-pagination-controls">
-        {% if admin_users.has_previous %}
-          <a
-            href="?q={{ search_query|urlencode }}&status={{ status_filter }}&role={{ role_filter }}&page={{ admin_users.previous_page_number }}"
-            class="eal-page-btn"
-          >
-            Previous
-          </a>
-        {% endif %}
-        <span class="eal-page-btn active">
-          Page {{ admin_users.number }} of {{ admin_users.paginator.num_pages }}
-        </span>
-        {% if admin_users.has_next %}
-          <a
-            href="?q={{ search_query|urlencode }}&status={{ status_filter }}&role={{ role_filter }}&page={{ admin_users.next_page_number }}"
-            class="eal-page-btn"
-          >
-            Next
-          </a>
-        {% endif %}
-      </div>
-      </div>
+      
     {% else %}
-      <div class="notification-empty" style="margin-top: 16px">
-        <div class="notification-empty-icon">
+      <div class="notification-empty" class="list-filter-wrapper">
+        <div class="empty-icon">
           <i class="bi bi-collection"></i>
         </div>
-        <p class="notification-empty-text">No admin users found.</p>
+        <h4 class="empty-title">No admin users found</h4>
+        <p class="empty-text">Try adjusting your search or filters.</p>
       </div>
     {% endif %}
   </div>
+{% include 'partials/pagination.html' with page_obj=roles %}
 {% endblock %}
-

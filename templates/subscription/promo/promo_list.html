@@ -1,24 +1,60 @@
 {% extends 'base.html' %}
+{% load i18n %}
+{% load i18n %}
 
-{% block page_title %}Promo Codes{% endblock %}
+{% block page_title %}Promo Codes{% include 'partials/pagination.html' with page_obj=messages %}
+{% endblock %}
+
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item active" aria-current="page">{% translate "Promo Codes" %}</li>
+{% include 'partials/pagination.html' with page_obj=messages %}
+{% endblock %}
 
 {% block content %}
-  <div class="page-header">
-    <div class="page-header-row">
-      <div class="page-header-left">
-        <h1 class="page-title">Promo Codes</h1>
+<div class="page-header">
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">{% translate "Promo Codes" %}</h1>
+      <p class="page-subtitle">{% translate "Manage your records here" %}</p>
+    </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        {% if request.user.is_root %}
+            <a href="{% url 'promo_code_create' %}" class="eal-btn eal-btn-primary">
+              <i class="bi bi-plus-lg"></i>
+              <span>Add Promo Code</span>
+            </a>
+          {% endif %}
       </div>
-      <div class="page-header-right">
-        <div class="eal-header-actions">
+    </div>
+  </div>
+</div>
+
+  
+
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        {% if request.user.is_root %}
+            <a href="{% url 'promo_code_create' %}" class="eal-btn eal-btn-primary">
+              <i class="bi bi-plus-lg"></i>
+              <span>Add Promo Code</span>
+            </a>
+          {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+  <div class="list-page-actions">
+    <div class="eal-header-actions">
           {% if request.user.is_root %}
             <a href="{% url 'promo_code_create' %}" class="eal-btn eal-btn-primary">
               <i class="bi bi-plus-lg"></i>
               <span>Add Promo Code</span>
             </a>
           {% endif %}
-        </div>
-      </div>
-    </div>
+  </div>
+</div>
   </div>
 
   <div class="eal-table-card">
@@ -77,7 +113,7 @@
               <th>Valid Until</th>
               <th>Uses</th>
               <th>Status</th>
-              <th>Actions</th>
+              <th>ACTIONS</th>
             </tr>
           </thead>
           <tbody>
@@ -95,26 +131,26 @@
                 </td>
                 <td>
                   {% if p.valid_until and p.valid_until < now %}
-                    <span class="badge status-badge status-expired">Expired</span>
+                    <span class="status-badge expired">Expired</span>
                   {% elif p.valid_from > now %}
-                    <span class="badge status-badge status-scheduled">Scheduled</span>
+                    <span class="status-badge warning">Scheduled</span>
                   {% elif p.is_active %}
-                    <span class="badge status-badge status-active">Active</span>
+                    <span class="status-badge active">Active</span>
                   {% else %}
-                    <span class="badge status-badge status-inactive">Inactive</span>
+                    <span class="status-badge inactive">Inactive</span>
                   {% endif %}
                 </td>
                 <td>
                   {% if request.user.is_root %}
                     <div class="eal-actions-cell">
-                      <a href="{% url 'promo_code_edit' p.promo_code_id %}" class="eal-row-btn" title="Edit">
-                        <i class="bi bi-pencil"></i>
-                      </a>
+                      <a href="{% url 'promo_code_edit' p.promo_code_id %}" class="eal-row-btn icon-only-btn icon-only-btn" title="Edit">
+<i class="bi bi-pencil"></i>
+</a>
                       <form method="post" action="{% url 'promo_code_toggle' p.promo_code_id %}" style="display:inline">
                         {% csrf_token %}
-                        <button type="submit" class="eal-row-btn" title="{% if p.is_active %}Deactivate{% else %}Activate{% endif %}">
-                          <i class="bi bi-arrow-repeat"></i>
-                        </button>
+                        <button type="submit" class="eal-row-btn icon-only-btn icon-only-btn" title="{% if p.is_active %}Deactivate{% else %}Activate{% endif %}">
+<i class="bi bi-arrow-repeat"></i>
+</button>
                       </form>
                     </div>
                   {% endif %}
@@ -127,27 +163,15 @@
         </table>
       </div>
 
-      <div class="eal-pagination" style="margin-top: 18px;">
-        <div class="eal-pagination-controls">
-          {% if promo_codes.has_previous %}
-            <a href="?q={{ search_query|urlencode }}&status={{ status_filter }}&page={{ promo_codes.previous_page_number }}" class="eal-page-btn" title="Previous">
-              <i class="bi bi-chevron-left"></i>
-            </a>
-          {% endif %}
-          <span class="eal-page-btn active">Page {{ promo_codes.number }} of {{ promo_codes.paginator.num_pages }}</span>
-          {% if promo_codes.has_next %}
-            <a href="?q={{ search_query|urlencode }}&status={{ status_filter }}&page={{ promo_codes.next_page_number }}" class="eal-page-btn" title="Next">
-              <i class="bi bi-chevron-right"></i>
-            </a>
-          {% endif %}
-        </div>
-      </div>
+      
     {% else %}
       <div class="notification-empty">
         <div class="empty-icon"><i class="bi bi-ticket-perforated"></i></div>
         <h4 class="empty-title">No promo codes found.</h4>
+        <p class="empty-text">Adjust filters or add a new promo code.</p>
       </div>
     {% endif %}
   </div>
+{% include 'partials/pagination.html' with page_obj=messages %}
 {% endblock %}
 

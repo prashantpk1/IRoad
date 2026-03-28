@@ -1,33 +1,52 @@
 {% extends 'base.html' %}
+{% load i18n %}
+{% load i18n %}
 
 {% block page_title %}{% if is_edit %}Edit Promo Code{% else %}Add Promo Code{% endif %}{% endblock %}
 
-{% block content %}
-  <div class="page-header">
-    <nav class="page-breadcrumb">
-      <ol class="breadcrumb">
-        <li class="breadcrumb-item"><a href="{% url 'promo_code_list' %}">Promo Codes</a></li>
-        {% if is_edit and promo %}
-          <li class="breadcrumb-item active" aria-current="page">Edit: {{ promo.code }}</li>
-        {% else %}
-          <li class="breadcrumb-item active" aria-current="page">Add Code</li>
-        {% endif %}
-      </ol>
-    </nav>
 
-    <div class="page-header-row">
-      <div class="page-header-left">
-        <h1 class="page-title">{% if is_edit %}Edit Promo Code{% else %}Add Promo Code{% endif %}</h1>
+{% block breadcrumb_items %}
+<li class="breadcrumb-item active" aria-current="page">{% translate "{% if is_edit %}Edit Promo Code{% else %}Add Promo Code{% endif %}" %}</li>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">{% translate "{% if is_edit %}Edit Promo Code{% else %}Add Promo Code{% endif %}" %}</h1>
+      <p class="page-subtitle">{% translate "Manage your records here" %}</p>
+    </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <a href="{% url 'promo_code_list' %}" class="eal-btn">
+            <i class="bi bi-arrow-left"></i>
+            <span>Back</span>
+          </a>
       </div>
-      <div class="page-header-right">
-        <div class="eal-header-actions">
+    </div>
+  </div>
+</div>
+
+  
+
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <a href="{% url 'promo_code_list' %}" class="eal-btn">
+            <i class="bi bi-arrow-left"></i>
+            <span>Back</span>
+          </a>
+      </div>
+    </div>
+  </div>
+</div>
+  <div class="list-page-actions">
+    <div class="eal-header-actions">
           <a href="{% url 'promo_code_list' %}" class="eal-btn">
             <i class="bi bi-arrow-left"></i>
             <span>Back</span>
           </a>
-        </div>
-      </div>
-    </div>
+  </div>
+</div>
   </div>
 
   {% if is_edit and promo and promo.updated_at %}
@@ -120,7 +139,7 @@
         {% endif %}
 
         <div class="submit-section" style="margin-top:14px">
-          <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Save</button>
+          <button type="submit" class="eal-btn eal-btn-primary"><i class="bi bi-save"></i> Save</button>
         </div>
       </form>
     </div>

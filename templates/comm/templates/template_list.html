@@ -1,22 +1,60 @@
 {% extends 'base.html' %}
+{% load i18n %}
+{% load i18n %}
 
-{% block page_title %}Notification Templates{% endblock %}
+{% block page_title %}Notification Templates{% include 'partials/pagination.html' with page_obj=templates_page %}
+{% endblock %}
+
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item active" aria-current="page">{% translate "Notification Templates" %}</li>
+{% include 'partials/pagination.html' with page_obj=templates_page %}
+{% endblock %}
 
 {% block content %}
-  <div class="page-header">
-    <div class="page-header-row">
-      <div class="page-header-left">
-        <h1 class="page-title">Notification Templates</h1>
-      </div>
-      <div class="page-header-right">
+<div class="page-header">
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">{% translate "Notification Templates" %}</h1>
+      <p class="page-subtitle">{% translate "Manage your records here" %}</p>
+    </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
         {% if request.user.is_root %}
-          <a href="{% url 'notif_template_create' %}" class="eal-btn eal-btn-primary">
-            <i class="bi bi-plus-lg"></i>
-            <span>Add Template</span>
-          </a>
-        {% endif %}
+            <a href="{% url 'notif_template_create' %}" class="eal-btn eal-btn-primary">
+              <i class="bi bi-plus-lg"></i>
+              <span>Add Template</span>
+            </a>
+          {% endif %}
       </div>
     </div>
+  </div>
+</div>
+
+  
+
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        {% if request.user.is_root %}
+            <a href="{% url 'notif_template_create' %}" class="eal-btn eal-btn-primary">
+              <i class="bi bi-plus-lg"></i>
+              <span>Add Template</span>
+            </a>
+          {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+  <div class="list-page-actions">
+    <div class="eal-header-actions">
+          {% if request.user.is_root %}
+            <a href="{% url 'notif_template_create' %}" class="eal-btn eal-btn-primary">
+              <i class="bi bi-plus-lg"></i>
+              <span>Add Template</span>
+            </a>
+          {% endif %}
+  </div>
+</div>
   </div>
 
   <div class="eal-table-card">
@@ -38,16 +76,16 @@
     {% if templates_page.object_list %}
       <div class="eal-table-wrap">
         <table class="eal-table">
-          <thead><tr><th>#</th><th>Name</th><th>Channel badge</th><th>Category badge</th><th>Subject EN</th><th>Status</th><th>Actions</th></tr></thead>
+          <thead><tr><th>#</th><th>Name</th><th>Channel badge</th><th>Category badge</th><th>Subject EN</th><th>Status</th><th>ACTIONS</th></tr></thead>
           <tbody>
             {% for t in templates_page.object_list %}
               <tr>
                 <td>{{ forloop.counter0|add:templates_page.start_index }}</td>
                 <td>{{ t.template_name }}</td>
-                <td>{% if t.channel_type == 'Email' %}<span class="badge status-badge status-issued">Email</span>{% else %}<span class="badge status-badge status-active">SMS</span>{% endif %}</td>
-                <td>{% if t.category == 'Transactional' %}<span class="badge status-badge status-suspended">Transactional</span>{% else %}<span class="badge status-badge status-scheduled">Promotional</span>{% endif %}</td>
+                <td>{% if t.channel_type == 'Email' %}<span class="status-badge inactive">Email</span>{% else %}<span class="status-badge active">SMS</span>{% endif %}</td>
+                <td>{% if t.category == 'Transactional' %}<span class="status-badge warning">Transactional</span>{% else %}<span class="status-badge pending">Promotional</span>{% endif %}</td>
                 <td>{{ t.subject_en|default:'-' }}</td>
-                <td>{% if t.is_active %}<span class="badge status-badge status-active">Active</span>{% else %}<span class="badge status-badge status-inactive">Inactive</span>{% endif %}</td>
+                <td>{% if t.is_active %}<span class="status-badge active">Active</span>{% else %}<span class="status-badge inactive">Inactive</span>{% endif %}</td>
                 <td>
                   {% if request.user.is_root %}
                     <div class="eal-actions-cell">
@@ -64,8 +102,9 @@
         </table>
       </div>
     {% else %}
-      <div class="notification-empty"><h4 class="empty-title">No templates found.</h4></div>
+      <div class="notification-empty"><div class="empty-icon"><i class="bi bi-file-earmark-text"></i></div><h4 class="empty-title">No templates found.</h4><p class="empty-text">Try different filters or add a template.</p></div>
     {% endif %}
   </div>
+{% include 'partials/pagination.html' with page_obj=templates_page %}
 {% endblock %}
 
