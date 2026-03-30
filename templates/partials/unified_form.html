@@ -1,41 +1,25 @@
-{# Unified form shell partial/base for create/edit pages #}
+{% load i18n %}
+{# Unified form shell for create/edit pages #}
+
 <div class="page-header">
   <div class="page-header-row">
     <div class="page-header-left">
-      <h1 class="page-title">{% translate "" %}</h1>
-      <p class="page-subtitle">{% translate "Manage your records here" %}</p>
+      <h1 class="page-title">{% block form_title %}{% translate "Record Form" %}{% endblock %}</h1>
+      <p class="page-subtitle">{% block form_subtitle %}{% translate "Create or update record data" %}{% endblock %}</p>
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
-        <!-- Actions here -->
+        {% block form_header_actions %}{% endblock %}
       </div>
     </div>
-  </div>
-</div>
   </div>
 </div>
 
 {% block form_info_alert %}{% endblock %}
 {% block edit_info_bar %}{% endblock %}
-{#
-STANDARD EDIT INFO BAR — paste inside edit form templates:
-
-{% if object and object.updated_at %}
-<div class="edit-info-bar">
-  <i class="bi bi-clock-history"></i>
-  Last updated
-  {% if object.updated_by %}
-    by <strong>{{ object.updated_by.first_name }}
-    {{ object.updated_by.last_name }}</strong>
-  {% endif %}
-  at <strong>
-    {{ object.updated_at|date:"d M Y, H:i" }}
-  </strong>
-</div>
-{% endif %}
-#}
 
 <div class="form-card">
+  {% block form_card_header %}{% endblock %}
   <div class="form-card-body">
     {% block form_content %}{% endblock %}
   </div>
@@ -43,21 +27,18 @@ STANDARD EDIT INFO BAR — paste inside edit form templates:
 
 {% block form_footer %}
   <div class="form-actions-bar">
-  <div class="eal-header-actions">
-
-    <div class="footer-left">
-      {% block cancel_url %}{% endblock %}
-    
-  </div>
-</div>
-    <div class="footer-right">
-      {% block submit_btn %}
+    <div class="form-actions-left">
+      {% block form_cancel %}
+        <button type="button" class="eal-btn eal-btn-outline">{% translate "Cancel" %}</button>
+      {% endblock %}
+    </div>
+    <div class="form-actions-right">
+      {% block form_submit %}
         <button type="submit" class="eal-btn eal-btn-primary">
-          Save
+          <i class="bi bi-save"></i>
+          <span>{% translate "Save" %}</span>
         </button>
       {% endblock %}
     </div>
   </div>
 {% endblock %}
-
-{% block extra_js %}{% endblock %}

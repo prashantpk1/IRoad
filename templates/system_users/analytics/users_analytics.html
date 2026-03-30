@@ -3,154 +3,131 @@
 {% block page_title %}System Users Analytics{% endblock %}
 
 {% block content %}
-  <div class="page-header">
-    <div class="page-header-row">
-      <div class="page-header-left">
-        <h1 class="page-title">System Users Analytics</h1>
-        <p class="page-subtitle text-muted font-weight-normal">Staff overview and activity insights</p>
+  <div class="dashboard-toolbar">
+    <div class="toolbar-left">
+      <div class="toolbar-title">System Users Analytics</div>
+      <div class="toolbar-subtitle">Staff overview and activity insights</div>
+    </div>
+  </div>
+
+  <div class="kpi-grid">
+    <div class="kpi-card db-fade" data-status="info">
+      <div class="kpi-top">
+        <div class="kpi-icon primary"><i class="bi bi-people-fill"></i></div>
+        <div class="kpi-sparkline-placeholder" style="color: #5051f9;">
+          <i class="bi bi-graph-up"></i>
+        </div>
+      </div>
+      <div class="kpi-title">Total Active Staff</div>
+      <div class="kpi-bottom">
+        <span class="kpi-value">{{ total_staff }}</span>
+        <span class="kpi-change positive"><i class="bi bi-arrow-up-short"></i> Active</span>
+      </div>
+    </div>
+
+    <div class="kpi-card db-fade" data-status="critical">
+      <div class="kpi-top">
+        <div class="kpi-icon red"><i class="bi bi-exclamation-triangle-fill"></i></div>
+        <div class="kpi-sparkline-placeholder" style="color: #ef4444;">
+          <i class="bi bi-exclamation-circle"></i>
+        </div>
+      </div>
+      <div class="kpi-title">Suspended Accounts</div>
+      <div class="kpi-bottom">
+        <span class="kpi-value">{{ suspended_count }}</span>
+        <span class="kpi-change negative">Locked</span>
+      </div>
+    </div>
+
+    <div class="kpi-card db-fade" data-status="warning">
+      <div class="kpi-top">
+        <div class="kpi-icon orange"><i class="bi bi-clock-fill"></i></div>
+        <div class="kpi-sparkline-placeholder" style="color: #f59e0b;">
+          <i class="bi bi-hourglass-split"></i>
+        </div>
+      </div>
+      <div class="kpi-title">Pending Activation</div>
+      <div class="kpi-bottom">
+        <span class="kpi-value">{{ pending_count }}</span>
+        <span class="kpi-change positive">Queue</span>
+      </div>
+    </div>
+
+    <div class="kpi-card db-fade" data-status="warning">
+      <div class="kpi-top">
+        <div class="kpi-icon purple"><i class="bi bi-shield-check"></i></div>
+        <div class="kpi-sparkline-placeholder" style="color: #8b5cf6;">
+          <i class="bi bi-shield-lock"></i>
+        </div>
+      </div>
+      <div class="kpi-title">2FA Adoption Rate</div>
+      <div class="kpi-bottom">
+        <span class="kpi-value">{{ two_fa_rate }}%</span>
+        <span class="kpi-change positive"><i class="bi bi-arrow-up-short"></i> Adoption</span>
       </div>
     </div>
   </div>
 
-  <div class="eal-stats-row">
-    <div class="eal-stat-card">
-      <div class="eal-stat-icon blue">
-        <i class="bi bi-people-fill"></i>
-      </div>
-      <div>
-        <div class="eal-stat-value">{{ total_staff }}</div>
-        <div class="eal-stat-label">Total Active Staff</div>
-      </div>
-    </div>
-
-    <div class="eal-stat-card">
-      <div class="eal-stat-icon amber">
-        <i class="bi bi-exclamation-triangle-fill"></i>
-      </div>
-      <div>
-        <div class="eal-stat-value">{{ suspended_count }}</div>
-        <div class="eal-stat-label">Suspended Accounts</div>
-      </div>
-    </div>
-
-    <div class="eal-stat-card">
-      <div class="eal-stat-icon green">
-        <i class="bi bi-clock-fill"></i>
-      </div>
-      <div>
-        <div class="eal-stat-value">{{ pending_count }}</div>
-        <div class="eal-stat-label">Pending Activation</div>
-      </div>
-    </div>
-
-    <div class="eal-stat-card">
-      <div class="eal-stat-icon purple">
-        <i class="bi bi-shield-check"></i>
-      </div>
-      <div>
-        <div class="eal-stat-value">{{ two_fa_rate }}%</div>
-        <div class="eal-stat-label">2FA Adoption Rate</div>
-      </div>
-    </div>
-  </div>
-
-  <div class="eal-table-card" style="margin-top: 24px">
-    <div style="display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap">
-      <div style="flex: 2; min-width: 520px">
-        <div class="page-header" style="margin-bottom: 12px">
-          <div class="page-header-left">
-            <h2 class="page-title" style="font-size: 18px">Stale Accounts</h2>
-            <p class="page-subtitle text-muted font-weight-normal" style="margin: 0">Accounts inactive for 30+ days (Active only)</p>
-          </div>
+  <div class="db-grid-2">
+    <div class="db-card db-fade">
+      <div class="db-card-header">
+        <div>
+          <div class="db-card-title">Stale Accounts</div>
+          <div class="db-card-subtitle">Accounts inactive for 30+ days (Active only)</div>
         </div>
-
-        {% if stale_accounts %}
-          <div class="eal-table-wrap">
-            <table class="eal-table">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Email</th>
-                  <th>Role</th>
-                  <th>Last Login</th>
-                  <th>Days Since Login</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for acc in stale_accounts %}
-                  <tr>
-                    <td>
-                      <div class="eal-name-cell">
-                        <span class="eal-name-text">{{ acc.name }}</span>
-                      </div>
-                    </td>
-                    <td>{{ acc.email }}</td>
-                    <td>{{ acc.role|default:'-' }}</td>
-                    <td>{{ acc.last_login_at }}</td>
-                    <td>
-                      {% if acc.days_since_login is not None %}
-                        {{ acc.days_since_login }}
-                      {% else %}
-                        -
-                      {% endif %}
-                    </td>
-                  </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-        {% else %}
-          <div class="table-empty-state" class="list-filter-wrapper">
-            <div class="empty-icon">
-              <i class="bi bi-check-circle"></i>
-            </div>
-            <h4 class="empty-title">All clear</h4>
-            <p class="empty-text">All accounts are active recently</p>
-          </div>
-        {% endif %}
       </div>
 
-      <div style="flex: 1; min-width: 320px">
-        <div class="page-header" style="margin-bottom: 12px">
-          <div class="page-header-left">
-            <h2 class="page-title" style="font-size: 18px">Role Distribution</h2>
-            <p class="page-subtitle text-muted font-weight-normal" style="margin: 0">Active users per role</p>
-          </div>
-        </div>
-
+      {% if stale_accounts %}
         <div class="eal-table-wrap">
           <table class="eal-table">
             <thead>
               <tr>
-                <th>Role Name</th>
-                <th style="width: 120px">User Count</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th>Last Login</th>
+                <th>Days Since Login</th>
               </tr>
             </thead>
             <tbody>
-              {% for item in role_distribution %}
+              {% for acc in stale_accounts %}
                 <tr>
                   <td>
                     <div class="eal-name-cell">
-                      <span class="eal-name-text">{{ item.role_name }}</span>
+                      <span class="eal-name-text">{{ acc.name }}</span>
                     </div>
                   </td>
-                  <td>{{ item.count }}</td>
+                  <td>{{ acc.email }}</td>
+                  <td>{{ acc.role|default:'-' }}</td>
+                  <td>{{ acc.last_login_at }}</td>
+                  <td>
+                    {% if acc.days_since_login is not None %}
+                      {{ acc.days_since_login }}
+                    {% else %}
+                      -
+                    {% endif %}
+                  </td>
                 </tr>
               {% endfor %}
             </tbody>
           </table>
         </div>
-
-        <p class="page-subtitle text-muted font-weight-normal" style="margin-top: 10px; font-size: 12px">
-          Donut chart is Phase 11. For now, using table view.
-        </p>
-      </div>
+      {% else %}
+        <div class="notification-empty">
+          <div class="empty-icon">
+            <i class="bi bi-check-circle"></i>
+          </div>
+          <h4 class="empty-title">All clear</h4>
+          <p class="empty-text">All accounts are active recently</p>
+        </div>
+      {% endif %}
     </div>
 
-    <div style="margin-top: 26px">
-      <div class="page-header" style="margin-bottom: 12px">
-        <div class="page-header-left">
-          <h2 class="page-title" style="font-size: 18px">Recently Added Users</h2>
+    <div class="db-card db-fade">
+      <div class="db-card-header">
+        <div>
+          <div class="db-card-title">Role Distribution</div>
+          <div class="db-card-subtitle">Active users per role</div>
         </div>
       </div>
 
@@ -158,38 +135,73 @@
         <table class="eal-table">
           <thead>
             <tr>
-              <th>Name</th>
-              <th>Email</th>
-              <th>Role</th>
-              <th>Status</th>
-              <th style="width: 180px">Created At</th>
+              <th>Role Name</th>
+              <th style="width: 120px">User Count</th>
             </tr>
           </thead>
           <tbody>
-            {% for u in recently_created %}
+            {% for item in role_distribution %}
               <tr>
                 <td>
                   <div class="eal-name-cell">
-                    <span class="eal-name-text">{{ u.first_name }} {{ u.last_name }}</span>
+                    <span class="eal-name-text">{{ item.role_name }}</span>
                   </div>
                 </td>
-                <td>{{ u.email }}</td>
-                <td>{{ u.role.role_name_en|default:'-' }}</td>
-                <td>
-                  {% if u.status == 'Pending_Activation' %}
-                    <span class="status-badge pending">Pending</span>
-                  {% elif u.status == 'Active' %}
-                    <span class="status-badge active">Active</span>
-                  {% else %}
-                    <span class="status-badge inactive">Suspended</span>
-                  {% endif %}
-                </td>
-                <td>{{ u.created_at }}</td>
+                <td>{{ item.count }}</td>
               </tr>
             {% endfor %}
           </tbody>
         </table>
       </div>
+
+      <p class="db-card-subtitle" style="margin-top: 12px; margin-bottom: 0">
+        Donut chart is Phase 11. For now, using table view.
+      </p>
+    </div>
+  </div>
+
+  <div class="db-card db-fade">
+    <div class="db-card-header">
+      <div>
+        <div class="db-card-title">Recently Added Users</div>
+      </div>
+    </div>
+
+    <div class="eal-table-wrap">
+      <table class="eal-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Role</th>
+            <th>Status</th>
+            <th style="width: 180px">Created At</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in recently_created %}
+            <tr>
+              <td>
+                <div class="eal-name-cell">
+                  <span class="eal-name-text">{{ u.first_name }} {{ u.last_name }}</span>
+                </div>
+              </td>
+              <td>{{ u.email }}</td>
+              <td>{{ u.role.role_name_en|default:'-' }}</td>
+              <td>
+                {% if u.status == 'Pending_Activation' %}
+                  <span class="status-badge pending">Pending</span>
+                {% elif u.status == 'Active' %}
+                  <span class="status-badge active">Active</span>
+                {% else %}
+                  <span class="status-badge inactive">Suspended</span>
+                {% endif %}
+              </td>
+              <td>{{ u.created_at }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
   </div>
 {% endblock %}

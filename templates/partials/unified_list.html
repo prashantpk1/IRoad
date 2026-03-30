@@ -1,5 +1,5 @@
 {% load i18n %}
-{% load i18n %}
+{# Generic list shell — override blocks in child templates. Pagination is rendered once at the bottom. #}
 {# STANDARD STATUS BADGES — use these classes everywhere #}
 {# Active / Success:   <span class="badge status-badge status-active">Active</span> #}
 {# Inactive / Disabled:<span class="badge status-badge status-inactive">Inactive</span> #}
@@ -11,58 +11,39 @@
 <div class="page-header">
   <div class="page-header-row">
     <div class="page-header-left">
-      <h1 class="page-title">{% translate "" %}</h1>
+      <h1 class="page-title">{% block list_title %}{% translate "Records" %}{% endblock %}</h1>
       <p class="page-subtitle">{% translate "Manage your records here" %}</p>
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
-        {% block page_actions %}{% include 'partials/pagination.html' with page_obj=page_obj %}
-{% endblock %}
+        {% block page_actions %}{% endblock %}
       </div>
     </div>
   </div>
-</div>
-  <div class="list-page-actions">
-    <div class="eal-header-actions">
-        {% block page_actions %}{% include 'partials/pagination.html' with page_obj=page_obj %}
-{% endblock %}
-  </div>
-</div>
 </div>
 
 <div class="eal-table-card">
   <div class="eal-toolbar">
     <div class="eal-toolbar-left">
-      {% block search_filters %}{% include 'partials/pagination.html' with page_obj=page_obj %}
-{% endblock %}
+      {% block search_filters %}{% endblock %}
     </div>
   </div>
 
-  <div class="eal-pagination-info" style="margin-bottom: 12px;">
-    {% block results_count %}{% include 'partials/pagination.html' with page_obj=page_obj %}
-{% endblock %}
-  </div>
+  {% block results_count %}{% endblock %}
 
   <div class="eal-table-wrap">
     <table class="eal-table">
-      {% block table_content %}{% include 'partials/pagination.html' with page_obj=page_obj %}
-{% endblock %}
+      {% block table_content %}{% endblock %}
     </table>
   </div>
 
-  <div class="eal-pagination">
-    {% block pagination %}{% include 'partials/pagination.html' with page_obj=page_obj %}
-{% endblock %}
-  </div>
+  {% block pagination %}
+    {% if page_obj %}
+      {% include 'partials/pagination.html' with page_obj=page_obj %}
+    {% endif %}
+  {% endblock %}
 
-  <div class="notification-empty" style="margin-top: 16px;">
-    <div class="empty-icon">
-      <i class="bi bi-inbox"></i>
-    </div>
-    <h4 class="empty-title">No records found</h4>
-    <p class="empty-text">{% block empty_state %}{% include 'partials/pagination.html' with page_obj=page_obj %}
-{% endblock %}</p>
-  </div>
+  {% block empty_panel %}{% endblock %}
 </div>
 
 {% block delete_modal %}
@@ -70,38 +51,36 @@
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
         <div class="modal-header">
-          <h5>Confirm Delete</h5>
+          <h5>{% translate "Confirm Delete" %}</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
           <p>
-            Are you sure you want to delete
+            {% translate "Are you sure you want to delete" %}
             "<span id="deleteRecordName"></span>"?
           </p>
           <p class="text-danger small">
-            This action cannot be undone.
+            {% translate "This action cannot be undone." %}
           </p>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
           <form id="deleteForm" method="POST">
             {% csrf_token %}
             <button type="submit" class="btn btn-danger">
-              Confirm Delete
+              {% translate "Confirm Delete" %}
             </button>
           </form>
         </div>
       </div>
     </div>
   </div>
-{% include 'partials/pagination.html' with page_obj=page_obj %}
 {% endblock %}
 
 <script>
 (function() {
   'use strict';
 
-  // Delete modal handler
   var deleteModal = document.getElementById('deleteModal');
   if (deleteModal) {
     var modalInstance = new bootstrap.Modal(deleteModal);
@@ -112,8 +91,7 @@
           e.preventDefault();
           var name = this.dataset.deleteName || 'this record';
           var url  = this.dataset.deleteUrl;
-          var nameEl = document.getElementById(
-              'deleteRecordName');
+          var nameEl = document.getElementById('deleteRecordName');
           var form = document.getElementById('deleteForm');
           if (nameEl) nameEl.textContent = name;
           if (form)   form.action = url;
@@ -121,7 +99,6 @@
         });
       });
 
-    // Show error inside modal if redirected with error
     var errorMsg = "{{ delete_error|default:'' }}";
     if (errorMsg && deleteModal) {
       var body = deleteModal.querySelector('.modal-body');
@@ -137,5 +114,4 @@
 })();
 </script>
 
-{% block extra_js %}{% include 'partials/pagination.html' with page_obj=page_obj %}
-{% endblock %}
+{% block extra_js %}{% endblock %}

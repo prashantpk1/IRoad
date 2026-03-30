@@ -1,14 +1,10 @@
 {% extends 'base.html' %}
 {% load i18n %}
-{% load i18n %}
 
-{% block page_title %}Countries{% include 'partials/pagination.html' with page_obj=messages %}
-{% endblock %}
-
+{% block page_title %}{% translate "Countries" %}{% endblock %}
 
 {% block breadcrumb_items %}
-<li class="breadcrumb-item active" aria-current="page">{% translate "Countries" %}</li>
-{% include 'partials/pagination.html' with page_obj=messages %}
+  <li class="breadcrumb-item active" aria-current="page">{% translate "Countries" %}</li>
 {% endblock %}
 
 {% block content %}
@@ -21,205 +17,169 @@
     <div class="page-header-right">
       <div class="eal-header-actions">
         {% if request.user.is_root %}
-            <a href="{% url 'country_create' %}" class="eal-btn eal-btn-primary">
-              <i class="bi bi-plus-lg"></i>
-              <span>Add Country</span>
-            </a>
-          {% endif %}
+          <a href="{% url 'country_create' %}" class="eal-btn eal-btn-primary">
+            <i class="bi bi-plus-lg"></i>
+            <span>Add Country</span>
+          </a>
+        {% endif %}
       </div>
     </div>
   </div>
 </div>
 
-  
+{% if messages %}
+  <div style="margin-bottom: 16px">
+    {% for message in messages %}
+      <p style="margin: 0; color: {% if message.tags == 'error' %}#b91c1c{% else %}#15803d{% endif %}; font-weight: 600">
+        {{ message }}
+      </p>
+    {% endfor %}
+  </div>
+{% endif %}
 
-    <div class="page-header-right">
-      <div class="eal-header-actions">
-        {% if request.user.is_root %}
-            <a href="{% url 'country_create' %}" class="eal-btn eal-btn-primary">
-              <i class="bi bi-plus-lg"></i>
-              <span>Add Country</span>
-            </a>
-          {% endif %}
+<div class="eal-table-card">
+  <form method="get" action="{% url 'country_list' %}">
+    <div class="eal-toolbar">
+      <div class="eal-toolbar-left" style="width: 100%; gap: 12px; display: flex; flex-wrap: wrap; align-items: end;">
+        <div class="eal-search" style="flex: 1; min-width: 260px;">
+          <i class="bi bi-search"></i>
+          <input
+            type="text"
+            name="q"
+            placeholder="Search by name, code..."
+            value="{{ search_query }}"
+          />
+        </div>
+        <div style="width: 220px;">
+          <label class="form-label">Status</label>
+          <select name="status" class="form-select form-select-sm">
+            <option value="All" {% if status_filter == 'All' %}selected{% endif %}>All</option>
+            <option value="Active" {% if status_filter == 'Active' %}selected{% endif %}>Active</option>
+            <option value="Inactive" {% if status_filter == 'Inactive' %}selected{% endif %}>Inactive</option>
+          </select>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <a href="{% url 'country_list' %}" class="eal-btn eal-btn-outline">
+            <i class="bi bi-arrow-counterclockwise"></i>
+            <span>Reset</span>
+          </a>
+          <button type="submit" class="eal-btn eal-btn-primary">
+            <i class="bi bi-funnel"></i>
+            <span>Apply</span>
+          </button>
+        </div>
       </div>
     </div>
-  </div>
-</div>
-  <div class="list-page-actions">
-    <div class="eal-header-actions">
-          {% if request.user.is_root %}
-            <a href="{% url 'country_create' %}" class="eal-btn eal-btn-primary">
-              <i class="bi bi-plus-lg"></i>
-              <span>Add Country</span>
-            </a>
-          {% endif %}
-  </div>
-</div>
-  </div>
+  </form>
 
-  {% if messages %}
-    <div style="margin-bottom: 16px">
-      {% for message in messages %}
-        <p style="margin: 0; color: {% if message.tags == 'error' %}#b91c1c{% else %}#15803d{% endif %}; font-weight: 600">
-          {{ message }}
-        </p>
-      {% endfor %}
+  {% if countries.object_list %}
+    <div class="eal-table-wrap">
+      <table class="eal-table">
+        <thead>
+          <tr>
+            <th style="width: 60px">#</th>
+            <th style="width: 130px">Code</th>
+            <th>English Name</th>
+            <th>Arabic Name</th>
+            <th style="width: 120px">Status</th>
+            <th style="width: 220px">ACTIONS</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in countries.object_list %}
+            <tr>
+              <td>{{ forloop.counter0|add:countries.start_index }}</td>
+              <td><span class="eal-entity-id">{{ c.country_code }}</span></td>
+              <td>{{ c.name_en }}</td>
+              <td class="eal-arabic">{{ c.name_ar }}</td>
+              <td>
+                {% if c.is_active %}
+                  <span class="status-badge active">Active</span>
+                {% else %}
+                  <span class="status-badge inactive">Inactive</span>
+                {% endif %}
+              </td>
+              <td>
+                <div class="eal-actions-cell">
+                  <a href="{% url 'country_edit' c.country_code %}" class="eal-row-btn" title="Edit">
+                    <i class="bi bi-pencil"></i>
+                  </a>
+                  {% if request.user.is_root %}
+                    <form method="post" action="{% url 'country_toggle_status' c.country_code %}" style="display: inline">
+                      {% csrf_token %}
+                      {% if c.is_active %}
+                        <button type="submit" class="eal-row-btn" title="Deactivate">
+                          <i class="bi bi-slash-circle"></i>
+                        </button>
+                      {% else %}
+                        <button type="submit" class="eal-row-btn" title="Activate">
+                          <i class="bi bi-check-circle"></i>
+                        </button>
+                      {% endif %}
+                    </form>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="notification-empty list-filter-wrapper">
+      <div class="empty-icon">
+        <i class="bi bi-globe"></i>
+      </div>
+      <h4 class="empty-title">No countries found</h4>
+      <p class="empty-text">No country records match your current filters.</p>
+      {% if request.user.is_root %}
+        <div class="mt-2">
+          <a href="{% url 'country_create' %}" class="eal-btn eal-btn-primary">
+            <i class="bi bi-plus-lg"></i>
+            <span>Add Country</span>
+          </a>
+        </div>
+      {% endif %}
     </div>
   {% endif %}
 
-  <div class="eal-table-card">
-    <form method="get" action="{% url 'country_list' %}">
-      <div class="eal-toolbar">
-        <div class="eal-toolbar-left" style="width: 100%; gap: 12px; display: flex; flex-wrap: wrap; align-items: end;">
-          <div class="eal-search" style="flex: 1; min-width: 260px;">
-            <i class="bi bi-search"></i>
-            <input
-              type="text"
-              name="q"
-              placeholder="Search by name, code..."
-              value="{{ search_query }}"
-            />
-          </div>
-          <div style="width: 220px;">
-            <label class="form-label">Status</label>
-            <select name="status" class="form-select form-select-sm">
-              <option value="All" {% if status_filter == 'All' %}selected{% endif %}>All</option>
-              <option value="Active" {% if status_filter == 'Active' %}selected{% endif %}>Active</option>
-              <option value="Inactive" {% if status_filter == 'Inactive' %}selected{% endif %}>Inactive</option>
-            </select>
-          </div>
-          <div style="display: flex; gap: 8px;">
-            <a href="{% url 'country_list' %}" class="eal-btn eal-btn-outline">
-              <i class="bi bi-arrow-counterclockwise"></i>
-              <span>Reset</span>
-            </a>
-            <button type="submit" class="eal-btn eal-btn-primary">
-              <i class="bi bi-funnel"></i>
-              <span>Apply</span>
-            </button>
-          </div>
+  <div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5>Confirm Delete</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
-      </div>
-    </form>
-
-    <div class="eal-pagination-info" style="margin-bottom: 12px;">
-      {% if countries.paginator.count %}
-        Showing <strong>{{ countries.start_index }}-{{ countries.end_index }}</strong> of <strong>{{ total_count }}</strong>
-      {% else %}
-        Showing <strong>0</strong> of <strong>{{ total_count }}</strong>
-      {% endif %}
-    </div>
-
-    {% if countries.object_list %}
-      <div class="eal-table-wrap">
-        <table class="eal-table">
-          <thead>
-            <tr>
-              <th style="width: 60px">#</th>
-              <th style="width: 130px">Code</th>
-              <th>English Name</th>
-              <th>Arabic Name</th>
-              <th style="width: 120px">Status</th>
-              <th style="width: 220px">ACTIONS</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for c in countries.object_list %}
-              <tr>
-                <td>{{ forloop.counter0|add:countries.start_index }}</td>
-                <td><span class="eal-entity-id">{{ c.country_code }}</span></td>
-                <td>{{ c.name_en }}</td>
-                <td class="eal-arabic">{{ c.name_ar }}</td>
-                <td>
-                  {% if c.is_active %}
-                    <span class="status-badge active">Active</span>
-                  {% else %}
-                    <span class="status-badge inactive">Inactive</span>
-                  {% endif %}
-                </td>
-                <td>
-                  <div class="eal-actions-cell">
-                    <a href="{% url 'country_edit' c.country_code %}" class="eal-row-btn icon-only-btn icon-only-btn" title="Edit">
-<i class="bi bi-pencil"></i>
-</a>
-                    {% if request.user.is_root %}
-                      <form method="post" action="{% url 'country_toggle_status' c.country_code %}" style="display: inline">
-                        {% csrf_token %}
-                        {% if c.is_active %}
-                          <button type="submit" class="eal-row-btn icon-only-btn icon-only-btn" title="Deactivate">
-<i class="bi bi-slash-circle"></i>
-</button>
-                        {% else %}
-                          <button type="submit" class="eal-row-btn icon-only-btn icon-only-btn" title="Activate">
-<i class="bi bi-check-circle"></i>
-</button>
-                        {% endif %}
-                      </form>
-                    {% endif %}
-                  </div>
-                </td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-
-      
-    {% else %}
-      <div class="notification-empty" class="list-filter-wrapper">
-        <div class="empty-icon">
-          <i class="bi bi-globe"></i>
+        <div class="modal-body">
+          <p>Are you sure you want to delete "<span id="deleteRecordName"></span>"?</p>
+          <p class="text-danger small">This action cannot be undone.</p>
         </div>
-        <h4 class="empty-title">No countries found</h4>
-        <p class="empty-text">No country records match your current filters.</p>
-        {% if request.user.is_root %}
-          <div class="mt-2">
-            <a href="{% url 'country_create' %}" class="eal-btn eal-btn-primary">
-              <i class="bi bi-plus-lg"></i>
-              <span>Add Country</span>
-            </a>
-          </div>
-        {% endif %}
-      </div>
-    {% endif %}
-
-    <div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5>Confirm Delete</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-          </div>
-          <div class="modal-body">
-            <p>Are you sure you want to delete "<span id="deleteRecordName"></span>"?</p>
-            <p class="text-danger small">This action cannot be undone.</p>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-            <form id="deleteForm" method="POST">
-              {% csrf_token %}
-              <button type="submit" class="btn btn-danger">Confirm Delete</button>
-            </form>
-          </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <form id="deleteForm" method="POST">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger">Confirm Delete</button>
+          </form>
         </div>
       </div>
     </div>
   </div>
 
-  <script>
-    document.querySelectorAll('[data-delete-url]')
-      .forEach(btn => {
-        btn.addEventListener('click', function() {
-          document.getElementById('deleteRecordName')
-            .textContent = this.dataset.deleteName;
-          document.getElementById('deleteForm')
-            .action = this.dataset.deleteUrl;
-          new bootstrap.Modal(
-            document.getElementById('deleteModal')
-          ).show();
-        });
-      });
-  </script>
-{% include 'partials/pagination.html' with page_obj=messages %}
-{% endblock %}
+  {% include 'partials/pagination.html' with page_obj=countries %}
+</div>
 
+<script>
+  document.querySelectorAll('[data-delete-url]')
+    .forEach(btn => {
+      btn.addEventListener('click', function() {
+        document.getElementById('deleteRecordName')
+          .textContent = this.dataset.deleteName;
+        document.getElementById('deleteForm')
+          .action = this.dataset.deleteUrl;
+        new bootstrap.Modal(
+          document.getElementById('deleteModal')
+        ).show();
+      });
+    });
+</script>
+{% endblock %}

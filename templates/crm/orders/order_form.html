@@ -31,21 +31,12 @@
 {% endif %}
 
 
-    <div class="page-header-right">
-      <div class="eal-header-actions">
-        <!-- Actions here -->
-      </div>
-    </div>
-  </div>
-</div></div>
-</div>
-
 <form method="post" action="{% url 'order_create' %}" id="order-form" class="vstack gap-4">
   {% csrf_token %}
   <div class="form-card">
     <div class="form-card-header">Section 1: Order Header</div>
     <div class="form-card-body row g-3">
-      <div class="col-md-6">
+      <div class="field col-md-6">
         <label class="form-label">Tenant</label>
         <select name="tenant" class="form-select" required id="id_tenant">
           <option value="">---------</option>
@@ -54,7 +45,7 @@
           {% endfor %}
         </select>
       </div>
-      <div class="col-md-6">
+      <div class="field col-md-6">
         <label class="form-label">Classification</label>
         <select name="order_classification" class="form-select" required id="id_classification">
           {% for code, label in classification_choices %}
@@ -62,7 +53,7 @@
           {% endfor %}
         </select>
       </div>
-      <div class="col-md-4">
+      <div class="field col-md-4">
         <label class="form-label">Currency</label>
         <select name="currency" class="form-select" required id="id_currency">
           {% for c in currencies %}
@@ -70,11 +61,11 @@
           {% endfor %}
         </select>
       </div>
-      <div class="col-md-4">
+      <div class="field col-md-4">
         <label class="form-label">Promo code (optional)</label>
         <input type="text" name="promo_code" class="form-control" maxlength="40" autocomplete="off">
       </div>
-      <div class="col-md-4">
+      <div class="field col-md-4">
         <label class="form-label">Payment method</label>
         <select name="payment_method" class="form-select" required id="id_payment_method">
           {% for m in payment_methods %}
@@ -88,7 +79,7 @@
   <div class="form-card" id="plan-section" style="display:none;">
     <div class="form-card-header">Section 2: Plan Selection</div>
     <div class="form-card-body row g-3">
-      <div class="col-md-6">
+      <div class="field col-md-6">
         <label class="form-label">Plan</label>
         <select name="plan" class="form-select" id="id_plan">
           <option value="">---------</option>
@@ -97,20 +88,20 @@
           {% endfor %}
         </select>
       </div>
-      <div class="col-md-3">
+      <div class="field col-md-3">
         <label class="form-label">Cycles</label>
         <input type="number" name="number_of_cycles" class="form-control" id="id_cycles" value="1" min="1">
       </div>
-      <div class="col-md-3">
+      <div class="field col-md-3">
         <label class="form-label">Plan price</label>
         <input type="text" class="form-control" id="preview_plan_price" readonly value="0.00">
       </div>
-      <div class="col-md-6" id="upgrade-pro-rata-wrap" style="display:none;">
+      <div class="field col-md-6" id="upgrade-pro-rata-wrap" style="display:none;">
         <label class="form-label">Pro-rata adjustment (credit)</label>
         <input type="text" class="form-control" id="preview_pro_rata" readonly value="0.00">
         <div class="form-text">Server calculates on save; hint: {{ upgrade_credit_hint|default:"—" }}</div>
       </div>
-      <div class="col-md-6">
+      <div class="field col-md-6">
         <label class="form-label">Line total (preview)</label>
         <input type="text" class="form-control fw-semibold" id="preview_plan_line_total" readonly value="0.00">
       </div>
@@ -131,10 +122,10 @@
   <div class="form-card">
     <div class="form-card-header">Section 4: Totals Preview card</div>
     <div class="form-card-body row g-2">
-      <div class="col-md-4"><strong>Sub total</strong> <span id="pv_sub" class="float-end">0.00</span></div>
-      <div class="col-md-4"><strong>Discount</strong> <span id="pv_disc" class="float-end">0.00</span></div>
-      <div class="col-md-4"><strong>Tax</strong> <span id="pv_tax" class="float-end">0.00</span></div>
-      <div class="col-md-4"><strong>Grand total</strong> <span id="pv_grand" class="float-end fw-bold">0.00</span></div>
+      <div class="field col-md-4"><strong>Sub total</strong> <span id="pv_sub" class="float-end">0.00</span></div>
+      <div class="field col-md-4"><strong>Discount</strong> <span id="pv_disc" class="float-end">0.00</span></div>
+      <div class="field col-md-4"><strong>Tax</strong> <span id="pv_tax" class="float-end">0.00</span></div>
+      <div class="field col-md-4"><strong>Grand total</strong> <span id="pv_grand" class="float-end fw-bold">0.00</span></div>
       <div class="col-md-8"><strong>Base currency equivalent</strong> <span id="pv_base" class="float-end">0.00</span></div>
       <div class="col-12 mt-3">
         <label class="form-label">Projected state preview</label>
@@ -158,7 +149,7 @@
 
 <template id="addon-row-tpl">
   <div class="addon-row row g-2 align-items-end border rounded p-2 bg-light">
-    <div class="col-md-3">
+    <div class="field col-md-3">
       <label class="form-label small">Action</label>
       <select name="addon_action" class="form-select form-select-sm addon-action">
         {% for code, label in addon_action_choices %}
@@ -166,7 +157,7 @@
         {% endfor %}
       </select>
     </div>
-    <div class="col-md-4">
+    <div class="field col-md-4">
       <label class="form-label small">Add-on type</label>
       <select name="addon_add_on_type" class="form-select form-select-sm addon-type">
         <option value="">---------</option>

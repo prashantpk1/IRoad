@@ -1,12 +1,11 @@
 {% extends 'base.html' %}
 {% load i18n %}
-{% load i18n %}
-{% block title %}Transactions Ledger | iRoad Admin{% include 'partials/pagination.html' with page_obj=messages %}
-{% endblock %}
+
+{% block title %}{% translate "Transactions Ledger | iRoad Admin" %}{% endblock %}
+{% block page_title %}{% translate "Transactions Ledger | iRoad Admin" %}{% endblock %}
 
 {% block breadcrumb_items %}
 <li class="breadcrumb-item active" aria-current="page">{% translate "Transactions Ledger | iRoad Admin" %}</li>
-{% include 'partials/pagination.html' with page_obj=messages %}
 {% endblock %}
 
 {% block content %}
@@ -26,28 +25,16 @@
 
 {% if messages %}{% for message in messages %}<div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">{{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button></div>{% endfor %}{% endif %}
 
-
-
-    <div class="page-header-right">
-      <div class="eal-header-actions">
-        {% if request.user.is_root %}<a href="{% url 'transaction_create' %}" class="eal-btn eal-btn-primary">Add wallet top-up</a>{% endif %}
-      </div>
-    </div>
-  </div>
-</div>
-  <div class="list-page-actions">
-    <div class="eal-header-actions">{% if request.user.is_root %}<a href="{% url 'transaction_create' %}" class="eal-btn eal-btn-primary">Add wallet top-up</a>{% endif %}
-  </div>
-</div></div>
-
 <div class="eal-table-card">
-  <form method="get" class="eal-toolbar">
-    <div class="eal-toolbar-left" style="width:100%;display:flex;gap:8px;flex-wrap:wrap;">
-      <div class="eal-search" style="flex:1;min-width:220px;"><i class="bi bi-search"></i><input type="text" name="q" placeholder="Tenant or gateway ref" value="{{ search_query }}"></div>
-      <div style="width:180px"><select class="form-select form-select-sm" name="transaction_type"><option value="">All types</option>{% for code, label in type_choices %}<option value="{{ code }}" {% if type_filter == code %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
-      <div style="width:180px"><select class="form-select form-select-sm" name="status"><option value="">All statuses</option>{% for code, label in status_choices %}<option value="{{ code }}" {% if status_filter == code %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
-      <div style="width:160px"><select class="form-select form-select-sm" name="currency"><option value="">All currencies</option>{% for c in currencies %}<option value="{{ c.currency_code }}" {% if currency_filter == c.currency_code %}selected{% endif %}>{{ c.currency_code }}</option>{% endfor %}</select></div>
-      <button type="submit" class="eal-btn eal-btn-outline">Filter</button>
+  <form method="get">
+    <div class="eal-toolbar">
+      <div class="eal-toolbar-left" style="width:100%;display:flex;gap:8px;flex-wrap:wrap;">
+        <div class="eal-search" style="flex:1;min-width:220px;"><i class="bi bi-search"></i><input type="text" name="q" placeholder="Tenant or gateway ref" value="{{ search_query }}"></div>
+        <div style="width:180px"><select class="eal-select" name="transaction_type"><option value="">All types</option>{% for code, label in type_choices %}<option value="{{ code }}" {% if type_filter == code %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+        <div style="width:180px"><select class="eal-select" name="status"><option value="">All statuses</option>{% for code, label in status_choices %}<option value="{{ code }}" {% if status_filter == code %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+        <div style="width:160px"><select class="eal-select" name="currency"><option value="">All currencies</option>{% for c in currencies %}<option value="{{ c.currency_code }}" {% if currency_filter == c.currency_code %}selected{% endif %}>{{ c.currency_code }}</option>{% endfor %}</select></div>
+        <button type="submit" class="eal-btn eal-btn-primary"><i class="bi bi-funnel"></i><span>{% translate "Apply" %}</span></button>
+      </div>
     </div>
   </form>
 
@@ -70,20 +57,18 @@
           </tr>
         {% empty %}
           <tr class="eal-table-empty">
-  <td colspan="20">
-    <div class="eal-empty-icon"><i class="bi bi-inbox"></i></div>
-    <div class="eal-empty-title">{% translate "No Data Found" %}</div>
-    <div class="eal-empty-text">No transactions.</div>
-  </td>
-</tr>
+            <td colspan="10">
+              <div class="notification-empty">
+                <div class="empty-icon"><i class="bi bi-inbox"></i></div>
+                <h4 class="empty-title">{% translate "No Data Found" %}</h4>
+                <p class="empty-text">No transactions.</p>
+              </div>
+            </td>
+          </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
+  {% include 'partials/pagination.html' with page_obj=transactions %}
 </div>
-
-{% if transactions.paginator.num_pages > 1 %}
-
-{% include 'partials/pagination.html' with page_obj=messages %}
 {% endblock %}
-

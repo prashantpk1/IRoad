@@ -1,14 +1,10 @@
 {% extends 'base.html' %}
 {% load i18n %}
-{% load i18n %}
 
-{% block page_title %}Exchange Rates{% include 'partials/pagination.html' with page_obj=messages %}
-{% endblock %}
-
+{% block page_title %}{% translate "Exchange Rates" %}{% endblock %}
 
 {% block breadcrumb_items %}
-<li class="breadcrumb-item active" aria-current="page">{% translate "Exchange Rates" %}</li>
-{% include 'partials/pagination.html' with page_obj=messages %}
+  <li class="breadcrumb-item active" aria-current="page">{% translate "Exchange Rates" %}</li>
 {% endblock %}
 
 {% block content %}
@@ -21,174 +17,131 @@
     <div class="page-header-right">
       <div class="eal-header-actions">
         <a href="{% url 'fx_change_log' %}" class="eal-btn eal-btn-outline">
-            <i class="bi bi-journal-bookmark"></i>
-            <span>FX Change Log</span>
+          <i class="bi bi-journal-bookmark"></i>
+          <span>FX Change Log</span>
+        </a>
+        {% if request.user.is_root %}
+          <a href="{% url 'fx_rate_create' %}" class="eal-btn eal-btn-primary">
+            <i class="bi bi-plus-lg"></i>
+            <span>Add Exchange Rate</span>
           </a>
-          {% if request.user.is_root %}
-            <a href="{% url 'fx_rate_create' %}" class="eal-btn eal-btn-primary">
-              <i class="bi bi-plus-lg"></i>
-              <span>Add Exchange Rate</span>
-            </a>
-          {% endif %}
-      </div>
-    </div>
-  </div>
-</div>
-
-  
-
-    <div class="page-header-right">
-      <div class="eal-header-actions">
-        <a href="{% url 'fx_change_log' %}" class="eal-btn eal-btn-outline">
-            <i class="bi bi-journal-bookmark"></i>
-            <span>FX Change Log</span>
-          </a>
-          {% if request.user.is_root %}
-            <a href="{% url 'fx_rate_create' %}" class="eal-btn eal-btn-primary">
-              <i class="bi bi-plus-lg"></i>
-              <span>Add Exchange Rate</span>
-            </a>
-          {% endif %}
-      </div>
-    </div>
-  </div>
-</div>
-  <div class="list-page-actions">
-    <div class="eal-header-actions">
-          <a href="{% url 'fx_change_log' %}" class="eal-btn eal-btn-outline">
-            <i class="bi bi-journal-bookmark"></i>
-            <span>FX Change Log</span>
-          </a>
-          {% if request.user.is_root %}
-            <a href="{% url 'fx_rate_create' %}" class="eal-btn eal-btn-primary">
-              <i class="bi bi-plus-lg"></i>
-              <span>Add Exchange Rate</span>
-            </a>
-          {% endif %}
-  </div>
-</div>
-  </div>
-
-  <div style="margin-bottom: 16px; padding: 12px 14px; border-radius: 10px; background:#eff6ff; border:1px solid #dbeafe">
-    <p style="margin: 0; font-weight: 700; color:#1e3a8a">
-      Base Currency:
-      <span style="font-family: monospace">
-        {% if base_currency_code %}
-          {{ base_currency_code }}
-        {% else %}
-          N/A
         {% endif %}
-      </span>
-    </p>
+      </div>
+    </div>
   </div>
+</div>
 
-  {% if messages %}
-    <div style="margin-bottom: 16px">
-      {% for message in messages %}
-        <p style="margin: 0; color: {% if message.tags == 'error' %}#b91c1c{% elif message.tags == 'warning' %}#92400e{% else %}#15803d{% endif %}; font-weight: 600">
-          {{ message }}
-        </p>
-      {% endfor %}
+<div style="margin-bottom: 16px; padding: 12px 14px; border-radius: 10px; background:#eff6ff; border:1px solid #dbeafe">
+  <p style="margin: 0; font-weight: 700; color:#1e3a8a">
+    Base Currency:
+    <span style="font-family: monospace">
+      {% if base_currency_code %}
+        {{ base_currency_code }}
+      {% else %}
+        N/A
+      {% endif %}
+    </span>
+  </p>
+</div>
+
+{% if messages %}
+  <div style="margin-bottom: 16px">
+    {% for message in messages %}
+      <p style="margin: 0; color: {% if message.tags == 'error' %}#b91c1c{% elif message.tags == 'warning' %}#92400e{% else %}#15803d{% endif %}; font-weight: 600">
+        {{ message }}
+      </p>
+    {% endfor %}
+  </div>
+{% endif %}
+
+<div class="eal-table-card">
+  <form method="get" action="{% url 'fx_rate_list' %}">
+    <div class="eal-toolbar">
+      <div class="eal-toolbar-left" style="width: 100%; gap: 12px; display: flex; flex-wrap: wrap; align-items: end;">
+        <div style="width: 220px;">
+          <label class="form-label">Status</label>
+          <select name="status" class="form-select form-select-sm">
+            <option value="All" {% if status_filter == 'All' %}selected{% endif %}>All</option>
+            <option value="Active" {% if status_filter == 'Active' %}selected{% endif %}>Active</option>
+            <option value="Inactive" {% if status_filter == 'Inactive' %}selected{% endif %}>Inactive</option>
+          </select>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <a href="{% url 'fx_rate_list' %}" class="eal-btn eal-btn-outline">
+            <i class="bi bi-arrow-counterclockwise"></i>
+            <span>Reset</span>
+          </a>
+          <button type="submit" class="eal-btn eal-btn-primary">
+            <i class="bi bi-funnel"></i>
+            <span>Apply</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </form>
+
+  {% if exchange_rates.object_list %}
+    <div class="eal-table-wrap">
+      <table class="eal-table">
+        <thead>
+          <tr>
+            <th style="width: 60px">#</th>
+            <th style="width: 140px">Currency Code</th>
+            <th>Name</th>
+            <th style="width: 120px">Symbol</th>
+            <th style="width: 170px">Rate</th>
+            <th style="width: 120px">Status</th>
+            <th style="width: 170px">Last Updated</th>
+            <th style="width: 220px">ACTIONS</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for rate in exchange_rates.object_list %}
+            <tr>
+              <td>{{ forloop.counter0|add:exchange_rates.start_index }}</td>
+              <td><span class="eal-entity-id">{{ rate.currency.currency_code }}</span></td>
+              <td>{{ rate.currency.name_en }}</td>
+              <td>{{ rate.currency.currency_symbol }}</td>
+              <td>{{ rate.exchange_rate|floatformat:6 }}</td>
+              <td>
+                {% if rate.is_active %}
+                  <span class="status-badge active">Active</span>
+                {% else %}
+                  <span class="status-badge inactive">Inactive</span>
+                {% endif %}
+              </td>
+              <td>{{ rate.updated_at }}</td>
+              <td>
+                <div class="eal-actions-cell">
+                  {% if request.user.is_root %}
+                    <a href="{% url 'fx_rate_edit' rate.fx_id %}" class="eal-row-btn" title="Edit">
+                      <i class="bi bi-pencil"></i>
+                    </a>
+                    <form method="post" action="{% url 'fx_rate_edit' rate.fx_id %}" style="display:inline">
+                      {% csrf_token %}
+                      <input type="hidden" name="action" value="toggle_status" />
+                      <button type="submit" class="eal-row-btn" title="Toggle Active">
+                        <i class="bi bi-arrow-repeat"></i>
+                      </button>
+                    </form>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="notification-empty list-filter-wrapper">
+      <div class="empty-icon">
+        <i class="bi bi-currency-exchange"></i>
+      </div>
+      <h4 class="empty-title">No exchange rates found</h4>
+      <p class="empty-text">No exchange-rate records are available for the selected filters.</p>
     </div>
   {% endif %}
 
-  <div class="eal-table-card">
-    <form method="get" action="{% url 'fx_rate_list' %}">
-      <div class="eal-toolbar">
-        <div class="eal-toolbar-left" style="width: 100%; gap: 12px; display: flex; flex-wrap: wrap; align-items: end;">
-          <div style="width: 220px;">
-            <label class="form-label">Status</label>
-            <select name="status" class="form-select form-select-sm">
-              <option value="All" {% if status_filter == 'All' %}selected{% endif %}>All</option>
-              <option value="Active" {% if status_filter == 'Active' %}selected{% endif %}>Active</option>
-              <option value="Inactive" {% if status_filter == 'Inactive' %}selected{% endif %}>Inactive</option>
-            </select>
-          </div>
-          <div style="display: flex; gap: 8px;">
-            <a href="{% url 'fx_rate_list' %}" class="eal-btn eal-btn-outline">
-              <i class="bi bi-arrow-counterclockwise"></i>
-              <span>Reset</span>
-            </a>
-            <button type="submit" class="eal-btn eal-btn-primary">
-              <i class="bi bi-funnel"></i>
-              <span>Apply</span>
-            </button>
-          </div>
-        </div>
-      </div>
-    </form>
-
-    <div class="eal-pagination-info" style="margin-bottom: 12px;">
-      {% if exchange_rates.paginator.count %}
-        Showing <strong>{{ exchange_rates.start_index }}-{{ exchange_rates.end_index }}</strong> of <strong>{{ exchange_rates.paginator.count }}</strong>
-      {% else %}
-        Showing <strong>0</strong> of <strong>0</strong>
-      {% endif %}
-    </div>
-
-    {% if exchange_rates.object_list %}
-      <div class="eal-table-wrap">
-        <table class="eal-table">
-          <thead>
-            <tr>
-              <th style="width: 60px">#</th>
-              <th style="width: 140px">Currency Code</th>
-              <th>Name</th>
-              <th style="width: 120px">Symbol</th>
-              <th style="width: 170px">Rate</th>
-              <th style="width: 120px">Status</th>
-              <th style="width: 170px">Last Updated</th>
-              <th style="width: 220px">ACTIONS</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for rate in exchange_rates.object_list %}
-              <tr>
-                <td>{{ forloop.counter0|add:exchange_rates.start_index }}</td>
-                <td><span class="eal-entity-id">{{ rate.currency.currency_code }}</span></td>
-                <td>{{ rate.currency.name_en }}</td>
-                <td>{{ rate.currency.currency_symbol }}</td>
-                <td>{{ rate.exchange_rate|floatformat:6 }}</td>
-                <td>
-                  {% if rate.is_active %}
-                    <span class="status-badge active">Active</span>
-                  {% else %}
-                    <span class="status-badge inactive">Inactive</span>
-                  {% endif %}
-                </td>
-                <td>{{ rate.updated_at }}</td>
-                <td>
-                  <div class="eal-actions-cell">
-                    {% if request.user.is_root %}
-                      <a href="{% url 'fx_rate_edit' rate.fx_id %}" class="eal-row-btn icon-only-btn icon-only-btn" title="Edit">
-<i class="bi bi-pencil"></i>
-</a>
-                      <form method="post" action="{% url 'fx_rate_edit' rate.fx_id %}" style="display:inline">
-                        {% csrf_token %}
-                        <input type="hidden" name="action" value="toggle_status" />
-                        <button type="submit" class="eal-row-btn icon-only-btn icon-only-btn" title="Toggle Active">
-<i class="bi bi-arrow-repeat"></i>
-</button>
-                      </form>
-                    {% endif %}
-                  </div>
-                </td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-
-      
-    {% else %}
-      <div class="notification-empty" class="list-filter-wrapper">
-        <div class="empty-icon">
-          <i class="bi bi-currency-exchange"></i>
-        </div>
-        <h4 class="empty-title">No exchange rates found</h4>
-        <p class="empty-text">No exchange-rate records are available for the selected filters.</p>
-      </div>
-    {% endif %}
-  </div>
-{% include 'partials/pagination.html' with page_obj=messages %}
+  {% include 'partials/pagination.html' with page_obj=exchange_rates %}
+</div>
 {% endblock %}

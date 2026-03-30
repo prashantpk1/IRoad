@@ -1,12 +1,11 @@
 {% extends 'base.html' %}
 {% load i18n %}
-{% load i18n %}
-{% block title %}Subscription Orders | iRoad Admin{% include 'partials/pagination.html' with page_obj=messages %}
-{% endblock %}
+
+{% block title %}{% translate "Subscription Orders | iRoad Admin" %}{% endblock %}
+{% block page_title %}{% translate "Subscription Orders | iRoad Admin" %}{% endblock %}
 
 {% block breadcrumb_items %}
 <li class="breadcrumb-item active" aria-current="page">{% translate "Subscription Orders | iRoad Admin" %}</li>
-{% include 'partials/pagination.html' with page_obj=messages %}
 {% endblock %}
 
 {% block content %}
@@ -26,28 +25,15 @@
 
 {% if messages %}{% for message in messages %}<div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">{{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button></div>{% endfor %}{% endif %}
 
-
-
-    <div class="page-header-right">
-      <div class="eal-header-actions">
-        {% if request.user.is_root %}<a href="{% url 'order_create' %}" class="eal-btn eal-btn-primary">Create order</a>{% endif %}
-      </div>
-    </div>
-  </div>
-</div>
-  <div class="list-page-actions">
-    <div class="eal-header-actions">{% if request.user.is_root %}<a href="{% url 'order_create' %}" class="eal-btn eal-btn-primary">Create order</a>{% endif %}
-  </div>
-</div>
-</div>
-
 <div class="eal-table-card">
-  <form method="get" class="eal-toolbar">
-    <div class="eal-toolbar-left" style="width:100%;display:flex;gap:8px;flex-wrap:wrap;">
-      <div class="eal-search" style="flex:1;min-width:220px;"><i class="bi bi-search"></i><input type="text" name="q" placeholder="Search tenant company" value="{{ search_query }}"></div>
-      <div style="width:220px"><select class="form-select form-select-sm" name="order_classification"><option value="">All classifications</option>{% for code, label in classification_choices %}<option value="{{ code }}" {% if classification_filter == code %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
-      <div style="width:220px"><select class="form-select form-select-sm" name="order_status"><option value="">All statuses</option>{% for code, label in status_choices %}<option value="{{ code }}" {% if status_filter == code %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
-      <button type="submit" class="eal-btn eal-btn-outline">Filter</button>
+  <form method="get">
+    <div class="eal-toolbar">
+      <div class="eal-toolbar-left" style="width:100%;display:flex;gap:8px;flex-wrap:wrap;">
+        <div class="eal-search" style="flex:1;min-width:220px;"><i class="bi bi-search"></i><input type="text" name="q" placeholder="Search tenant company" value="{{ search_query }}"></div>
+      <div style="width:220px"><select class="eal-select" name="order_classification"><option value="">All classifications</option>{% for code, label in classification_choices %}<option value="{{ code }}" {% if classification_filter == code %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+      <div style="width:220px"><select class="eal-select" name="order_status"><option value="">All statuses</option>{% for code, label in status_choices %}<option value="{{ code }}" {% if status_filter == code %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+      <button type="submit" class="eal-btn eal-btn-primary"><i class="bi bi-funnel"></i><span>{% translate "Apply" %}</span></button>
+      </div>
     </div>
   </form>
   <div class="eal-table-wrap">
@@ -68,19 +54,18 @@
         </tr>
       {% empty %}
         <tr class="eal-table-empty">
-  <td colspan="20">
-    <div class="eal-empty-icon"><i class="bi bi-inbox"></i></div>
-    <div class="eal-empty-title">{% translate "No Data Found" %}</div>
-    <div class="eal-empty-text">No orders found.</div>
-  </td>
-</tr>
+          <td colspan="9">
+            <div class="notification-empty">
+              <div class="empty-icon"><i class="bi bi-inbox"></i></div>
+              <h4 class="empty-title">{% translate "No Data Found" %}</h4>
+              <p class="empty-text">No orders found.</p>
+            </div>
+          </td>
+        </tr>
       {% endfor %}
       </tbody>
     </table>
   </div>
+  {% include 'partials/pagination.html' with page_obj=orders %}
 </div>
-{% if orders.paginator.num_pages > 1 %}
-
-{% include 'partials/pagination.html' with page_obj=messages %}
 {% endblock %}
-

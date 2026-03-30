@@ -1,4 +1,9 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
 {% block title %}{% if is_edit %}{% translate "Edit Tenant" %}{% else %}{% translate "Add Tenant" %}{% endif %}{% endblock %}
+
+{% block page_title %}{% if is_edit %}{{ tenant.company_name }}{% else %}{% translate "Add Tenant" %}{% endif %}{% endblock %}
 
 {% block breadcrumb_items %}
 <li class="breadcrumb-item"><a href="{% url 'tenant_list' %}">{% translate "Subscribers" %}</a></li>
@@ -9,27 +14,15 @@
 <div class="page-header">
   <div class="page-header-row">
     <div class="page-header-left">
-      <h1 class="page-title">{% translate "{% if is_edit %}{% translate "Edit Tenant" %}{% else %}{% translate "Add Tenant" %}{% endif %}" %}</h1>
+      <h1 class="page-title">{% if is_edit %}{% translate "Edit" %} {{ tenant.company_name }}{% else %}{% translate "Add Tenant" %}{% endif %}</h1>
       <p class="page-subtitle">{% translate "Manage your records here" %}</p>
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
-        <a href="{% url 'tenant_detail' tenant.tenant_id %}" class="eal-btn eal-btn-outline">{% translate "Cancel" %}</a>
-            <button type="submit" class="eal-btn eal-btn-primary"><i class="bi bi-check-lg"></i><span>{% translate "Save Changes" %}</span></button>
+        <a href="{% if is_edit %}{% url 'tenant_detail' tenant.tenant_id %}{% else %}{% url 'tenant_list' %}{% endif %}" class="eal-btn eal-btn-outline">{% translate "Cancel" %}</a>
+        <button type="submit" class="eal-btn eal-btn-primary"><i class="bi bi-check-lg"></i><span>{% translate "Save Changes" %}</span></button>
       </div>
     </div>
-  </div>
-</div>
-
-
-    <div class="page-header-right">
-      <div class="eal-header-actions">
-        <a href="{% url 'tenant_detail' tenant.tenant_id %}" class="eal-btn eal-btn-outline">{% translate "Cancel" %}</a>
-            <button type="submit" class="eal-btn eal-btn-primary"><i class="bi bi-check-lg"></i><span>{% translate "Save Changes" %}</span></button>
-      </div>
-    </div>
-  </div>
-</div>
   </div>
 </div>
 

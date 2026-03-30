@@ -1,14 +1,10 @@
 {% extends 'base.html' %}
 {% load i18n %}
-{% load i18n %}
 
-{% block page_title %}Communication Gateways{% include 'partials/pagination.html' with page_obj=messages %}
-{% endblock %}
-
+{% block page_title %}{% translate "Communication Gateways" %}{% endblock %}
 
 {% block breadcrumb_items %}
 <li class="breadcrumb-item active" aria-current="page">{% translate "Communication Gateways" %}</li>
-{% include 'partials/pagination.html' with page_obj=messages %}
 {% endblock %}
 
 {% block content %}
@@ -30,33 +26,6 @@
     </div>
   </div>
 </div>
-
-  
-
-    <div class="page-header-right">
-      <div class="eal-header-actions">
-        {% if request.user.is_root %}
-            <a href="{% url 'comm_gateway_create' %}" class="eal-btn eal-btn-primary">
-              <i class="bi bi-plus-lg"></i>
-              <span>Add Gateway</span>
-            </a>
-          {% endif %}
-      </div>
-    </div>
-  </div>
-</div>
-  </div>
-  <div class="list-page-actions">
-    <div class="eal-header-actions">
-          {% if request.user.is_root %}
-            <a href="{% url 'comm_gateway_create' %}" class="eal-btn eal-btn-primary">
-              <i class="bi bi-plus-lg"></i>
-              <span>Add Gateway</span>
-            </a>
-          {% endif %}
-  </div>
-</div>
-  </div>
 
   {% if messages %}
     <div style="margin-bottom: 16px">
@@ -109,12 +78,12 @@
                 <td>
                   {% if request.user.is_root %}
                     <div class="eal-actions-cell">
-                      <a href="{% url 'comm_gateway_edit' gateway.gateway_id %}" class="eal-row-btn icon-only-btn icon-only-btn" title="Edit">
+                      <a href="{% url 'comm_gateway_edit' gateway.gateway_id %}" class="eal-row-btn icon-only-btn" title="Edit">
 <i class="bi bi-pencil"></i>
 </a>
                       <form method="post" action="{% url 'comm_gateway_toggle' gateway.gateway_id %}" style="display: inline">
                         {% csrf_token %}
-                        <button type="submit" class="eal-row-btn icon-only-btn icon-only-btn" title="{% if gateway.is_active %}Deactivate{% else %}Activate{% endif %}">
+                        <button type="submit" class="eal-row-btn icon-only-btn" title="{% if gateway.is_active %}Deactivate{% else %}Activate{% endif %}">
 <i class="bi bi-arrow-repeat"></i>
 </button>
                       </form>
@@ -135,7 +104,6 @@
         <p class="empty-text">Add a gateway to send email or SMS.</p>
       </div>
     {% endif %}
+    {% include 'partials/pagination.html' with page_obj=gateways %}
   </div>
-{% include 'partials/pagination.html' with page_obj=messages %}
 {% endblock %}
-

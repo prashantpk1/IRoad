@@ -1,12 +1,10 @@
 {% extends "base.html" %}
 {% load i18n %}
-{% load i18n %}
-{% block title %}Support Inbox{% include 'partials/pagination.html' with page_obj=categories %}
-{% endblock %}
+
+{% block title %}{% translate "Support Inbox" %}{% endblock %}
 
 {% block breadcrumb_items %}
 <li class="breadcrumb-item active" aria-current="page">{% translate "Support Inbox" %}</li>
-{% include 'partials/pagination.html' with page_obj=categories %}
 {% endblock %}
 
 {% block content %}
@@ -24,29 +22,18 @@
   </div>
 </div>
 
-<div class="container-fluid py-3">
-  
-
-    <div class="page-header-right">
-      <div class="eal-header-actions">
-        <!-- Actions here -->
-      </div>
-    </div>
-  </div>
-</div>
-  <div class="list-page-actions">
-    {% if request.user.is_root %}<a href="{% url 'ticket_create' %}" class="eal-btn eal-btn-primary"><i class="bi bi-plus-circle"></i> Create Ticket</a>{% endif %}
-  </div>
+<div class="list-page-actions">
+  {% if request.user.is_root %}<a href="{% url 'ticket_create' %}" class="eal-btn eal-btn-primary"><i class="bi bi-plus-circle"></i> {% translate "Create Ticket" %}</a>{% endif %}
 </div>
 
-  <form method="get" class="eal-table-card mb-3 p-3">
+<form method="get" class="eal-table-card mb-3 p-3">
     <div class="row g-2">
       <div class="col-md-3"><input type="text" name="q" value="{{ search_query }}" class="form-control" placeholder="Search ticket no, subject, tenant"></div>
-      <div class="col-md-2"><select name="status" class="form-select"><option value="">All Status</option>{% for value, label in status_choices %}<option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
-      <div class="col-md-2"><select name="priority" class="form-select"><option value="">All Priority</option>{% for value, label in priority_choices %}<option value="{{ value }}" {% if priority_filter == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
-      <div class="col-md-2"><select name="category" class="form-select"><option value="">All Categories</option>{% for category in categories %}<option value="{{ category.pk }}" {% if category_filter == category.pk|stringformat:"s" %}selected{% endif %}>{{ category.name_en }}</option>{% endfor %}</select></div>
-      <div class="col-md-2"><select name="assigned_to" class="form-select"><option value="">All Assignees</option><option value="unassigned" {% if assigned_filter == 'unassigned' %}selected{% endif %}>Unassigned</option>{% for admin in admins %}<option value="{{ admin.pk }}" {% if assigned_filter == admin.pk|stringformat:"s" %}selected{% endif %}>{{ admin.first_name }} {{ admin.last_name }}</option>{% endfor %}</select></div>
-      <div class="col-md-1 d-grid"><button class="btn btn-outline-primary" type="submit">Filter</button></div>
+      <div class="col-md-2"><select name="status" class="eal-select"><option value="">All Status</option>{% for value, label in status_choices %}<option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+      <div class="col-md-2"><select name="priority" class="eal-select"><option value="">All Priority</option>{% for value, label in priority_choices %}<option value="{{ value }}" {% if priority_filter == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+      <div class="col-md-2"><select name="category" class="eal-select"><option value="">All Categories</option>{% for category in categories %}<option value="{{ category.pk }}" {% if category_filter == category.pk|stringformat:"s" %}selected{% endif %}>{{ category.name_en }}</option>{% endfor %}</select></div>
+      <div class="col-md-2"><select name="assigned_to" class="eal-select"><option value="">All Assignees</option><option value="unassigned" {% if assigned_filter == 'unassigned' %}selected{% endif %}>Unassigned</option>{% for admin in admins %}<option value="{{ admin.pk }}" {% if assigned_filter == admin.pk|stringformat:"s" %}selected{% endif %}>{{ admin.first_name }} {{ admin.last_name }}</option>{% endfor %}</select></div>
+      <div class="col-md-1 d-grid"><button type="submit" class="eal-btn eal-btn-primary"><i class="bi bi-funnel"></i><span>{% translate "Apply" %}</span></button></div>
     </div>
   </form>
 
@@ -87,11 +74,7 @@
         </tbody>
       </table>
     </div>
+    {% include 'partials/pagination.html' with page_obj=tickets %}
   </div>
-
-  {% if tickets.paginator.num_pages > 1 %}
-    
-</div>
-{% include 'partials/pagination.html' with page_obj=categories %}
 {% endblock %}
 

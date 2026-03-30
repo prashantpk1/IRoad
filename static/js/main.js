@@ -116,10 +116,6 @@ function initHeaderDateTime() {
    Sidebar Active State Management
    ============================================ */
 function initSidebarActiveState() {
-  if (document.documentElement.getAttribute("data-sidebar-active") === "server") {
-    return;
-  }
-
   const currentPage = window.location.pathname.split("/").pop() || "index.html";
 
   // Remove all active classes first

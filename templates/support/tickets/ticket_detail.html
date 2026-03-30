@@ -9,7 +9,20 @@
         <li class="breadcrumb-item active" aria-current="page">{{ ticket.ticket_no }}</li>
       </ol>
     </nav>
-    <div class="page-header-row"><div class="page-header-left"><h1 class="page-title">{{ ticket.ticket_no }} - {{ ticket.subject }}</h1></div></div>
+    <div class="page-header-row">
+      <div class="page-header-left">
+        <h1 class="page-title">{{ ticket.ticket_no }} - {{ ticket.subject }}</h1>
+        <p class="page-subtitle">Conversation thread, assignment, and ticket actions</p>
+      </div>
+      <div class="page-header-right">
+        <div class="eal-header-actions">
+          <a href="{% url 'ticket_list' %}" class="eal-btn eal-btn-outline">
+            <i class="bi bi-arrow-left"></i>
+            <span>Back to inbox</span>
+          </a>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div class="row g-3">

@@ -1,14 +1,10 @@
 {% extends 'base.html' %}
 {% load i18n %}
-{% load i18n %}
 
-{% block page_title %}Notification Templates{% include 'partials/pagination.html' with page_obj=templates_page %}
-{% endblock %}
-
+{% block page_title %}{% translate "Notification Templates" %}{% endblock %}
 
 {% block breadcrumb_items %}
 <li class="breadcrumb-item active" aria-current="page">{% translate "Notification Templates" %}</li>
-{% include 'partials/pagination.html' with page_obj=templates_page %}
 {% endblock %}
 
 {% block content %}
@@ -30,32 +26,6 @@
     </div>
   </div>
 </div>
-
-  
-
-    <div class="page-header-right">
-      <div class="eal-header-actions">
-        {% if request.user.is_root %}
-            <a href="{% url 'notif_template_create' %}" class="eal-btn eal-btn-primary">
-              <i class="bi bi-plus-lg"></i>
-              <span>Add Template</span>
-            </a>
-          {% endif %}
-      </div>
-    </div>
-  </div>
-</div>
-  <div class="list-page-actions">
-    <div class="eal-header-actions">
-          {% if request.user.is_root %}
-            <a href="{% url 'notif_template_create' %}" class="eal-btn eal-btn-primary">
-              <i class="bi bi-plus-lg"></i>
-              <span>Add Template</span>
-            </a>
-          {% endif %}
-  </div>
-</div>
-  </div>
 
   <div class="eal-table-card">
     <form method="get" action="{% url 'notif_template_list' %}">
@@ -104,7 +74,6 @@
     {% else %}
       <div class="notification-empty"><div class="empty-icon"><i class="bi bi-file-earmark-text"></i></div><h4 class="empty-title">No templates found.</h4><p class="empty-text">Try different filters or add a template.</p></div>
     {% endif %}
+    {% include 'partials/pagination.html' with page_obj=templates_page %}
   </div>
-{% include 'partials/pagination.html' with page_obj=templates_page %}
 {% endblock %}
-

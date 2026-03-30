@@ -1,19 +1,18 @@
 {% extends 'base.html' %}
 {% load i18n %}
-{% load i18n %}
 
-{% block page_title %}{% if is_edit %}Edit Tax Code{% else %}Add Tax Code{% endif %}{% endblock %}
+{% block page_title %}{% if is_edit %}{% translate "Edit Tax Code" %}{% else %}{% translate "Add Tax Code" %}{% endif %}{% endblock %}
 
 
 {% block breadcrumb_items %}
-<li class="breadcrumb-item active" aria-current="page">{% translate "{% if is_edit %}Edit Tax Code{% else %}Add Tax Code{% endif %}" %}</li>
+<li class="breadcrumb-item active" aria-current="page">{% if is_edit %}{% translate "Edit Tax Code" %}{% else %}{% translate "Add Tax Code" %}{% endif %}</li>
 {% endblock %}
 
 {% block content %}
 <div class="page-header">
   <div class="page-header-row">
     <div class="page-header-left">
-      <h1 class="page-title">{% translate "{% if is_edit %}Edit Tax Code{% else %}Add Tax Code{% endif %}" %}</h1>
+      <h1 class="page-title">{% if is_edit %}{% translate "Edit Tax Code" %}{% else %}{% translate "Add Tax Code" %}{% endif %}</h1>
       <p class="page-subtitle">{% translate "Manage your records here" %}</p>
     </div>
     <div class="page-header-right">
@@ -29,16 +28,6 @@
 
   
 
-    <div class="page-header-right">
-      <div class="eal-header-actions">
-        <a href="{% url 'tax_code_list' %}" class="eal-btn eal-btn-outline">
-            <i class="bi bi-arrow-left"></i>
-            <span>Back</span>
-          </a>
-      </div>
-    </div>
-  </div>
-</div>
   <div class="list-page-actions">
     <div class="eal-header-actions">
           <a href="{% url 'tax_code_list' %}" class="eal-btn eal-btn-outline">

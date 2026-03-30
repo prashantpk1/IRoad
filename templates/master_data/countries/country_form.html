@@ -1,75 +1,52 @@
 {% extends 'base.html' %}
 {% load i18n %}
-{% load i18n %}
 
-{% block page_title %}{% if is_edit %}Edit Country{% else %}Add Country{% endif %}{% endblock %}
+{% block page_title %}{% if is_edit %}{% translate "Edit Country" %}{% else %}{% translate "Add Country" %}{% endif %}{% endblock %}
 
 
 {% block breadcrumb_items %}
-<li class="breadcrumb-item active" aria-current="page">{% translate "{% if is_edit %}Edit Country{% else %}Add Country{% endif %}" %}</li>
+<li class="breadcrumb-item active" aria-current="page">{% if is_edit %}{% translate "Edit Country" %}{% else %}{% translate "Add Country" %}{% endif %}</li>
 {% endblock %}
 
 {% block content %}
 <div class="page-header">
   <div class="page-header-row">
     <div class="page-header-left">
-      <h1 class="page-title">{% translate "{% if is_edit %}Edit Country{% else %}Add Country{% endif %}" %}</h1>
+      <h1 class="page-title">{% if is_edit %}{% translate "Edit Country" %}{% else %}{% translate "Add Country" %}{% endif %}</h1>
       <p class="page-subtitle">{% translate "Manage your records here" %}</p>
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
         <a href="{% url 'country_list' %}" class="eal-btn eal-btn-outline">
-            <i class="bi bi-arrow-left"></i>
-            <span>Back</span>
-          </a>
+          <i class="bi bi-arrow-left"></i>
+          <span>{% translate "Back" %}</span>
+        </a>
       </div>
     </div>
   </div>
 </div>
-
-  
-
-    <div class="page-header-right">
-      <div class="eal-header-actions">
-        <a href="{% url 'country_list' %}" class="eal-btn eal-btn-outline">
-            <i class="bi bi-arrow-left"></i>
-            <span>Back</span>
-          </a>
-      </div>
-    </div>
-  </div>
-</div>
-  <div class="list-page-actions">
-    <div class="eal-header-actions">
-          <a href="{% url 'country_list' %}" class="eal-btn eal-btn-outline">
-            <i class="bi bi-arrow-left"></i>
-            <span>Back</span>
-          </a>
-  </div>
-</div>
-  </div>
 
   {% if form.instance.pk and form.instance.updated_at %}
   <div class="edit-info-bar">
     <i class="bi bi-clock-history"></i>
-    Last updated
+    {% translate "Last updated" %}
     {% if form.instance.updated_by %}
-      by <strong>{{ form.instance.updated_by.first_name }} {{ form.instance.updated_by.last_name }}</strong>
+      {% translate "by" %} <strong>{{ form.instance.updated_by.first_name }} {{ form.instance.updated_by.last_name }}</strong>
     {% endif %}
-    at <strong>{{ form.instance.updated_at|date:"d M Y, H:i" }}</strong>
+    {% translate "at" %} <strong>{{ form.instance.updated_at|date:"d M Y, H:i" }}</strong>
   </div>
   {% endif %}
 
   {% if is_edit %}
-    <div class="alert alert-info" style="margin-bottom: 16px;">
-      Country Code is locked and cannot be changed.
+    <div class="alert alert-info" style="margin-bottom: 16px; border-radius: var(--radius-md);">
+      {% translate "Country Code is locked and cannot be changed." %}
     </div>
   {% endif %}
 
   {% if messages %}
-    <div style="margin-bottom: 16px">
+    <div class="mb-3">
       {% for message in messages %}
-        <p style="margin: 0; color: {% if message.tags == 'error' %}#b91c1c{% else %}#15803d{% endif %}; font-weight: 600">
+        <p class="mb-1 fw-semibold {% if message.tags == 'error' %}text-danger{% else %}text-success{% endif %}">
           {{ message }}
         </p>
       {% endfor %}
@@ -80,7 +57,7 @@
     {% csrf_token %}
 
     {% if form.non_field_errors %}
-      <div style="margin-bottom: 16px; color: #b91c1c; font-weight: 600">
+      <div class="alert alert-danger mb-3" role="alert">
         {{ form.non_field_errors }}
       </div>
     {% endif %}
@@ -91,41 +68,44 @@
           <i class="bi bi-globe"></i>
         </div>
         <div class="form-card-header-text">
-          <h2 class="form-card-title">Country Information</h2>
-          <p class="form-card-desc">Provide country identity and status details.</p>
+          <h2 class="form-card-title">{% translate "Country Information" %}</h2>
+          <p class="form-card-desc">{% translate "Provide country identity and status details." %}</p>
         </div>
       </div>
       <div class="form-card-body">
         <div class="field-group">
           <div class="fields-grid cols-2">
             <div class="field">
-              <label class="form-label">Country Code</label>
+              <label class="form-label" for="{{ form.country_code.id_for_label }}">{{ form.country_code.label }}</label>
               {{ form.country_code }}
+              {% if form.country_code.help_text %}
+                <span class="field-hint">{{ form.country_code.help_text }}</span>
+              {% endif %}
               {% for error in form.country_code.errors %}
-                <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+                <div class="text-danger small mt-1">{{ error }}</div>
               {% endfor %}
             </div>
             <div class="field">
-              <label class="form-label">English Name</label>
+              <label class="form-label" for="{{ form.name_en.id_for_label }}">{{ form.name_en.label }}</label>
               {{ form.name_en }}
               {% for error in form.name_en.errors %}
-                <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+                <div class="text-danger small mt-1">{{ error }}</div>
               {% endfor %}
             </div>
             <div class="field">
-              <label class="form-label">Arabic Name</label>
+              <label class="form-label" for="{{ form.name_ar.id_for_label }}">{{ form.name_ar.label }}</label>
               {{ form.name_ar }}
               {% for error in form.name_ar.errors %}
-                <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+                <div class="text-danger small mt-1">{{ error }}</div>
               {% endfor %}
             </div>
             <div class="field">
-              <label class="form-label">Status</label>
-              <div style="display: flex; align-items: center; gap: 10px">
+              <label class="form-label" for="{{ form.is_active.id_for_label }}">{{ form.is_active.label }}</label>
+              <div class="form-check">
                 {{ form.is_active }}
               </div>
               {% for error in form.is_active.errors %}
-                <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+                <div class="text-danger small mt-1">{{ error }}</div>
               {% endfor %}
             </div>
           </div>
@@ -133,17 +113,17 @@
       </div>
     </div>
 
-    <div class="form-actions-bar sticky-bottom">
+    <div class="form-actions-bar">
       <div class="form-actions-left">
         <a href="{% url 'country_list' %}" class="eal-btn eal-btn-outline">
           <i class="bi bi-arrow-left"></i>
-          Cancel
+          <span>{% translate "Cancel" %}</span>
         </a>
       </div>
       <div class="form-actions-right">
         <button type="submit" class="eal-btn eal-btn-primary">
           <i class="bi bi-save"></i>
-          Save
+          <span>{% translate "Save" %}</span>
         </button>
       </div>
     </div>

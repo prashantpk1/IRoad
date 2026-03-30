@@ -1,18 +1,17 @@
 {% extends 'base.html' %}
 {% load i18n %}
 
-{% block page_title %}{% if is_edit %}Edit Gateway{% else %}Add Gateway{% endif %}{% endblock %}
-
+{% block page_title %}{% if is_edit %}{% translate "Edit Gateway" %}{% else %}{% translate "Add Gateway" %}{% endif %}{% endblock %}
 
 {% block breadcrumb_items %}
-<li class="breadcrumb-item active" aria-current="page">{% translate "{% if is_edit %}Edit Gateway{% else %}Add Gateway{% endif %}" %}</li>
+<li class="breadcrumb-item active" aria-current="page">{% if is_edit %}{% translate "Edit Gateway" %}{% else %}{% translate "Add Gateway" %}{% endif %}</li>
 {% endblock %}
 
 {% block content %}
 <div class="page-header">
   <div class="page-header-row">
     <div class="page-header-left">
-      <h1 class="page-title">{% translate "{% if is_edit %}Edit Gateway{% else %}Add Gateway{% endif %}" %}</h1>
+      <h1 class="page-title">{% if is_edit %}{% translate "Edit Gateway" %}{% else %}{% translate "Add Gateway" %}{% endif %}</h1>
       <p class="page-subtitle">{% translate "Manage your records here" %}</p>
     </div>
     <div class="page-header-right">
@@ -24,16 +23,6 @@
 </div>
 
   
-    <div class="page-header-right">
-      <div class="eal-header-actions">
-        <!-- Actions here -->
-      </div>
-    </div>
-  </div>
-</div>
-    </div>
-  </div>
-
   {% if form.instance.pk and form.instance.updated_at %}
   <div class="edit-info-bar">
     <i class="bi bi-clock-history"></i>
@@ -57,15 +46,17 @@
 
       <form method="post" action="">
         {% csrf_token %}
-        <div style="margin-bottom: 16px"><label class="form-label">Gateway Type</label>{{ form.gateway_type }}</div>
-        <div style="margin-bottom: 16px"><label class="form-label">Provider Name</label>{{ form.provider_name }}</div>
-        <div style="margin-bottom: 16px"><label class="form-label">Host/URL</label>{{ form.host_url }}</div>
-        <div id="port-wrap" style="margin-bottom: 16px"><label class="form-label">Port</label>{{ form.port }}</div>
-        <div style="margin-bottom: 16px"><label class="form-label">Username/API Key</label>{{ form.username_key }}</div>
-        <div style="margin-bottom: 16px"><label class="form-label">Password/Secret</label>{{ form.password_secret }}</div>
-        <div style="margin-bottom: 16px"><label class="form-label">Sender ID</label>{{ form.sender_id }}</div>
-        <div id="enc-wrap" style="margin-bottom: 16px"><label class="form-label">Encryption</label>{{ form.encryption_type }}</div>
-        <div style="margin-bottom: 16px"><label class="form-label">Status</label>{{ form.is_active }}</div>
+        <div class="fields-grid cols-2">
+          <div class="field"><label class="form-label">Gateway Type</label>{{ form.gateway_type }}</div>
+          <div class="field"><label class="form-label">Provider Name</label>{{ form.provider_name }}</div>
+          <div class="field"><label class="form-label">Host/URL</label>{{ form.host_url }}</div>
+          <div class="field" id="port-wrap"><label class="form-label">Port</label>{{ form.port }}</div>
+          <div class="field"><label class="form-label">Username/API Key</label>{{ form.username_key }}</div>
+          <div class="field"><label class="form-label">Password/Secret</label>{{ form.password_secret }}</div>
+          <div class="field"><label class="form-label">Sender ID</label>{{ form.sender_id }}</div>
+          <div class="field" id="enc-wrap"><label class="form-label">Encryption</label>{{ form.encryption_type }}</div>
+          <div class="field"><label class="form-label">Status</label>{{ form.is_active }}</div>
+        </div>
 
         <div class="form-actions-bar">
   <div class="eal-header-actions">

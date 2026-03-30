@@ -1,18 +1,18 @@
 {% extends 'base.html' %}
 {% load i18n %}
 
-{% block page_title %}{% if form.instance.pk %}Edit Admin User{% else %}Invite New User{% endif %}{% endblock %}
+{% block page_title %}{% if form.instance.pk %}{% translate "Edit Admin User" %}{% else %}{% translate "Invite New User" %}{% endif %}{% endblock %}
 
 
 {% block breadcrumb_items %}
-<li class="breadcrumb-item active" aria-current="page">{% translate "{% if form.instance.pk %}Edit Admin User{% else %}Invite New User{% endif %}" %}</li>
+<li class="breadcrumb-item active" aria-current="page">{% if form.instance.pk %}{% translate "Edit Admin User" %}{% else %}{% translate "Invite New User" %}{% endif %}</li>
 {% endblock %}
 
 {% block content %}
 <div class="page-header">
   <div class="page-header-row">
     <div class="page-header-left">
-      <h1 class="page-title">{% translate "{% if form.instance.pk %}Edit Admin User{% else %}Invite New User{% endif %}" %}</h1>
+      <h1 class="page-title">{% if form.instance.pk %}{% translate "Edit Admin User" %}{% else %}{% translate "Invite New User" %}{% endif %}</h1>
       <p class="page-subtitle">{% translate "Manage your records here" %}</p>
     </div>
     <div class="page-header-right">
@@ -22,17 +22,6 @@
     </div>
   </div>
 </div>
-
-  
-    <div class="page-header-right">
-      <div class="eal-header-actions">
-        <!-- Actions here -->
-      </div>
-    </div>
-  </div>
-</div>
-    </div>
-  </div>
 
   {% if form.instance.pk and form.instance.updated_at %}
   <div class="edit-info-bar">
@@ -121,8 +110,14 @@
       </div>
 
       <div class="form-actions-bar">
-        <a href="{% url 'admin_user_list' %}" class="btn btn-light border">Cancel</a>
-        <button type="submit" class="eal-btn eal-btn-primary"><i class="bi bi-save"></i> Save</button>
+        <a href="{% url 'admin_user_list' %}" class="eal-btn eal-btn-outline">
+          <i class="bi bi-arrow-left"></i>
+          <span>{% translate "Cancel" %}</span>
+        </a>
+        <button type="submit" class="eal-btn eal-btn-primary">
+          <i class="bi bi-save"></i>
+          <span>{% translate "Save" %}</span>
+        </button>
       </div>
     </form>
     </div>

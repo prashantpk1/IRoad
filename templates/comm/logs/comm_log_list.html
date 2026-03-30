@@ -1,11 +1,11 @@
 {% extends 'base.html' %}
 {% load i18n %}
-{% block title %}Communication Logs{% include 'partials/pagination.html' with page_obj=logs %}
-{% endblock %}
+
+{% block title %}{% translate "Communication Logs" %}{% endblock %}
+{% block page_title %}{% translate "Communication Logs" %}{% endblock %}
 
 {% block breadcrumb_items %}
 <li class="breadcrumb-item active" aria-current="page">{% translate "Communication Logs" %}</li>
-{% include 'partials/pagination.html' with page_obj=logs %}
 {% endblock %}
 
 {% block content %}
@@ -23,26 +23,20 @@
   </div>
 </div>
 
-
-    <div class="page-header-right">
-      <div class="eal-header-actions">
-        <!-- Actions here -->
-      </div>
-    </div>
-  </div>
-</div></div></div>
 <div class="eal-table-card">
-  <form method="get" class="eal-toolbar">
-    <div class="eal-toolbar-left" style="width:100%; display:flex; gap:8px; flex-wrap:wrap;">
-      <div style="width:170px"><select class="form-select form-select-sm" name="channel"><option value="All" {% if channel_filter == 'All' %}selected{% endif %}>All Channels</option><option value="Email" {% if channel_filter == 'Email' %}selected{% endif %}>Email</option><option value="SMS" {% if channel_filter == 'SMS' %}selected{% endif %}>SMS</option><option value="Push" {% if channel_filter == 'Push' %}selected{% endif %}>Push</option></select></div>
-      <div style="width:170px"><select class="form-select form-select-sm" name="status"><option value="All" {% if status_filter == 'All' %}selected{% endif %}>All Statuses</option><option value="Sent" {% if status_filter == 'Sent' %}selected{% endif %}>Sent</option><option value="Failed" {% if status_filter == 'Failed' %}selected{% endif %}>Failed</option><option value="Bounced" {% if status_filter == 'Bounced' %}selected{% endif %}>Bounced</option></select></div>
-      <input type="date" name="date_from" value="{{ date_from }}" class="form-control form-control-sm" style="width:150px">
-      <input type="date" name="date_to" value="{{ date_to }}" class="form-control form-control-sm" style="width:150px">
-      <div class="eal-search" style="flex:1;min-width:200px;max-width:280px">
-        <i class="bi bi-search"></i>
-        <input type="text" name="q" value="{{ search_query }}" placeholder="Search recipient" />
+  <form method="get">
+    <div class="eal-toolbar">
+      <div class="eal-toolbar-left" style="width:100%; display:flex; gap:8px; flex-wrap:wrap;">
+        <div style="width:170px"><select class="eal-select" name="channel"><option value="All" {% if channel_filter == 'All' %}selected{% endif %}>All Channels</option><option value="Email" {% if channel_filter == 'Email' %}selected{% endif %}>Email</option><option value="SMS" {% if channel_filter == 'SMS' %}selected{% endif %}>SMS</option><option value="Push" {% if channel_filter == 'Push' %}selected{% endif %}>Push</option></select></div>
+        <div style="width:170px"><select class="eal-select" name="status"><option value="All" {% if status_filter == 'All' %}selected{% endif %}>All Statuses</option><option value="Sent" {% if status_filter == 'Sent' %}selected{% endif %}>Sent</option><option value="Failed" {% if status_filter == 'Failed' %}selected{% endif %}>Failed</option><option value="Bounced" {% if status_filter == 'Bounced' %}selected{% endif %}>Bounced</option></select></div>
+        <input type="date" name="date_from" value="{{ date_from }}" class="form-control form-control-sm" style="width:150px">
+        <input type="date" name="date_to" value="{{ date_to }}" class="form-control form-control-sm" style="width:150px">
+        <div class="eal-search" style="flex:1;min-width:200px;max-width:280px">
+          <i class="bi bi-search"></i>
+          <input type="text" name="q" value="{{ search_query }}" placeholder="Search recipient" />
+        </div>
+        <button type="submit" class="eal-btn eal-btn-primary"><i class="bi bi-funnel"></i><span>{% translate "Apply" %}</span></button>
       </div>
-      <button class="eal-btn eal-btn-outline">Go</button>
     </div>
   </form>
   <div class="eal-table-wrap">
@@ -61,19 +55,18 @@
           </tr>
         {% empty %}
           <tr class="eal-table-empty">
-  <td colspan="20">
-    <div class="eal-empty-icon"><i class="bi bi-inbox"></i></div>
-    <div class="eal-empty-title">{% translate "No Data Found" %}</div>
-    <div class="eal-empty-text">No communication logs found.</div>
-  </td>
-</tr>
+            <td colspan="7">
+              <div class="notification-empty">
+                <div class="empty-icon"><i class="bi bi-inbox"></i></div>
+                <h4 class="empty-title">{% translate "No Data Found" %}</h4>
+                <p class="empty-text">No communication logs found.</p>
+              </div>
+            </td>
+          </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
+  {% include 'partials/pagination.html' with page_obj=logs %}
 </div>
-{% if logs.paginator.num_pages > 1 %}
-  
-{% include 'partials/pagination.html' with page_obj=logs %}
 {% endblock %}
-

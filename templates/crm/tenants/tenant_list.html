@@ -1,7 +1,8 @@
 {% extends 'base.html' %}
 {% load i18n %}
-{% load i18n %}
+
 {% block title %}{% translate "Subscribers" %}{% endblock %}
+{% block page_title %}{% translate "Subscribers" %}{% endblock %}
 
 {% block breadcrumb_items %}
 <li class="breadcrumb-item active" aria-current="page">{% translate "Subscribers" %}</li>
@@ -11,7 +12,7 @@
 <div class="page-header">
   <div class="page-header-row">
     <div class="page-header-left">
-      <h1 class="page-title">{% translate "{% translate "Subscribers" %}" %}</h1>
+      <h1 class="page-title">{% translate "Subscribers" %}</h1>
       <p class="page-subtitle">{% translate "Manage your records here" %}</p>
     </div>
     <div class="page-header-right">
@@ -24,67 +25,46 @@
   </div>
 </div>
 
-
-    <div class="page-header-right">
-      <div class="eal-header-actions">
-        {% if request.user.is_root %}
-          <a href="{% url 'tenant_create' %}" class="eal-btn eal-btn-primary"><i class="bi bi-plus-lg"></i><span>{% translate "Add Tenant" %}</span></a>
-        {% endif %}
-      </div>
-    </div>
-  </div>
-</div>
-    <div class="page-header-right">
-      <div class="eal-header-actions">
-        {% if request.user.is_root %}
-          <a href="{% url 'tenant_create' %}" class="eal-btn eal-btn-primary"><i class="bi bi-plus-lg"></i><span>{% translate "Add Tenant" %}</span></a>
-        {% endif %}
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Filters Bar -->
-<div class="form-card" style="margin-bottom: 24px;">
-  <div class="form-card-body">
-    <form method="get" class="eal-filter-bar js-auto-submit">
+<div class="eal-table-card">
+  <form method="get" class="eal-filter-bar js-auto-submit">
+    <div class="eal-toolbar">
+      <div class="eal-toolbar-left" style="width: 100%; gap: 12px; display: flex; flex-wrap: wrap; align-items: end;">
       <div class="eal-search" style="flex: 1; min-width: 240px;">
         <i class="bi bi-search"></i>
         <input type="text" name="q" placeholder="{% translate 'Search company or email' %}" value="{{ search_query }}">
       </div>
-      
+
       <select class="eal-select" name="account_status" onchange="this.form.submit()">
         <option value="All" {% if status_filter == 'All' %}selected{% endif %}>{% translate "All statuses" %}</option>
         {% for code, label in status_choices %}
           <option value="{{ code }}" {% if status_filter == code %}selected{% endif %}>{{ label }}</option>
         {% endfor %}
       </select>
-      
+
       <select class="eal-select" name="assigned_sales_rep" onchange="this.form.submit()">
         <option value="">{% translate "All reps" %}</option>
         {% for rep in sales_reps %}
           <option value="{{ rep.pk }}" {% if rep_filter == rep.pk|stringformat:"s" %}selected{% endif %}>{{ rep.first_name }} {{ rep.last_name }}</option>
         {% endfor %}
       </select>
-      
+
       <select class="eal-select" name="current_plan" onchange="this.form.submit()">
         <option value="">{% translate "All plans" %}</option>
         {% for p in plans %}
           <option value="{{ p.plan_id }}" {% if plan_filter == p.plan_id|stringformat:"s" %}selected{% endif %}>{{ p.plan_name_en }}</option>
         {% endfor %}
       </select>
-      
+
       {% if search_query or status_filter != 'All' or rep_filter or plan_filter %}
       <a href="{% url 'tenant_list' %}" class="eal-btn eal-btn-outline" style="border-style: dashed; color: var(--text-muted);">
         <i class="bi bi-x-circle"></i>
         <span>{% translate "Clear" %}</span>
       </a>
       {% endif %}
-    </form>
-  </div>
-</div>
+    </div>
+    </div>
+  </form>
 
-<div class="eal-table-card">
   <div class="eal-table-wrap">
     <table class="eal-table">
       <thead>
@@ -143,20 +123,20 @@
         {% empty %}
           <tr class="eal-table-empty">
             <td colspan="9">
-              <div class="eal-empty-icon"><i class="bi bi-people"></i></div>
-              <div class="eal-empty-title">{% translate "No subscribers found" %}</div>
-              <div class="eal-empty-text">{% translate "There are no subscribers matching your current filters." %}.</div>
-              {% if request.user.is_root %}
-                <a href="{% url 'tenant_create' %}" class="eal-btn eal-btn-primary" style="margin-top: 1rem;"><i class="bi bi-plus-lg"></i> {% translate "Add Tenant" %}</a>
-              {% endif %}
+              <div class="notification-empty">
+                <div class="empty-icon"><i class="bi bi-people"></i></div>
+                <h4 class="empty-title">{% translate "No subscribers found" %}</h4>
+                <p class="empty-text">{% translate "There are no subscribers matching your current filters." %}</p>
+                {% if request.user.is_root %}
+                  <a href="{% url 'tenant_create' %}" class="eal-btn eal-btn-primary" style="margin-top: 1rem;"><i class="bi bi-plus-lg"></i> {% translate "Add Tenant" %}</a>
+                {% endif %}
+              </div>
             </td>
           </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
+  {% include 'partials/pagination.html' with page_obj=tenants %}
 </div>
-
-{% include 'partials/pagination.html' with page_obj=tenants %}
 {% endblock %}
-

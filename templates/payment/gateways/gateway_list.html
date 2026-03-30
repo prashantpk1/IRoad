@@ -1,14 +1,10 @@
 {% extends 'base.html' %}
 {% load i18n %}
-{% load i18n %}
 
-{% block page_title %}Payment Gateways{% include 'partials/pagination.html' with page_obj=messages %}
-{% endblock %}
-
+{% block page_title %}{% translate "Payment Gateways" %}{% endblock %}
 
 {% block breadcrumb_items %}
 <li class="breadcrumb-item active" aria-current="page">{% translate "Payment Gateways" %}</li>
-{% include 'partials/pagination.html' with page_obj=messages %}
 {% endblock %}
 
 {% block content %}
@@ -31,32 +27,15 @@
   </div>
 </div>
 
-  
-
-    <div class="page-header-right">
-      <div class="eal-header-actions">
-        {% if request.user.is_root %}
-            <a href="{% url 'gateway_create' %}" class="eal-btn eal-btn-primary">
-              <i class="bi bi-plus-lg"></i>
-              <span>Add Gateway</span>
-            </a>
-          {% endif %}
-      </div>
+  {% if messages %}
+    <div style="margin-bottom: 16px">
+      {% for message in messages %}
+        <p style="margin: 0; color: {% if message.tags == 'error' %}#b91c1c{% else %}#15803d{% endif %}; font-weight: 600">
+          {{ message }}
+        </p>
+      {% endfor %}
     </div>
-  </div>
-</div>
-  </div>
-  <div class="list-page-actions">
-    <div class="eal-header-actions">
-          {% if request.user.is_root %}
-            <a href="{% url 'gateway_create' %}" class="eal-btn eal-btn-primary">
-              <i class="bi bi-plus-lg"></i>
-              <span>Add Gateway</span>
-            </a>
-          {% endif %}
-  </div>
-</div>
-  </div>
+  {% endif %}
 
   <div class="eal-table-card">
     <form method="get" action="{% url 'gateway_list' %}">
@@ -87,16 +66,6 @@
         </div>
       </div>
     </form>
-
-    {% if messages %}
-      <div class="list-filter-wrapper">
-        {% for message in messages %}
-          <p style="margin: 0; color: {% if message.tags == 'error' %}#b91c1c{% else %}#15803d{% endif %}; font-weight: 600">
-            {{ message }}
-          </p>
-        {% endfor %}
-      </div>
-    {% endif %}
 
     {% if gateways.object_list %}
       <div class="eal-table-wrap">
@@ -134,17 +103,17 @@
                 <td>
                   {% if request.user.is_root %}
                     <div class="eal-actions-cell">
-                      <a href="{% url 'gateway_edit' gateway.gateway_id %}" class="eal-row-btn icon-only-btn icon-only-btn" title="Edit">
+                      <a href="{% url 'gateway_edit' gateway.gateway_id %}" class="eal-row-btn icon-only-btn" title="Edit">
 <i class="bi bi-pencil"></i>
 </a>
                       <form method="post" action="{% url 'gateway_toggle' gateway.gateway_id %}" style="display: inline">
                         {% csrf_token %}
                         {% if gateway.is_active %}
-                          <button type="submit" class="eal-row-btn icon-only-btn icon-only-btn" title="Deactivate">
+                          <button type="submit" class="eal-row-btn icon-only-btn" title="Deactivate">
 <i class="bi bi-slash-circle"></i>
 </button>
                         {% else %}
-                          <button type="submit" class="eal-row-btn icon-only-btn icon-only-btn" title="Activate">
+                          <button type="submit" class="eal-row-btn icon-only-btn" title="Activate">
 <i class="bi bi-check-circle"></i>
 </button>
                         {% endif %}
@@ -160,7 +129,7 @@
 
       
     {% else %}
-      <div class="notification-empty" class="list-filter-wrapper">
+      <div class="notification-empty">
         <div class="empty-icon">
           <i class="bi bi-shield-lock"></i>
         </div>
@@ -168,7 +137,7 @@
         <p class="empty-text">No payment gateways records match your current filters.</p>
       </div>
     {% endif %}
-  </div>
-{% include 'partials/pagination.html' with page_obj=messages %}
-{% endblock %}
 
+    {% include 'partials/pagination.html' with page_obj=gateways %}
+  </div>
+{% endblock %}

@@ -1,12 +1,11 @@
 {% extends 'base.html' %}
 {% load i18n %}
-{% load i18n %}
-{% block title %}Events Mapping Engine{% include 'partials/pagination.html' with page_obj=mappings %}
-{% endblock %}
+
+{% block title %}{% translate "Events Mapping Engine" %}{% endblock %}
+{% block page_title %}{% translate "Events Mapping Engine" %}{% endblock %}
 
 {% block breadcrumb_items %}
 <li class="breadcrumb-item active" aria-current="page">{% translate "Events Mapping Engine" %}</li>
-{% include 'partials/pagination.html' with page_obj=mappings %}
 {% endblock %}
 
 {% block content %}
@@ -23,22 +22,6 @@
     </div>
   </div>
 </div>
-
-  
-
-    <div class="page-header-right">
-      <div class="eal-header-actions">
-        <a href="{% url 'event_mapping_create' %}" class="eal-btn eal-btn-primary">Add Mapping</a>
-      </div>
-    </div>
-  </div>
-</div>
-  <div class="list-page-actions">
-    <div class="eal-header-actions">
-          <a href="{% url 'event_mapping_create' %}" class="eal-btn eal-btn-primary">Add Mapping</a>
-  </div>
-</div>
-  </div>
 
   <div class="eal-table-card">
     <div class="eal-table-wrap">
@@ -77,20 +60,18 @@
           {% endfor %}
           {% if not mappings and not unmapped_events %}
             <tr class="eal-table-empty">
-  <td colspan="20">
-    <div class="eal-empty-icon"><i class="bi bi-inbox"></i></div>
-    <div class="eal-empty-title">{% translate "No Data Found" %}</div>
-    <div class="eal-empty-text">No events found.</div>
-  </td>
-</tr>
+              <td colspan="8">
+                <div class="notification-empty">
+                  <div class="empty-icon"><i class="bi bi-inbox"></i></div>
+                  <h4 class="empty-title">{% translate "No Data Found" %}</h4>
+                  <p class="empty-text">No events found.</p>
+                </div>
+              </td>
+            </tr>
           {% endif %}
         </tbody>
       </table>
     </div>
+    {% include 'partials/pagination.html' with page_obj=mappings %}
   </div>
-
-  {% if mappings.paginator.num_pages > 1 %}
-    
-{% include 'partials/pagination.html' with page_obj=mappings %}
 {% endblock %}
-

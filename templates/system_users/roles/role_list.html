@@ -1,11 +1,12 @@
 {% extends 'base.html' %}
 {% load i18n %}
-{% load i18n %}
 
 {% block title %}{% translate "Roles" %}{% endblock %}
 
+{% block page_title %}{% translate "Roles" %}{% endblock %}
+
 {% block breadcrumb_items %}
-<li class="breadcrumb-item active" aria-current="page">{% translate "Roles" %}</li>
+  <li class="breadcrumb-item active" aria-current="page">{% translate "Roles" %}</li>
 {% endblock %}
 
 {% block content %}
@@ -29,37 +30,35 @@
 </div>
 
 <div class="eal-table-card">
-  <div class="form-card" style="margin-bottom: 24px; border: none; box-shadow: none;">
-    <div class="form-card-body" style="padding: 0;">
-      <form method="get" action="{% url 'role_list' %}" class="eal-filter-bar js-auto-submit">
-        <div class="eal-search" style="flex: 1; min-width: 240px">
-          <i class="bi bi-search"></i>
-          <input
-            type="text"
-            name="q"
-            placeholder="{% translate 'Search by Role Name' %}"
-            value="{{ search_query }}"
-          />
-        </div>
-        
-        <select name="status" class="eal-select" onchange="this.form.submit()">
-          <option value="All" {% if status_filter == 'All' %}selected{% endif %}>{% translate "All Status" %}</option>
-          <option value="Active" {% if status_filter == 'Active' %}selected{% endif %}>{% translate "Active" %}</option>
-          <option value="Inactive" {% if status_filter == 'Inactive' %}selected{% endif %}>{% translate "Inactive" %}</option>
-        </select>
-        
-        {% if search_query or status_filter != 'All' %}
+  <form method="get" action="{% url 'role_list' %}" class="eal-toolbar js-auto-submit">
+    <div class="eal-toolbar-left" style="width: 100%; display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end">
+      <div class="eal-search" style="flex: 1; min-width: 240px">
+        <i class="bi bi-search"></i>
+        <input
+          type="text"
+          name="q"
+          placeholder="{% translate 'Search by Role Name' %}"
+          value="{{ search_query }}"
+        />
+      </div>
+
+      <select name="status" class="eal-select" onchange="this.form.submit()">
+        <option value="All" {% if status_filter == 'All' %}selected{% endif %}>{% translate "All Status" %}</option>
+        <option value="Active" {% if status_filter == 'Active' %}selected{% endif %}>{% translate "Active" %}</option>
+        <option value="Inactive" {% if status_filter == 'Inactive' %}selected{% endif %}>{% translate "Inactive" %}</option>
+      </select>
+
+      {% if search_query or status_filter != 'All' %}
         <a href="{% url 'role_list' %}" class="eal-btn eal-btn-outline" style="border-style: dashed; color: var(--text-muted);">
           <i class="bi bi-x-circle"></i>
           <span>{% translate "Clear" %}</span>
         </a>
-        {% endif %}
-      </form>
+      {% endif %}
     </div>
-  </div>
+  </form>
 
   {% if messages %}
-    <div class="alert-container mb-3">
+    <div class="alert-container mb-3 px-3">
       {% for message in messages %}
         <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}success{% endif %} py-2 small">
           {{ message }}
@@ -106,7 +105,7 @@
               <div class="eal-actions-cell">
                 {% if not role.is_system_default %}
                   <a href="{% url 'role_edit' role.pk %}" class="eal-row-btn" title="{% translate 'Edit' %}"><i class="bi bi-pencil"></i></a>
-                  <form method="post" action="{% url 'role_toggle_status' role.pk %}" style="display:inline" class="js-confirm-submit">
+                  <form method="post" action="{% url 'role_toggle_status' role.pk %}" style="display: inline" class="js-confirm-submit">
                     {% csrf_token %}
                     <button type="submit" class="eal-row-btn" title="{% translate 'Toggle Status' %}"><i class="bi bi-arrow-repeat"></i></button>
                   </form>
@@ -117,16 +116,18 @@
         {% empty %}
           <tr class="eal-table-empty">
             <td colspan="7">
-              <div class="eal-empty-icon"><i class="bi bi-person-lock"></i></div>
-              <div class="eal-empty-title">{% translate "No roles found" %}</div>
-              <div class="eal-empty-text">{% translate "No system roles match your current search or filters." %}</div>
+              <div class="notification-empty">
+                <div class="empty-icon"><i class="bi bi-person-lock"></i></div>
+                <h4 class="empty-title">{% translate "No roles found" %}</h4>
+                <p class="empty-text">{% translate "No system roles match your current search or filters." %}</p>
+              </div>
             </td>
           </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
-</div>
 
-{% include 'partials/pagination.html' with page_obj=roles %}
+  {% include 'partials/pagination.html' with page_obj=roles %}
+</div>
 {% endblock %}

@@ -1,11 +1,10 @@
 {% extends 'base.html' %}
 {% load i18n %}
-{% block title %}Authentication Log{% include 'partials/pagination.html' with page_obj=access_logs %}
-{% endblock %}
+
+{% block title %}{% translate "Authentication Log" %}{% endblock %}
 
 {% block breadcrumb_items %}
 <li class="breadcrumb-item active" aria-current="page">{% translate "Authentication Log" %}</li>
-{% include 'partials/pagination.html' with page_obj=access_logs %}
 {% endblock %}
 
 {% block content %}
@@ -24,17 +23,6 @@
 </div>
 
 <div class="container py-3">
-  
-    <div class="page-header-right">
-      <div class="eal-header-actions">
-        <!-- Actions here -->
-      </div>
-    </div>
-  </div>
-</div>
-    </div>
-  </div>
-
   <div class="alert alert-info">
     This log captures every login, logout, and token refresh attempt across all domains. Immutable — cannot be modified or deleted.
   </div>
@@ -42,13 +30,13 @@
   <div class="eal-table-card">
     <form method="get" class="eal-toolbar">
       <div class="eal-toolbar-left" style="width:100%;display:flex;gap:8px;flex-wrap:wrap;">
-        <div style="width:170px"><select name="attempt_type" class="form-select form-select-sm"><option value="All" {% if attempt_type_filter == 'All' %}selected{% endif %}>All Attempts</option><option value="Login" {% if attempt_type_filter == 'Login' %}selected{% endif %}>Login</option><option value="Logout" {% if attempt_type_filter == 'Logout' %}selected{% endif %}>Logout</option><option value="Token_Refresh" {% if attempt_type_filter == 'Token_Refresh' %}selected{% endif %}>Token Refresh</option></select></div>
-        <div style="width:170px"><select name="status" class="form-select form-select-sm"><option value="All" {% if status_filter == 'All' %}selected{% endif %}>All Status</option><option value="Success" {% if status_filter == 'Success' %}selected{% endif %}>Success</option><option value="Failed" {% if status_filter == 'Failed' %}selected{% endif %}>Failed</option><option value="Blocked" {% if status_filter == 'Blocked' %}selected{% endif %}>Blocked</option></select></div>
-        <div style="width:170px"><select name="user_domain" class="form-select form-select-sm"><option value="All" {% if domain_filter == 'All' %}selected{% endif %}>All Domains</option><option value="Admin" {% if domain_filter == 'Admin' %}selected{% endif %}>Admin</option><option value="Tenant_User" {% if domain_filter == 'Tenant_User' %}selected{% endif %}>Tenant User</option><option value="Driver" {% if domain_filter == 'Driver' %}selected{% endif %}>Driver</option></select></div>
+        <div style="width:170px"><select name="attempt_type" class="eal-select"><option value="All" {% if attempt_type_filter == 'All' %}selected{% endif %}>All Attempts</option><option value="Login" {% if attempt_type_filter == 'Login' %}selected{% endif %}>Login</option><option value="Logout" {% if attempt_type_filter == 'Logout' %}selected{% endif %}>Logout</option><option value="Token_Refresh" {% if attempt_type_filter == 'Token_Refresh' %}selected{% endif %}>Token Refresh</option></select></div>
+        <div style="width:170px"><select name="status" class="eal-select"><option value="All" {% if status_filter == 'All' %}selected{% endif %}>All Status</option><option value="Success" {% if status_filter == 'Success' %}selected{% endif %}>Success</option><option value="Failed" {% if status_filter == 'Failed' %}selected{% endif %}>Failed</option><option value="Blocked" {% if status_filter == 'Blocked' %}selected{% endif %}>Blocked</option></select></div>
+        <div style="width:170px"><select name="user_domain" class="eal-select"><option value="All" {% if domain_filter == 'All' %}selected{% endif %}>All Domains</option><option value="Admin" {% if domain_filter == 'Admin' %}selected{% endif %}>Admin</option><option value="Tenant_User" {% if domain_filter == 'Tenant_User' %}selected{% endif %}>Tenant User</option><option value="Driver" {% if domain_filter == 'Driver' %}selected{% endif %}>Driver</option></select></div>
         <input type="date" name="from_date" value="{{ from_date }}" class="form-control form-control-sm" style="width:150px">
         <input type="date" name="to_date" value="{{ to_date }}" class="form-control form-control-sm" style="width:150px">
         <input type="text" name="q" value="{{ search_query }}" class="form-control form-control-sm" placeholder="Email or IP" style="width:180px">
-        <button class="eal-btn eal-btn-primary" type="submit">Filter</button>
+        <button class="eal-btn eal-btn-primary" type="submit"><i class="bi bi-funnel"></i><span>{% translate "Apply" %}</span></button>
       </div>
     </form>
 
@@ -78,11 +66,8 @@
         </tbody>
       </table>
     </div>
+    {% include 'partials/pagination.html' with page_obj=access_logs %}
   </div>
-
-  {% if access_logs.paginator.num_pages > 1 %}
-  
 </div>
-{% include 'partials/pagination.html' with page_obj=access_logs %}
 {% endblock %}
 

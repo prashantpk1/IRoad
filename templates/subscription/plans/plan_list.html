@@ -1,18 +1,19 @@
 {% extends 'base.html' %}
 {% load i18n %}
-{% load i18n %}
 
 {% block title %}{% translate "Subscription Plans" %}{% endblock %}
 
+{% block page_title %}{% translate "Subscription Plans" %}{% endblock %}
+
 {% block breadcrumb_items %}
-<li class="breadcrumb-item active" aria-current="page">{% translate "Subscription Plans" %}</li>
+  <li class="breadcrumb-item active" aria-current="page">{% translate "Subscription Plans" %}</li>
 {% endblock %}
 
 {% block content %}
 <div class="page-header">
   <div class="page-header-row">
     <div class="page-header-left">
-      <h1 class="page-title">{% translate "{% translate "Subscription Plans" %}" %}</h1>
+      <h1 class="page-title">{% translate "Subscription Plans" %}</h1>
       <p class="page-subtitle">{% translate "Manage your records here" %}</p>
     </div>
     <div class="page-header-right">
@@ -28,59 +29,30 @@
   </div>
 </div>
 
-
-    <div class="page-header-right">
-      <div class="eal-header-actions">
-        {% if request.user.is_root %}
-          <a href="{% url 'plan_create' %}" class="eal-btn eal-btn-primary">
-            <i class="bi bi-plus-lg"></i>
-            <span>{% translate "Add Plan" %}</span>
-          </a>
-        {% endif %}
-      </div>
-    </div>
-  </div>
-</div>
-    <div class="page-header-right">
-      <div class="eal-header-actions">
-        {% if request.user.is_root %}
-          <a href="{% url 'plan_create' %}" class="eal-btn eal-btn-primary">
-            <i class="bi bi-plus-lg"></i>
-            <span>{% translate "Add Plan" %}</span>
-          </a>
-        {% endif %}
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Filters Bar -->
-<div class="form-card" style="margin-bottom: 24px;">
-  <div class="form-card-body">
-    <form method="get" class="eal-filter-bar js-auto-submit">
+<div class="eal-table-card">
+  <form method="get" class="eal-toolbar js-auto-submit">
+    <div class="eal-toolbar-left" style="width: 100%; display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end">
       <div class="eal-search" style="flex: 1; min-width: 260px;">
         <i class="bi bi-search"></i>
         <input type="text" name="q" placeholder="{% translate 'Search by name, code...' %}" value="{{ search_query }}">
       </div>
-      
+
       <select class="eal-select" name="status" onchange="this.form.submit()">
         <option value="All" {% if status_filter == 'All' %}selected{% endif %}>{% translate "All Status" %}</option>
         <option value="Active" {% if status_filter == 'Active' %}selected{% endif %}>{% translate "Active" %}</option>
         <option value="Inactive" {% if status_filter == 'Inactive' %}selected{% endif %}>{% translate "Inactive" %}</option>
       </select>
-      
-      {% if search_query or status_filter != 'All' %}
-      <a href="{% url 'plan_list' %}" class="eal-btn eal-btn-outline" style="border-style: dashed; color: var(--text-muted);">
-        <i class="bi bi-x-circle"></i>
-        <span>{% translate "Clear" %}</span>
-      </a>
-      {% endif %}
-    </form>
-  </div>
-</div>
 
-<div class="eal-table-card">
-  <div class="eal-table-wrap">
+      {% if search_query or status_filter != 'All' %}
+        <a href="{% url 'plan_list' %}" class="eal-btn eal-btn-outline" style="border-style: dashed; color: var(--text-muted);">
+          <i class="bi bi-x-circle"></i>
+          <span>{% translate "Clear" %}</span>
+        </a>
+      {% endif %}
+    </div>
+  </form>
+
+  <div class="eal-table-wrap" style="margin-top: 8px;">
     <table class="eal-table">
       <thead>
         <tr>
@@ -134,21 +106,21 @@
         {% empty %}
           <tr class="eal-table-empty">
             <td colspan="9">
-              <div class="eal-empty-icon"><i class="bi bi-card-checklist"></i></div>
-              <div class="eal-empty-title">{% translate "No plans found" %}</div>
-              <div class="eal-empty-text">{% translate "No subscription plans match your current filters." %}</div>
-              {% if request.user.is_root %}
-                <a href="{% url 'plan_create' %}" class="eal-btn eal-btn-primary" style="margin-top: 1rem;"><i class="bi bi-plus-lg"></i> {% translate "Add Plan" %}</a>
-              {% endif %}
+              <div class="notification-empty">
+                <div class="empty-icon"><i class="bi bi-card-checklist"></i></div>
+                <h4 class="empty-title">{% translate "No plans found" %}</h4>
+                <p class="empty-text">{% translate "No subscription plans match your current filters." %}</p>
+                {% if request.user.is_root %}
+                  <a href="{% url 'plan_create' %}" class="eal-btn eal-btn-primary" style="margin-top: 1rem;"><i class="bi bi-plus-lg"></i> {% translate "Add Plan" %}</a>
+                {% endif %}
+              </div>
             </td>
           </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
-</div>
 
-{% include 'partials/pagination.html' with page_obj=plans %}
-{% endblock %}
-  </div>
+  {% include 'partials/pagination.html' with page_obj=plans %}
+</div>
 {% endblock %}

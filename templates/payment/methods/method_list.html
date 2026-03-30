@@ -1,14 +1,10 @@
 {% extends 'base.html' %}
 {% load i18n %}
-{% load i18n %}
 
-{% block page_title %}Payment Methods{% include 'partials/pagination.html' with page_obj=messages %}
-{% endblock %}
-
+{% block page_title %}{% translate "Payment Methods" %}{% endblock %}
 
 {% block breadcrumb_items %}
 <li class="breadcrumb-item active" aria-current="page">{% translate "Payment Methods" %}</li>
-{% include 'partials/pagination.html' with page_obj=messages %}
 {% endblock %}
 
 {% block content %}
@@ -30,32 +26,6 @@
     </div>
   </div>
 </div>
-
-  
-
-    <div class="page-header-right">
-      <div class="eal-header-actions">
-        {% if request.user.is_root %}
-            <a href="{% url 'payment_method_create' %}" class="eal-btn eal-btn-primary">
-              <i class="bi bi-plus-lg"></i>
-              <span>Add Payment Method</span>
-            </a>
-          {% endif %}
-      </div>
-    </div>
-  </div>
-</div>
-  <div class="list-page-actions">
-    <div class="eal-header-actions">
-          {% if request.user.is_root %}
-            <a href="{% url 'payment_method_create' %}" class="eal-btn eal-btn-primary">
-              <i class="bi bi-plus-lg"></i>
-              <span>Add Payment Method</span>
-            </a>
-          {% endif %}
-  </div>
-</div>
-  </div>
 
   {% if messages %}
     <div style="margin-bottom: 16px">
@@ -98,10 +68,6 @@
         </div>
       </div>
     </form>
-
-    <div class="eal-pagination-info" style="margin-bottom: 12px;">
-      Page <strong>{{ methods.number }}</strong> of <strong>{{ methods.paginator.num_pages }}</strong>
-    </div>
 
     {% if methods.object_list %}
       <div class="eal-table-wrap">
@@ -155,17 +121,17 @@
                 <td>
                   {% if request.user.is_root %}
                     <div class="eal-actions-cell">
-                      <a href="{% url 'payment_method_edit' method.method_id %}" class="eal-row-btn icon-only-btn icon-only-btn" title="Edit">
+                      <a href="{% url 'payment_method_edit' method.method_id %}" class="eal-row-btn icon-only-btn" title="Edit">
 <i class="bi bi-pencil"></i>
 </a>
                       <form method="post" action="{% url 'payment_method_toggle' method.method_id %}" style="display: inline">
                         {% csrf_token %}
                         {% if method.is_active %}
-                          <button type="submit" class="eal-row-btn icon-only-btn icon-only-btn" title="Deactivate">
+                          <button type="submit" class="eal-row-btn icon-only-btn" title="Deactivate">
 <i class="bi bi-slash-circle"></i>
 </button>
                         {% else %}
-                          <button type="submit" class="eal-row-btn icon-only-btn icon-only-btn" title="Activate">
+                          <button type="submit" class="eal-row-btn icon-only-btn" title="Activate">
 <i class="bi bi-check-circle"></i>
 </button>
                         {% endif %}
@@ -181,13 +147,13 @@
 
       
     {% else %}
-      <div class="notification-empty" class="list-filter-wrapper">
+      <div class="notification-empty">
         <div class="empty-icon"><i class="bi bi-credit-card"></i></div>
         <h4 class="empty-title">No payment methods found</h4>
         <p class="empty-text">No payment method records match your current filters.</p>
       </div>
     {% endif %}
-  </div>
-{% include 'partials/pagination.html' with page_obj=messages %}
-{% endblock %}
 
+    {% include 'partials/pagination.html' with page_obj=methods %}
+  </div>
+{% endblock %}

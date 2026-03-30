@@ -214,7 +214,7 @@ urlpatterns = [
     path(
         'security/access-log/',
         AccessLogListView.as_view(),
-        name='access_log_list',
+        name='access_log',
     ),
     path(
         'security/audit-log/',

@@ -1,4 +1,4 @@
-<!-- Sidebar (unified by main.js from index.html) -->
+<!-- Sidebar (unified by main.js) -->
 <aside class="sidebar" id="appSidebar">
   <!-- Sidebar Header -->
   <div class="sidebar-header">
@@ -444,11 +444,11 @@
 
       <!-- Security & Audit (Phase 10 placeholders except Access Log) -->
       <li
-        class="nav-item has-submenu{% if request.resolver_match and request.resolver_match.url_name == 'access_log_list' %} open{% endif %}"
+        class="nav-item has-submenu{% if request.resolver_match and request.resolver_match.url_name == 'access_log' %} open{% endif %}"
       >
         <a
           href="#"
-          class="nav-link{% if request.resolver_match and request.resolver_match.url_name == 'access_log_list' %} active{% endif %}"
+          class="nav-link{% if request.resolver_match and request.resolver_match.url_name == 'access_log' %} active{% endif %}"
           data-tooltip="Security & Audit"
         >
           <i class="bi bi-shield-lock"></i>
@@ -458,8 +458,8 @@
         <ul class="submenu">
           <li class="submenu-item">
             <a
-              href="{% url 'access_log_list' %}"
-              class="submenu-link{% if request.resolver_match and request.resolver_match.url_name == 'access_log_list' %} active{% endif %}"
+              href="{% url 'access_log' %}"
+              class="submenu-link{% if request.resolver_match and request.resolver_match.url_name == 'access_log' %} active{% endif %}"
             >
               <i class="bi bi-journal-text"></i>
               <span>Access Log</span>
@@ -468,7 +468,7 @@
           <li class="submenu-item">
             <a href="#" class="submenu-link">
               <i class="bi bi-sliders"></i>
-              <span>Admin Security Settings</span>
+              <span>Admin Security</span>
             </a>
           </li>
           <li class="submenu-item">

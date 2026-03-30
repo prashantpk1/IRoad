@@ -1,19 +1,18 @@
 {% extends 'base.html' %}
 {% load i18n %}
-{% load i18n %}
 
-{% block page_title %}{% if is_edit %}Edit Plan{% else %}Add Plan{% endif %}{% endblock %}
+{% block page_title %}{% if is_edit %}{% translate "Edit Plan" %}{% else %}{% translate "Add Plan" %}{% endif %}{% endblock %}
 
 
 {% block breadcrumb_items %}
-<li class="breadcrumb-item active" aria-current="page">{% translate "{% if is_edit %}Edit Plan{% else %}Add Plan{% endif %}" %}</li>
+<li class="breadcrumb-item active" aria-current="page">{% if is_edit %}{% translate "Edit Plan" %}{% else %}{% translate "Add Plan" %}{% endif %}</li>
 {% endblock %}
 
 {% block content %}
 <div class="page-header">
   <div class="page-header-row">
     <div class="page-header-left">
-      <h1 class="page-title">{% translate "{% if is_edit %}Edit Plan{% else %}Add Plan{% endif %}" %}</h1>
+      <h1 class="page-title">{% if is_edit %}{% translate "Edit Plan" %}{% else %}{% translate "Add Plan" %}{% endif %}</h1>
       <p class="page-subtitle">{% translate "Manage your records here" %}</p>
     </div>
     <div class="page-header-right">
@@ -26,13 +25,6 @@
 
   
 
-    <div class="page-header-right">
-      <div class="eal-header-actions">
-        
-      </div>
-    </div>
-  </div>
-</div>
   <div class="list-page-actions">
     <div class="eal-header-actions">
   </div>
@@ -154,7 +146,9 @@
                     <input type="number" min="0" step="0.01" class="form-control" name="pricing-{{ row.row_index }}-price" value="{{ row.price|default:'' }}" />
                   </td>
                   <td>
-                    <button type="button" class="btn btn-danger remove-row" style="padding:6px 10px">X</button>
+                    <button type="button" class="eal-row-btn remove-row" title="Remove">
+                      <i class="bi bi-trash"></i>
+                    </button>
                     <input type="hidden" name="pricing-{{ row.row_index }}-delete" value="{% if row.delete %}1{% else %}0{% endif %}" class="delete-flag" />
                   </td>
                 </tr>
@@ -208,7 +202,9 @@
         <input type="number" min="0" step="0.01" class="form-control" name="pricing-__INDEX__-price" value="" />
       </td>
       <td>
-        <button type="button" class="btn btn-danger remove-row" style="padding:6px 10px">X</button>
+        <button type="button" class="eal-row-btn remove-row" title="Remove">
+          <i class="bi bi-trash"></i>
+        </button>
         <input type="hidden" name="pricing-__INDEX__-delete" value="0" class="delete-flag" />
       </td>
     </tr>

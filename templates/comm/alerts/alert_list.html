@@ -1,12 +1,11 @@
 {% extends 'base.html' %}
 {% load i18n %}
-{% load i18n %}
-{% block title %}Internal Alerts Routing{% include 'partials/pagination.html' with page_obj=routes %}
-{% endblock %}
+
+{% block title %}{% translate "Internal Alerts Routing" %}{% endblock %}
+{% block page_title %}{% translate "Internal Alerts Routing" %}{% endblock %}
 
 {% block breadcrumb_items %}
 <li class="breadcrumb-item active" aria-current="page">{% translate "Internal Alerts Routing" %}</li>
-{% include 'partials/pagination.html' with page_obj=routes %}
 {% endblock %}
 
 {% block content %}
@@ -24,20 +23,6 @@
   </div>
 </div>
 
-
-
-    <div class="page-header-right">
-      <div class="eal-header-actions">
-        <a href="{% url 'alert_route_create' %}" class="eal-btn eal-btn-primary">Add Alert Route</a>
-      </div>
-    </div>
-  </div>
-</div>
-  <div class="list-page-actions">
-    <div class="eal-header-actions"><a href="{% url 'alert_route_create' %}" class="eal-btn eal-btn-primary">Add Alert Route</a>
-  </div>
-</div>
-</div>
 <div class="eal-table-card">
   <div class="eal-table-wrap">
     <table class="eal-table">
@@ -53,25 +38,24 @@
             <td>
               <div class="eal-actions-cell">
                 <a href="{% url 'alert_route_edit' row.route_id %}" class="eal-row-btn"><i class="bi bi-pencil"></i></a>
-                <form method="post" action="{% url 'alert_route_toggle' row.route_id %}" style="display:inline">{% csrf_token %}<button class="eal-row-btn"><i class="bi bi-arrow-repeat"></i></button></form>
+                <form method="post" action="{% url 'alert_route_toggle' row.route_id %}" style="display:inline">{% csrf_token %}<button type="submit" class="eal-row-btn"><i class="bi bi-arrow-repeat"></i></button></form>
               </div>
             </td>
           </tr>
         {% empty %}
           <tr class="eal-table-empty">
-  <td colspan="20">
-    <div class="eal-empty-icon"><i class="bi bi-inbox"></i></div>
-    <div class="eal-empty-title">{% translate "No Data Found" %}</div>
-    <div class="eal-empty-text">No routes found.</div>
-  </td>
-</tr>
+            <td colspan="6">
+              <div class="notification-empty">
+                <div class="empty-icon"><i class="bi bi-inbox"></i></div>
+                <h4 class="empty-title">{% translate "No Data Found" %}</h4>
+                <p class="empty-text">No routes found.</p>
+              </div>
+            </td>
+          </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
+  {% include 'partials/pagination.html' with page_obj=routes %}
 </div>
-{% if routes.paginator.num_pages > 1 %}
-  
-{% include 'partials/pagination.html' with page_obj=routes %}
 {% endblock %}
-

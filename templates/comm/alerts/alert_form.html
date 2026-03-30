@@ -1,16 +1,18 @@
 {% extends 'base.html' %}
 {% load i18n %}
-{% block title %}{% if is_edit %}Edit Alert Route{% else %}Add Alert Route{% endif %}{% endblock %}
+{% block title %}{% if is_edit %}{% translate "Edit Alert Route" %}{% else %}{% translate "Add Alert Route" %}{% endif %}{% endblock %}
+
+{% block page_title %}{% if is_edit %}{% translate "Edit Alert Route" %}{% else %}{% translate "Add Alert Route" %}{% endif %}{% endblock %}
 
 {% block breadcrumb_items %}
-<li class="breadcrumb-item active" aria-current="page">{% translate "{% if is_edit %}Edit Alert Route{% else %}Add Alert Route{% endif %}" %}</li>
+<li class="breadcrumb-item active" aria-current="page">{% if is_edit %}{% translate "Edit Alert Route" %}{% else %}{% translate "Add Alert Route" %}{% endif %}</li>
 {% endblock %}
 
 {% block content %}
 <div class="page-header">
   <div class="page-header-row">
     <div class="page-header-left">
-      <h1 class="page-title">{% translate "{% if is_edit %}Edit Alert Route{% else %}Add Alert Route{% endif %}" %}</h1>
+      <h1 class="page-title">{% if is_edit %}{% translate "Edit Alert Route" %}{% else %}{% translate "Add Alert Route" %}{% endif %}</h1>
       <p class="page-subtitle">{% translate "Manage your records here" %}</p>
     </div>
     <div class="page-header-right">
@@ -22,14 +24,6 @@
 </div>
 
 
-    <div class="page-header-right">
-      <div class="eal-header-actions">
-        <!-- Actions here -->
-      </div>
-    </div>
-  </div>
-</div></div>
-</div>
 {% if form.instance.pk and form.instance.updated_at %}
 <div class="edit-info-bar">
   <i class="bi bi-clock-history"></i>
@@ -46,11 +40,11 @@
     <form method="post">
       {% csrf_token %}
       {{ form.non_field_errors }}
-      <div class="row g-3">
-        <div class="col-md-6">{{ form.trigger_event.label_tag }}{{ form.trigger_event }}{{ form.trigger_event.errors }}</div>
-        <div class="col-md-6">{{ form.is_active.label_tag }}{{ form.is_active }}{{ form.is_active.errors }}</div>
-        <div class="col-md-6">{{ form.notify_role.label_tag }}{{ form.notify_role }}{{ form.notify_role.errors }}</div>
-        <div class="col-md-6">{{ form.notify_custom_email.label_tag }}{{ form.notify_custom_email }}{{ form.notify_custom_email.errors }}</div>
+      <div class="fields-grid cols-2">
+        <div class="field">{{ form.trigger_event.label_tag }}{{ form.trigger_event }}{{ form.trigger_event.errors }}</div>
+        <div class="field">{{ form.is_active.label_tag }}{{ form.is_active }}{{ form.is_active.errors }}</div>
+        <div class="field">{{ form.notify_role.label_tag }}{{ form.notify_role }}{{ form.notify_role.errors }}</div>
+        <div class="field">{{ form.notify_custom_email.label_tag }}{{ form.notify_custom_email }}{{ form.notify_custom_email.errors }}</div>
       </div>
       <div class="form-actions-bar">
   <div class="eal-header-actions">

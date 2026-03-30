@@ -1,19 +1,18 @@
 {% extends 'base.html' %}
 {% load i18n %}
-{% load i18n %}
 
-{% block page_title %}{% if is_edit %}Edit Exchange Rate{% else %}Add Exchange Rate{% endif %}{% endblock %}
+{% block page_title %}{% if is_edit %}{% translate "Edit Exchange Rate" %}{% else %}{% translate "Add Exchange Rate" %}{% endif %}{% endblock %}
 
 
 {% block breadcrumb_items %}
-<li class="breadcrumb-item active" aria-current="page">{% translate "{% if is_edit %}Edit Exchange Rate{% else %}Add Exchange Rate{% endif %}" %}</li>
+<li class="breadcrumb-item active" aria-current="page">{% if is_edit %}{% translate "Edit Exchange Rate" %}{% else %}{% translate "Add Exchange Rate" %}{% endif %}</li>
 {% endblock %}
 
 {% block content %}
 <div class="page-header">
   <div class="page-header-row">
     <div class="page-header-left">
-      <h1 class="page-title">{% translate "{% if is_edit %}Edit Exchange Rate{% else %}Add Exchange Rate{% endif %}" %}</h1>
+      <h1 class="page-title">{% if is_edit %}{% translate "Edit Exchange Rate" %}{% else %}{% translate "Add Exchange Rate" %}{% endif %}</h1>
       <p class="page-subtitle">{% translate "Manage your records here" %}</p>
     </div>
     <div class="page-header-right">
@@ -29,16 +28,6 @@
 
   
 
-    <div class="page-header-right">
-      <div class="eal-header-actions">
-        <a href="{% url 'fx_rate_list' %}" class="eal-btn eal-btn-outline">
-            <i class="bi bi-arrow-left"></i>
-            <span>Back</span>
-          </a>
-      </div>
-    </div>
-  </div>
-</div>
   <div class="list-page-actions">
     <div class="eal-header-actions">
           <a href="{% url 'fx_rate_list' %}" class="eal-btn eal-btn-outline">

@@ -1,11 +1,11 @@
 {% extends 'base.html' %}
 {% load i18n %}
-{% block title %}Standard Invoices | iRoad Admin{% include 'partials/pagination.html' with page_obj=messages %}
-{% endblock %}
+
+{% block title %}{% translate "Standard Invoices | iRoad Admin" %}{% endblock %}
+{% block page_title %}{% translate "Standard Invoices | iRoad Admin" %}{% endblock %}
 
 {% block breadcrumb_items %}
 <li class="breadcrumb-item active" aria-current="page">{% translate "Standard Invoices | iRoad Admin" %}</li>
-{% include 'partials/pagination.html' with page_obj=messages %}
 {% endblock %}
 
 {% block content %}
@@ -32,23 +32,16 @@
   {% endfor %}
 {% endif %}
 
-
-    <div class="page-header-right">
-      <div class="eal-header-actions">
-        <!-- Actions here -->
-      </div>
-    </div>
-  </div>
-</div></div></div>
-
 <div class="eal-table-card">
-  <form method="get" class="eal-toolbar">
-    <div class="eal-toolbar-left" style="width:100%;display:flex;gap:8px;flex-wrap:wrap;">
-      <div class="eal-search" style="flex:1;min-width:220px;"><i class="bi bi-search"></i><input type="text" name="q" placeholder="Invoice no. or customer" value="{{ search_query }}"></div>
-      <div style="width:180px"><select class="form-select form-select-sm" name="status"><option value="">All statuses</option>{% for code, label in status_choices %}<option value="{{ code }}" {% if status_filter == code %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
-      <div style="width:160px"><select class="form-select form-select-sm" name="currency"><option value="">All currencies</option>{% for c in currencies %}<option value="{{ c.currency_code }}" {% if currency_filter == c.currency_code %}selected{% endif %}>{{ c.currency_code }}</option>{% endfor %}</select></div>
-      <div style="width:220px"><select class="form-select form-select-sm" name="tenant"><option value="">All tenants</option>{% for t in tenants %}<option value="{{ t.tenant_id }}" {% if tenant_filter == t.tenant_id|stringformat:"s" %}selected{% endif %}>{{ t.company_name }}</option>{% endfor %}</select></div>
-      <button type="submit" class="eal-btn eal-btn-outline">Filter</button>
+  <form method="get">
+    <div class="eal-toolbar">
+      <div class="eal-toolbar-left" style="width:100%;display:flex;gap:8px;flex-wrap:wrap;">
+        <div class="eal-search" style="flex:1;min-width:220px;"><i class="bi bi-search"></i><input type="text" name="q" placeholder="Invoice no. or customer" value="{{ search_query }}"></div>
+        <div style="width:180px"><select class="eal-select" name="status"><option value="">All statuses</option>{% for code, label in status_choices %}<option value="{{ code }}" {% if status_filter == code %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+        <div style="width:160px"><select class="eal-select" name="currency"><option value="">All currencies</option>{% for c in currencies %}<option value="{{ c.currency_code }}" {% if currency_filter == c.currency_code %}selected{% endif %}>{{ c.currency_code }}</option>{% endfor %}</select></div>
+        <div style="width:220px"><select class="eal-select" name="tenant"><option value="">All tenants</option>{% for t in tenants %}<option value="{{ t.tenant_id }}" {% if tenant_filter == t.tenant_id|stringformat:"s" %}selected{% endif %}>{{ t.company_name }}</option>{% endfor %}</select></div>
+        <button type="submit" class="eal-btn eal-btn-primary"><i class="bi bi-funnel"></i><span>{% translate "Apply" %}</span></button>
+      </div>
     </div>
   </form>
   <div class="eal-table-wrap">
@@ -69,20 +62,18 @@
           </tr>
         {% empty %}
           <tr class="eal-table-empty">
-  <td colspan="20">
-    <div class="eal-empty-icon"><i class="bi bi-inbox"></i></div>
-    <div class="eal-empty-title">{% translate "No Data Found" %}</div>
-    <div class="eal-empty-text">No invoices.</div>
-  </td>
-</tr>
+            <td colspan="9">
+              <div class="notification-empty">
+                <div class="empty-icon"><i class="bi bi-inbox"></i></div>
+                <h4 class="empty-title">{% translate "No Data Found" %}</h4>
+                <p class="empty-text">No invoices.</p>
+              </div>
+            </td>
+          </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
+  {% include 'partials/pagination.html' with page_obj=invoices %}
 </div>
-
-{% if invoices.paginator.num_pages > 1 %}
-
-{% include 'partials/pagination.html' with page_obj=messages %}
 {% endblock %}
-

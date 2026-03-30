@@ -1,19 +1,18 @@
 {% extends 'base.html' %}
 {% load i18n %}
-{% load i18n %}
 
-{% block page_title %}{% if is_edit %}Edit Payment Method{% else %}Add Payment Method{% endif %}{% endblock %}
+{% block page_title %}{% if is_edit %}{% translate "Edit Payment Method" %}{% else %}{% translate "Add Payment Method" %}{% endif %}{% endblock %}
 
 
 {% block breadcrumb_items %}
-<li class="breadcrumb-item active" aria-current="page">{% translate "{% if is_edit %}Edit Payment Method{% else %}Add Payment Method{% endif %}" %}</li>
+<li class="breadcrumb-item active" aria-current="page">{% if is_edit %}{% translate "Edit Payment Method" %}{% else %}{% translate "Add Payment Method" %}{% endif %}</li>
 {% endblock %}
 
 {% block content %}
 <div class="page-header">
   <div class="page-header-row">
     <div class="page-header-left">
-      <h1 class="page-title">{% translate "{% if is_edit %}Edit Payment Method{% else %}Add Payment Method{% endif %}" %}</h1>
+      <h1 class="page-title">{% if is_edit %}{% translate "Edit Payment Method" %}{% else %}{% translate "Add Payment Method" %}{% endif %}</h1>
       <p class="page-subtitle">{% translate "Manage your records here" %}</p>
     </div>
     <div class="page-header-right">
@@ -26,13 +25,6 @@
 
   
 
-    <div class="page-header-right">
-      <div class="eal-header-actions">
-        <!-- Actions here -->
-      </div>
-    </div>
-  </div>
-</div>
   <div class="list-page-actions">
     <a href="{% url 'payment_method_list' %}" class="eal-btn">
           <i class="bi bi-arrow-left"></i>

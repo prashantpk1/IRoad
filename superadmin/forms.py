@@ -134,6 +134,31 @@ class RoleForm(forms.ModelForm):
 
         return cleaned_data
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # DesignerDesign-compatible field styling classes.
+        # (Template layer must not use `as_widget(attrs={...})` to avoid TemplateSyntaxError.)
+        if 'role_name_en' in self.fields:
+            self.fields['role_name_en'].widget.attrs.update(
+                {'class': 'field-input'}
+            )
+        if 'role_name_ar' in self.fields:
+            self.fields['role_name_ar'].widget.attrs.update(
+                {'class': 'field-input', 'dir': 'rtl'}
+            )
+        if 'description' in self.fields:
+            # Keep it simple: style as a regular input unless widget is textarea.
+            desc_widget = self.fields['description'].widget
+            extra_class = 'field-textarea' if desc_widget.__class__.__name__ == 'Textarea' else ''
+            desc_widget.attrs.update(
+                {'class': ('field-input ' + extra_class).strip()}
+            )
+        if 'status' in self.fields:
+            self.fields['status'].widget.attrs.update(
+                {'class': 'field-select'}
+            )
+
 
 class AdminUserForm(forms.ModelForm):
     class Meta:
@@ -172,6 +197,21 @@ class CountryForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         is_edit = kwargs.pop('is_edit', False)
         super().__init__(*args, **kwargs)
+
+        for name in ('country_code', 'name_en', 'name_ar'):
+            if name in self.fields:
+                w = self.fields[name].widget
+                w.attrs['class'] = f"{w.attrs.get('class', '')} form-control".strip()
+        if 'name_ar' in self.fields:
+            self.fields['name_ar'].widget.attrs.setdefault('dir', 'rtl')
+            self.fields['name_ar'].widget.attrs.setdefault(
+                'placeholder', 'الاسم بالعربية'
+            )
+        if 'is_active' in self.fields:
+            self.fields['is_active'].widget.attrs['class'] = (
+                f"{self.fields['is_active'].widget.attrs.get('class', '')} "
+                'form-check-input'
+            ).strip()
 
         if is_edit and 'country_code' in self.fields:
             self.fields['country_code'].disabled = True

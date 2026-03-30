@@ -1,16 +1,18 @@
 {% extends 'base.html' %}
 {% load i18n %}
-{% block title %}{% if is_edit %}Edit Push Notification{% else %}Add Push Notification{% endif %}{% endblock %}
+{% block title %}{% if is_edit %}{% translate "Edit Push Notification" %}{% else %}{% translate "Add Push Notification" %}{% endif %}{% endblock %}
+
+{% block page_title %}{% if is_edit %}{% translate "Edit Push Notification" %}{% else %}{% translate "Add Push Notification" %}{% endif %}{% endblock %}
 
 {% block breadcrumb_items %}
-<li class="breadcrumb-item active" aria-current="page">{% translate "{% if is_edit %}Edit Push Notification{% else %}Add Push Notification{% endif %}" %}</li>
+<li class="breadcrumb-item active" aria-current="page">{% if is_edit %}{% translate "Edit Push Notification" %}{% else %}{% translate "Add Push Notification" %}{% endif %}</li>
 {% endblock %}
 
 {% block content %}
 <div class="page-header">
   <div class="page-header-row">
     <div class="page-header-left">
-      <h1 class="page-title">{% translate "{% if is_edit %}Edit Push Notification{% else %}Add Push Notification{% endif %}" %}</h1>
+      <h1 class="page-title">{% if is_edit %}{% translate "Edit Push Notification" %}{% else %}{% translate "Add Push Notification" %}{% endif %}</h1>
       <p class="page-subtitle">{% translate "Manage your records here" %}</p>
     </div>
     <div class="page-header-right">
@@ -21,33 +23,25 @@
   </div>
 </div>
 
-  
-    <div class="page-header-right">
-      <div class="eal-header-actions">
-        <!-- Actions here -->
-      </div>
-    </div>
-  </div>
-</div></div></div>
   <div class="form-card">
     <div class="form-card-body">
       <form method="post">
         {% csrf_token %}
         {{ form.non_field_errors }}
-        <div class="row g-3">
-          <div class="col-md-6">{{ form.internal_name.label_tag }}{{ form.internal_name }}{{ form.internal_name.errors }}</div>
-          <div class="col-md-6">{{ form.trigger_mode.label_tag }}{{ form.trigger_mode }}{{ form.trigger_mode.errors }}</div>
-          <div class="col-md-6">{{ form.title_en.label_tag }}{{ form.title_en }}{{ form.title_en.errors }}</div>
-          <div class="col-md-6" dir="rtl">{{ form.title_ar.label_tag }}{{ form.title_ar }}{{ form.title_ar.errors }}</div>
-          <div class="col-md-6">{{ form.message_en.label_tag }}{{ form.message_en }}{{ form.message_en.errors }}</div>
-          <div class="col-md-6" dir="rtl">{{ form.message_ar.label_tag }}{{ form.message_ar }}{{ form.message_ar.errors }}</div>
-          <div class="col-md-6">{{ form.action_link.label_tag }}{{ form.action_link }}{{ form.action_link.errors }}</div>
-          <div class="col-md-6" id="wrap-linked-event">{{ form.linked_event.label_tag }}{{ form.linked_event }}{{ form.linked_event.errors }}</div>
-          <div class="col-md-6" id="wrap-target-audience">{{ form.target_audience.label_tag }}{{ form.target_audience }}{{ form.target_audience.errors }}</div>
-          <div class="col-md-6" id="wrap-specific-target">{{ form.specific_target_id.label_tag }}{{ form.specific_target_id }}{{ form.specific_target_id.errors }}</div>
-          <div class="col-md-6" id="wrap-scheduled-at">{{ form.scheduled_at.label_tag }}{{ form.scheduled_at }}{{ form.scheduled_at.errors }}</div>
-          <div class="col-md-6" id="wrap-dispatch-status">{{ form.dispatch_status.label_tag }}{{ form.dispatch_status }}{{ form.dispatch_status.errors }}</div>
-          <div class="col-md-6" id="wrap-is-active">{{ form.is_active.label_tag }}{{ form.is_active }}{{ form.is_active.errors }}</div>
+        <div class="fields-grid cols-2">
+          <div class="field">{{ form.internal_name.label_tag }}{{ form.internal_name }}{{ form.internal_name.errors }}</div>
+          <div class="field">{{ form.trigger_mode.label_tag }}{{ form.trigger_mode }}{{ form.trigger_mode.errors }}</div>
+          <div class="field">{{ form.title_en.label_tag }}{{ form.title_en }}{{ form.title_en.errors }}</div>
+          <div class="field" dir="rtl">{{ form.title_ar.label_tag }}{{ form.title_ar }}{{ form.title_ar.errors }}</div>
+          <div class="field">{{ form.message_en.label_tag }}{{ form.message_en }}{{ form.message_en.errors }}</div>
+          <div class="field" dir="rtl">{{ form.message_ar.label_tag }}{{ form.message_ar }}{{ form.message_ar.errors }}</div>
+          <div class="field">{{ form.action_link.label_tag }}{{ form.action_link }}{{ form.action_link.errors }}</div>
+          <div class="field" id="wrap-linked-event">{{ form.linked_event.label_tag }}{{ form.linked_event }}{{ form.linked_event.errors }}</div>
+          <div class="field" id="wrap-target-audience">{{ form.target_audience.label_tag }}{{ form.target_audience }}{{ form.target_audience.errors }}</div>
+          <div class="field" id="wrap-specific-target">{{ form.specific_target_id.label_tag }}{{ form.specific_target_id }}{{ form.specific_target_id.errors }}</div>
+          <div class="field" id="wrap-scheduled-at">{{ form.scheduled_at.label_tag }}{{ form.scheduled_at }}{{ form.scheduled_at.errors }}</div>
+          <div class="field" id="wrap-dispatch-status">{{ form.dispatch_status.label_tag }}{{ form.dispatch_status }}{{ form.dispatch_status.errors }}</div>
+          <div class="field" id="wrap-is-active">{{ form.is_active.label_tag }}{{ form.is_active }}{{ form.is_active.errors }}</div>
         </div>
         <div class="form-actions-bar">
   <div class="eal-header-actions">

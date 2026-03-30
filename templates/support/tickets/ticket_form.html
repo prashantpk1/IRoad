@@ -23,21 +23,13 @@
 
 <div class="container py-3">
   
-    <div class="page-header-right">
-      <div class="eal-header-actions">
-        <!-- Actions here -->
-      </div>
-    </div>
-  </div>
-</div></div>
-  </div>
   <div class="form-card">
     <div class="form-card-body">
       <form method="post" novalidate>
         {% csrf_token %}
         <div class="row g-3">
           {% for field in form %}
-            <div class="col-md-6">
+            <div class="field col-md-6">
               <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
               {{ field }}
               {% if field.errors %}

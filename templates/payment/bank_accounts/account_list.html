@@ -1,14 +1,10 @@
 {% extends 'base.html' %}
 {% load i18n %}
-{% load i18n %}
 
-{% block page_title %}Bank Accounts{% include 'partials/pagination.html' with page_obj=messages %}
-{% endblock %}
-
+{% block page_title %}{% translate "Bank Accounts" %}{% endblock %}
 
 {% block breadcrumb_items %}
 <li class="breadcrumb-item active" aria-current="page">{% translate "Bank Accounts" %}</li>
-{% include 'partials/pagination.html' with page_obj=messages %}
 {% endblock %}
 
 {% block content %}
@@ -30,32 +26,6 @@
     </div>
   </div>
 </div>
-
-  
-
-    <div class="page-header-right">
-      <div class="eal-header-actions">
-        {% if request.user.is_root %}
-            <a href="{% url 'bank_account_create' %}" class="eal-btn eal-btn-primary">
-              <i class="bi bi-plus-lg"></i>
-              <span>Add Account</span>
-            </a>
-          {% endif %}
-      </div>
-    </div>
-  </div>
-</div>
-  <div class="list-page-actions">
-    <div class="eal-header-actions">
-          {% if request.user.is_root %}
-            <a href="{% url 'bank_account_create' %}" class="eal-btn eal-btn-primary">
-              <i class="bi bi-plus-lg"></i>
-              <span>Add Account</span>
-            </a>
-          {% endif %}
-  </div>
-</div>
-  </div>
 
   {% if messages %}
     <div style="margin-bottom: 16px">
@@ -109,12 +79,6 @@
       </div>
     </form>
 
-    <div class="eal-pagination-info" style="margin-bottom: 12px;">
-      Showing
-      <strong>{{ accounts.start_index }}</strong>-<strong>{{ accounts.end_index }}</strong>
-      of <strong>{{ accounts.paginator.count }}</strong> bank accounts
-    </div>
-
     {% if accounts.object_list %}
       <div class="eal-table-wrap">
         <table class="eal-table">
@@ -151,17 +115,17 @@
                 <td>
                   {% if request.user.is_root %}
                     <div class="eal-actions-cell">
-                      <a href="{% url 'bank_account_edit' account.account_id %}" class="eal-row-btn icon-only-btn icon-only-btn" title="Edit">
+                      <a href="{% url 'bank_account_edit' account.account_id %}" class="eal-row-btn icon-only-btn" title="Edit">
 <i class="bi bi-pencil"></i>
 </a>
                       <form method="post" action="{% url 'bank_account_toggle' account.account_id %}" style="display:inline">
                         {% csrf_token %}
                         {% if account.is_active %}
-                          <button type="submit" class="eal-row-btn icon-only-btn icon-only-btn" title="Deactivate">
+                          <button type="submit" class="eal-row-btn icon-only-btn" title="Deactivate">
 <i class="bi bi-slash-circle"></i>
 </button>
                         {% else %}
-                          <button type="submit" class="eal-row-btn icon-only-btn icon-only-btn" title="Activate">
+                          <button type="submit" class="eal-row-btn icon-only-btn" title="Activate">
 <i class="bi bi-check-circle"></i>
 </button>
                         {% endif %}
@@ -177,13 +141,13 @@
 
       
     {% else %}
-      <div class="notification-empty" class="list-filter-wrapper">
+      <div class="notification-empty">
         <div class="empty-icon"><i class="bi bi-building"></i></div>
         <h4 class="empty-title">No bank accounts found</h4>
         <p class="empty-text">No bank account records match your current filters.</p>
       </div>
     {% endif %}
-  </div>
-{% include 'partials/pagination.html' with page_obj=messages %}
-{% endblock %}
 
+    {% include 'partials/pagination.html' with page_obj=accounts %}
+  </div>
+{% endblock %}

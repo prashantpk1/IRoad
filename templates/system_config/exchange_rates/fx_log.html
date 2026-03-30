@@ -1,128 +1,111 @@
 {% extends 'base.html' %}
 {% load i18n %}
-{% load i18n %}
 
 {% block page_title %}FX Rate Change Log{% endblock %}
 
+{% block breadcrumb_items %}
+  <li class="breadcrumb-item active" aria-current="page">{% translate "FX Rate Change Log" %}</li>
+{% endblock %}
+
 {% block content %}
-  <div class="breadcrumb-container">
-  <a href="#">System</a> 
-  <span class="separator">/</span> 
-  <span class="current">{% translate "Manage" %}</span>
-</div>
-<div class="list-page-header">
-  <div class="list-page-title-area">
-    <h1 class="page-title-main">FX Rate Change Log</h1>
-    <p class="page-subtitle text-muted font-weight-normal">Read-only history of exchange-rate changes</p>
-  </div>
-  <div class="list-page-actions">
-    <div class="eal-header-actions">
-          <a href="{% url 'fx_rate_list' %}" class="eal-btn eal-btn-outline">
-            <i class="bi bi-chevron-left"></i>
-            <span>Back to Exchange Rates</span>
-          </a>
-  </div>
-</div>
-  </div>
-
-  <div class="eal-table-card">
-    <form method="get" action="{% url 'fx_change_log' %}">
-      <div class="eal-toolbar">
-        <div class="eal-toolbar-left" style="width: 100%; gap: 12px; display: flex; flex-wrap: wrap; align-items: end;">
-          <div style="width: 340px">
-            <label class="form-label">Filter by Currency</label>
-            <select name="currency" class="form-select form-select-sm">
-              <option value="" {% if not selected_currency_code %}selected{% endif %}>All currencies</option>
-              {% for c in currencies %}
-                <option
-                  value="{{ c.currency_code }}"
-                  {% if selected_currency_code == c.currency_code %}selected{% endif %}
-                >
-                  {{ c.currency_code }} - {{ c.name_en }}
-                </option>
-              {% endfor %}
-            </select>
-          </div>
-          <div style="display: flex; gap: 8px;">
-            <button type="submit" class="btn-solid-indigo">
-              <i class="bi bi-funnel"></i>
-              <span>Filter</span>
-            </button>
-          </div>
-        </div>
+<div class="page-header">
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">FX Rate Change Log</h1>
+      <p class="page-subtitle text-muted font-weight-normal">Read-only history of exchange-rate changes</p>
+    </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <a href="{% url 'fx_rate_list' %}" class="eal-btn eal-btn-outline">
+          <i class="bi bi-chevron-left"></i>
+          <span>Back to Exchange Rates</span>
+        </a>
       </div>
-    </form>
+    </div>
+  </div>
+</div>
 
-    {% if fx_logs.object_list %}
-      <div class="eal-table-wrap">
-        <table class="eal-table">
-          <thead>
-            <tr>
-              <th style="width: 60px">#</th>
-              <th style="width: 140px">Currency</th>
-              <th style="width: 160px">Old Rate</th>
-              <th style="width: 160px">New Rate</th>
-              <th style="width: 160px">Change±</th>
-              <th>Notes</th>
-              <th style="width: 160px">Changed By</th>
-              <th style="width: 190px">Changed At</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for log in fx_logs.object_list %}
-              <tr>
-                <td>{{ forloop.counter0|add:fx_logs.start_index }}</td>
-                <td><span class="eal-entity-id">{{ log.currency.currency_code }}</span></td>
-                <td>{{ log.old_rate|floatformat:6 }}</td>
-                <td>{{ log.new_rate|floatformat:6 }}</td>
-                <td>
-                  {% if log.delta >= 0 %}
-                    <span style="color:#16a34a; font-weight:700">+{{ log.delta_abs|floatformat:6 }}</span>
-                  {% else %}
-                    <span style="color:#dc2626; font-weight:700">-{{ log.delta_abs|floatformat:6 }}</span>
-                  {% endif %}
-                </td>
-                <td>{{ log.notes|default:"-" }}</td>
-                <td>
-                  {% if log.changed_by %}
-                    {{ log.changed_by.email }}
-                  {% else %}
-                    -
-                  {% endif %}
-                </td>
-                <td>{{ log.changed_at }}</td>
-              </tr>
+<div class="eal-table-card">
+  <form method="get" action="{% url 'fx_change_log' %}">
+    <div class="eal-toolbar">
+      <div class="eal-toolbar-left" style="width: 100%; gap: 12px; display: flex; flex-wrap: wrap; align-items: end;">
+        <div style="width: 340px">
+          <label class="form-label">Filter by Currency</label>
+          <select name="currency" class="form-select form-select-sm">
+            <option value="" {% if not selected_currency_code %}selected{% endif %}>All currencies</option>
+            {% for c in currencies %}
+              <option
+                value="{{ c.currency_code }}"
+                {% if selected_currency_code == c.currency_code %}selected{% endif %}
+              >
+                {{ c.currency_code }} - {{ c.name_en }}
+              </option>
             {% endfor %}
-          </tbody>
-        </table>
-      </div>
-
-      <div class="table-pagination-wrapper">
-  <div class="pagination-info">
-    Showing {{ fx_logs.start_index }} to {{ fx_logs.end_index }} of {{ fx_logs.paginator.count }} entries
-  </div>
-  <div class="pagination-controls">
-    {% if fx_logs.has_previous %}
-      <a href="?search={{ search_query|urlencode }}&page={{ fx_logs.previous_page_number }}" class="page-link-btn"><i class="bi bi-chevron-left"></i></a>
-    {% else %}
-      <span class="page-link-btn disabled"><i class="bi bi-chevron-left"></i></span>
-    {% endif %}
-    <span class="page-link-btn active">{{ fx_logs.number }}</span>
-    {% if fx_logs.has_next %}
-      <a href="?search={{ search_query|urlencode }}&page={{ fx_logs.next_page_number }}" class="page-link-btn"><i class="bi bi-chevron-right"></i></a>
-    {% else %}
-      <span class="page-link-btn disabled"><i class="bi bi-chevron-right"></i></span>
-    {% endif %}
-  </div>
-</div>
-    {% else %}
-      <div class="notification-empty" class="list-filter-wrapper">
-        <div class="empty-icon">
-          <i class="bi bi-list-check"></i>
+          </select>
         </div>
-        <h4 class="empty-title">No FX change log entries found</h4>
-        <p class="empty-text">No entries match your current filters.</p>
+        <div style="display: flex; gap: 8px;">
+          <button type="submit" class="eal-btn eal-btn-primary">
+            <i class="bi bi-funnel"></i>
+            <span>Filter</span>
+          </button>
+        </div>
       </div>
-    {% endif %}
-  </div>
+    </div>
+  </form>
+
+  {% if fx_logs.object_list %}
+    <div class="eal-table-wrap">
+      <table class="eal-table">
+        <thead>
+          <tr>
+            <th style="width: 60px">#</th>
+            <th style="width: 140px">Currency</th>
+            <th style="width: 160px">Old Rate</th>
+            <th style="width: 160px">New Rate</th>
+            <th style="width: 160px">Change±</th>
+            <th>Notes</th>
+            <th style="width: 160px">Changed By</th>
+            <th style="width: 190px">Changed At</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for log in fx_logs.object_list %}
+            <tr>
+              <td>{{ forloop.counter0|add:fx_logs.start_index }}</td>
+              <td><span class="eal-entity-id">{{ log.currency.currency_code }}</span></td>
+              <td>{{ log.old_rate|floatformat:6 }}</td>
+              <td>{{ log.new_rate|floatformat:6 }}</td>
+              <td>
+                {% if log.delta >= 0 %}
+                  <span style="color:#16a34a; font-weight:700">+{{ log.delta_abs|floatformat:6 }}</span>
+                {% else %}
+                  <span style="color:#dc2626; font-weight:700">-{{ log.delta_abs|floatformat:6 }}</span>
+                {% endif %}
+              </td>
+              <td>{{ log.notes|default:"-" }}</td>
+              <td>
+                {% if log.changed_by %}
+                  {{ log.changed_by.email }}
+                {% else %}
+                  -
+                {% endif %}
+              </td>
+              <td>{{ log.changed_at }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% include 'partials/pagination.html' with page_obj=fx_logs %}
+  {% else %}
+    <div class="notification-empty list-filter-wrapper">
+      <div class="empty-icon">
+        <i class="bi bi-list-check"></i>
+      </div>
+      <h4 class="empty-title">No FX change log entries found</h4>
+      <p class="empty-text">No entries match your current filters.</p>
+    </div>
+  {% endif %}
+</div>
 {% endblock %}

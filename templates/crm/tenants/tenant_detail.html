@@ -8,7 +8,20 @@
       <li class="breadcrumb-item active" aria-current="page">{{ tenant.company_name }}</li>
     </ol>
   </nav>
-  <div class="page-header-row"><div class="page-header-left"><h1 class="page-title">{{ tenant.company_name }}</h1></div></div>
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">{{ tenant.company_name }}</h1>
+      <p class="page-subtitle">Tenant profile, subscription state, and CRM notes</p>
+    </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <a href="{% url 'tenant_list' %}" class="eal-btn eal-btn-outline">
+          <i class="bi bi-arrow-left"></i>
+          <span>Back to list</span>
+        </a>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div class="form-card mb-3">
@@ -94,6 +107,5 @@
   </div>
 </div>
 
-<div><a href="{% url 'tenant_list' %}" class="btn btn-outline-secondary">Back to list</a></div>
 {% endblock %}
 

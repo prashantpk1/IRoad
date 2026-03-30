@@ -1,11 +1,10 @@
 {% extends 'base.html' %}
 {% load i18n %}
-{% block title %}Active Sessions Monitor{% include 'partials/pagination.html' with page_obj=sessions %}
-{% endblock %}
+
+{% block title %}{% translate "Active Sessions Monitor" %}{% endblock %}
 
 {% block breadcrumb_items %}
 <li class="breadcrumb-item active" aria-current="page">{% translate "Active Sessions Monitor" %}</li>
-{% include 'partials/pagination.html' with page_obj=sessions %}
 {% endblock %}
 
 {% block content %}
@@ -24,17 +23,6 @@
 </div>
 
 <div class="container py-3">
-  
-    <div class="page-header-right">
-      <div class="eal-header-actions">
-        <!-- Actions here -->
-      </div>
-    </div>
-  </div>
-</div>
-    </div>
-  </div>
-
   <div class="kpi-grid mb-3">
     <div class="kpi-card"><div class="kpi-label">Total Active</div><div class="kpi-value">{{ total_active }}</div></div>
     <div class="kpi-card"><div class="kpi-label">Admin</div><div class="kpi-value">{{ total_admin }}</div></div>
@@ -50,7 +38,7 @@
     <form method="get" class="eal-toolbar">
       <div class="eal-toolbar-left" style="width:100%;display:flex;gap:8px;flex-wrap:wrap;align-items:end;">
         <div style="width:220px">
-          <select name="user_domain" class="form-select form-select-sm">
+          <select name="user_domain" class="eal-select">
             <option value="All" {% if domain_filter == 'All' %}selected{% endif %}>All Domains</option>
             <option value="Admin" {% if domain_filter == 'Admin' %}selected{% endif %}>Admin</option>
             <option value="Tenant_User" {% if domain_filter == 'Tenant_User' %}selected{% endif %}>Tenant User</option>
@@ -61,7 +49,7 @@
           <i class="bi bi-search"></i>
           <input type="text" name="q" class="" value="{{ search_query }}" placeholder="Search by user name/reference or IP address">
         </div>
-        <button type="submit" class="eal-btn eal-btn-outline">Filter</button>
+        <button type="submit" class="eal-btn eal-btn-primary"><i class="bi bi-funnel"></i><span>{% translate "Apply" %}</span></button>
         {% if request.user.is_root %}
           <a href="{% url 'session_mass_revoke' %}" class="btn btn-danger">Mass Revoke</a>
         {% endif %}
@@ -112,11 +100,8 @@
         </tbody>
       </table>
     </div>
+    {% include 'partials/pagination.html' with page_obj=sessions %}
   </div>
-
-  {% if sessions.paginator.num_pages > 1 %}
-  
 </div>
-{% include 'partials/pagination.html' with page_obj=sessions %}
 {% endblock %}
 

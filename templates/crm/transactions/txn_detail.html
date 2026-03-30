@@ -1,6 +1,5 @@
 {% extends 'base.html' %}
 {% load i18n %}
-{% load i18n %}
 {% block title %}Transaction Details | iRoad Admin{% endblock %}
 {% block content %}
 {% if messages %}
@@ -12,18 +11,26 @@
   {% endfor %}
 {% endif %}
 
-<div class="breadcrumb-container">
-  <a href="#">System</a> 
-  <span class="separator">/</span> 
-  <span class="current">{% translate "Manage" %}</span>
-</div>
-<div class="list-page-header">
-  <div class="list-page-title-area">
-    <h1 class="page-title-main">Transaction Details</h1>
-    
-  </div>
-  <div class="list-page-actions">
-    <a href="{% url 'transaction_list' %}" class="btn btn-outline-secondary btn-sm">Back to ledger</a>
+<div class="page-header">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{% url 'transaction_list' %}">Transactions</a></li>
+      <li class="breadcrumb-item active" aria-current="page">Transaction Details</li>
+    </ol>
+  </nav>
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">Transaction Details</h1>
+      <p class="page-subtitle">Review payment, references, and manual review status</p>
+    </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <a href="{% url 'transaction_list' %}" class="eal-btn eal-btn-outline">
+          <i class="bi bi-arrow-left"></i>
+          <span>Back to ledger</span>
+        </a>
+      </div>
+    </div>
   </div>
 </div>
 

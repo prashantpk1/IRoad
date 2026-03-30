@@ -1,14 +1,10 @@
 {% extends 'base.html' %}
 {% load i18n %}
-{% load i18n %}
 
-{% block page_title %}Admin Users{% include 'partials/pagination.html' with page_obj=roles %}
-{% endblock %}
-
+{% block page_title %}{% translate "Admin Users" %}{% endblock %}
 
 {% block breadcrumb_items %}
-<li class="breadcrumb-item active" aria-current="page">{% translate "Admin Users" %}</li>
-{% include 'partials/pagination.html' with page_obj=roles %}
+  <li class="breadcrumb-item active" aria-current="page">{% translate "Admin Users" %}</li>
 {% endblock %}
 
 {% block content %}
@@ -21,188 +17,161 @@
     <div class="page-header-right">
       <div class="eal-header-actions">
         {% if request.user.is_root %}
-            <a href="{% url 'admin_user_create' %}" class="eal-btn eal-btn-primary">
-              <i class="bi bi-plus-lg"></i>
-              <span>Invite New User</span>
-            </a>
-          {% endif %}
+          <a href="{% url 'admin_user_create' %}" class="eal-btn eal-btn-primary">
+            <i class="bi bi-plus-lg"></i>
+            <span>Invite New User</span>
+          </a>
+        {% endif %}
       </div>
     </div>
   </div>
 </div>
 
-  
-
-    <div class="page-header-right">
-      <div class="eal-header-actions">
-        {% if request.user.is_root %}
-            <a href="{% url 'admin_user_create' %}" class="eal-btn eal-btn-primary">
-              <i class="bi bi-plus-lg"></i>
-              <span>Invite New User</span>
-            </a>
-          {% endif %}
-      </div>
+<div class="eal-table-card">
+  <div class="eal-toolbar">
+    <div class="eal-toolbar-left">
+      <span class="eal-result-badge">Total: <strong>{{ total_count }}</strong></span>
     </div>
   </div>
-</div>
-  <div class="list-page-actions">
-    <div class="eal-header-actions">
-          {% if request.user.is_root %}
-            <a href="{% url 'admin_user_create' %}" class="eal-btn eal-btn-primary">
-              <i class="bi bi-plus-lg"></i>
-              <span>Invite New User</span>
-            </a>
-          {% endif %}
-  </div>
-</div>
-  </div>
 
-  <div class="eal-table-card">
-    <div class="eal-toolbar">
-      <div class="eal-toolbar-left">
-        <span class="eal-result-badge">Total: <strong>{{ total_count }}</strong></span>
+  <form method="get" action="{% url 'admin_user_list' %}" class="eal-toolbar">
+    <div class="eal-toolbar-left" style="width: 100%; display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap">
+      <div class="eal-search" style="flex: 1; min-width: 240px">
+        <i class="bi bi-search"></i>
+        <input
+          type="text"
+          name="q"
+          placeholder="Search by name or email"
+          value="{{ search_query }}"
+        />
       </div>
-    </div>
-
-    <form method="get" action="{% url 'admin_user_list' %}" class="eal-toolbar" style="margin-top: 8px">
-      <div class="eal-toolbar-left" style="width:100%;display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
-        <div class="eal-search" style="flex: 1; min-width: 240px">
-          <i class="bi bi-search"></i>
-          <input
-            type="text"
-            name="q"
-            placeholder="Search by name or email"
-            value="{{ search_query }}"
-          />
-        </div>
-        <div style="width: 220px">
-          <select name="status" class="form-select form-select-sm">
-            <option value="All" {% if status_filter == 'All' %}selected{% endif %}>All</option>
-            <option value="Pending_Activation" {% if status_filter == 'Pending_Activation' %}selected{% endif %}>
-              Pending
+      <div style="width: 220px">
+        <select name="status" class="form-select form-select-sm">
+          <option value="All" {% if status_filter == 'All' %}selected{% endif %}>All</option>
+          <option value="Pending_Activation" {% if status_filter == 'Pending_Activation' %}selected{% endif %}>
+            Pending
+          </option>
+          <option value="Active" {% if status_filter == 'Active' %}selected{% endif %}>Active</option>
+          <option value="Suspended" {% if status_filter == 'Suspended' %}selected{% endif %}>Suspended</option>
+        </select>
+      </div>
+      <div style="width: 220px">
+        <select name="role" class="form-select form-select-sm">
+          <option value="All" {% if role_filter == 'All' %}selected{% endif %}>All</option>
+          {% for role in roles %}
+            <option value="{{ role.pk }}" {% if role_filter == role.pk|stringformat:"s" %}selected{% endif %}>
+              {{ role.role_name_en }}
             </option>
-            <option value="Active" {% if status_filter == 'Active' %}selected{% endif %}>Active</option>
-            <option value="Suspended" {% if status_filter == 'Suspended' %}selected{% endif %}>Suspended</option>
-          </select>
-        </div>
-        <div style="width: 220px">
-          <select name="role" class="form-select form-select-sm">
-            <option value="All" {% if role_filter == 'All' %}selected{% endif %}>All</option>
-            {% for role in roles %}
-              <option value="{{ role.pk }}" {% if role_filter == role.pk|stringformat:"s" %}selected{% endif %}>
-                {{ role.role_name_en }}
-              </option>
-            {% endfor %}
-          </select>
-        </div>
-        <div style="width: 120px">
-          <button type="submit" class="eal-btn eal-btn-primary" style="width: 100%">
-            <i class="bi bi-search"></i>
-            <span>Filter</span>
-          </button>
-        </div>
+          {% endfor %}
+        </select>
       </div>
-    </form>
-
-    {% if messages %}
-      <div class="list-filter-wrapper">
-        {% for message in messages %}
-          <p style="margin: 0; color: {% if message.tags == 'error' %}#b91c1c{% else %}#15803d{% endif %}; font-weight: 600">
-            {{ message }}
-          </p>
-        {% endfor %}
+      <div style="width: 120px">
+        <button type="submit" class="eal-btn eal-btn-primary" style="width: 100%">
+          <i class="bi bi-search"></i>
+          <span>Filter</span>
+        </button>
       </div>
-    {% endif %}
+    </div>
+  </form>
 
-    {% if admin_users.object_list %}
-      <div class="eal-table-wrap" style="margin-top: 8px">
-        <table class="eal-table">
-          <thead>
+  {% if messages %}
+    <div class="list-filter-wrapper">
+      {% for message in messages %}
+        <p style="margin: 0; color: {% if message.tags == 'error' %}#b91c1c{% else %}#15803d{% endif %}; font-weight: 600">
+          {{ message }}
+        </p>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  {% if admin_users.object_list %}
+    <div class="eal-table-wrap" style="margin-top: 8px">
+      <table class="eal-table">
+        <thead>
+          <tr>
+            <th style="width: 60px">#</th>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Role</th>
+            <th style="width: 140px">Status badge</th>
+            <th style="width: 120px">2FA</th>
+            <th style="width: 170px">Last Login</th>
+            <th style="width: 260px">ACTIONS</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in admin_users.object_list %}
             <tr>
-              <th style="width: 60px">#</th>
-              <th>Name</th>
-              <th>Email</th>
-              <th>Role</th>
-              <th style="width: 140px">Status badge</th>
-              <th style="width: 120px">2FA</th>
-              <th style="width: 170px">Last Login</th>
-              <th style="width: 260px">ACTIONS</th>
+              <td>{{ forloop.counter0|add:admin_users.start_index }}</td>
+              <td>
+                <div class="eal-name-cell">
+                  <span class="eal-name-text">
+                    {{ u.first_name }} {{ u.last_name }}
+                  </span>
+                  {% if u.is_root %}
+                    <i class="bi bi-lock-fill text-warning" title="Root admin"></i>
+                  {% endif %}
+                </div>
+              </td>
+              <td>{{ u.email }}</td>
+              <td>{{ u.role.role_name_en|default:"-" }}</td>
+              <td>
+                {% if u.status == 'Pending_Activation' %}
+                  <span class="status-badge pending">Pending</span>
+                {% elif u.status == 'Active' %}
+                  <span class="status-badge active">Active</span>
+                {% else %}
+                  <span class="status-badge inactive">Suspended</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if u.two_factor_enabled %}
+                  <span class="status-badge active">Enabled</span>
+                {% else %}
+                  <span class="status-badge inactive">Disabled</span>
+                {% endif %}
+              </td>
+              <td>{{ u.last_login_at|default:"-" }}</td>
+              <td>
+                <div class="eal-actions-cell">
+                  <a href="{% url 'admin_user_edit' u.pk %}" class="eal-row-btn" title="Edit">
+                    <i class="bi bi-pencil"></i>
+                  </a>
+                  <button type="button" class="eal-row-btn" disabled title="Invite resend flow not available in current logic">
+                    <i class="bi bi-send"></i>
+                  </button>
+
+                  {% if not u.is_root %}
+                    <form method="post" action="{% url 'admin_user_toggle_status' u.pk %}">
+                      {% csrf_token %}
+                      {% if u.status == 'Suspended' %}
+                        <button type="submit" class="eal-row-btn" title="Activate">
+                          <i class="bi bi-check-circle"></i>
+                        </button>
+                      {% else %}
+                        <button type="submit" class="eal-row-btn" title="Suspend">
+                          <i class="bi bi-slash-circle"></i>
+                        </button>
+                      {% endif %}
+                    </form>
+                  {% endif %}
+                </div>
+              </td>
             </tr>
-          </thead>
-          <tbody>
-            {% for u in admin_users.object_list %}
-              <tr>
-                <td>{{ forloop.counter0|add:admin_users.start_index }}</td>
-                <td>
-                  <div class="eal-name-cell">
-                    <span class="eal-name-text">
-                      {{ u.first_name }} {{ u.last_name }}
-                    </span>
-                    {% if u.is_root %}
-                      <i class="bi bi-lock-fill text-warning" title="Root admin"></i>
-                    {% endif %}
-                  </div>
-                </td>
-                <td>{{ u.email }}</td>
-                <td>{{ u.role.role_name_en|default:"-" }}</td>
-                <td>
-                  {% if u.status == 'Pending_Activation' %}
-                    <span class="status-badge pending">Pending</span>
-                  {% elif u.status == 'Active' %}
-                    <span class="status-badge active">Active</span>
-                  {% else %}
-                    <span class="status-badge inactive">Suspended</span>
-                  {% endif %}
-                </td>
-                <td>
-                  {% if u.two_factor_enabled %}
-                    <span class="status-badge active">Enabled</span>
-                  {% else %}
-                    <span class="status-badge inactive">Disabled</span>
-                  {% endif %}
-                </td>
-                <td>{{ u.last_login_at|default:"-" }}</td>
-                <td>
-                  <div class="eal-actions-cell">
-                    <a href="{% url 'admin_user_edit' u.pk %}" class="eal-row-btn icon-only-btn icon-only-btn">
-<i class="bi bi-pencil"></i>
-</a>
-                    <button type="button" class="eal-row-btn icon-only-btn icon-only-btn" disabled title="Invite resend flow not available in current logic">
-<i class="bi bi-send"></i>
-</button>
-
-                    {% if not u.is_root %}
-                      <form method="post" action="{% url 'admin_user_toggle_status' u.pk %}">
-                        {% csrf_token %}
-                        {% if u.status == 'Suspended' %}
-                          <button type="submit" class="eal-row-btn icon-only-btn icon-only-btn">
-<i class="bi bi-check-circle"></i>
-</button>
-                        {% else %}
-                          <button type="submit" class="eal-row-btn icon-only-btn icon-only-btn">
-<i class="bi bi-slash-circle"></i>
-</button>
-                        {% endif %}
-                      </form>
-                    {% endif %}
-                  </div>
-                </td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="notification-empty list-filter-wrapper">
+      <div class="empty-icon">
+        <i class="bi bi-collection"></i>
       </div>
+      <h4 class="empty-title">No admin users found</h4>
+      <p class="empty-text">Try adjusting your search or filters.</p>
+    </div>
+  {% endif %}
 
-      
-    {% else %}
-      <div class="notification-empty" class="list-filter-wrapper">
-        <div class="empty-icon">
-          <i class="bi bi-collection"></i>
-        </div>
-        <h4 class="empty-title">No admin users found</h4>
-        <p class="empty-text">Try adjusting your search or filters.</p>
-      </div>
-    {% endif %}
-  </div>
-{% include 'partials/pagination.html' with page_obj=roles %}
+  {% include 'partials/pagination.html' with page_obj=admin_users %}
+</div>
 {% endblock %}

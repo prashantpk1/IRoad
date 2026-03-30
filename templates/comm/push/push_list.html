@@ -1,12 +1,11 @@
 {% extends 'base.html' %}
 {% load i18n %}
-{% load i18n %}
-{% block title %}Push Notifications{% include 'partials/pagination.html' with page_obj=push_items %}
-{% endblock %}
+
+{% block title %}{% translate "Push Notifications" %}{% endblock %}
+{% block page_title %}{% translate "Push Notifications" %}{% endblock %}
 
 {% block breadcrumb_items %}
 <li class="breadcrumb-item active" aria-current="page">{% translate "Push Notifications" %}</li>
-{% include 'partials/pagination.html' with page_obj=push_items %}
 {% endblock %}
 
 {% block content %}
@@ -24,27 +23,14 @@
   </div>
 </div>
 
-  
-
-    <div class="page-header-right">
-      <div class="eal-header-actions">
-        <a href="{% url 'push_notif_create' %}" class="eal-btn eal-btn-primary">Add Push Notification</a>
-      </div>
-    </div>
-  </div>
-</div>
-  <div class="list-page-actions">
-    <div class="eal-header-actions"><a href="{% url 'push_notif_create' %}" class="eal-btn eal-btn-primary">Add Push Notification</a>
-  </div>
-</div>
-  </div>
-
   <div class="eal-table-card">
-    <form method="get" class="eal-toolbar">
-      <div class="eal-toolbar-left" style="width:100%; display:flex; gap:12px; flex-wrap:wrap;">
-        <div style="width:220px"><select class="form-select form-select-sm" name="trigger_mode"><option value="All" {% if trigger_mode_filter == 'All' %}selected{% endif %}>All Trigger Modes</option><option value="Manual_Broadcast" {% if trigger_mode_filter == 'Manual_Broadcast' %}selected{% endif %}>Manual</option><option value="System_Event" {% if trigger_mode_filter == 'System_Event' %}selected{% endif %}>System</option></select></div>
-        <div style="width:220px"><select class="form-select form-select-sm" name="dispatch_status"><option value="All" {% if dispatch_status_filter == 'All' %}selected{% endif %}>All Statuses</option><option value="Draft" {% if dispatch_status_filter == 'Draft' %}selected{% endif %}>Draft</option><option value="Scheduled" {% if dispatch_status_filter == 'Scheduled' %}selected{% endif %}>Scheduled</option><option value="Completed" {% if dispatch_status_filter == 'Completed' %}selected{% endif %}>Completed</option></select></div>
-        <button class="eal-btn eal-btn-outline">Filter</button>
+    <form method="get">
+      <div class="eal-toolbar">
+        <div class="eal-toolbar-left" style="width:100%; display:flex; gap:12px; flex-wrap:wrap;">
+          <div style="width:220px"><select class="eal-select" name="trigger_mode"><option value="All" {% if trigger_mode_filter == 'All' %}selected{% endif %}>All Trigger Modes</option><option value="Manual_Broadcast" {% if trigger_mode_filter == 'Manual_Broadcast' %}selected{% endif %}>Manual</option><option value="System_Event" {% if trigger_mode_filter == 'System_Event' %}selected{% endif %}>System</option></select></div>
+          <div style="width:220px"><select class="eal-select" name="dispatch_status"><option value="All" {% if dispatch_status_filter == 'All' %}selected{% endif %}>All Statuses</option><option value="Draft" {% if dispatch_status_filter == 'Draft' %}selected{% endif %}>Draft</option><option value="Scheduled" {% if dispatch_status_filter == 'Scheduled' %}selected{% endif %}>Scheduled</option><option value="Completed" {% if dispatch_status_filter == 'Completed' %}selected{% endif %}>Completed</option></select></div>
+          <button type="submit" class="eal-btn eal-btn-primary"><i class="bi bi-funnel"></i><span>{% translate "Apply" %}</span></button>
+        </div>
       </div>
     </form>
 
@@ -79,7 +65,7 @@
               <td>
                 <div class="eal-actions-cell">
                   {% if row.dispatch_status == 'Completed' %}
-                    <button class="eal-row-btn" disabled><i class="bi bi-pencil"></i></button>
+                    <button type="button" class="eal-row-btn" disabled><i class="bi bi-pencil"></i></button>
                   {% else %}
                     <a href="{% url 'push_notif_edit' row.notification_id %}" class="eal-row-btn"><i class="bi bi-pencil"></i></a>
                   {% endif %}
@@ -89,20 +75,18 @@
             </tr>
           {% empty %}
             <tr class="eal-table-empty">
-  <td colspan="20">
-    <div class="eal-empty-icon"><i class="bi bi-inbox"></i></div>
-    <div class="eal-empty-title">{% translate "No Data Found" %}</div>
-    <div class="eal-empty-text">No push notifications found.</div>
-  </td>
-</tr>
+              <td colspan="7">
+                <div class="notification-empty">
+                  <div class="empty-icon"><i class="bi bi-inbox"></i></div>
+                  <h4 class="empty-title">{% translate "No Data Found" %}</h4>
+                  <p class="empty-text">No push notifications found.</p>
+                </div>
+              </td>
+            </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
+    {% include 'partials/pagination.html' with page_obj=push_items %}
   </div>
-
-  {% if push_items.paginator.num_pages > 1 %}
-    
-{% include 'partials/pagination.html' with page_obj=push_items %}
 {% endblock %}
-

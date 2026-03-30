@@ -1,14 +1,13 @@
+{% load i18n %}
 <div class="header-datetime">
-  <span class="header-date" id="headerDate"
-    >Tuesday, 28 January 2026</span
-  >
-  <span class="header-time" id="headerTime">3:52 PM</span>
+  <span class="header-date" id="headerDate"></span>
+  <span class="header-time" id="headerTime"></span>
 </div>
 <div class="header-right">
-  <button class="header-icon-btn" title="Switch Language">
+  <button type="button" class="header-icon-btn" title="{% translate 'Switch Language' %}">
     <i class="bi bi-translate"></i>
   </button>
-  <button class="header-icon-btn" title="Notifications">
+  <button type="button" class="header-icon-btn" title="{% translate 'Notifications' %}">
     <i class="bi bi-bell"></i>
     <span class="badge">3</span>
   </button>
@@ -17,14 +16,21 @@
     <div class="header-user" id="headerUserToggle">
       <div class="header-user-avatar">
         {% if request.user.is_authenticated %}
-          <img
-            src="https://ui-avatars.com/api/?name={{ request.user.email|urlencode }}&background=5051f9&color=fff&size=40"
-            alt="User"
-          />
+          {% if request.user.first_name or request.user.last_name %}
+            <img
+              src="https://ui-avatars.com/api/?name={{ request.user.first_name|urlencode }}%20{{ request.user.last_name|urlencode }}&background=5051f9&color=fff&size=40"
+              alt=""
+            />
+          {% else %}
+            <img
+              src="https://ui-avatars.com/api/?name={{ request.user.email|urlencode }}&background=5051f9&color=fff&size=40"
+              alt=""
+            />
+          {% endif %}
         {% else %}
           <img
             src="https://ui-avatars.com/api/?name=Admin&background=5051f9&color=fff&size=40"
-            alt="User"
+            alt=""
           />
         {% endif %}
       </div>
@@ -33,14 +39,14 @@
           {% if request.user.is_authenticated %}
             {{ request.user.first_name }} {{ request.user.last_name }}
           {% else %}
-            Admin
+            {% translate "Admin" %}
           {% endif %}
         </span>
         <span class="header-user-role">
           {% if request.user.is_authenticated and request.user.role %}
             {{ request.user.role.role_name_en }}
           {% else %}
-            Super Admin
+            {% translate "Super Admin" %}
           {% endif %}
         </span>
       </div>
@@ -50,14 +56,21 @@
       <div class="header-dropdown-profile">
         <div class="header-dropdown-avatar">
           {% if request.user.is_authenticated %}
-            <img
-              src="https://ui-avatars.com/api/?name={{ request.user.email|urlencode }}&background=e8e8e8&color=888&size=80"
-              alt="User"
-            />
+            {% if request.user.first_name or request.user.last_name %}
+              <img
+                src="https://ui-avatars.com/api/?name={{ request.user.first_name|urlencode }}%20{{ request.user.last_name|urlencode }}&background=e8e8e8&color=888&size=80"
+                alt=""
+              />
+            {% else %}
+              <img
+                src="https://ui-avatars.com/api/?name={{ request.user.email|urlencode }}&background=e8e8e8&color=888&size=80"
+                alt=""
+              />
+            {% endif %}
           {% else %}
             <img
               src="https://ui-avatars.com/api/?name=Admin&background=e8e8e8&color=888&size=80"
-              alt="User"
+              alt=""
             />
           {% endif %}
         </div>
@@ -65,7 +78,7 @@
           {% if request.user.is_authenticated %}
             {{ request.user.first_name }} {{ request.user.last_name }}
           {% else %}
-            Admin
+            {% translate "Admin" %}
           {% endif %}
         </div>
         <div class="header-dropdown-email">
@@ -79,13 +92,13 @@
         <li>
           <a href="#" class="header-dropdown-item">
             <i class="bi bi-person"></i>
-            <span>My Account</span>
+            <span>{% translate "My Account" %}</span>
           </a>
         </li>
         <li>
           <a href="{% url 'logout' %}" class="header-dropdown-item">
             <i class="bi bi-box-arrow-right"></i>
-            <span>Sign out</span>
+            <span>{% translate "Sign out" %}</span>
           </a>
         </li>
       </ul>
