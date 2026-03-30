@@ -1,0 +1,969 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Demo Items | iRoad Admin</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Bootstrap 5 CSS -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+
+    <!-- Bootstrap Icons -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css"
+      rel="stylesheet"
+    />
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="Style/style.css" />
+    <link rel="stylesheet" href="Style/responsive.css" />
+  </head>
+
+  <body>
+    <!-- Mobile Menu Toggle -->
+    <button class="mobile-menu-toggle" aria-label="Toggle menu">
+      <i class="bi bi-list"></i>
+    </button>
+
+    <!-- Sidebar Overlay -->
+    <div class="sidebar-overlay"></div>
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="appSidebar">
+      <div class="sidebar-header">
+        <a href="index.html" class="sidebar-logo">
+          <span class="logo-icon">i</span>
+          <span class="logo-label">Road</span>
+        </a>
+      </div>
+
+      <nav class="sidebar-nav">
+        <ul class="nav-menu">
+          <li class="nav-item">
+            <a
+              href="index.html"
+              class="nav-link"
+              data-tooltip="Dashboard"
+            >
+              <i class="bi bi-speedometer2"></i>
+              <span class="nav-text">Dashboard</span>
+            </a>
+          </li>
+
+          <li class="nav-section-title">
+            <span>Demo</span>
+          </li>
+
+          <li class="nav-item has-submenu">
+            <a href="#" class="nav-link" data-tooltip="Demo Management">
+              <i class="bi bi-flask"></i>
+              <span class="nav-text">Demo Management</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a
+                  href="Demo-items-list.html"
+                  class="submenu-link"
+                >
+                  <i class="bi bi-list-ul"></i>
+                  <span>Demo Items</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Demo-item-form.html" class="submenu-link">
+                  <i class="bi bi-plus-lg"></i>
+                  <span>Create Demo Item</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <li class="nav-section-title">
+            <span>Administration</span>
+          </li>
+
+          <li class="nav-item">
+            <a
+              href="Users-administration.html"
+              class="nav-link"
+              data-tooltip="Users Administration"
+            >
+              <i class="bi bi-people"></i>
+              <span class="nav-text">Users</span>
+            </a>
+          </li>
+        </ul>
+      </nav>
+    </aside>
+
+    <!-- Notification Panel -->
+    <div class="notification-panel" id="notificationPanel">
+      <div class="notification-header">
+        <h3 class="notification-title">Notifications</h3>
+        <button
+          class="notification-close"
+          id="notificationClose"
+          aria-label="Close"
+        >
+          <i class="bi bi-x-lg"></i>
+        </button>
+      </div>
+
+      <div class="notification-content">
+        <div class="notification-settings">
+          <button
+            class="settings-btn"
+            id="notificationSettingsBtn"
+            aria-label="Settings"
+          >
+            <i class="bi bi-gear"></i>
+          </button>
+        </div>
+
+        <div class="preferences-popup" id="preferencesPopup">
+          <h4 class="preferences-title">Preferences</h4>
+
+          <div class="ce-item">
+            <div class="preference-label">
+              <span>Allow Notifications</span>
+              <i
+                class="bi bi-info-circle"
+                title="Enable or disable all notifications"
+              ></i>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="allowNotifications" checked />
+              <span class="toggle-slider">
+                <span class="toggle-text-on">Enable</span>
+                <span class="toggle-text-off">Disable</span>
+              </span>
+            </label>
+          </div>
+
+          <div class="preference-item">
+            <label class="preference-checkbox">
+              <input type="checkbox" checked />
+              <span class="checkmark"></span>
+              <span>Record Comments</span>
+            </label>
+          </div>
+
+          <div class="preference-item">
+            <label class="preference-checkbox">
+              <input type="checkbox" checked />
+              <span class="checkmark"></span>
+              <span>Blueprint Transitions</span>
+            </label>
+          </div>
+
+          <button
+            class="btn btn-primary preferences-done"
+            id="preferencesDone"
+          >
+            Done
+          </button>
+        </div>
+
+        <div class="notification-empty">
+          <div class="empty-icon">
+            <i class="bi bi-bell"></i>
+            <span class="sparkle sparkle-1">&#10022;</span>
+            <span class="sparkle sparkle-2">&#10023;</span>
+            <span class="sparkle sparkle-3">&#176;</span>
+          </div>
+          <h4 class="empty-title">No notifications</h4>
+          <p class="empty-text">You are yet to receive notifications</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="notification-overlay" id="notificationOverlay"></div>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- Top Header -->
+      <header class="top-header">
+        <div class="header-left">
+          <button
+            class="header-toggle-btn"
+            id="sidebarCollapseBtn"
+            title="Toggle Sidebar"
+          >
+            <i class="bi bi-list"></i>
+          </button>
+
+          <div class="header-search">
+            <i class="bi bi-search"></i>
+            <input
+              type="text"
+              placeholder="Search shipments, clients, addresses..."
+            />
+          </div>
+        </div>
+
+        <div class="header-datetime">
+          <span class="header-date" id="headerDate"></span>
+          <span class="header-time" id="headerTime"></span>
+        </div>
+
+        <div class="header-right">
+          <button class="header-icon-btn" title="Switch Language">
+            <i class="bi bi-translate"></i>
+          </button>
+
+          <button class="header-icon-btn" title="Notifications">
+            <i class="bi bi-bell"></i>
+            <span class="badge">3</span>
+          </button>
+
+          <div class="header-divider"></div>
+
+          <div class="header-user-wrapper">
+            <div class="header-user" id="headerUserToggle">
+              <div class="header-user-avatar">
+                <img
+                  src="https://ui-avatars.com/api/?name=Mark&background=5051f9&color=fff&size=40"
+                  alt="User"
+                />
+              </div>
+              <div class="header-user-info">
+                <span class="header-user-name">Mark</span>
+                <span class="header-user-role">Administrator</span>
+              </div>
+              <i class="bi bi-chevron-down header-user-chevron"></i>
+            </div>
+
+            <div class="header-user-dropdown" id="headerUserDropdown">
+              <div class="header-dropdown-profile">
+                <div class="header-dropdown-avatar">
+                  <img
+                    src="https://ui-avatars.com/api/?name=Mark&background=e8e8e8&color=888&size=80"
+                    alt="User"
+                  />
+                </div>
+                <div class="header-dropdown-name">mark</div>
+                <div class="header-dropdown-email">mark@redsparkinfo.com</div>
+              </div>
+              <div class="header-dropdown-divider"></div>
+              <ul class="header-dropdown-menu">
+                <li>
+                  <a href="#" class="header-dropdown-item">
+                    <i class="bi bi-person"></i>
+                    <span>My Account</span>
+                  </a>
+                </li>
+                <li>
+                  <a href="#" class="header-dropdown-item">
+                    <i class="bi bi-box-arrow-right"></i>
+                    <span>Sign out</span>
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- Page Header -->
+      <div class="page-header">
+        <nav aria-label="breadcrumb">
+          <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+              <a href="index.html">Dashboard</a>
+            </li>
+            <li class="breadcrumb-item">Demo</li>
+            <li class="breadcrumb-item active" aria-current="page">
+              Demo Items
+            </li>
+          </ol>
+        </nav>
+
+        <div class="page-header-row">
+          <div class="page-header-left">
+            <h1 class="page-title">Demo Items</h1>
+            <p class="page-subtitle">
+              Sort, search, filter, and manage demo items.
+            </p>
+          </div>
+
+          <div class="page-header-right">
+            <div class="eal-header-actions">
+              <a href="Demo-item-form.html" class="eal-btn eal-btn-primary">
+                <i class="bi bi-plus-lg"></i>
+                <span>Create Demo Item</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stats Row -->
+      <div class="eal-stats-row">
+        <div class="eal-stat-card">
+          <div class="eal-stat-icon purple">
+            <i class="bi bi-list-ul"></i>
+          </div>
+          <div>
+            <div class="eal-stat-value" id="demoTotalCount">0</div>
+            <div class="eal-stat-label">Total Demo Items</div>
+          </div>
+        </div>
+
+        <div class="eal-stat-card">
+          <div class="eal-stat-icon green">
+            <i class="bi bi-check-circle"></i>
+          </div>
+          <div>
+            <div class="eal-stat-value" id="demoActiveCount">0</div>
+            <div class="eal-stat-label">Active</div>
+          </div>
+        </div>
+
+        <div class="eal-stat-card">
+          <div class="eal-stat-icon amber">
+            <i class="bi bi-hourglass-split"></i>
+          </div>
+          <div>
+            <div class="eal-stat-value" id="demoDraftCount">0</div>
+            <div class="eal-stat-label">Draft</div>
+          </div>
+        </div>
+
+        <div class="eal-stat-card">
+          <div class="eal-stat-icon red">
+            <i class="bi bi-archive"></i>
+          </div>
+          <div>
+            <div class="eal-stat-value" id="demoArchivedCount">0</div>
+            <div class="eal-stat-label">Inactive / Archived</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Table Card -->
+      <div class="eal-table-card">
+        <div class="eal-toolbar">
+          <div class="eal-toolbar-left">
+            <div class="eal-search">
+              <i class="bi bi-search"></i>
+              <input
+                id="demoTableSearch"
+                type="text"
+                placeholder="Search demo items by ID, name, or description..."
+              />
+            </div>
+          </div>
+
+          <div class="eal-toolbar-right">
+            <select class="eal-filter-select" id="demoStatusFilter">
+              <option value="All" selected>Status: All</option>
+            </select>
+
+            <select class="eal-filter-select" id="demoCategoryFilter">
+              <option value="All" selected>Category: All</option>
+            </select>
+
+            <input
+              class="eal-filter-date"
+              id="demoFromDate"
+              type="date"
+              placeholder="From date"
+            />
+            <input
+              class="eal-filter-date"
+              id="demoToDate"
+              type="date"
+              placeholder="To date"
+            />
+
+            <select class="eal-filter-select" id="demoPageSize">
+              <option value="10" selected>Rows: 10</option>
+              <option value="20">Rows: 20</option>
+              <option value="50">Rows: 50</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Table -->
+        <div class="eal-table-wrap">
+          <table class="eal-table" id="demoItemsTable">
+            <thead>
+              <tr>
+                <th class="eal-col-check">
+                  <input type="checkbox" class="eal-custom-check" />
+                </th>
+                <th data-sort-key="id" data-sort-type="string">
+                  Demo ID
+                  <span class="sort-indicator">
+                    <i class="bi bi-caret-up-fill"></i>
+                    <i class="bi bi-caret-down-fill"></i>
+                  </span>
+                </th>
+                <th data-sort-key="name" data-sort-type="string">
+                  Name
+                  <span class="sort-indicator">
+                    <i class="bi bi-caret-up-fill"></i>
+                    <i class="bi bi-caret-down-fill"></i>
+                  </span>
+                </th>
+                <th data-sort-key="category" data-sort-type="string">
+                  Category
+                  <span class="sort-indicator">
+                    <i class="bi bi-caret-up-fill"></i>
+                    <i class="bi bi-caret-down-fill"></i>
+                  </span>
+                </th>
+                <th data-sort-key="status" data-sort-type="string">
+                  Status
+                  <span class="sort-indicator">
+                    <i class="bi bi-caret-up-fill"></i>
+                    <i class="bi bi-caret-down-fill"></i>
+                  </span>
+                </th>
+                <th data-sort-key="priority" data-sort-type="number">
+                  Priority
+                  <span class="sort-indicator">
+                    <i class="bi bi-caret-up-fill"></i>
+                    <i class="bi bi-caret-down-fill"></i>
+                  </span>
+                </th>
+                <th data-sort-key="createdAt" data-sort-type="date">
+                  Created At
+                  <span class="sort-indicator">
+                    <i class="bi bi-caret-up-fill"></i>
+                    <i class="bi bi-caret-down-fill"></i>
+                  </span>
+                </th>
+                <th>ACTIONS</th>
+              </tr>
+            </thead>
+            <tbody id="demoItemsTbody"></tbody>
+          </table>
+        </div>
+
+        <!-- Pagination -->
+        <div class="eal-pagination">
+          <div class="eal-pagination-info" id="demoPaginationInfo">
+            Showing <strong>0&ndash;0</strong> of <strong>0</strong> demo items
+          </div>
+          <div class="eal-pagination-controls" id="demoPaginationControls">
+            <!-- JS renders buttons -->
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Core Scripts -->
+    <script src="Javascript/main.js"></script>
+    <script src="Javascript/demo-items.js"></script>
+
+    <!-- Demo Items Listing Scripts -->
+    <script>
+      (function () {
+        var tbody = document.getElementById("demoItemsTbody");
+        var searchInput = document.getElementById("demoTableSearch");
+        var statusFilter = document.getElementById("demoStatusFilter");
+        var categoryFilter = document.getElementById("demoCategoryFilter");
+        var fromDateInput = document.getElementById("demoFromDate");
+        var toDateInput = document.getElementById("demoToDate");
+        var pageSizeSelect = document.getElementById("demoPageSize");
+        var paginationInfo = document.getElementById("demoPaginationInfo");
+        var paginationControls = document.getElementById(
+          "demoPaginationControls"
+        );
+
+        if (!tbody) return;
+
+        var state = {
+          search: "",
+          status: "All",
+          category: "All",
+          fromDate: "",
+          toDate: "",
+          sortKey: "createdAt",
+          sortType: "date",
+          sortDir: "desc", // asc | desc
+          page: 1,
+          pageSize: parseInt(pageSizeSelect.value || "10", 10),
+          viewItems: [],
+        };
+
+        function badgeClassForStatus(status) {
+          switch (status) {
+            case "Active":
+              return "active";
+            case "Draft":
+              return "pending";
+            case "Inactive":
+              return "inactive";
+            case "Archived":
+              return "expired";
+            default:
+              return "warning";
+          }
+        }
+
+        function formatDate(isoDate) {
+          if (!isoDate) return "—";
+          // ISO date "YYYY-MM-DD"
+          var d = new Date(isoDate);
+          if (isNaN(d.getTime())) return isoDate;
+          // Keep it compact and stable
+          return d.toLocaleDateString("en-GB", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+          });
+        }
+
+        function isDateWithinRange(isoDate, fromIso, toIso) {
+          if (!isoDate) return false;
+          var t = Date.parse(isoDate);
+          if (isNaN(t)) return false;
+          if (fromIso) {
+            var fromT = Date.parse(fromIso);
+            if (!isNaN(fromT) && t < fromT) return false;
+          }
+          if (toIso) {
+            var toT = Date.parse(toIso);
+            if (!isNaN(toT) && t > toT) return false;
+          }
+          return true;
+        }
+
+        function normalizeText(s) {
+          return (s || "").toString().toLowerCase();
+        }
+
+        function renderStats(allItems) {
+          var total = allItems.length;
+          var active = allItems.filter(function (it) {
+            return it.status === "Active";
+          }).length;
+          var draft = allItems.filter(function (it) {
+            return it.status === "Draft";
+          }).length;
+          var archived = allItems.filter(function (it) {
+            return it.status === "Inactive" || it.status === "Archived";
+          }).length;
+
+          var elTotal = document.getElementById("demoTotalCount");
+          var elActive = document.getElementById("demoActiveCount");
+          var elDraft = document.getElementById("demoDraftCount");
+          var elArchived = document.getElementById("demoArchivedCount");
+
+          if (elTotal) elTotal.textContent = total;
+          if (elActive) elActive.textContent = active;
+          if (elDraft) elDraft.textContent = draft;
+          if (elArchived) elArchived.textContent = archived;
+        }
+
+        function compare(a, b, sortKey, sortType, sortDir) {
+          var mult = sortDir === "asc" ? 1 : -1;
+          var av = a[sortKey];
+          var bv = b[sortKey];
+
+          if (sortType === "number") {
+            av = Number(av || 0);
+            bv = Number(bv || 0);
+            return (av - bv) * mult;
+          }
+
+          if (sortType === "date") {
+            var at = Date.parse(av);
+            var bt = Date.parse(bv);
+            if (isNaN(at)) at = 0;
+            if (isNaN(bt)) bt = 0;
+            return (at - bt) * mult;
+          }
+
+          // string
+          return (normalizeText(av)).localeCompare(normalizeText(bv), undefined, {
+            numeric: true,
+            sensitivity: "base",
+          }) * mult;
+        }
+
+        function computeFilteredSortedItems(allItems) {
+          var q = normalizeText(state.search);
+
+          var filtered = allItems.filter(function (it) {
+            if (state.status !== "All" && it.status !== state.status)
+              return false;
+            if (state.category !== "All" && it.category !== state.category)
+              return false;
+
+            if (q) {
+              var haystack =
+                normalizeText(it.id) +
+                " " +
+                normalizeText(it.name) +
+                " " +
+                normalizeText(it.description);
+              if (haystack.indexOf(q) === -1) return false;
+            }
+
+            if (state.fromDate || state.toDate) {
+              if (
+                !isDateWithinRange(
+                  it.createdAt,
+                  state.fromDate,
+                  state.toDate
+                )
+              )
+                return false;
+            }
+
+            return true;
+          });
+
+          filtered.sort(function (a, b) {
+            return compare(
+              a,
+              b,
+              state.sortKey,
+              state.sortType,
+              state.sortDir
+            );
+          });
+
+          return filtered;
+        }
+
+        function setActiveSortIndicators() {
+          var ths = document.querySelectorAll("#demoItemsTable thead th");
+          ths.forEach(function (th) {
+            var key = th.getAttribute("data-sort-key");
+            if (!key) return;
+            var indicator = th.querySelector(".sort-indicator");
+            if (!indicator) return;
+            var up = indicator.querySelectorAll("i")[0];
+            var down = indicator.querySelectorAll("i")[1];
+            if (!up || !down) return;
+
+            var isActive = key === state.sortKey;
+            indicator.style.opacity = isActive ? "1" : "";
+
+            if (!isActive) {
+              up.style.opacity = "";
+              down.style.opacity = "";
+              return;
+            }
+
+            if (state.sortDir === "asc") {
+              up.style.opacity = "1";
+              down.style.opacity = "0.25";
+            } else {
+              up.style.opacity = "0.25";
+              down.style.opacity = "1";
+            }
+          });
+        }
+
+        function createBadge(status) {
+          var span = document.createElement("span");
+          span.className = "status-badge " + badgeClassForStatus(status);
+          span.textContent = status;
+          return span;
+        }
+
+        function renderTablePage(itemsPage) {
+          tbody.innerHTML = "";
+
+          itemsPage.forEach(function (it) {
+            var tr = document.createElement("tr");
+            tr.dataset.demoId = it.id;
+            tr.style.cursor = "pointer";
+
+            var tdCheck = document.createElement("td");
+            tdCheck.className = "eal-col-check";
+            var input = document.createElement("input");
+            input.type = "checkbox";
+            input.className = "eal-custom-check";
+            tdCheck.appendChild(input);
+            tr.appendChild(tdCheck);
+
+            var tdId = document.createElement("td");
+            var idPill = document.createElement("span");
+            idPill.className = "eal-entity-id";
+            idPill.textContent = it.id;
+            tdId.appendChild(idPill);
+            tr.appendChild(tdId);
+
+            var tdName = document.createElement("td");
+            var nameCell = document.createElement("div");
+            nameCell.className = "eal-name-cell";
+            var nameText = document.createElement("span");
+            nameText.className = "eal-name-text";
+            nameText.textContent = it.name;
+            nameCell.appendChild(nameText);
+            tdName.appendChild(nameCell);
+            tr.appendChild(tdName);
+
+            var tdCategory = document.createElement("td");
+            tdCategory.textContent = it.category;
+            tr.appendChild(tdCategory);
+
+            var tdStatus = document.createElement("td");
+            tdStatus.appendChild(createBadge(it.status));
+            tr.appendChild(tdStatus);
+
+            var tdPriority = document.createElement("td");
+            tdPriority.textContent = it.priority;
+            tr.appendChild(tdPriority);
+
+            var tdCreatedAt = document.createElement("td");
+            tdCreatedAt.textContent = formatDate(it.createdAt);
+            tr.appendChild(tdCreatedAt);
+
+            var tdActions = document.createElement("td");
+            var actions = document.createElement("div");
+            actions.className = "eal-actions-cell";
+
+            var btnView = document.createElement("a");
+            btnView.className = "eal-row-btn";
+            btnView.title = "View";
+            btnView.href =
+              "Demo-item-detail.html?id=" + encodeURIComponent(it.id);
+            btnView.innerHTML = '<i class="bi bi-eye"></i>';
+
+            var btnEdit = document.createElement("a");
+            btnEdit.className = "eal-row-btn";
+            btnEdit.title = "Edit";
+            btnEdit.href = "Demo-item-form.html?id=" + encodeURIComponent(it.id);
+            btnEdit.innerHTML = '<i class="bi bi-pencil"></i>';
+
+            var btnDelete = document.createElement("button");
+            btnDelete.className = "eal-row-btn danger";
+            btnDelete.type = "button";
+            btnDelete.title = "Delete";
+            btnDelete.innerHTML = '<i class="bi bi-trash3"></i>';
+            btnDelete.addEventListener("click", function (e) {
+              e.stopPropagation();
+              deleteAndRerender(it.id);
+            });
+
+            actions.appendChild(btnView);
+            actions.appendChild(btnEdit);
+            actions.appendChild(btnDelete);
+
+            tdActions.appendChild(actions);
+            tr.appendChild(tdActions);
+
+            tr.addEventListener("click", function () {
+              window.location.href =
+                "Demo-item-detail.html?id=" + encodeURIComponent(it.id);
+            });
+
+            tbody.appendChild(tr);
+          });
+        }
+
+        function renderPagination(filteredSorted) {
+          var total = filteredSorted.length;
+          var pageCount = Math.max(1, Math.ceil(total / state.pageSize));
+
+          if (state.page > pageCount) state.page = pageCount;
+          if (state.page < 1) state.page = 1;
+
+          var start = total === 0 ? 0 : (state.page - 1) * state.pageSize + 1;
+          var end = total === 0 ? 0 : Math.min(total, state.page * state.pageSize);
+          paginationInfo.innerHTML =
+            "Showing <strong>" +
+            start +
+            "&ndash;" +
+            end +
+            "</strong> of <strong>" +
+            total +
+            "</strong> demo items";
+
+          paginationControls.innerHTML = "";
+
+          var prevBtn = document.createElement("button");
+          prevBtn.className = "eal-page-btn";
+          if (state.page === 1) prevBtn.disabled = true;
+          prevBtn.title = "Previous";
+          prevBtn.innerHTML = '<i class="bi bi-chevron-left"></i>';
+          prevBtn.addEventListener("click", function () {
+            if (state.page <= 1) return;
+            state.page -= 1;
+            rerender();
+          });
+
+          var nextBtn = document.createElement("button");
+          nextBtn.className = "eal-page-btn";
+          if (state.page === pageCount) nextBtn.disabled = true;
+          nextBtn.title = "Next";
+          nextBtn.innerHTML = '<i class="bi bi-chevron-right"></i>';
+          nextBtn.addEventListener("click", function () {
+            if (state.page >= pageCount) return;
+            state.page += 1;
+            rerender();
+          });
+
+          paginationControls.appendChild(prevBtn);
+
+          // Page numbers (compact window)
+          var windowSize = 5;
+          var startPage = Math.max(1, state.page - 2);
+          var endPage = Math.min(pageCount, startPage + windowSize - 1);
+          // If we are close to the end, shift window left
+          startPage = Math.max(1, endPage - windowSize + 1);
+
+          for (var p = startPage; p <= endPage; p++) {
+            (function (pageNum) {
+              var btn = document.createElement("button");
+              btn.type = "button";
+              btn.className = "eal-page-btn" + (pageNum === state.page ? " active" : "");
+              btn.textContent = String(pageNum);
+              btn.addEventListener("click", function () {
+                state.page = pageNum;
+                rerender();
+              });
+              paginationControls.appendChild(btn);
+            })(p);
+          }
+
+          paginationControls.appendChild(nextBtn);
+        }
+
+        function rerender() {
+          var allItems = globalThis.demoItems.loadItems();
+          renderStats(allItems);
+
+          var filteredSorted = computeFilteredSortedItems(allItems);
+          state.viewItems = filteredSorted;
+
+          setActiveSortIndicators();
+          renderPagination(filteredSorted);
+
+          var startIdx = (state.page - 1) * state.pageSize;
+          var pageItems = filteredSorted.slice(startIdx, startIdx + state.pageSize);
+          renderTablePage(pageItems);
+        }
+
+        function deleteAndRerender(id) {
+          var item = globalThis.demoItems.getItemById(id);
+          if (!item) return;
+          var ok = window.confirm(
+            "Delete " + id + "?\n\nThis only affects the browser demo data."
+          );
+          if (!ok) return;
+
+          globalThis.demoItems.deleteItem(id);
+          if (typeof showAlert === "function") {
+            showAlert("Deleted " + id + " successfully!", "success");
+          }
+          rerender();
+        }
+
+        function handleSortHeaderClick() {
+          var table = document.getElementById("demoItemsTable");
+          if (!table) return;
+
+          table.addEventListener("click", function (e) {
+            var th = e.target.closest("th[data-sort-key]");
+            if (!th) return;
+
+            var key = th.getAttribute("data-sort-key");
+            var type = th.getAttribute("data-sort-type");
+            if (!key || !type) return;
+
+            if (state.sortKey === key) {
+              state.sortDir = state.sortDir === "asc" ? "desc" : "asc";
+            } else {
+              state.sortKey = key;
+              state.sortType = type;
+              // Defaults: newest/datas high values first
+              state.sortDir = type === "string" ? "asc" : "desc";
+            }
+            state.page = 1;
+            rerender();
+          });
+        }
+
+        function wireEvents() {
+          // Seed filters
+          var statuses = globalThis.demoItems.getStatusOptions();
+          statuses.forEach(function (s) {
+            var opt = document.createElement("option");
+            opt.value = s;
+            opt.textContent = "Status: " + s;
+            statusFilter.appendChild(opt);
+          });
+
+          var categories = globalThis.demoItems.getAllCategories();
+          categories.forEach(function (c) {
+            var opt = document.createElement("option");
+            opt.value = c;
+            opt.textContent = "Category: " + c;
+            categoryFilter.appendChild(opt);
+          });
+
+          searchInput.addEventListener("input", function () {
+            state.search = this.value || "";
+            state.page = 1;
+            rerender();
+          });
+
+          statusFilter.addEventListener("change", function () {
+            state.status = this.value || "All";
+            state.page = 1;
+            rerender();
+          });
+
+          categoryFilter.addEventListener("change", function () {
+            state.category = this.value || "All";
+            state.page = 1;
+            rerender();
+          });
+
+          fromDateInput.addEventListener("change", function () {
+            state.fromDate = this.value || "";
+            state.page = 1;
+            rerender();
+          });
+
+          toDateInput.addEventListener("change", function () {
+            state.toDate = this.value || "";
+            state.page = 1;
+            rerender();
+          });
+
+          pageSizeSelect.addEventListener("change", function () {
+            state.pageSize = parseInt(this.value || "10", 10);
+            state.page = 1;
+            rerender();
+          });
+
+        }
+
+        // Init
+        wireEvents();
+        handleSortHeaderClick();
+
+        // Optional: align the date inputs with stable defaults
+        state.fromDate = fromDateInput.value || "";
+        state.toDate = toDateInput.value || "";
+
+        rerender();
+      })();
+    </script>
+  </body>
+</html>
+

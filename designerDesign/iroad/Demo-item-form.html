@@ -1,0 +1,700 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Demo Item Form | iRoad Admin</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Bootstrap 5 CSS -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+
+    <!-- Bootstrap Icons -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css"
+      rel="stylesheet"
+    />
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="Style/style.css" />
+    <link rel="stylesheet" href="Style/responsive.css" />
+  </head>
+
+  <body>
+    <!-- Mobile Menu Toggle -->
+    <button class="mobile-menu-toggle" aria-label="Toggle menu">
+      <i class="bi bi-list"></i>
+    </button>
+
+    <!-- Sidebar Overlay -->
+    <div class="sidebar-overlay"></div>
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="appSidebar">
+      <div class="sidebar-header">
+        <a href="index.html" class="sidebar-logo">
+          <span class="logo-icon">i</span>
+          <span class="logo-label">Road</span>
+        </a>
+      </div>
+
+      <nav class="sidebar-nav">
+        <ul class="nav-menu">
+          <li class="nav-item">
+            <a
+              href="index.html"
+              class="nav-link"
+              data-tooltip="Dashboard"
+            >
+              <i class="bi bi-speedometer2"></i>
+              <span class="nav-text">Dashboard</span>
+            </a>
+          </li>
+
+          <li class="nav-section-title">
+            <span>Demo</span>
+          </li>
+
+          <li class="nav-item has-submenu">
+            <a href="#" class="nav-link" data-tooltip="Demo Management">
+              <i class="bi bi-flask"></i>
+              <span class="nav-text">Demo Management</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Demo-items-list.html" class="submenu-link">
+                  <i class="bi bi-list-ul"></i>
+                  <span>Demo Items</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a
+                  href="Demo-item-form.html"
+                  class="submenu-link active"
+                >
+                  <i class="bi bi-plus-lg"></i>
+                  <span>Create Demo Item</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <li class="nav-section-title">
+            <span>Administration</span>
+          </li>
+
+          <li class="nav-item">
+            <a
+              href="Users-administration.html"
+              class="nav-link"
+              data-tooltip="Users Administration"
+            >
+              <i class="bi bi-people"></i>
+              <span class="nav-text">Users</span>
+            </a>
+          </li>
+        </ul>
+      </nav>
+    </aside>
+
+    <!-- Notification Panel -->
+    <div class="notification-panel" id="notificationPanel">
+      <div class="notification-header">
+        <h3 class="notification-title">Notifications</h3>
+        <button
+          class="notification-close"
+          id="notificationClose"
+          aria-label="Close"
+        >
+          <i class="bi bi-x-lg"></i>
+        </button>
+      </div>
+
+      <div class="notification-content">
+        <div class="notification-settings">
+          <button
+            class="settings-btn"
+            id="notificationSettingsBtn"
+            aria-label="Settings"
+          >
+            <i class="bi bi-gear"></i>
+          </button>
+        </div>
+
+        <div class="preferences-popup" id="preferencesPopup">
+          <h4 class="preferences-title">Preferences</h4>
+
+          <div class="ce-item">
+            <div class="preference-label">
+              <span>Allow Notifications</span>
+              <i
+                class="bi bi-info-circle"
+                title="Enable or disable all notifications"
+              ></i>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="allowNotifications" checked />
+              <span class="toggle-slider">
+                <span class="toggle-text-on">Enable</span>
+                <span class="toggle-text-off">Disable</span>
+              </span>
+            </label>
+          </div>
+
+          <div class="preference-item">
+            <label class="preference-checkbox">
+              <input type="checkbox" checked />
+              <span class="checkmark"></span>
+              <span>Record Comments</span>
+            </label>
+          </div>
+
+          <div class="preference-item">
+            <label class="preference-checkbox">
+              <input type="checkbox" checked />
+              <span class="checkmark"></span>
+              <span>Blueprint Transitions</span>
+            </label>
+          </div>
+
+          <button
+            class="btn btn-primary preferences-done"
+            id="preferencesDone"
+          >
+            Done
+          </button>
+        </div>
+
+        <div class="notification-empty">
+          <div class="empty-icon">
+            <i class="bi bi-bell"></i>
+            <span class="sparkle sparkle-1">&#10022;</span>
+            <span class="sparkle sparkle-2">&#10023;</span>
+            <span class="sparkle sparkle-3">&#176;</span>
+          </div>
+          <h4 class="empty-title">No notifications</h4>
+          <p class="empty-text">You are yet to receive notifications</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="notification-overlay" id="notificationOverlay"></div>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- Top Header -->
+      <header class="top-header">
+        <div class="header-left">
+          <button
+            class="header-toggle-btn"
+            id="sidebarCollapseBtn"
+            title="Toggle Sidebar"
+          >
+            <i class="bi bi-list"></i>
+          </button>
+
+          <div class="header-search">
+            <i class="bi bi-search"></i>
+            <input
+              type="text"
+              placeholder="Search shipments, clients, addresses..."
+            />
+          </div>
+        </div>
+
+        <div class="header-datetime">
+          <span class="header-date" id="headerDate"></span>
+          <span class="header-time" id="headerTime"></span>
+        </div>
+
+        <div class="header-right">
+          <button class="header-icon-btn" title="Switch Language">
+            <i class="bi bi-translate"></i>
+          </button>
+
+          <button class="header-icon-btn" title="Notifications">
+            <i class="bi bi-bell"></i>
+            <span class="badge">3</span>
+          </button>
+
+          <div class="header-divider"></div>
+
+          <div class="header-user-wrapper">
+            <div class="header-user" id="headerUserToggle">
+              <div class="header-user-avatar">
+                <img
+                  src="https://ui-avatars.com/api/?name=Mark&background=5051f9&color=fff&size=40"
+                  alt="User"
+                />
+              </div>
+              <div class="header-user-info">
+                <span class="header-user-name">Mark</span>
+                <span class="header-user-role">Administrator</span>
+              </div>
+              <i class="bi bi-chevron-down header-user-chevron"></i>
+            </div>
+
+            <div class="header-user-dropdown" id="headerUserDropdown">
+              <div class="header-dropdown-profile">
+                <div class="header-dropdown-avatar">
+                  <img
+                    src="https://ui-avatars.com/api/?name=Mark&background=e8e8e8&color=888&size=80"
+                    alt="User"
+                  />
+                </div>
+                <div class="header-dropdown-name">mark</div>
+                <div class="header-dropdown-email">mark@redsparkinfo.com</div>
+              </div>
+              <div class="header-dropdown-divider"></div>
+              <ul class="header-dropdown-menu">
+                <li>
+                  <a href="#" class="header-dropdown-item">
+                    <i class="bi bi-person"></i>
+                    <span>My Account</span>
+                  </a>
+                </li>
+                <li>
+                  <a href="#" class="header-dropdown-item">
+                    <i class="bi bi-box-arrow-right"></i>
+                    <span>Sign out</span>
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- Page Header -->
+      <div class="page-header">
+        <nav aria-label="breadcrumb">
+          <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+              <a href="index.html">Dashboard</a>
+            </li>
+            <li class="breadcrumb-item">Demo</li>
+            <li class="breadcrumb-item active" aria-current="page">
+              Demo Item
+            </li>
+          </ol>
+        </nav>
+
+        <div class="page-header-row">
+          <div class="page-header-left">
+            <h1 class="page-title" id="demoFormTitle">Create Demo Item</h1>
+            <p class="page-subtitle" id="demoFormSubtitle">
+              Create or update demo data for listing and filtering.
+            </p>
+          </div>
+          <div class="page-header-right">
+            <div class="eal-header-actions">
+              <a href="Demo-items-list.html" class="eal-btn eal-btn-outline">
+                <i class="bi bi-arrow-left"></i>
+                <span>Back to list</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <form id="demoItemForm" class="demo-form" autocomplete="off">
+        <div class="form-card">
+          <div class="form-card-header">
+            <div class="form-card-icon blue">
+              <i class="bi bi-flask"></i>
+            </div>
+            <div class="form-card-header-text">
+              <h3 class="form-card-title">Demo Item Details</h3>
+              <p class="form-card-desc">
+                Fields required: ID, Name, Category, Status, Priority, Description.
+              </p>
+            </div>
+          </div>
+
+          <div class="form-card-body">
+            <div class="field-group">
+              <div class="row g-3">
+                <div class="col-12 col-md-4">
+                  <label class="form-label" for="demoId">Demo ID</label>
+                  <input
+                    id="demoId"
+                    name="demoId"
+                    class="form-control"
+                    type="text"
+                    readonly
+                  />
+                </div>
+
+                <div class="col-12 col-md-4">
+                  <label class="form-label" for="demoPriority">
+                    Priority
+                  </label>
+                  <input
+                    id="demoPriority"
+                    name="demoPriority"
+                    class="form-control"
+                    type="number"
+                    min="1"
+                    required
+                  />
+                </div>
+
+                <div class="col-12 col-md-4">
+                  <label class="form-label" for="demoStatus">
+                    Status
+                  </label>
+                  <select
+                    id="demoStatus"
+                    name="demoStatus"
+                    class="form-select"
+                    required
+                  ></select>
+                </div>
+              </div>
+            </div>
+
+            <div class="field-group">
+              <div class="row g-3">
+                <div class="col-12 col-md-6">
+                  <label class="form-label" for="demoName">Name</label>
+                  <input
+                    id="demoName"
+                    name="demoName"
+                    class="form-control"
+                    type="text"
+                    required
+                    maxlength="120"
+                  />
+                </div>
+
+                <div class="col-12 col-md-6">
+                  <label class="form-label" for="demoCategory">
+                    Category
+                  </label>
+                  <select
+                    id="demoCategory"
+                    name="demoCategory"
+                    class="form-select"
+                    required
+                  ></select>
+                </div>
+              </div>
+            </div>
+
+            <div class="field-group">
+              <div class="row g-3">
+                <div class="col-12">
+                  <label class="form-label" for="demoDescription">
+                    Description
+                  </label>
+                  <textarea
+                    id="demoDescription"
+                    name="demoDescription"
+                    class="form-control"
+                    rows="5"
+                    required
+                    minlength="10"
+                    maxlength="800"
+                  ></textarea>
+                </div>
+              </div>
+            </div>
+
+            <div class="field-group">
+              <div class="row g-3">
+                <div class="col-12 col-md-6">
+                  <label class="form-label" for="demoCreatedAt">
+                    Created At (read-only)
+                  </label>
+                  <input
+                    id="demoCreatedAt"
+                    class="form-control"
+                    type="text"
+                    readonly
+                  />
+                </div>
+                <div class="col-12 col-md-6">
+                  <label class="form-label" for="demoUpdatedAt">
+                    Updated At (read-only)
+                  </label>
+                  <input
+                    id="demoUpdatedAt"
+                    class="form-control"
+                    type="text"
+                    readonly
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div class="d-flex flex-wrap gap-2 mt-3">
+              <button type="submit" class="eal-btn eal-btn-primary">
+                <i class="bi bi-save"></i>
+                <span>Save Demo Item</span>
+              </button>
+              <button
+                type="button"
+                id="demoFormResetBtn"
+                class="eal-btn eal-btn-outline"
+              >
+                <i class="bi bi-x-lg"></i>
+                <span>Reset</span>
+              </button>
+              <button
+                type="button"
+                id="demoFormDeleteBtn"
+                class="eal-btn eal-btn-outline"
+                style="display: none"
+              >
+                <i class="bi bi-trash3"></i>
+                <span>Delete</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </form>
+    </main>
+
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Core Scripts -->
+    <script src="Javascript/main.js"></script>
+    <script src="Javascript/demo-items.js"></script>
+
+    <!-- Demo Item Form Scripts -->
+    <script>
+      (function () {
+        var form = document.getElementById("demoItemForm");
+        if (!form) return;
+
+        var params = new URLSearchParams(window.location.search);
+        var itemId = params.get("id");
+
+        var titleEl = document.getElementById("demoFormTitle");
+        var subtitleEl = document.getElementById("demoFormSubtitle");
+
+        var demoIdInput = document.getElementById("demoId");
+        var demoPriorityInput = document.getElementById("demoPriority");
+        var demoStatusSelect = document.getElementById("demoStatus");
+        var demoNameInput = document.getElementById("demoName");
+        var demoCategorySelect = document.getElementById("demoCategory");
+        var demoDescriptionInput = document.getElementById(
+          "demoDescription"
+        );
+        var demoCreatedAtInput = document.getElementById("demoCreatedAt");
+        var demoUpdatedAtInput = document.getElementById("demoUpdatedAt");
+
+        var resetBtn = document.getElementById("demoFormResetBtn");
+        var deleteBtn = document.getElementById("demoFormDeleteBtn");
+
+        function formatDate(isoDate) {
+          if (!isoDate) return "";
+          var d = new Date(isoDate);
+          if (isNaN(d.getTime())) return isoDate;
+          return d.toLocaleDateString("en-GB", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+          });
+        }
+
+        function todayIsoDate() {
+          var d = new Date();
+          // stable YYYY-MM-DD in local time
+          var yyyy = String(d.getFullYear());
+          var mm = String(d.getMonth() + 1).padStart(2, "0");
+          var dd = String(d.getDate()).padStart(2, "0");
+          return yyyy + "-" + mm + "-" + dd;
+        }
+
+        function seedSelect(selectEl, values, prefix) {
+          if (!selectEl) return;
+          selectEl.innerHTML = "";
+          values.forEach(function (v) {
+            var opt = document.createElement("option");
+            opt.value = v;
+            opt.textContent = (prefix || "") + v;
+            selectEl.appendChild(opt);
+          });
+        }
+
+        // Seed status + category options
+        if (window.demoItems) {
+          seedSelect(
+            demoStatusSelect,
+            window.demoItems.getStatusOptions(),
+            ""
+          );
+          seedSelect(
+            demoCategorySelect,
+            (function () {
+              var cats = window.demoItems.getAllCategories();
+              // Provide a stable order for the demo UX
+              return cats.length ? cats : ["Operations"];
+            })(),
+            ""
+          );
+        }
+
+        function showEditMode(item) {
+          if (titleEl) titleEl.textContent = "Edit Demo Item";
+          if (subtitleEl)
+            subtitleEl.textContent =
+              "Update fields and save changes to the browser demo store.";
+          if (item) {
+            demoIdInput.value = item.id || "";
+            demoNameInput.value = item.name || "";
+            demoCategorySelect.value = item.category || "";
+            demoStatusSelect.value = item.status || "";
+            demoPriorityInput.value =
+              item.priority != null ? String(item.priority) : "";
+            demoDescriptionInput.value = item.description || "";
+            demoCreatedAtInput.value = formatDate(item.createdAt);
+            demoUpdatedAtInput.value = formatDate(item.updatedAt);
+          }
+          if (deleteBtn) deleteBtn.style.display = "inline-flex";
+        }
+
+        function showCreateMode() {
+          if (titleEl) titleEl.textContent = "Create Demo Item";
+          if (subtitleEl)
+            subtitleEl.textContent =
+              "Add a new demo item. It will appear in the listing with sorting, search, and filters.";
+
+          var id = window.demoItems.generateNewId();
+          demoIdInput.value = id;
+
+          demoCreatedAtInput.value = formatDate(todayIsoDate());
+          demoUpdatedAtInput.value = formatDate(todayIsoDate());
+
+          // Defaults
+          if (demoStatusSelect && demoStatusSelect.options.length) {
+            demoStatusSelect.value = "Active";
+            if (!Array.prototype.some.call(demoStatusSelect.options, function (o) { return o.value === "Active"; })) {
+              demoStatusSelect.value = demoStatusSelect.options[0].value;
+            }
+          }
+          if (demoPriorityInput) demoPriorityInput.value = "1";
+          if (demoCategorySelect && demoCategorySelect.options.length) {
+            demoCategorySelect.value = demoCategorySelect.options[0].value;
+          }
+        }
+
+        // Load item if editing
+        var currentItem = null;
+        if (itemId) {
+          currentItem = window.demoItems.getItemById(itemId);
+          if (currentItem) showEditMode(currentItem);
+          else showCreateMode();
+        } else {
+          showCreateMode();
+        }
+
+        function getFormValue() {
+          var id = (demoIdInput.value || "").trim();
+          var name = (demoNameInput.value || "").trim();
+          var category = (demoCategorySelect.value || "").trim();
+          var status = (demoStatusSelect.value || "").trim();
+          var priority = demoPriorityInput.value
+            ? parseInt(demoPriorityInput.value, 10)
+            : NaN;
+          var description = (demoDescriptionInput.value || "").trim();
+
+          return { id, name, category, status, priority, description };
+        }
+
+        function validate(values) {
+          if (!values.id) return "Demo ID is required.";
+          if (!values.name) return "Name is required.";
+          if (!values.category) return "Category is required.";
+          if (!values.status) return "Status is required.";
+          if (!values.priority || Number.isNaN(values.priority))
+            return "Priority must be a number greater than or equal to 1.";
+          if (!values.description || values.description.length < 10)
+            return "Description must be at least 10 characters.";
+          return null;
+        }
+
+        function setUpdatedAtField() {
+          demoUpdatedAtInput.value = formatDate(todayIsoDate());
+        }
+
+        form.addEventListener("submit", function (e) {
+          e.preventDefault();
+
+          var values = getFormValue();
+          var err = validate(values);
+          if (err) {
+            if (typeof showAlert === "function") showAlert(err, "error");
+            return;
+          }
+
+          // Preserve createdAt when editing
+          var createdAt =
+            currentItem && currentItem.createdAt ? currentItem.createdAt : todayIsoDate();
+
+          var item = {
+            id: values.id,
+            name: values.name,
+            category: values.category,
+            status: values.status,
+            priority: values.priority,
+            description: values.description,
+            createdAt: createdAt,
+            updatedAt: todayIsoDate(),
+          };
+
+          window.demoItems.upsertItem(item);
+
+          if (typeof showAlert === "function") {
+            showAlert(
+              "Saved " + item.id + " successfully!",
+              "success"
+            );
+          }
+
+          window.location.href = "Demo-items-list.html";
+        });
+
+        if (resetBtn) {
+          resetBtn.addEventListener("click", function () {
+            if (currentItem) showEditMode(currentItem);
+            else showCreateMode();
+          });
+        }
+
+        if (deleteBtn) {
+          deleteBtn.addEventListener("click", function () {
+            if (!currentItem || !currentItem.id) return;
+            var ok = window.confirm(
+              "Delete " + currentItem.id + "?\n\nThis only affects the browser demo data."
+            );
+            if (!ok) return;
+
+            window.demoItems.deleteItem(currentItem.id);
+            if (typeof showAlert === "function") {
+              showAlert(
+                "Deleted " + currentItem.id + " successfully!",
+                "success"
+              );
+            }
+            window.location.href = "Demo-items-list.html";
+          });
+        }
+      })();
+    </script>
+  </body>
+</html>
+
