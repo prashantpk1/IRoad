@@ -13,12 +13,15 @@
   <div class="page-header-row">
     <div class="page-header-left">
       <h1 class="page-title">{% translate "Subscribers" %}</h1>
-      <p class="page-subtitle">{% translate "Manage your records here" %}</p>
+      <p class="page-subtitle">{% translate "Sort, search, filter, and manage subscriber accounts." %}</p>
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
         {% if request.user.is_root %}
-          <a href="{% url 'tenant_create' %}" class="eal-btn eal-btn-primary"><i class="bi bi-plus-lg"></i><span>{% translate "Add Tenant" %}</span></a>
+          <a href="{% url 'tenant_create' %}" class="eal-btn eal-btn-primary">
+            <i class="bi bi-plus-lg"></i>
+            <span>{% translate "Add Tenant" %}</span>
+          </a>
         {% endif %}
       </div>
     </div>
@@ -28,40 +31,42 @@
 <div class="eal-table-card">
   <form method="get" class="eal-filter-bar js-auto-submit">
     <div class="eal-toolbar">
-      <div class="eal-toolbar-left" style="width: 100%; gap: 12px; display: flex; flex-wrap: wrap; align-items: end;">
-      <div class="eal-search" style="flex: 1; min-width: 240px;">
-        <i class="bi bi-search"></i>
-        <input type="text" name="q" placeholder="{% translate 'Search company or email' %}" value="{{ search_query }}">
+      <div class="eal-toolbar-left">
+        <div class="eal-search">
+          <i class="bi bi-search"></i>
+          <input type="text" name="q" placeholder="{% translate 'Search company or email...' %}" value="{{ search_query }}">
+        </div>
       </div>
 
-      <select class="eal-select" name="account_status" onchange="this.form.submit()">
-        <option value="All" {% if status_filter == 'All' %}selected{% endif %}>{% translate "All statuses" %}</option>
-        {% for code, label in status_choices %}
-          <option value="{{ code }}" {% if status_filter == code %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-      </select>
+      <div class="eal-toolbar-right">
+        <select class="eal-filter-select" name="account_status" onchange="this.form.submit()">
+          <option value="All" {% if status_filter == 'All' %}selected{% endif %}>{% translate "Status: All" %}</option>
+          {% for code, label in status_choices %}
+            <option value="{{ code }}" {% if status_filter == code %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
 
-      <select class="eal-select" name="assigned_sales_rep" onchange="this.form.submit()">
-        <option value="">{% translate "All reps" %}</option>
-        {% for rep in sales_reps %}
-          <option value="{{ rep.pk }}" {% if rep_filter == rep.pk|stringformat:"s" %}selected{% endif %}>{{ rep.first_name }} {{ rep.last_name }}</option>
-        {% endfor %}
-      </select>
+        <select class="eal-filter-select" name="assigned_sales_rep" onchange="this.form.submit()">
+          <option value="">{% translate "Rep: All" %}</option>
+          {% for rep in sales_reps %}
+            <option value="{{ rep.pk }}" {% if rep_filter == rep.pk|stringformat:"s" %}selected{% endif %}>{{ rep.first_name }} {{ rep.last_name }}</option>
+          {% endfor %}
+        </select>
 
-      <select class="eal-select" name="current_plan" onchange="this.form.submit()">
-        <option value="">{% translate "All plans" %}</option>
-        {% for p in plans %}
-          <option value="{{ p.plan_id }}" {% if plan_filter == p.plan_id|stringformat:"s" %}selected{% endif %}>{{ p.plan_name_en }}</option>
-        {% endfor %}
-      </select>
+        <select class="eal-filter-select" name="current_plan" onchange="this.form.submit()">
+          <option value="">{% translate "Plan: All" %}</option>
+          {% for p in plans %}
+            <option value="{{ p.plan_id }}" {% if plan_filter == p.plan_id|stringformat:"s" %}selected{% endif %}>{{ p.plan_name_en }}</option>
+          {% endfor %}
+        </select>
 
-      {% if search_query or status_filter != 'All' or rep_filter or plan_filter %}
-      <a href="{% url 'tenant_list' %}" class="eal-btn eal-btn-outline" style="border-style: dashed; color: var(--text-muted);">
-        <i class="bi bi-x-circle"></i>
-        <span>{% translate "Clear" %}</span>
-      </a>
-      {% endif %}
-    </div>
+        {% if search_query or status_filter != 'All' or rep_filter or plan_filter %}
+        <a href="{% url 'tenant_list' %}" class="eal-btn eal-btn-outline" style="border-style: dashed; color: var(--text-muted);">
+          <i class="bi bi-x-circle"></i>
+          <span>{% translate "Clear" %}</span>
+        </a>
+        {% endif %}
+      </div>
     </div>
   </form>
 

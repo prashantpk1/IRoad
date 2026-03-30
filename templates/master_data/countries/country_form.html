@@ -3,8 +3,8 @@
 
 {% block page_title %}{% if is_edit %}{% translate "Edit Country" %}{% else %}{% translate "Add Country" %}{% endif %}{% endblock %}
 
-
 {% block breadcrumb_items %}
+<li class="breadcrumb-item"><a href="{% url 'country_list' %}">{% translate "Countries" %}</a></li>
 <li class="breadcrumb-item active" aria-current="page">{% if is_edit %}{% translate "Edit Country" %}{% else %}{% translate "Add Country" %}{% endif %}</li>
 {% endblock %}
 
@@ -13,119 +13,120 @@
   <div class="page-header-row">
     <div class="page-header-left">
       <h1 class="page-title">{% if is_edit %}{% translate "Edit Country" %}{% else %}{% translate "Add Country" %}{% endif %}</h1>
-      <p class="page-subtitle">{% translate "Manage your records here" %}</p>
+      <p class="page-subtitle">{% if is_edit %}{% translate "Update country identity and status details." %}{% else %}{% translate "Register a new country in the system." %}{% endif %}</p>
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
         <a href="{% url 'country_list' %}" class="eal-btn eal-btn-outline">
           <i class="bi bi-arrow-left"></i>
-          <span>{% translate "Back" %}</span>
+          <span>{% translate "Back to list" %}</span>
         </a>
       </div>
     </div>
   </div>
 </div>
 
-  {% if form.instance.pk and form.instance.updated_at %}
-  <div class="edit-info-bar">
-    <i class="bi bi-clock-history"></i>
-    {% translate "Last updated" %}
-    {% if form.instance.updated_by %}
-      {% translate "by" %} <strong>{{ form.instance.updated_by.first_name }} {{ form.instance.updated_by.last_name }}</strong>
-    {% endif %}
-    {% translate "at" %} <strong>{{ form.instance.updated_at|date:"d M Y, H:i" }}</strong>
+{% if form.instance.pk and form.instance.updated_at %}
+<div class="edit-info-bar">
+  <i class="bi bi-clock-history"></i>
+  {% translate "Last updated" %}
+  {% if form.instance.updated_by %}
+    {% translate "by" %} <strong>{{ form.instance.updated_by.first_name }} {{ form.instance.updated_by.last_name }}</strong>
+  {% endif %}
+  {% translate "at" %} <strong>{{ form.instance.updated_at|date:"d M Y, H:i" }}</strong>
+</div>
+{% endif %}
+
+{% if is_edit %}
+  <div class="alert alert-info" style="margin-bottom: 16px; border-radius: var(--radius-md);">
+    <i class="bi bi-info-circle me-1"></i> {% translate "Country Code is locked and cannot be changed." %}
   </div>
-  {% endif %}
+{% endif %}
 
-  {% if is_edit %}
-    <div class="alert alert-info" style="margin-bottom: 16px; border-radius: var(--radius-md);">
-      {% translate "Country Code is locked and cannot be changed." %}
+{% if messages %}
+  <div class="mb-3">
+    {% for message in messages %}
+      <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags|default:'info' }}{% endif %} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    {% endfor %}
+  </div>
+{% endif %}
+
+<form method="post" action="" autocomplete="off">
+  {% csrf_token %}
+
+  {% if form.non_field_errors %}
+    <div class="alert alert-danger mb-3" role="alert">
+      {{ form.non_field_errors }}
     </div>
   {% endif %}
 
-  {% if messages %}
-    <div class="mb-3">
-      {% for message in messages %}
-        <p class="mb-1 fw-semibold {% if message.tags == 'error' %}text-danger{% else %}text-success{% endif %}">
-          {{ message }}
-        </p>
-      {% endfor %}
+  <div class="form-card">
+    <div class="form-card-header">
+      <div class="form-card-icon blue">
+        <i class="bi bi-globe"></i>
+      </div>
+      <div class="form-card-header-text">
+        <h3 class="form-card-title">{% translate "Country Information" %}</h3>
+        <p class="form-card-desc">{% translate "Provide country identity and status details." %}</p>
+      </div>
     </div>
-  {% endif %}
-
-  <form method="post" action="">
-    {% csrf_token %}
-
-    {% if form.non_field_errors %}
-      <div class="alert alert-danger mb-3" role="alert">
-        {{ form.non_field_errors }}
-      </div>
-    {% endif %}
-
-    <div class="form-card">
-      <div class="form-card-header">
-        <div class="form-card-icon blue">
-          <i class="bi bi-globe"></i>
-        </div>
-        <div class="form-card-header-text">
-          <h2 class="form-card-title">{% translate "Country Information" %}</h2>
-          <p class="form-card-desc">{% translate "Provide country identity and status details." %}</p>
-        </div>
-      </div>
-      <div class="form-card-body">
-        <div class="field-group">
-          <div class="fields-grid cols-2">
-            <div class="field">
-              <label class="form-label" for="{{ form.country_code.id_for_label }}">{{ form.country_code.label }}</label>
-              {{ form.country_code }}
-              {% if form.country_code.help_text %}
-                <span class="field-hint">{{ form.country_code.help_text }}</span>
-              {% endif %}
-              {% for error in form.country_code.errors %}
-                <div class="text-danger small mt-1">{{ error }}</div>
-              {% endfor %}
+    <div class="form-card-body">
+      <div class="field-group">
+        <div class="row g-3">
+          <div class="col-12 col-md-6">
+            <label class="form-label" for="{{ form.country_code.id_for_label }}">{{ form.country_code.label }}</label>
+            {{ form.country_code }}
+            {% if form.country_code.help_text %}
+              <span class="field-hint">{{ form.country_code.help_text }}</span>
+            {% endif %}
+            {% for error in form.country_code.errors %}
+              <div class="field-error">{{ error }}</div>
+            {% endfor %}
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label" for="{{ form.name_en.id_for_label }}">{{ form.name_en.label }}</label>
+            {{ form.name_en }}
+            {% for error in form.name_en.errors %}
+              <div class="field-error">{{ error }}</div>
+            {% endfor %}
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label" for="{{ form.name_ar.id_for_label }}">{{ form.name_ar.label }}</label>
+            {{ form.name_ar }}
+            {% for error in form.name_ar.errors %}
+              <div class="field-error">{{ error }}</div>
+            {% endfor %}
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label" for="{{ form.is_active.id_for_label }}">{{ form.is_active.label }}</label>
+            <div class="form-check">
+              {{ form.is_active }}
             </div>
-            <div class="field">
-              <label class="form-label" for="{{ form.name_en.id_for_label }}">{{ form.name_en.label }}</label>
-              {{ form.name_en }}
-              {% for error in form.name_en.errors %}
-                <div class="text-danger small mt-1">{{ error }}</div>
-              {% endfor %}
-            </div>
-            <div class="field">
-              <label class="form-label" for="{{ form.name_ar.id_for_label }}">{{ form.name_ar.label }}</label>
-              {{ form.name_ar }}
-              {% for error in form.name_ar.errors %}
-                <div class="text-danger small mt-1">{{ error }}</div>
-              {% endfor %}
-            </div>
-            <div class="field">
-              <label class="form-label" for="{{ form.is_active.id_for_label }}">{{ form.is_active.label }}</label>
-              <div class="form-check">
-                {{ form.is_active }}
-              </div>
-              {% for error in form.is_active.errors %}
-                <div class="text-danger small mt-1">{{ error }}</div>
-              {% endfor %}
-            </div>
+            {% for error in form.is_active.errors %}
+              <div class="field-error">{{ error }}</div>
+            {% endfor %}
           </div>
         </div>
       </div>
+
     </div>
 
+    <!-- Fixed Action Bar at the bottom of the viewport -->
     <div class="form-actions-bar">
       <div class="form-actions-left">
+        <button type="submit" class="eal-btn eal-btn-primary">
+          <i class="bi bi-save"></i>
+          <span>{% translate "Save Changes" %}</span>
+        </button>
         <a href="{% url 'country_list' %}" class="eal-btn eal-btn-outline">
-          <i class="bi bi-arrow-left"></i>
+          <i class="bi bi-x-lg"></i>
           <span>{% translate "Cancel" %}</span>
         </a>
       </div>
-      <div class="form-actions-right">
-        <button type="submit" class="eal-btn eal-btn-primary">
-          <i class="bi bi-save"></i>
-          <span>{% translate "Save" %}</span>
-        </button>
-      </div>
     </div>
-  </form>
+  </div>
+</form>
 {% endblock %}

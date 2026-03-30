@@ -6984,3 +6984,324 @@ th[data-sort]:hover {
 .btn-footer-save:hover {
   background: #4040d4;
 }
+
+/* ============================================
+   Missing eal Design System Components
+   ============================================ */
+
+/* ── eal Buttons ──────────────────────────────── */
+.eal-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 18px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: "Inter", sans-serif;
+  text-decoration: none;
+}
+.eal-btn i {
+  font-size: 15px;
+}
+.eal-btn-primary {
+  background: linear-gradient(135deg, #5051f9 0%, #7b6cf6 100%);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(80, 81, 249, 0.25);
+}
+.eal-btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(80, 81, 249, 0.35);
+  color: #fff;
+}
+.eal-btn-outline {
+  background: #fff;
+  color: #4b4e5e;
+  border: 1.5px solid #e2e4ed;
+}
+.eal-btn-outline:hover {
+  border-color: #c5c8d4;
+  background: #f7f8fb;
+  color: #4b4e5e;
+}
+
+/* ── stats row ─────────────────────────────── */
+.eal-stats-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.eal-stat-card {
+  background: #fff;
+  border: 1px solid #ecedf3;
+  border-radius: 14px;
+  padding: 18px 20px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  transition: box-shadow 0.25s, border-color 0.25s;
+}
+.eal-stat-card:hover {
+  box-shadow: 0 4px 18px rgba(80, 81, 249, 0.08);
+  border-color: #d4d5f9;
+}
+.eal-stat-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+.eal-stat-icon.purple { background: #eeedfe; color: #5051f9; }
+.eal-stat-icon.blue { background: #e8f4fd; color: #2e8bd8; }
+.eal-stat-icon.green { background: #e6f7ee; color: #1ca653; }
+.eal-stat-icon.amber { background: #fff5e5; color: #d4880f; }
+.eal-stat-icon.red { background: #fde8e8; color: #d93025; }
+
+.eal-stat-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1e1f26;
+  line-height: 1.15;
+}
+.eal-stat-label {
+  font-size: 12.5px;
+  color: #8b8fa3;
+  margin-top: 1px;
+}
+
+/* ── Toolbar ─────────────────────────────────── */
+.eal-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid #f0f1f6;
+}
+.eal-toolbar-left {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.eal-toolbar-right {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.eal-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #f5f6fa;
+  border: 1.5px solid transparent;
+  border-radius: 10px;
+  padding: 8px 14px;
+  min-width: 320px;
+  transition: border-color 0.2s, background 0.2s;
+}
+.eal-search:focus-within {
+  border-color: #5051f9;
+  background: #fff;
+}
+.eal-search i {
+  color: #a0a4b8;
+  font-size: 15px;
+}
+.eal-search input {
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 13.5px;
+  color: #2d2f3a;
+  width: 100%;
+}
+
+/* ── Table Wrap ──────────────────────────────── */
+.eal-table-wrap {
+  overflow-x: auto;
+}
+.eal-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+.eal-entity-id {
+  font-weight: 700;
+  color: #5051f9;
+  font-size: 13px;
+  background: #f0f0ff;
+  padding: 4px 10px;
+  border-radius: 7px;
+  display: inline-block;
+}
+
+/* ── Edit Info Bar ─────────────────────────────── */
+.edit-info-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #64748b;
+  margin-bottom: 24px;
+}
+.edit-info-bar i {
+  font-size: 14px;
+  color: #94a3b8;
+}
+.edit-info-bar strong {
+  color: #1e293b;
+}
+
+/* ── Form Components & Field Standardization ─ */
+.form-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155; /* Slate 700 */
+  margin-bottom: 8px;
+  letter-spacing: -0.1px;
+}
+
+.form-control, 
+.form-select {
+  display: block;
+  width: 100%;
+  height: 42px;
+  padding: 10px 14px;
+  font-size: 14px;
+  font-family: inherit;
+  color: #1e293b;
+  background-color: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+.form-control:focus,
+.form-select:focus {
+  border-color: #5051f9;
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(80, 81, 249, 0.12);
+  background-color: #ffffff;
+}
+
+.form-control::placeholder {
+  color: #94a3b8;
+  opacity: 1;
+}
+
+.form-control[readonly] {
+  background-color: #f8fafc;
+  border-color: #e2e8f0;
+  color: #64748b;
+  cursor: default;
+}
+
+textarea.form-control {
+  height: auto;
+  min-height: 100px;
+}
+
+/* Custom Checkbox Design */
+.form-check-input {
+  width: 20px;
+  height: 20px;
+  margin-top: 0.15em;
+  vertical-align: top;
+  background-color: #fff;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  border: 2px solid #cbd5e1;
+  appearance: none;
+  print-color-adjust: exact;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.form-check-input:checked {
+  background-color: #5051f9;
+  border-color: #5051f9;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath fill='none' stroke='%23fff' stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='m6 10 3 3 6-6'/%3E%3C/svg%3E");
+}
+
+.form-check-input:focus {
+  border-color: #5051f9;
+  outline: 0;
+  box-shadow: 0 0 0 4px rgba(80, 81, 249, 0.12);
+}
+
+/* Field Group Wrapping */
+.field-group {
+  margin-bottom: 24px;
+}
+
+.field-group:last-child {
+  margin-bottom: 0;
+}
+
+/* ── Premium Form Action Bar (Fixed Footer) ── */
+.form-actions-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start; /* Both buttons to the left */
+  gap: 16px;
+  padding: 16px 32px;
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-top: 1px solid #e2e8f0;
+  box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.05);
+  z-index: 1000;
+}
+
+/* Ensure form space at bottom for fixed bar */
+form {
+  padding-bottom: 80px; 
+}
+
+.form-actions-left {
+  display: flex;
+  gap: 16px;
+  width: auto;
+}
+
+/* Responsive adjustments for fixed bar */
+@media (max-width: 768px) {
+  .form-actions-bar {
+    padding: 12px 20px;
+    flex-direction: row; 
+    gap: 10px;
+  }
+  .form-actions-left {
+    width: 100%;
+    gap: 10px;
+  }
+  .form-actions-bar .eal-btn {
+    flex: 1;
+    justify-content: center;
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+}
+

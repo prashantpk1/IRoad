@@ -1,18 +1,18 @@
 {% load i18n %}
-{# Generic list shell — override blocks in child templates. Pagination is rendered once at the bottom. #}
+{# Unified list shell — matches Demo-items-list.html design pattern #}
+{# Override blocks in child templates. Pagination is rendered once at the bottom. #}
 {# STANDARD STATUS BADGES — use these classes everywhere #}
-{# Active / Success:   <span class="badge status-badge status-active">Active</span> #}
-{# Inactive / Disabled:<span class="badge status-badge status-inactive">Inactive</span> #}
-{# Pending / Warning:  <span class="badge status-badge status-pending">Pending</span> #}
-{# Suspended / Danger: <span class="badge status-badge status-suspended">Suspended</span> #}
-{# Expired:            <span class="badge status-badge status-expired">Expired</span> #}
-{# Scheduled:          <span class="badge status-badge status-scheduled">Scheduled</span> #}
+{# Active / Success:   <span class="status-badge active">Active</span> #}
+{# Inactive / Disabled:<span class="status-badge inactive">Inactive</span> #}
+{# Pending / Warning:  <span class="status-badge pending">Pending</span> #}
+{# Suspended / Danger: <span class="status-badge warning">Suspended</span> #}
+{# Expired:            <span class="status-badge expired">Expired</span> #}
 
 <div class="page-header">
   <div class="page-header-row">
     <div class="page-header-left">
       <h1 class="page-title">{% block list_title %}{% translate "Records" %}{% endblock %}</h1>
-      <p class="page-subtitle">{% translate "Manage your records here" %}</p>
+      <p class="page-subtitle">{% block list_subtitle %}{% translate "Sort, search, filter, and manage records." %}{% endblock %}</p>
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
@@ -22,10 +22,15 @@
   </div>
 </div>
 
+{% block stats_row %}{% endblock %}
+
 <div class="eal-table-card">
   <div class="eal-toolbar">
     <div class="eal-toolbar-left">
-      {% block search_filters %}{% endblock %}
+      {% block search_box %}{% endblock %}
+    </div>
+    <div class="eal-toolbar-right">
+      {% block filter_controls %}{% endblock %}
     </div>
   </div>
 

@@ -1,6 +1,12 @@
 {% extends 'base.html' %}
 {% load i18n %}
-{% block title %}Transaction Details | iRoad Admin{% endblock %}
+{% block title %}{% translate "Transaction Details" %}{% endblock %}
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item"><a href="{% url 'transaction_list' %}">{% translate "Transactions" %}</a></li>
+<li class="breadcrumb-item active" aria-current="page">{% translate "Transaction Details" %}</li>
+{% endblock %}
+
 {% block content %}
 {% if messages %}
   {% for message in messages %}
@@ -12,78 +18,163 @@
 {% endif %}
 
 <div class="page-header">
-  <nav aria-label="breadcrumb">
-    <ol class="breadcrumb">
-      <li class="breadcrumb-item"><a href="{% url 'transaction_list' %}">Transactions</a></li>
-      <li class="breadcrumb-item active" aria-current="page">Transaction Details</li>
-    </ol>
-  </nav>
   <div class="page-header-row">
     <div class="page-header-left">
-      <h1 class="page-title">Transaction Details</h1>
-      <p class="page-subtitle">Review payment, references, and manual review status</p>
+      <h1 class="page-title">{% translate "Transaction Details" %}</h1>
+      <p class="page-subtitle">{% translate "Review payment, references, and manual review status." %}</p>
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
         <a href="{% url 'transaction_list' %}" class="eal-btn eal-btn-outline">
           <i class="bi bi-arrow-left"></i>
-          <span>Back to ledger</span>
+          <span>{% translate "Back to ledger" %}</span>
         </a>
       </div>
     </div>
   </div>
 </div>
 
+{# Transaction Info Card #}
 <div class="form-card mb-3">
-  <div class="form-card-body row g-2 small">
-    <div class="col-md-4"><strong>Tenant</strong><br>{{ txn.tenant.company_name }}</div>
-    <div class="col-md-4"><strong>Type</strong><br>{{ txn.get_transaction_type_display }}</div>
-    <div class="col-md-4"><strong>Status</strong><br>{{ txn.get_status_display }}</div>
-    <div class="col-md-4"><strong>Currency / Amount</strong><br>{{ txn.currency_id }} {{ txn.amount|floatformat:2 }}</div>
-    <div class="col-md-4"><strong>Base equivalent</strong><br>{{ txn.base_currency_equivalent_amount|floatformat:2 }}</div>
-    <div class="col-md-4"><strong>FX snapshot</strong><br>{{ txn.exchange_rate_snapshot }}</div>
-    <div class="col-md-4"><strong>Payment method</strong><br>{% if txn.payment_method %}{{ txn.payment_method.method_name_en }} ({{ txn.payment_method.get_method_type_display }}){% else %}—{% endif %}</div>
-    <div class="col-md-4"><strong>Gateway ref</strong><br>{{ txn.gateway_ref|default:'—' }}</div>
-    <div class="col-md-4"><strong>Linked order</strong><br>{% if txn.order %}<a href="{% url 'order_detail' txn.order.order_id %}">{{ txn.order.order_id }}</a>{% else %}—{% endif %}</div>
-    <div class="col-md-4"><strong>Created</strong><br>{{ txn.created_at|date:'Y-m-d H:i' }}</div>
+  <div class="form-card-header">
+    <div class="form-card-icon blue">
+      <i class="bi bi-credit-card-2-front"></i>
+    </div>
+    <div class="form-card-header-text">
+      <h3 class="form-card-title">{% translate "Payment Information" %}</h3>
+      <p class="form-card-desc">{% translate "Core transaction details and references." %}</p>
+    </div>
+  </div>
+  <div class="form-card-body">
+    <div class="row g-3">
+      <div class="col-12 col-md-4">
+        <label class="form-label">{% translate "Tenant" %}</label>
+        <input class="form-control" value="{{ txn.tenant.company_name }}" readonly>
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label">{% translate "Type" %}</label>
+        <input class="form-control" value="{{ txn.get_transaction_type_display }}" readonly>
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label">{% translate "Status" %}</label>
+        <input class="form-control" value="{{ txn.get_status_display }}" readonly>
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label">{% translate "Currency / Amount" %}</label>
+        <input class="form-control" value="{{ txn.currency_id }} {{ txn.amount|floatformat:2 }}" readonly>
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label">{% translate "Base equivalent" %}</label>
+        <input class="form-control" value="{{ txn.base_currency_equivalent_amount|floatformat:2 }}" readonly>
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label">{% translate "FX snapshot" %}</label>
+        <input class="form-control" value="{{ txn.exchange_rate_snapshot }}" readonly>
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label">{% translate "Payment method" %}</label>
+        <input class="form-control" value="{% if txn.payment_method %}{{ txn.payment_method.method_name_en }} ({{ txn.payment_method.get_method_type_display }}){% else %}—{% endif %}" readonly>
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label">{% translate "Gateway ref" %}</label>
+        <input class="form-control" value="{{ txn.gateway_ref|default:'—' }}" readonly>
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label">{% translate "Linked order" %}</label>
+        {% if txn.order %}
+          <a href="{% url 'order_detail' txn.order.order_id %}" class="form-control d-block text-decoration-none" style="color: var(--primary-color); background: #f8fafc;">{{ txn.order.order_id }}</a>
+        {% else %}
+          <input class="form-control" value="—" readonly>
+        {% endif %}
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label">{% translate "Created" %}</label>
+        <input class="form-control" value="{{ txn.created_at|date:'d M Y, H:i' }}" readonly>
+      </div>
+    </div>
   </div>
 </div>
 
+{# Attachment Card #}
 {% if txn.attachment %}
 <div class="form-card mb-3">
-  <div class="form-card-header">Receipt / attachment</div>
+  <div class="form-card-header">
+    <div class="form-card-icon" style="background: rgba(245, 158, 11, 0.1); color: var(--warning-color);">
+      <i class="bi bi-paperclip"></i>
+    </div>
+    <div class="form-card-header-text">
+      <h3 class="form-card-title">{% translate "Receipt / Attachment" %}</h3>
+      <p class="form-card-desc">{% translate "Uploaded payment receipt or reference document." %}</p>
+    </div>
+  </div>
   <div class="form-card-body">
-    <a href="{{ txn.attachment.url }}" target="_blank" rel="noopener">Open attachment</a>
+    <a href="{{ txn.attachment.url }}" target="_blank" rel="noopener" class="eal-btn eal-btn-outline">
+      <i class="bi bi-download"></i>
+      <span>{% translate "Open attachment" %}</span>
+    </a>
   </div>
 </div>
 {% endif %}
 
+{# Review Card #}
 {% if txn.reviewed_by %}
 <div class="form-card mb-3">
-  <div class="form-card-header">Review</div>
-  <div class="form-card-body small">
-    <p class="mb-1"><strong>Reviewed by:</strong> {{ txn.reviewed_by.email }}</p>
-    {% if txn.review_notes %}<p class="mb-0"><strong>Notes:</strong> {{ txn.review_notes }}</p>{% endif %}
+  <div class="form-card-header">
+    <div class="form-card-icon" style="background: rgba(16, 185, 129, 0.1); color: var(--success-color);">
+      <i class="bi bi-check-circle"></i>
+    </div>
+    <div class="form-card-header-text">
+      <h3 class="form-card-title">{% translate "Review" %}</h3>
+      <p class="form-card-desc">{% translate "Review decision and notes." %}</p>
+    </div>
+  </div>
+  <div class="form-card-body">
+    <div class="row g-3">
+      <div class="col-12 col-md-6">
+        <label class="form-label">{% translate "Reviewed by" %}</label>
+        <input class="form-control" value="{{ txn.reviewed_by.email }}" readonly>
+      </div>
+      {% if txn.review_notes %}
+      <div class="col-12 col-md-6">
+        <label class="form-label">{% translate "Notes" %}</label>
+        <input class="form-control" value="{{ txn.review_notes }}" readonly>
+      </div>
+      {% endif %}
+    </div>
   </div>
 </div>
 {% endif %}
 
+{# Manual Decision Card #}
 {% if txn.status == 'Pending' and txn.payment_method and txn.payment_method.method_type == 'Offline_Bank' and request.user.is_root %}
-<div class="form-card border-success mb-3">
-  <div class="form-card-header bg-success text-white">Offline bank — manual decision</div>
+<div class="form-card mb-3" style="border: 2px solid var(--success-color);">
+  <div class="form-card-header">
+    <div class="form-card-icon" style="background: rgba(16, 185, 129, 0.1); color: var(--success-color);">
+      <i class="bi bi-bank"></i>
+    </div>
+    <div class="form-card-header-text">
+      <h3 class="form-card-title">{% translate "Offline Bank — Manual Decision" %}</h3>
+      <p class="form-card-desc">{% translate "Approve or reject this offline bank payment." %}</p>
+    </div>
+  </div>
   <div class="form-card-body">
-    <form method="post" action="{% url 'transaction_approve' txn.transaction_id %}" class="mb-3">
+    <form method="post" action="{% url 'transaction_approve' txn.transaction_id %}" class="mb-4">
       {% csrf_token %}
-      <button type="submit" class="btn btn-success" onclick="return confirm('Approve this payment?');">Approve</button>
+      <button type="submit" class="eal-btn eal-btn-primary" onclick="return confirm('{% translate "Approve this payment?" %}');">
+        <i class="bi bi-check-lg"></i>
+        <span>{% translate "Approve" %}</span>
+      </button>
     </form>
     <form method="post" action="{% url 'transaction_reject' txn.transaction_id %}">
       {% csrf_token %}
-      <label class="form-label text-danger">Reject — review notes required</label>
-      <textarea name="review_notes" class="form-control mb-2" rows="3" required placeholder="Reason for rejection"></textarea>
-      <button type="submit" class="btn btn-danger">Reject</button>
+      <label class="form-label" style="color: var(--danger-color);">{% translate "Reject — review notes required" %}</label>
+      <textarea name="review_notes" class="form-control mb-2" rows="3" required placeholder="{% translate 'Reason for rejection' %}"></textarea>
+      <button type="submit" class="eal-btn eal-btn-outline" style="color: var(--danger-color); border-color: var(--danger-color);">
+        <i class="bi bi-x-circle"></i>
+        <span>{% translate "Reject" %}</span>
+      </button>
     </form>
   </div>
 </div>
 {% endif %}
 {% endblock %}
-

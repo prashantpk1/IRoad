@@ -39,6 +39,32 @@ from .models import (
 )
 
 
+def apply_premium_styling(form):
+    """
+    Utility to inject premium Bootstrap classes into Django form widgets.
+    """
+    for field_name, field in form.fields.items():
+        widget = field.widget
+        widget_name = widget.__class__.__name__
+
+        # Inputs and selects
+        if widget_name in [
+            'TextInput', 'EmailInput', 'PasswordInput', 'NumberInput', 
+            'Textarea', 'Select', 'DateInput', 'DateTimeInput', 'URLInput',
+            'ClearableFileInput'
+        ]:
+            existing_classes = widget.attrs.get('class', '')
+            target_class = 'form-select' if widget_name == 'Select' else 'form-control'
+            if target_class not in existing_classes:
+                widget.attrs['class'] = f"{existing_classes} {target_class}".strip()
+
+        # Checkboxes
+        if widget_name == 'CheckboxInput':
+            existing_classes = widget.attrs.get('class', '')
+            if 'form-check-input' not in existing_classes:
+                widget.attrs['class'] = f"{existing_classes} form-check-input".strip()
+
+
 class LoginForm(forms.Form):
     email = forms.EmailField(max_length=100)
     password = forms.CharField(widget=forms.PasswordInput)
@@ -136,6 +162,7 @@ class RoleForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        apply_premium_styling(self)
 
         # DesignerDesign-compatible field styling classes.
         # (Template layer must not use `as_widget(attrs={...})` to avoid TemplateSyntaxError.)
@@ -171,6 +198,7 @@ class AdminUserForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        apply_premium_styling(self)
         # Only Active roles in dropdown (creation + edit).
         active_roles = Role.objects.filter(status='Active').order_by('role_name_en')
         current_role = getattr(self.instance, 'role', None)
@@ -197,21 +225,13 @@ class CountryForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         is_edit = kwargs.pop('is_edit', False)
         super().__init__(*args, **kwargs)
+        apply_premium_styling(self)
 
-        for name in ('country_code', 'name_en', 'name_ar'):
-            if name in self.fields:
-                w = self.fields[name].widget
-                w.attrs['class'] = f"{w.attrs.get('class', '')} form-control".strip()
         if 'name_ar' in self.fields:
             self.fields['name_ar'].widget.attrs.setdefault('dir', 'rtl')
             self.fields['name_ar'].widget.attrs.setdefault(
                 'placeholder', 'الاسم بالعربية'
             )
-        if 'is_active' in self.fields:
-            self.fields['is_active'].widget.attrs['class'] = (
-                f"{self.fields['is_active'].widget.attrs.get('class', '')} "
-                'form-check-input'
-            ).strip()
 
         if is_edit and 'country_code' in self.fields:
             self.fields['country_code'].disabled = True
@@ -250,6 +270,7 @@ class CurrencyForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         is_edit = kwargs.pop('is_edit', False)
         super().__init__(*args, **kwargs)
+        apply_premium_styling(self)
 
         # Ensure dropdowns / templates show a default if user doesn't supply it.
         if 'decimal_places' in self.fields:
@@ -305,6 +326,7 @@ class TaxCodeForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         is_edit = kwargs.pop('is_edit', False)
         super().__init__(*args, **kwargs)
+        apply_premium_styling(self)
         if is_edit:
             self.fields['tax_code'].disabled = True
         self.fields['applicable_country_code'].queryset = (
@@ -364,6 +386,10 @@ class GeneralTaxSettingsForm(forms.ModelForm):
         model = GeneralTaxSettings
         fields = ['prices_include_tax', 'location_verification']
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        apply_premium_styling(self)
+
 
 class LegalIdentityForm(forms.ModelForm):
     class Meta:
@@ -382,6 +408,7 @@ class LegalIdentityForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        apply_premium_styling(self)
         self.fields['company_country_code'].queryset = (
             Country.objects.filter(is_active=True).order_by('name_en')
         )
@@ -422,6 +449,7 @@ class BaseCurrencyForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        apply_premium_styling(self)
         self.fields['base_currency'].queryset = (
             Currency.objects.filter(is_active=True).order_by('name_en')
         )
@@ -435,6 +463,7 @@ class ExchangeRateForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         base_currency_code = kwargs.pop('base_currency_code', None)
         super().__init__(*args, **kwargs)
+        apply_premium_styling(self)
         qs = Currency.objects.filter(is_active=True)
         if base_currency_code:
             qs = qs.exclude(currency_code=base_currency_code)
@@ -478,6 +507,7 @@ class SubscriptionPlanForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        apply_premium_styling(self)
         for field_name in self.MAX_FIELDS:
             if field_name in self.fields:
                 self.fields[field_name].help_text = 'Enter -1 for Unlimited'
@@ -508,6 +538,7 @@ class PlanPricingCycleForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        apply_premium_styling(self)
         self.fields['currency'].queryset = (
             Currency.objects.filter(is_active=True).order_by('name_en')
         )
@@ -552,6 +583,10 @@ class AddOnsPricingPolicyForm(forms.ModelForm):
             'extra_storage_gb_price',
         ]
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        apply_premium_styling(self)
+
     def clean(self):
         cleaned = super().clean()
         for field_name in self.PRICE_FIELDS:
@@ -589,6 +624,7 @@ class PromoCodeForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        apply_premium_styling(self)
         self.fields['applicable_plans'].queryset = (
             SubscriptionPlan.objects.filter(is_active=True).order_by('plan_name_en')
         )
@@ -716,6 +752,7 @@ class PaymentGatewayForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        apply_premium_styling(self)
         self.fields['credentials_payload'].help_text = (
             'Enter JSON object e.g. '
             '{"public_key": "pk_test_...", "secret_key": "sk_..."}'
@@ -756,6 +793,7 @@ class PaymentMethodForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        apply_premium_styling(self)
         self.fields['gateway'].queryset = (
             PaymentGateway.objects.filter(is_active=True).order_by('gateway_name')
         )
@@ -835,6 +873,10 @@ class CommGatewayForm(forms.ModelForm):
             'password_secret': forms.PasswordInput(render_value=False),
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        apply_premium_styling(self)
+
     def clean(self):
         cleaned = super().clean()
         gateway_type = cleaned.get('gateway_type')
@@ -873,6 +915,10 @@ class NotificationTemplateForm(forms.ModelForm):
             'subject_ar': forms.TextInput(attrs={'dir': 'rtl'}),
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        apply_premium_styling(self)
+
     def clean(self):
         cleaned = super().clean()
         channel_type = cleaned.get('channel_type')
@@ -908,6 +954,7 @@ class EventMappingForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        apply_premium_styling(self)
         self.fields['primary_template'].queryset = (
             NotificationTemplate.objects.filter(is_active=True)
         )
@@ -990,6 +1037,10 @@ class PushNotificationForm(forms.ModelForm):
             'scheduled_at': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        apply_premium_styling(self)
+
     def clean(self):
         cleaned = super().clean()
         trigger_mode = cleaned.get('trigger_mode')
@@ -1041,6 +1092,10 @@ class SystemBannerForm(forms.ModelForm):
             'valid_until': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        apply_premium_styling(self)
+
     def clean(self):
         cleaned = super().clean()
         valid_from = cleaned.get('valid_from')
@@ -1067,6 +1122,7 @@ class InternalAlertRouteForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        apply_premium_styling(self)
         self.fields['notify_role'].queryset = (
             Role.objects.filter(status='Active').order_by('role_name_en')
         )
@@ -1101,6 +1157,7 @@ class TenantProfileCreateForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        apply_premium_styling(self)
         self.fields['country'].queryset = (
             Country.objects.filter(is_active=True).order_by('name_en')
         )
@@ -1121,6 +1178,7 @@ class TenantProfileUpdateForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        apply_premium_styling(self)
         active_reps = AdminUser.objects.filter(status='Active').order_by(
             'first_name', 'last_name'
         )
@@ -1176,6 +1234,7 @@ class SupportTicketForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        apply_premium_styling(self)
         self.fields['tenant'].queryset = TenantProfile.objects.filter(
             account_status='Active'
         ).order_by('company_name')
@@ -1194,6 +1253,7 @@ class TicketAssignForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        apply_premium_styling(self)
         self.fields['assigned_to'].queryset = AdminUser.objects.filter(
             status='Active'
         ).order_by('first_name')
@@ -1205,6 +1265,10 @@ class TicketPriorityForm(forms.ModelForm):
         model = SupportTicket
         fields = ['priority']
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        apply_premium_styling(self)
+
 
 class AdminReplyForm(forms.ModelForm):
     class Meta:
@@ -1213,6 +1277,10 @@ class AdminReplyForm(forms.ModelForm):
         widgets = {
             'message_body': forms.Textarea(attrs={'rows': 5}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        apply_premium_styling(self)
 
 
 class TenantReplyForm(forms.ModelForm):
@@ -1223,6 +1291,10 @@ class TenantReplyForm(forms.ModelForm):
             'message_body': forms.Textarea(attrs={'rows': 5}),
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        apply_premium_styling(self)
+
 
 class TenantTicketCreateForm(forms.ModelForm):
     class Meta:
@@ -1231,6 +1303,7 @@ class TenantTicketCreateForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        apply_premium_styling(self)
         self.fields['category'].queryset = SupportCategory.objects.filter(
             is_active=True
         ).order_by('name_en')
@@ -1245,6 +1318,10 @@ class TenantSecuritySettingsForm(forms.ModelForm):
             'max_failed_logins',
             'lockout_duration_minutes',
         ]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        apply_premium_styling(self)
 
     def clean_tenant_web_timeout_hours(self):
         value = self.cleaned_data.get('tenant_web_timeout_hours')
@@ -1279,6 +1356,10 @@ class AdminSecuritySettingsForm(forms.ModelForm):
             'max_failed_logins',
             'lockout_duration_minutes',
         ]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        apply_premium_styling(self)
 
     def clean_session_timeout_minutes(self):
         value = self.cleaned_data.get('session_timeout_minutes')

@@ -1,111 +1,219 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% block title %}{{ tenant.company_name }}{% endblock %}
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item"><a href="{% url 'tenant_list' %}">{% translate "Subscribers" %}</a></li>
+<li class="breadcrumb-item active" aria-current="page">{{ tenant.company_name }}</li>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
-  <nav aria-label="breadcrumb">
-    <ol class="breadcrumb">
-      <li class="breadcrumb-item"><a href="{% url 'tenant_list' %}">Subscribers</a></li>
-      <li class="breadcrumb-item active" aria-current="page">{{ tenant.company_name }}</li>
-    </ol>
-  </nav>
   <div class="page-header-row">
     <div class="page-header-left">
       <h1 class="page-title">{{ tenant.company_name }}</h1>
-      <p class="page-subtitle">Tenant profile, subscription state, and CRM notes</p>
+      <p class="page-subtitle">{% translate "Tenant profile, subscription state, and CRM notes." %}</p>
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
+        {% if request.user.is_root %}
+          <a href="{% url 'tenant_edit' tenant.tenant_id %}" class="eal-btn eal-btn-primary">
+            <i class="bi bi-pencil"></i>
+            <span>{% translate "Edit" %}</span>
+          </a>
+        {% endif %}
         <a href="{% url 'tenant_list' %}" class="eal-btn eal-btn-outline">
           <i class="bi bi-arrow-left"></i>
-          <span>Back to list</span>
+          <span>{% translate "Back to list" %}</span>
         </a>
       </div>
     </div>
   </div>
 </div>
 
+{# Profile Card #}
 <div class="form-card mb-3">
-  <div class="form-card-header fw-semibold">Profile</div>
-  <div class="form-card-body row g-3">
-    <div class="col-md-6"><strong>Registration #</strong><br>{{ tenant.registration_number }}</div>
-    <div class="col-md-6"><strong>Tax number</strong><br>{{ tenant.tax_number|default:'-' }}</div>
-    <div class="col-md-6"><strong>Email</strong><br>{{ tenant.primary_email }}</div>
-    <div class="col-md-6"><strong>Phone</strong><br>{{ tenant.primary_phone }}</div>
-    <div class="col-md-6"><strong>Country</strong><br>{{ tenant.country.name_en|default:'-' }}</div>
-    <div class="col-md-6"><strong>Account status</strong><br>{{ tenant.get_account_status_display }}</div>
-    <div class="col-md-6"><strong>Assigned sales rep</strong><br>{% if tenant.assigned_sales_rep %}{{ tenant.assigned_sales_rep.first_name }} {{ tenant.assigned_sales_rep.last_name }}{% else %}-{% endif %}</div>
-    <div class="col-md-6"><strong>Registered</strong><br>{{ tenant.registered_at|date:'Y-m-d H:i' }}</div>
+  <div class="form-card-header">
+    <div class="form-card-icon blue">
+      <i class="bi bi-person-badge"></i>
+    </div>
+    <div class="form-card-header-text">
+      <h3 class="form-card-title">{% translate "Profile" %}</h3>
+      <p class="form-card-desc">{% translate "Core identity and contact information." %}</p>
+    </div>
   </div>
-</div>
-
-<div class="form-card mb-3">
-  <div class="form-card-header fw-semibold">Subscription State</div>
   <div class="form-card-body">
-    <div class="row g-2 mb-3">
-      <div class="col-md-4"><strong>Current plan</strong><br>{{ tenant.current_plan.plan_name_en|default:'-' }}</div>
-      <div class="col-md-4"><strong>Start date</strong><br>{{ tenant.subscription_start_date|default:'-' }}</div>
-      <div class="col-md-4"><strong>Expiry date</strong><br>{{ tenant.subscription_expiry_date|default:'-' }}</div>
-    </div>
-    <div class="mb-2"><strong>Active limits</strong></div>
-    <ul class="list-unstyled small mb-3">
-      <li>Users: {{ tenant.active_max_users }}</li>
-      <li>Internal trucks: {{ tenant.active_max_internal_trucks }}</li>
-      <li>External trucks: {{ tenant.active_max_external_trucks }}</li>
-      <li>Drivers: {{ tenant.active_max_drivers }}</li>
-    </ul>
-    <div class="row g-2">
-      <div class="col-md-6"><strong>Wallet balance</strong><br>{{ tenant.wallet_balance|floatformat:2 }}</div>
-      <div class="col-md-6"><strong>Total LTV</strong><br>{{ tenant.total_ltv|floatformat:2 }}</div>
+    <div class="row g-3">
+      <div class="col-12 col-md-6">
+        <label class="form-label">{% translate "Registration #" %}</label>
+        <input class="form-control" value="{{ tenant.registration_number }}" readonly>
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">{% translate "Tax number" %}</label>
+        <input class="form-control" value="{{ tenant.tax_number|default:'-' }}" readonly>
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">{% translate "Email" %}</label>
+        <input class="form-control" value="{{ tenant.primary_email }}" readonly>
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">{% translate "Phone" %}</label>
+        <input class="form-control" value="{{ tenant.primary_phone }}" readonly>
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">{% translate "Country" %}</label>
+        <input class="form-control" value="{{ tenant.country.name_en|default:'-' }}" readonly>
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">{% translate "Account status" %}</label>
+        <input class="form-control" value="{{ tenant.get_account_status_display }}" readonly>
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">{% translate "Assigned sales rep" %}</label>
+        <input class="form-control" value="{% if tenant.assigned_sales_rep %}{{ tenant.assigned_sales_rep.first_name }} {{ tenant.assigned_sales_rep.last_name }}{% else %}-{% endif %}" readonly>
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">{% translate "Registered" %}</label>
+        <input class="form-control" value="{{ tenant.registered_at|date:'d M Y, H:i' }}" readonly>
+      </div>
     </div>
   </div>
 </div>
 
+{# Subscription State Card #}
 <div class="form-card mb-3">
-  <div class="form-card-header fw-semibold">Quick Actions</div>
+  <div class="form-card-header">
+    <div class="form-card-icon" style="background: rgba(16, 185, 129, 0.1); color: var(--success-color);">
+      <i class="bi bi-credit-card-2-front"></i>
+    </div>
+    <div class="form-card-header-text">
+      <h3 class="form-card-title">{% translate "Subscription State" %}</h3>
+      <p class="form-card-desc">{% translate "Current plan, limits, and billing details." %}</p>
+    </div>
+  </div>
+  <div class="form-card-body">
+    <div class="row g-3">
+      <div class="col-12 col-md-4">
+        <label class="form-label">{% translate "Current plan" %}</label>
+        <input class="form-control" value="{{ tenant.current_plan.plan_name_en|default:'-' }}" readonly>
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label">{% translate "Start date" %}</label>
+        <input class="form-control" value="{{ tenant.subscription_start_date|default:'-' }}" readonly>
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label">{% translate "Expiry date" %}</label>
+        <input class="form-control" value="{{ tenant.subscription_expiry_date|default:'-' }}" readonly>
+      </div>
+    </div>
+    <div class="row g-3 mt-1">
+      <div class="col-12">
+        <label class="form-label fw-semibold">{% translate "Active limits" %}</label>
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="form-label">{% translate "Users" %}</label>
+        <input class="form-control" value="{{ tenant.active_max_users }}" readonly>
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="form-label">{% translate "Internal trucks" %}</label>
+        <input class="form-control" value="{{ tenant.active_max_internal_trucks }}" readonly>
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="form-label">{% translate "External trucks" %}</label>
+        <input class="form-control" value="{{ tenant.active_max_external_trucks }}" readonly>
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="form-label">{% translate "Drivers" %}</label>
+        <input class="form-control" value="{{ tenant.active_max_drivers }}" readonly>
+      </div>
+    </div>
+    <div class="row g-3 mt-1">
+      <div class="col-12 col-md-6">
+        <label class="form-label">{% translate "Wallet balance" %}</label>
+        <input class="form-control" value="{{ tenant.wallet_balance|floatformat:2 }}" readonly>
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">{% translate "Total LTV" %}</label>
+        <input class="form-control" value="{{ tenant.total_ltv|floatformat:2 }}" readonly>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# Quick Actions Card #}
+<div class="form-card mb-3">
+  <div class="form-card-header">
+    <div class="form-card-icon" style="background: rgba(245, 158, 11, 0.1); color: var(--warning-color);">
+      <i class="bi bi-lightning-charge"></i>
+    </div>
+    <div class="form-card-header-text">
+      <h3 class="form-card-title">{% translate "Quick Actions" %}</h3>
+      <p class="form-card-desc">{% translate "Common actions for this subscriber." %}</p>
+    </div>
+  </div>
   <div class="form-card-body d-flex flex-wrap gap-2">
-    <a href="{% url 'order_create' %}?tenant={{ tenant.tenant_id }}" class="btn btn-primary">Create Order</a>
+    <a href="{% url 'order_create' %}?tenant={{ tenant.tenant_id }}" class="eal-btn eal-btn-primary">
+      <i class="bi bi-cart-plus"></i>
+      <span>{% translate "Create Order" %}</span>
+    </a>
     {% if request.user.is_root %}
-      <a href="{% url 'tenant_edit' tenant.tenant_id %}" class="btn btn-outline-secondary">Edit Status</a>
+      <a href="{% url 'tenant_edit' tenant.tenant_id %}" class="eal-btn eal-btn-outline">
+        <i class="bi bi-pencil"></i>
+        <span>{% translate "Edit Status" %}</span>
+      </a>
     {% endif %}
   </div>
 </div>
 
+{# CRM Notes Card #}
 <div class="form-card mb-3">
-  <div class="form-card-header fw-semibold">CRM Notes</div>
+  <div class="form-card-header">
+    <div class="form-card-icon" style="background: rgba(99, 102, 241, 0.1); color: #6366f1;">
+      <i class="bi bi-journal-text"></i>
+    </div>
+    <div class="form-card-header-text">
+      <h3 class="form-card-title">{% translate "CRM Notes" %}</h3>
+      <p class="form-card-desc">{% translate "Internal notes and interaction history." %}</p>
+    </div>
+  </div>
   <div class="form-card-body">
     <form method="post" action="{% url 'crm_note_create' tenant.tenant_id %}" class="mb-4">
       {% csrf_token %}
-      <div class="row g-2">
-        <div class="col-md-3">
-          <label class="form-label">Type</label>
+      <div class="row g-3">
+        <div class="col-12 col-md-3">
+          <label class="form-label">{% translate "Type" %}</label>
           <select name="note_type" class="form-select">
             {% for code, label in note_type_choices %}
               <option value="{{ code }}">{{ label }}</option>
             {% endfor %}
           </select>
         </div>
-        <div class="col-md-9">
-          <label class="form-label">Note</label>
-          <textarea name="note_content" class="form-control" rows="3" required placeholder="Enter note content"></textarea>
+        <div class="col-12 col-md-9">
+          <label class="form-label">{% translate "Note" %}</label>
+          <textarea name="note_content" class="form-control" rows="3" required placeholder="{% translate 'Enter note content' %}"></textarea>
         </div>
       </div>
-      <button type="submit" class="btn btn-primary mt-2">Add Note</button>
+      <div class="d-flex flex-wrap gap-2 mt-3">
+        <button type="submit" class="eal-btn eal-btn-primary">
+          <i class="bi bi-plus-lg"></i>
+          <span>{% translate "Add Note" %}</span>
+        </button>
+      </div>
     </form>
 
     {% for note in notes %}
       <div class="border-bottom py-3 {% if forloop.last %}border-bottom-0{% endif %}">
-        <span class="badge bg-secondary me-2">{{ note.get_note_type_display }}</span>
-        <span class="text-muted small">
+        <span class="status-badge pending">{{ note.get_note_type_display }}</span>
+        <span class="text-muted small ms-2">
           {% if note.admin %}{{ note.admin.first_name }} {{ note.admin.last_name }}{% else %}—{% endif %}
-          · {{ note.created_at|date:'Y-m-d H:i' }}
+          · {{ note.created_at|date:'d M Y, H:i' }}
         </span>
         <p class="mb-0 mt-2">{{ note.note_content|linebreaksbr }}</p>
       </div>
     {% empty %}
-      <p class="text-muted mb-0">No notes yet.</p>
+      <p class="text-muted mb-0">{% translate "No notes yet." %}</p>
     {% endfor %}
   </div>
 </div>
 
 {% endblock %}
-

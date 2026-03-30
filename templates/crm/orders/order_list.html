@@ -1,23 +1,28 @@
 {% extends 'base.html' %}
 {% load i18n %}
 
-{% block title %}{% translate "Subscription Orders | iRoad Admin" %}{% endblock %}
-{% block page_title %}{% translate "Subscription Orders | iRoad Admin" %}{% endblock %}
+{% block title %}{% translate "Subscription Orders" %}{% endblock %}
+{% block page_title %}{% translate "Subscription Orders" %}{% endblock %}
 
 {% block breadcrumb_items %}
-<li class="breadcrumb-item active" aria-current="page">{% translate "Subscription Orders | iRoad Admin" %}</li>
+<li class="breadcrumb-item active" aria-current="page">{% translate "Subscription Orders" %}</li>
 {% endblock %}
 
 {% block content %}
 <div class="page-header">
   <div class="page-header-row">
     <div class="page-header-left">
-      <h1 class="page-title">{% translate "Subscription Orders | iRoad Admin" %}</h1>
-      <p class="page-subtitle">{% translate "Manage your records here" %}</p>
+      <h1 class="page-title">{% translate "Subscription Orders" %}</h1>
+      <p class="page-subtitle">{% translate "Sort, search, filter, and manage subscription orders." %}</p>
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
-        {% if request.user.is_root %}<a href="{% url 'order_create' %}" class="eal-btn eal-btn-primary">Create order</a>{% endif %}
+        {% if request.user.is_root %}
+          <a href="{% url 'order_create' %}" class="eal-btn eal-btn-primary">
+            <i class="bi bi-plus-lg"></i>
+            <span>{% translate "Create Order" %}</span>
+          </a>
+        {% endif %}
       </div>
     </div>
   </div>
@@ -28,37 +33,75 @@
 <div class="eal-table-card">
   <form method="get">
     <div class="eal-toolbar">
-      <div class="eal-toolbar-left" style="width:100%;display:flex;gap:8px;flex-wrap:wrap;">
-        <div class="eal-search" style="flex:1;min-width:220px;"><i class="bi bi-search"></i><input type="text" name="q" placeholder="Search tenant company" value="{{ search_query }}"></div>
-      <div style="width:220px"><select class="eal-select" name="order_classification"><option value="">All classifications</option>{% for code, label in classification_choices %}<option value="{{ code }}" {% if classification_filter == code %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
-      <div style="width:220px"><select class="eal-select" name="order_status"><option value="">All statuses</option>{% for code, label in status_choices %}<option value="{{ code }}" {% if status_filter == code %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
-      <button type="submit" class="eal-btn eal-btn-primary"><i class="bi bi-funnel"></i><span>{% translate "Apply" %}</span></button>
+      <div class="eal-toolbar-left">
+        <div class="eal-search">
+          <i class="bi bi-search"></i>
+          <input type="text" name="q" placeholder="{% translate 'Search tenant company...' %}" value="{{ search_query }}">
+        </div>
+      </div>
+      <div class="eal-toolbar-right">
+        <select class="eal-filter-select" name="order_classification" onchange="this.form.submit()">
+          <option value="">{% translate "Classification: All" %}</option>
+          {% for code, label in classification_choices %}
+            <option value="{{ code }}" {% if classification_filter == code %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+        <select class="eal-filter-select" name="order_status" onchange="this.form.submit()">
+          <option value="">{% translate "Status: All" %}</option>
+          {% for code, label in status_choices %}
+            <option value="{{ code }}" {% if status_filter == code %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+
+        {% if search_query or classification_filter or status_filter %}
+          <a href="{% url 'order_list' %}" class="eal-btn eal-btn-outline" style="border-style: dashed; color: var(--text-muted);">
+            <i class="bi bi-x-circle"></i>
+            <span>{% translate "Clear" %}</span>
+          </a>
+        {% endif %}
       </div>
     </div>
   </form>
+
   <div class="eal-table-wrap">
     <table class="eal-table">
-      <thead><tr><th>#</th><th>Tenant</th><th>Classification</th><th>Currency</th><th>Grand total</th><th>Status</th><th>Created by</th><th>Date</th><th>ACTIONS</th></tr></thead>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>{% translate "Tenant" %}</th>
+          <th>{% translate "Classification" %}</th>
+          <th>{% translate "Currency" %}</th>
+          <th>{% translate "Grand Total" %}</th>
+          <th>{% translate "Status" %}</th>
+          <th>{% translate "Created By" %}</th>
+          <th>{% translate "Date" %}</th>
+          <th>{% translate "ACTIONS" %}</th>
+        </tr>
+      </thead>
       <tbody>
       {% for o in orders %}
         <tr>
           <td>{{ forloop.counter0|add:orders.start_index }}</td>
-          <td>{{ o.tenant.company_name }}</td>
+          <td><span class="fw-bold">{{ o.tenant.company_name }}</span></td>
           <td>{% if o.order_classification == 'New_Subscription' %}<span class="status-badge active">{{ o.get_order_classification_display }}</span>{% elif o.order_classification == 'Renewal' %}<span class="status-badge warning">{{ o.get_order_classification_display }}</span>{% elif o.order_classification == 'Upgrade' %}<span class="status-badge active">{{ o.get_order_classification_display }}</span>{% elif o.order_classification == 'Downgrade' %}<span class="status-badge pending">{{ o.get_order_classification_display }}</span>{% else %}<span class="status-badge inactive">{{ o.get_order_classification_display }}</span>{% endif %}</td>
           <td>{{ o.currency_id }}</td>
-          <td>{{ o.grand_total|floatformat:2 }}</td>
+          <td><span class="eal-entity-id">{{ o.grand_total|floatformat:2 }}</span></td>
           <td>{% if o.order_status == 'Draft' %}<span class="status-badge pending">{{ o.get_order_status_display }}</span>{% elif o.order_status == 'Pending_Payment' %}<span class="status-badge pending">{{ o.get_order_status_display }}</span>{% elif o.order_status == 'Paid' %}<span class="status-badge active">{{ o.get_order_status_display }}</span>{% else %}<span class="status-badge inactive">{{ o.get_order_status_display }}</span>{% endif %}</td>
           <td>{% if o.created_by %}{{ o.created_by.first_name }} {{ o.created_by.last_name }}{% else %}-{% endif %}</td>
-          <td>{{ o.created_at|date:'Y-m-d H:i' }}</td>
-          <td><div class="eal-actions-cell"><a href="{% url 'order_detail' o.order_id %}" class="eal-row-btn"><i class="bi bi-eye"></i></a></div></td>
+          <td>{{ o.created_at|date:'d M Y' }}</td>
+          <td>
+            <div class="eal-actions-cell">
+              <a href="{% url 'order_detail' o.order_id %}" class="eal-row-btn" title="{% translate 'View' %}"><i class="bi bi-eye"></i></a>
+            </div>
+          </td>
         </tr>
       {% empty %}
         <tr class="eal-table-empty">
           <td colspan="9">
             <div class="notification-empty">
               <div class="empty-icon"><i class="bi bi-inbox"></i></div>
-              <h4 class="empty-title">{% translate "No Data Found" %}</h4>
-              <p class="empty-text">No orders found.</p>
+              <h4 class="empty-title">{% translate "No orders found" %}</h4>
+              <p class="empty-text">{% translate "No orders match your current filters." %}</p>
             </div>
           </td>
         </tr>

@@ -168,21 +168,21 @@
       </div>
     </div>
 
-    <div class="form-actions-bar sticky-bottom">
+    <!-- Fixed Action Bar at the bottom of the viewport -->
+    <div class="form-actions-bar">
       <div class="form-actions-left">
-        <a href="{% if is_edit and plan %}{% url 'plan_detail' plan.plan_id %}{% else %}{% url 'plan_list' %}{% endif %}" class="eal-btn eal-btn-outline">
-          <i class="bi bi-arrow-left"></i>
-          Cancel
-        </a>
-      </div>
-      <div class="form-actions-right">
         <button type="submit" class="eal-btn eal-btn-primary">
           <i class="bi bi-save"></i>
-          Save
+          <span>{% translate "Save Plan" %}</span>
         </button>
+        <a href="{% if is_edit and plan %}{% url 'plan_detail' plan.plan_id %}{% else %}{% url 'plan_list' %}{% endif %}" class="eal-btn eal-btn-outline">
+          <i class="bi bi-x-lg"></i>
+          <span>{% translate "Cancel" %}</span>
+        </a>
       </div>
     </div>
-  </form>
+  </div>
+</form>
 
   <template id="pricing-row-template">
     <tr class="pricing-row" data-index="__INDEX__">

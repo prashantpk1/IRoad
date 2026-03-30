@@ -1,11 +1,12 @@
 {% load i18n %}
-{# Unified form shell for create/edit pages #}
+{# Unified form shell — matches Demo-item-form.html design pattern #}
+{# Usage: Override blocks in child templates that extend base.html #}
 
 <div class="page-header">
   <div class="page-header-row">
     <div class="page-header-left">
       <h1 class="page-title">{% block form_title %}{% translate "Record Form" %}{% endblock %}</h1>
-      <p class="page-subtitle">{% block form_subtitle %}{% translate "Create or update record data" %}{% endblock %}</p>
+      <p class="page-subtitle">{% block form_subtitle %}{% translate "Create or update record data." %}{% endblock %}</p>
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
@@ -18,27 +19,48 @@
 {% block form_info_alert %}{% endblock %}
 {% block edit_info_bar %}{% endblock %}
 
-<div class="form-card">
-  {% block form_card_header %}{% endblock %}
-  <div class="form-card-body">
-    {% block form_content %}{% endblock %}
-  </div>
-</div>
+<form method="post" {% block form_attrs %}{% endblock %} autocomplete="off">
+  {% csrf_token %}
+  {% block form_non_field_errors %}{% endblock %}
 
-{% block form_footer %}
-  <div class="form-actions-bar">
-    <div class="form-actions-left">
-      {% block form_cancel %}
-        <button type="button" class="eal-btn eal-btn-outline">{% translate "Cancel" %}</button>
+  <div class="form-card">
+    <div class="form-card-header">
+      {% block form_card_icon %}
+        <div class="form-card-icon blue">
+          <i class="bi bi-pencil-square"></i>
+        </div>
       {% endblock %}
+      <div class="form-card-header-text">
+        <h3 class="form-card-title">{% block form_card_title %}{% translate "Details" %}{% endblock %}</h3>
+        <p class="form-card-desc">{% block form_card_desc %}{% translate "Fill in the required fields below." %}{% endblock %}</p>
+      </div>
     </div>
-    <div class="form-actions-right">
-      {% block form_submit %}
-        <button type="submit" class="eal-btn eal-btn-primary">
-          <i class="bi bi-save"></i>
-          <span>{% translate "Save" %}</span>
-        </button>
-      {% endblock %}
+      {% block form_content %}{% endblock %}
     </div>
+
+    {# Fixed Action Bar at the bottom of the viewport #}
+    {% block form_actions %}
+      <div class="form-actions-bar">
+        <div class="form-actions-left">
+          {% block form_submit %}
+            <button type="submit" class="eal-btn eal-btn-primary">
+              <i class="bi bi-save"></i>
+              <span>{% translate "Save Changes" %}</span>
+            </button>
+          {% endblock %}
+          
+          {% block form_cancel %}
+            <button type="button" class="eal-btn eal-btn-outline" onclick="history.back()">
+              <i class="bi bi-x-lg"></i>
+              <span>{% translate "Cancel" %}</span>
+            </button>
+          {% endblock %}
+          {% block form_extra_actions %}{% endblock %}
+        </div>
+      </div>
+    {% endblock %}
   </div>
-{% endblock %}
+  </div>
+
+  {% block form_extra_cards %}{% endblock %}
+</form>

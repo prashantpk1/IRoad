@@ -1,21 +1,25 @@
 {% extends 'base.html' %}
 {% load i18n %}
-{% block title %}Create Subscription Order | iRoad Admin{% endblock %}
+{% block title %}{% translate "Create Subscription Order" %}{% endblock %}
 
 {% block breadcrumb_items %}
-<li class="breadcrumb-item active" aria-current="page">{% translate "Create Subscription Order | iRoad Admin" %}</li>
+<li class="breadcrumb-item"><a href="{% url 'order_list' %}">{% translate "Subscription Orders" %}</a></li>
+<li class="breadcrumb-item active" aria-current="page">{% translate "Create Order" %}</li>
 {% endblock %}
 
 {% block content %}
 <div class="page-header">
   <div class="page-header-row">
     <div class="page-header-left">
-      <h1 class="page-title">{% translate "Create Subscription Order | iRoad Admin" %}</h1>
-      <p class="page-subtitle">{% translate "Manage your records here" %}</p>
+      <h1 class="page-title">{% translate "Create Subscription Order" %}</h1>
+      <p class="page-subtitle">{% translate "Configure order header, plan selection, add-ons, and review totals." %}</p>
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
-        <!-- Actions here -->
+        <a href="{% url 'order_list' %}" class="eal-btn eal-btn-outline">
+          <i class="bi bi-arrow-left"></i>
+          <span>{% translate "Back to list" %}</span>
+        </a>
       </div>
     </div>
   </div>
@@ -31,116 +35,167 @@
 {% endif %}
 
 
-<form method="post" action="{% url 'order_create' %}" id="order-form" class="vstack gap-4">
+<form method="post" action="{% url 'order_create' %}" id="order-form" class="vstack gap-4" autocomplete="off">
   {% csrf_token %}
   <div class="form-card">
-    <div class="form-card-header">Section 1: Order Header</div>
-    <div class="form-card-body row g-3">
-      <div class="field col-md-6">
-        <label class="form-label">Tenant</label>
-        <select name="tenant" class="form-select" required id="id_tenant">
-          <option value="">---------</option>
-          {% for t in tenants %}
-            <option value="{{ t.tenant_id }}" {% if tenant_preselect == t.tenant_id|stringformat:"s" %}selected{% endif %}>{{ t.company_name }}</option>
-          {% endfor %}
-        </select>
+    <div class="form-card-header">
+      <div class="form-card-icon blue">
+        <i class="bi bi-cart-plus"></i>
       </div>
-      <div class="field col-md-6">
-        <label class="form-label">Classification</label>
-        <select name="order_classification" class="form-select" required id="id_classification">
-          {% for code, label in classification_choices %}
-            <option value="{{ code }}">{{ label }}</option>
-          {% endfor %}
-        </select>
+      <div class="form-card-header-text">
+        <h3 class="form-card-title">{% translate "Order Header" %}</h3>
+        <p class="form-card-desc">{% translate "Select tenant, classification, currency, and payment method." %}</p>
       </div>
-      <div class="field col-md-4">
-        <label class="form-label">Currency</label>
-        <select name="currency" class="form-select" required id="id_currency">
-          {% for c in currencies %}
-            <option value="{{ c.currency_code }}">{{ c.currency_code }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="field col-md-4">
-        <label class="form-label">Promo code (optional)</label>
-        <input type="text" name="promo_code" class="form-control" maxlength="40" autocomplete="off">
-      </div>
-      <div class="field col-md-4">
-        <label class="form-label">Payment method</label>
-        <select name="payment_method" class="form-select" required id="id_payment_method">
-          {% for m in payment_methods %}
-            <option value="{{ m.method_id }}">{{ m.method_name_en }}</option>
-          {% endfor %}
-        </select>
+    </div>
+    <div class="form-card-body">
+      <div class="field-group">
+        <div class="row g-3">
+          <div class="col-12 col-md-6">
+            <label class="form-label">{% translate "Tenant" %}</label>
+            <select name="tenant" class="form-select" required id="id_tenant">
+              <option value="">---------</option>
+              {% for t in tenants %}
+                <option value="{{ t.tenant_id }}" {% if tenant_preselect == t.tenant_id|stringformat:"s" %}selected{% endif %}>{{ t.company_name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label">{% translate "Classification" %}</label>
+            <select name="order_classification" class="form-select" required id="id_classification">
+              {% for code, label in classification_choices %}
+                <option value="{{ code }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-12 col-md-4">
+            <label class="form-label">{% translate "Currency" %}</label>
+            <select name="currency" class="form-select" required id="id_currency">
+              {% for c in currencies %}
+                <option value="{{ c.currency_code }}">{{ c.currency_code }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-12 col-md-4">
+            <label class="form-label">{% translate "Promo code (optional)" %}</label>
+            <input type="text" name="promo_code" class="form-control" maxlength="40" autocomplete="off">
+          </div>
+          <div class="col-12 col-md-4">
+            <label class="form-label">{% translate "Payment method" %}</label>
+            <select name="payment_method" class="form-select" required id="id_payment_method">
+              {% for m in payment_methods %}
+                <option value="{{ m.method_id }}">{{ m.method_name_en }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 
   <div class="form-card" id="plan-section" style="display:none;">
-    <div class="form-card-header">Section 2: Plan Selection</div>
-    <div class="form-card-body row g-3">
-      <div class="field col-md-6">
-        <label class="form-label">Plan</label>
-        <select name="plan" class="form-select" id="id_plan">
-          <option value="">---------</option>
-          {% for p in plans %}
-            <option value="{{ p.plan_id }}">{{ p.plan_name_en }}</option>
-          {% endfor %}
-        </select>
+    <div class="form-card-header">
+      <div class="form-card-icon" style="background: rgba(16, 185, 129, 0.1); color: var(--success-color);">
+        <i class="bi bi-box-seam"></i>
       </div>
-      <div class="field col-md-3">
-        <label class="form-label">Cycles</label>
-        <input type="number" name="number_of_cycles" class="form-control" id="id_cycles" value="1" min="1">
+      <div class="form-card-header-text">
+        <h3 class="form-card-title">{% translate "Plan Selection" %}</h3>
+        <p class="form-card-desc">{% translate "Choose a subscription plan, number of cycles, and review pricing." %}</p>
       </div>
-      <div class="field col-md-3">
-        <label class="form-label">Plan price</label>
-        <input type="text" class="form-control" id="preview_plan_price" readonly value="0.00">
-      </div>
-      <div class="field col-md-6" id="upgrade-pro-rata-wrap" style="display:none;">
-        <label class="form-label">Pro-rata adjustment (credit)</label>
-        <input type="text" class="form-control" id="preview_pro_rata" readonly value="0.00">
-        <div class="form-text">Server calculates on save; hint: {{ upgrade_credit_hint|default:"—" }}</div>
-      </div>
-      <div class="field col-md-6">
-        <label class="form-label">Line total (preview)</label>
-        <input type="text" class="form-control fw-semibold" id="preview_plan_line_total" readonly value="0.00">
+    </div>
+    <div class="form-card-body">
+      <div class="field-group">
+        <div class="row g-3">
+          <div class="col-12 col-md-6">
+            <label class="form-label">{% translate "Plan" %}</label>
+            <select name="plan" class="form-select" id="id_plan">
+              <option value="">---------</option>
+              {% for p in plans %}
+                <option value="{{ p.plan_id }}">{{ p.plan_name_en }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-12 col-md-3">
+            <label class="form-label">{% translate "Cycles" %}</label>
+            <input type="number" name="number_of_cycles" class="form-control" id="id_cycles" value="1" min="1">
+          </div>
+          <div class="col-12 col-md-3">
+            <label class="form-label">{% translate "Plan price" %}</label>
+            <input type="text" class="form-control" id="preview_plan_price" readonly value="0.00">
+          </div>
+          <div class="col-12 col-md-6" id="upgrade-pro-rata-wrap" style="display:none;">
+            <label class="form-label">{% translate "Pro-rata adjustment (credit)" %}</label>
+            <input type="text" class="form-control" id="preview_pro_rata" readonly value="0.00">
+            <div class="field-hint">{% translate "Server calculates on save" %}; hint: {{ upgrade_credit_hint|default:"—" }}</div>
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label">{% translate "Line total (preview)" %}</label>
+            <input type="text" class="form-control fw-semibold" id="preview_plan_line_total" readonly value="0.00">
+          </div>
+        </div>
       </div>
     </div>
   </div>
 
   <div class="form-card" id="addon-section" style="display:none;">
-    <div class="form-card-header d-flex justify-content-between align-items-center">
-      <span>Section 3: Add-ons</span>
-      <button type="button" class="btn btn-sm btn-outline-primary" id="btn-add-addon-row">Add row</button>
+    <div class="form-card-header">
+      <div class="form-card-icon" style="background: rgba(245, 158, 11, 0.1); color: var(--warning-color);">
+        <i class="bi bi-puzzle"></i>
+      </div>
+      <div class="form-card-header-text">
+        <h3 class="form-card-title">{% translate "Add-ons" %}</h3>
+        <p class="form-card-desc">{% translate "Add or remove add-on resources for the subscription." %}</p>
+      </div>
+      <button type="button" class="btn btn-sm btn-outline-primary ms-auto" id="btn-add-addon-row">
+        <i class="bi bi-plus-lg"></i> {% translate "Add row" %}
+      </button>
     </div>
     <div class="form-card-body">
       <div id="addon-rows" class="vstack gap-2"></div>
-      <p class="text-muted small mb-0 mt-2">Unit prices follow the active add-ons policy. Line totals use remaining days in the current cycle (server-validated on save).</p>
+      <p class="text-muted small mb-0 mt-2">{% translate "Unit prices follow the active add-ons policy. Line totals use remaining days in the current cycle (server-validated on save)." %}</p>
     </div>
   </div>
 
   <div class="form-card">
-    <div class="form-card-header">Section 4: Totals Preview card</div>
-    <div class="form-card-body row g-2">
-      <div class="field col-md-4"><strong>Sub total</strong> <span id="pv_sub" class="float-end">0.00</span></div>
-      <div class="field col-md-4"><strong>Discount</strong> <span id="pv_disc" class="float-end">0.00</span></div>
-      <div class="field col-md-4"><strong>Tax</strong> <span id="pv_tax" class="float-end">0.00</span></div>
-      <div class="field col-md-4"><strong>Grand total</strong> <span id="pv_grand" class="float-end fw-bold">0.00</span></div>
-      <div class="col-md-8"><strong>Base currency equivalent</strong> <span id="pv_base" class="float-end">0.00</span></div>
-      <div class="col-12 mt-3">
-        <label class="form-label">Projected state preview</label>
-        <p class="small text-muted mb-0" id="projected_hint">After save, open the order detail to see full projected plan, expiry, and limits from the server.</p>
+    <div class="form-card-header">
+      <div class="form-card-icon" style="background: rgba(99, 102, 241, 0.1); color: #6366f1;">
+        <i class="bi bi-calculator"></i>
+      </div>
+      <div class="form-card-header-text">
+        <h3 class="form-card-title">{% translate "Totals Preview" %}</h3>
+        <p class="form-card-desc">{% translate "Review the calculated totals before saving." %}</p>
       </div>
     </div>
-  </div>
+    <div class="form-card-body">
+      <div class="row g-3">
+        <div class="col-12 col-md-4"><label class="form-label">{% translate "Sub total" %}</label><input class="form-control" id="pv_sub_input" readonly value="0.00"></div>
+        <div class="col-12 col-md-4"><label class="form-label">{% translate "Discount" %}</label><input class="form-control" id="pv_disc_input" readonly value="0.00"></div>
+        <div class="col-12 col-md-4"><label class="form-label">{% translate "Tax" %}</label><input class="form-control" id="pv_tax_input" readonly value="0.00"></div>
+        <div class="col-12 col-md-4"><label class="form-label fw-semibold">{% translate "Grand total" %}</label><input class="form-control fw-bold" id="pv_grand_input" readonly value="0.00"></div>
+        <div class="col-12 col-md-8"><label class="form-label">{% translate "Base currency equivalent" %}</label><input class="form-control" id="pv_base_input" readonly value="0.00"></div>
+        <div class="col-12 mt-2">
+          <label class="form-label">{% translate "Projected state preview" %}</label>
+          <p class="small text-muted mb-0" id="projected_hint">{% translate "After save, open the order detail to see full projected plan, expiry, and limits from the server." %}</p>
+        </div>
+      </div>
 
-  <div class="form-actions-bar">
-  <div class="eal-header-actions">
+      {# Hidden spans for JS compatibility #}
+      <span id="pv_sub" style="display:none">0.00</span>
+      <span id="pv_disc" style="display:none">0.00</span>
+      <span id="pv_tax" style="display:none">0.00</span>
+      <span id="pv_grand" style="display:none">0.00</span>
+      <span id="pv_base" style="display:none">0.00</span>
 
-    <div class="footer-left"><a href="{% url 'order_list' %}" class="eal-btn eal-btn-outline">Cancel</a>
-  </div>
-</div>
-    <div class="footer-right"><button type="submit" class="eal-btn eal-btn-primary">Save as draft</button></div>
+      <div class="d-flex flex-wrap gap-2 mt-4">
+        <button type="submit" class="eal-btn eal-btn-primary">
+          <i class="bi bi-save"></i>
+          <span>{% translate "Save as draft" %}</span>
+        </button>
+        <a href="{% url 'order_list' %}" class="eal-btn eal-btn-outline">
+          <i class="bi bi-x-lg"></i>
+          <span>{% translate "Cancel" %}</span>
+        </a>
+      </div>
+    </div>
   </div>
 </form>
 
@@ -150,7 +205,7 @@
 <template id="addon-row-tpl">
   <div class="addon-row row g-2 align-items-end border rounded p-2 bg-light">
     <div class="field col-md-3">
-      <label class="form-label small">Action</label>
+      <label class="form-label small">{% translate "Action" %}</label>
       <select name="addon_action" class="form-select form-select-sm addon-action">
         {% for code, label in addon_action_choices %}
           <option value="{{ code }}">{{ label }}</option>
@@ -158,7 +213,7 @@
       </select>
     </div>
     <div class="field col-md-4">
-      <label class="form-label small">Add-on type</label>
+      <label class="form-label small">{% translate "Add-on type" %}</label>
       <select name="addon_add_on_type" class="form-select form-select-sm addon-type">
         <option value="">---------</option>
         {% for code, label in addon_type_choices %}
@@ -167,15 +222,15 @@
       </select>
     </div>
     <div class="col-md-2">
-      <label class="form-label small">Qty</label>
+      <label class="form-label small">{% translate "Qty" %}</label>
       <input type="number" name="addon_quantity" class="form-control form-control-sm addon-qty" value="1" min="1">
     </div>
     <div class="col-md-2">
-      <label class="form-label small">Unit</label>
+      <label class="form-label small">{% translate "Unit" %}</label>
       <input type="text" class="form-control form-control-sm addon-unit" readonly value="0.00">
     </div>
     <div class="col-md-1">
-      <button type="button" class="btn btn-sm btn-outline-danger w-100 btn-remove-addon" title="Remove">&times;</button>
+      <button type="button" class="btn btn-sm btn-outline-danger w-100 btn-remove-addon" title="{% translate 'Remove' %}">&times;</button>
     </div>
   </div>
 </template>
@@ -279,11 +334,22 @@
     const taxable = Math.max(0, sub - disc);
     const tax = taxable * (taxRate / 100);
     const grand = taxable + tax;
+    // Update both hidden spans (legacy) and new inputs
     document.getElementById('pv_sub').textContent = sub.toFixed(2);
     document.getElementById('pv_disc').textContent = disc.toFixed(2);
     document.getElementById('pv_tax').textContent = tax.toFixed(2);
     document.getElementById('pv_grand').textContent = grand.toFixed(2);
     document.getElementById('pv_base').textContent = grand.toFixed(2);
+    var subI = document.getElementById('pv_sub_input');
+    var discI = document.getElementById('pv_disc_input');
+    var taxI = document.getElementById('pv_tax_input');
+    var grandI = document.getElementById('pv_grand_input');
+    var baseI = document.getElementById('pv_base_input');
+    if (subI) subI.value = sub.toFixed(2);
+    if (discI) discI.value = disc.toFixed(2);
+    if (taxI) taxI.value = tax.toFixed(2);
+    if (grandI) grandI.value = grand.toFixed(2);
+    if (baseI) baseI.value = grand.toFixed(2);
   }
 
   clsEl.addEventListener('change', showSections);
@@ -297,4 +363,3 @@
 })();
 </script>
 {% endblock %}
-

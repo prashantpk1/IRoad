@@ -1,5 +1,12 @@
 {% extends 'base.html' %}
-{% block title %}{{ invoice.invoice_number }} | iRoad Admin{% endblock %}
+{% load i18n %}
+{% block title %}{{ invoice.invoice_number }}{% endblock %}
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item"><a href="{% url 'invoice_list' %}">{% translate "Invoices" %}</a></li>
+<li class="breadcrumb-item active" aria-current="page">{{ invoice.invoice_number }}</li>
+{% endblock %}
+
 {% block content %}
 {% if messages %}
   {% for message in messages %}
@@ -11,63 +18,95 @@
 {% endif %}
 
 <div class="page-header">
-  <nav aria-label="breadcrumb">
-    <ol class="breadcrumb">
-      <li class="breadcrumb-item"><a href="{% url 'invoice_list' %}">Invoices</a></li>
-      <li class="breadcrumb-item active" aria-current="page">{{ invoice.invoice_number }}</li>
-    </ol>
-  </nav>
   <div class="page-header-row">
     <div class="page-header-left">
       <h1 class="page-title">{{ invoice.invoice_number }}</h1>
-      <p class="page-subtitle">Supplier and customer snapshot with immutable totals</p>
+      <p class="page-subtitle">{% translate "Supplier and customer snapshot with immutable totals." %}</p>
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
         <a href="{% url 'invoice_list' %}" class="eal-btn eal-btn-outline">
           <i class="bi bi-arrow-left"></i>
-          <span>Back to list</span>
+          <span>{% translate "Back to list" %}</span>
         </a>
-        <button type="button" class="eal-btn eal-btn-outline" disabled title="Coming soon">
+        <button type="button" class="eal-btn eal-btn-outline" disabled title="{% translate 'Coming soon' %}">
           <i class="bi bi-printer"></i>
-          <span>Print / download</span>
+          <span>{% translate "Print / Download" %}</span>
         </button>
-        <!-- TODO Phase 11: Implement PDF generation here -->
       </div>
     </div>
   </div>
 </div>
 
-<div class="card mb-4">
-  <div class="card-body">
-    <div class="row">
-      <div class="col-md-6">
-        <h6 class="text-uppercase text-muted small">Supplier</h6>
-        <p class="mb-0 fw-semibold">{{ invoice.supplier_name }}</p>
-        <p class="small mb-0">Tax: {{ invoice.supplier_tax_number|default:'—' }}</p>
+{# Parties Card #}
+<div class="form-card mb-3">
+  <div class="form-card-header">
+    <div class="form-card-icon blue">
+      <i class="bi bi-people"></i>
+    </div>
+    <div class="form-card-header-text">
+      <h3 class="form-card-title">{% translate "Parties" %}</h3>
+      <p class="form-card-desc">{% translate "Supplier and customer details." %}</p>
+    </div>
+  </div>
+  <div class="form-card-body">
+    <div class="row g-3">
+      <div class="col-12 col-md-6">
+        <label class="form-label fw-semibold">{% translate "Supplier" %}</label>
+        <input class="form-control" value="{{ invoice.supplier_name }}" readonly>
+        <div class="field-hint">{% translate "Tax" %}: {{ invoice.supplier_tax_number|default:'—' }}</div>
       </div>
-      <div class="col-md-6 text-md-end mt-3 mt-md-0">
-        <h6 class="text-uppercase text-muted small">Bill to</h6>
-        <p class="mb-0 fw-semibold">{{ invoice.customer_name }}</p>
-        <p class="small mb-0">Tax: {{ invoice.customer_tax_number|default:'—' }}</p>
-        {% if invoice.customer_address %}<p class="small mb-0">{{ invoice.customer_address }}</p>{% endif %}
+      <div class="col-12 col-md-6">
+        <label class="form-label fw-semibold">{% translate "Bill To" %}</label>
+        <input class="form-control" value="{{ invoice.customer_name }}" readonly>
+        <div class="field-hint">{% translate "Tax" %}: {{ invoice.customer_tax_number|default:'—' }}{% if invoice.customer_address %} · {{ invoice.customer_address }}{% endif %}</div>
       </div>
     </div>
-    <hr>
-    <div class="row small">
-      <div class="col-md-4"><strong>Issue date</strong><br>{{ invoice.issue_date|date:'Y-m-d' }}</div>
-      <div class="col-md-4"><strong>Due date</strong><br>{{ invoice.due_date|default:'—' }}</div>
-      <div class="col-md-4"><strong>Status</strong><br>{{ invoice.get_status_display }}</div>
-      {% if invoice.tax_code %}<div class="col-md-4 mt-2"><strong>Tax code</strong><br>{{ invoice.tax_code.tax_code }} ({{ invoice.tax_code.rate_percent }}%)</div>{% endif %}
+    <div class="row g-3 mt-1">
+      <div class="col-12 col-md-4">
+        <label class="form-label">{% translate "Issue date" %}</label>
+        <input class="form-control" value="{{ invoice.issue_date|date:'d M Y' }}" readonly>
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label">{% translate "Due date" %}</label>
+        <input class="form-control" value="{{ invoice.due_date|default:'—' }}" readonly>
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label">{% translate "Status" %}</label>
+        <input class="form-control" value="{{ invoice.get_status_display }}" readonly>
+      </div>
+      {% if invoice.tax_code %}
+      <div class="col-12 col-md-4">
+        <label class="form-label">{% translate "Tax code" %}</label>
+        <input class="form-control" value="{{ invoice.tax_code.tax_code }} ({{ invoice.tax_code.rate_percent }}%)" readonly>
+      </div>
+      {% endif %}
     </div>
   </div>
 </div>
 
-<div class="card mb-4">
-  <div class="table-responsive">
-    <table class="table mb-0">
+{# Line Items Card #}
+<div class="form-card mb-3">
+  <div class="form-card-header">
+    <div class="form-card-icon" style="background: rgba(16, 185, 129, 0.1); color: var(--success-color);">
+      <i class="bi bi-list-columns-reverse"></i>
+    </div>
+    <div class="form-card-header-text">
+      <h3 class="form-card-title">{% translate "Line Items" %}</h3>
+      <p class="form-card-desc">{% translate "Invoice line item breakdown." %}</p>
+    </div>
+  </div>
+  <div class="eal-table-wrap">
+    <table class="eal-table">
       <thead>
-        <tr><th>Description</th><th class="text-end">Qty</th><th class="text-end">Unit price</th><th class="text-end">Tax rate</th><th class="text-end">Tax</th><th class="text-end">Line total</th></tr>
+        <tr>
+          <th>{% translate "Description" %}</th>
+          <th class="text-end">{% translate "Qty" %}</th>
+          <th class="text-end">{% translate "Unit Price" %}</th>
+          <th class="text-end">{% translate "Tax Rate" %}</th>
+          <th class="text-end">{% translate "Tax" %}</th>
+          <th class="text-end">{% translate "Line Total" %}</th>
+        </tr>
       </thead>
       <tbody>
         {% for line in invoice.line_items.all %}
@@ -77,38 +116,70 @@
             <td class="text-end">{{ line.unit_price|floatformat:2 }}</td>
             <td class="text-end">{{ line.tax_rate|floatformat:2 }}%</td>
             <td class="text-end">{{ line.tax_amount|floatformat:2 }}</td>
-            <td class="text-end">{{ line.line_total|floatformat:2 }}</td>
+            <td class="text-end"><span class="eal-entity-id">{{ line.line_total|floatformat:2 }}</span></td>
           </tr>
         {% empty %}
-          <tr><td colspan="6" class="text-center text-muted py-3">No line items.</td></tr>
+          <tr><td colspan="6" class="text-center text-muted py-3">{% translate "No line items." %}</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 </div>
 
-<div class="row justify-content-end">
-  <div class="col-md-5">
-    <div class="card">
-      <div class="card-body small">
-        <div class="d-flex justify-content-between"><span>Sub total</span><span>{{ invoice.sub_total|floatformat:2 }} {{ invoice.currency_id }}</span></div>
-        <div class="d-flex justify-content-between"><span>Discount</span><span>{{ invoice.discount_amount|floatformat:2 }}</span></div>
-        <div class="d-flex justify-content-between"><span>Taxable</span><span>{{ invoice.taxable_amount|floatformat:2 }}</span></div>
-        <div class="d-flex justify-content-between"><span>Tax amount</span><span>{{ invoice.tax_amount|floatformat:2 }}</span></div>
-        <hr class="my-2">
-        <div class="d-flex justify-content-between fw-bold"><span>Grand total</span><span>{{ invoice.grand_total|floatformat:2 }} {{ invoice.currency_id }}</span></div>
-        <div class="d-flex justify-content-between"><span>Base currency equivalent</span><span>{{ invoice.base_currency_equivalent_amount|floatformat:2 }}</span></div>
-        <div class="d-flex justify-content-between"><span>FX snapshot</span><span>{{ invoice.exchange_rate_snapshot }}</span></div>
+{# Totals Card #}
+<div class="form-card mb-3">
+  <div class="form-card-header">
+    <div class="form-card-icon" style="background: rgba(99, 102, 241, 0.1); color: #6366f1;">
+      <i class="bi bi-calculator"></i>
+    </div>
+    <div class="form-card-header-text">
+      <h3 class="form-card-title">{% translate "Totals" %}</h3>
+      <p class="form-card-desc">{% translate "Final invoice amounts." %}</p>
+    </div>
+  </div>
+  <div class="form-card-body">
+    <div class="row g-3">
+      <div class="col-12 col-md-4">
+        <label class="form-label">{% translate "Sub total" %}</label>
+        <input class="form-control" value="{{ invoice.sub_total|floatformat:2 }} {{ invoice.currency_id }}" readonly>
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label">{% translate "Discount" %}</label>
+        <input class="form-control" value="{{ invoice.discount_amount|floatformat:2 }}" readonly>
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label">{% translate "Taxable" %}</label>
+        <input class="form-control" value="{{ invoice.taxable_amount|floatformat:2 }}" readonly>
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label">{% translate "Tax amount" %}</label>
+        <input class="form-control" value="{{ invoice.tax_amount|floatformat:2 }}" readonly>
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label fw-semibold">{% translate "Grand total" %}</label>
+        <input class="form-control fw-bold" value="{{ invoice.grand_total|floatformat:2 }} {{ invoice.currency_id }}" readonly>
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label">{% translate "Base currency equivalent" %}</label>
+        <input class="form-control" value="{{ invoice.base_currency_equivalent_amount|floatformat:2 }}" readonly>
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label">{% translate "FX snapshot" %}</label>
+        <input class="form-control" value="{{ invoice.exchange_rate_snapshot }}" readonly>
       </div>
     </div>
   </div>
 </div>
 
 {% if invoice.status == 'Issued' and request.user.is_root %}
-<form method="post" action="{% url 'invoice_void' invoice.invoice_id %}" class="mt-4" onsubmit="return confirm('Void this invoice?');">
-  {% csrf_token %}
-  <button type="submit" class="btn btn-outline-secondary">Void invoice</button>
-</form>
+<div class="d-flex flex-wrap gap-2 mb-4">
+  <form method="post" action="{% url 'invoice_void' invoice.invoice_id %}" onsubmit="return confirm('{% translate "Void this invoice?" %}');">
+    {% csrf_token %}
+    <button type="submit" class="eal-btn eal-btn-outline" style="color: var(--danger-color); border-color: var(--danger-color);">
+      <i class="bi bi-slash-circle"></i>
+      <span>{% translate "Void Invoice" %}</span>
+    </button>
+  </form>
+</div>
 {% endif %}
 {% endblock %}
-

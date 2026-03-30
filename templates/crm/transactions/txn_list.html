@@ -1,23 +1,28 @@
 {% extends 'base.html' %}
 {% load i18n %}
 
-{% block title %}{% translate "Transactions Ledger | iRoad Admin" %}{% endblock %}
-{% block page_title %}{% translate "Transactions Ledger | iRoad Admin" %}{% endblock %}
+{% block title %}{% translate "Transactions Ledger" %}{% endblock %}
+{% block page_title %}{% translate "Transactions Ledger" %}{% endblock %}
 
 {% block breadcrumb_items %}
-<li class="breadcrumb-item active" aria-current="page">{% translate "Transactions Ledger | iRoad Admin" %}</li>
+<li class="breadcrumb-item active" aria-current="page">{% translate "Transactions Ledger" %}</li>
 {% endblock %}
 
 {% block content %}
 <div class="page-header">
   <div class="page-header-row">
     <div class="page-header-left">
-      <h1 class="page-title">{% translate "Transactions Ledger | iRoad Admin" %}</h1>
-      <p class="page-subtitle">{% translate "Manage your records here" %}</p>
+      <h1 class="page-title">{% translate "Transactions Ledger" %}</h1>
+      <p class="page-subtitle">{% translate "Sort, search, filter, and manage payment transactions." %}</p>
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
-        {% if request.user.is_root %}<a href="{% url 'transaction_create' %}" class="eal-btn eal-btn-primary">Add wallet top-up</a>{% endif %}
+        {% if request.user.is_root %}
+          <a href="{% url 'transaction_create' %}" class="eal-btn eal-btn-primary">
+            <i class="bi bi-plus-lg"></i>
+            <span>{% translate "Add Wallet Top-Up" %}</span>
+          </a>
+        {% endif %}
       </div>
     </div>
   </div>
@@ -28,40 +33,83 @@
 <div class="eal-table-card">
   <form method="get">
     <div class="eal-toolbar">
-      <div class="eal-toolbar-left" style="width:100%;display:flex;gap:8px;flex-wrap:wrap;">
-        <div class="eal-search" style="flex:1;min-width:220px;"><i class="bi bi-search"></i><input type="text" name="q" placeholder="Tenant or gateway ref" value="{{ search_query }}"></div>
-        <div style="width:180px"><select class="eal-select" name="transaction_type"><option value="">All types</option>{% for code, label in type_choices %}<option value="{{ code }}" {% if type_filter == code %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
-        <div style="width:180px"><select class="eal-select" name="status"><option value="">All statuses</option>{% for code, label in status_choices %}<option value="{{ code }}" {% if status_filter == code %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
-        <div style="width:160px"><select class="eal-select" name="currency"><option value="">All currencies</option>{% for c in currencies %}<option value="{{ c.currency_code }}" {% if currency_filter == c.currency_code %}selected{% endif %}>{{ c.currency_code }}</option>{% endfor %}</select></div>
-        <button type="submit" class="eal-btn eal-btn-primary"><i class="bi bi-funnel"></i><span>{% translate "Apply" %}</span></button>
+      <div class="eal-toolbar-left">
+        <div class="eal-search">
+          <i class="bi bi-search"></i>
+          <input type="text" name="q" placeholder="{% translate 'Tenant or gateway ref...' %}" value="{{ search_query }}">
+        </div>
+      </div>
+      <div class="eal-toolbar-right">
+        <select class="eal-filter-select" name="transaction_type" onchange="this.form.submit()">
+          <option value="">{% translate "Type: All" %}</option>
+          {% for code, label in type_choices %}
+            <option value="{{ code }}" {% if type_filter == code %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+        <select class="eal-filter-select" name="status" onchange="this.form.submit()">
+          <option value="">{% translate "Status: All" %}</option>
+          {% for code, label in status_choices %}
+            <option value="{{ code }}" {% if status_filter == code %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+        <select class="eal-filter-select" name="currency" onchange="this.form.submit()">
+          <option value="">{% translate "Currency: All" %}</option>
+          {% for c in currencies %}
+            <option value="{{ c.currency_code }}" {% if currency_filter == c.currency_code %}selected{% endif %}>{{ c.currency_code }}</option>
+          {% endfor %}
+        </select>
+
+        {% if search_query or type_filter or status_filter or currency_filter %}
+          <a href="{% url 'transaction_list' %}" class="eal-btn eal-btn-outline" style="border-style: dashed; color: var(--text-muted);">
+            <i class="bi bi-x-circle"></i>
+            <span>{% translate "Clear" %}</span>
+          </a>
+        {% endif %}
       </div>
     </div>
   </form>
 
   <div class="eal-table-wrap">
     <table class="eal-table">
-      <thead><tr><th>#</th><th>Tenant</th><th>Type</th><th>Currency</th><th>Amount</th><th>Base equiv.</th><th>Status</th><th>Gateway ref</th><th>Date</th><th>ACTIONS</th></tr></thead>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>{% translate "Tenant" %}</th>
+          <th>{% translate "Type" %}</th>
+          <th>{% translate "Currency" %}</th>
+          <th>{% translate "Amount" %}</th>
+          <th>{% translate "Base Equiv." %}</th>
+          <th>{% translate "Status" %}</th>
+          <th>{% translate "Gateway Ref" %}</th>
+          <th>{% translate "Date" %}</th>
+          <th>{% translate "ACTIONS" %}</th>
+        </tr>
+      </thead>
       <tbody>
         {% for t in transactions %}
           <tr>
             <td>{{ forloop.counter0|add:transactions.start_index }}</td>
-            <td>{{ t.tenant.company_name }}</td>
+            <td><span class="fw-bold">{{ t.tenant.company_name }}</span></td>
             <td>{{ t.get_transaction_type_display }}</td>
             <td>{{ t.currency_id }}</td>
-            <td>{{ t.amount|floatformat:2 }}</td>
+            <td><span class="eal-entity-id">{{ t.amount|floatformat:2 }}</span></td>
             <td>{{ t.base_currency_equivalent_amount|floatformat:2 }}</td>
             <td>{% if t.status == 'Pending' %}<span class="status-badge pending">{{ t.get_status_display }}</span>{% elif t.status == 'Completed' %}<span class="status-badge active">{{ t.get_status_display }}</span>{% elif t.status == 'Failed' %}<span class="status-badge warning">{{ t.get_status_display }}</span>{% elif t.status == 'Rejected' %}<span class="status-badge pending">{{ t.get_status_display }}</span>{% else %}<span class="status-badge inactive">{{ t.get_status_display }}</span>{% endif %}</td>
             <td class="small">{{ t.gateway_ref|default:'—' }}</td>
-            <td>{{ t.created_at|date:'Y-m-d H:i' }}</td>
-            <td><div class="eal-actions-cell"><a href="{% url 'transaction_detail' t.transaction_id %}" class="eal-row-btn"><i class="bi bi-eye"></i></a></div></td>
+            <td>{{ t.created_at|date:'d M Y' }}</td>
+            <td>
+              <div class="eal-actions-cell">
+                <a href="{% url 'transaction_detail' t.transaction_id %}" class="eal-row-btn" title="{% translate 'View' %}"><i class="bi bi-eye"></i></a>
+              </div>
+            </td>
           </tr>
         {% empty %}
           <tr class="eal-table-empty">
             <td colspan="10">
               <div class="notification-empty">
                 <div class="empty-icon"><i class="bi bi-inbox"></i></div>
-                <h4 class="empty-title">{% translate "No Data Found" %}</h4>
-                <p class="empty-text">No transactions.</p>
+                <h4 class="empty-title">{% translate "No transactions found" %}</h4>
+                <p class="empty-text">{% translate "No transactions match your current filters." %}</p>
               </div>
             </td>
           </tr>

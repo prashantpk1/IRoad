@@ -1,26 +1,29 @@
 {% extends 'base.html' %}
 {% load i18n %}
-{% block title %}Manual Wallet Top-Up | iRoad Admin{% endblock %}
+{% block title %}{% translate "Manual Wallet Top-Up" %}{% endblock %}
 
 {% block breadcrumb_items %}
-<li class="breadcrumb-item active" aria-current="page">{% translate "Manual Wallet Top-Up | iRoad Admin" %}</li>
+<li class="breadcrumb-item"><a href="{% url 'transaction_list' %}">{% translate "Transactions" %}</a></li>
+<li class="breadcrumb-item active" aria-current="page">{% translate "Manual Wallet Top-Up" %}</li>
 {% endblock %}
 
 {% block content %}
 <div class="page-header">
   <div class="page-header-row">
     <div class="page-header-left">
-      <h1 class="page-title">{% translate "Manual Wallet Top-Up | iRoad Admin" %}</h1>
-      <p class="page-subtitle">{% translate "Manage your records here" %}</p>
+      <h1 class="page-title">{% translate "Manual Wallet Top-Up" %}</h1>
+      <p class="page-subtitle">{% translate "This will be marked completed immediately and added to the tenant wallet balance." %}</p>
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
-        <!-- Actions here -->
+        <a href="{% url 'transaction_list' %}" class="eal-btn eal-btn-outline">
+          <i class="bi bi-arrow-left"></i>
+          <span>{% translate "Back to list" %}</span>
+        </a>
       </div>
     </div>
   </div>
 </div>
-
 
 {% if messages %}
   {% for message in messages %}
@@ -31,49 +34,65 @@
   {% endfor %}
 {% endif %}
 
-<h4 class="mb-3">Manual Wallet Top-Up</h4>
-<p class="text-muted">This will be marked completed immediately and added to the tenant wallet balance.</p>
-
-<div class="form-card">
-  <div class="form-card-body">
-<form method="post" enctype="multipart/form-data" action="{% url 'transaction_create' %}" class="card p-4">
+<form method="post" enctype="multipart/form-data" action="{% url 'transaction_create' %}" autocomplete="off">
   {% csrf_token %}
-    <div class="row g-3">
-    <div class="field col-md-6">
-      <label class="form-label">Tenant</label>
-      <select name="tenant" class="form-select" required>
-        <option value="">---------</option>
-        {% for t in tenants %}
-          <option value="{{ t.tenant_id }}">{{ t.company_name }}</option>
-        {% endfor %}
-      </select>
+
+  <div class="form-card">
+    <div class="form-card-header">
+      <div class="form-card-icon" style="background: rgba(16, 185, 129, 0.1); color: var(--success-color);">
+        <i class="bi bi-wallet2"></i>
+      </div>
+      <div class="form-card-header-text">
+        <h3 class="form-card-title">{% translate "Top-Up Details" %}</h3>
+        <p class="form-card-desc">{% translate "Select tenant, currency, amount, and optional references." %}</p>
+      </div>
     </div>
-    <div class="field col-md-3">
-      <label class="form-label">Currency</label>
-      <select name="currency" class="form-select" required>
-        {% for c in currencies %}
-          <option value="{{ c.currency_code }}">{{ c.currency_code }}</option>
-        {% endfor %}
-      </select>
+    <div class="form-card-body">
+      <div class="field-group">
+        <div class="row g-3">
+          <div class="col-12 col-md-6">
+            <label class="form-label">{% translate "Tenant" %}</label>
+            <select name="tenant" class="form-select" required>
+              <option value="">---------</option>
+              {% for t in tenants %}
+                <option value="{{ t.tenant_id }}">{{ t.company_name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-12 col-md-3">
+            <label class="form-label">{% translate "Currency" %}</label>
+            <select name="currency" class="form-select" required>
+              {% for c in currencies %}
+                <option value="{{ c.currency_code }}">{{ c.currency_code }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-12 col-md-3">
+            <label class="form-label">{% translate "Amount" %}</label>
+            <input type="number" name="amount" class="form-control" required min="0.01" step="0.01">
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label">{% translate "Gateway ref (optional)" %}</label>
+            <input type="text" name="gateway_ref" class="form-control" maxlength="100">
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label">{% translate "Attachment" %}</label>
+            <input type="file" name="attachment" class="form-control">
+          </div>
+        </div>
+      </div>
+
+      <div class="d-flex flex-wrap gap-2 mt-4">
+        <button type="submit" class="eal-btn eal-btn-primary">
+          <i class="bi bi-save"></i>
+          <span>{% translate "Save" %}</span>
+        </button>
+        <a href="{% url 'transaction_list' %}" class="eal-btn eal-btn-outline">
+          <i class="bi bi-x-lg"></i>
+          <span>{% translate "Cancel" %}</span>
+        </a>
+      </div>
     </div>
-    <div class="field col-md-3">
-      <label class="form-label">Amount</label>
-      <input type="number" name="amount" class="form-control" required min="0.01" step="0.01">
-    </div>
-    <div class="field col-md-6">
-      <label class="form-label">Gateway ref (optional)</label>
-      <input type="text" name="gateway_ref" class="form-control" maxlength="100">
-    </div>
-    <div class="field col-md-6">
-      <label class="form-label">Attachment</label>
-      <input type="file" name="attachment" class="form-control">
-    </div>
-  </div>
-  <div class="mt-4 d-flex gap-2">
-    <a href="{% url 'transaction_list' %}" class="eal-btn eal-btn-outline">Cancel</a>
-    <button type="submit" class="eal-btn eal-btn-primary">Save</button>
   </div>
 </form>
-  </div>
-</div>
 {% endblock %}

@@ -12,14 +12,14 @@
   <div class="page-header-row">
     <div class="page-header-left">
       <h1 class="page-title">{% translate "Countries" %}</h1>
-      <p class="page-subtitle">{% translate "Manage your records here" %}</p>
+      <p class="page-subtitle">{% translate "Sort, search, filter, and manage country records." %}</p>
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
         {% if request.user.is_root %}
           <a href="{% url 'country_create' %}" class="eal-btn eal-btn-primary">
             <i class="bi bi-plus-lg"></i>
-            <span>Add Country</span>
+            <span>{% translate "Add Country" %}</span>
           </a>
         {% endif %}
       </div>
@@ -30,9 +30,10 @@
 {% if messages %}
   <div style="margin-bottom: 16px">
     {% for message in messages %}
-      <p style="margin: 0; color: {% if message.tags == 'error' %}#b91c1c{% else %}#15803d{% endif %}; font-weight: 600">
+      <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags|default:'info' }}{% endif %} alert-dismissible fade show" role="alert">
         {{ message }}
-      </p>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
     {% endfor %}
   </div>
 {% endif %}
@@ -40,34 +41,25 @@
 <div class="eal-table-card">
   <form method="get" action="{% url 'country_list' %}">
     <div class="eal-toolbar">
-      <div class="eal-toolbar-left" style="width: 100%; gap: 12px; display: flex; flex-wrap: wrap; align-items: end;">
-        <div class="eal-search" style="flex: 1; min-width: 260px;">
+      <div class="eal-toolbar-left">
+        <div class="eal-search">
           <i class="bi bi-search"></i>
-          <input
-            type="text"
-            name="q"
-            placeholder="Search by name, code..."
-            value="{{ search_query }}"
-          />
+          <input type="text" name="q" placeholder="{% translate 'Search by name, code...' %}" value="{{ search_query }}">
         </div>
-        <div style="width: 220px;">
-          <label class="form-label">Status</label>
-          <select name="status" class="form-select form-select-sm">
-            <option value="All" {% if status_filter == 'All' %}selected{% endif %}>All</option>
-            <option value="Active" {% if status_filter == 'Active' %}selected{% endif %}>Active</option>
-            <option value="Inactive" {% if status_filter == 'Inactive' %}selected{% endif %}>Inactive</option>
-          </select>
-        </div>
-        <div style="display: flex; gap: 8px;">
-          <a href="{% url 'country_list' %}" class="eal-btn eal-btn-outline">
-            <i class="bi bi-arrow-counterclockwise"></i>
-            <span>Reset</span>
+      </div>
+      <div class="eal-toolbar-right">
+        <select name="status" class="eal-filter-select" onchange="this.form.submit()">
+          <option value="All" {% if status_filter == 'All' %}selected{% endif %}>{% translate "Status: All" %}</option>
+          <option value="Active" {% if status_filter == 'Active' %}selected{% endif %}>{% translate "Active" %}</option>
+          <option value="Inactive" {% if status_filter == 'Inactive' %}selected{% endif %}>{% translate "Inactive" %}</option>
+        </select>
+
+        {% if search_query or status_filter != 'All' %}
+          <a href="{% url 'country_list' %}" class="eal-btn eal-btn-outline" style="border-style: dashed; color: var(--text-muted);">
+            <i class="bi bi-x-circle"></i>
+            <span>{% translate "Clear" %}</span>
           </a>
-          <button type="submit" class="eal-btn eal-btn-primary">
-            <i class="bi bi-funnel"></i>
-            <span>Apply</span>
-          </button>
-        </div>
+        {% endif %}
       </div>
     </div>
   </form>
@@ -78,11 +70,11 @@
         <thead>
           <tr>
             <th style="width: 60px">#</th>
-            <th style="width: 130px">Code</th>
-            <th>English Name</th>
-            <th>Arabic Name</th>
-            <th style="width: 120px">Status</th>
-            <th style="width: 220px">ACTIONS</th>
+            <th style="width: 130px">{% translate "Code" %}</th>
+            <th>{% translate "English Name" %}</th>
+            <th>{% translate "Arabic Name" %}</th>
+            <th style="width: 120px">{% translate "Status" %}</th>
+            <th style="width: 220px">{% translate "ACTIONS" %}</th>
           </tr>
         </thead>
         <tbody>
@@ -94,25 +86,25 @@
               <td class="eal-arabic">{{ c.name_ar }}</td>
               <td>
                 {% if c.is_active %}
-                  <span class="status-badge active">Active</span>
+                  <span class="status-badge active">{% translate "Active" %}</span>
                 {% else %}
-                  <span class="status-badge inactive">Inactive</span>
+                  <span class="status-badge inactive">{% translate "Inactive" %}</span>
                 {% endif %}
               </td>
               <td>
                 <div class="eal-actions-cell">
-                  <a href="{% url 'country_edit' c.country_code %}" class="eal-row-btn" title="Edit">
+                  <a href="{% url 'country_edit' c.country_code %}" class="eal-row-btn" title="{% translate 'Edit' %}">
                     <i class="bi bi-pencil"></i>
                   </a>
                   {% if request.user.is_root %}
                     <form method="post" action="{% url 'country_toggle_status' c.country_code %}" style="display: inline">
                       {% csrf_token %}
                       {% if c.is_active %}
-                        <button type="submit" class="eal-row-btn" title="Deactivate">
+                        <button type="submit" class="eal-row-btn" title="{% translate 'Deactivate' %}">
                           <i class="bi bi-slash-circle"></i>
                         </button>
                       {% else %}
-                        <button type="submit" class="eal-row-btn" title="Activate">
+                        <button type="submit" class="eal-row-btn" title="{% translate 'Activate' %}">
                           <i class="bi bi-check-circle"></i>
                         </button>
                       {% endif %}
@@ -130,13 +122,13 @@
       <div class="empty-icon">
         <i class="bi bi-globe"></i>
       </div>
-      <h4 class="empty-title">No countries found</h4>
-      <p class="empty-text">No country records match your current filters.</p>
+      <h4 class="empty-title">{% translate "No countries found" %}</h4>
+      <p class="empty-text">{% translate "No country records match your current filters." %}</p>
       {% if request.user.is_root %}
         <div class="mt-2">
           <a href="{% url 'country_create' %}" class="eal-btn eal-btn-primary">
             <i class="bi bi-plus-lg"></i>
-            <span>Add Country</span>
+            <span>{% translate "Add Country" %}</span>
           </a>
         </div>
       {% endif %}
@@ -147,18 +139,18 @@
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
         <div class="modal-header">
-          <h5>Confirm Delete</h5>
+          <h5>{% translate "Confirm Delete" %}</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
-          <p>Are you sure you want to delete "<span id="deleteRecordName"></span>"?</p>
-          <p class="text-danger small">This action cannot be undone.</p>
+          <p>{% translate "Are you sure you want to delete" %} "<span id="deleteRecordName"></span>"?</p>
+          <p class="text-danger small">{% translate "This action cannot be undone." %}</p>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
           <form id="deleteForm" method="POST">
             {% csrf_token %}
-            <button type="submit" class="btn btn-danger">Confirm Delete</button>
+            <button type="submit" class="btn btn-danger">{% translate "Confirm Delete" %}</button>
           </form>
         </div>
       </div>
