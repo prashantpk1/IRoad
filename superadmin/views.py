@@ -37,6 +37,7 @@ from .auth_helpers import (
     log_access,
     record_failed_attempt,
     reset_failed_attempts,
+    send_auth_email,
 )
 from .audit_helpers import create_session, close_session, log_audit_action
 from .forms import (
@@ -319,28 +320,51 @@ class ForgotPasswordView(View):
             )
 
         email = form.cleaned_data['email'].lower().strip()
-        reset_url = None
 
         try:
             user = AdminUser.objects.get(email=email)
         except AdminUser.DoesNotExist:
-            user = None
-        else:
-            if user.status in ('Active', 'Pending_Activation'):
-                token = create_auth_token(user, 'password_reset')
-                reset_url = request.build_absolute_uri(
-                    f'/new-password/{token.token}/'
-                )
-                # TODO Phase 7: Send reset_url via email here
+            return render(
+                request,
+                self.template_request,
+                {
+                    'form': form,
+                    'error': 'This email address is not registered in our system.',
+                },
+            )
+
+        if user.status not in ('Active', 'Pending_Activation'):
+            return render(
+                request,
+                self.template_request,
+                {
+                    'form': form,
+                    'error': (
+                        'This account is currently inactive. '
+                        'Contact your administrator.'
+                    ),
+                },
+            )
+
+        # Generate token
+        token = create_auth_token(user, 'password_reset')
+        reset_url = request.build_absolute_uri(f'/new-password/{token.token}/')
+
+        # Send actual reset email
+        context = {
+            'admin_user': user,
+            'reset_url': reset_url,
+        }
+        send_auth_email(user, 'password_reset', context)
 
         return render(
             request,
             self.template_sent,
             {
                 'success_message': self.success_message,
-                'reset_url': reset_url,
             },
         )
+
 
 
 class ResetPasswordConfirmView(View):
@@ -1271,26 +1295,29 @@ class AdminUserCreateView(LoginRequiredMixin, View):
             return render(request, self.template_name, {'form': form})
 
         user = form.save(commit=False)
-        # Phase 1 rule: invite flow (no password/email yet)
+        # Phase 1 rule: invite flow (no password yet)
         user.status = 'Pending_Activation'
         user.created_by = request.user
         user.updated_by = request.user
-
-        # TODO Phase 2: Send invite email here
-
         user.save()
 
         auth_token = create_auth_token(user, 'invite')
         invite_url = request.build_absolute_uri(
             f'/set-password/{auth_token.token}/'
         )
-        # TODO Phase 7: Send invite_url via email here
+
+        # Send actual invite email
+        context = {
+            'admin_user': user,
+            'invite_url': invite_url,
+        }
+        send_auth_email(user, 'invite', context)
 
         return render(
             request,
             'system_users/admin_users/invite_success.html',
-            {'invite_url': invite_url},
         )
+
 
 
 class SetPasswordView(View):

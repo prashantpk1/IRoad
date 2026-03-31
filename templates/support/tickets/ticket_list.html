@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 {% load i18n %}
 
-{% block title %}{% translate "Support Inbox" %}{% endblock %}
+{% block page_title %}{% translate "Support Inbox" %}{% endblock %}
 
 {% block breadcrumb_items %}
-<li class="breadcrumb-item active" aria-current="page">{% translate "Support Inbox" %}</li>
+  <li class="breadcrumb-item active" aria-current="page">{% translate "Support Inbox" %}</li>
 {% endblock %}
 
 {% block content %}
@@ -12,69 +12,166 @@
   <div class="page-header-row">
     <div class="page-header-left">
       <h1 class="page-title">{% translate "Support Inbox" %}</h1>
-      <p class="page-subtitle">{% translate "Manage your records here" %}</p>
+      <p class="page-subtitle">{% translate "Track and manage tenant support requests." %}</p>
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
-        <!-- Actions here -->
+        {% if request.user.is_root %}
+          <a href="{% url 'ticket_create' %}" class="eal-btn eal-btn-primary">
+            <i class="bi bi-plus-lg"></i>
+            <span>{% translate "Create Ticket" %}</span>
+          </a>
+        {% endif %}
       </div>
     </div>
   </div>
 </div>
 
-<div class="list-page-actions">
-  {% if request.user.is_root %}<a href="{% url 'ticket_create' %}" class="eal-btn eal-btn-primary"><i class="bi bi-plus-circle"></i> {% translate "Create Ticket" %}</a>{% endif %}
-</div>
+<div class="eal-table-card">
+  <div class="eal-toolbar">
+    <div class="eal-toolbar-left">
+      <span class="eal-result-badge">Total Tickets: <strong>{{ tickets.paginator.count }}</strong></span>
+    </div>
+  </div>
 
-<form method="get" class="eal-table-card mb-3 p-3">
-    <div class="row g-2">
-      <div class="col-md-3"><input type="text" name="q" value="{{ search_query }}" class="form-control" placeholder="Search ticket no, subject, tenant"></div>
-      <div class="col-md-2"><select name="status" class="eal-select"><option value="">All Status</option>{% for value, label in status_choices %}<option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
-      <div class="col-md-2"><select name="priority" class="eal-select"><option value="">All Priority</option>{% for value, label in priority_choices %}<option value="{{ value }}" {% if priority_filter == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
-      <div class="col-md-2"><select name="category" class="eal-select"><option value="">All Categories</option>{% for category in categories %}<option value="{{ category.pk }}" {% if category_filter == category.pk|stringformat:"s" %}selected{% endif %}>{{ category.name_en }}</option>{% endfor %}</select></div>
-      <div class="col-md-2"><select name="assigned_to" class="eal-select"><option value="">All Assignees</option><option value="unassigned" {% if assigned_filter == 'unassigned' %}selected{% endif %}>Unassigned</option>{% for admin in admins %}<option value="{{ admin.pk }}" {% if assigned_filter == admin.pk|stringformat:"s" %}selected{% endif %}>{{ admin.first_name }} {{ admin.last_name }}</option>{% endfor %}</select></div>
-      <div class="col-md-1 d-grid"><button type="submit" class="eal-btn eal-btn-primary"><i class="bi bi-funnel"></i><span>{% translate "Apply" %}</span></button></div>
+  <form method="get" class="eal-toolbar" style="padding: 16px;">
+    <div class="row g-3">
+      <div class="col-12 col-md-4">
+        <label class="form-label small fw-bold">{% translate "Search" %}</label>
+        <div class="eal-search w-100">
+          <i class="bi bi-search"></i>
+          <input type="text" name="q" value="{{ search_query }}" placeholder="{% translate 'Ticket #, subject, or tenant' %}">
+        </div>
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label small fw-bold">{% translate "Status" %}</label>
+        <select name="status" class="form-select form-select-sm">
+          <option value="">{% translate "All Statuses" %}</option>
+          {% for value, label in status_choices %}
+            <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label small fw-bold">{% translate "Priority" %}</label>
+        <select name="priority" class="form-select form-select-sm">
+          <option value="">{% translate "All Priorities" %}</option>
+          {% for value, label in priority_choices %}
+            <option value="{{ value }}" {% if priority_filter == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label small fw-bold">{% translate "Assignee" %}</label>
+        <select name="assigned_to" class="form-select form-select-sm">
+          <option value="">{% translate "All Assignees" %}</option>
+          <option value="unassigned" {% if assigned_filter == 'unassigned' %}selected{% endif %}>{% translate "Unassigned" %}</option>
+          {% for admin in admins %}
+            <option value="{{ admin.pk }}" {% if assigned_filter == admin.pk|stringformat:"s" %}selected{% endif %}>{{ admin.first_name }} {{ admin.last_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label d-none d-md-block">&nbsp;</label>
+        <button type="submit" class="eal-btn eal-btn-primary w-100">
+          <i class="bi bi-funnel"></i>
+          <span>{% translate "Filter" %}</span>
+        </button>
+      </div>
     </div>
   </form>
 
-  <div class="eal-table-card">
-    <div class="eal-table-wrap">
-      <table class="eal-table">
-        <thead><tr><th>#</th><th>Ticket No</th><th>Tenant</th><th>Subject</th><th>Category</th><th>Priority</th><th>Status</th><th>Assigned To</th><th>Created At</th><th>Actions</th></tr></thead>
-        <tbody>
-          {% for ticket in tickets %}
-            <tr>
-              <td>{{ tickets.start_index|add:forloop.counter0 }}</td>
-              <td>{{ ticket.ticket_no }}</td>
-              <td>{{ ticket.tenant.company_name }}</td>
-              <td>{{ ticket.subject }}</td>
-              <td>{{ ticket.category.name_en }}</td>
-              <td>
-                <span class="badge status-badge {% if ticket.priority == 'Critical' %}status-suspended{% elif ticket.priority == 'High' %}status-pending{% elif ticket.priority == 'Medium' %}status-issued{% else %}status-inactive{% endif %}">
-                  {{ ticket.priority }}
-                </span>
-              </td>
-              <td>
-                <span class="badge status-badge {% if ticket.status == 'New' %}status-new{% elif ticket.status == 'In_Progress' %}status-in-progress{% elif ticket.status == 'Closed' %}status-closed{% else %}status-pending-client{% endif %}">{{ ticket.get_status_display }}</span>
-                {% if ticket.status == 'New' %}<span class="badge status-badge status-new ms-1">Unread</span>{% elif ticket.status == 'In_Progress' %}<span class="badge status-badge status-pending ms-1">Attention</span>{% endif %}
-              </td>
-              <td>{% if ticket.assigned_to %}{{ ticket.assigned_to.first_name }} {{ ticket.assigned_to.last_name }}{% else %}<span class="text-muted">Unassigned</span>{% endif %}</td>
-              <td>{{ ticket.created_at|date:"Y-m-d H:i" }}</td>
-              <td><a href="{% url 'ticket_detail' ticket.pk %}" class="eal-row-btn"><i class="bi bi-eye"></i></a></td>
-            </tr>
-          {% empty %}
-            <tr class="eal-table-empty">
-  <td colspan="20">
-    <div class="eal-empty-icon"><i class="bi bi-inbox"></i></div>
-    <div class="eal-empty-title">{% translate "No Data Found" %}</div>
-    <div class="eal-empty-text">No tickets found.</div>
-  </td>
-</tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    {% include 'partials/pagination.html' with page_obj=tickets %}
+  <div class="eal-table-wrap">
+    <table class="eal-table">
+      <thead>
+        <tr>
+          <th style="width: 100px">{% translate "Ticket #" %}</th>
+          <th>{% translate "Tenant & Subject" %}</th>
+          <th style="width: 140px">{% translate "Category" %}</th>
+          <th style="width: 120px">{% translate "Priority" %}</th>
+          <th style="width: 150px">{% translate "Status" %}</th>
+          <th style="width: 150px">{% translate "Assignee" %}</th>
+          <th style="width: 160px">{% translate "Created" %}</th>
+          <th style="width: 80px">{% translate "View" %}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ticket in tickets %}
+          <tr>
+            <td class="fw-bold text-primary">{{ ticket.ticket_no }}</td>
+            <td>
+              <div class="d-flex flex-column">
+                <span class="fw-semibold text-dark">{{ ticket.subject }}</span>
+                <span class="text-muted small">{{ ticket.tenant.company_name }}</span>
+              </div>
+            </td>
+            <td>
+              <span class="badge bg-light text-dark border">{{ ticket.category.name_en }}</span>
+            </td>
+            <td>
+              {% if ticket.priority == 'Critical' %}
+                <span class="status-badge suspended">{% translate "Critical" %}</span>
+              {% elif ticket.priority == 'High' %}
+                <span class="status-badge pending">{% translate "High" %}</span>
+              {% elif ticket.priority == 'Medium' %}
+                <span class="status-badge active">{% translate "Medium" %}</span>
+              {% else %}
+                <span class="status-badge inactive">{% translate "Low" %}</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if ticket.status == 'New' %}
+                <span class="status-badge active">{% translate "New" %}</span>
+              {% elif ticket.status == 'In_Progress' %}
+                <span class="status-badge pending">{% translate "In Progress" %}</span>
+              {% elif ticket.status == 'Closed' %}
+                <span class="status-badge inactive">{% translate "Closed" %}</span>
+              {% else %}
+                <span class="status-badge active" style="background: var(--primary-light); color: var(--primary-color);">{{ ticket.get_status_display }}</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if ticket.assigned_to %}
+                <div class="d-flex align-items-center gap-2">
+                  <div class="avatar-xs bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 24px; height: 24px; font-size: 10px;">
+                    {{ ticket.assigned_to.first_name|slice:":1" }}{{ ticket.assigned_to.last_name|slice:":1" }}
+                  </div>
+                  <span class="small">{{ ticket.assigned_to.first_name }}</span>
+                </div>
+              {% else %}
+                <span class="text-muted small italic">{% translate "Unassigned" %}</span>
+              {% endif %}
+            </td>
+            <td>
+              <div class="text-muted small">
+                {{ ticket.created_at|date:"d M Y" }}<br>
+                {{ ticket.created_at|date:"H:i" }}
+              </div>
+            </td>
+            <td>
+              <a href="{% url 'ticket_detail' ticket.pk %}" class="eal-row-btn" title="{% translate 'View Detail' %}">
+                <i class="bi bi-eye"></i>
+              </a>
+            </td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="8">
+              <div class="notification-empty py-5">
+                <div class="empty-icon">
+                  <i class="bi bi-ticket-detailed"></i>
+                </div>
+                <h4 class="empty-title">{% translate "No Tickets Found" %}</h4>
+                <p class="empty-text">{% translate "There are no support tickets matching your criteria." %}</p>
+              </div>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
   </div>
+  {% include 'partials/pagination.html' with page_obj=tickets %}
+</div>
 {% endblock %}
+
 

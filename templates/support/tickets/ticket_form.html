@@ -1,9 +1,11 @@
 {% extends "base.html" %}
 {% load i18n %}
-{% block title %}Create Support Ticket{% endblock %}
+
+{% block page_title %}{% translate "Create Support Ticket" %}{% endblock %}
 
 {% block breadcrumb_items %}
-<li class="breadcrumb-item active" aria-current="page">{% translate "Create Support Ticket" %}</li>
+  <li class="breadcrumb-item"><a href="{% url 'ticket_list' %}">{% translate "Support Inbox" %}</a></li>
+  <li class="breadcrumb-item active" aria-current="page">{% translate "New Ticket" %}</li>
 {% endblock %}
 
 {% block content %}
@@ -11,44 +13,99 @@
   <div class="page-header-row">
     <div class="page-header-left">
       <h1 class="page-title">{% translate "Create Support Ticket" %}</h1>
-      <p class="page-subtitle">{% translate "Manage your records here" %}</p>
+      <p class="page-subtitle">{% translate "Manually initiate a support request for a tenant." %}</p>
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
-        <!-- Actions here -->
+        <a href="{% url 'ticket_list' %}" class="eal-btn eal-btn-outline">
+          <i class="bi bi-arrow-left"></i>
+          <span>{% translate "Back to Inbox" %}</span>
+        </a>
       </div>
     </div>
   </div>
 </div>
 
-<div class="container py-3">
+<form method="post" autocomplete="off">
+  {% csrf_token %}
   
-  <div class="form-card">
+  {% if form.non_field_errors %}
+    <div class="alert alert-danger mb-4">
+      {{ form.non_field_errors }}
+    </div>
+  {% endif %}
+
+  <div class="form-card mb-4">
+    <div class="form-card-header">
+      <div class="form-card-icon blue">
+        <i class="bi bi-ticket-detailed"></i>
+      </div>
+      <div class="form-card-header-text">
+        <h3 class="form-card-title">{% translate "Ticket Information" %}</h3>
+        <p class="form-card-desc">{% translate "Basic details about the support request." %}</p>
+      </div>
+    </div>
     <div class="form-card-body">
-      <form method="post" novalidate>
-        {% csrf_token %}
-        <div class="row g-3">
-          {% for field in form %}
-            <div class="field col-md-6">
-              <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
-              {{ field }}
-              {% if field.errors %}
-                <div class="text-danger small mt-1">{{ field.errors|join:", " }}</div>
-              {% endif %}
-            </div>
+      <div class="row g-3">
+        <div class="col-12 col-md-6">
+          <label class="form-label">{% translate "Tenant" %}</label>
+          {{ form.tenant }}
+          {% for error in form.tenant.errors %}
+            <div class="field-error">{{ error }}</div>
           {% endfor %}
         </div>
-        <div class="form-actions-bar">
-  <div class="eal-header-actions">
-
-          <div class="footer-left"><a href="{% url 'ticket_list' %}" class="eal-btn eal-btn-outline">Cancel</a>
-  </div>
-</div>
-          <div class="footer-right"><button type="submit" class="eal-btn eal-btn-primary">Save</button></div>
+        <div class="col-12 col-md-6">
+          <label class="form-label">{% translate "Category" %}</label>
+          {{ form.category }}
+          {% for error in form.category.errors %}
+            <div class="field-error">{{ error }}</div>
+          {% endfor %}
         </div>
-      </form>
+        <div class="col-12">
+          <label class="form-label">{% translate "Subject" %}</label>
+          {{ form.subject }}
+          {% for error in form.subject.errors %}
+            <div class="field-error">{{ error }}</div>
+          {% endfor %}
+        </div>
+        <div class="col-12">
+          <label class="form-label">{% translate "Initial Message" %}</label>
+          {{ form.description }}
+          {% for error in form.description.errors %}
+            <div class="field-error">{{ error }}</div>
+          {% endfor %}
+        </div>
+        <div class="col-12 col-md-6">
+          <label class="form-label">{% translate "Priority" %}</label>
+          {{ form.priority }}
+          {% for error in form.priority.errors %}
+            <div class="field-error">{{ error }}</div>
+          {% endfor %}
+        </div>
+        <div class="col-12 col-md-6">
+          <label class="form-label">{% translate "Assign To" %}</label>
+          {{ form.assigned_to }}
+          {% for error in form.assigned_to.errors %}
+            <div class="field-error">{{ error }}</div>
+          {% endfor %}
+        </div>
+      </div>
     </div>
   </div>
-</div>
+
+  <div class="form-actions-bar">
+    <div class="form-actions-left">
+      <button type="submit" class="eal-btn eal-btn-primary">
+        <i class="bi bi-check-lg"></i>
+        <span>{% translate "Create Ticket" %}</span>
+      </button>
+      <a href="{% url 'ticket_list' %}" class="eal-btn eal-btn-outline">
+        <i class="bi bi-x-lg"></i>
+        <span>{% translate "Cancel" %}</span>
+      </a>
+    </div>
+  </div>
+</form>
 {% endblock %}
+
 

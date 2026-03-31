@@ -1,81 +1,131 @@
 {% extends 'base.html' %}
 {% load i18n %}
 
-{% block title %}{% translate "Support Categories | iRoad Admin" %}{% endblock %}
+{% block page_title %}{% translate "Support Categories" %}{% endblock %}
 
 {% block breadcrumb_items %}
-<li class="breadcrumb-item active" aria-current="page">{% translate "Support Categories | iRoad Admin" %}</li>
+  <li class="breadcrumb-item active" aria-current="page">{% translate "Support Categories" %}</li>
 {% endblock %}
+
 {% block content %}
 <div class="page-header">
   <div class="page-header-row">
     <div class="page-header-left">
-      <h1 class="page-title">{% translate "Support Categories | iRoad Admin" %}</h1>
-      <p class="page-subtitle">{% translate "Manage your records here" %}</p>
+      <h1 class="page-title">{% translate "Support Categories" %}</h1>
+      <p class="page-subtitle">{% translate "Manage and organize ticket classifications." %}</p>
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
-        <!-- Actions here -->
+        {% if request.user.is_root %}
+          <a href="{% url 'support_category_create' %}" class="eal-btn eal-btn-primary">
+            <i class="bi bi-plus-lg"></i>
+            <span>{% translate "Add Category" %}</span>
+          </a>
+        {% endif %}
       </div>
     </div>
   </div>
 </div>
 
 {% if messages %}
-  {% for message in messages %}
-    <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">
-      {{ message }}
-      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
-  {% endfor %}
+  <div class="mb-4">
+    {% for message in messages %}
+      <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags|default:'info' }}{% endif %} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    {% endfor %}
+  </div>
 {% endif %}
 
-<div class="list-page-actions">
-  {% if request.user.is_root %}
-    <a href="{% url 'support_category_create' %}" class="eal-btn eal-btn-primary">{% translate "Add Category" %}</a>
-  {% endif %}
-</div>
+<div class="eal-table-card">
+  <div class="eal-toolbar">
+    <div class="eal-toolbar-left">
+      <span class="eal-result-badge">Total Categories: <strong>{{ categories.paginator.count }}</strong></span>
+    </div>
+  </div>
 
-<div class="eal-table-card">  <form method="get" class="eal-toolbar">
-    <div class="eal-toolbar-left" style="width:100%;display:flex;gap:8px;flex-wrap:wrap;">
-      <div class="eal-search" style="flex:1;min-width:240px;"><i class="bi bi-search"></i><input type="text" name="q" class="" placeholder="Search English name" value="{{ search_query }}"></div>
-      <div style="width:200px"><select class="eal-select" name="is_active"><option value="All" {% if status_filter == 'All' %}selected{% endif %}>All statuses</option><option value="Active" {% if status_filter == 'Active' %}selected{% endif %}>Active</option><option value="Inactive" {% if status_filter == 'Inactive' %}selected{% endif %}>Inactive</option></select></div>
-      <button type="submit" class="eal-btn eal-btn-primary"><i class="bi bi-funnel"></i><span>{% translate "Apply" %}</span></button>
+  <form method="get" class="eal-toolbar">
+    <div class="eal-toolbar-left" style="width: 100%; display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap">
+      <div class="eal-search" style="flex: 1; min-width: 240px">
+        <i class="bi bi-search"></i>
+        <input
+          type="text"
+          name="q"
+          placeholder="{% translate 'Search by English or Arabic name' %}"
+          value="{{ search_query }}"
+        />
+      </div>
+      <div style="width: 200px">
+        <select name="is_active" class="form-select form-select-sm">
+          <option value="All" {% if status_filter == 'All' %}selected{% endif %}>{% translate "All Statuses" %}</option>
+          <option value="Active" {% if status_filter == 'Active' %}selected{% endif %}>{% translate "Active" %}</option>
+          <option value="Inactive" {% if status_filter == 'Inactive' %}selected{% endif %}>{% translate "Inactive" %}</option>
+        </select>
+      </div>
+      <div style="width: 120px">
+        <button type="submit" class="eal-btn eal-btn-primary" style="width: 100%">
+          <i class="bi bi-funnel"></i>
+          <span>{% translate "Apply" %}</span>
+        </button>
+      </div>
     </div>
   </form>
 
   <div class="eal-table-wrap">
     <table class="eal-table">
-      <thead><tr><th>#</th><th>English Name</th><th>Arabic Name</th><th>Status</th><th>Actions</th></tr></thead>
+      <thead>
+        <tr>
+          <th style="width: 60px">#</th>
+          <th>{% translate "English Name" %}</th>
+          <th>{% translate "Arabic Name" %}</th>
+          <th style="width: 140px">{% translate "Status" %}</th>
+          <th style="width: 180px">{% translate "Actions" %}</th>
+        </tr>
+      </thead>
       <tbody>
         {% for c in categories %}
           <tr>
             <td>{{ forloop.counter0|add:categories.start_index }}</td>
-            <td>{{ c.name_en }}</td>
+            <td class="fw-semibold">{{ c.name_en }}</td>
             <td dir="rtl">{{ c.name_ar }}</td>
-            <td>{% if c.is_active %}<span class="badge status-badge status-active">Active</span>{% else %}<span class="badge status-badge status-inactive">Inactive</span>{% endif %}</td>
-            <td class="text-nowrap">
-              {% if request.user.is_root %}
-                <div class="eal-actions-cell">
-                  <a href="{% url 'support_category_edit' c.category_id %}" class="eal-row-btn"><i class="bi bi-pencil"></i></a>
-                  <form method="post" action="{% url 'support_category_toggle' c.category_id %}" style="display:inline">
-                    {% csrf_token %}
-                    <button type="submit" class="eal-row-btn"><i class="bi bi-arrow-repeat"></i></button>
-                  </form>
-                </div>
+            <td>
+              {% if c.is_active %}
+                <span class="status-badge active">{% translate "Active" %}</span>
               {% else %}
-                <span class="text-muted">-</span>
+                <span class="status-badge inactive">{% translate "Inactive" %}</span>
               {% endif %}
+            </td>
+            <td>
+              <div class="eal-actions-cell">
+                {% if request.user.is_root %}
+                  <a href="{% url 'support_category_edit' c.category_id %}" class="eal-row-btn" title="{% translate 'Edit' %}">
+                    <i class="bi bi-pencil"></i>
+                  </a>
+                  <form method="post" action="{% url 'support_category_toggle' c.category_id %}" style="display:contents">
+                    {% csrf_token %}
+                    <button type="submit" class="eal-row-btn" title="{% translate 'Toggle Status' %}" style="margin: 0;">
+                      <i class="bi bi-arrow-repeat"></i>
+                    </button>
+                  </form>
+                {% else %}
+                  <span class="text-muted">-</span>
+                {% endif %}
+              </div>
             </td>
           </tr>
         {% empty %}
-          <tr class="eal-table-empty">
-  <td colspan="20">
-    <div class="eal-empty-icon"><i class="bi bi-inbox"></i></div>
-    <div class="eal-empty-title">{% translate "No Data Found" %}</div>
-    <div class="eal-empty-text">No support categories found.</div>
-  </td>
-</tr>
+          <tr>
+            <td colspan="5">
+              <div class="notification-empty py-5">
+                <div class="empty-icon">
+                  <i class="bi bi-tags"></i>
+                </div>
+                <h4 class="empty-title">{% translate "No Categories Found" %}</h4>
+                <p class="empty-text">{% translate "Try adjusting your search or filters." %}</p>
+              </div>
+            </td>
+          </tr>
         {% endfor %}
       </tbody>
     </table>
@@ -83,4 +133,5 @@
   {% include 'partials/pagination.html' with page_obj=categories %}
 </div>
 {% endblock %}
+
 

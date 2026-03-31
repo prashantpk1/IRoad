@@ -409,11 +409,13 @@
         </ul>
       </li>
 
-      <!-- Support Management (Phase 9 placeholders) -->
-      <li class="nav-item has-submenu">
+      <!-- Support Management -->
+      <li
+        class="nav-item has-submenu{% if request.resolver_match %}{% if request.resolver_match.url_name == 'support_category_list' or request.resolver_match.url_name == 'support_category_create' or request.resolver_match.url_name == 'support_category_edit' or request.resolver_match.url_name == 'canned_response_list' or request.resolver_match.url_name == 'canned_response_create' or request.resolver_match.url_name == 'canned_response_edit' or request.resolver_match.url_name == 'ticket_list' or request.resolver_match.url_name == 'ticket_create' or request.resolver_match.url_name == 'ticket_detail' or request.resolver_match.url_name == 'ticket_reply' %} open{% endif %}{% endif %}"
+      >
         <a
           href="#"
-          class="nav-link"
+          class="nav-link{% if request.resolver_match %}{% if request.resolver_match.url_name == 'support_category_list' or request.resolver_match.url_name == 'support_category_create' or request.resolver_match.url_name == 'support_category_edit' or request.resolver_match.url_name == 'canned_response_list' or request.resolver_match.url_name == 'canned_response_create' or request.resolver_match.url_name == 'canned_response_edit' or request.resolver_match.url_name == 'ticket_list' or request.resolver_match.url_name == 'ticket_create' or request.resolver_match.url_name == 'ticket_detail' or request.resolver_match.url_name == 'ticket_reply' %} active{% endif %}{% endif %}"
           data-tooltip="Support Management"
         >
           <i class="bi bi-headset"></i>
@@ -422,19 +424,28 @@
         </a>
         <ul class="submenu">
           <li class="submenu-item">
-            <a href="#" class="submenu-link">
+            <a
+              href="{% url 'support_category_list' %}"
+              class="submenu-link{% if request.resolver_match %}{% if request.resolver_match.url_name == 'support_category_list' or request.resolver_match.url_name == 'support_category_create' or request.resolver_match.url_name == 'support_category_edit' %} active{% endif %}{% endif %}"
+            >
               <i class="bi bi-tags"></i>
               <span>Support Categories</span>
             </a>
           </li>
           <li class="submenu-item">
-            <a href="#" class="submenu-link">
+            <a
+              href="{% url 'canned_response_list' %}"
+              class="submenu-link{% if request.resolver_match %}{% if request.resolver_match.url_name == 'canned_response_list' or request.resolver_match.url_name == 'canned_response_create' or request.resolver_match.url_name == 'canned_response_edit' %} active{% endif %}{% endif %}"
+            >
               <i class="bi bi-chat-square-text"></i>
               <span>Canned Responses</span>
             </a>
           </li>
           <li class="submenu-item">
-            <a href="#" class="submenu-link">
+            <a
+              href="{% url 'ticket_list' %}"
+              class="submenu-link{% if request.resolver_match %}{% if request.resolver_match.url_name == 'ticket_list' or request.resolver_match.url_name == 'ticket_create' or request.resolver_match.url_name == 'ticket_detail' or request.resolver_match.url_name == 'ticket_reply' %} active{% endif %}{% endif %}"
+            >
               <i class="bi bi-ticket-detailed"></i>
               <span>Support Tickets</span>
             </a>

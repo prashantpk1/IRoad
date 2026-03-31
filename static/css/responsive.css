@@ -29,9 +29,6 @@
     padding: 20px 22px 24px;
   }
 
-  .form-actions-bar {
-    padding: 18px 22px;
-  }
 }
 
 /* ============================================
@@ -137,6 +134,13 @@
   .header-search {
     flex: 1;
     min-width: 0;
+  }
+
+  .form-actions-bar {
+    left: 0 !important;
+    width: 100% !important;
+    padding: 16px 20px;
+    border-radius: 0;
   }
 
   .header-datetime {
@@ -364,11 +368,6 @@
     max-width: 50px;
   }
 
-  .form-actions-bar {
-    flex-direction: column;
-    gap: 12px;
-    padding: 16px 18px;
-  }
 
   .form-actions-left,
   .form-actions-right {

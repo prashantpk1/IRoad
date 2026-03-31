@@ -59,22 +59,11 @@
             {% if messages %}
             <div class="auth-field">
               {% for message in messages %}
-              <div
-                class="auth-input-wrapper"
-                style="
-                  border-color: #22c55e;
-                  background: rgba(34, 197, 94, 0.08);
-                  align-items: flex-start;
-                  padding: 12px 14px;
-                "
-              >
-                <i class="bi bi-check-circle" style="color: #16a34a"></i>
-                <p
-                  class="auth-text"
-                  style="margin: 0; color: #15803d; font-size: 13px"
-                >
-                  {{ message }}
-                </p>
+              <div class="auth-alert auth-alert-{% if message.tags == 'error' %}error{% else %}{{ message.tags|default:'success' }}{% endif %}">
+                <i class="bi bi-{% if message.tags == 'error' %}exclamation-circle{% else %}check-circle{% endif %}"></i>
+                <div class="auth-alert-content">
+                  <p class="auth-text">{{ message }}</p>
+                </div>
               </div>
               {% endfor %}
             </div>
@@ -82,43 +71,20 @@
 
             {% if form.errors or error %}
             <div class="auth-field">
-              <div
-                class="auth-input-wrapper"
-                style="
-                  border-color: #ef4444;
-                  background: rgba(239, 68, 68, 0.06);
-                  align-items: flex-start;
-                  padding: 12px 14px;
-                "
-              >
-                <i class="bi bi-exclamation-circle" style="color: #ef4444"></i>
-                <div style="flex: 1; min-width: 0">
+              <div class="auth-alert auth-alert-error">
+                <i class="bi bi-exclamation-circle"></i>
+                <div class="auth-alert-content">
                   {% if error %}
-                  <p
-                    class="auth-text"
-                    style="margin: 0 0 6px; color: #b91c1c; font-size: 13px"
-                  >
-                    {{ error }}
-                  </p>
+                  <p class="auth-text">{{ error }}</p>
                   {% endif %}
                   {% if form.non_field_errors %}
                     {% for error in form.non_field_errors %}
-                      <p
-                        class="auth-text"
-                        style="margin: 0 0 6px; color: #b91c1c; font-size: 13px"
-                      >
-                        {{ error }}
-                      </p>
+                    <p class="auth-text">{{ error }}</p>
                     {% endfor %}
                   {% endif %}
                   {% for field in form %}
                     {% for error in field.errors %}
-                      <p
-                        class="auth-text"
-                        style="margin: 0 0 6px; color: #b91c1c; font-size: 13px"
-                      >
-                        {{ error }}
-                      </p>
+                    <p class="auth-text">{{ error }}</p>
                     {% endfor %}
                   {% endfor %}
                 </div>

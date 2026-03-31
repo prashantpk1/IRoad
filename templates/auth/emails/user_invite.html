@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to iRoad Logistics</title>
+    <style>
+        body { font-family: 'Inter', -apple-system, sans-serif; line-height: 1.6; color: #334155; margin: 0; padding: 0; background-color: #f8fafc; }
+        .container { max-width: 600px; margin: 40px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+        .header { background: #4f46e5; padding: 32px; text-align: center; }
+        .header h1 { color: #ffffff; margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.025em; }
+        .content { padding: 40px; }
+        .content h2 { color: #1e293b; margin-top: 0; font-size: 20px; }
+        .button-wrapper { text-align: center; margin: 32px 0; }
+        .button { background-color: #4f46e5; color: #ffffff !important; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; display: inline-block; transition: all 0.2s; }
+        .footer { background: #f1f5f9; padding: 24px; text-align: center; font-size: 14px; color: #64748b; }
+        .invite-info { background-color: #f8fafc; padding: 20px; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 24px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>iRoad Logistics</h1>
+        </div>
+        <div class="content">
+            <h2>Welcome, {{ admin_user.first_name|default:"Admin" }}!</h2>
+            <p>You have been invited to join the iRoad Logistics admin team. Your account has been created, and you just need to set up your password to activate it.</p>
+            
+            <div class="invite-info">
+                <strong>Login Email:</strong> {{ admin_user.email }}<br>
+                <strong>Role:</strong> {{ admin_user.role }}
+            </div>
+
+            <div class="button-wrapper">
+                <a href="{{ invite_url }}" class="button">Activate Account</a>
+            </div>
+
+            <p>If you have any questions, please contact your system administrator.</p>
+            
+            <p style="font-size: 13px; color: #64748b; margin-top: 24px;">This invitation link will expire in 24 hours.</p>
+        </div>
+        <div class="footer">
+            &copy; 2026 iRoad Logistics. All rights reserved.<br>
+            Automated system message, please do not reply.
+        </div>
+    </div>
+</body>
+</html>

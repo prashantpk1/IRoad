@@ -1,7 +1,10 @@
 import secrets
 from datetime import timedelta
-
 from django.utils import timezone
+from django.core.mail import EmailMultiAlternatives
+from django.template.loader import render_to_string
+from django.utils.html import strip_tags
+from django.conf import settings
 
 
 def get_security_settings():
@@ -128,3 +131,38 @@ def log_access(attempt_type, status, email_used, ip_address=None):
         email_used=email_used,
         ip_address=ip_address,
     ).save()
+
+
+def send_auth_email(user, email_type, context):
+    """
+    Renders and sends an authentication-related email.
+    email_type: 'password_reset' or 'invite'
+    """
+    if email_type == 'password_reset':
+        subject = 'Reset Your iRoad Password'
+        template_name = 'auth/emails/password_reset.html'
+    elif email_type == 'invite':
+        subject = 'Activate Your iRoad Admin Account'
+        template_name = 'auth/emails/user_invite.html'
+    else:
+        return False
+
+    try:
+        html_content = render_to_string(template_name, context)
+        text_content = strip_tags(html_content)
+
+        msg = EmailMultiAlternatives(
+            subject,
+            text_content,
+            settings.DEFAULT_FROM_EMAIL,
+            [user.email]
+        )
+        msg.attach_alternative(html_content, "text/html")
+        msg.send()
+        return True
+    except Exception as e:
+        # In a real production system, consider logging this error
+        # to an observability platform.
+        print(f"Error sending {email_type} email to {user.email}: {e}")
+        return False
+
