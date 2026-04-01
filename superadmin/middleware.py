@@ -1,8 +1,6 @@
-from datetime import datetime, timedelta
-
 from django.contrib import messages
+from django.contrib.auth import logout as auth_logout
 from django.shortcuts import redirect
-from django.utils import timezone
 
 
 class SessionTimeoutMiddleware:
@@ -26,43 +24,43 @@ class SessionTimeoutMiddleware:
         if any(request.path.startswith(url) for url in self.EXEMPT_URLS):
             return self.get_response(request)
 
-        # Skip static files
-        if request.path.startswith("/static/") or request.path.startswith(
-            "/media/"
-        ):
+        # Skip static and media files
+        if request.path.startswith("/static/") or request.path.startswith("/media/"):
             return self.get_response(request)
 
-        # Get timeout setting
         try:
             from superadmin.auth_helpers import get_security_settings
+            from superadmin.redis_helpers import refresh_admin_session
 
             settings_obj = get_security_settings()
             timeout_minutes = settings_obj.session_timeout_minutes
-        except Exception:
-            timeout_minutes = 240
 
-        # Check last activity
-        last_activity = request.session.get("last_activity")
+            jti = request.session.get("jti")
 
-        if last_activity:
-            last_activity_time = datetime.fromisoformat(last_activity)
-            if timezone.is_naive(last_activity_time):
-                last_activity_time = timezone.make_aware(
-                    last_activity_time,
-                    timezone=timezone.get_current_timezone(),
-                )
-
-            expiry_time = last_activity_time + timedelta(minutes=timeout_minutes)
-
-            if timezone.now() > expiry_time:
-                request.session.flush()
+            if not jti:
+                # No JTI in session — force logout
+                auth_logout(request)
                 messages.warning(
                     request,
                     "Your session has expired. Please login again.",
                 )
                 return redirect("/login/")
 
-        # Update last activity
-        request.session["last_activity"] = timezone.now().isoformat()
+            # Check Redis and refresh TTL
+            session_alive = refresh_admin_session(jti, timeout_minutes)
+
+            if not session_alive:
+                # Redis key gone — session expired
+                auth_logout(request)
+                messages.warning(
+                    request,
+                    "Your session has expired. Please login again.",
+                )
+                return redirect("/login/")
+
+        except Exception:
+            # If Redis is down — fail safe, allow request
+            pass
 
         return self.get_response(request)
+

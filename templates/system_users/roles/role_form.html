@@ -1,18 +1,18 @@
 {% extends 'base.html' %}
 {% load i18n %}
 
-{% block title %}{% if form.instance.pk %}{% translate "Edit Role" %}{% else %}{% translate "Add Role" %}{% endif %}{% endblock %}
+{% block title %}{% if is_edit %}{% translate "Edit Role" %}{% else %}{% translate "Add Role" %}{% endif %}{% endblock %}
 
 {% block breadcrumb_items %}
 <li class="breadcrumb-item"><a href="{% url 'role_list' %}">{% translate "Roles" %}</a></li>
-<li class="breadcrumb-item active" aria-current="page">{% if form.instance.pk %}{% translate "Edit" %}{% else %}{% translate "Add" %}{% endif %}</li>
+<li class="breadcrumb-item active" aria-current="page">{% if is_edit %}{% translate "Edit" %}{% else %}{% translate "Add" %}{% endif %}</li>
 {% endblock %}
 
 {% block content %}
 <div class="page-header">
   <div class="page-header-row">
     <div class="page-header-left">
-      <h1 class="page-title">{% if form.instance.pk %}{% translate "Edit Role" %}{% else %}{% translate "Add Role" %}{% endif %}</h1>
+      <h1 class="page-title">{% if is_edit %}{% translate "Edit Role" %}{% else %}{% translate "Add Role" %}{% endif %}</h1>
       <p class="page-subtitle">{% translate "Define access permissions and role properties." %}</p>
     </div>
     <div class="page-header-right">

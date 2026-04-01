@@ -4,7 +4,6 @@ from django.views.generic import RedirectView
 from .views import (
     AdminSecuritySettingsView,
     AccessLogListView,
-    ActiveSessionListView,
     AuditLogDetailView,
     AuditLogListView,
     BaseCurrencyView,
@@ -140,6 +139,8 @@ from .views import (
     TransactionListView,
     TransactionRejectView,
     MassRevokeView,
+    ActiveSessionsView,
+    RevokeSessionView,
 )
 
 urlpatterns = [
@@ -227,14 +228,14 @@ urlpatterns = [
         name='audit_log_detail',
     ),
     path(
-        'security/sessions/',
-        ActiveSessionListView.as_view(),
-        name='session_list',
+        'security/active-sessions/',
+        ActiveSessionsView.as_view(),
+        name='active_sessions',
     ),
     path(
-        'security/sessions/<uuid:pk>/revoke/',
-        SessionRevokeView.as_view(),
-        name='session_revoke',
+        'security/active-sessions/revoke/<str:jti>/',
+        RevokeSessionView.as_view(),
+        name='revoke_session',
     ),
     path(
         'security/sessions/mass-revoke/',

@@ -1,18 +1,18 @@
 {% extends 'base.html' %}
 {% load i18n %}
 
-{% block page_title %}{% if form.instance.pk %}{% translate "Edit Admin User" %}{% else %}{% translate "Invite New User" %}{% endif %}{% endblock %}
+{% block page_title %}{% if is_edit %}{% translate "Edit Admin User" %}{% else %}{% translate "Invite New User" %}{% endif %}{% endblock %}
 
 {% block breadcrumb_items %}
 <li class="breadcrumb-item"><a href="{% url 'admin_user_list' %}">{% translate "Admin Users" %}</a></li>
-<li class="breadcrumb-item active" aria-current="page">{% if form.instance.pk %}{% translate "Edit User" %}{% else %}{% translate "New Invite" %}{% endif %}</li>
+<li class="breadcrumb-item active" aria-current="page">{% if is_edit %}{% translate "Edit User" %}{% else %}{% translate "New Invite" %}{% endif %}</li>
 {% endblock %}
 
 {% block content %}
 <div class="page-header">
   <div class="page-header-row">
     <div class="page-header-left">
-      <h1 class="page-title">{% if form.instance.pk %}{% translate "Edit Admin User" %}{% else %}{% translate "Invite New User" %}{% endif %}</h1>
+      <h1 class="page-title">{% if is_edit %}{% translate "Edit Admin User" %}{% else %}{% translate "Invite New User" %}{% endif %}</h1>
       <p class="page-subtitle">{% translate "Manage administrative access and profile settings." %}</p>
     </div>
     <div class="page-header-right">
@@ -37,7 +37,7 @@
 </div>
 {% endif %}
 
-{% if not form.instance.pk %}
+{% if not is_edit %}
   <div class="alert alert-info d-flex align-items-center mb-4" style="border-radius: var(--radius-md);">
     <i class="bi bi-envelope-check-fill me-2 fs-5"></i>
     <div>
@@ -147,7 +147,7 @@
       <div class="form-actions-left">
         <button type="submit" class="eal-btn eal-btn-primary">
           <i class="bi bi-send"></i>
-          <span>{% if form.instance.pk %}{% translate "Update Account" %}{% else %}{% translate "Send Invitation" %}{% endif %}</span>
+          <span>{% if is_edit %}{% translate "Update Account" %}{% else %}{% translate "Send Invitation" %}{% endif %}</span>
         </button>
         <a href="{% url 'admin_user_list' %}" class="eal-btn eal-btn-outline">
           <i class="bi bi-x-lg"></i>

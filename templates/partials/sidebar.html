@@ -453,13 +453,13 @@
         </ul>
       </li>
 
-      <!-- Security & Audit (Phase 10 placeholders except Access Log) -->
+      <!-- Security & Audit -->
       <li
-        class="nav-item has-submenu{% if request.resolver_match and request.resolver_match.url_name == 'access_log' %} open{% endif %}"
+        class="nav-item has-submenu{% if request.resolver_match and request.resolver_match.url_name == 'access_log' or request.resolver_match and request.resolver_match.url_name == 'active_sessions' or request.resolver_match and request.resolver_match.url_name == 'security_settings' or request.resolver_match and request.resolver_match.url_name == 'audit_log_list' %} open{% endif %}"
       >
         <a
           href="#"
-          class="nav-link{% if request.resolver_match and request.resolver_match.url_name == 'access_log' %} active{% endif %}"
+          class="nav-link{% if request.resolver_match and request.resolver_match.url_name == 'access_log' or request.resolver_match and request.resolver_match.url_name == 'active_sessions' or request.resolver_match and request.resolver_match.url_name == 'security_settings' or request.resolver_match and request.resolver_match.url_name == 'audit_log_list' %} active{% endif %}"
           data-tooltip="Security & Audit"
         >
           <i class="bi bi-shield-lock"></i>
@@ -477,19 +477,28 @@
             </a>
           </li>
           <li class="submenu-item">
-            <a href="#" class="submenu-link">
+            <a
+              href="{% url 'security_settings' %}"
+              class="submenu-link{% if request.resolver_match and request.resolver_match.url_name == 'security_settings' %} active{% endif %}"
+            >
               <i class="bi bi-sliders"></i>
               <span>Admin Security</span>
             </a>
           </li>
           <li class="submenu-item">
-            <a href="#" class="submenu-link">
+            <a
+              href="{% url 'active_sessions' %}"
+              class="submenu-link{% if request.resolver_match and request.resolver_match.url_name == 'active_sessions' %} active{% endif %}"
+            >
               <i class="bi bi-activity"></i>
-              <span>Active Sessions</span>
+              <span>Active Sessions Monitor</span>
             </a>
           </li>
           <li class="submenu-item">
-            <a href="#" class="submenu-link">
+            <a
+              href="{% url 'audit_log_list' %}"
+              class="submenu-link{% if request.resolver_match and request.resolver_match.url_name == 'audit_log_list' %} active{% endif %}"
+            >
               <i class="bi bi-clipboard-data"></i>
               <span>Audit Log</span>
             </a>

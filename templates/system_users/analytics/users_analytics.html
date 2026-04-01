@@ -131,6 +131,10 @@
         </div>
       </div>
 
+      <div style="height: 280px; position: relative; margin-bottom: 16px">
+        <canvas id="roleDistributionChart"></canvas>
+      </div>
+
       <div class="eal-table-wrap">
         <table class="eal-table">
           <thead>
@@ -153,10 +157,6 @@
           </tbody>
         </table>
       </div>
-
-      <p class="db-card-subtitle" style="margin-top: 12px; margin-bottom: 0">
-        Donut chart is Phase 11. For now, using table view.
-      </p>
     </div>
   </div>
 
@@ -204,4 +204,60 @@
       </table>
     </div>
   </div>
+{% endblock %}
+
+{% block extra_js %}
+  {{ block.super }}
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    const roleData = {
+      labels: [{% for r in role_distribution %}"{{ r.role_name }}"{% if not forloop.last %}, {% endif %}{% endfor %}],
+      counts: [{% for r in role_distribution %}{{ r.count }}{% if not forloop.last %}, {% endif %}{% endfor %}],
+    };
+
+    (function () {
+      const ctx = document.getElementById('roleDistributionChart');
+      if (!ctx || !roleData.labels || roleData.labels.length === 0) {
+        return;
+      }
+
+      const data = {
+        labels: roleData.labels,
+        datasets: [
+          {
+            data: roleData.counts,
+            backgroundColor: ['#6366f1', '#f59e0b', '#10b981', '#ef4444', '#3b82f6', '#8b5cf6'],
+            borderWidth: 0,
+          },
+        ],
+      };
+
+      const totalCount = roleData.counts.reduce((sum, value) => sum + value, 0);
+
+      new Chart(ctx, {
+        type: 'doughnut',
+        data: data,
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '65%',
+          plugins: {
+            legend: {
+              position: 'bottom',
+            },
+            tooltip: {
+              callbacks: {
+                label: function (context) {
+                  const label = context.label || '';
+                  const value = context.parsed || 0;
+                  const percentage = totalCount > 0 ? ((value / totalCount) * 100).toFixed(1) : 0;
+                  return `${label}: ${value} (${percentage}%)`;
+                },
+              },
+            },
+          },
+        },
+      });
+    })();
+  </script>
 {% endblock %}

@@ -263,7 +263,19 @@ class LoginView(View):
         user.save(update_fields=['last_login_at'])
 
         login(request, user)
-        request.session['last_activity'] = timezone.now().isoformat()
+        from superadmin.redis_helpers import create_admin_session
+        from superadmin.auth_helpers import get_security_settings
+
+        settings_obj = get_security_settings()
+        user_agent = request.META.get('HTTP_USER_AGENT', '')
+
+        jti = create_admin_session(
+            admin_user=user,
+            ip_address=ip,
+            user_agent=user_agent,
+            timeout_minutes=settings_obj.session_timeout_minutes,
+        )
+        request.session['jti'] = jti
         create_session(request, user, user_domain='Admin')
         log_audit_action(
             request=request,
@@ -280,17 +292,39 @@ class LoginView(View):
 class LogoutView(View):
     def get(self, request):
         if request.user.is_authenticated:
-            log_access('Logout', 'Success', request.user.email, _client_ip(request))
+            from superadmin.redis_helpers import revoke_admin_session
+            from django.contrib.auth import logout as auth_logout
+
+            email = request.user.email
+            ip = _client_ip(request)
+
+            jti = request.session.get('jti')
+            if jti:
+                revoke_admin_session(jti)
+
             close_session(request)
-        logout(request)
-        return redirect(reverse('login'))
+            auth_logout(request)
+            log_access('Logout', 'Success', email, ip)
+            return redirect('login')
+        return redirect('login')
 
     def post(self, request):
         if request.user.is_authenticated:
-            log_access('Logout', 'Success', request.user.email, _client_ip(request))
+            from superadmin.redis_helpers import revoke_admin_session
+            from django.contrib.auth import logout as auth_logout
+
+            email = request.user.email
+            ip = _client_ip(request)
+
+            jti = request.session.get('jti')
+            if jti:
+                revoke_admin_session(jti)
+
             close_session(request)
-        logout(request)
-        return redirect(reverse('login'))
+            auth_logout(request)
+            log_access('Logout', 'Success', email, ip)
+            return redirect('login')
+        return redirect('login')
 
 
 class ForgotPasswordView(View):
@@ -970,6 +1004,60 @@ class ActiveSessionListView(LoginRequiredMixin, View):
         return render(request, self.template_name, context)
 
 
+from superadmin.redis_helpers import (
+    get_all_active_admin_sessions,
+    revoke_admin_session,
+)
+
+
+class ActiveSessionsView(LoginRequiredMixin, View):
+    def get(self, request):
+        if not request.user.is_root:
+            messages.error(request, 'Access denied.')
+            return redirect('dashboard')
+
+        sessions = get_all_active_admin_sessions()
+        current_jti = request.session.get('jti')
+
+        return render(
+            request,
+            'security/active_sessions.html',
+            {
+                'sessions': sessions,
+                'current_jti': current_jti,
+                'total_count': len(sessions),
+            },
+        )
+
+
+class RevokeSessionView(LoginRequiredMixin, View):
+    def post(self, request, jti):
+        if not request.user.is_root:
+            messages.error(request, 'Access denied.')
+            return redirect('dashboard')
+
+        current_jti = request.session.get('jti')
+
+        if jti == current_jti:
+            messages.error(
+                request,
+                'You cannot revoke your own active session.',
+            )
+            return redirect('active_sessions')
+
+        revoke_admin_session(jti)
+
+        from superadmin.auth_helpers import log_access
+
+        log_access('Logout', 'Success', request.user.email, request.META.get('REMOTE_ADDR'))
+
+        messages.success(
+            request,
+            f'Session {jti[:8]}... has been revoked.',
+        )
+        return redirect('active_sessions')
+
+
 class SessionRevokeView(LoginRequiredMixin, View):
     def _require_root(self, request):
         if not getattr(request.user, 'is_root', False):
@@ -1108,7 +1196,7 @@ class RoleCreateView(LoginRequiredMixin, View):
         root_redirect = self._require_root(request)
         if root_redirect:
             return root_redirect
-        return render(request, self.template_name, {'form': RoleForm()})
+        return render(request, self.template_name, {'form': RoleForm(), 'is_edit': False})
 
     def post(self, request):
         root_redirect = self._require_root(request)
@@ -1123,7 +1211,7 @@ class RoleCreateView(LoginRequiredMixin, View):
             messages.success(request, 'Role created successfully.')
             return redirect(reverse('role_list'))
 
-        return render(request, self.template_name, {'form': form})
+        return render(request, self.template_name, {'form': form, 'is_edit': False})
 
 
 class RoleUpdateView(LoginRequiredMixin, View):
@@ -1145,7 +1233,7 @@ class RoleUpdateView(LoginRequiredMixin, View):
             messages.error(request, 'System default roles cannot be modified')
             return redirect(reverse('role_list'))
 
-        return render(request, self.template_name, {'form': RoleForm(instance=role)})
+        return render(request, self.template_name, {'form': RoleForm(instance=role), 'is_edit': True})
 
     def post(self, request, pk):
         redirect_resp = self._require_root_or_redirect(request, reverse('role_list'))
@@ -1165,7 +1253,7 @@ class RoleUpdateView(LoginRequiredMixin, View):
             messages.success(request, 'Role updated successfully.')
             return redirect(reverse('role_list'))
 
-        return render(request, self.template_name, {'form': form})
+        return render(request, self.template_name, {'form': form, 'is_edit': True})
 
 
 class RoleToggleStatusView(LoginRequiredMixin, View):
@@ -1283,7 +1371,7 @@ class AdminUserCreateView(LoginRequiredMixin, View):
         if redirect_resp:
             return redirect_resp
         form = AdminUserForm(initial={'status': 'Pending_Activation'})
-        return render(request, self.template_name, {'form': form})
+        return render(request, self.template_name, {'form': form, 'is_edit': False})
 
     def post(self, request):
         redirect_resp = self._require_root(request)
@@ -1292,7 +1380,7 @@ class AdminUserCreateView(LoginRequiredMixin, View):
 
         form = AdminUserForm(request.POST)
         if not form.is_valid():
-            return render(request, self.template_name, {'form': form})
+            return render(request, self.template_name, {'form': form, 'is_edit': False})
 
         user = form.save(commit=False)
         # Phase 1 rule: invite flow (no password yet)
@@ -1395,7 +1483,8 @@ class SetPasswordView(View):
         password = form.cleaned_data['password']
         user.set_password(password)
         user.status = 'Active'
-        user.save(update_fields=['password', 'status'])
+        user.two_factor_enabled = True
+        user.save(update_fields=['password', 'status', 'two_factor_enabled'])
 
         invite.is_used = True
         invite.save(update_fields=['is_used'])
@@ -1425,7 +1514,7 @@ class AdminUserUpdateView(LoginRequiredMixin, View):
             return redirect_resp
         target_user = get_object_or_404(AdminUser, pk=pk)
         form = AdminUserForm(instance=target_user)
-        return render(request, self.template_name, {'form': form})
+        return render(request, self.template_name, {'form': form, 'is_edit': True})
 
     def post(self, request, pk):
         redirect_resp = self._require_root(request)
@@ -1437,7 +1526,7 @@ class AdminUserUpdateView(LoginRequiredMixin, View):
 
         form = AdminUserForm(request.POST, instance=target_user)
         if not form.is_valid():
-            return render(request, self.template_name, {'form': form})
+            return render(request, self.template_name, {'form': form, 'is_edit': True})
 
         # Block root admin role changes.
         new_role = form.cleaned_data.get('role')
@@ -1491,13 +1580,19 @@ class AdminUserToggleStatusView(LoginRequiredMixin, View):
             target_user.updated_by = request.user
             target_user.save(update_fields=['status', 'updated_by'])
 
-            # TODO Phase 2: Revoke JWT token from Redis here
+            from superadmin.redis_helpers import revoke_all_sessions_for_admin
+
+            revoke_all_sessions_for_admin(target_user.id)
+            # Kill Switch: all Redis sessions for this admin destroyed
+            # TODO Phase 8: also call revoke_all_tenant_sessions()
+            #               when tenant suspend is implemented
             _revoke_user_sessions(target_user)
             messages.success(request, 'Admin user suspended successfully.')
         else:
             target_user.status = 'Active'
+            target_user.two_factor_enabled = True
             target_user.updated_by = request.user
-            target_user.save(update_fields=['status', 'updated_by'])
+            target_user.save(update_fields=['status', 'two_factor_enabled', 'updated_by'])
             messages.success(request, 'Admin user activated successfully.')
 
         return redirect(reverse('admin_user_list'))

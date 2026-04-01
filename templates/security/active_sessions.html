@@ -1,0 +1,130 @@
+{% extends 'base.html' %}
+
+{% block page_title %}Active Sessions Monitor{% endblock %}
+
+{% block content %}
+  <meta http-equiv="refresh" content="30" />
+
+  <div class="dashboard-toolbar">
+    <div class="toolbar-left">
+      <div class="toolbar-title">Active Sessions Monitor</div>
+      <div class="toolbar-subtitle">
+        Live view of all active admin sessions. This page auto-refreshes every 30 seconds.
+      </div>
+    </div>
+  </div>
+
+  <div class="kpi-grid" style="margin-bottom: 1.5rem">
+    <div class="kpi-card db-fade" data-status="info">
+      <div class="kpi-top">
+        <div class="kpi-icon primary">
+          <i class="bi bi-activity"></i>
+        </div>
+      </div>
+      <div class="kpi-title">Active Sessions</div>
+      <div class="kpi-bottom">
+        <span class="kpi-value">{{ total_count }}</span>
+      </div>
+    </div>
+  </div>
+
+  {% if sessions %}
+    <div class="db-card db-fade">
+      <div class="db-card-header">
+        <div>
+          <div class="db-card-title">Current Active Sessions</div>
+          <div class="db-card-subtitle">
+            Revoke sessions to immediately terminate admin access.
+          </div>
+        </div>
+      </div>
+
+      <div class="eal-table-wrap">
+        <table class="eal-table">
+          <thead>
+            <tr>
+              <th>User</th>
+              <th>Role</th>
+              <th>IP Address</th>
+              <th>Device / Browser</th>
+              <th>Started At</th>
+              <th>Last Activity</th>
+              <th>TTL Remaining</th>
+              <th style="width: 140px">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for session in sessions %}
+              {% if session.jti == current_jti %}
+                <tr class="table-info">
+                  <td>
+                    <div class="eal-name-cell">
+                      <span class="eal-name-text">
+                        {{ session.first_name }} {{ session.last_name }}
+                      </span>
+                      <span class="eal-name-subtext">{{ session.email }}</span>
+                    </div>
+                    {% if session.jti == current_jti %}
+                      <span class="status-badge active" style="margin-top: 4px">You</span>
+                    {% endif %}
+                  </td>
+                  <td>{{ session.role }}</td>
+                  <td>{{ session.ip_address }}</td>
+                  <td>
+                    <span class="small text-muted">
+                      {{ session.user_agent|default:'-' }}
+                    </span>
+                  </td>
+                  <td>{{ session.started_at }}</td>
+                  <td>{{ session.last_activity }}</td>
+                  <td>
+                    {% if session.ttl_seconds and session.ttl_seconds > 0 %}
+                      {{ session.ttl_seconds|divisibleby:60 }}
+                      {{ session.ttl_seconds|floatformat:-2 }}
+                    {% else %}
+                      &lt; 1 min
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if session.jti != current_jti %}
+                      <form
+                        method="post"
+                        action="{% url 'revoke_session' session.jti %}"
+                        style="display: inline"
+                      >
+                        {% csrf_token %}
+                        <button
+                          type="submit"
+                          class="btn btn-sm btn-danger"
+                          onclick="return confirm('Revoke this session now?');"
+                        >
+                          <i class="bi bi-x-circle"></i>
+                          Revoke
+                        </button>
+                      </form>
+                    {% else %}
+                      <span class="text-muted small">Current session</span>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endif %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  {% else %}
+    <div class="db-card db-fade">
+      <div class="notification-empty">
+        <div class="empty-icon">
+          <i class="bi bi-activity"></i>
+        </div>
+        <h4 class="empty-title">No active sessions found</h4>
+        <p class="empty-text">
+          There are currently no active admin sessions in the system.
+        </p>
+      </div>
+    </div>
+  {% endif %}
+{% endblock %}
+

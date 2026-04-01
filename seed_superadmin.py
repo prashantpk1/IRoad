@@ -128,6 +128,58 @@ def seed_security_settings():
         print("  ⏭️  Admin Security Settings already exists")
 
 
+def setup_celery_beat_tasks():
+    print("\n--- Setting Up Celery Beat Tasks ---")
+    try:
+        from django_celery_beat.models import CrontabSchedule, PeriodicTask
+        import json
+
+        schedule_midnight, _ = CrontabSchedule.objects.get_or_create(
+            minute='0',
+            hour='0',
+            day_of_week='*',
+            day_of_month='*',
+            month_of_year='*',
+        )
+
+        schedule_1am, _ = CrontabSchedule.objects.get_or_create(
+            minute='0',
+            hour='1',
+            day_of_week='*',
+            day_of_month='*',
+            month_of_year='*',
+        )
+
+        tasks = [
+            {
+                'name': 'Daily: Cleanup Expired Auth Tokens',
+                'crontab': schedule_midnight,
+                'task': 'iroad.auth.cleanup_expired_tokens',
+            },
+            {
+                'name': 'Daily: Check Subscription Expiry',
+                'crontab': schedule_1am,
+                'task': 'iroad.billing.check_subscription_expiry',
+            },
+        ]
+
+        for task_data in tasks:
+            _, created = PeriodicTask.objects.get_or_create(
+                name=task_data['name'],
+                defaults={
+                    'crontab': task_data['crontab'],
+                    'task': task_data['task'],
+                    'args': json.dumps([]),
+                },
+            )
+            status = '✅ Created' if created else '⏭️  Exists'
+            print(f"  {status}: {task_data['name']}")
+
+    except Exception as e:
+        print(f"  ⚠️  Celery Beat setup skipped: {e}")
+        print("      Run: python manage.py migrate first")
+
+
 def seed_countries():
     print("\n--- Seeding Countries ---")
     from superadmin.models import Country
@@ -379,6 +431,7 @@ def main():
         seed_roles()
         seed_root_admin()
         seed_security_settings()
+        setup_celery_beat_tasks()
         seed_countries()
         seed_currencies()
         seed_tax_codes()
@@ -397,6 +450,7 @@ def main():
         # seed_base_currency()        ← Phase 4 ✅ (now active above)
         # seed_tenant_security_settings() ← Phase 10 ✅ (now active above)
         # seed_plans()             ← Phase 5
+        # revoke_tenant_sessions_task ← Phase 8
 
         print("\n" + "=" * 50)
         print("  ✅ All seeding completed successfully")
