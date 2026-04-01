@@ -913,3 +913,99 @@
 - All action buttons: same size, icons from Bootstrap Icons only
 - All status badges: pill shape, consistent padding
 - Empty states: always show relevant icon + message + CTA button
+
+
+## Redis + Celery Full Implementation Rules
+
+
+### Redis Session Rules
+
+- ALL admin sessions stored in Redis — NOT Django DB sessions
+
+- Redis key pattern for admin sessions:
+
+    admin:session:{jti}
+
+    Value: JSON with admin_id, email, ip_address, 
+
+           user_agent, started_at, last_activity
+
+    TTL: session_timeout_minutes * 60 (in seconds)
+
+- On every authenticated request: refresh TTL in Redis
+
+- On logout: delete Redis key immediately
+
+- On suspend: delete ALL Redis keys for that admin
+
+- Session ID (JTI) stored in Django session only as reference pointer
+
+- Never store password or sensitive tokens in Redis
+
+
+### JWT Rules
+
+- Use PyJWT for token generation
+
+- JWT payload must contain: jti, admin_id, email, issued_at
+
+- jti (JWT ID) is uuid4 — unique per session
+
+- JWT secret loaded from .env SECRET_KEY
+
+- JWT used only for session identification — not for API auth yet
+
+
+### Celery Rules
+
+- Broker: Redis DB 1
+
+- Result Backend: Redis DB 2
+
+- All tasks defined in superadmin/tasks.py
+
+- All tasks must be idempotent — safe to retry
+
+- All tasks wrapped in try/except with proper logging
+
+- Task naming: iroad.{module}.{action}
+
+  e.g., iroad.auth.revoke_tenant_sessions
+
+- Never call tasks synchronously — always .delay() or .apply_async()
+
+
+### Kill Switch Rules (PCS P3 Rule B + P11)
+
+- Suspending admin: delete their Redis session key immediately
+
+- Suspending tenant: delete all Redis keys matching tenant pattern
+
+  (Phase 8 — tenant keys not yet created but pattern reserved)
+
+- Kill switch must be atomic — use Redis pipeline
+
+
+### Active Sessions Monitor Rules (FRM-CP-11-03)
+
+- Sessions read from Redis SCAN — not from DB
+
+- Fields shown: session_id, user_domain, admin email,
+
+  ip_address, user_agent, started_at, last_activity
+
+- Revoke button: deletes Redis key immediately
+
+- Data is live — no pagination cache
+
+
+### Celery Task Rules
+
+- Email task: reads active SMTP gateway from DB, sends via smtplib
+
+- SMS task: reads active SMS gateway from DB, sends via HTTP
+
+- Expiry task: runs daily via Celery Beat
+
+- All tasks log result to Django logger
+
