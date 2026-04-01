@@ -46,13 +46,6 @@
         Activating this will deactivate all other policies.
       </div>
 
-      {% if messages %}
-        {% for message in messages %}
-          <p style="margin: 12px 0 0; color:{% if message.tags == 'error' %}#b91c1c{% else %}#15803d{% endif %}; font-weight: 600">
-            {{ message }}
-          </p>
-        {% endfor %}
-      {% endif %}
 
       <form method="post" action="">
         {% csrf_token %}
@@ -91,21 +84,21 @@
             {% endif %}
           {% endfor %}
         </div>
+        </div>
+        </div>
 
         <div class="form-actions-bar">
-          <div class="eal-header-actions">
-            <div class="footer-left">
-              <button type="reset" class="eal-btn eal-btn-outline">
-                <i class="bi bi-arrow-counterclockwise"></i>
-                Reset Form
-              </button>
-            </div>
-            <div class="footer-right">
-              <button type="submit" class="eal-btn eal-btn-primary">
-                <i class="bi bi-save"></i>
-                Save
-              </button>
-            </div>
+          <div class="form-actions-left">
+            <a href="{% url 'addons_policy_list' %}" class="eal-btn eal-btn-outline">
+              <i class="bi bi-x-lg"></i>
+              <span>{% translate "Cancel" %}</span>
+            </a>
+          </div>
+          <div class="form-actions-right">
+            <button type="submit" class="eal-btn eal-btn-primary">
+              <i class="bi bi-send"></i>
+              <span>{% if is_edit %}{% translate "Update Policy" %}{% else %}{% translate "Add Policy" %}{% endif %}</span>
+            </button>
           </div>
         </div>
       </form>

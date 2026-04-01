@@ -331,7 +331,6 @@ class ForgotPasswordView(View):
     """Request password reset (email always gets same response text)."""
 
     template_request = 'auth/reset_password.html'
-    template_sent = 'auth/reset_password_sent.html'
     success_message = (
         'If this email exists in our system, '
         'a reset link has been generated.'
@@ -354,48 +353,29 @@ class ForgotPasswordView(View):
             )
 
         email = form.cleaned_data['email'].lower().strip()
+        reset_url = None
 
         try:
             user = AdminUser.objects.get(email=email)
         except AdminUser.DoesNotExist:
-            return render(
-                request,
-                self.template_request,
-                {
-                    'form': form,
-                    'error': 'This email address is not registered in our system.',
-                },
+            user = None
+
+        if user and user.status in ('Active', 'Pending_Activation'):
+            # Generate token only for valid accounts
+            token = create_auth_token(user, 'password_reset')
+            reset_url = request.build_absolute_uri(
+                f'/new-password/{token.token}/'
             )
+            # TODO Phase 7: Send reset_url via email here
 
-        if user.status not in ('Active', 'Pending_Activation'):
-            return render(
-                request,
-                self.template_request,
-                {
-                    'form': form,
-                    'error': (
-                        'This account is currently inactive. '
-                        'Contact your administrator.'
-                    ),
-                },
-            )
-
-        # Generate token
-        token = create_auth_token(user, 'password_reset')
-        reset_url = request.build_absolute_uri(f'/new-password/{token.token}/')
-
-        # Send actual reset email
-        context = {
-            'admin_user': user,
-            'reset_url': reset_url,
-        }
-        send_auth_email(user, 'password_reset', context)
-
+        # Always show the same success_message text to avoid information leaks
         return render(
             request,
-            self.template_sent,
+            self.template_request,
             {
+                'form': ForgotPasswordForm(),
                 'success_message': self.success_message,
+                'reset_url': reset_url,
             },
         )
 
@@ -706,7 +686,7 @@ class AccessLogListView(LoginRequiredMixin, View):
         qs = qs.order_by('-timestamp')
         total_count = qs.count()
 
-        paginator = Paginator(qs, 25)
+        paginator = Paginator(qs, 5)
         page_number = request.GET.get('page', 1)
         page_obj = paginator.get_page(page_number)
 
@@ -1383,7 +1363,7 @@ class AdminUserCreateView(LoginRequiredMixin, View):
             return render(request, self.template_name, {'form': form, 'is_edit': False})
 
         user = form.save(commit=False)
-        # Phase 1 rule: invite flow (no password yet)
+        # Phase 1/2 rule: invite flow (no password yet)
         user.status = 'Pending_Activation'
         user.created_by = request.user
         user.updated_by = request.user
@@ -1394,16 +1374,12 @@ class AdminUserCreateView(LoginRequiredMixin, View):
             f'/set-password/{auth_token.token}/'
         )
 
-        # Send actual invite email
-        context = {
-            'admin_user': user,
-            'invite_url': invite_url,
-        }
-        send_auth_email(user, 'invite', context)
+        # TODO Phase 7: Send invite_url via email here
 
         return render(
             request,
             'system_users/admin_users/invite_success.html',
+            {'invite_url': invite_url},
         )
 
 
@@ -5128,7 +5104,7 @@ class TransactionCreateView(RootRequiredMixin, View):
             tenant.save(update_fields=['wallet_balance', 'updated_at'])
 
         messages.success(request, 'Wallet top-up recorded.')
-        return redirect('transaction_detail', pk=txn.pk)
+        return redirect('transaction_list')
 
 
 class TransactionDetailView(LoginRequiredMixin, View):

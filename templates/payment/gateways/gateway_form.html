@@ -111,20 +111,16 @@
         </div>
 
         <div class="form-actions-bar">
-  <div class="eal-header-actions">
-
-          <div class="footer-left">
+          <div class="form-actions-left">
             <a href="{% url 'gateway_list' %}" class="eal-btn eal-btn-outline">
-              <i class="bi bi-arrow-left"></i>
-              Cancel
+              <i class="bi bi-x-lg"></i>
+              <span>{% translate "Cancel" %}</span>
             </a>
-          
-  </div>
-</div>
-          <div class="footer-right">
+          </div>
+          <div class="form-actions-right">
             <button type="submit" class="eal-btn eal-btn-primary">
-              <i class="bi bi-save"></i>
-              Save
+              <i class="bi bi-send"></i>
+              <span>{% if is_edit %}{% translate "Update Gateway" %}{% else %}{% translate "Add Gateway" %}{% endif %}</span>
             </button>
           </div>
         </div>

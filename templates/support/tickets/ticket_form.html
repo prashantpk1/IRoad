@@ -95,14 +95,16 @@
 
   <div class="form-actions-bar">
     <div class="form-actions-left">
-      <button type="submit" class="eal-btn eal-btn-primary">
-        <i class="bi bi-check-lg"></i>
-        <span>{% translate "Create Ticket" %}</span>
-      </button>
       <a href="{% url 'ticket_list' %}" class="eal-btn eal-btn-outline">
         <i class="bi bi-x-lg"></i>
         <span>{% translate "Cancel" %}</span>
       </a>
+    </div>
+    <div class="form-actions-right">
+      <button type="submit" class="eal-btn eal-btn-primary">
+        <i class="bi bi-send"></i>
+        <span>{% if is_edit %}{% translate "Update Ticket" %}{% else %}{% translate "Create Ticket" %}{% endif %}</span>
+      </button>
     </div>
   </div>
 </form>

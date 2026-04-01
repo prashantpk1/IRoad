@@ -100,14 +100,16 @@
 
   <div class="form-actions-bar">
     <div class="form-actions-left">
-      <button type="submit" class="eal-btn eal-btn-primary">
-        <i class="bi bi-check-lg"></i>
-        <span>{% if is_edit %}{% translate "Update Category" %}{% else %}{% translate "Create Category" %}{% endif %}</span>
-      </button>
       <a href="{% url 'support_category_list' %}" class="eal-btn eal-btn-outline">
         <i class="bi bi-x-lg"></i>
         <span>{% translate "Cancel" %}</span>
       </a>
+    </div>
+    <div class="form-actions-right">
+      <button type="submit" class="eal-btn eal-btn-primary">
+        <i class="bi bi-send"></i>
+        <span>{% if is_edit %}{% translate "Update Category" %}{% else %}{% translate "Add Category" %}{% endif %}</span>
+      </button>
     </div>
   </div>
 </form>

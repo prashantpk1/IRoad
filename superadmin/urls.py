@@ -162,7 +162,7 @@ urlpatterns = [
         name='set_password',
     ),
     path('', DashboardView.as_view(), name='dashboard'),
-    path('dashboard/', RedirectView.as_view(url='/', permanent=False)),
+    path('dashboard/', DashboardView.as_view(), name='dashboard_alt'),
     path('roles/', RoleListView.as_view(), name='role_list'),
     path('roles/create/', RoleCreateView.as_view(), name='role_create'),
     path('roles/<uuid:pk>/edit/', RoleUpdateView.as_view(), name='role_edit'),

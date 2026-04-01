@@ -4,6 +4,38 @@
 {% block page_title %}{% if is_edit %}{% translate "Edit Template" %}{% else %}{% translate "Add Template" %}{% endif %}{% endblock %}
 
 
+{% block extra_css %}
+<style>
+  .var-chip {
+    padding: 6px 12px;
+    border-radius: 20px;
+    background: white;
+    border: 1px solid var(--primary-light);
+    color: var(--primary-color);
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .var-chip:hover {
+    background: var(--primary-light);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  }
+  .var-chip i { font-size: 0.9rem; }
+  
+  /* editor container styling */
+  .tox-tinymce {
+    border-radius: 12px !important;
+    border: 1px solid #e2e8f0 !important;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  }
+</style>
+{% endblock %}
+
 {% block breadcrumb_items %}
 <li class="breadcrumb-item active" aria-current="page">{% if is_edit %}{% translate "Edit Template" %}{% else %}{% translate "Add Template" %}{% endif %}</li>
 {% endblock %}
@@ -17,27 +49,25 @@
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
-        <!-- Actions here -->
       </div>
     </div>
   </div>
 </div>
 
-  
   {% if form.instance.pk and form.instance.updated_at %}
   <div class="edit-info-bar">
     <i class="bi bi-clock-history"></i>
-    Last updated
+    {% translate "Last updated" %}
     {% if form.instance.updated_by %}
-      by <strong>{{ form.instance.updated_by.first_name }} {{ form.instance.updated_by.last_name }}</strong>
+      {% translate "by" %} <strong>{{ form.instance.updated_by.first_name }} {{ form.instance.updated_by.last_name }}</strong>
     {% endif %}
-    at <strong>{{ form.instance.updated_at|date:"d M Y, H:i" }}</strong>
+    {% translate "at" %} <strong>{{ form.instance.updated_at|date:"d M Y, H:i" }}</strong>
   </div>
   {% endif %}
 
   <div class="form-card">
     <div class="form-card-body">
-      {% if form.non_field_errors %}<div style="margin-bottom: 16px; color:#b91c1c">{{ form.non_field_errors }}</div>{% endif %}
+      {% if form.non_field_errors %}<div class="alert alert-danger mb-3">{{ form.non_field_errors }}</div>{% endif %}
       <form method="post" action="">
         {% csrf_token %}
         <div class="fields-grid cols-2">
@@ -51,52 +81,102 @@
           <div class="field"><label class="form-label">Status</label>{{ form.is_active }}</div>
         </div>
 
-        <div class="alert alert-info" style="padding: 12px 14px; border-radius: 10px; margin-bottom: 16px;">
-          <strong>Available Variables:</strong>
-          <div style="margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap;">
-            <button type="button" class="btn" onclick="copyVar('{% templatetag openvariable %}client_name{% templatetag closevariable %}')">{% templatetag openvariable %}client_name{% templatetag closevariable %}</button>
-            <button type="button" class="btn" onclick="copyVar('{% templatetag openvariable %}otp_code{% templatetag closevariable %}')">{% templatetag openvariable %}otp_code{% templatetag closevariable %}</button>
-            <button type="button" class="btn" onclick="copyVar('{% templatetag openvariable %}invoice_amount{% templatetag closevariable %}')">{% templatetag openvariable %}invoice_amount{% templatetag closevariable %}</button>
-            <button type="button" class="btn" onclick="copyVar('{% templatetag openvariable %}invoice_number{% templatetag closevariable %}')">{% templatetag openvariable %}invoice_number{% templatetag closevariable %}</button>
-            <button type="button" class="btn" onclick="copyVar('{% templatetag openvariable %}plan_name{% templatetag closevariable %}')">{% templatetag openvariable %}plan_name{% templatetag closevariable %}</button>
-            <button type="button" class="btn" onclick="copyVar('{% templatetag openvariable %}expiry_date{% templatetag closevariable %}')">{% templatetag openvariable %}expiry_date{% templatetag closevariable %}</button>
-            <button type="button" class="btn" onclick="copyVar('{% templatetag openvariable %}company_name{% templatetag closevariable %}')">{% templatetag openvariable %}company_name{% templatetag closevariable %}</button>
-            <button type="button" class="btn" onclick="copyVar('{% templatetag openvariable %}support_email{% templatetag closevariable %}')">{% templatetag openvariable %}support_email{% templatetag closevariable %}</button>
+        <div class="alert alert-info mt-4" style="background: rgba(80, 81, 249, 0.05); border: 1px solid rgba(80, 81, 249, 0.1); border-radius:12px">
+          <div class="d-flex align-items-center gap-2 mb-3">
+            <i class="bi bi-magic" style="color: var(--primary-color)"></i>
+            <strong style="color: var(--primary-color)">{% translate "Available Variables" %}</strong>
+            <span class="text-muted small ms-2">{% translate "(Click to insert at cursor position)" %}</span>
+          </div>
+          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            {% with vars="client_name otp_code invoice_amount invoice_number plan_name expiry_date company_name support_email" %}
+            {% for var in vars.split %}
+              <button type="button" class="var-chip" onclick="insertVar('{% templatetag openvariable %}{{ var }}{% templatetag closevariable %}')">
+                <i class="bi bi-plus-circle"></i>
+                <span>{% templatetag openvariable %}{{ var }}{% templatetag closevariable %}</span>
+              </button>
+            {% endfor %}
+            {% endwith %}
           </div>
         </div>
 
         <div class="form-actions-bar">
-  <div class="eal-header-actions">
-
-          <div class="footer-left">
-            <a href="{% url 'notif_template_list' %}" class="eal-btn eal-btn-outline"><i class="bi bi-arrow-left"></i> Cancel</a>
-          
-  </div>
-</div>
-          <div class="footer-right">
-            <button type="submit" class="eal-btn eal-btn-primary"><i class="bi bi-save"></i> Save</button>
+          <div class="form-actions-left">
+            <a href="{% url 'notif_template_list' %}" class="eal-btn eal-btn-outline">
+              <i class="bi bi-x-lg"></i>
+              <span>{% translate "Cancel" %}</span>
+            </a>
+          </div>
+          <div class="form-actions-right">
+            <button type="submit" class="eal-btn eal-btn-primary">
+              <i class="bi bi-send"></i>
+              <span>{% if is_edit %}{% translate "Update Template" %}{% else %}{% translate "Add Template" %}{% endif %}</span>
+            </button>
           </div>
         </div>
       </form>
     </div>
   </div>
+{% endblock %}
 
-  <script>
+{% block extra_js %}
+<script src="https://cdn.tiny.cloud/1/fnj23wpiq1bb11q3pkw07k5j6xljfalt5c9eziqjt6sp4g1z/tinymce/6/tinymce.min.js" referrerpolicy="origin"></script>
+<script>
+  (function() {
+    const editorConfig = {
+      menubar: false,
+      plugins: 'lists link image code table wordcount',
+      toolbar: 'undo redo | blocks | bold italic | alignleft aligncenter alignright | bullist numlist | table link | code',
+      height: 350,
+      skin: 'oxide',
+      content_css: 'default',
+      branding: false,
+      promotion: false,
+    };
+
+    tinymce.init({
+      ...editorConfig,
+      selector: '#id_body_en',
+      placeholder: 'Write your content here...',
+    });
+
+    tinymce.init({
+      ...editorConfig,
+      selector: '#id_body_ar',
+      directionality: 'rtl',
+      placeholder: 'اكتب المحتوى هنا...',
+    });
+
+    // Subject toggle logic
     function toggleSubjects() {
-      var channel = document.getElementById('id_channel_type');
-      var en = document.getElementById('subject-en-wrap');
-      var ar = document.getElementById('subject-ar-wrap');
+      const channel = document.getElementById('id_channel_type');
+      const en = document.getElementById('subject-en-wrap');
+      const ar = document.getElementById('subject-ar-wrap');
       if (!channel) return;
-      var show = channel.value === 'Email';
+      const show = channel.value === 'Email';
       en.style.display = show ? 'block' : 'none';
       ar.style.display = show ? 'block' : 'none';
     }
-    function copyVar(v) {
-      navigator.clipboard.writeText(v);
-    }
-    var channel = document.getElementById('id_channel_type');
+
+    const channel = document.getElementById('id_channel_type');
     if (channel) channel.addEventListener('change', toggleSubjects);
     toggleSubjects();
-  </script>
+  })();
+
+  function insertVar(v) {
+    const editor = tinymce.activeEditor;
+    if (editor) {
+      editor.execCommand('mceInsertContent', false, v);
+      editor.focus();
+    } else {
+      // Fallback for standard textarea if tinymce failed
+      const active = document.activeElement;
+      if (active && (active.id === 'id_body_en' || active.id === 'id_body_ar')) {
+        const start = active.selectionStart;
+        const end = active.selectionEnd;
+        active.value = active.value.substring(0, start) + v + active.value.substring(end);
+      }
+    }
+  }
+</script>
 {% endblock %}
 

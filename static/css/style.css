@@ -2461,11 +2461,11 @@ textarea.form-control {
   box-shadow: 0 1px 2px rgba(220, 38, 38, 0.1);
 }
 
-/* Expired state */
+/* Expired / Blocked state (orange) */
 .status-badge.expired {
-  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
-  color: #92400e;
-  border: 1px solid rgba(217, 119, 6, 0.2);
+  background: linear-gradient(135deg, #ffedd5 0%, #fed7aa 100%);
+  color: #c2410c;
+  border: 1px solid rgba(194, 65, 12, 0.2);
   box-shadow: 0 1px 2px rgba(217, 119, 6, 0.1);
 }
 
@@ -7313,22 +7313,15 @@ textarea.form-control {
 
 /* ── Premium Form Action Bar (Fixed Footer) ── */
 .form-actions-bar {
-  position: fixed;
-  bottom: 0;
-  left: var(--sidebar-width);
-  right: 0;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start; /* Both buttons to the left */
-  gap: 16px;
-  padding: 16px 54px;
-  background: rgba(255, 255, 255, 0.98);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-top: 1px solid #e2e8f0;
-  box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.05);
-  z-index: 1000;
-  transition: left var(--sidebar-transition, 0.3s ease);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 28px;
+    background: var(--bg-white);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--border-light);
+    margin-bottom: 20px;
 }
 
 .sidebar.collapsed ~ .main-content .form-actions-bar {
@@ -7357,6 +7350,10 @@ textarea.form-control {
 /* Ensure form space at bottom for fixed bar */
 form {
   padding-bottom: 80px; 
+}
+
+.eal-table-card form {
+  padding-bottom: 0px !important;
 }
 
 .form-actions-left {
@@ -7401,3 +7398,116 @@ form {
 .eal-row-btn i {
   line-height: 1;
 }
+
+/* ── Selectable Card Grid (Premium Selection) ── */
+.selectable-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 12px;
+    margin-top: 10px;
+}
+
+.selectable-item {
+    cursor: pointer;
+    position: relative;
+    user-select: none;
+}
+
+.selectable-item input[type="checkbox"],
+.selectable-item input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+    cursor: pointer;
+    height: 0;
+    width: 0;
+}
+
+.selectable-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: #ffffff;
+    border: 1.5px solid #e2e8f0;
+    border-radius: var(--radius-lg);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    text-align: center;
+    min-height: 100px;
+}
+
+.selectable-card i {
+    font-size: 24px;
+    color: #94a3b8;
+    margin-bottom: 10px;
+    transition: all 0.2s;
+}
+
+.selectable-card .card-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #475569;
+    line-height: 1.2;
+}
+
+.selectable-card .card-check {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 18px;
+    height: 18px;
+    background: #5051f9;
+    color: #ffffff;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    opacity: 0;
+    transform: scale(0.5);
+    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* Hover State */
+.selectable-item:hover .selectable-card {
+    border-color: #cbd5e1;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.selectable-item:hover .selectable-card i {
+    color: #64748b;
+}
+
+/* Selected State */
+.selectable-item input:checked + .selectable-card {
+    background: #f5f3ff;
+    border-color: #5051f9;
+    box-shadow: 0 4px 15px rgba(80, 81, 249, 0.1);
+}
+
+.selectable-item input:checked + .selectable-card i {
+    color: #5051f9;
+    transform: scale(1.1);
+}
+
+.selectable-item input:checked + .selectable-card .card-label {
+    color: #1e1b4b;
+}
+
+.selectable-item input:checked + .selectable-card .card-check {
+    opacity: 1;
+    transform: scale(1);
+}
+
+/* Mobile Adjustments */
+@media (max-width: 576px) {
+    .selectable-grid {
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    }
+    .selectable-card {
+        padding: 12px;
+        min-height: 80px;
+    }
+}
+

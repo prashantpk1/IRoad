@@ -3,23 +3,53 @@
 {% block page_title %}Invite sent{% endblock %}
 
 {% block content %}
-  <div class="content-card" style="background: #ffffff; padding: 40px; border-radius: 12px; max-width: 600px; text-align: center; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
-    <div style="margin-bottom: 24px;">
-      <div style="width: 80px; height: 80px; background: #ecfdf5; color: #10b981; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto; font-size: 40px;">
-        <i class="bi bi-envelope-check"></i>
+  <div class="content-card" style="background: #ffffff; padding: 40px; border-radius: 12px; max-width: 720px; margin: 0 auto; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+    <div style="display: flex; flex-direction: column; gap: 24px;">
+      <div style="text-align: center;">
+        <div style="width: 80px; height: 80px; background: #ecfdf5; color: #10b981; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 40px;">
+          <i class="bi bi-envelope-check"></i>
+        </div>
+        <h2 class="page-title" style="margin-bottom: 8px; font-weight: 700; color: #1e293b;">Invitation Created</h2>
+        <p class="text-muted" style="margin: 0; font-size: 15px; line-height: 1.6;">
+          Share the invite link below with the administrator. The link is valid for <strong>24 hours</strong>.
+        </p>
       </div>
-    </div>
-    
-    <h2 class="page-title" style="margin-bottom: 12px; font-weight: 700; color: #1e293b;">Invitation Sent</h2>
-    <p class="text-muted" style="margin-bottom: 32px; font-size: 16px; line-height: 1.6;">
-      An activation email has been sent to the new administrator. 
-      They will need to follow the link in the email to set their password and activate their account.
-    </p>
 
-    <div style="border-top: 1px solid #f1f5f9; padding-top: 32px;">
-      <a href="{% url 'admin_user_list' %}" class="btn btn-primary btn-lg" style="padding: 12px 32px; font-weight: 600; border-radius: 8px;">
-        <i class="bi bi-arrow-left"></i> Back to Users List
-      </a>
+      {% if invite_url %}
+        <div style="text-align: left;">
+          <label class="form-label" style="font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 6px;">
+            Invite URL
+          </label>
+          <div style="display: flex; gap: 8px; align-items: stretch; flex-wrap: wrap;">
+            <input
+              type="text"
+              class="form-control"
+              id="inviteUrlInput"
+              readonly
+              value="{{ invite_url }}"
+              style="font-size: 13px; padding: 10px 12px; flex: 1 1 260px;"
+            />
+            <button
+              type="button"
+              class="btn btn-outline-secondary"
+              style="white-space: nowrap; font-size: 13px; font-weight: 600;"
+              onclick="navigator.clipboard && navigator.clipboard.writeText && navigator.clipboard.writeText(document.getElementById('inviteUrlInput').value);"
+            >
+              <i class="bi bi-clipboard"></i>
+              Copy Link
+            </button>
+          </div>
+          <p class="text-muted" style="margin-top: 8px; font-size: 12px;">
+            Anyone with this link can activate the invited admin account once. The token expires in <strong>24 hours</strong>.
+          </p>
+        </div>
+      {% endif %}
+
+      <div style="border-top: 1px solid #f1f5f9; padding-top: 20px; text-align: right;">
+        <a href="{% url 'admin_user_list' %}" class="btn btn-primary btn-lg" style="padding: 10px 24px; font-weight: 600; border-radius: 8px;">
+          <i class="bi bi-arrow-left"></i> Back to Users List
+        </a>
+      </div>
     </div>
   </div>
 

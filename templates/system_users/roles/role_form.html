@@ -43,16 +43,6 @@
   </div>
 {% endif %}
 
-{% if messages %}
-  <div class="mb-4">
-    {% for message in messages %}
-      <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags|default:'info' }}{% endif %} alert-dismissible fade show" role="alert">
-        {{ message }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-      </div>
-    {% endfor %}
-  </div>
-{% endif %}
 
 <form method="post" action="" autocomplete="off" novalidate>
   {% csrf_token %}
@@ -108,16 +98,20 @@
     </div>
 
     <!-- Fixed Action Bar at the bottom of the viewport -->
+
+    </div>  
     <div class="form-actions-bar">
       <div class="form-actions-left">
-        <button type="submit" class="eal-btn eal-btn-primary">
-          <i class="bi bi-save"></i>
-          <span>{% translate "Save Role" %}</span>
-        </button>
         <a href="{% url 'role_list' %}" class="eal-btn eal-btn-outline">
           <i class="bi bi-x-lg"></i>
           <span>{% translate "Cancel" %}</span>
         </a>
+      </div>
+      <div class="form-actions-right">
+        <button type="submit" class="eal-btn eal-btn-primary">
+          <i class="bi bi-send"></i>
+          <span>{% if is_edit %}{% translate "Update Role" %}{% else %}{% translate "Add Role" %}{% endif %}</span>
+        </button>
       </div>
     </div>
   </div>

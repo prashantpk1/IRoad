@@ -25,14 +25,6 @@
   </div>
 </div>
 
-{% if messages %}
-  {% for message in messages %}
-    <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">
-      {{ message }}
-      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
-  {% endfor %}
-{% endif %}
 
 <form method="post" enctype="multipart/form-data" action="{% url 'transaction_create' %}" autocomplete="off">
   {% csrf_token %}
@@ -82,16 +74,22 @@
         </div>
       </div>
 
-      <div class="d-flex flex-wrap gap-2 mt-4">
-        <button type="submit" class="eal-btn eal-btn-primary">
-          <i class="bi bi-save"></i>
-          <span>{% translate "Save" %}</span>
-        </button>
-        <a href="{% url 'transaction_list' %}" class="eal-btn eal-btn-outline">
-          <i class="bi bi-x-lg"></i>
-          <span>{% translate "Cancel" %}</span>
-        </a>
-      </div>
+    </div>
+  </div>
+
+  <!-- Fixed Action Bar at the bottom of the viewport -->
+  <div class="form-actions-bar">
+    <div class="form-actions-left">
+      <a href="{% url 'transaction_list' %}" class="eal-btn eal-btn-outline">
+        <i class="bi bi-x-lg"></i>
+        <span>{% translate "Cancel" %}</span>
+      </a>
+    </div>
+    <div class="form-actions-right">
+      <button type="submit" class="eal-btn eal-btn-primary">
+        <i class="bi bi-send"></i>
+        <span>{% translate "Process Top-Up" %}</span>
+      </button>
     </div>
   </div>
 </form>

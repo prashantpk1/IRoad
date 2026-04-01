@@ -56,16 +56,18 @@
           <div class="field"><label class="form-label">Sender ID</label>{{ form.sender_id }}</div>
           <div class="field" id="enc-wrap"><label class="form-label">Encryption</label>{{ form.encryption_type }}</div>
           <div class="field"><label class="form-label">Status</label>{{ form.is_active }}</div>
-        </div>
+          </div>
+      </div>
+      <button type="button" class="btn" disabled title="Test Connection (Available in Phase 11)" style="border-width: 1px; opacity: 0.5; cursor: not-allowed;">
+        <i class="bi bi-wifi"></i>
+        Test Connection
+      </button>
+    </div>
 
         <div class="form-actions-bar">
   <div class="eal-header-actions">
 
           <div class="footer-left">
-            <button type="button" class="btn" disabled title="Test Connection (Available in Phase 11)" style="border-width: 1px; opacity: 0.5; cursor: not-allowed;">
-              <i class="bi bi-wifi"></i>
-              Test Connection
-            </button>
             <a href="{% url 'comm_gateway_list' %}" class="eal-btn eal-btn-outline">
               <i class="bi bi-arrow-left"></i>
               Cancel

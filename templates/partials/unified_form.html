@@ -42,17 +42,18 @@
     {% block form_actions %}
       <div class="form-actions-bar">
         <div class="form-actions-left">
-          {% block form_submit %}
-            <button type="submit" class="eal-btn eal-btn-primary">
-              <i class="bi bi-save"></i>
-              <span>{% translate "Save Changes" %}</span>
-            </button>
-          {% endblock %}
-          
           {% block form_cancel %}
-            <button type="button" class="eal-btn eal-btn-outline" onclick="history.back()">
+            <a href="javascript:history.back()" class="eal-btn eal-btn-outline">
               <i class="bi bi-x-lg"></i>
               <span>{% translate "Cancel" %}</span>
+            </a>
+          {% endblock %}
+        </div>
+        <div class="form-actions-right">
+          {% block form_submit %}
+            <button type="submit" class="eal-btn eal-btn-primary">
+              <i class="bi bi-send"></i>
+              <span>{% if is_edit %}{% translate "Update Record" %}{% else %}{% translate "Create Record" %}{% endif %}</span>
             </button>
           {% endblock %}
           {% block form_extra_actions %}{% endblock %}

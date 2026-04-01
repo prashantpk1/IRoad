@@ -25,16 +25,6 @@
   </div>
 </div>
 
-{% if messages %}
-  {% for message in messages %}
-    <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">
-      {{ message }}
-      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
-  {% endfor %}
-{% endif %}
-
-
 <form method="post" action="{% url 'order_create' %}" id="order-form" class="vstack gap-4" autocomplete="off">
   {% csrf_token %}
   <div class="form-card">
@@ -184,20 +174,24 @@
       <span id="pv_tax" style="display:none">0.00</span>
       <span id="pv_grand" style="display:none">0.00</span>
       <span id="pv_base" style="display:none">0.00</span>
-
-      <div class="d-flex flex-wrap gap-2 mt-4">
-        <button type="submit" class="eal-btn eal-btn-primary">
-          <i class="bi bi-save"></i>
-          <span>{% translate "Save as draft" %}</span>
-        </button>
-        <a href="{% url 'order_list' %}" class="eal-btn eal-btn-outline">
-          <i class="bi bi-x-lg"></i>
-          <span>{% translate "Cancel" %}</span>
-        </a>
-      </div>
     </div>
   </div>
-</form>
+
+
+<div class="form-actions-bar">
+  <div class="form-actions-left">
+    <a href="{% url 'order_list' %}" class="eal-btn eal-btn-outline">
+      <i class="bi bi-x-lg"></i>
+      <span>{% translate "Cancel" %}</span>
+    </a>
+  </div>
+  <div class="form-actions-right">
+    <button type="submit" form="order-form" class="eal-btn eal-btn-primary">
+      <i class="bi bi-save"></i>
+      <span>{% translate "Save as draft" %}</span>
+    </button>
+  </div>
+</div>
 
 {{ pricing_data|json_script:"crm-order-pricing" }}
 {{ addons_data|json_script:"crm-order-addons" }}

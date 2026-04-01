@@ -62,11 +62,6 @@
         Leave applicable plans empty to apply to ALL plans.
       </div>
 
-      {% if messages %}
-        {% for message in messages %}
-          <p style="margin: 12px 0 0; color:{% if message.tags == 'error' %}#b91c1c{% else %}#15803d{% endif %}; font-weight:600">{{ message }}</p>
-        {% endfor %}
-      {% endif %}
 
       <form method="post" action="">
         {% csrf_token %}
@@ -105,18 +100,29 @@
           {% endfor %}
         </div>
 
-        <h3 style="margin: 18px 0 12px 0">Applicable Plans</h3>
-        <div style="display:grid; grid-template-columns:1fr; gap:12px">
+        <h3 style="margin: 18px 0 12px 0">{% translate "Applicable Plans" %}</h3>
+        <div class="field-group">
+          <p class="text-muted small mb-3">{% translate "Select one or more plans this promo code applies to. Leave empty to apply to ALL plans." %}</p>
+          
           {% for field in form %}
             {% if field.name == 'applicable_plans' %}
-              <div>
-                <label class="form-label">{{ field.label }}</label>
-                {{ field }}
-                <small style="color:#64748b">Leave empty to apply to ALL plans</small>
-                {% for e in field.errors %}
-                  <div style="color:#b91c1c; font-weight:600">{{ e }}</div>
+              <div class="selectable-grid">
+                {% for choice in field %}
+                  <label class="selectable-item">
+                    {{ choice.tag }}
+                    <div class="selectable-card">
+                      <div class="card-check">
+                        <i class="bi bi-check-lg" style="color: white; margin-bottom: 0; font-size: 10px;"></i>
+                      </div>
+                      <i class="bi bi-layers"></i>
+                      <span class="card-label">{{ choice.choice_label }}</span>
+                    </div>
+                  </label>
                 {% endfor %}
               </div>
+              {% for e in field.errors %}
+                <div class="field-error">{{ e }}</div>
+              {% endfor %}
             {% endif %}
           {% endfor %}
         </div>
@@ -126,21 +132,21 @@
             <strong>Current Uses (read-only):</strong> {{ promo.current_uses }}
           </div>
         {% endif %}
+        </div>
+        </div>
 
         <div class="form-actions-bar">
-          <div class="eal-header-actions">
-            <div class="footer-left">
-              <button type="reset" class="eal-btn eal-btn-outline">
-                <i class="bi bi-arrow-counterclockwise"></i>
-                Reset Form
-              </button>
-            </div>
-            <div class="footer-right">
-              <button type="submit" class="eal-btn eal-btn-primary">
-                <i class="bi bi-save"></i>
-                Save
-              </button>
-            </div>
+          <div class="form-actions-left">
+            <a href="{% url 'promo_code_list' %}" class="eal-btn eal-btn-outline">
+              <i class="bi bi-x-lg"></i>
+              <span>{% translate "Cancel" %}</span>
+            </a>
+          </div>
+          <div class="form-actions-right">
+            <button type="submit" class="eal-btn eal-btn-primary">
+              <i class="bi bi-send"></i>
+              <span>{% if is_edit %}{% translate "Update Promo" %}{% else %}{% translate "Add Promo" %}{% endif %}</span>
+            </button>
           </div>
         </div>
       </form>
