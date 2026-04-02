@@ -1,8 +1,9 @@
+{% load i18n %}
 <!-- Sidebar (unified by main.js) -->
 <aside class="sidebar" id="appSidebar">
   <!-- Sidebar Header -->
   <div class="sidebar-header">
-    <a href="{% url 'dashboard' %}" class="sidebar-logo" aria-label="iRoad Home">
+    <a href="{% url 'dashboard' %}" class="sidebar-logo" aria-label="{% translate 'iRoad Home' %}">
       <span class="logo-icon">i</span>
       <span class="logo-label">Road</span>
     </a>
@@ -15,30 +16,30 @@
       <li class="nav-item">
         <a
           href="{% url 'dashboard' %}"
-          class="nav-link{% if request.resolver_match.url_name == 'dashboard' %} active{% endif %}"
-          data-tooltip="Dashboard"
+          class="nav-link{% if 'dashboard' in request.resolver_match.url_name %} active{% endif %}"
+          data-tooltip="{% translate 'Dashboard' %}"
         >
           <i class="bi bi-speedometer2"></i>
-          <span class="nav-text">Dashboard</span>
+          <span class="nav-text">{% translate "Dashboard" %}</span>
         </a>
       </li>
 
       <!-- --- ADMINISTRATION --- -->
       <li class="nav-section-title">
-        <span>Administration</span>
+        <span>{% translate "Administration" %}</span>
       </li>
 
       <!-- System Users Management -->
       <li
-        class="nav-item has-submenu{% if request.resolver_match.url_name in 'users_analytics role_list role_create role_edit role_toggle_status role_delete admin_user_list admin_user_create admin_user_detail admin_user_edit admin_user_toggle_status' %} open{% endif %}"
+        class="nav-item has-submenu{% if 'users_analytics' in request.resolver_match.url_name or 'role' in request.resolver_match.url_name or 'admin_user' in request.resolver_match.url_name %} open{% endif %}"
       >
         <a
           href="#"
-          class="nav-link{% if request.resolver_match.url_name in 'users_analytics role_list role_create role_edit role_toggle_status role_delete admin_user_list admin_user_create admin_user_detail admin_user_edit admin_user_toggle_status' %} active{% endif %}"
-          data-tooltip="System Users Management"
+          class="nav-link{% if 'users_analytics' in request.resolver_match.url_name or 'role' in request.resolver_match.url_name or 'admin_user' in request.resolver_match.url_name %} active{% endif %}"
+          data-tooltip="{% translate 'System Users Management' %}"
         >
           <i class="bi bi-people"></i>
-          <span class="nav-text">System Users Management</span>
+          <span class="nav-text">{% translate "System Users Management" %}</span>
           <i class="bi bi-chevron-right arrow"></i>
         </a>
         <ul class="submenu">
@@ -48,25 +49,25 @@
               class="submenu-link{% if request.resolver_match.url_name == 'users_analytics' %} active{% endif %}"
             >
               <i class="bi bi-file-earmark-bar-graph"></i>
-              <span>Users Analytics</span>
+              <span>{% translate "Users Analytics" %}</span>
             </a>
           </li>
           <li class="submenu-item">
             <a
               href="{% url 'role_list' %}"
-              class="submenu-link{% if request.resolver_match.url_name in 'role_list role_create role_edit role_toggle_status role_delete' %} active{% endif %}"
+              class="submenu-link{% if 'role' in request.resolver_match.url_name %} active{% endif %}"
             >
               <i class="bi bi-person-lock"></i>
-              <span>Roles Master</span>
+              <span>{% translate "Roles Master" %}</span>
             </a>
           </li>
           <li class="submenu-item">
             <a
               href="{% url 'admin_user_list' %}"
-              class="submenu-link{% if request.resolver_match.url_name in 'admin_user_list admin_user_create admin_user_detail admin_user_edit admin_user_toggle_status' %} active{% endif %}"
+              class="submenu-link{% if 'admin_user' in request.resolver_match.url_name %} active{% endif %}"
             >
               <i class="bi bi-person-gear"></i>
-              <span>Admin Users</span>
+              <span>{% translate "Admin Users" %}</span>
             </a>
           </li>
         </ul>
@@ -74,43 +75,43 @@
 
       <!-- Subscription Plans Management -->
       <li
-        class="nav-item has-submenu{% if request.resolver_match.url_name in 'plan_list plan_create plan_detail plan_edit plan_toggle plan_delete addons_policy_list addons_policy_create addons_policy_edit addons_policy_delete promo_code_list promo_code_create promo_code_edit promo_code_toggle promo_code_delete' %} open{% endif %}"
+        class="nav-item has-submenu{% if 'plan' in request.resolver_match.url_name or 'addons_policy' in request.resolver_match.url_name or 'promo_code' in request.resolver_match.url_name %} open{% endif %}"
       >
         <a
           href="#"
-          class="nav-link{% if request.resolver_match.url_name in 'plan_list plan_create plan_detail plan_edit plan_toggle plan_delete addons_policy_list addons_policy_create addons_policy_edit addons_policy_delete promo_code_list promo_code_create promo_code_edit promo_code_toggle promo_code_delete' %} active{% endif %}"
-          data-tooltip="Subscription Plans Management"
+          class="nav-link{% if 'plan' in request.resolver_match.url_name or 'addons_policy' in request.resolver_match.url_name or 'promo_code' in request.resolver_match.url_name %} active{% endif %}"
+          data-tooltip="{% translate 'Subscription Plans Management' %}"
         >
           <i class="bi bi-card-checklist"></i>
-          <span class="nav-text">Subscription Plans Management</span>
+          <span class="nav-text">{% translate "Subscription Plans Management" %}</span>
           <i class="bi bi-chevron-right arrow"></i>
         </a>
         <ul class="submenu">
           <li class="submenu-item">
             <a
               href="{% url 'plan_list' %}"
-              class="submenu-link{% if request.resolver_match.url_name in 'plan_list plan_create plan_detail plan_edit plan_toggle plan_delete' %} active{% endif %}"
+              class="submenu-link{% if 'plan' in request.resolver_match.url_name %} active{% endif %}"
             >
               <i class="bi bi-grid"></i>
-              <span>Subscription Plans</span>
+              <span>{% translate "Subscription Plans" %}</span>
             </a>
           </li>
           <li class="submenu-item">
             <a
               href="{% url 'addons_policy_list' %}"
-              class="submenu-link{% if request.resolver_match.url_name in 'addons_policy_list addons_policy_create addons_policy_edit addons_policy_delete' %} active{% endif %}"
+              class="submenu-link{% if 'addons_policy' in request.resolver_match.url_name %} active{% endif %}"
             >
               <i class="bi bi-sliders2"></i>
-              <span>Add-ons Pricing</span>
+              <span>{% translate "Add-ons Pricing" %}</span>
             </a>
           </li>
           <li class="submenu-item">
             <a
               href="{% url 'promo_code_list' %}"
-              class="submenu-link{% if request.resolver_match.url_name in 'promo_code_list promo_code_create promo_code_edit promo_code_toggle promo_code_delete' %} active{% endif %}"
+              class="submenu-link{% if 'promo_code' in request.resolver_match.url_name %} active{% endif %}"
             >
               <i class="bi bi-ticket-perforated"></i>
-              <span>Promo Codes</span>
+              <span>{% translate "Promo Codes" %}</span>
             </a>
           </li>
         </ul>
@@ -118,52 +119,52 @@
 
       <!-- Subscribers CRM & Billing -->
       <li
-        class="nav-item has-submenu{% if request.resolver_match.url_name in 'tenant_list tenant_create tenant_detail tenant_edit crm_note_create order_create order_list order_detail order_status_update transaction_list transaction_create transaction_detail transaction_approve transaction_reject invoice_list invoice_detail invoice_void' %} open{% endif %}"
+        class="nav-item has-submenu{% if 'tenant' in request.resolver_match.url_name or 'crm_note' in request.resolver_match.url_name or 'order' in request.resolver_match.url_name or 'transaction' in request.resolver_match.url_name or 'invoice' in request.resolver_match.url_name %} open{% endif %}"
       >
         <a
           href="#"
-          class="nav-link{% if request.resolver_match.url_name in 'tenant_list tenant_create tenant_detail tenant_edit crm_note_create order_create order_list order_detail order_status_update transaction_list transaction_create transaction_detail transaction_approve transaction_reject invoice_list invoice_detail invoice_void' %} active{% endif %}"
-          data-tooltip="Subscribers CRM & Billing"
+          class="nav-link{% if 'tenant' in request.resolver_match.url_name or 'crm_note' in request.resolver_match.url_name or 'order' in request.resolver_match.url_name or 'transaction' in request.resolver_match.url_name or 'invoice' in request.resolver_match.url_name %} active{% endif %}"
+          data-tooltip="{% translate 'Subscribers CRM & Billing' %}"
         >
           <i class="bi bi-receipt"></i>
-          <span class="nav-text">Subscribers CRM &amp; Billing</span>
+          <span class="nav-text">{% translate "Subscribers CRM & Billing" %}</span>
           <i class="bi bi-chevron-right arrow"></i>
         </a>
         <ul class="submenu">
           <li class="submenu-item">
             <a
               href="{% url 'tenant_list' %}"
-              class="submenu-link{% if request.resolver_match.url_name in 'tenant_list tenant_create tenant_detail tenant_edit crm_note_create' %} active{% endif %}"
+              class="submenu-link{% if 'tenant' in request.resolver_match.url_name or 'crm_note' in request.resolver_match.url_name %} active{% endif %}"
             >
               <i class="bi bi-people"></i>
-              <span>Subscribers List</span>
+              <span>{% translate "Subscribers List" %}</span>
             </a>
           </li>
           <li class="submenu-item">
             <a
               href="{% url 'order_list' %}"
-              class="submenu-link{% if request.resolver_match.url_name in 'order_list order_create order_detail order_status_update' %} active{% endif %}"
+              class="submenu-link{% if 'order' in request.resolver_match.url_name %} active{% endif %}"
             >
               <i class="bi bi-cart-check"></i>
-              <span>Subscription Orders</span>
+              <span>{% translate "Subscription Orders" %}</span>
             </a>
           </li>
           <li class="submenu-item">
             <a
               href="{% url 'transaction_list' %}"
-              class="submenu-link{% if request.resolver_match.url_name in 'transaction_list transaction_create transaction_detail transaction_approve transaction_reject' %} active{% endif %}"
+              class="submenu-link{% if 'transaction' in request.resolver_match.url_name %} active{% endif %}"
             >
               <i class="bi bi-journal-text"></i>
-              <span>Transactions Ledger</span>
+              <span>{% translate "Transactions Ledger" %}</span>
             </a>
           </li>
           <li class="submenu-item">
             <a
               href="{% url 'invoice_list' %}"
-              class="submenu-link{% if request.resolver_match.url_name in 'invoice_list invoice_detail invoice_void' %} active{% endif %}"
+              class="submenu-link{% if 'invoice' in request.resolver_match.url_name %} active{% endif %}"
             >
               <i class="bi bi-file-earmark-text"></i>
-              <span>Standard Invoices</span>
+              <span>{% translate "Standard Invoices" %}</span>
             </a>
           </li>
         </ul>
@@ -171,79 +172,79 @@
 
       <!-- Communication & Alerts -->
       <li
-        class="nav-item has-submenu{% if request.resolver_match.url_name in 'comm_gateway_list comm_gateway_create comm_gateway_edit notif_template_list notif_template_create notif_template_edit event_mapping_list event_mapping_create event_mapping_edit push_notif_list push_notif_create push_notif_edit banner_list banner_create banner_edit alert_route_list alert_route_create alert_route_edit comm_log_list' %} open{% endif %}"
+        class="nav-item has-submenu{% if 'comm_gateway' in request.resolver_match.url_name or 'notif_template' in request.resolver_match.url_name or 'event_mapping' in request.resolver_match.url_name or 'push_notif' in request.resolver_match.url_name or 'banner' in request.resolver_match.url_name or 'alert_route' in request.resolver_match.url_name or 'comm_log' in request.resolver_match.url_name %} open{% endif %}"
       >
         <a
           href="#"
-          class="nav-link{% if request.resolver_match.url_name in 'comm_gateway_list comm_gateway_create comm_gateway_edit notif_template_list notif_template_create notif_template_edit event_mapping_list event_mapping_create event_mapping_edit push_notif_list push_notif_create push_notif_edit banner_list banner_create banner_edit alert_route_list alert_route_create alert_route_edit comm_log_list' %} active{% endif %}"
-          data-tooltip="Communication & Alerts"
+          class="nav-link{% if 'comm_gateway' in request.resolver_match.url_name or 'notif_template' in request.resolver_match.url_name or 'event_mapping' in request.resolver_match.url_name or 'push_notif' in request.resolver_match.url_name or 'banner' in request.resolver_match.url_name or 'alert_route' in request.resolver_match.url_name or 'comm_log' in request.resolver_match.url_name %} active{% endif %}"
+          data-tooltip="{% translate 'Communication & Alerts' %}"
         >
           <i class="bi bi-bell"></i>
-          <span class="nav-text">Communication &amp; Alerts</span>
+          <span class="nav-text">{% translate "Communication & Alerts" %}</span>
           <i class="bi bi-chevron-right arrow"></i>
         </a>
         <ul class="submenu">
           <li class="submenu-item">
             <a
               href="{% url 'comm_gateway_list' %}"
-              class="submenu-link{% if request.resolver_match.url_name in 'comm_gateway_list comm_gateway_create comm_gateway_edit' %} active{% endif %}"
+              class="submenu-link{% if 'comm_gateway' in request.resolver_match.url_name %} active{% endif %}"
             >
               <i class="bi bi-broadcast"></i>
-              <span>Gateway Settings</span>
+              <span>{% translate "Gateway Settings" %}</span>
             </a>
           </li>
           <li class="submenu-item">
             <a
               href="{% url 'notif_template_list' %}"
-              class="submenu-link{% if request.resolver_match.url_name in 'notif_template_list notif_template_create notif_template_edit' %} active{% endif %}"
+              class="submenu-link{% if 'notif_template' in request.resolver_match.url_name %} active{% endif %}"
             >
               <i class="bi bi-envelope-paper"></i>
-              <span>Notification Templates</span>
+              <span>{% translate "Notification Templates" %}</span>
             </a>
           </li>
           <li class="submenu-item">
             <a
               href="{% url 'event_mapping_list' %}"
-              class="submenu-link{% if request.resolver_match.url_name in 'event_mapping_list event_mapping_create event_mapping_edit' %} active{% endif %}"
+              class="submenu-link{% if 'event_mapping' in request.resolver_match.url_name %} active{% endif %}"
             >
               <i class="bi bi-diagram-3"></i>
-              <span>Events Mapping</span>
+              <span>{% translate "Events Mapping" %}</span>
             </a>
           </li>
           <li class="submenu-item">
             <a
               href="{% url 'push_notif_list' %}"
-              class="submenu-link{% if request.resolver_match.url_name in 'push_notif_list push_notif_create push_notif_edit' %} active{% endif %}"
+              class="submenu-link{% if 'push_notif' in request.resolver_match.url_name %} active{% endif %}"
             >
               <i class="bi bi-phone-vibrate"></i>
-              <span>Push Notifications</span>
+              <span>{% translate "Push Notifications" %}</span>
             </a>
           </li>
           <li class="submenu-item">
             <a
               href="{% url 'banner_list' %}"
-              class="submenu-link{% if request.resolver_match.url_name in 'banner_list banner_create banner_edit' %} active{% endif %}"
+              class="submenu-link{% if 'banner' in request.resolver_match.url_name %} active{% endif %}"
             >
               <i class="bi bi-card-text"></i>
-              <span>System Banners</span>
+              <span>{% translate "System Banners" %}</span>
             </a>
           </li>
           <li class="submenu-item">
             <a
               href="{% url 'alert_route_list' %}"
-              class="submenu-link{% if request.resolver_match.url_name in 'alert_route_list alert_route_create alert_route_edit' %} active{% endif %}"
+              class="submenu-link{% if 'alert_route' in request.resolver_match.url_name %} active{% endif %}"
             >
               <i class="bi bi-exclamation-triangle"></i>
-              <span>Internal Alerts</span>
+              <span>{% translate "Internal Alerts" %}</span>
             </a>
           </li>
           <li class="submenu-item">
             <a
               href="{% url 'comm_log_list' %}"
-              class="submenu-link{% if request.resolver_match.url_name == 'comm_log_list' %} active{% endif %}"
+              class="submenu-link{% if 'comm_log' in request.resolver_match.url_name %} active{% endif %}"
             >
               <i class="bi bi-clock-history"></i>
-              <span>Comm Logs</span>
+              <span>{% translate "Comm Logs" %}</span>
             </a>
           </li>
         </ul>
@@ -251,43 +252,43 @@
 
       <!-- Payment Infrastructure -->
       <li
-        class="nav-item has-submenu{% if request.resolver_match.url_name in 'bank_account_list bank_account_create bank_account_edit gateway_list gateway_create gateway_edit payment_method_list payment_method_create payment_method_edit' %} open{% endif %}"
+        class="nav-item has-submenu{% if 'bank_account' in request.resolver_match.url_name or 'gateway' in request.resolver_match.url_name or 'payment_method' in request.resolver_match.url_name %} open{% endif %}"
       >
         <a
           href="#"
-          class="nav-link{% if request.resolver_match.url_name in 'bank_account_list bank_account_create bank_account_edit gateway_list gateway_create gateway_edit payment_method_list payment_method_create payment_method_edit' %} active{% endif %}"
-          data-tooltip="Payment Infrastructure"
+          class="nav-link{% if 'bank_account' in request.resolver_match.url_name or 'gateway' in request.resolver_match.url_name or 'payment_method' in request.resolver_match.url_name %} active{% endif %}"
+          data-tooltip="{% translate 'Payment Infrastructure' %}"
         >
           <i class="bi bi-building"></i>
-          <span class="nav-text">Payment Infrastructure</span>
+          <span class="nav-text">{% translate "Payment Infrastructure" %}</span>
           <i class="bi bi-chevron-right arrow"></i>
         </a>
         <ul class="submenu">
           <li class="submenu-item">
             <a
               href="{% url 'bank_account_list' %}"
-              class="submenu-link{% if request.resolver_match.url_name in 'bank_account_list bank_account_create bank_account_edit' %} active{% endif %}"
+              class="submenu-link{% if 'bank_account' in request.resolver_match.url_name %} active{% endif %}"
             >
               <i class="bi bi-bank"></i>
-              <span>Bank Accounts</span>
+              <span>{% translate "Bank Accounts" %}</span>
             </a>
           </li>
           <li class="submenu-item">
             <a
               href="{% url 'gateway_list' %}"
-              class="submenu-link{% if request.resolver_match.url_name in 'gateway_list gateway_create gateway_edit' %} active{% endif %}"
+              class="submenu-link{% if 'gateway' in request.resolver_match.url_name %} active{% endif %}"
             >
               <i class="bi bi-shield-lock"></i>
-              <span>Payment Gateways</span>
+              <span>{% translate "Payment Gateways" %}</span>
             </a>
           </li>
           <li class="submenu-item">
             <a
               href="{% url 'payment_method_list' %}"
-              class="submenu-link{% if request.resolver_match.url_name in 'payment_method_list payment_method_create payment_method_edit' %} active{% endif %}"
+              class="submenu-link{% if 'payment_method' in request.resolver_match.url_name %} active{% endif %}"
             >
               <i class="bi bi-credit-card-2-front"></i>
-              <span>Payment Methods</span>
+              <span>{% translate "Payment Methods" %}</span>
             </a>
           </li>
         </ul>
@@ -295,35 +296,35 @@
 
       <!-- Global Master Data -->
       <li
-        class="nav-item has-submenu{% if request.resolver_match.url_name in 'country_list country_create country_edit currency_list currency_create currency_edit' %} open{% endif %}"
+        class="nav-item has-submenu{% if 'country' in request.resolver_match.url_name or 'currency' in request.resolver_match.url_name %} open{% endif %}"
       >
         <a
           href="#"
-          class="nav-link{% if request.resolver_match.url_name in 'country_list country_create country_edit currency_list currency_create currency_edit' %} active{% endif %}"
-          data-tooltip="Global Master Data"
+          class="nav-link{% if 'country' in request.resolver_match.url_name or 'currency' in request.resolver_match.url_name %} active{% endif %}"
+          data-tooltip="{% translate 'Global Master Data' %}"
         >
           <i class="bi bi-map"></i>
-          <span class="nav-text">Global Master Data</span>
+          <span class="nav-text">{% translate "Global Master Data" %}</span>
           <i class="bi bi-chevron-right arrow"></i>
         </a>
         <ul class="submenu">
           <li class="submenu-item">
             <a
               href="{% url 'country_list' %}"
-              class="submenu-link{% if request.resolver_match.url_name in 'country_list country_create country_edit' %} active{% endif %}"
+              class="submenu-link{% if 'country' in request.resolver_match.url_name %} active{% endif %}"
             >
               <i class="bi bi-globe"></i>
-              <span>Countries Master</span>
+              <span>{% translate "Countries Master" %}</span>
             </a>
           </li>
           <li class="submenu-item">
             <a
               href="{% url 'currency_list' %}"
-              class="submenu-link{% if request.resolver_match.url_name in 'currency_list currency_create currency_edit' %} active{% endif %}"
-              data-tooltip="Currencies Master"
+              class="submenu-link{% if 'currency' in request.resolver_match.url_name %} active{% endif %}"
+              data-tooltip="{% translate 'Currencies Master' %}"
             >
               <i class="bi bi-currency-exchange"></i>
-              <span>Currencies Master</span>
+              <span>{% translate "Currencies Master" %}</span>
             </a>
           </li>
         </ul>
@@ -331,25 +332,25 @@
 
       <!-- System Configurations & Tax -->
       <li
-        class="nav-item has-submenu{% if request.resolver_match.url_name in 'tax_code_list tax_code_create tax_code_edit general_tax_settings legal_identity global_system_rules base_currency fx_rate_list fx_rate_create fx_rate_edit fx_change_log' %} open{% endif %}"
+        class="nav-item has-submenu{% if 'tax_code' in request.resolver_match.url_name or 'general_tax_settings' in request.resolver_match.url_name or 'legal_identity' in request.resolver_match.url_name or 'global_system_rules' in request.resolver_match.url_name or 'base_currency' in request.resolver_match.url_name or 'fx_rate' in request.resolver_match.url_name or 'fx_change_log' in request.resolver_match.url_name %} open{% endif %}"
       >
         <a
           href="#"
-          class="nav-link{% if request.resolver_match.url_name in 'tax_code_list tax_code_create tax_code_edit general_tax_settings legal_identity global_system_rules base_currency fx_rate_list fx_rate_create fx_rate_edit fx_change_log' %} active{% endif %}"
-          data-tooltip="System Configurations & Tax"
+          class="nav-link{% if 'tax_code' in request.resolver_match.url_name or 'general_tax_settings' in request.resolver_match.url_name or 'legal_identity' in request.resolver_match.url_name or 'global_system_rules' in request.resolver_match.url_name or 'base_currency' in request.resolver_match.url_name or 'fx_rate' in request.resolver_match.url_name or 'fx_change_log' in request.resolver_match.url_name %} active{% endif %}"
+          data-tooltip="{% translate 'System Configurations & Tax' %}"
         >
           <i class="bi bi-gear-wide-connected"></i>
-          <span class="nav-text">System Configurations &amp; Tax</span>
+          <span class="nav-text">{% translate "System Configurations & Tax" %}</span>
           <i class="bi bi-chevron-right arrow"></i>
         </a>
         <ul class="submenu">
           <li class="submenu-item">
             <a
               href="{% url 'tax_code_list' %}"
-              class="submenu-link{% if request.resolver_match.url_name in 'tax_code_list tax_code_create tax_code_edit' %} active{% endif %}"
+              class="submenu-link{% if 'tax_code' in request.resolver_match.url_name %} active{% endif %}"
             >
               <i class="bi bi-percent"></i>
-              <span>Tax Codes</span>
+              <span>{% translate "Tax Codes" %}</span>
             </a>
           </li>
           <li class="submenu-item">
@@ -358,7 +359,7 @@
               class="submenu-link{% if request.resolver_match.url_name == 'general_tax_settings' %} active{% endif %}"
             >
               <i class="bi bi-sliders"></i>
-              <span>General Tax Settings</span>
+              <span>{% translate "General Tax Settings" %}</span>
             </a>
           </li>
           <li class="submenu-item">
@@ -367,7 +368,7 @@
               class="submenu-link{% if request.resolver_match.url_name == 'legal_identity' %} active{% endif %}"
             >
               <i class="bi bi-building-check"></i>
-              <span>Legal Identity</span>
+              <span>{% translate "Legal Identity" %}</span>
             </a>
           </li>
           <li class="submenu-item">
@@ -376,7 +377,7 @@
               class="submenu-link{% if request.resolver_match.url_name == 'global_system_rules' %} active{% endif %}"
             >
               <i class="bi bi-globe2"></i>
-              <span>Global System Rules</span>
+              <span>{% translate "Global System Rules" %}</span>
             </a>
           </li>
           <li class="submenu-item">
@@ -385,16 +386,16 @@
               class="submenu-link{% if request.resolver_match.url_name == 'base_currency' %} active{% endif %}"
             >
               <i class="bi bi-cash-stack"></i>
-              <span>Base Currency</span>
+              <span>{% translate "Base Currency" %}</span>
             </a>
           </li>
           <li class="submenu-item">
             <a
               href="{% url 'fx_rate_list' %}"
-              class="submenu-link{% if request.resolver_match.url_name in 'fx_rate_list fx_rate_create fx_rate_edit' %} active{% endif %}"
+              class="submenu-link{% if 'fx_rate' in request.resolver_match.url_name %} active{% endif %}"
             >
               <i class="bi bi-graph-up-arrow"></i>
-              <span>Exchange Rates</span>
+              <span>{% translate "Exchange Rates" %}</span>
             </a>
           </li>
           <li class="submenu-item">
@@ -403,7 +404,7 @@
               class="submenu-link{% if request.resolver_match.url_name == 'fx_change_log' %} active{% endif %}"
             >
               <i class="bi bi-clock-history"></i>
-              <span>FX Change Log</span>
+              <span>{% translate "FX Change Log" %}</span>
             </a>
           </li>
         </ul>
@@ -411,43 +412,43 @@
 
       <!-- Support Management -->
       <li
-        class="nav-item has-submenu{% if request.resolver_match.url_name in 'support_category_list support_category_create support_category_edit canned_response_list canned_response_create canned_response_edit ticket_list ticket_create ticket_detail ticket_reply' %} open{% endif %}"
+        class="nav-item has-submenu{% if 'support_category' in request.resolver_match.url_name or 'canned_response' in request.resolver_match.url_name or 'ticket' in request.resolver_match.url_name %} open{% endif %}"
       >
         <a
           href="#"
-          class="nav-link{% if request.resolver_match.url_name in 'support_category_list support_category_create support_category_edit canned_response_list canned_response_create canned_response_edit ticket_list ticket_create ticket_detail ticket_reply' %} active{% endif %}"
-          data-tooltip="Support Management"
+          class="nav-link{% if 'support_category' in request.resolver_match.url_name or 'canned_response' in request.resolver_match.url_name or 'ticket' in request.resolver_match.url_name %} active{% endif %}"
+          data-tooltip="{% translate 'Support Management' %}"
         >
           <i class="bi bi-headset"></i>
-          <span class="nav-text">Support Management</span>
+          <span class="nav-text">{% translate "Support Management" %}</span>
           <i class="bi bi-chevron-right arrow"></i>
         </a>
         <ul class="submenu">
           <li class="submenu-item">
             <a
               href="{% url 'support_category_list' %}"
-              class="submenu-link{% if request.resolver_match.url_name in 'support_category_list support_category_create support_category_edit' %} active{% endif %}"
+              class="submenu-link{% if 'support_category' in request.resolver_match.url_name %} active{% endif %}"
             >
               <i class="bi bi-tags"></i>
-              <span>Support Categories</span>
+              <span>{% translate "Support Categories" %}</span>
             </a>
           </li>
           <li class="submenu-item">
             <a
               href="{% url 'canned_response_list' %}"
-              class="submenu-link{% if request.resolver_match.url_name in 'canned_response_list canned_response_create canned_response_edit' %} active{% endif %}"
+              class="submenu-link{% if 'canned_response' in request.resolver_match.url_name %} active{% endif %}"
             >
               <i class="bi bi-chat-square-text"></i>
-              <span>Canned Responses</span>
+              <span>{% translate "Canned Responses" %}</span>
             </a>
           </li>
           <li class="submenu-item">
             <a
               href="{% url 'ticket_list' %}"
-              class="submenu-link{% if request.resolver_match.url_name in 'ticket_list ticket_create ticket_detail ticket_reply' %} active{% endif %}"
+              class="submenu-link{% if 'ticket' in request.resolver_match.url_name %} active{% endif %}"
             >
               <i class="bi bi-ticket-detailed"></i>
-              <span>Support Tickets</span>
+              <span>{% translate "Support Tickets" %}</span>
             </a>
           </li>
         </ul>
@@ -455,15 +456,15 @@
 
       <!-- Security & Audit -->
       <li
-        class="nav-item has-submenu{% if request.resolver_match.url_name in 'access_log active_sessions security_settings audit_log_list' %} open{% endif %}"
+        class="nav-item has-submenu{% if 'access_log' in request.resolver_match.url_name or 'active_sessions' in request.resolver_match.url_name or 'security_settings' in request.resolver_match.url_name or 'audit_log' in request.resolver_match.url_name %} open{% endif %}"
       >
         <a
           href="#"
-          class="nav-link{% if request.resolver_match.url_name in 'access_log active_sessions security_settings audit_log_list' %} active{% endif %}"
-          data-tooltip="Security & Audit"
+          class="nav-link{% if 'access_log' in request.resolver_match.url_name or 'active_sessions' in request.resolver_match.url_name or 'security_settings' in request.resolver_match.url_name or 'audit_log' in request.resolver_match.url_name %} active{% endif %}"
+          data-tooltip="{% translate 'Security & Audit' %}"
         >
           <i class="bi bi-shield-lock"></i>
-          <span class="nav-text">Security &amp; Audit</span>
+          <span class="nav-text">{% translate "Security & Audit" %}</span>
           <i class="bi bi-chevron-right arrow"></i>
         </a>
         <ul class="submenu">
@@ -473,16 +474,16 @@
               class="submenu-link{% if request.resolver_match.url_name == 'access_log' %} active{% endif %}"
             >
               <i class="bi bi-journal-text"></i>
-              <span>Access Log</span>
+              <span>{% translate "Access Log" %}</span>
             </a>
           </li>
           <li class="submenu-item">
             <a
               href="{% url 'security_settings' %}"
-              class="submenu-link{% if request.resolver_match.url_name == 'security_settings' %} active{% endif %}"
+              class="submenu-link{% if 'security_settings' in request.resolver_match.url_name %} active{% endif %}"
             >
               <i class="bi bi-sliders"></i>
-              <span>Admin Security</span>
+              <span>{% translate "Admin Security" %}</span>
             </a>
           </li>
           <li class="submenu-item">
@@ -491,16 +492,16 @@
               class="submenu-link{% if request.resolver_match.url_name == 'active_sessions' %} active{% endif %}"
             >
               <i class="bi bi-activity"></i>
-              <span>Active Sessions Monitor</span>
+              <span>{% translate "Active Sessions Monitor" %}</span>
             </a>
           </li>
           <li class="submenu-item">
             <a
               href="{% url 'audit_log_list' %}"
-              class="submenu-link{% if request.resolver_match.url_name == 'audit_log_list' %} active{% endif %}"
+              class="submenu-link{% if 'audit_log' in request.resolver_match.url_name %} active{% endif %}"
             >
               <i class="bi bi-clipboard-data"></i>
-              <span>Audit Log</span>
+              <span>{% translate "Audit Log" %}</span>
             </a>
           </li>
         </ul>

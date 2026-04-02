@@ -1,0 +1,345 @@
+{% extends 'base.html' %}
+{% load i18n %}
+{% load static %}
+
+{% block page_title %}{% translate "Search Results" %}{% endblock %}
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item active" aria-current="page">{% translate "Search" %}</li>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-body p-4" style="background: linear-gradient(135deg, #f8f9ff 0%, #ffffff 100%);">
+                    <h2 class="h4 mb-1">{% translate "Search results for" %} <span class="text-primary">"{{ query }}"</span></h2>
+                    <p class="text-muted mb-0">{% blocktranslate count total=total_results %}Found {{ total }} result.{% plural %}Found {{ total }} results.{% endblocktranslate %}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if total_results > 0 %}
+    
+    {% if results.tenants %}
+    <div class="row mb-5">
+        <div class="col-12">
+            <h3 class="h5 mb-3 d-flex align-items-center">
+                <i class="bi bi-building me-2 text-primary fs-4"></i>
+                {% translate "Clients / Tenants" %}
+            </h3>
+            <div class="card border-0 shadow-sm">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="bg-light">
+                            <tr>
+                                <th class="ps-4">{% translate "Company Name" %}</th>
+                                <th>{% translate "Email" %}</th>
+                                <th>{% translate "Phone" %}</th>
+                                <th>{% translate "Status" %}</th>
+                                <th class="text-end pe-4">{% translate "Actions" %}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for tenant in results.tenants %}
+                            <tr>
+                                <td class="ps-4 fw-medium text-dark">{{ tenant.company_name }}</td>
+                                <td>{{ tenant.primary_email }}</td>
+                                <td>{{ tenant.primary_phone }}</td>
+                                <td>
+                                    <span class="badge {% if tenant.account_status == 'Active' %}bg-success-subtle text-success{% else %}bg-warning-subtle text-warning{% endif %}" style="font-weight: 500;">
+                                        {{ tenant.get_account_status_display }}
+                                    </span>
+                                </td>
+                                <td class="text-end pe-4">
+                                    <a href="{% url 'tenant_detail' tenant.pk %}" class="btn btn-icon btn-sm btn-light border" title="{% translate 'View' %}">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if results.orders %}
+    <div class="row mb-5">
+        <div class="col-12">
+            <h3 class="h5 mb-3 d-flex align-items-center">
+                <i class="bi bi-cart-check me-2 text-primary fs-4"></i>
+                {% translate "Subscription Orders" %}
+            </h3>
+            <div class="card border-0 shadow-sm">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="bg-light">
+                            <tr>
+                                <th class="ps-4">{% translate "Order ID" %}</th>
+                                <th>{% translate "Tenant" %}</th>
+                                <th>{% translate "Classification" %}</th>
+                                <th>{% translate "Total" %}</th>
+                                <th>{% translate "Status" %}</th>
+                                <th class="text-end pe-4">{% translate "Actions" %}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for order in results.orders %}
+                            <tr>
+                                <td class="ps-4 font-monospace small text-muted">{{ order.order_id|stringformat:"s"|slice:":13" }}...</td>
+                                <td class="fw-medium text-dark">{{ order.tenant.company_name }}</td>
+                                <td>{{ order.get_order_classification_display }}</td>
+                                <td class="fw-semibold">{{ order.grand_total }} {{ order.currency.currency_code }}</td>
+                                <td>
+                                    <span class="badge {% if order.order_status == 'Paid' %}bg-success-subtle text-success{% elif order.order_status == 'Pending_Payment' %}bg-warning-subtle text-warning{% else %}bg-secondary-subtle text-muted{% endif %}" style="font-weight: 500;">
+                                        {{ order.get_order_status_display }}
+                                    </span>
+                                </td>
+                                <td class="text-end pe-4">
+                                    <a href="{% url 'order_detail' order.pk %}" class="btn btn-icon btn-sm btn-light border" title="{% translate 'View' %}">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if results.invoices %}
+    <div class="row mb-5">
+        <div class="col-12">
+            <h3 class="h5 mb-3 d-flex align-items-center">
+                <i class="bi bi-file-earmark-text me-2 text-primary fs-4"></i>
+                {% translate "Invoices" %}
+            </h3>
+            <div class="card border-0 shadow-sm">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="bg-light">
+                            <tr>
+                                <th class="ps-4">{% translate "Invoice #" %}</th>
+                                <th>{% translate "Tenant" %}</th>
+                                <th>{% translate "Date" %}</th>
+                                <th>{% translate "Total" %}</th>
+                                <th>{% translate "Status" %}</th>
+                                <th class="text-end pe-4">{% translate "Actions" %}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for invoice in results.invoices %}
+                            <tr>
+                                <td class="ps-4 fw-medium text-dark">{{ invoice.invoice_number }}</td>
+                                <td>{{ invoice.tenant.company_name }}</td>
+                                <td>{{ invoice.issue_date|date:"d M Y" }}</td>
+                                <td class="fw-semibold">{{ invoice.grand_total }} {{ invoice.currency.currency_code }}</td>
+                                <td>
+                                    <span class="badge {% if invoice.status == 'Paid' %}bg-success-subtle text-success{% elif invoice.status == 'Issued' %}bg-info-subtle text-info{% else %}bg-secondary-subtle text-muted{% endif %}" style="font-weight: 500;">
+                                        {{ invoice.get_status_display }}
+                                    </span>
+                                </td>
+                                <td class="text-end pe-4">
+                                    <a href="{% url 'invoice_detail' invoice.pk %}" class="btn btn-icon btn-sm btn-light border" title="{% translate 'View' %}">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if results.tickets %}
+    <div class="row mb-5">
+        <div class="col-12">
+            <h3 class="h5 mb-3 d-flex align-items-center">
+                <i class="bi bi-ticket-perforated me-2 text-primary fs-4"></i>
+                {% translate "Support Tickets" %}
+            </h3>
+            <div class="card border-0 shadow-sm">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="bg-light">
+                            <tr>
+                                <th class="ps-4">{% translate "Ticket #" %}</th>
+                                <th>{% translate "Subject" %}</th>
+                                <th>{% translate "Tenant" %}</th>
+                                <th>{% translate "Status" %}</th>
+                                <th class="text-end pe-4">{% translate "Actions" %}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for ticket in results.tickets %}
+                            <tr>
+                                <td class="ps-4 fw-medium text-dark">{{ ticket.ticket_no }}</td>
+                                <td>{{ ticket.subject }}</td>
+                                <td>{{ ticket.tenant.company_name }}</td>
+                                <td>
+                                    <span class="badge {% if ticket.status == 'New' %}bg-danger-subtle text-danger{% elif ticket.status == 'Closed' %}bg-secondary-subtle text-muted{% else %}bg-info-subtle text-info{% endif %}" style="font-weight: 500;">
+                                        {{ ticket.get_status_display }}
+                                    </span>
+                                </td>
+                                <td class="text-end pe-4">
+                                    <a href="{% url 'ticket_detail' ticket.pk %}" class="btn btn-icon btn-sm btn-light border" title="{% translate 'View' %}">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if results.transactions %}
+    <div class="row mb-5">
+        <div class="col-12">
+            <h3 class="h5 mb-3 d-flex align-items-center">
+                <i class="bi bi-cash-stack me-2 text-primary fs-4"></i>
+                {% translate "Transactions" %}
+            </h3>
+            <div class="card border-0 shadow-sm">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="bg-light">
+                            <tr>
+                                <th class="ps-4">{% translate "Reference" %}</th>
+                                <th>{% translate "Tenant" %}</th>
+                                <th>{% translate "Amount" %}</th>
+                                <th>{% translate "Status" %}</th>
+                                <th class="text-end pe-4">{% translate "Actions" %}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for txn in results.transactions %}
+                            <tr>
+                                <td class="ps-4 fw-medium text-dark">{{ txn.gateway_ref|default:txn.transaction_id|stringformat:"s"|slice:":8" }}</td>
+                                <td>{{ txn.tenant.company_name }}</td>
+                                <td class="fw-semibold">{{ txn.amount }} {{ txn.currency.currency_code }}</td>
+                                <td>
+                                    <span class="badge {% if txn.status == 'Completed' %}bg-success-subtle text-success{% elif txn.status == 'Pending' %}bg-warning-subtle text-warning{% else %}bg-danger-subtle text-danger{% endif %}" style="font-weight: 500;">
+                                        {{ txn.get_status_display }}
+                                    </span>
+                                </td>
+                                <td class="text-end pe-4">
+                                    <a href="{% url 'transaction_detail' txn.pk %}" class="btn btn-icon btn-sm btn-light border" title="{% translate 'View' %}">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if results.admins %}
+    <div class="row mb-5">
+        <div class="col-12">
+            <h3 class="h5 mb-3 d-flex align-items-center">
+                <i class="bi bi-person-badge me-2 text-primary fs-4"></i>
+                {% translate "Admin Users" %}
+            </h3>
+            <div class="card border-0 shadow-sm">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="bg-light">
+                            <tr>
+                                <th class="ps-4">{% translate "Name" %}</th>
+                                <th>{% translate "Email" %}</th>
+                                <th>{% translate "Role" %}</th>
+                                <th class="text-end pe-4">{% translate "Actions" %}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for admin in results.admins %}
+                            <tr>
+                                <td class="ps-4 fw-medium text-dark">{{ admin.first_name }} {{ admin.last_name }}</td>
+                                <td>{{ admin.email }}</td>
+                                <td>
+                                    <span class="badge bg-light text-dark border fw-normal">
+                                        {{ admin.role.role_name_en }}
+                                    </span>
+                                </td>
+                                <td class="text-end pe-4">
+                                    <a href="{% url 'admin_user_detail' admin.pk %}" class="btn btn-icon btn-sm btn-light border" title="{% translate 'View' %}">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="row">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body p-5 text-center">
+                    <div class="mb-4 text-muted opacity-25">
+                        <i class="bi bi-search" style="font-size: 5rem;"></i>
+                    </div>
+                    <h3 class="h4 mb-2">{% translate "No results found" %}</h3>
+                    <p class="text-muted mb-4">{% translate "We couldn't find anything matching your search term." %}</p>
+                    <div class="d-flex justify-content-center gap-3">
+                        <a href="{% url 'dashboard' %}" class="btn btn-light border px-4">
+                            {% translate "Back to Dashboard" %}
+                        </a>
+                        <button onclick="document.querySelector('.header-search input').focus()" class="btn btn-primary px-4">
+                            {% translate "Try Another Search" %}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+    .btn-icon {
+        width: 32px;
+        height: 32px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+    }
+    .table thead th {
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 0.025em;
+        padding-top: 1rem;
+        padding-bottom: 1rem;
+    }
+    .badge {
+        padding: 0.4em 0.8em;
+    }
+</style>
+{% endblock %}

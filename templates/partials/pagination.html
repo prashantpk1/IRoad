@@ -27,7 +27,25 @@ Showing <strong>{{ s }}-{{ e }}</strong> of <strong>{{ t }}</strong>
         </button>
       {% endif %}
 
+      {% if page_obj.has_previous %}
+        <a
+          href="?page={{ page_obj.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value|urlencode }}{% endif %}{% endfor %}"
+          class="eal-page-btn"
+        >
+          {{ page_obj.previous_page_number }}
+        </a>
+      {% endif %}
+
       <button type="button" class="eal-page-btn active" disabled aria-current="page">{{ page_obj.number }}</button>
+
+      {% if page_obj.has_next %}
+        <a
+          href="?page={{ page_obj.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value|urlencode }}{% endif %}{% endfor %}"
+          class="eal-page-btn"
+        >
+          {{ page_obj.next_page_number }}
+        </a>
+      {% endif %}
 
       {% if page_obj.has_next %}
         <a

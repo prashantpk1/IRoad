@@ -7,7 +7,7 @@ document.addEventListener("DOMContentLoaded", function () {
   ensureUnifiedSidebar().then(function () {
     // Initialize all components after sidebar is unified
     initSidebar();
-    initSidebarActiveState();
+    // initSidebarActiveState(); // Disabled: relying on server-side active state logic in sidebar.html
     initSidebarCollapse();
     initTimeValidation();
     initFormValidation();

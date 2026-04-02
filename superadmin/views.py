@@ -366,7 +366,11 @@ class ForgotPasswordView(View):
             reset_url = request.build_absolute_uri(
                 f'/new-password/{token.token}/'
             )
-            # TODO Phase 7: Send reset_url via email here
+            send_auth_email(
+                user,
+                "password_reset",
+                {"admin_user": user, "reset_url": reset_url},
+            )
 
         # Always show the same success_message text to avoid information leaks
         return render(
@@ -1320,7 +1324,7 @@ class AdminUserListView(LoginRequiredMixin, View):
         users_qs = users_qs.order_by('first_name', 'last_name')
         total_count = users_qs.count()
 
-        paginator = Paginator(users_qs, 10)
+        paginator = Paginator(users_qs, 5)
         page_number = request.GET.get('page', 1)
         users_page = paginator.get_page(page_number)
 
@@ -1371,10 +1375,10 @@ class AdminUserCreateView(LoginRequiredMixin, View):
 
         auth_token = create_auth_token(user, 'invite')
         invite_url = request.build_absolute_uri(
-            f'/set-password/{auth_token.token}/'
+            reverse('set_password', args=[auth_token.token])
         )
 
-        # TODO Phase 7: Send invite_url via email here
+        send_auth_email(user, 'invite', {'admin_user': user, 'invite_url': invite_url})
 
         return render(
             request,
@@ -1472,7 +1476,54 @@ class SetPasswordView(View):
             request,
             'Password set successfully. Please login.',
         )
+
         return redirect(reverse('login'))
+
+
+class AdminUserResendInviteView(LoginRequiredMixin, View):
+    """Resend the activation link to a Pending user."""
+
+    def _require_root(self, request):
+        if not getattr(request.user, "is_root", False):
+            messages.error(request, "Access denied: root admin only.")
+            return redirect(reverse("admin_user_list"))
+        return None
+
+    def post(self, request, pk):
+        redirect_resp = self._require_root(request)
+        if redirect_resp:
+            return redirect_resp
+
+        user = get_object_or_404(AdminUser, pk=pk)
+
+        if user.status != "Pending_Activation":
+            messages.error(
+                request,
+                f"User {user.email} is already active or suspended.",
+            )
+            return redirect(reverse("admin_user_list"))
+
+        auth_token = create_auth_token(user, "invite")
+        invite_url = request.build_absolute_uri(
+            reverse("set_password", args=[auth_token.token])
+        )
+
+        sent = send_auth_email(
+            user, "invite", {"admin_user": user, "invite_url": invite_url}
+        )
+
+        if sent:
+            messages.success(
+                request,
+                f"Invitation email resent successfully to {user.email}.",
+            )
+        else:
+            messages.error(
+                request,
+                f"Failed to send invitation email to {user.email}. Check system logs.",
+            )
+
+        return redirect(reverse("admin_user_list"))
 
 
 class AdminUserUpdateView(LoginRequiredMixin, View):
@@ -5763,4 +5814,73 @@ class TicketForceCloseView(LoginRequiredMixin, View):
 
     def get(self, request, pk):
         return redirect('ticket_detail', pk=pk)
+
+
+class GlobalSearchView(LoginRequiredMixin, View):
+    template_name = 'search/results.html'
+
+    def get(self, request):
+        query = request.GET.get('q', '').strip()
+        results = {
+            'tenants': [],
+            'orders': [],
+            'invoices': [],
+            'tickets': [],
+            'admins': [],
+            'transactions': [],
+        }
+
+        if query:
+            # Tenants
+            results['tenants'] = TenantProfile.objects.filter(
+                Q(company_name__icontains=query) |
+                Q(primary_email__icontains=query) |
+                Q(primary_phone__icontains=query) |
+                Q(registration_number__icontains=query) |
+                Q(tax_number__icontains=query)
+            ).order_by('company_name')[:10]
+
+            # Orders
+            results['orders'] = SubscriptionOrder.objects.filter(
+                Q(tenant__company_name__icontains=query) |
+                Q(order_classification__icontains=query)
+            ).select_related('tenant').order_by('-created_at')[:10]
+
+            # Invoices
+            results['invoices'] = StandardInvoice.objects.filter(
+                Q(invoice_number__icontains=query) |
+                Q(tenant__company_name__icontains=query) |
+                Q(customer_name__icontains=query)
+            ).select_related('tenant').order_by('-issue_date')[:10]
+
+            # Support Tickets
+            results['tickets'] = SupportTicket.objects.filter(
+                Q(ticket_no__icontains=query) |
+                Q(subject__icontains=query) |
+                Q(tenant__company_name__icontains=query)
+            ).select_related('tenant').order_by('-created_at')[:10]
+
+            # Admin Users
+            results['admins'] = AdminUser.objects.filter(
+                Q(first_name__icontains=query) |
+                Q(last_name__icontains=query) |
+                Q(email__icontains=query)
+            ).order_by('first_name')[:10]
+
+            # Transactions
+            results['transactions'] = Transaction.objects.filter(
+                Q(gateway_ref__icontains=query) |
+                Q(tenant__company_name__icontains=query)
+            ).select_related('tenant').order_by('-created_at')[:10]
+
+        total_results = sum(len(v) for v in results.values())
+
+        context = {
+            'query': query,
+            'results': results,
+            'total_results': total_results,
+            'page_title': f'Search Results for "{query}"',
+        }
+        return render(request, self.template_name, context)
+
 

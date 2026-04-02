@@ -81,6 +81,7 @@ from .views import (
     AdminUserCreateView,
     AdminUserDetailView,
     AdminUserListView,
+    AdminUserResendInviteView,
     AdminUserToggleStatusView,
     AdminUserUpdateView,
     SystemUsersAnalyticsView,
@@ -99,6 +100,7 @@ from .views import (
     ExchangeRateCreateView,
     ExchangeRateUpdateView,
     FXRateChangeLogView,
+    GlobalSearchView,
     PlanCreateView,
     PlanDeleteView,
     PlanDetailView,
@@ -196,6 +198,11 @@ urlpatterns = [
         'admin-users/<uuid:pk>/toggle-status/',
         AdminUserToggleStatusView.as_view(),
         name='admin_user_toggle_status',
+    ),
+    path(
+        "admin-users/<uuid:pk>/resend-invite/",
+        AdminUserResendInviteView.as_view(),
+        name="admin_user_resend_invite",
     ),
     path(
         'system-users/analytics/',
@@ -791,5 +798,6 @@ urlpatterns = [
         CRMNoteCreateView.as_view(),
         name='crm_note_create',
     ),
+    path('search/', GlobalSearchView.as_view(), name='global_search'),
 ]
 

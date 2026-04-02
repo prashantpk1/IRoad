@@ -128,9 +128,18 @@
                   <a href="{% url 'admin_user_edit' u.pk %}" class="eal-row-btn" title="Edit">
                     <i class="bi bi-pencil"></i>
                   </a>
-                  <button type="button" class="eal-row-btn" disabled title="Invite resend flow not available in current logic">
-                    <i class="bi bi-send"></i>
-                  </button>
+                  {% if u.status == 'Pending_Activation' %}
+                    <form method="post" action="{% url 'admin_user_resend_invite' u.pk %}">
+                      {% csrf_token %}
+                      <button type="submit" class="eal-row-btn" title="Resend Invitation">
+                        <i class="bi bi-send"></i>
+                      </button>
+                    </form>
+                  {% else %}
+                    <button type="button" class="eal-row-btn" disabled title="Invite resend not available for active users">
+                      <i class="bi bi-send"></i>
+                    </button>
+                  {% endif %}
 
                   {% if not u.is_root %}
                     <form method="post" action="{% url 'admin_user_toggle_status' u.pk %}">
