@@ -100,7 +100,6 @@ from .views import (
     ExchangeRateCreateView,
     ExchangeRateUpdateView,
     FXRateChangeLogView,
-    GlobalSearchView,
     PlanCreateView,
     PlanDeleteView,
     PlanDetailView,
@@ -798,6 +797,5 @@ urlpatterns = [
         CRMNoteCreateView.as_view(),
         name='crm_note_create',
     ),
-    path('search/', GlobalSearchView.as_view(), name='global_search'),
 ]
 
