@@ -23,14 +23,6 @@
   </div>
 </div>
 
-  
-
-  <div class="list-page-actions">
-    <div class="eal-header-actions">
-  </div>
-</div>
-  </div>
-
   {% if is_edit and plan and plan.updated_at %}
   <div class="edit-info-bar">
     <i class="bi bi-clock-history"></i>
@@ -62,7 +54,7 @@
           <div>
             <label class="form-label">Plan Name (AR)</label>
             {{ form.plan_name_ar }}
-            {% for e in form.plan_name_ar.errors %}<div style="color:#b91c; font-weight:600">{{ e }}</div>{% endfor %}
+            {% for e in form.plan_name_ar.errors %}<div style="color:#b91c1c; font-weight:600">{{ e }}</div>{% endfor %}
           </div>
           <div>
             <label class="form-label">Base Cycle Days</label>
@@ -70,17 +62,32 @@
             {% for e in form.base_cycle_days.errors %}<div style="color:#b91c1c; font-weight:600">{{ e }}</div>{% endfor %}
           </div>
           <div>
-            <label class="form-label">Backup Restore Level</label>
+            <label class="form-label" for="id_backup_restore_level">{% translate "Backup restore level" %}</label>
             {{ form.backup_restore_level }}
+            <small class="text-muted d-block mt-1">{% translate "Standard, Extended, or Premium backup/restore tier for subscribers on this plan." %}</small>
             {% for e in form.backup_restore_level.errors %}<div style="color:#b91c1c; font-weight:600">{{ e }}</div>{% endfor %}
           </div>
           <div>
-            <label class="form-label">Has Driver App</label>
-            <div>{{ form.has_driver_app }}</div>
+            <div class="form-label d-block mb-0">{% translate "Has driver app" %}</div>
+            <div class="form-check form-switch mt-2">
+              {{ form.has_driver_app }}
+              <label class="form-check-label ms-1" for="id_plan_has_driver_app">
+                <span class="fw-medium">{% translate "Enabled" %}</span>
+                <span class="text-muted small d-block">{% translate "Allow tenant drivers to use the mobile app on this plan." %}</span>
+              </label>
+            </div>
+            {% for e in form.has_driver_app.errors %}<div style="color:#b91c1c; font-weight:600">{{ e }}</div>{% endfor %}
           </div>
           <div>
-            <label class="form-label">Status</label>
-            <div>{{ form.is_active }}</div>
+            <div class="form-label d-block mb-0">{% translate "Status" %}</div>
+            <div class="form-check form-switch mt-2">
+              {{ form.is_active }}
+              <label class="form-check-label ms-1" for="id_plan_is_active">
+                <span class="fw-medium">{% translate "Active" %}</span>
+                <span class="text-muted small d-block">{% translate "When off, new tenants cannot subscribe to this plan." %}</span>
+              </label>
+            </div>
+            {% for e in form.is_active.errors %}<div style="color:#b91c1c; font-weight:600">{{ e }}</div>{% endfor %}
           </div>
         </div>
 
@@ -176,7 +183,6 @@
         </button>
       </div>
     </div>
-  </div>
 </form>
 
   <template id="pricing-row-template">

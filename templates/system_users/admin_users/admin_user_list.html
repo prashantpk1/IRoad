@@ -87,7 +87,7 @@
             <th style="width: 140px">Status badge</th>
             <th style="width: 120px">2FA</th>
             <th style="width: 170px">Last Login</th>
-            <th style="width: 260px">ACTIONS</th>
+            <th style="width: 300px">{% translate "Actions" %}</th>
           </tr>
         </thead>
         <tbody>
@@ -125,7 +125,10 @@
               <td>{{ u.last_login_at|default:"-" }}</td>
               <td>
                 <div class="eal-actions-cell">
-                  <a href="{% url 'admin_user_edit' u.pk %}" class="eal-row-btn" title="Edit">
+                  <a href="{% url 'admin_user_detail' u.pk %}" class="eal-row-btn" title="{% translate 'View details' %}">
+                    <i class="bi bi-eye"></i>
+                  </a>
+                  <a href="{% url 'admin_user_edit' u.pk %}" class="eal-row-btn" title="{% translate 'Edit' %}">
                     <i class="bi bi-pencil"></i>
                   </a>
                   {% if u.status == 'Pending_Activation' %}

@@ -1,12 +1,18 @@
 {% extends 'base.html' %}
+{% load i18n %}
 
-{% block page_title %}Admin User Details{% endblock %}
+{% block page_title %}{% translate "Admin User Details" %}{% endblock %}
+
+{% block breadcrumb_items %}
+  <li class="breadcrumb-item"><a href="{% url 'admin_user_list' %}">{% translate "Admin Users" %}</a></li>
+  <li class="breadcrumb-item active" aria-current="page">{% translate "Details" %}</li>
+{% endblock %}
 
 {% block content %}
 <div class="page-header">
   <div class="page-header-row">
     <div class="page-header-left">
-      <h1 class="page-title">Admin User Details</h1>
+      <h1 class="page-title">{% translate "Admin User Details" %}</h1>
       <p class="page-subtitle">
         {{ target_user.first_name }} {{ target_user.last_name }}
         {% if target_user.is_root %}
@@ -18,11 +24,11 @@
       <div class="eal-header-actions">
         <a href="{% url 'admin_user_edit' target_user.pk %}" class="eal-btn eal-btn-primary">
           <i class="bi bi-pencil"></i>
-          <span>Edit</span>
+          <span>{% translate "Edit" %}</span>
         </a>
         <a href="{% url 'admin_user_list' %}" class="eal-btn eal-btn-outline">
           <i class="bi bi-arrow-left"></i>
-          <span>Back to list</span>
+          <span>{% translate "Back to list" %}</span>
         </a>
       </div>
     </div>
@@ -66,8 +72,10 @@
       </div>
     </div>
     <div class="col-12 col-md-4"><label class="form-label">Last Login At</label><input class="form-control" value="{{ target_user.last_login_at|default:'-' }}" readonly></div>
-    <div class="col-12 col-md-4"><label class="form-label">Created By</label><input class="form-control" value="{% if target_user.created_by %}{{ target_user.created_by.first_name }} {{ target_user.created_by.last_name }}{% else %}System{% endif %}" readonly></div>
-    <div class="col-12 col-md-4"><label class="form-label">Created At</label><input class="form-control" value="{{ target_user.created_at|default:'-' }}" readonly></div>
+    <div class="col-12 col-md-4"><label class="form-label">{% translate "Created by" %}</label><input class="form-control" value="{% if target_user.created_by %}{{ target_user.created_by.first_name }} {{ target_user.created_by.last_name }}{% else %}{% translate "System" %}{% endif %}" readonly></div>
+    <div class="col-12 col-md-4"><label class="form-label">{% translate "Updated by" %}</label><input class="form-control" value="{% if target_user.updated_by %}{{ target_user.updated_by.first_name }} {{ target_user.updated_by.last_name }}{% else %}—{% endif %}" readonly></div>
+    <div class="col-12 col-md-4"><label class="form-label">{% translate "Created at" %}</label><input class="form-control" value="{{ target_user.created_at|default:'-' }}" readonly></div>
+    <div class="col-12 col-md-4"><label class="form-label">{% translate "Updated at" %}</label><input class="form-control" value="{{ target_user.updated_at|default:'-' }}" readonly></div>
   </div>
 </div>
 {% endblock %}

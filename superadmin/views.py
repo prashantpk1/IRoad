@@ -18,16 +18,18 @@ from django.views.generic import TemplateView
 from datetime import date, timedelta
 from decimal import Decimal
 import json
+import logging
 import uuid
+
+logger = logging.getLogger(__name__)
 
 from .billing_helpers import (
     calculate_addon_prorata,
     calculate_promo_discount,
     calculate_pro_rata_credit,
-    generate_invoice_from_order,
+    fulfill_paid_order,
     get_fx_snapshot,
     get_tax_code_for_tenant,
-    provision_tenant_from_order,
     refresh_order_projected_fields,
 )
 from .auth_helpers import (
@@ -40,6 +42,7 @@ from .auth_helpers import (
     send_auth_email,
 )
 from .audit_helpers import create_session, close_session, log_audit_action
+from .redis_helpers import create_admin_session
 from .forms import (
     AddOnsPricingPolicyForm,
     AdminSecuritySettingsForm,
@@ -218,8 +221,18 @@ class LoginView(View):
                 },
             )
 
-        # STEP 4: Check password
-        if not user.check_password(form.cleaned_data['password']):
+        # STEP 4: Check password (never log plaintext password)
+        password_ok = user.check_password(form.cleaned_data['password'])
+        if not password_ok:
+            logger.warning(
+                'Admin login: password mismatch (user_id=%s email=%s ip=%s '
+                'has_usable_password=%s password_len=%s)',
+                user.pk,
+                email,
+                ip,
+                user.has_usable_password(),
+                len(form.cleaned_data.get('password') or ''),
+            )
             record_failed_attempt(email)
             log_access('Login', 'Failed', email, ip)
 
@@ -263,8 +276,6 @@ class LoginView(View):
         user.save(update_fields=['last_login_at'])
 
         login(request, user)
-        from superadmin.redis_helpers import create_admin_session
-        from superadmin.auth_helpers import get_security_settings
 
         settings_obj = get_security_settings()
         user_agent = request.META.get('HTTP_USER_AGENT', '')
@@ -477,7 +488,6 @@ class DashboardView(LoginRequiredMixin, View):
 
     def get(self, request):
         now = timezone.now()
-        today = now.date()
 
         # ── IMPORT ALL NEEDED MODELS ──
         from .models import (
@@ -500,8 +510,56 @@ class DashboardView(LoginRequiredMixin, View):
             total=Sum('base_currency_equivalent_amount')
         )['total'] or Decimal('0.00')
 
+        period_30d_start = now - timedelta(days=30)
+        period_60d_start = now - timedelta(days=60)
+        revenue_30d = StandardInvoice.objects.filter(
+            status__in=['Issued', 'Paid'],
+            issue_date__gte=period_30d_start,
+            issue_date__lte=now,
+        ).aggregate(
+            t=Sum('base_currency_equivalent_amount')
+        )['t'] or Decimal('0.00')
+        revenue_prev_30d = StandardInvoice.objects.filter(
+            status__in=['Issued', 'Paid'],
+            issue_date__gte=period_60d_start,
+            issue_date__lt=period_30d_start,
+        ).aggregate(
+            t=Sum('base_currency_equivalent_amount')
+        )['t'] or Decimal('0.00')
+        if revenue_prev_30d > 0:
+            revenue_30d_growth_pct = float(
+                (revenue_30d - revenue_prev_30d) / revenue_prev_30d * 100)
+        elif revenue_30d > 0:
+            revenue_30d_growth_pct = 100.0
+        else:
+            revenue_30d_growth_pct = 0.0
+
         active_tenants = TenantProfile.objects.filter(
             account_status='Active').count()
+        tenants_active_month_start = TenantProfile.objects.filter(
+            account_status='Active',
+            registered_at__lt=month_start,
+        ).count()
+        active_tenants_net_mtd = active_tenants - tenants_active_month_start
+        new_signups_mtd = TenantProfile.objects.filter(
+            registered_at__gte=month_start,
+        ).count()
+
+        fleet_totals = TenantProfile.objects.filter(
+            account_status='Active',
+        ).aggregate(
+            trucks=Sum(
+                F('active_max_internal_trucks')
+                + F('active_max_external_trucks')
+            ),
+            drivers=Sum('active_max_drivers'),
+        )
+        total_trucks_licensed = int(fleet_totals['trucks'] or 0)
+        total_drivers_licensed = int(fleet_totals['drivers'] or 0)
+
+        failed_payment_count = Transaction.objects.filter(
+            status__in=['Failed', 'Rejected'],
+        ).count()
 
         pending_orders = SubscriptionOrder.objects.filter(
             order_status='Pending_Payment').count()
@@ -568,9 +626,35 @@ class DashboardView(LoginRequiredMixin, View):
         total_staff = AdminUser.objects.exclude(
             status='Suspended').count()
 
-        # ── REVENUE CHART (last 6 months) ──
+        total_tenants = TenantProfile.objects.count()
+        inactive_tenants = max(0, total_tenants - active_tenants)
+
+        attention_chart = {
+            'labels': [
+                'Pending orders',
+                'Pending bank transfers',
+                'Open tickets',
+                'Overdue (>48h)',
+                'Failed / rejected',
+            ],
+            'data': [
+                pending_orders,
+                pending_bank_txns,
+                open_tickets,
+                overdue_tickets,
+                failed_payment_count,
+            ],
+        }
+        tenant_status_chart = {
+            'labels': ['Active subscribers', 'Other statuses'],
+            'data': [active_tenants, inactive_tenants],
+        }
+
+        # ── REVENUE + LICENSED FLEET TREND (last 6 months) ──
         revenue_data = []
         revenue_labels = []
+        fleet_trucks_series = []
+        fleet_drivers_series = []
         for i in range(5, -1, -1):
             month_date = (now.replace(day=1) -
                           timedelta(days=i * 30))
@@ -596,6 +680,25 @@ class DashboardView(LoginRequiredMixin, View):
             revenue_labels.append(
                 m_start.strftime('%b %Y'))
 
+            ft = TenantProfile.objects.filter(
+                account_status='Active',
+                registered_at__lt=m_end,
+            ).aggregate(
+                trucks=Sum(
+                    F('active_max_internal_trucks')
+                    + F('active_max_external_trucks')
+                ),
+                drivers=Sum('active_max_drivers'),
+            )
+            fleet_trucks_series.append(int(ft['trucks'] or 0))
+            fleet_drivers_series.append(int(ft['drivers'] or 0))
+
+        fleet_chart = {
+            'labels': revenue_labels,
+            'trucks': fleet_trucks_series,
+            'drivers': fleet_drivers_series,
+        }
+
         # ── RECENT AUDIT LOG ──
         recent_audit = AuditLog.objects.select_related(
             'admin'
@@ -604,7 +707,15 @@ class DashboardView(LoginRequiredMixin, View):
         context = {
             # KPIs
             'mrr': mrr,
+            'revenue_30d': revenue_30d,
+            'revenue_30d_growth_pct': revenue_30d_growth_pct,
             'active_tenants': active_tenants,
+            'active_tenants_net_mtd': active_tenants_net_mtd,
+            'new_signups_mtd': new_signups_mtd,
+            'tenants_active_month_start': tenants_active_month_start,
+            'total_trucks_licensed': total_trucks_licensed,
+            'total_drivers_licensed': total_drivers_licensed,
+            'failed_payment_count': failed_payment_count,
             'pending_orders': pending_orders,
             'pending_bank_txns': pending_bank_txns,
             'open_tickets': open_tickets,
@@ -620,9 +731,12 @@ class DashboardView(LoginRequiredMixin, View):
             'stale_accounts': stale_accounts,
             'suspended_admins': suspended_admins,
             'total_staff': total_staff,
-            # Chart
+            # Charts (Chart.js)
             'revenue_data': revenue_data,
             'revenue_labels': revenue_labels,
+            'fleet_chart': fleet_chart,
+            'attention_chart': attention_chart,
+            'tenant_status_chart': tenant_status_chart,
             # Audit
             'recent_audit': recent_audit,
             # Meta
@@ -1167,6 +1281,21 @@ class RoleListView(LoginRequiredMixin, View):
         return render(request, self.template_name, context)
 
 
+class RoleDetailView(LoginRequiredMixin, View):
+    template_name = 'system_users/roles/role_detail.html'
+
+    def get(self, request, pk):
+        role = get_object_or_404(
+            Role.objects.select_related('created_by', 'updated_by'),
+            pk=pk,
+        )
+        return render(
+            request,
+            self.template_name,
+            {'role': role, 'page_title': 'Role details'},
+        )
+
+
 class RoleCreateView(LoginRequiredMixin, View):
     template_name = 'system_users/roles/role_form.html'
 
@@ -1539,7 +1668,10 @@ class AdminUserUpdateView(LoginRequiredMixin, View):
         redirect_resp = self._require_root(request)
         if redirect_resp:
             return redirect_resp
-        target_user = get_object_or_404(AdminUser, pk=pk)
+        target_user = get_object_or_404(
+            AdminUser.objects.select_related('role', 'created_by', 'updated_by'),
+            pk=pk,
+        )
         form = AdminUserForm(instance=target_user)
         return render(request, self.template_name, {'form': form, 'is_edit': True})
 
@@ -1548,7 +1680,10 @@ class AdminUserUpdateView(LoginRequiredMixin, View):
         if redirect_resp:
             return redirect_resp
 
-        target_user = get_object_or_404(AdminUser, pk=pk)
+        target_user = get_object_or_404(
+            AdminUser.objects.select_related('role', 'created_by', 'updated_by'),
+            pk=pk,
+        )
         original_role = target_user.role
 
         form = AdminUserForm(request.POST, instance=target_user)
@@ -1579,7 +1714,10 @@ class AdminUserDetailView(LoginRequiredMixin, View):
     template_name = 'system_users/admin_users/admin_user_detail.html'
 
     def get(self, request, pk):
-        target_user = get_object_or_404(AdminUser, pk=pk)
+        target_user = get_object_or_404(
+            AdminUser.objects.select_related('role', 'created_by', 'updated_by'),
+            pk=pk,
+        )
         return render(request, self.template_name, {'target_user': target_user, 'page_title': 'Admin User Details'})
 
 
@@ -4827,13 +4965,6 @@ class OrderCreateView(RootRequiredMixin, View):
         if promo_input:
             promo_obj = PromoCode.objects.filter(
                 code__iexact=promo_input).first()
-            ok, err = promo_obj.is_valid_for_use() if promo_obj else (False, '')
-            if not promo_obj or not ok:
-                messages.error(
-                    request,
-                    err or 'Invalid or inactive promo code.',
-                )
-                return redirect('order_create')
 
         sub_total = Decimal('0.00')
         plan_line_data = None
@@ -4958,23 +5089,22 @@ class OrderCreateView(RootRequiredMixin, View):
                 order.delete()
                 return redirect('order_create')
 
-            if promo_obj and promo_obj.applicable_plans.exists():
-                if plan_line_data is None:
-                    messages.error(
-                        request,
-                        'This promo code applies only to plan-based orders.',
-                    )
+            if promo_input:
+                if not promo_obj:
+                    messages.error(request, 'Invalid or Expired Code.')
                     order.delete()
                     return redirect('order_create')
-                if plan_line_data not in promo_obj.applicable_plans.all():
+                ok, err = promo_obj.is_valid_for_use(for_plan=plan_line_data)
+                if not ok:
                     messages.error(
                         request,
-                        'This promo code does not apply to the selected plan.',
+                        err or 'Invalid or Expired Code.',
                     )
                     order.delete()
                     return redirect('order_create')
 
-            discount = calculate_promo_discount(promo_obj, sub_total)
+            discount = calculate_promo_discount(
+                promo_obj, sub_total, for_plan=plan_line_data)
             taxable_base = (sub_total - discount).quantize(Decimal('0.01'))
             if taxable_base < 0:
                 taxable_base = Decimal('0.00')
@@ -5056,6 +5186,57 @@ class OrderStatusUpdateView(RootRequiredMixin, View):
                     status='Pending',
                 ).update(status='Failed')
                 messages.success(request, 'Order cancelled.')
+        elif action == 'mark_paid':
+            if order.order_status != 'Pending_Payment':
+                messages.error(
+                    request,
+                    'Only orders awaiting payment can be recorded as paid.',
+                )
+            else:
+                fulfilled = False
+                with db_transaction.atomic():
+                    ord_row = SubscriptionOrder.objects.select_for_update().get(
+                        pk=order.pk)
+                    txn = (
+                        Transaction.objects.select_for_update()
+                        .filter(
+                            order=ord_row,
+                            transaction_type='Order_Payment',
+                            status='Pending',
+                        )
+                        .first()
+                    )
+                    if not txn:
+                        messages.error(
+                            request,
+                            'No pending payment transaction found for this order.',
+                        )
+                    else:
+                        txn.status = 'Completed'
+                        txn.reviewed_by = request.user
+                        txn.review_notes = None
+                        txn.save(update_fields=[
+                            'status', 'reviewed_by', 'review_notes',
+                            'updated_at',
+                        ])
+                        ord_row.order_status = 'Paid'
+                        ord_row.save(update_fields=[
+                            'order_status', 'updated_at',
+                        ])
+                        fulfill_paid_order(ord_row, request.user, txn.amount)
+                        log_audit_action(
+                            request,
+                            'Status_Change',
+                            'Order Marked Paid',
+                            str(ord_row.order_id),
+                            new_instance=ord_row,
+                        )
+                        fulfilled = True
+                if fulfilled:
+                    messages.success(
+                        request,
+                        'Payment recorded. Invoice, subscription, and LTV updated.',
+                    )
         else:
             messages.error(request, 'Unknown action.')
         return redirect('order_detail', pk=order.pk)
@@ -5206,23 +5387,7 @@ class TransactionApproveView(RootRequiredMixin, View):
             order.order_status = 'Paid'
             order.save(update_fields=['order_status', 'updated_at'])
 
-            if not StandardInvoice.objects.filter(order=order).exists():
-                generate_invoice_from_order(order, request.user)
-
-            provision_tenant_from_order(order)
-
-            if order.promo_code_id:
-                pc = PromoCode.objects.select_for_update().get(
-                    pk=order.promo_code_id)
-                pc.current_uses = (pc.current_uses or 0) + 1
-                pc.save(update_fields=['current_uses'])
-
-            ten = TenantProfile.objects.select_for_update().get(
-                pk=txn.tenant_id)
-            ten.total_ltv = (
-                ten.total_ltv + txn.amount
-            ).quantize(Decimal('0.01'))
-            ten.save(update_fields=['total_ltv', 'updated_at'])
+            fulfill_paid_order(order, request.user, txn.amount)
             log_audit_action(
                 request,
                 'Status_Change',
@@ -5814,4 +5979,83 @@ class TicketForceCloseView(LoginRequiredMixin, View):
 
     def get(self, request, pk):
         return redirect('ticket_detail', pk=pk)
+
+
+class GlobalSearchView(LoginRequiredMixin, TemplateView):
+    template_name = 'search/search_results.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        query = self.request.GET.get('q', '').strip()
+
+        results = {
+            'users': [],
+            'tenants': [],
+            'tickets': [],
+            'invoices': [],
+            'roles': [],
+            'plans': [],
+            'promo_codes': [],
+        }
+
+        if query:
+            # Users
+            results['users'] = AdminUser.objects.filter(
+                Q(first_name__icontains=query) |
+                Q(last_name__icontains=query) |
+                Q(email__icontains=query) |
+                Q(phone_number__icontains=query)
+            ).distinct()[:10]
+
+            # Tenants
+            results['tenants'] = TenantProfile.objects.filter(
+                Q(company_name__icontains=query) |
+                Q(registration_number__icontains=query) |
+                Q(tax_number__icontains=query) |
+                Q(primary_email__icontains=query) |
+                Q(primary_phone__icontains=query)
+            ).distinct()[:10]
+
+            # Tickets
+            results['tickets'] = SupportTicket.objects.filter(
+                Q(subject__icontains=query) |
+                Q(ticket_no__icontains=query)
+            ).distinct()[:10]
+
+            # Invoices
+            results['invoices'] = StandardInvoice.objects.filter(
+                Q(invoice_number__icontains=query) |
+                Q(customer_name__icontains=query) |
+                Q(customer_tax_number__icontains=query)
+            ).distinct()[:10]
+
+            # Roles
+            results['roles'] = Role.objects.filter(
+                Q(role_name_en__icontains=query) |
+                Q(role_name_ar__icontains=query)
+            ).distinct()[:10]
+
+            # Plans
+            results['plans'] = SubscriptionPlan.objects.filter(
+                Q(plan_name_en__icontains=query) |
+                Q(plan_name_ar__icontains=query)
+            ).distinct()[:10]
+
+            # Promo Codes
+            results['promo_codes'] = PromoCode.objects.filter(
+                Q(code__icontains=query)
+            ).distinct()[:10]
+
+        context['query'] = query
+        context['results'] = results
+        total_count = 0
+        for key, val in results.items():
+            if hasattr(val, 'count'):
+                total_count += val.count()
+            else:
+                total_count += len(val)
+        
+        context['total_count'] = total_count
+        context['page_title'] = f"Search results for '{query}'"
+        return context
 

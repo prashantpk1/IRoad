@@ -68,7 +68,7 @@
           <th>{% translate "Description" %}</th>
           <th style="width: 140px">{% translate "System Default" %}</th>
           <th style="width: 120px">{% translate "Status" %}</th>
-          <!-- <th style="width: 160px">{% translate "Actions" %}</th> -->
+          <th style="width: 140px">{% translate "Actions" %}</th>
         </tr>
       </thead>
       <tbody>
@@ -94,6 +94,9 @@
             </td>
             <td>
               <div class="eal-actions-cell">
+                <a href="{% url 'role_detail' role.pk %}" class="eal-row-btn" title="{% translate 'View details' %}">
+                  <i class="bi bi-eye"></i>
+                </a>
                 {% if not role.is_system_default %}
                   <a href="{% url 'role_edit' role.pk %}" class="eal-row-btn" title="{% translate 'Edit' %}"><i class="bi bi-pencil"></i></a>
                   <form method="post" action="{% url 'role_toggle_status' role.pk %}" style="display: inline" class="js-confirm-submit">
@@ -106,7 +109,7 @@
           </tr>
         {% empty %}
           <tr class="eal-table-empty">
-            <td colspan="8">
+            <td colspan="7">
               <div class="notification-empty">
                 <div class="empty-icon"><i class="bi bi-person-lock"></i></div>
                 <h4 class="empty-title">{% translate "No roles found" %}</h4>

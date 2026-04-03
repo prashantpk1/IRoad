@@ -7348,9 +7348,9 @@ textarea.form-control {
 }
 
 /* Ensure form space at bottom for fixed bar */
-form {
+/* form {
   padding-bottom: 80px; 
-}
+} */
 
 .eal-table-card form {
   padding-bottom: 0px !important;

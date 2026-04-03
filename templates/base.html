@@ -131,13 +131,15 @@
           >
             <i class="bi bi-list"></i>
           </button>
-          <div class="header-search">
+          <form action="{% url 'global_search' %}" method="get" class="header-search">
             <i class="bi bi-search"></i>
             <input
               type="text"
+              name="q"
+              value="{{ query|default:'' }}"
               placeholder="{% translate 'Search shipments, clients, addresses...' %}"
             />
-          </div>
+          </form>
           <div class="header-current-page text-truncate small fw-semibold text-dark align-self-center ms-1 d-none d-xl-block" style="max-width: 220px">
             {% block page_title %}{% endblock %}
           </div>

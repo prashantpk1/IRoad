@@ -129,9 +129,23 @@ class SetPasswordForm(forms.Form):
         return cleaned
 
 class RoleForm(forms.ModelForm):
+    """Status is edited via a boolean toggle (Active ↔ Inactive) in templates."""
+
+    status_active = forms.BooleanField(
+        required=False,
+        label='',
+        widget=forms.CheckboxInput(
+            attrs={
+                'class': 'form-check-input',
+                'role': 'switch',
+                'id': 'id_role_status_active',
+            }
+        ),
+    )
+
     class Meta:
         model = Role
-        fields = ['role_name_en', 'role_name_ar', 'description', 'status']
+        fields = ['role_name_en', 'role_name_ar', 'description']
 
     def clean_role_name_en(self):
         value = self.cleaned_data.get('role_name_en', '').strip()
@@ -160,8 +174,22 @@ class RoleForm(forms.ModelForm):
 
         return cleaned_data
 
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        instance.status = (
+            'Active' if self.cleaned_data.get('status_active') else 'Inactive'
+        )
+        if commit:
+            instance.save()
+        return instance
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        if self.instance.pk:
+            self.initial['status_active'] = self.instance.status == 'Active'
+        else:
+            self.initial.setdefault('status_active', True)
+
         apply_premium_styling(self)
 
         # DesignerDesign-compatible field styling classes.
@@ -180,10 +208,6 @@ class RoleForm(forms.ModelForm):
             extra_class = 'field-textarea' if desc_widget.__class__.__name__ == 'Textarea' else ''
             desc_widget.attrs.update(
                 {'class': ('field-input ' + extra_class).strip()}
-            )
-        if 'status' in self.fields:
-            self.fields['status'].widget.attrs.update(
-                {'class': 'field-select'}
             )
 
 
@@ -508,6 +532,19 @@ class SubscriptionPlanForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         apply_premium_styling(self)
+
+        switch = lambda el_id: forms.CheckboxInput(
+            attrs={
+                'class': 'form-check-input',
+                'role': 'switch',
+                'id': el_id,
+            }
+        )
+        if 'is_active' in self.fields:
+            self.fields['is_active'].widget = switch('id_plan_is_active')
+        if 'has_driver_app' in self.fields:
+            self.fields['has_driver_app'].widget = switch('id_plan_has_driver_app')
+
         for field_name in self.MAX_FIELDS:
             if field_name in self.fields:
                 self.fields[field_name].help_text = 'Enter -1 for Unlimited'
@@ -586,6 +623,14 @@ class AddOnsPricingPolicyForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         apply_premium_styling(self)
+        if 'is_active' in self.fields:
+            self.fields['is_active'].widget = forms.CheckboxInput(
+                attrs={
+                    'class': 'form-check-input',
+                    'role': 'switch',
+                    'id': 'id_addons_policy_is_active',
+                }
+            )
 
     def clean(self):
         cleaned = super().clean()
@@ -630,6 +675,19 @@ class PromoCodeForm(forms.ModelForm):
         )
         self.fields['code'].help_text = 'Code is auto-converted to uppercase.'
 
+        switch = forms.CheckboxInput(
+            attrs={
+                'class': 'form-check-input',
+                'role': 'switch',
+                'id': 'id_promo_is_active',
+            }
+        )
+        self.fields['is_active'].widget = switch
+
+        dv = self.fields['discount_value']
+        dv.widget.attrs.setdefault('step', '0.01')
+        dv.widget.attrs.setdefault('min', '0')
+
     def clean_code(self):
         value = self.cleaned_data.get('code', '')
         value = value.upper().strip()
@@ -640,24 +698,28 @@ class PromoCodeForm(forms.ModelForm):
             )
         return value
 
-    def clean(self):
-        cleaned = super().clean()
-        discount_type = cleaned.get('discount_type')
-        discount_value = cleaned.get('discount_value')
-        valid_from = cleaned.get('valid_from')
-        valid_until = cleaned.get('valid_until')
-        max_uses = cleaned.get('max_uses')
-
-        if discount_type == 'Percentage':
-            if discount_value and discount_value > 100:
-                raise forms.ValidationError(
-                    'Percentage discount cannot exceed 100.'
-                )
-
-        if discount_value and discount_value <= 0:
+    def clean_discount_value(self):
+        value = self.cleaned_data.get('discount_value')
+        discount_type = self.cleaned_data.get('discount_type') or (
+            self.data.get('discount_type') or ''
+        )
+        if value is None:
+            return value
+        if value <= 0:
             raise forms.ValidationError(
                 'Discount value must be greater than 0.'
             )
+        if discount_type == 'Percentage' and value > 100:
+            raise forms.ValidationError(
+                'Percentage discount cannot exceed 100.'
+            )
+        return value
+
+    def clean(self):
+        cleaned = super().clean()
+        valid_from = cleaned.get('valid_from')
+        valid_until = cleaned.get('valid_until')
+        max_uses = cleaned.get('max_uses')
 
         if valid_until and valid_from:
             if valid_until <= valid_from:

@@ -870,19 +870,35 @@ class PromoCode(models.Model):
         db_table = 'subscription_promo_codes'
         ordering = ['-created_at']
 
-    def is_valid_for_use(self):
+    def is_valid_for_use(self, for_plan=None):
+        """
+        Order validation order: is_active → valid_from/until →
+        max_uses vs current_uses → applicable_plans (when restricted).
+        Returns (ok, message). On failure, message is the generic
+        client-facing error for apply-to-order flows.
+        """
         from django.utils import timezone
+
+        invalid_msg = 'Invalid or Expired Code'
+
         if not self.is_active:
-            return False, "Promo code is inactive."
+            return False, invalid_msg
         now = timezone.now()
         if now < self.valid_from:
-            return False, "Promo code is not yet valid."
+            return False, invalid_msg
         if self.valid_until and now > self.valid_until:
-            return False, "Promo code has expired."
-        if self.max_uses is not None and \
-                self.current_uses >= self.max_uses:
-            return False, "Promo code usage limit reached."
-        return True, "Valid"
+            return False, invalid_msg
+        if self.max_uses is not None and self.current_uses >= self.max_uses:
+            return False, invalid_msg
+
+        plan_qs = self.applicable_plans.all()
+        if plan_qs.exists():
+            if for_plan is None:
+                return False, invalid_msg
+            if not plan_qs.filter(pk=for_plan.pk).exists():
+                return False, invalid_msg
+
+        return True, ''
 
 
 class BankAccount(models.Model):

@@ -1,0 +1,586 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block title %}{% translate "Search Results" %}{% endblock %}
+{% block page_title %}{% translate "Search Results" %}{% endblock %}
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item active" aria-current="page">{% translate "Search" %}</li>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="page-header">
+    <div class="page-header-row">
+        <div class="page-header-left">
+            <h1 class="page-title">{% translate "Search Results" %}</h1>
+            <p class="page-subtitle">
+                {% if query %}
+                    {% blocktranslate with count=total_count q=query %}Found {{ count }} results for "{{ q }}"{% endblocktranslate %}
+                {% else %}
+                    {% translate "Enter a keyword to search across the platform." %}
+                {% endif %}
+            </p>
+        </div>
+        <div class="page-header-right">
+            <div class="eal-header-actions">
+                <a href="{% url 'dashboard' %}" class="eal-btn eal-btn-outline shadow-sm">
+                    <i class="bi bi-arrow-left"></i>
+                    <span>{% translate "Return to Dashboard" %}</span>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container-fluid px-0">
+    {% if not query %}
+        <!-- Initial Search State -->
+        <div class="eal-table-card db-fade p-5 text-center border-0" style="border-radius: var(--radius-lg); box-shadow: var(--shadow-md);">
+            <div class="mb-4">
+                <div class="d-inline-flex align-items-center justify-content-center bg-primary-light rounded-circle" style="width: 100px; height: 100px;">
+                    <i class="bi bi-search-heart text-primary" style="font-size: 3rem;"></i>
+                </div>
+            </div>
+            <h2 class="fw-bold text-dark">{% translate "Global Search" %}</h2>
+            <p class="text-muted mx-auto" style="max-width: 500px;">
+                {% translate "Looking for someone or something? Enter a name, email, invoice number, or ticket ID in the search bar to find results across the entire iRoad platform." %}
+            </p>
+        </div>
+    {% elif total_count == 0 %}
+        <!-- No Results Found State -->
+        <div class="eal-table-card db-fade p-5 text-center border-0" style="border-radius: var(--radius-lg); box-shadow: var(--shadow-md);">
+            <div class="mb-4">
+                <div class="d-inline-flex align-items-center justify-content-center bg-light rounded-circle" style="width: 100px; height: 100px;">
+                    <i class="bi bi-folder2-open text-muted" style="font-size: 3rem;"></i>
+                </div>
+            </div>
+            <h2 class="fw-bold text-dark">{% translate "No Matches Found" %}</h2>
+            <p class="text-muted mx-auto" style="max-width: 500px;">
+                {% blocktranslate with q=query %}We couldn't find any results matching "{{ q }}". Try searching with more specific keywords or check your spelling.{% endblocktranslate %}
+            </p>
+            <div class="mt-4">
+                <a href="{% url 'dashboard' %}" class="eal-btn eal-btn-primary">
+                    {% translate "Try Again" %}
+                </a>
+            </div>
+        </div>
+    {% else %}
+        <!-- Rich Category Navigation Grid (Jump To) -->
+        <div class="mb-4">
+            <div class="d-flex align-items-center mb-3">
+                <span class="text-muted small text-uppercase fw-bold" style="letter-spacing: 1px;">{% translate "Quick Jump" %}</span>
+                <div class="flex-grow-1 ms-3 border-bottom opacity-25"></div>
+            </div>
+            
+            <div class="eal-jump-grid">
+                {% if results.users %}
+                <a href="#users-section" class="eal-jump-card">
+                    <div class="eal-jump-icon" style="--icon-bg: #e0f2fe; --icon-color: #0ea5e9;">
+                        <i class="bi bi-people"></i>
+                    </div>
+                    <div class="eal-jump-content">
+                        <span class="eal-jump-title">{% translate "Users" %}</span>
+                        <span class="eal-jump-count">{{ results.users|length }} {% translate "Matches" %}</span>
+                    </div>
+                    <i class="bi bi-chevron-right eal-jump-arrow"></i>
+                </a>
+                {% endif %}
+
+                {% if results.tenants %}
+                <a href="#tenants-section" class="eal-jump-card">
+                    <div class="eal-jump-icon" style="--icon-bg: #fef3c7; --icon-color: #d97706;">
+                        <i class="bi bi-building text-warning"></i>
+                    </div>
+                    <div class="eal-jump-content">
+                        <span class="eal-jump-title">{% translate "Tenants" %}</span>
+                        <span class="eal-jump-count">{{ results.tenants|length }} {% translate "Matches" %}</span>
+                    </div>
+                    <i class="bi bi-chevron-right eal-jump-arrow"></i>
+                </a>
+                {% endif %}
+
+                {% if results.tickets %}
+                <a href="#tickets-section" class="eal-jump-card">
+                    <div class="eal-jump-icon" style="--icon-bg: #dcfce7; --icon-color: #16a34a;">
+                        <i class="bi bi-ticket-detailed text-success"></i>
+                    </div>
+                    <div class="eal-jump-content">
+                        <span class="eal-jump-title">{% translate "Tickets" %}</span>
+                        <span class="eal-jump-count">{{ results.tickets|length }} {% translate "Matches" %}</span>
+                    </div>
+                    <i class="bi bi-chevron-right eal-jump-arrow"></i>
+                </a>
+                {% endif %}
+
+                {% if results.invoices %}
+                <a href="#invoices-section" class="eal-jump-card">
+                    <div class="eal-jump-icon" style="--icon-bg: #ede9fe; --icon-color: #7c3aed;">
+                        <i class="bi bi-receipt text-purple"></i>
+                    </div>
+                    <div class="eal-jump-content">
+                        <span class="eal-jump-title">{% translate "Invoices" %}</span>
+                        <span class="eal-jump-count">{{ results.invoices|length }} {% translate "Matches" %}</span>
+                    </div>
+                    <i class="bi bi-chevron-right eal-jump-arrow"></i>
+                </a>
+                {% endif %}
+
+                {% if results.roles %}
+                <a href="#roles-section" class="eal-jump-card">
+                    <div class="eal-jump-icon" style="--icon-bg: #fce7f3; --icon-color: #db2777;">
+                        <i class="bi bi-shield-check text-pink"></i>
+                    </div>
+                    <div class="eal-jump-content">
+                        <span class="eal-jump-title">{% translate "Roles" %}</span>
+                        <span class="eal-jump-count">{{ results.roles|length }} {% translate "Matches" %}</span>
+                    </div>
+                    <i class="bi bi-chevron-right eal-jump-arrow"></i>
+                </a>
+                {% endif %}
+
+                {% if results.plans %}
+                <a href="#plans-section" class="eal-jump-card">
+                    <div class="eal-jump-icon" style="--icon-bg: #fff1f2; --icon-color: #e11d48;">
+                        <i class="bi bi-box text-danger"></i>
+                    </div>
+                    <div class="eal-jump-content">
+                        <span class="eal-jump-title">{% translate "Plans" %}</span>
+                        <span class="eal-jump-count">{{ results.plans|length }} {% translate "Matches" %}</span>
+                    </div>
+                    <i class="bi bi-chevron-right eal-jump-arrow"></i>
+                </a>
+                {% endif %}
+
+                {% if results.promo_codes %}
+                <a href="#promo-section" class="eal-jump-card">
+                    <div class="eal-jump-icon" style="--icon-bg: #f0f9ff; --icon-color: #0369a1;">
+                        <i class="bi bi-tags text-info"></i>
+                    </div>
+                    <div class="eal-jump-content">
+                        <span class="eal-jump-title">{% translate "Promos" %}</span>
+                        <span class="eal-jump-count">{{ results.promo_codes|length }} {% translate "Matches" %}</span>
+                    </div>
+                    <i class="bi bi-chevron-right eal-jump-arrow"></i>
+                </a>
+                {% endif %}
+            </div>
+        </div>
+
+        {# Results Sections #}
+        
+        {# Users #}
+        {% if results.users %}
+        <div class="eal-table-card mb-5 border-0" id="users-section" style="border-radius: var(--radius-lg); box-shadow: var(--shadow-md);">
+            <div class="eal-toolbar px-4 py-3 border-bottom-0">
+                <div class="eal-toolbar-left">
+                    <h5 class="mb-0 fw-bold d-flex align-items-center text-dark">
+                        <i class="bi bi-people-fill text-primary me-2"></i> {% translate "Users" %}
+                    </h5>
+                </div>
+                <div class="eal-toolbar-right">
+                    <span class="badge rounded-pill bg-primary-light text-primary px-3 py-2">{{ results.users|length }} {% translate "Results" %}</span>
+                </div>
+            </div>
+            <div class="eal-table-wrap">
+                <table class="eal-table mb-0">
+                    <thead>
+                        <tr>
+                            <th class="ps-4">{% translate "User" %}</th>
+                            <th>{% translate "Email" %}</th>
+                            <th>{% translate "Phone" %}</th>
+                            <th class="text-end pe-4">{% translate "Actions" %}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for user in results.users %}
+                        <tr>
+                            <td class="ps-4">
+                                <div class="d-flex align-items-center">
+                                    <div class="avatar-sm me-3 bg-light rounded-circle d-flex align-items-center justify-content-center" style="width: 36px; height: 36px; min-width: 36px;">
+                                        <i class="bi bi-person text-secondary"></i>
+                                    </div>
+                                    <div>
+                                        <div class="fw-semibold text-dark">{{ user.first_name }} {{ user.last_name }}</div>
+                                        <div class="small text-muted">{{ user.role.role_name_en|default:"No Role" }}</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td><span class="text-muted font-monospace small">{{ user.email }}</span></td>
+                            <td>{{ user.phone_number|default:"-" }}</td>
+                            <td class="text-end pe-4">
+                                <a href="{% url 'admin_user_detail' user.pk %}" class="eal-row-btn" title="{% translate 'View Details' %}">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        {# Tenants #}
+        {% if results.tenants %}
+        <div class="eal-table-card mb-5 border-0" id="tenants-section" style="border-radius: var(--radius-lg); box-shadow: var(--shadow-md);">
+            <div class="eal-toolbar px-4 py-3 border-bottom-0">
+                <div class="eal-toolbar-left">
+                    <h5 class="mb-0 fw-bold d-flex align-items-center text-dark">
+                        <i class="bi bi-building-fill text-warning me-2"></i> {% translate "Tenants" %}
+                    </h5>
+                </div>
+                <div class="eal-toolbar-right">
+                    <span class="badge rounded-pill bg-primary-light text-primary px-3 py-2">{{ results.tenants|length }} {% translate "Results" %}</span>
+                </div>
+            </div>
+            <div class="eal-table-wrap">
+                <table class="eal-table mb-0">
+                    <thead>
+                        <tr>
+                            <th class="ps-4">{% translate "Company" %}</th>
+                            <th>{% translate "Reg. No" %}</th>
+                            <th>{% translate "Tax No" %}</th>
+                            <th class="text-end pe-4">{% translate "Actions" %}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for tenant in results.tenants %}
+                        <tr>
+                            <td class="ps-4">
+                                <div class="fw-semibold text-dark">{{ tenant.company_name }}</div>
+                                <div class="small text-muted">{{ tenant.primary_email }}</div>
+                            </td>
+                            <td><span class="eal-entity-id bg-light text-dark px-2 py-1 rounded small">{{ tenant.registration_number|default:"-" }}</span></td>
+                            <td>{{ tenant.tax_number|default:"-" }}</td>
+                            <td class="text-end pe-4">
+                                <a href="{% url 'tenant_detail' tenant.pk %}" class="eal-row-btn" title="{% translate 'View Details' %}">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        {# Support Tickets #}
+        {% if results.tickets %}
+        <div class="eal-table-card mb-5 border-0" id="tickets-section" style="border-radius: var(--radius-lg); box-shadow: var(--shadow-md);">
+            <div class="eal-toolbar px-4 py-3 border-bottom-0">
+                <div class="eal-toolbar-left">
+                    <h5 class="mb-0 fw-bold d-flex align-items-center text-dark">
+                        <i class="bi bi-ticket-perforated-fill text-success me-2"></i> {% translate "Support Tickets" %}
+                    </h5>
+                </div>
+                <div class="eal-toolbar-right">
+                    <span class="badge rounded-pill bg-primary-light text-primary px-3 py-2">{{ results.tickets|length }} {% translate "Results" %}</span>
+                </div>
+            </div>
+            <div class="eal-table-wrap">
+                <table class="eal-table mb-0">
+                    <thead>
+                        <tr>
+                            <th class="ps-4">{% translate "Ticket ID" %}</th>
+                            <th>{% translate "Subject" %}</th>
+                            <th>{% translate "Status" %}</th>
+                            <th class="text-end pe-4">{% translate "Actions" %}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ticket in results.tickets %}
+                        <tr>
+                            <td class="ps-4"><span class="fw-bold text-primary">#{{ ticket.ticket_no }}</span></td>
+                            <td><div class="text-truncate" style="max-width: 400px; color: var(--text-dark);">{{ ticket.subject }}</div></td>
+                            <td>
+                                <span class="status-badge {% if ticket.status == 'New' %}pending{% elif ticket.status == 'In_Progress' %}active{% elif ticket.status == 'Closed' %}inactive{% else %}warning{% endif %}">
+                                    {{ ticket.get_status_display|default:ticket.status }}
+                                </span>
+                            </td>
+                            <td class="text-end pe-4">
+                                <a href="{% url 'ticket_detail' ticket.pk %}" class="eal-row-btn" title="{% translate 'View' %}">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        {# Invoices #}
+        {% if results.invoices %}
+        <div class="eal-table-card mb-5 border-0" id="invoices-section" style="border-radius: var(--radius-lg); box-shadow: var(--shadow-md);">
+            <div class="eal-toolbar px-4 py-3 border-bottom-0">
+                <div class="eal-toolbar-left">
+                    <h5 class="mb-0 fw-bold d-flex align-items-center text-dark">
+                        <i class="bi bi-file-earmark-text-fill text-purple me-2"></i> {% translate "Invoices" %}
+                    </h5>
+                </div>
+                <div class="eal-toolbar-right">
+                    <span class="badge rounded-pill bg-primary-light text-primary px-3 py-2">{{ results.invoices|length }} {% translate "Results" %}</span>
+                </div>
+            </div>
+            <div class="eal-table-wrap">
+                <table class="eal-table mb-0">
+                    <thead>
+                        <tr>
+                            <th class="ps-4">{% translate "Invoice No" %}</th>
+                            <th>{% translate "Customer" %}</th>
+                            <th>{% translate "Total" %}</th>
+                            <th>{% translate "Status" %}</th>
+                            <th class="text-end pe-4">{% translate "Actions" %}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for invoice in results.invoices %}
+                        <tr>
+                            <td class="ps-4"><span class="fw-bold">#{{ invoice.invoice_number }}</span></td>
+                            <td class="fw-medium">{{ invoice.customer_name }}</td>
+                            <td><span class="text-dark fw-bold">{{ invoice.currency.symbol }} {{ invoice.grand_total }}</span></td>
+                            <td>
+                                <span class="status-badge {% if invoice.status == 'Paid' %}active{% elif invoice.status == 'Issued' %}pending{% elif invoice.status == 'Draft' %}inactive{% else %}warning{% endif %}">
+                                    {{ invoice.status }}
+                                </span>
+                            </td>
+                            <td class="text-end pe-4">
+                                <a href="{% url 'invoice_detail' invoice.pk %}" class="eal-row-btn" title="{% translate 'View' %}">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        {# Roles #}
+        {% if results.roles %}
+        <div class="eal-table-card mb-5 border-0" id="roles-section" style="border-radius: var(--radius-lg); box-shadow: var(--shadow-md);">
+            <div class="eal-toolbar px-4 py-3 border-bottom-0">
+                <div class="eal-toolbar-left">
+                    <h5 class="mb-0 fw-bold d-flex align-items-center text-dark">
+                        <i class="bi bi-shield-check-fill text-pink me-2"></i> {% translate "Roles" %}
+                    </h5>
+                </div>
+                <div class="eal-toolbar-right">
+                    <span class="badge rounded-pill bg-primary-light text-primary px-3 py-2">{{ results.roles|length }} {% translate "Results" %}</span>
+                </div>
+            </div>
+            <div class="eal-table-wrap">
+                <table class="eal-table mb-0">
+                    <thead>
+                        <tr>
+                            <th class="ps-4">{% translate "Role Name" %}</th>
+                            <th>{% translate "Description" %}</th>
+                            <th class="text-end pe-4">{% translate "Actions" %}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for role in results.roles %}
+                        <tr>
+                            <td class="ps-4"><span class="fw-semibold text-dark">{{ role.role_name_en }}</span></td>
+                            <td><div class="small text-muted text-truncate" style="max-width: 500px;">{{ role.description|default:"-" }}</div></td>
+                            <td class="text-end pe-4">
+                                <a href="{% url 'role_edit' role.pk %}" class="eal-row-btn" title="{% translate 'Edit' %}">
+                                    <i class="bi bi-pencil-square"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        {# Plans #}
+        {% if results.plans %}
+        <div class="eal-table-card mb-5 border-0" id="plans-section" style="border-radius: var(--radius-lg); box-shadow: var(--shadow-md);">
+            <div class="eal-toolbar px-4 py-3 border-bottom-0">
+                <div class="eal-toolbar-left">
+                    <h5 class="mb-0 fw-bold d-flex align-items-center text-dark">
+                        <i class="bi bi-box-fill text-danger me-2"></i> {% translate "Subscription Plans" %}
+                    </h5>
+                </div>
+                <div class="eal-toolbar-right">
+                    <span class="badge rounded-pill bg-primary-light text-primary px-3 py-2">{{ results.plans|length }} {% translate "Results" %}</span>
+                </div>
+            </div>
+            <div class="eal-table-wrap">
+                <table class="eal-table mb-0">
+                    <thead>
+                        <tr>
+                            <th class="ps-4">{% translate "Plan Name" %}</th>
+                            <th>{% translate "Base Price" %}</th>
+                            <th class="text-end pe-4">{% translate "Actions" %}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for plan in results.plans %}
+                        <tr>
+                            <td class="ps-4"><span class="fw-semibold text-dark">{{ plan.plan_name_en }}</span></td>
+                            <td><span class="fw-bold">{{ plan.base_price }}</span></td>
+                            <td class="text-end pe-4">
+                                <a href="{% url 'plan_detail' plan.pk %}" class="eal-row-btn" title="{% translate 'View' %}">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        {# Promo Codes #}
+        {% if results.promo_codes %}
+        <div class="eal-table-card mb-5 border-0" id="promo-section" style="border-radius: var(--radius-lg); box-shadow: var(--shadow-md);">
+            <div class="eal-toolbar px-4 py-3 border-bottom-0">
+                <div class="eal-toolbar-left">
+                    <h5 class="mb-0 fw-bold d-flex align-items-center text-dark">
+                        <i class="bi bi-tag-fill text-info me-2"></i> {% translate "Promo Codes" %}
+                    </h5>
+                </div>
+                <div class="eal-toolbar-right">
+                    <span class="badge rounded-pill bg-primary-light text-primary px-3 py-2">{{ results.promo_codes|length }} {% translate "Results" %}</span>
+                </div>
+            </div>
+            <div class="eal-table-wrap">
+                <table class="eal-table mb-0">
+                    <thead>
+                        <tr>
+                            <th class="ps-4">{% translate "Code" %}</th>
+                            <th>{% translate "Discount" %}</th>
+                            <th>{% translate "Expiry" %}</th>
+                            <th class="text-end pe-4">{% translate "Actions" %}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for promo in results.promo_codes %}
+                        <tr>
+                            <td class="ps-4"><span class="fw-bold text-primary">{{ promo.code }}</span></td>
+                            <td class="fw-medium text-dark">{{ promo.discount_value }}{% if promo.discount_type == 'Percentage' %}%{% endif %}</td>
+                            <td>{{ promo.expiry_date|date:"d M Y"|default:"-" }}</td>
+                            <td class="text-end pe-4">
+                                <a href="{% url 'promo_code_edit' promo.pk %}" class="eal-row-btn" title="{% translate 'Edit' %}">
+                                    <i class="bi bi-pencil-square"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+    {% endif %}
+</div>
+
+<style>
+    /* Premium Jump-To Grid Styles */
+    .eal-jump-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 16px;
+    }
+
+    .eal-jump-card {
+        background: #fff;
+        border: 1px solid var(--border-light);
+        border-radius: var(--radius-lg);
+        padding: 16px;
+        display: flex;
+        align-items: center;
+        text-decoration: none;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: var(--shadow-sm);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .eal-jump-card:hover {
+        transform: translateY(-4px);
+        box-shadow: var(--shadow-md);
+        border-color: var(--primary-color);
+        background: #fbfbfb;
+    }
+
+    .eal-jump-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        background: var(--icon-bg);
+        color: var(--icon-color);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        margin-right: 16px;
+        transition: transform 0.3s ease;
+    }
+
+    .eal-jump-card:hover .eal-jump-icon {
+        transform: scale(1.1);
+    }
+
+    .eal-jump-content {
+        display: flex;
+        flex-direction: column;
+        flex-grow: 1;
+    }
+
+    .eal-jump-title {
+        color: var(--text-dark);
+        font-weight: 700;
+        font-size: 14px;
+        margin-bottom: 2px;
+    }
+
+    .eal-jump-count {
+        color: var(--text-muted);
+        font-size: 12px;
+        font-weight: 500;
+    }
+
+    .eal-jump-arrow {
+        color: #e2e8f0;
+        font-size: 12px;
+        transition: transform 0.3s ease, color 0.3s ease;
+    }
+
+    .eal-jump-card:hover .eal-jump-arrow {
+        transform: translateX(3px);
+        color: var(--primary-color);
+    }
+
+    .bg-primary-light {
+        background-color: var(--primary-light) !important;
+        color: var(--primary-color) !important;
+    }
+
+    .text-purple { color: #7c3aed !important; }
+    .text-pink { color: #db2777 !important; }
+
+    section[id], .eal-table-card[id] {
+        scroll-margin-top: 100px;
+    }
+
+    /* Animation */
+    .db-fade {
+        animation: fadeIn 0.5s ease-out forwards;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+</style>
+{% endblock %}

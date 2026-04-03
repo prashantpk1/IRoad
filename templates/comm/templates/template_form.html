@@ -7,31 +7,99 @@
 {% block extra_css %}
 <style>
   .var-chip {
-    padding: 6px 12px;
+    padding: 6px 14px;
     border-radius: 20px;
-    background: white;
+    background: #ffffff;
     border: 1px solid var(--primary-light);
     color: var(--primary-color);
-    font-size: 0.85rem;
-    font-weight: 500;
+    font-size: 0.82rem;
+    font-weight: 600;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.02);
   }
   .var-chip:hover {
     background: var(--primary-light);
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(80, 81, 249, 0.1);
   }
-  .var-chip i { font-size: 0.9rem; }
+  .var-chip i { font-size: 0.85rem; opacity: 0.8; }
   
-  /* editor container styling */
-  .tox-tinymce {
-    border-radius: 12px !important;
-    border: 1px solid #e2e8f0 !important;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  /* Section Layout */
+  .form-section {
+    margin-bottom: 24px;
+    padding: 24px;
+    border-radius: 16px;
+    background: #ffffff;
+    border: 1px solid var(--border-light);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+  }
+  .form-section-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--bg-gray);
+  }
+  .form-section-header i {
+    width: 32px;
+    height: 32px;
+    background: var(--primary-bg);
+    color: var(--primary-color);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+  }
+  .form-section-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-dark);
+    margin: 0;
+  }
+
+  /* Configuration Grid */
+  .config-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 0.6fr;
+    gap: 16px;
+    align-items: flex-start;
+  }
+  
+  /* Localization Split */
+  .localization-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+  .localization-col {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .localization-col.ar {
+    padding: 16px;
+    background: rgba(80, 81, 249, 0.015);
+    border-radius: 12px;
+    border: 1px dashed var(--border-light);
+  }
+
+  /* Status Toggle Styling */
+  .status-field {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-light);
+    border-radius: 12px;
+    padding: 10px;
+    border: 1px solid var(--border-light);
+    min-height: 100%;
   }
 </style>
 {% endblock %}
@@ -45,81 +113,148 @@
   <div class="page-header-row">
     <div class="page-header-left">
       <h1 class="page-title">{% if is_edit %}{% translate "Edit Template" %}{% else %}{% translate "Add Template" %}{% endif %}</h1>
-      <p class="page-subtitle">{% translate "Manage your records here" %}</p>
-    </div>
-    <div class="page-header-right">
-      <div class="eal-header-actions">
-      </div>
+      <p class="page-subtitle">{% translate "Notification blueprints for your automated communication flows." %}</p>
     </div>
   </div>
 </div>
 
-  {% if form.instance.pk and form.instance.updated_at %}
-  <div class="edit-info-bar">
-    <i class="bi bi-clock-history"></i>
-    {% translate "Last updated" %}
-    {% if form.instance.updated_by %}
-      {% translate "by" %} <strong>{{ form.instance.updated_by.first_name }} {{ form.instance.updated_by.last_name }}</strong>
-    {% endif %}
-    {% translate "at" %} <strong>{{ form.instance.updated_at|date:"d M Y, H:i" }}</strong>
-  </div>
+{% if form.instance.pk and form.instance.updated_at %}
+<div class="edit-info-bar">
+  <i class="bi bi-clock-history"></i>
+  {% translate "Last updated" %}
+  {% if form.instance.updated_by %}
+    {% translate "by" %} <strong>{{ form.instance.updated_by.first_name }} {{ form.instance.updated_by.last_name }}</strong>
+  {% endif %}
+  {% translate "at" %} <strong>{{ form.instance.updated_at|date:"d M Y, H:i" }}</strong>
+</div>
+{% endif %}
+
+<form method="post" action="" autocomplete="off">
+  {% csrf_token %}
+  {% if form.non_field_errors %}
+    <div class="alert alert-danger mb-4 shadow-sm border-0" style="border-radius: 12px">{{ form.non_field_errors }}</div>
   {% endif %}
 
-  <div class="form-card">
-    <div class="form-card-body">
-      {% if form.non_field_errors %}<div class="alert alert-danger mb-3">{{ form.non_field_errors }}</div>{% endif %}
-      <form method="post" action="">
-        {% csrf_token %}
-        <div class="fields-grid cols-2">
-          <div class="field"><label class="form-label">Template Name</label>{{ form.template_name }}</div>
-          <div class="field"><label class="form-label">Channel</label>{{ form.channel_type }}</div>
-          <div class="field"><label class="form-label">Category</label>{{ form.category }}</div>
-          <div class="field" id="subject-en-wrap"><label class="form-label">Subject (EN)</label>{{ form.subject_en }}</div>
-          <div class="field" id="subject-ar-wrap" dir="rtl"><label class="form-label">Subject (AR)</label>{{ form.subject_ar }}</div>
-          <div class="field"><label class="form-label">Body (EN)</label>{{ form.body_en }}</div>
-          <div class="field" dir="rtl"><label class="form-label">Body (AR)</label>{{ form.body_ar }}</div>
-          <div class="field"><label class="form-label">Status</label>{{ form.is_active }}</div>
+  <!-- Section 1: Basic Configuration -->
+  <div class="form-section">
+    <div class="form-section-header">
+      <i class="bi bi-gear-fill"></i>
+      <h3 class="form-section-title">{% translate "Template Configuration" %}</h3>
+    </div>
+    <div class="config-grid">
+      <div class="field">
+        <label class="form-label">{% translate "Template Name" %}</label>
+        {{ form.template_name }}
+        {{ form.template_name.errors }}
+      </div>
+      <div class="field">
+        <label class="form-label">{% translate "Channel" %}</label>
+        {{ form.channel_type }}
+        {{ form.channel_type.errors }}
+      </div>
+      <div class="field">
+        <label class="form-label">{% translate "Category" %}</label>
+        {{ form.category }}
+        {{ form.category.errors }}
+      </div>
+      <div class="field">
+        <label class="form-label text-center d-block w-100 mb-2">{% translate "Status" %}</label>
+        <div class="status-field">
+          {{ form.is_active }}
+          <span class="small text-muted mt-1">{% translate "Active" %}</span>
         </div>
-
-        <div class="alert alert-info mt-4" style="background: rgba(80, 81, 249, 0.05); border: 1px solid rgba(80, 81, 249, 0.1); border-radius:12px">
-          <div class="d-flex align-items-center gap-2 mb-3">
-            <i class="bi bi-magic" style="color: var(--primary-color)"></i>
-            <strong style="color: var(--primary-color)">{% translate "Available Variables" %}</strong>
-            <span class="text-muted small ms-2">{% translate "(Click to insert at cursor position)" %}</span>
-          </div>
-          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-            {% with vars="client_name otp_code invoice_amount invoice_number plan_name expiry_date company_name support_email" %}
-            {% for var in vars.split %}
-              <button type="button" class="var-chip" onclick="insertVar('{% templatetag openvariable %}{{ var }}{% templatetag closevariable %}')">
-                <i class="bi bi-plus-circle"></i>
-                <span>{% templatetag openvariable %}{{ var }}{% templatetag closevariable %}</span>
-              </button>
-            {% endfor %}
-            {% endwith %}
-          </div>
-        </div>
-
-        <div class="form-actions-bar">
-          <div class="form-actions-left">
-            <a href="{% url 'notif_template_list' %}" class="eal-btn eal-btn-outline">
-              <i class="bi bi-x-lg"></i>
-              <span>{% translate "Cancel" %}</span>
-            </a>
-          </div>
-          <div class="form-actions-right">
-            <button type="submit" class="eal-btn eal-btn-primary">
-              <i class="bi bi-send"></i>
-              <span>{% if is_edit %}{% translate "Update Template" %}{% else %}{% translate "Add Template" %}{% endif %}</span>
-            </button>
-          </div>
-        </div>
-      </form>
+      </div>
     </div>
   </div>
+
+  <!-- Section 2: Localization & Content -->
+  <div class="localization-row">
+    <!-- English Version -->
+    <div class="localization-col">
+      <div class="form-section h-100 m-0">
+        <div class="form-section-header">
+          <i class="bi bi-alphabet-uppercase"></i>
+          <h3 class="form-section-title">{% translate "English Version" %}</h3>
+        </div>
+        <div class="localization-col">
+          <div class="field" id="subject-en-wrap">
+            <label class="form-label">{% translate "Subject (EN)" %}</label>
+            {{ form.subject_en }}
+            {{ form.subject_en.errors }}
+          </div>
+          <div class="field">
+            <label class="form-label">{% translate "Body (EN)" %}</label>
+            {{ form.body_en }}
+            {{ form.body_en.errors }}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Arabic Version -->
+    <div class="localization-col">
+      <div class="form-section h-100 m-0 ar">
+        <div class="form-section-header">
+          <i class="bi bi-translate"></i>
+          <h3 class="form-section-title">{% translate "Arabic Version" %}</h3>
+          <span class="badge bg-primary ms-auto" style="font-size: 10px">RTL</span>
+        </div>
+        <div class="localization-col" dir="rtl">
+          <div class="field" id="subject-ar-wrap">
+            <label class="form-label">{% translate "Subject (AR)" %}</label>
+            {{ form.subject_ar }}
+            {{ form.subject_ar.errors }}
+          </div>
+          <div class="field">
+            <label class="form-label">{% translate "Body (AR)" %}</label>
+            {{ form.body_ar }}
+            {{ form.body_ar.errors }}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 3: Available Variables -->
+  <div class="form-section mt-4 mb-5">
+    <div class="form-section-header">
+      <i class="bi bi-magic"></i>
+      <h3 class="form-section-title">{% translate "Magic Variables" %}</h3>
+      <span class="text-muted small ms-2">{% translate "(Click to insert at cursor position)" %}</span>
+    </div>
+    <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+      {% with vars="client_name otp_code invoice_amount invoice_number plan_name expiry_date company_name support_email" %}
+      {% for var in vars.split %}
+        <button type="button" class="var-chip" onclick="insertVar('{% templatetag openvariable %}{{ var }}{% templatetag closevariable %}')">
+          <i class="bi bi-code-slash"></i>
+          <span>{% templatetag openvariable %}{{ var }}{% templatetag closevariable %}</span>
+        </button>
+      {% endfor %}
+      {% endwith %}
+    </div>
+  </div>
+
+  <!-- Sticky Actions Bar -->
+  <div class="form-actions-bar">
+    <div class="form-actions-left">
+      <a href="{% url 'notif_template_list' %}" class="eal-btn eal-btn-outline">
+        <i class="bi bi-x-lg"></i>
+        <span>{% translate "Cancel" %}</span>
+      </a>
+    </div>
+    <div class="form-actions-right">
+      <button type="submit" class="eal-btn eal-btn-primary">
+        <i class="bi bi-send-check"></i>
+        <span>{% if is_edit %}{% translate "Update Template" %}{% else %}{% translate "Add Template" %}{% endif %}</span>
+      </button>
+    </div>
+  </div>
+</form>
+
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://cdn.tiny.cloud/1/fnj23wpiq1bb11q3pkw07k5j6xljfalt5c9eziqjt6sp4g1z/tinymce/6/tinymce.min.js" referrerpolicy="origin"></script>
+<script src="https://cdn.jsdelivr.net/npm/tinymce@6.8.3/tinymce.min.js" referrerpolicy="origin"></script>
 <script>
   (function() {
     const editorConfig = {

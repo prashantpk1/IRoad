@@ -234,8 +234,16 @@
     </div>
   {% elif order.order_status == 'Pending_Payment' %}
     <div class="d-flex flex-wrap gap-2 mb-4">
+      <form method="post" action="{% url 'order_status_update' order.order_id %}" onsubmit="return confirm('{% translate "Record payment and update subscriber plan, limits, and LTV?" %}');">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="mark_paid">
+        <button type="submit" class="eal-btn eal-btn-primary">
+          <i class="bi bi-check-circle"></i>
+          <span>{% translate "Record payment" %}</span>
+        </button>
+      </form>
       {% if payment_txn %}
-        <a href="{% url 'transaction_detail' payment_txn.transaction_id %}" class="eal-btn eal-btn-primary">
+        <a href="{% url 'transaction_detail' payment_txn.transaction_id %}" class="eal-btn eal-btn-outline">
           <i class="bi bi-eye"></i>
           <span>{% translate "View Transaction" %}</span>
         </a>

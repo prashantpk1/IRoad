@@ -87,19 +87,26 @@
           {% endfor %}
         </div>
         <div class="col-12 col-md-6">
-          <label class="form-label">{% translate "Status" %}</label>
-          {{ form.status }}
-          {% for error in form.status.errors %}
+          <div class="form-label d-block mb-0">{% translate "Status" %}</div>
+          <div class="form-check form-switch mt-2">
+            {{ form.status_active }}
+            <label class="form-check-label ms-1" for="id_role_status_active">
+              <span class="fw-medium">{% translate "Active" %}</span>
+              <span class="text-muted small d-block">
+                {% translate "When off, the role is Inactive." %}
+              </span>
+            </label>
+          </div>
+          {% for error in form.status_active.errors %}
             <div class="field-error">{{ error }}</div>
           {% endfor %}
         </div>
       </div>
 
     </div>
+    </div>
+    
 
-    <!-- Fixed Action Bar at the bottom of the viewport -->
-
-    </div>  
     <div class="form-actions-bar">
       <div class="form-actions-left">
         <a href="{% url 'role_list' %}" class="eal-btn eal-btn-outline">

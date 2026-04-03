@@ -15,28 +15,8 @@
       <h1 class="page-title">{% if is_edit %}{% translate "Edit Promo Code" %}{% else %}{% translate "Add Promo Code" %}{% endif %}</h1>
       <p class="page-subtitle">{% translate "Manage your records here" %}</p>
     </div>
-    <div class="page-header-right">
-      <div class="eal-header-actions">
-        <a href="{% url 'promo_code_list' %}" class="eal-btn">
-            <i class="bi bi-arrow-left"></i>
-            <span>Back</span>
-          </a>
-      </div>
-    </div>
   </div>
 </div>
-
-  
-
-  <div class="list-page-actions">
-    <div class="eal-header-actions">
-          <a href="{% url 'promo_code_list' %}" class="eal-btn">
-            <i class="bi bi-arrow-left"></i>
-            <span>Back</span>
-          </a>
-  </div>
-</div>
-  </div>
 
   {% if is_edit and promo and promo.updated_at %}
   <div class="edit-info-bar">
@@ -50,60 +30,81 @@
   {% endif %}
 
   <div class="form-card">
-    <div class="form-card-body">
-      {% if is_edit and promo %}
-        <div class="alert alert-info" style="border-radius:10px">
-          Code is immutable and cannot be changed.
-        </div>
-      {% endif %}
+    <!-- <div class="form-card-body">
+       <div class="alert alert-info" style="border-radius:10px"> -->
+        <!-- {% if is_edit and promo %}
+          <p class="mb-2">{% translate "Code is immutable and cannot be changed." %}</p>
+        {% endif %} -->
+        <!-- <p class="mb-0">
+          {% translate "Percentage max 100. Alphanumeric only. No spaces." %}
+          {% translate "Leave applicable plans empty to apply to ALL plans." %}
+        </p>  
+      </div> -->
 
-      <div class="alert alert-info" style="border-radius:10px">
-        Percentage max 100. Alphanumeric only. No spaces.
-        Leave applicable plans empty to apply to ALL plans.
-      </div>
-
-
-      <form method="post" action="">
+      <form method="post" action="" id="promo-code-form" novalidate>
         {% csrf_token %}
 
-        {% if form.non_field_errors %}
-          <div style="color:#b91c1c; font-weight:600; margin-bottom:10px">{{ form.non_field_errors }}</div>
+        {% if form.errors %}
+          <div class="alert alert-danger" role="alert" style="border-radius:10px">
+            <div class="fw-semibold mb-2">{% translate "Please fix the following:" %}</div>
+            <ul class="mb-0 ps-3">
+              {% for err in form.non_field_errors %}
+                <li>{{ err }}</li>
+              {% endfor %}
+              {% for field in form %}
+                {% for err in field.errors %}
+                  <li><span class="fw-medium">{{ field.label }}:</span> {{ err }}</li>
+                {% endfor %}
+              {% endfor %}
+            </ul>
+          </div>
         {% endif %}
 
         <h3 style="margin: 18px 0 12px 0">Code Details</h3>
         <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:12px">
           {% for field in form %}
-            {% if field.name == 'code' or field.name == 'discount_type' or field.name == 'discount_value' or field.name == 'discount_duration' %}
+            {% if field.name == 'code' or field.name == 'discount_type' or field.name == 'discount_duration' %}
               <div>
-                <label class="form-label">{{ field.label }}</label>
+                <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
                 {{ field }}
-                {% for e in field.errors %}
-                  <div style="color:#b91c1c; font-weight:600">{{ e }}</div>
-                {% endfor %}
               </div>
             {% endif %}
           {% endfor %}
+          <div>
+            <label class="form-label" for="{{ form.discount_value.id_for_label }}">{{ form.discount_value.label }}</label>
+            {{ form.discount_value }}
+            <small class="text-muted d-block mt-1" id="discount-value-hint">
+              {% translate "When type is Percentage, maximum is 100." %}
+            </small>
+          </div>
         </div>
 
         <h3 style="margin: 18px 0 12px 0">Validity & Limits</h3>
         <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:12px">
           {% for field in form %}
-            {% if field.name == 'valid_from' or field.name == 'valid_until' or field.name == 'max_uses' or field.name == 'is_active' %}
+            {% if field.name == 'valid_from' or field.name == 'valid_until' or field.name == 'max_uses' %}
               <div>
-                <label class="form-label">{{ field.label }}</label>
+                <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
                 {{ field }}
-                {% for e in field.errors %}
-                  <div style="color:#b91c1c; font-weight:600">{{ e }}</div>
-                {% endfor %}
               </div>
             {% endif %}
           {% endfor %}
+          <div class="d-flex flex-column justify-content-end">
+            <div class="form-label d-block mb-0">{% translate "Status" %}</div>
+            <div class="form-check form-switch mt-2">
+              {{ form.is_active }}
+              <label class="form-check-label ms-1" for="id_promo_is_active">
+                <span class="fw-medium">{% translate "Active" %}</span>
+                <span class="text-muted small d-block">{% translate "If off, the code cannot be used regardless of dates." %}</span>
+              </label>
+            </div>
+          </div>
         </div>
 
         <h3 style="margin: 18px 0 12px 0">{% translate "Applicable Plans" %}</h3>
         <div class="field-group">
           <p class="text-muted small mb-3">{% translate "Select one or more plans this promo code applies to. Leave empty to apply to ALL plans." %}</p>
-          
+
           {% for field in form %}
             {% if field.name == 'applicable_plans' %}
               <div class="selectable-grid">
@@ -120,9 +121,6 @@
                   </label>
                 {% endfor %}
               </div>
-              {% for e in field.errors %}
-                <div class="field-error">{{ e }}</div>
-              {% endfor %}
             {% endif %}
           {% endfor %}
         </div>
@@ -132,8 +130,6 @@
             <strong>Current Uses (read-only):</strong> {{ promo.current_uses }}
           </div>
         {% endif %}
-        </div>
-        </div>
 
         <div class="form-actions-bar">
           <div class="form-actions-left">

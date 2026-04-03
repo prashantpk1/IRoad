@@ -15,14 +15,7 @@
       <h1 class="page-title">{% if is_edit %}{% translate "Edit Policy" %}{% else %}{% translate "Add Policy" %}{% endif %}</h1>
       <p class="page-subtitle">{% translate "Manage your records here" %}</p>
     </div>
-    <div class="page-header-right">
-      <div class="eal-header-actions">
-        <a href="{% url 'addons_policy_list' %}" class="eal-btn">
-          <i class="bi bi-arrow-left"></i>
-          <span>Cancel</span>
-        </a>
-      </div>
-    </div>
+   
   </div>
 </div>
 
@@ -55,13 +48,27 @@
           </div>
         {% endif %}
 
-        <h3 style="margin: 18px 0 12px 0">Policy Details</h3>
+        <h3 style="margin: 18px 0 12px 0">{% translate "Policy Details" %}</h3>
         <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:12px">
           {% for field in form %}
-            {% if field.name == 'policy_name' or field.name == 'is_active' %}
+            {% if field.name == 'policy_name' %}
               <div>
-                <label class="form-label">{{ field.label }}</label>
+                <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
                 {{ field }}
+                {% for e in field.errors %}
+                  <div style="color:#b91c1c; font-weight:600">{{ e }}</div>
+                {% endfor %}
+              </div>
+            {% elif field.name == 'is_active' %}
+              <div>
+                <div class="form-label d-block mb-0">{% translate "Status" %}</div>
+                <div class="form-check form-switch mt-2">
+                  {{ field }}
+                  <label class="form-check-label ms-1" for="{{ field.id_for_label }}">
+                    <span class="fw-medium">{% translate "Active" %}</span>
+                    <span class="text-muted small d-block">{% translate "When on, this policy is the active add-ons tariff. Other policies will be deactivated." %}</span>
+                  </label>
+                </div>
                 {% for e in field.errors %}
                   <div style="color:#b91c1c; font-weight:600">{{ e }}</div>
                 {% endfor %}
@@ -85,8 +92,8 @@
           {% endfor %}
         </div>
         </div>
-        </div>
-
+       
+      </div>
         <div class="form-actions-bar">
           <div class="form-actions-left">
             <a href="{% url 'addons_policy_list' %}" class="eal-btn eal-btn-outline">

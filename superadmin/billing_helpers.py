@@ -2,11 +2,11 @@ from decimal import Decimal
 from datetime import date, timedelta
 
 
-def calculate_promo_discount(promo, sub_total):
+def calculate_promo_discount(promo, sub_total, for_plan=None):
     """Return discount amount from validated promo, capped to sub_total."""
     if not promo:
         return Decimal('0.00')
-    ok, _msg = promo.is_valid_for_use()
+    ok, _msg = promo.is_valid_for_use(for_plan=for_plan)
     if not ok:
         return Decimal('0.00')
     if promo.discount_type == 'Percentage':
@@ -401,3 +401,30 @@ def provision_tenant_from_order(order):
     tenant.save()
     # TODO Phase 10: Send provisioning event to
     #               tenant isolated DB here
+
+
+def fulfill_paid_order(order, admin_user, ltv_amount):
+    """
+    Run side effects after an order is marked Paid: invoice, tenant
+    provisioning, promo redemption count, lifetime value.
+
+    Call inside transaction.atomic(); order.order_status should already
+    be Saved as Paid. ltv_amount is normally the payment transaction amount.
+    """
+    from .models import PromoCode, StandardInvoice, TenantProfile
+
+    if not StandardInvoice.objects.filter(order=order).exists():
+        generate_invoice_from_order(order, admin_user)
+
+    provision_tenant_from_order(order)
+
+    if order.promo_code_id:
+        pc = PromoCode.objects.select_for_update().get(pk=order.promo_code_id)
+        pc.current_uses = (pc.current_uses or 0) + 1
+        pc.save(update_fields=['current_uses'])
+
+    ten = TenantProfile.objects.select_for_update().get(pk=order.tenant_id)
+    ten.total_ltv = (
+        ten.total_ltv + ltv_amount
+    ).quantize(Decimal('0.01'))
+    ten.save(update_fields=['total_ltv', 'updated_at'])

@@ -129,11 +129,72 @@
           {% endfor %}
         </div>
       </div>
-
     </div>
-
-    
   </div>
+
+  {% if is_edit and form.instance.pk %}
+  <!-- Read-only system fields (edit only; not submitted) -->
+  <div class="form-card mb-4">
+    <div class="form-card-header">
+      <div class="form-card-icon blue">
+        <i class="bi bi-info-circle"></i>
+      </div>
+      <div class="form-card-header-text">
+        <h3 class="form-card-title">{% translate "Account metadata" %}</h3>
+        <p class="form-card-desc">{% translate "Read-only values from the directory. Two-factor status changes when the user completes 2FA setup." %}</p>
+      </div>
+    </div>
+    <div class="form-card-body">
+      <div class="row g-3">
+   
+        <div class="col-12 col-md-6 d-flex align-items-end">
+          <div class="w-100">
+            <label class="form-label d-block">{% translate "Two-factor authentication" %}</label>
+            <div class="form-check form-switch ps-0">
+              <input
+                class="form-check-input ms-0"
+                type="checkbox"
+                role="switch"
+                id="id_two_factor_readonly"
+                {% if form.instance.two_factor_enabled %}checked{% endif %}
+                disabled
+                aria-disabled="true"
+              >
+              <label class="form-check-label text-muted ms-2" for="id_two_factor_readonly">
+                {% if form.instance.two_factor_enabled %}
+                  {% translate "Enabled" %}
+                {% else %}
+                  {% translate "Disabled" %}
+                {% endif %}
+              </label>
+            </div>
+          </div>
+        </div>
+        <div class="col-12 col-md-6">
+          <label class="form-label">{% translate "Last login" %}</label>
+          <input type="text" class="form-control" value="{% if form.instance.last_login_at %}{{ form.instance.last_login_at }}{% else %}—{% endif %}" readonly aria-readonly="true">
+        </div>
+        <div class="col-12 col-md-6">
+          <label class="form-label">{% translate "Created at" %}</label>
+          <input type="text" class="form-control" value="{{ form.instance.created_at|date:'d M Y, H:i' }}" readonly aria-readonly="true">
+        </div>
+        <div class="col-12 col-md-6">
+          <label class="form-label">{% translate "Updated at" %}</label>
+          <input type="text" class="form-control" value="{{ form.instance.updated_at|date:'d M Y, H:i' }}" readonly aria-readonly="true">
+        </div>
+        <div class="col-12 col-md-6">
+          <label class="form-label">{% translate "Created by" %}</label>
+          <input type="text" class="form-control" value="{% if form.instance.created_by %}{{ form.instance.created_by.first_name }} {{ form.instance.created_by.last_name }} ({{ form.instance.created_by.email }}){% else %}—{% endif %}" readonly aria-readonly="true">
+        </div>
+        <div class="col-12 col-md-6">
+          <label class="form-label">{% translate "Last updated by" %}</label>
+          <input type="text" class="form-control" value="{% if form.instance.updated_by %}{{ form.instance.updated_by.first_name }} {{ form.instance.updated_by.last_name }} ({{ form.instance.updated_by.email }}){% else %}—{% endif %}" readonly aria-readonly="true">
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
   <!-- Fixed Action Bar at the bottom of the viewport -->
   <div class="form-actions-bar">
     <div class="form-actions-left">

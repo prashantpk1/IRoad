@@ -87,6 +87,7 @@ from .views import (
     SystemUsersAnalyticsView,
     RoleCreateView,
     RoleDeleteView,
+    RoleDetailView,
     RoleListView,
     RoleToggleStatusView,
     RoleUpdateView,
@@ -142,6 +143,7 @@ from .views import (
     MassRevokeView,
     ActiveSessionsView,
     RevokeSessionView,
+    GlobalSearchView,
 )
 
 urlpatterns = [
@@ -166,6 +168,7 @@ urlpatterns = [
     path('dashboard/', DashboardView.as_view(), name='dashboard_alt'),
     path('roles/', RoleListView.as_view(), name='role_list'),
     path('roles/create/', RoleCreateView.as_view(), name='role_create'),
+    path('roles/<uuid:pk>/', RoleDetailView.as_view(), name='role_detail'),
     path('roles/<uuid:pk>/edit/', RoleUpdateView.as_view(), name='role_edit'),
     path(
         'roles/<uuid:pk>/toggle-status/',
@@ -796,6 +799,11 @@ urlpatterns = [
         'crm/tenants/<uuid:pk>/add-note/',
         CRMNoteCreateView.as_view(),
         name='crm_note_create',
+    ),
+    path(
+        'search/',
+        GlobalSearchView.as_view(),
+        name='global_search',
     ),
 ]
 
