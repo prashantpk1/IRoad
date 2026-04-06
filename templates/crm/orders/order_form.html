@@ -61,7 +61,7 @@
             <label class="form-label">{% translate "Currency" %}</label>
             <select name="currency" class="form-select" required id="id_currency">
               {% for c in currencies %}
-                <option value="{{ c.currency_code }}">{{ c.currency_code }}</option>
+                <option value="{{ c.currency_code }}">{{ c.currency_code }} - {{ c.name_en }}</option>
               {% endfor %}
             </select>
           </div>
@@ -115,11 +115,14 @@
           <div class="col-12 col-md-6" id="upgrade-pro-rata-wrap" style="display:none;">
             <label class="form-label">{% translate "Pro-rata adjustment (credit)" %}</label>
             <input type="text" class="form-control" id="preview_pro_rata" readonly value="0.00">
-            <div class="field-hint">{% translate "Server calculates on save" %}; hint: {{ upgrade_credit_hint|default:"—" }}</div>
+            <p class="field-hint text-muted small mb-0" id="upgrade_credit_hint_line" aria-live="polite"></p>
           </div>
           <div class="col-12 col-md-6">
             <label class="form-label">{% translate "Line total (preview)" %}</label>
             <input type="text" class="form-control fw-semibold" id="preview_plan_line_total" readonly value="0.00">
+          </div>
+          <div class="col-12">
+            <p class="text-muted small mb-0" id="plan-price-match-hint" aria-live="polite"></p>
           </div>
         </div>
       </div>
@@ -186,15 +189,24 @@
     </a>
   </div>
   <div class="form-actions-right">
-    <button type="submit" form="order-form" class="eal-btn eal-btn-primary">
+    <button type="submit" class="eal-btn eal-btn-primary">
       <i class="bi bi-save"></i>
       <span>{% translate "Save as draft" %}</span>
     </button>
   </div>
 </div>
 
+</form>
+
+<div id="order-form-ui-strings" hidden
+  data-hint-upgrade="{% translate 'Estimated credit for unused time on the current plan — in selected order currency (same as save).' %}"
+  data-hint-upgrade-none="{% translate 'No credit calculated. Ensure the subscriber has a current plan and dates, and pricing exists for the selected currency.' %}"
+  data-hint-select-tenant="{% translate 'Select a subscriber to load upgrade credit for the chosen currency.' %}"
+></div>
+
 {{ pricing_data|json_script:"crm-order-pricing" }}
 {{ addons_data|json_script:"crm-order-addons" }}
+{{ upgrade_credits_by_currency|json_script:"crm-order-upgrade-credits" }}
 
 <template id="addon-row-tpl">
   <div class="addon-row row g-2 align-items-end border rounded p-2 bg-light">
@@ -231,8 +243,18 @@
 
 <script>
 (function () {
-  const pricing = JSON.parse(document.getElementById('crm-order-pricing').textContent);
+  const pricingRaw = document.getElementById('crm-order-pricing');
+  let pricing = [];
+  try {
+    pricing = JSON.parse(pricingRaw ? pricingRaw.textContent : '[]');
+  } catch (e) {
+    pricing = [];
+  }
   const addons = JSON.parse(document.getElementById('crm-order-addons').textContent);
+  const upgradeCreditsEl = document.getElementById('crm-order-upgrade-credits');
+  const upgradeCredits = upgradeCreditsEl
+    ? JSON.parse(upgradeCreditsEl.textContent || '{}')
+    : {};
   const clsEl = document.getElementById('id_classification');
   const planSec = document.getElementById('plan-section');
   const addonSec = document.getElementById('addon-section');
@@ -243,6 +265,36 @@
   const upgradeWrap = document.getElementById('upgrade-pro-rata-wrap');
   const tpl = document.getElementById('addon-row-tpl');
   const addonRows = document.getElementById('addon-rows');
+  const planPriceHintEl = document.getElementById('plan-price-match-hint');
+  const upgradeCreditHintLine = document.getElementById('upgrade_credit_hint_line');
+  const uiStrings = document.getElementById('order-form-ui-strings');
+  const tenantEl = document.getElementById('id_tenant');
+  const orderCreateBaseUrl = '{% url "order_create" %}';
+
+  function normUuid(s) {
+    return String(s || '').replace(/-/g, '').toLowerCase();
+  }
+
+  function cycleCount(r) {
+    var v = r.cycles != null ? r.cycles : r.number_of_cycles;
+    return Math.max(1, parseInt(String(v), 10) || 1);
+  }
+
+  /** Closest pricing tier: exact cycles, else smallest cycles >= requested, else largest available. */
+  function pickBestPricingRow(rows, cy) {
+    var exact = rows.find(function (r) { return cycleCount(r) === cy; });
+    if (exact) {
+      return exact;
+    }
+    var sorted = rows.slice().sort(function (a, b) { return cycleCount(a) - cycleCount(b); });
+    var i;
+    for (i = 0; i < sorted.length; i += 1) {
+      if (cycleCount(sorted[i]) >= cy) {
+        return sorted[i];
+      }
+    }
+    return sorted[sorted.length - 1];
+  }
 
   function showSections() {
     const v = clsEl.value;
@@ -256,24 +308,93 @@
     }
   }
 
-  function findPrice() {
-    const pid = planEl.value;
-    const cur = currencyEl.value;
-    const cy = parseInt(cyclesEl.value || '1', 10);
-    const row = pricing.find(function (r) {
-      return r.plan_id === pid && r.currency === cur && parseInt(r.cycles, 10) === cy;
+  function findPricingRow() {
+    const pid = String(planEl.value || '');
+    const cur = String(currencyEl.value || '');
+    const cy = Math.max(1, parseInt(String(cyclesEl.value || '1'), 10) || 1);
+    if (!pid) {
+      if (planPriceHintEl) planPriceHintEl.textContent = '';
+      return null;
+    }
+    const pidN = normUuid(pid);
+    const rows = pricing.filter(function (r) {
+      return normUuid(r.plan_id) === pidN && String(r.currency) === cur;
     });
+    if (!rows.length) {
+      if (planPriceHintEl) {
+        const anyCur = pricing.some(function (r) { return normUuid(r.plan_id) === pidN; });
+        planPriceHintEl.textContent = anyCur
+          ? ('No pricing for ' + cur + '. Choose another currency or add plan pricing.')
+          : 'No pricing for this plan. Add pricing cycles in Subscription Plans.';
+      }
+      return null;
+    }
+    const best = pickBestPricingRow(rows, cy);
+    if (planPriceHintEl) planPriceHintEl.textContent = '';
+    var bestC = cycleCount(best);
+    if (bestC !== cy) {
+      cyclesEl.value = String(bestC);
+    }
+    return best;
+  }
+
+  function findPrice() {
+    const row = findPricingRow();
     return row ? parseFloat(row.price) : 0;
   }
 
+  function upgradeCreditForCurrency() {
+    const cur = String(currencyEl.value || '');
+    if (!Object.prototype.hasOwnProperty.call(upgradeCredits, cur)) {
+      return 0;
+    }
+    return parseFloat(upgradeCredits[cur]) || 0;
+  }
+
+  function refreshUpgradeCreditHint(proRataValue) {
+    if (!upgradeCreditHintLine || !uiStrings) return;
+    if (clsEl.value !== 'Upgrade') {
+      upgradeCreditHintLine.textContent = '';
+      return;
+    }
+    var tenantId = tenantEl && tenantEl.value ? String(tenantEl.value) : '';
+    if (!tenantId) {
+      upgradeCreditHintLine.textContent = uiStrings.dataset.hintSelectTenant || '';
+      return;
+    }
+    var cur = String(currencyEl.value || '');
+    var hasKey = Object.prototype.hasOwnProperty.call(upgradeCredits, cur);
+    var pr = typeof proRataValue === 'number' ? proRataValue : upgradeCreditForCurrency();
+    if (!hasKey) {
+      upgradeCreditHintLine.textContent = uiStrings.dataset.hintUpgradeNone || '';
+      return;
+    }
+    if (pr === 0 || Math.abs(pr) < 1e-9) {
+      upgradeCreditHintLine.textContent = uiStrings.dataset.hintUpgradeNone || '';
+      return;
+    }
+    var base = uiStrings.dataset.hintUpgrade || '';
+    upgradeCreditHintLine.textContent = base + ' ' + cur + ': ' + pr.toFixed(2);
+  }
+
   function refreshPlanPreview() {
+    if (!planIds.includes(clsEl.value)) {
+      document.getElementById('preview_plan_price').value = '0.00';
+      document.getElementById('preview_pro_rata').value = '0.00';
+      document.getElementById('preview_plan_line_total').value = '0.00';
+      if (planPriceHintEl) planPriceHintEl.textContent = '';
+      refreshUpgradeCreditHint(0);
+      refreshTotalsPreview();
+      return;
+    }
     const price = findPrice();
     document.getElementById('preview_plan_price').value = price.toFixed(2);
     let proRata = 0;
     if (clsEl.value === 'Upgrade') {
-      proRata = 0;
+      proRata = upgradeCreditForCurrency();
     }
     document.getElementById('preview_pro_rata').value = proRata.toFixed(2);
+    refreshUpgradeCreditHint(proRata);
     const line = price + proRata;
     document.getElementById('preview_plan_line_total').value = line.toFixed(2);
     refreshTotalsPreview();
@@ -346,10 +467,28 @@
     if (baseI) baseI.value = grand.toFixed(2);
   }
 
-  clsEl.addEventListener('change', showSections);
+  function onClassificationOrSectionsChange() {
+    showSections();
+    refreshPlanPreview();
+  }
+
+  if (tenantEl) {
+    tenantEl.addEventListener('change', function () {
+      var v = tenantEl.value;
+      var url = orderCreateBaseUrl;
+      if (v) {
+        url += (url.indexOf('?') >= 0 ? '&' : '?') + 'tenant=' + encodeURIComponent(v);
+      }
+      window.location.assign(url);
+    });
+  }
+
+  clsEl.addEventListener('change', onClassificationOrSectionsChange);
   currencyEl.addEventListener('change', refreshPlanPreview);
   planEl.addEventListener('change', refreshPlanPreview);
+  planEl.addEventListener('input', refreshPlanPreview);
   cyclesEl.addEventListener('input', refreshPlanPreview);
+  cyclesEl.addEventListener('change', refreshPlanPreview);
   document.getElementById('btn-add-addon-row').addEventListener('click', addAddonRow);
 
   showSections();

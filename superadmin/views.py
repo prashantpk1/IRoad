@@ -7,12 +7,14 @@ from django.db.models import Sum, Count, F, Q
 from django.db.models.expressions import ExpressionWrapper
 from django.db.models.fields import DecimalField
 from django.db.models.functions import Abs
-from django.http import JsonResponse
+from django.http import HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.core.paginator import Paginator
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.dateparse import parse_date
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views import View
 from django.views.generic import TemplateView
 from datetime import date, timedelta
@@ -27,10 +29,14 @@ from .billing_helpers import (
     calculate_addon_prorata,
     calculate_promo_discount,
     calculate_pro_rata_credit,
+    complete_order_payment_as_system,
     fulfill_paid_order,
     get_fx_snapshot,
     get_tax_code_for_tenant,
     refresh_order_projected_fields,
+    resolve_upgrade_credit_basis_price,
+    sync_or_create_order_payment_transaction,
+    validate_downgrade_order,
 )
 from .auth_helpers import (
     check_brute_force,
@@ -41,7 +47,12 @@ from .auth_helpers import (
     reset_failed_attempts,
     send_auth_email,
 )
-from .audit_helpers import create_session, close_session, log_audit_action
+from .audit_helpers import (
+    create_session,
+    close_session,
+    get_client_ip,
+    log_audit_action,
+)
 from .redis_helpers import create_admin_session
 from .forms import (
     AddOnsPricingPolicyForm,
@@ -134,6 +145,7 @@ def _client_ip(request):
     return request.META.get('REMOTE_ADDR')
 
 
+@method_decorator(ensure_csrf_cookie, name='dispatch')
 class LoginView(View):
     template_name = 'auth/login.html'
 
@@ -287,7 +299,7 @@ class LoginView(View):
             timeout_minutes=settings_obj.session_timeout_minutes,
         )
         request.session['jti'] = jti
-        create_session(request, user, user_domain='Admin')
+        create_session(request, user, user_domain='Admin', redis_jti=jti)
         log_audit_action(
             request=request,
             action_type='Create',
@@ -297,6 +309,9 @@ class LoginView(View):
         )
 
         log_access('Login', 'Success', email, ip)
+        # Let other tabs (open /login/) reload via localStorage so CSRF matches
+        # after django.contrib.auth.login() rotates the token.
+        request.session['notify_auth_tabs'] = True
         return redirect('dashboard')
 
 
@@ -316,7 +331,8 @@ class LogoutView(View):
             close_session(request)
             auth_logout(request)
             log_access('Logout', 'Success', email, ip)
-            return redirect('login')
+            # Bridge page notifies other tabs (localStorage) then goes to login.
+            return render(request, 'auth/logout_bridge.html')
         return redirect('login')
 
     def post(self, request):
@@ -334,7 +350,7 @@ class LogoutView(View):
             close_session(request)
             auth_logout(request)
             log_access('Logout', 'Success', email, ip)
-            return redirect('login')
+            return render(request, 'auth/logout_bridge.html')
         return redirect('login')
 
 
@@ -488,6 +504,10 @@ class DashboardView(LoginRequiredMixin, View):
 
     def get(self, request):
         now = timezone.now()
+        auth_tab_sync_bump = request.session.pop(
+            'notify_auth_tabs',
+            False,
+        )
 
         # ── IMPORT ALL NEEDED MODELS ──
         from .models import (
@@ -741,6 +761,7 @@ class DashboardView(LoginRequiredMixin, View):
             'recent_audit': recent_audit,
             # Meta
             'page_title': 'Super Admin Dashboard',
+            'auth_tab_sync_bump': auth_tab_sync_bump,
         }
 
         return render(
@@ -1187,8 +1208,18 @@ class SessionRevokeView(LoginRequiredMixin, View):
             old_instance=old_obj,
             new_instance=session,
         )
-        # TODO Phase 11 Redis: Also delete JWT from
-        # Redis cache here to enforce real-time revocation
+        from superadmin.redis_helpers import (
+            revoke_admin_session,
+            revoke_tenant_session_key,
+        )
+
+        rj = (session.redis_jti or str(session.session_id)).strip()
+        if session.user_domain == 'Admin':
+            revoke_admin_session(rj)
+        elif session.user_domain in ('Tenant_User', 'Driver'):
+            tid = str(session.tenant_id) if session.tenant_id else ''
+            if tid:
+                revoke_tenant_session_key(tid, rj)
         messages.success(request, 'Session revoked successfully.')
         return redirect(reverse('session_list'))
 
@@ -1224,13 +1255,18 @@ class MassRevokeView(LoginRequiredMixin, View):
         if tenant is None:
             return JsonResponse({'error': 'Tenant not found'}, status=404)
 
+        from django.db.models import Q
+
         active_qs = ActiveSession.objects.filter(
             is_active=True,
             user_domain__in=['Tenant_User', 'Driver'],
+        ).filter(
+            Q(tenant=tenant)
+            | Q(
+                tenant__isnull=True,
+                reference_id=str(tenant.tenant_id),
+            ),
         )
-        # TODO Phase 11: Filter by tenant_id properly
-        # when tenant user model is integrated
-        active_qs = active_qs.filter(reference_id__icontains=str(tenant.tenant_id))
         revoked_count = active_qs.count()
         active_qs.update(
             is_active=False,
@@ -1245,9 +1281,9 @@ class MassRevokeView(LoginRequiredMixin, View):
             str(tenant_id),
             new_instance=None,
         )
-        # TODO Phase 11 Redis: Also flush all JWT tokens
-        # for this tenant from Redis here —
-        # this is the actual Kill Switch implementation
+        from superadmin.redis_helpers import revoke_all_tenant_sessions
+
+        revoke_all_tenant_sessions(str(tenant.tenant_id))
         return JsonResponse(
             {'message': 'Mass revoke executed.', 'revoked_count': revoked_count},
             status=200,
@@ -1748,9 +1784,8 @@ class AdminUserToggleStatusView(LoginRequiredMixin, View):
             from superadmin.redis_helpers import revoke_all_sessions_for_admin
 
             revoke_all_sessions_for_admin(target_user.id)
-            # Kill Switch: all Redis sessions for this admin destroyed
-            # TODO Phase 8: also call revoke_all_tenant_sessions()
-            #               when tenant suspend is implemented
+            # Kill Switch: all Redis sessions for this admin destroyed.
+            # (Tenant suspend uses ``revoke_all_tenant_sessions`` in TenantUpdateView.)
             _revoke_user_sessions(target_user)
             messages.success(request, 'Admin user suspended successfully.')
         else:
@@ -2914,7 +2949,7 @@ class PlanListView(LoginRequiredMixin, View):
             plans_qs = plans_qs.filter(is_active=False)
 
         total_count = plans_qs.count()
-        paginator = Paginator(plans_qs, 10)
+        paginator = Paginator(plans_qs, 5)
         page_number = request.GET.get('page', 1)
         plans_page = paginator.get_page(page_number)
 
@@ -3292,11 +3327,30 @@ class AddOnsPolicyListView(LoginRequiredMixin, View):
     template_name = 'subscription/addons/policy_list.html'
 
     def get(self, request):
-        policies = AddOnsPricingPolicy.objects.all().order_by('-updated_at')
+        search_query = request.GET.get('q', '').strip()
+        status_filter = request.GET.get('status', 'All')
+
+        policies_qs = AddOnsPricingPolicy.objects.all().order_by('-updated_at')
+        if search_query:
+            policies_qs = policies_qs.filter(
+                policy_name__icontains=search_query,
+            )
+        if status_filter == 'Active':
+            policies_qs = policies_qs.filter(is_active=True)
+        elif status_filter == 'Inactive':
+            policies_qs = policies_qs.filter(is_active=False)
+
+        paginator = Paginator(policies_qs, 5)
+        page_number = request.GET.get('page', 1)
+        policies_page = paginator.get_page(page_number)
         return render(
             request,
             self.template_name,
-            {'policies': policies},
+            {
+                'policies': policies_page,
+                'search_query': search_query,
+                'status_filter': status_filter,
+            },
         )
 
 
@@ -4590,7 +4644,7 @@ class TenantListView(LoginRequiredMixin, View):
             except ValueError:
                 pass
 
-        paginator = Paginator(qs, 15)
+        paginator = Paginator(qs, 5)
         tenants = paginator.get_page(request.GET.get('page', 1))
         sales_reps = AdminUser.objects.filter(status='Active').order_by(
             'first_name', 'last_name'
@@ -4645,8 +4699,41 @@ class TenantCreateView(LoginRequiredMixin, View):
             tenant.active_max_external_trucks = 0
             tenant.active_max_drivers = 0
             tenant.save()
-            # TODO Phase 12: Trigger tenant DB provisioning here
-            messages.success(request, 'Subscriber profile created successfully.')
+            import secrets
+            from django.contrib.auth.hashers import make_password
+
+            from superadmin.provisioning import (
+                schedule_tenant_workspace_provisioning,
+            )
+
+            plain_key = secrets.token_urlsafe(32)
+            plain_portal = secrets.token_urlsafe(14)
+            tenant.api_bridge_secret_hash = make_password(plain_key)
+            tenant.portal_bootstrap_password_hash = make_password(plain_portal)
+            tenant.save(
+                update_fields=[
+                    'api_bridge_secret_hash',
+                    'portal_bootstrap_password_hash',
+                ],
+            )
+            schedule_tenant_workspace_provisioning(tenant)
+            try:
+                from superadmin.communication_helpers import send_tenant_welcome_email
+
+                send_tenant_welcome_email(tenant, plain_key, plain_portal)
+            except Exception:
+                logger.exception(
+                    'Welcome email failed for tenant %s',
+                    tenant.tenant_id,
+                )
+            messages.success(
+                request,
+                'Subscriber profile created. The API bridge key was sent to '
+                f'{tenant.primary_email} when SMTP (settings.py) is configured; '
+                'it is never shown in the Control Panel. Fix EMAIL_* / '
+                'DEFAULT_FROM_EMAIL and use "Generate new API bridge key" on '
+                'edit if delivery failed.',
+            )
             return redirect(reverse('tenant_detail', kwargs={'pk': tenant.pk}))
         return render(
             request,
@@ -4692,24 +4779,48 @@ class TenantUpdateView(LoginRequiredMixin, View):
                 },
             )
         new_status = form.cleaned_data['account_status']
-        if (
-            new_status in _SUSPEND_ACCOUNT_STATUSES
-            and old_status not in _SUSPEND_ACCOUNT_STATUSES
-        ):
-            # TODO Phase 10: Trigger Kill Switch here
-            #               Revoke all tenant JWT tokens via Redis
-            pass
-        form.save()
+        inst = form.save(commit=False)
+        plain_bridge_key = None
+        if form.cleaned_data.get('rotate_bridge_api_key'):
+            import secrets
+            from django.contrib.auth.hashers import make_password
+
+            plain_bridge_key = secrets.token_urlsafe(32)
+            inst.api_bridge_secret_hash = make_password(plain_bridge_key)
+        inst.save()
+        inst.refresh_from_db()
         if old_status != new_status:
             log_audit_action(
                 request,
                 'Status_Change',
                 'Tenant Profile',
-                str(tenant.tenant_id),
+                str(inst.tenant_id),
                 old_instance=old_obj,
-                new_instance=tenant,
+                new_instance=inst,
             )
-        messages.success(request, 'Subscriber profile updated successfully.')
+        if plain_bridge_key:
+            try:
+                from superadmin.communication_helpers import (
+                    send_tenant_bridge_rotated_email,
+                )
+
+                send_tenant_bridge_rotated_email(inst, plain_bridge_key)
+            except Exception:
+                logger.exception(
+                    'Bridge rotation email failed for tenant %s',
+                    inst.tenant_id,
+                )
+            messages.success(
+                request,
+                'Subscriber profile updated. A new API bridge key was emailed to '
+                f'{inst.primary_email} when mail is configured; it is never '
+                'shown in the Control Panel.',
+            )
+        else:
+            messages.success(
+                request,
+                'Subscriber profile updated successfully.',
+            )
         return redirect(reverse('tenant_detail', kwargs={'pk': tenant.pk}))
 
 
@@ -4719,7 +4830,10 @@ class TenantDetailView(LoginRequiredMixin, View):
     def get(self, request, pk):
         tenant = get_object_or_404(
             TenantProfile.objects.select_related(
-                'country', 'current_plan', 'assigned_sales_rep'
+                'country',
+                'current_plan',
+                'scheduled_downgrade_plan',
+                'assigned_sales_rep',
             ),
             pk=pk,
         )
@@ -4779,6 +4893,64 @@ class RootRequiredMixin(LoginRequiredMixin):
         return super().dispatch(request, *args, **kwargs)
 
 
+class TenantImpersonationView(RootRequiredMixin, View):
+    """CP-PCS-P5 short-lived JWT for root 'Login As' workspace handoff."""
+
+    http_method_names = ['post']
+
+    def post(self, request, pk):
+        from django.conf import settings as dj_settings
+
+        from superadmin.tenant_jwt import sign_cp_impersonation_jwt
+
+        tenant = get_object_or_404(TenantProfile, pk=pk)
+        if tenant.account_status != 'Active':
+            messages.error(
+                request,
+                'Only active subscribers can be opened in the workspace.',
+            )
+            return redirect(reverse('tenant_detail', kwargs={'pk': pk}))
+
+        token = sign_cp_impersonation_jwt(tenant, request.user, ttl_minutes=15)
+        admin_label = (
+            f'{request.user.first_name} {request.user.last_name}'.strip()
+            or request.user.email
+        )
+        CRMNote.objects.create(
+            tenant=tenant,
+            admin=request.user,
+            note_type='General',
+            note_content=(
+                f'Control Panel "Login As": {admin_label} issued a 15-minute '
+                'workspace impersonation token (tenant portal handoff).'
+            ),
+        )
+        log_audit_action(
+            request,
+            'Create',
+            'Tenant Impersonation',
+            str(tenant.tenant_id),
+            new_instance=tenant,
+        )
+        target = (
+            getattr(dj_settings, 'TENANT_IMPERSONATION_REDIRECT_URL', '') or ''
+        ).strip()
+        if target:
+            join_char = '&' if ('?' in target) else '?'
+            return HttpResponseRedirect(
+                f'{target}{join_char}cp_impersonation_token={token}',
+            )
+        return render(
+            request,
+            'auth/tenant_impersonation_handoff.html',
+            {
+                'tenant': tenant,
+                'impersonation_token': token,
+                'expires_minutes': 15,
+            },
+        )
+
+
 _PLAN_CLASSIFICATIONS = {
     'New_Subscription',
     'Renewal',
@@ -4797,46 +4969,6 @@ def _billing_addon_unit_price(policy, add_on_type):
         'Extra_Storage_GB': policy.extra_storage_gb_price,
     }
     return mapping.get(add_on_type, Decimal('0.00'))
-
-
-def _billing_one_cycle_plan_price(plan, currency):
-    ppc = PlanPricingCycle.objects.filter(
-        plan=plan,
-        currency=currency,
-        number_of_cycles=1,
-    ).first()
-    return ppc.price if ppc else Decimal('0.00')
-
-
-def _sync_or_create_order_payment_transaction(order):
-    txn = Transaction.objects.filter(
-        order=order,
-        transaction_type='Order_Payment',
-    ).first()
-    if txn:
-        txn.amount = order.grand_total
-        txn.currency = order.currency
-        txn.exchange_rate_snapshot = order.exchange_rate_snapshot
-        txn.base_currency_equivalent_amount = order.base_currency_equivalent
-        txn.payment_method = order.payment_method
-        if txn.status == 'Pending':
-            txn.save(update_fields=[
-                'amount', 'currency', 'exchange_rate_snapshot',
-                'base_currency_equivalent_amount', 'payment_method',
-                'updated_at',
-            ])
-        return txn
-    return Transaction.objects.create(
-        tenant=order.tenant,
-        order=order,
-        transaction_type='Order_Payment',
-        payment_method=order.payment_method,
-        currency=order.currency,
-        amount=order.grand_total,
-        exchange_rate_snapshot=order.exchange_rate_snapshot,
-        base_currency_equivalent_amount=order.base_currency_equivalent,
-        status='Pending',
-    )
 
 
 class OrderListView(LoginRequiredMixin, View):
@@ -4899,20 +5031,19 @@ class OrderCreateView(RootRequiredMixin, View):
                 addons_json[choice_code] = str(
                     _billing_addon_unit_price(policy, choice_code))
 
-        upgrade_credit_hint = ''
+        upgrade_credits_by_currency = {}
+        active_currencies = Currency.objects.filter(is_active=True).order_by(
+            'currency_code')
         if tenant_obj and tenant_obj.current_plan:
-            op = _billing_one_cycle_plan_price(
-                tenant_obj.current_plan,
-                Currency.objects.filter(is_active=True).first(),
-            )
-            if op:
-                upgrade_credit_hint = str(
-                    calculate_pro_rata_credit(tenant_obj, op))
+            for cur in active_currencies:
+                op = resolve_upgrade_credit_basis_price(
+                    tenant_obj.current_plan, cur.currency_code)
+                cr = calculate_pro_rata_credit(tenant_obj, op)
+                upgrade_credits_by_currency[cur.currency_code] = str(cr)
 
         return render(request, self.template_name, {
             'tenants': TenantProfile.objects.order_by('company_name'),
-            'currencies': Currency.objects.filter(is_active=True).order_by(
-                'currency_code'),
+            'currencies': active_currencies,
             'plans': plan_qs,
             'payment_methods': PaymentMethod.objects.filter(
                 is_active=True).order_by('display_order'),
@@ -4922,7 +5053,7 @@ class OrderCreateView(RootRequiredMixin, View):
             'tenant_preselect': str(tenant_obj.tenant_id) if tenant_obj else '',
             'pricing_data': pricing_json,
             'addons_data': addons_json,
-            'upgrade_credit_hint': upgrade_credit_hint,
+            'upgrade_credits_by_currency': upgrade_credits_by_currency,
         })
 
     def post(self, request):
@@ -4957,7 +5088,7 @@ class OrderCreateView(RootRequiredMixin, View):
             messages.error(request, 'Invalid order classification.')
             return redirect('order_create')
 
-        tax = get_tax_code_for_tenant(tenant)
+        tax = get_tax_code_for_tenant(tenant, client_ip=get_client_ip(request))
         fx = get_fx_snapshot(currency_id)
         tax_rate = tax.rate_percent if tax else Decimal('0.00')
 
@@ -5011,11 +5142,17 @@ class OrderCreateView(RootRequiredMixin, View):
                     )
                     order.delete()
                     return redirect('order_create')
+                if classification == 'Downgrade':
+                    err = validate_downgrade_order(tenant, plan)
+                    if err:
+                        messages.error(request, err)
+                        order.delete()
+                        return redirect('order_create')
                 plan_price = ppc.price
                 pro_rata = Decimal('0.00')
                 if classification == 'Upgrade' and tenant.current_plan:
-                    old_px = _billing_one_cycle_plan_price(
-                        tenant.current_plan, currency)
+                    old_px = resolve_upgrade_credit_basis_price(
+                        tenant.current_plan, currency.currency_code)
                     pro_rata = calculate_pro_rata_credit(tenant, old_px)
                 line_total = (plan_price + pro_rata).quantize(Decimal('0.01'))
                 OrderPlanLine.objects.create(
@@ -5025,6 +5162,8 @@ class OrderCreateView(RootRequiredMixin, View):
                     plan_price=plan_price,
                     pro_rata_adjustment=pro_rata,
                     line_total=line_total,
+                    plan_name_en_snapshot=plan.plan_name_en,
+                    plan_name_ar_snapshot=plan.plan_name_ar or '',
                 )
                 sub_total += line_total
                 plan_line_data = plan
@@ -5065,6 +5204,9 @@ class OrderCreateView(RootRequiredMixin, View):
                     line_piece = (
                         Decimal(str(signed_qty)) *
                         prorata_unit_total).quantize(Decimal('0.01'))
+                    addon_label = dict(
+                        OrderAddonLine.ADDON_TYPE_CHOICES,
+                    ).get(add_type, add_type)
                     OrderAddonLine.objects.create(
                         order=order,
                         action_type=action,
@@ -5074,6 +5216,7 @@ class OrderCreateView(RootRequiredMixin, View):
                         unit_price=unit,
                         pro_rata_adjustment=Decimal('0.00'),
                         line_total=line_piece,
+                        add_on_type_label_snapshot=str(addon_label),
                     )
                     sub_total += line_piece
             else:
@@ -5142,7 +5285,9 @@ class OrderDetailView(LoginRequiredMixin, View):
     def get(self, request, pk):
         order = get_object_or_404(
             SubscriptionOrder.objects.select_related(
-                'tenant', 'currency', 'payment_method', 'promo_code',
+                'tenant',
+                'tenant__scheduled_downgrade_plan',
+                'currency', 'payment_method', 'promo_code',
                 'tax_code', 'created_by', 'projected_plan',
             ).prefetch_related('plan_lines__plan', 'addon_lines'),
             order_id=pk,
@@ -5169,11 +5314,26 @@ class OrderStatusUpdateView(RootRequiredMixin, View):
             else:
                 order.order_status = 'Pending_Payment'
                 order.save(update_fields=['order_status', 'updated_at'])
-                _sync_or_create_order_payment_transaction(order)
-                messages.success(
-                    request,
-                    'Order marked as pending payment.',
-                )
+                sync_or_create_order_payment_transaction(order)
+                order.refresh_from_db()
+                pm = order.payment_method
+                if pm and pm.method_type == 'Online_Gateway':
+                    if complete_order_payment_as_system(order, request.user):
+                        messages.success(
+                            request,
+                            'Online payment captured. Order fulfilled.',
+                        )
+                    else:
+                        messages.warning(
+                            request,
+                            'Order submitted; online capture did not complete '
+                            '(check amount or retry from order detail).',
+                        )
+                else:
+                    messages.success(
+                        request,
+                        'Order marked as pending payment.',
+                    )
         elif action == 'cancel':
             if order.order_status not in ('Draft', 'Pending_Payment'):
                 messages.error(request, 'This order cannot be cancelled.')
@@ -5197,6 +5357,7 @@ class OrderStatusUpdateView(RootRequiredMixin, View):
                 with db_transaction.atomic():
                     ord_row = SubscriptionOrder.objects.select_for_update().get(
                         pk=order.pk)
+                    sync_or_create_order_payment_transaction(ord_row)
                     txn = (
                         Transaction.objects.select_for_update()
                         .filter(

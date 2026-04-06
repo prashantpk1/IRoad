@@ -107,16 +107,29 @@ def log_audit_action(
         logger.error(f"Audit log failed: {e}")
 
 
-def create_session(request, user, user_domain):
+def create_session(
+        request,
+        user,
+        user_domain,
+        redis_jti='',
+        tenant=None):
     """
     Register a new active session on login.
     Called from LoginView after successful authentication.
+    ``redis_jti`` should match the Redis session id (admin JTI).
     """
     from .models import ActiveSession
     import uuid
 
+    sid = uuid.uuid4()
+    if redis_jti:
+        try:
+            sid = uuid.UUID(str(redis_jti))
+        except (ValueError, TypeError):
+            sid = uuid.uuid4()
+
     session = ActiveSession(
-        session_id=uuid.uuid4(),
+        session_id=sid,
         user_domain=user_domain,
         reference_id=str(user.admin_id)
             if hasattr(user, 'admin_id')
@@ -125,18 +138,17 @@ def create_session(request, user, user_domain):
             f"{user.first_name} {user.last_name}"
             if hasattr(user, 'first_name')
             else str(user)),
+        tenant=tenant,
+        redis_jti=str(redis_jti) if redis_jti else str(sid),
         ip_address=get_client_ip(request),
         user_agent=request.META.get(
             'HTTP_USER_AGENT', '')[:500],
         is_active=True,
     )
-    # Store session_id in Django session for later revocation
     session.save()
     request.session['active_session_id'] = \
         str(session.session_id)
 
-    # TODO Phase 11 Redis: Also store JWT JTI in
-    # Redis with TTL for real-time revocation here.
     return session
 
 

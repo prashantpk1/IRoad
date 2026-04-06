@@ -12,7 +12,7 @@
   <div class="page-header-row">
     <div class="page-header-left">
       <h1 class="page-title">{{ tenant.company_name }}</h1>
-      <p class="page-subtitle">{% translate "Tenant profile, subscription state, and CRM notes." %}</p>
+      <p class="page-subtitle">{% translate "Subscriber profile (master directory), subscription state, and CRM notes." %}</p>
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
@@ -45,6 +45,11 @@
   <div class="form-card-body">
     <div class="row g-3">
       <div class="col-12 col-md-6">
+        <label class="form-label">{% translate "Tenant ID (API bridge)" %}</label>
+        <input class="form-control font-monospace small" value="{{ tenant.tenant_id }}" readonly>
+        <div class="form-text">{% translate "Subscriber identifier for X-Tenant-ID and master-side row scope." %}</div>
+      </div>
+      <div class="col-12 col-md-6">
         <label class="form-label">{% translate "Registration #" %}</label>
         <input class="form-control" value="{{ tenant.registration_number }}" readonly>
       </div>
@@ -76,6 +81,10 @@
         <label class="form-label">{% translate "Registered" %}</label>
         <input class="form-control" value="{{ tenant.registered_at|date:'d M Y, H:i' }}" readonly>
       </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">{% translate "Last modified" %}</label>
+        <input class="form-control" value="{{ tenant.updated_at|date:'d M Y, H:i' }}" readonly>
+      </div>
     </div>
   </div>
 </div>
@@ -106,6 +115,20 @@
         <input class="form-control" value="{{ tenant.subscription_expiry_date|default:'-' }}" readonly>
       </div>
     </div>
+    {% if tenant.scheduled_downgrade_plan %}
+    <div class="row g-3 mt-2">
+      <div class="col-12">
+        {% with plan_name=tenant.scheduled_downgrade_plan.plan_name_en eff_date=tenant.scheduled_downgrade_effective_date|date:"d M Y" %}
+        <div class="alert alert-info mb-0 py-2" role="status">
+          <strong>{% translate "Pending plan change" %}</strong>
+          {% blocktranslate with plan=plan_name date=eff_date %}
+            Downgrade to "{{ plan }}" scheduled for {{ date }}.
+          {% endblocktranslate %}
+        </div>
+        {% endwith %}
+      </div>
+    </div>
+    {% endif %}
     <div class="row g-3 mt-1">
       <div class="col-12">
         <label class="form-label fw-semibold">{% translate "Active limits" %}</label>
@@ -161,6 +184,13 @@
         <i class="bi bi-pencil"></i>
         <span>{% translate "Edit Status" %}</span>
       </a>
+      <form method="post" action="{% url 'tenant_impersonate' tenant.tenant_id %}" class="d-inline">
+        {% csrf_token %}
+        <button type="submit" class="eal-btn eal-btn-outline" title="{% translate 'Issue a short-lived workspace token (root only)' %}">
+          <i class="bi bi-box-arrow-in-right"></i>
+          <span>{% translate "Login As" %}</span>
+        </button>
+      </form>
     {% endif %}
   </div>
 </div>

@@ -119,6 +119,16 @@
               {{ form.assigned_sales_rep }}
               {% if form.assigned_sales_rep.errors %}<div class="field-error">{{ form.assigned_sales_rep.errors.0 }}</div>{% endif %}
             </div>
+            {% if form.rotate_bridge_api_key %}
+            <div class="col-12">
+              <div class="form-check mt-2">
+                {{ form.rotate_bridge_api_key }}
+                <label class="form-check-label" for="{{ form.rotate_bridge_api_key.id_for_label }}">{{ form.rotate_bridge_api_key.label }}</label>
+              </div>
+              {% if form.rotate_bridge_api_key.help_text %}<div class="field-hint small text-muted">{{ form.rotate_bridge_api_key.help_text }}</div>{% endif %}
+              {% if form.rotate_bridge_api_key.errors %}<div class="field-error">{{ form.rotate_bridge_api_key.errors.0 }}</div>{% endif %}
+            </div>
+            {% endif %}
           </div>
         </div>
 

@@ -63,22 +63,13 @@ def revoke_tenant_sessions_task(self, tenant_id):
 @shared_task(name='iroad.communication.send_email', bind=True, max_retries=3)
 def send_email_task(self, recipient, subject, body, template_id=None):
     """
-    Send email via active SMTP gateway (FRM-CP-05-01).
-    Phase 7: reads active gateway credentials from DB.
-    TODO Phase 7: implement full SMTP dispatch here.
+    Send email: active CommGateway (SMTP) when configured, else Django email backend.
     """
     try:
-        logger.info(f'Email task queued for: {recipient}')
-        # TODO Phase 7: implement below
-        # from superadmin.models import CommunicationGateway
-        # gateway = CommunicationGateway.objects.get(
-        #     gateway_type='Email', is_active=True)
-        # send via smtplib using gateway credentials
-        return {
-            'recipient': recipient,
-            'status': 'queued',
-            'note': 'Phase 7 implementation pending',
-        }
+        from superadmin.communication_helpers import send_transactional_email
+
+        send_transactional_email(recipient, subject, body, html_body=None)
+        return {'recipient': recipient, 'status': 'sent'}
     except Exception as exc:
         logger.error(f'send_email_task failed: {exc}')
         raise self.retry(exc=exc, countdown=60)
@@ -87,47 +78,106 @@ def send_email_task(self, recipient, subject, body, template_id=None):
 @shared_task(name='iroad.communication.send_sms', bind=True, max_retries=3)
 def send_sms_task(self, recipient_phone, message, template_id=None):
     """
-    Send SMS via active SMS gateway (FRM-CP-05-01).
-    Phase 7: reads active gateway credentials from DB.
-    TODO Phase 7: implement full SMS dispatch here.
+    Send SMS: JSON POST to active gateway ``host_url`` (see ``communication_helpers``).
     """
     try:
-        logger.info(f'SMS task queued for: {recipient_phone}')
-        # TODO Phase 7: implement below
+        from superadmin.communication_helpers import send_transactional_sms
+
+        ok = send_transactional_sms(recipient_phone, message)
         return {
             'recipient': recipient_phone,
-            'status': 'queued',
-            'note': 'Phase 7 implementation pending',
+            'status': 'sent' if ok else 'skipped_no_gateway',
         }
     except Exception as exc:
         logger.error(f'send_sms_task failed: {exc}')
         raise self.retry(exc=exc, countdown=60)
 
 
+@shared_task(name='iroad.billing.apply_scheduled_downgrades', bind=True, max_retries=3)
+def apply_scheduled_downgrades_task(self):
+    """
+    Daily: apply plan downgrades scheduled for subscription cycle end (2.3.2.B).
+    """
+    try:
+        from superadmin.billing_helpers import apply_due_scheduled_downgrades
+
+        applied = apply_due_scheduled_downgrades()
+        logger.info(f'Applied {applied} scheduled downgrade(s)')
+        return {'applied': applied}
+    except Exception as exc:
+        logger.error(f'apply_scheduled_downgrades_task failed: {exc}')
+        raise self.retry(exc=exc, countdown=3600)
+
+
 @shared_task(name='iroad.billing.check_subscription_expiry', bind=True, max_retries=3)
 def check_subscription_expiry_task(self):
     """
-    Daily cron: Check expired subscriptions.
-    Phase 8: auto-suspend tenants past grace period.
-    TODO Phase 8: implement full expiry logic here.
+    Daily: suspend tenants still Active after subscription_expiry_date + grace.
     """
     try:
-        logger.info('Subscription expiry check task running')
-        # TODO Phase 8: implement below
-        # from superadmin.models import TenantProfile
-        # from superadmin.auth_helpers import get_security_settings
-        # settings = get_security_settings()
-        # grace_days = GlobalSystemRules.grace_period_days
-        # expired = TenantProfile.objects.filter(
-        #     subscription_expiry_date__lt=today - grace_days,
-        #     account_status='Active'
-        # )
-        # for tenant in expired:
-        #     tenant.account_status = 'Suspended_Billing'
-        #     tenant.save()
-        #     revoke_tenant_sessions_task.delay(tenant.tenant_id)
-        return {'status': 'completed', 'note': 'Phase 8 implementation pending'}
+        from datetime import date, timedelta
+
+        from django.conf import settings as dj_settings
+
+        from superadmin.models import TenantProfile
+        from superadmin.redis_helpers import revoke_all_tenant_sessions
+
+        grace = int(getattr(dj_settings, 'SUBSCRIPTION_EXPIRY_GRACE_DAYS', 14) or 14)
+        cutoff = date.today() - timedelta(days=grace)
+        qs = TenantProfile.objects.filter(
+            account_status='Active',
+            subscription_expiry_date__isnull=False,
+            subscription_expiry_date__lt=cutoff,
+        )
+        suspended = 0
+        for tenant in qs.iterator():
+            tenant.account_status = 'Suspended_Billing'
+            tenant.save(update_fields=['account_status', 'updated_at'])
+            revoke_all_tenant_sessions(str(tenant.tenant_id))
+            revoke_tenant_sessions_task.delay(str(tenant.tenant_id))
+            suspended += 1
+        logger.info(
+            'Subscription expiry check: cutoff=%s suspended=%s',
+            cutoff,
+            suspended,
+        )
+        return {'status': 'completed', 'cutoff': str(cutoff), 'suspended': suspended}
     except Exception as exc:
         logger.error(f'check_subscription_expiry_task failed: {exc}')
+        raise self.retry(exc=exc, countdown=3600)
+
+
+@shared_task(name='iroad.billing.recurring_billing_scan', bind=True, max_retries=3)
+def recurring_billing_scan_task(self):
+    """
+    Periodic billing hygiene: apply scheduled downgrades (same helper as dedicated task).
+
+    Provider-specific recurring card charges remain webhook-driven; this task keeps
+    cycle-bound plan transitions moving without manual CP action.
+    """
+    try:
+        from superadmin.billing_helpers import apply_due_scheduled_downgrades
+
+        applied = apply_due_scheduled_downgrades()
+        logger.info('recurring_billing_scan: applied %s scheduled downgrade(s)', applied)
+        return {'status': 'completed', 'scheduled_downgrades_applied': applied}
+    except Exception as exc:
+        logger.error(f'recurring_billing_scan_task failed: {exc}')
+        raise self.retry(exc=exc, countdown=3600)
+
+
+@shared_task(name='iroad.billing.proactive_renewal_scan', bind=True, max_retries=3)
+def proactive_renewal_scan_task(self):
+    """
+    Daily scan: Identify subscriptions expiring in 14 days and create draft orders.
+    """
+    try:
+        from superadmin.billing_helpers import scan_active_subscriptions_for_renewal
+
+        generated = scan_active_subscriptions_for_renewal(days_until_expiry=14)
+        logger.info('proactive_renewal_scan: generated %s renewal order(s)', generated)
+        return {'status': 'completed', 'renewal_orders_generated': generated}
+    except Exception as exc:
+        logger.error(f'proactive_renewal_scan_task failed: {exc}')
         raise self.retry(exc=exc, countdown=3600)
 

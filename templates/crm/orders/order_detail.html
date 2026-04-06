@@ -8,15 +8,6 @@
 {% endblock %}
 
 {% block content %}
-{% if messages %}
-  {% for message in messages %}
-    <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">
-      {{ message }}
-      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
-  {% endfor %}
-{% endif %}
-
 <div class="page-header">
   <div class="page-header-row">
     <div class="page-header-left">
@@ -87,6 +78,24 @@
   </div>
 </div>
 
+{% if order.order_classification == 'Downgrade' and order.order_status == 'Paid' %}
+  {% if order.tenant.scheduled_downgrade_plan %}
+    {% with plan_name=order.tenant.scheduled_downgrade_plan.plan_name_en eff_date=order.tenant.scheduled_downgrade_effective_date|date:"d M Y" %}
+    <div class="alert alert-info d-flex align-items-start gap-2 mb-3" role="status">
+      <i class="bi bi-calendar-event flex-shrink-0 mt-1"></i>
+      <div>
+        <strong>{% translate "Scheduled downgrade" %}</strong>
+        <p class="mb-0 mt-1">
+          {% blocktranslate with plan=plan_name date=eff_date %}
+            The subscription will move to plan "{{ plan }}" on {{ date }} (end of the current billing cycle).
+          {% endblocktranslate %}
+        </p>
+      </div>
+    </div>
+    {% endwith %}
+  {% endif %}
+{% endif %}
+
 {# Plan Lines Card #}
 {% if order.plan_lines.exists %}
 <div class="form-card mb-3">
@@ -102,7 +111,7 @@
   <div class="eal-table-wrap">
     <table class="eal-table">
       <thead><tr><th>{% translate "Plan" %}</th><th>{% translate "Cycles" %}</th><th>{% translate "Plan Price" %}</th><th>{% translate "Pro-rata Adj." %}</th><th>{% translate "Line Total" %}</th></tr></thead>
-      <tbody>{% for pl in order.plan_lines.all %}<tr><td>{{ pl.plan.plan_name_en }}</td><td>{{ pl.number_of_cycles }}</td><td>{{ pl.plan_price|floatformat:2 }}</td><td>{{ pl.pro_rata_adjustment|floatformat:2 }}</td><td><span class="eal-entity-id">{{ pl.line_total|floatformat:2 }}</span></td></tr>{% endfor %}</tbody>
+      <tbody>{% for pl in order.plan_lines.all %}<tr><td>{% if pl.plan_name_en_snapshot %}{{ pl.plan_name_en_snapshot }}{% else %}{{ pl.plan.plan_name_en }}{% endif %}</td><td>{{ pl.number_of_cycles }}</td><td>{{ pl.plan_price|floatformat:2 }}</td><td>{{ pl.pro_rata_adjustment|floatformat:2 }}</td><td><span class="eal-entity-id">{{ pl.line_total|floatformat:2 }}</span></td></tr>{% endfor %}</tbody>
     </table>
   </div>
 </div>
@@ -223,7 +232,7 @@
           <span>{% translate "Mark as Pending Payment" %}</span>
         </button>
       </form>
-      <form method="post" action="{% url 'order_status_update' order.order_id %}" onsubmit="return confirm('Cancel this order?');">
+      <form method="post" action="{% url 'order_status_update' order.order_id %}" data-confirm="{% translate 'Cancel this order?' %}">
         {% csrf_token %}
         <input type="hidden" name="action" value="cancel">
         <button type="submit" class="eal-btn eal-btn-outline" style="color: var(--danger-color); border-color: var(--danger-color);">
@@ -234,7 +243,7 @@
     </div>
   {% elif order.order_status == 'Pending_Payment' %}
     <div class="d-flex flex-wrap gap-2 mb-4">
-      <form method="post" action="{% url 'order_status_update' order.order_id %}" onsubmit="return confirm('{% translate "Record payment and update subscriber plan, limits, and LTV?" %}');">
+      <form method="post" action="{% url 'order_status_update' order.order_id %}" data-confirm="{% translate 'Record payment and update subscriber plan, limits, and LTV?' %}">
         {% csrf_token %}
         <input type="hidden" name="action" value="mark_paid">
         <button type="submit" class="eal-btn eal-btn-primary">
@@ -248,7 +257,7 @@
           <span>{% translate "View Transaction" %}</span>
         </a>
       {% endif %}
-      <form method="post" action="{% url 'order_status_update' order.order_id %}" onsubmit="return confirm('Cancel this order?');">
+      <form method="post" action="{% url 'order_status_update' order.order_id %}" data-confirm="{% translate 'Cancel this order?' %}">
         {% csrf_token %}
         <input type="hidden" name="action" value="cancel">
         <button type="submit" class="eal-btn eal-btn-outline" style="color: var(--danger-color); border-color: var(--danger-color);">

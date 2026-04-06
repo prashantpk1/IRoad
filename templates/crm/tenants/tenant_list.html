@@ -80,6 +80,7 @@
           <th>{% translate "Country" %}</th>
           <th>{% translate "Current Plan" %}</th>
           <th>{% translate "Expiry Date" %}</th>
+          <th>{% translate "Last modified" %}</th>
           <th>{% translate "Status" %}</th>
           <th>{% translate "Wallet Balance" %}</th>
           <th>{% translate "ACTIONS" %}</th>
@@ -106,6 +107,7 @@
                 -
               {% endif %}
             </td>
+            <td class="text-nowrap small text-muted">{{ t.updated_at|date:'d M Y, H:i' }}</td>
             <td>
               {% if t.account_status == 'Active' %}
                 <span class="status-badge active">{% translate "Active" %}</span>
@@ -127,7 +129,7 @@
           </tr>
         {% empty %}
           <tr class="eal-table-empty">
-            <td colspan="9">
+            <td colspan="10">
               <div class="notification-empty">
                 <div class="empty-icon"><i class="bi bi-people"></i></div>
                 <h4 class="empty-title">{% translate "No subscribers found" %}</h4>

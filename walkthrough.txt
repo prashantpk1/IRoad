@@ -1,0 +1,61 @@
+# Subscriber CRM & Billing (CP-PCS-P5) Manual Walkthrough
+
+This guide provides step-by-step instructions for manually verifying the Subscribers CRM & Billing module in the iRoad Control Panel.
+
+## 1. Subscriber Profile & Data Dictionary
+Goal: Verify that all synced and master-side fields are visible and accurate.
+
+1. Navigate: Go to 'Subscribers CRM & Billing' > 'Subscribers List'.
+2. Verify List View:
+    - Ensure the "Last Modified" (updated_at) column is visible.
+    - Check that "Wallet Balance" is displayed for each tenant.
+3. Verify Detail View:
+    - Click 'View' on a subscriber (e.g., 'iRoad Saudi-HQ').
+    - Confirm the presence of:
+        - Identity: Tenant ID (UUID), Registration Number, Tax Number.
+        - Billing State: Current Plan, Expiry Date, Wallet Balance, Total LTV.
+        - Timestamps: Registered At, Last Modified.
+
+## 2. Admin Controls (Kill Switch & Login As)
+Goal: Test the administrative intervention features.
+
+### A. The "Kill Switch" (Session Revocation)
+1. Status Change: Click 'Edit Status' or 'Edit' on a subscriber.
+2. Trigger: Change the 'Account Status' to 'Suspended_Violation'.
+3. Verification: 
+    - Save the record.
+    - The background task 'superadmin.tasks.revoke_tenant_sessions' will execute.
+    - Note: In a manual test with a live user, they would be immediately logged out of the workspace portal.
+
+### B. "Login As" (Impersonation)
+1. Navigate: Open a Subscriber's detail page.
+2. Action: Scroll to 'Quick Actions' and click the 'Login As' button.
+3. Verification:
+    - You should be redirected (or shown a handoff page) with a secure 'cp_impersonation_token'.
+    - Check the 'CRM Notes' section; an automated note is created for the impersonation event.
+
+## 3. CRM Notes Interaction
+Goal: Verify the interaction log and its immutability.
+
+1. Add Note:
+    - In the 'CRM Notes' card, select a type (e.g., 'Billing').
+    - Enter a message and click 'Add Note'.
+2. Verify Immutability:
+    - Note: The UI correctly omits "Edit" or "Delete" buttons for notes.
+    - The backend prevents deletion/modification in 'superadmin.models.CRMNote.save()'.
+
+## 4. Subscription Orders & Invoices
+Goal: Verify financial record-keeping and snapshot accuracy.
+
+1. Orders:
+    - Navigate to 'Subscription Orders'.
+    - View an order to see the Classification (New, Renewal, etc.) and pro-rata adjustments.
+2. Invoices:
+    - Navigate to 'Standard Invoices'.
+    - View an issued invoice.
+    - Snapshot Check: Verify that the supplier and customer data are fixed on the invoice.
+    - Immutability Check: Confirm that only 'Void' is available as an action.
+
+---
+
+IMPORTANT: The database migration issue for 'portal_bootstrap_password_hash' has been resolved. All CRM and Billing views are fully accessible.

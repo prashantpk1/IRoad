@@ -206,6 +206,20 @@ class ActiveSession(models.Model):
         blank=True,
         help_text='Display name for UI',
     )
+    tenant = models.ForeignKey(
+        'TenantProfile',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='active_sessions',
+    )
+    redis_jti = models.CharField(
+        max_length=128,
+        blank=True,
+        default='',
+        db_index=True,
+        help_text='Redis JTI for CP Kill Switch / mass revoke.',
+    )
     ip_address = models.CharField(max_length=45)
     user_agent = models.TextField(null=True, blank=True)
     started_at = models.DateTimeField(auto_now_add=True)
@@ -227,6 +241,23 @@ class ActiveSession(models.Model):
         ordering = ['-started_at']
 
 
+class AuditLogQuerySet(models.QuerySet):
+    def delete(self):
+        raise PermissionError(
+            'Audit log entries cannot be bulk-deleted.',
+        )
+
+    def update(self, **kwargs):
+        raise PermissionError(
+            'Audit log entries cannot be bulk-updated.',
+        )
+
+
+class AuditLogManager(models.Manager):
+    def get_queryset(self):
+        return AuditLogQuerySet(self.model, using=self._db)
+
+
 class AuditLog(models.Model):
     ACTION_TYPE_CHOICES = [
         ('Create', 'Create'),
@@ -234,6 +265,8 @@ class AuditLog(models.Model):
         ('Delete', 'Delete'),
         ('Status_Change', 'Status Change'),
     ]
+
+    objects = AuditLogManager()
 
     audit_id = models.AutoField(primary_key=True)
     admin = models.ForeignKey(
@@ -1410,6 +1443,26 @@ class TenantProfile(models.Model):
         decimal_places=2,
         default=Decimal('0.00'),
     )
+    api_bridge_secret_hash = models.TextField(
+        blank=True,
+        default='',
+        help_text='Hashed secret for tenant API bridge (/api/v1/). Rotated from Control Panel.',
+    )
+    portal_bootstrap_password_hash = models.TextField(
+        blank=True,
+        default='',
+        help_text=(
+            'Hashed initial tenant-portal password set at provisioning (CP-PCS-P1 '
+            'handover). Plaintext sent once in welcome email; not shown in CP.'
+        ),
+    )
+    workspace_schema = models.CharField(
+        max_length=63,
+        blank=True,
+        default='',
+        db_index=True,
+        help_text='PostgreSQL schema name for isolated tenant workspace (CP 4.3.2).',
+    )
     registered_at = models.DateTimeField(auto_now_add=True)
     total_ltv = models.DecimalField(
         max_digits=12,
@@ -1425,6 +1478,18 @@ class TenantProfile(models.Model):
     )
     subscription_start_date = models.DateField(null=True, blank=True)
     subscription_expiry_date = models.DateField(null=True, blank=True)
+    scheduled_downgrade_plan = models.ForeignKey(
+        'SubscriptionPlan',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='tenants_pending_downgrade',
+    )
+    scheduled_downgrade_effective_date = models.DateField(
+        null=True,
+        blank=True,
+        help_text='Date the subscriber moves to the lower plan (end of current cycle).',
+    )
     active_max_users = models.IntegerField(default=0)
     active_max_internal_trucks = models.IntegerField(default=0)
     active_max_external_trucks = models.IntegerField(default=0)
@@ -1434,9 +1499,36 @@ class TenantProfile(models.Model):
     def __str__(self):
         return self.company_name
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.__original_status = self.account_status
+
+    def save(self, *args, **kwargs):
+        """Ref: CP-PCS-P1 §5.1 - Centralized Session Kill Switch."""
+        SUSPEND_STATUSES = ['Suspended_Billing', 'Suspended_Violation']
+        is_new_suspension = (
+            self.account_status in SUSPEND_STATUSES
+            and self.__original_status not in SUSPEND_STATUSES
+        )
+
+        super().save(*args, **kwargs)
+
+        if is_new_suspension:
+            from superadmin.tasks import revoke_tenant_sessions_task
+            revoke_tenant_sessions_task.delay(str(self.tenant_id))
+
+        self.__original_status = self.account_status
+
     class Meta:
         db_table = 'crm_tenant_profiles'
         ordering = ['company_name']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['workspace_schema'],
+                condition=~models.Q(workspace_schema=''),
+                name='uniq_tenant_workspace_schema_when_set',
+            ),
+        ]
 
 
 class CRMNote(models.Model):
@@ -1630,9 +1722,23 @@ class OrderPlanLine(models.Model):
         decimal_places=2,
         default=Decimal('0.00'),
     )
+    plan_name_en_snapshot = models.CharField(
+        max_length=200,
+        blank=True,
+        default='',
+        help_text='Plan display name at order time (invoice immutability, §5.3).',
+    )
+    plan_name_ar_snapshot = models.CharField(
+        max_length=200,
+        blank=True,
+        default='',
+    )
 
     def __str__(self):
-        return f'{self.plan.plan_name_en} x {self.number_of_cycles} cycles'
+        disp = (self.plan_name_en_snapshot or '').strip()
+        if not disp and self.plan_id:
+            disp = self.plan.plan_name_en
+        return f'{disp} x {self.number_of_cycles} cycles'
 
     class Meta:
         db_table = 'crm_order_plan_lines'
@@ -1687,6 +1793,12 @@ class OrderAddonLine(models.Model):
         max_digits=10,
         decimal_places=2,
         default=Decimal('0.00'),
+    )
+    add_on_type_label_snapshot = models.CharField(
+        max_length=200,
+        blank=True,
+        default='',
+        help_text='English label for add-on type at order time (§5.3).',
     )
 
     def __str__(self):

@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% load i18n %}
+{% block title %}{% translate "Workspace handoff" %}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">{% translate "Tenant workspace handoff" %}</h1>
+      <p class="page-subtitle">
+        {% blocktranslate with company=tenant.company_name minutes=expires_minutes %}
+          Impersonation token for {{ company }}. Valid for about {{ minutes }} minutes. Configure TENANT_IMPERSONATION_REDIRECT_URL to send this automatically to your tenant app.
+        {% endblocktranslate %}
+      </p>
+    </div>
+  </div>
+</div>
+
+<div class="form-card mb-3">
+  <div class="form-card-body">
+    <label class="form-label">{% translate "Copy token" %}</label>
+    <textarea class="form-control font-monospace small" rows="6" readonly id="imp-tok">{{ impersonation_token }}</textarea>
+    <div class="d-flex flex-wrap gap-2 mt-3">
+      <button type="button" class="eal-btn eal-btn-primary" id="copy-imp">{% translate "Copy to clipboard" %}</button>
+      <a href="{% url 'tenant_detail' tenant.tenant_id %}" class="eal-btn eal-btn-outline">{% translate "Back to subscriber" %}</a>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var btn = document.getElementById('copy-imp');
+  var ta = document.getElementById('imp-tok');
+  if (btn && ta) {
+    btn.addEventListener('click', function () {
+      ta.select();
+      document.execCommand('copy');
+    });
+  }
+})();
+</script>
+{% endblock %}

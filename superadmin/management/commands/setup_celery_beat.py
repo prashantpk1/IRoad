@@ -44,6 +44,24 @@ class Command(BaseCommand):
             },
         )
 
+        # Daily at 2am — apply scheduled plan downgrades (cycle-end)
+        schedule_downgrade, _ = CrontabSchedule.objects.get_or_create(
+            minute='0',
+            hour='2',
+            day_of_week='*',
+            day_of_month='*',
+            month_of_year='*',
+        )
+
+        PeriodicTask.objects.get_or_create(
+            name='Daily: Apply Scheduled Plan Downgrades',
+            defaults={
+                'crontab': schedule_downgrade,
+                'task': 'iroad.billing.apply_scheduled_downgrades',
+                'args': json.dumps([]),
+            },
+        )
+
         self.stdout.write(
             self.style.SUCCESS('✅ Celery Beat periodic tasks registered')
         )

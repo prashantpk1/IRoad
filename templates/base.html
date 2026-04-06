@@ -184,6 +184,24 @@
     <script src="{% static 'js/main.js' %}"></script>
     <script src="{% static 'js/dashboard.js' %}"></script>
 
+    {# Cross-tab: after login elsewhere, refresh stale /login/ tabs (CSRF rotation). #}
+    {% if auth_tab_sync_bump %}
+    <script>
+      try {
+        localStorage.setItem('iroad_auth_bump', String(Date.now()));
+      } catch (e) {}
+    </script>
+    {% endif %}
+    {% if user.is_authenticated %}
+    <script>
+      window.addEventListener('storage', function (ev) {
+        if (ev.key === 'iroad_logout_bump' && ev.newValue) {
+          window.location.href = '{% url "login" %}';
+        }
+      });
+    </script>
+    {% endif %}
+
     {% block extra_js %}{% endblock %}
   </body>
 </html>

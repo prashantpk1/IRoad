@@ -166,6 +166,17 @@
           toggleIcon.classList.add("bi-eye");
         }
       }
+      (function () {
+        /* Other tab logged in -> CSRF was rotated; reload to get a fresh token or redirect. */
+        window.addEventListener("storage", function (ev) {
+          if (ev.key === "iroad_auth_bump" && ev.newValue) {
+            window.location.reload();
+          }
+          if (ev.key === "iroad_logout_bump" && ev.newValue) {
+            window.location.reload();
+          }
+        });
+      })();
     </script>
   </body>
 </html>

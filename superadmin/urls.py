@@ -132,6 +132,7 @@ from .views import (
     TicketPriorityOverrideView,
     TenantCreateView,
     TenantDetailView,
+    TenantImpersonationView,
     TenantListView,
     TenantSecuritySettingsView,
     TenantUpdateView,
@@ -794,6 +795,11 @@ urlpatterns = [
         'crm/tenants/<uuid:pk>/edit/',
         TenantUpdateView.as_view(),
         name='tenant_edit',
+    ),
+    path(
+        'crm/tenants/<uuid:pk>/impersonate/',
+        TenantImpersonationView.as_view(),
+        name='tenant_impersonate',
     ),
     path(
         'crm/tenants/<uuid:pk>/add-note/',

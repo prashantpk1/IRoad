@@ -28,5 +28,30 @@ urlpatterns = [
         api_views.tenant_category_list,
         name='api_category_list',
     ),
+    path(
+        'billing/orders/',
+        api_views.tenant_billing_order_list,
+        name='api_billing_order_list',
+    ),
+    path(
+        'billing/orders/<uuid:order_id>/',
+        api_views.tenant_billing_order_detail,
+        name='api_billing_order_detail',
+    ),
+    path(
+        'tenant/sessions/register/',
+        api_views.tenant_session_register,
+        name='api_tenant_session_register',
+    ),
+    path(
+        'tenant/profile/sync/',
+        api_views.tenant_profile_sync,
+        name='api_tenant_profile_sync',
+    ),
+    path(
+        'tenant/auth/bootstrap/',
+        api_views.tenant_bootstrap_auth,
+        name='api_tenant_bootstrap_auth',
+    ),
 ]
 

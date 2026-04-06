@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block email_title %}iRoad Logistics{% endblock %}</title>
+    <style>
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; line-height: 1.6; color: #334155; margin: 0; padding: 0; background-color: #f8fafc; }
+        .container { max-width: 600px; margin: 40px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+        .header { background: #4f46e5; padding: 32px; text-align: center; }
+        .header h1 { color: #ffffff; margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.025em; }
+        .content { padding: 40px; }
+        .content h2 { color: #1e293b; margin-top: 0; font-size: 20px; }
+        .button-wrapper { text-align: center; margin: 32px 0; }
+        .button { background-color: #4f46e5; color: #ffffff !important; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; display: inline-block; transition: all 0.2s; }
+        .footer { background: #f1f5f9; padding: 24px; text-align: center; font-size: 14px; color: #64748b; }
+        .invite-info { background-color: #f8fafc; padding: 20px; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 24px; }
+        .secret-box { background-color: #f8fafc; padding: 16px; border-radius: 8px; border: 1px solid #e2e8f0; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 14px; word-break: break-all; margin: 16px 0; }
+        .label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: #64748b; margin-bottom: 6px; }
+        .expiry { font-size: 13px; color: #ef4444; margin-top: 24px; font-weight: 500; }
+        .muted { font-size: 13px; color: #64748b; margin-top: 16px; }
+    </style>
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>iRoad Logistics</h1>
+        </div>
+        <div class="content">
+            {% block content %}{% endblock %}
+        </div>
+        <div class="footer">
+            &copy; 2026 iRoad Logistics. All rights reserved.<br>
+            Automated system message, please do not reply.
+        </div>
+    </div>
+</body>
+</html>

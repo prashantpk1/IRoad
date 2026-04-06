@@ -1,0 +1,33 @@
+{% extends "emails/transactional_base.html" %}
+{% block email_title %}Welcome to iRoad Logistics{% endblock %}
+{% block content %}
+<h2>Welcome{% if company_name %}, {{ company_name }}{% endif %}!</h2>
+<p>Your subscriber workspace is ready. Below are your sign-in credentials (same layout as other iRoad account emails), plus your <strong>Tenant ID</strong> and <strong>API bridge key</strong> for master-platform integrations.</p>
+
+{% if portal_bootstrap_password %}
+<div class="invite-info">
+    <strong>Login email:</strong> {{ tenant.primary_email }}<br>
+    <strong>Initial password:</strong> (change after first sign-in)<br>
+    <div class="secret-box" style="margin-top: 12px;">{{ portal_bootstrap_password }}</div>
+</div>
+
+{% if portal_login_url %}
+<div class="button-wrapper">
+    <a href="{{ portal_login_url }}" class="button">Open workspace sign-in</a>
+</div>
+{% endif %}
+{% endif %}
+
+<div class="invite-info">
+    <p style="margin: 0 0 8px;"><strong>Tenant ID</strong> (subscriber identifier — use with <code>X-Tenant-ID</code> on API calls):</p>
+    <div class="secret-box" style="margin: 0;">{{ tenant.tenant_id }}</div>
+</div>
+
+<p class="label">API bridge key</p>
+<p style="margin-top: 0;">Authentication for the bridge. Store securely. It is <strong>never shown in the Control Panel</strong>; email is the delivery channel.</p>
+<div class="secret-box">{{ api_bridge_key }}</div>
+
+<p>Send your Tenant ID and this key on each request: <code>X-Tenant-ID</code> plus <code>X-Tenant-API-Key</code> (or <code>Authorization: Bearer</code>). After verification, the platform applies your tenant scope on shared master data.</p>
+
+<p class="muted">Daily operational data stays in your isolated workspace. After sign-in, your access token includes <code>tenant_id</code> so clients can scope data correctly.</p>
+{% endblock %}

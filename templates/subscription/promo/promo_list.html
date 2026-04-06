@@ -41,8 +41,7 @@
           />
         </div>
         <div style="width: 220px;">
-          <label class="form-label">Status</label>
-          <select name="status" class="form-select form-select-sm">
+          <select name="status" class="form-select form-select-sm" aria-label="{% translate 'Status' %}">
             <option value="All" {% if status_filter == 'All' %}selected{% endif %}>All</option>
             <option value="Active" {% if status_filter == 'Active' %}selected{% endif %}>Active</option>
             <option value="Inactive" {% if status_filter == 'Inactive' %}selected{% endif %}>Inactive</option>

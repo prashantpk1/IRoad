@@ -1,0 +1,21 @@
+{% load i18n %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% translate "Signing out" %}…</title>
+</head>
+<body>
+  <p style="font-family: system-ui, sans-serif; padding: 1rem;">
+    {% translate "Signing out" %}…
+    <a href="{% url 'login' %}">{% translate "Continue to sign in" %}</a>
+  </p>
+  <script>
+    try {
+      localStorage.setItem('iroad_logout_bump', String(Date.now()));
+    } catch (e) {}
+    window.location.replace('{% url 'login' %}');
+  </script>
+</body>
+</html>

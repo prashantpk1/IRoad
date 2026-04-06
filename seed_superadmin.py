@@ -150,6 +150,22 @@ def setup_celery_beat_tasks():
             month_of_year='*',
         )
 
+        schedule_2am, _ = CrontabSchedule.objects.get_or_create(
+            minute='0',
+            hour='2',
+            day_of_week='*',
+            day_of_month='*',
+            month_of_year='*',
+        )
+
+        schedule_weekly_billing, _ = CrontabSchedule.objects.get_or_create(
+            minute='30',
+            hour='4',
+            day_of_week='1',
+            day_of_month='*',
+            month_of_year='*',
+        )
+
         tasks = [
             {
                 'name': 'Daily: Cleanup Expired Auth Tokens',
@@ -160,6 +176,16 @@ def setup_celery_beat_tasks():
                 'name': 'Daily: Check Subscription Expiry',
                 'crontab': schedule_1am,
                 'task': 'iroad.billing.check_subscription_expiry',
+            },
+            {
+                'name': 'Daily: Apply Scheduled Plan Downgrades',
+                'crontab': schedule_2am,
+                'task': 'iroad.billing.apply_scheduled_downgrades',
+            },
+            {
+                'name': 'Weekly: Recurring billing scan (placeholder)',
+                'crontab': schedule_weekly_billing,
+                'task': 'iroad.billing.recurring_billing_scan',
             },
         ]
 

@@ -34,26 +34,49 @@ CSRF_TRUSTED_ORIGINS = [
     "https://*.ngrok.io",
     "https://*.trycloudflare.com",
     "http://127.0.0.1:8000",
+    "http://localhost:8000",
 ]
 
 # Allow SSL termination at proxy
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
-# Application definition
+# Application definition (django-tenants: shared = public schema, tenant = per subscriber)
+# https://django-tenants.readthedocs.io/
 
-INSTALLED_APPS = [
-    'django.contrib.admin',
-    'django.contrib.auth',
+SHARED_APPS = [
+    'django_tenants',
+    'iroad_tenants',
     'django.contrib.contenttypes',
+    'django.contrib.auth',
     'django.contrib.sessions',
     'django.contrib.messages',
+    'django.contrib.admin',
     'django.contrib.staticfiles',
     'django_celery_results',
     'django_celery_beat',
     'superadmin',
+    
 ]
 
+TENANT_APPS = [
+    'tenant_workspace',
+]
+
+INSTALLED_APPS = list(SHARED_APPS) + [
+    app for app in TENANT_APPS if app not in SHARED_APPS
+]
+
+TENANT_MODEL = 'iroad_tenants.TenantRegistry'
+TENANT_DOMAIN_MODEL = 'iroad_tenants.TenantSite'
+
+# Hostname may not match a Domain (e.g. localhost CP); keep public schema.
+SHOW_PUBLIC_IF_NO_TENANT_FOUND = True
+
+DATABASE_ROUTERS = ('django_tenants.routers.TenantSyncRouter',)
+
 MIDDLEWARE = [
+    'django_tenants.middleware.main.TenantMainMiddleware',
+    'superadmin.middleware.TenantApiSchemaMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -90,7 +113,7 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql',
+        'ENGINE': 'django_tenants.postgresql_backend',
         'NAME': config('DB_NAME'),
         'USER': config('DB_USER'),
         'PASSWORD': config('DB_PASSWORD'),
@@ -147,7 +170,8 @@ LOGOUT_REDIRECT_URL = '/login/'
 
 AUTH_USER_MODEL = 'superadmin.AdminUser'
 
-# Email Configuration
+# Email Configuration (SMTP). Tenant API bridge welcome/rotation emails use this
+# backend only—see superadmin.communication_helpers.send_email_via_django_smtp.
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = config('EMAIL_HOST', default='smtp.gmail.com')
 EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
@@ -168,6 +192,39 @@ CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'Asia/Riyadh'
 CELERY_TASK_TRACK_STARTED = True
 CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
+
+# Tenant API bridge (CP Type B): require X-Tenant-API-Key by default.
+# Set TENANT_API_REQUIRE_KEY=False only for local/dev while migrating clients.
+TENANT_API_REQUIRE_KEY = config('TENANT_API_REQUIRE_KEY', default=True, cast=bool)
+
+# Tenant workspace JWTs (bootstrap login, CP impersonation). Defaults to SECRET_KEY.
+TENANT_JWT_SIGNING_KEY = config('TENANT_JWT_SIGNING_KEY', default='')
+
+# Optional: shown as primary button in subscriber welcome email.
+TENANT_PORTAL_LOGIN_URL = config('TENANT_PORTAL_LOGIN_URL', default='')
+
+# Optional: after CP "Login As", browser is sent here with ?cp_impersonation_token=…
+TENANT_IMPERSONATION_REDIRECT_URL = config(
+    'TENANT_IMPERSONATION_REDIRECT_URL',
+    default='',
+)
+
+# Bootstrap POST /api/v1/tenant/auth/bootstrap/ access_token lifetime (seconds).
+TENANT_BOOTSTRAP_JWT_TTL_SECONDS = config(
+    'TENANT_BOOTSTRAP_JWT_TTL_SECONDS',
+    default=900,
+    cast=int,
+)
+
+# Optional MaxMind GeoLite2-Country.mmdb path for tax routing by client IP (P9).
+GEOIP2_COUNTRY_DB = config('GEOIP2_COUNTRY_DB', default='')
+
+# Days after subscription_expiry_date before auto-suspend (billing cron).
+SUBSCRIPTION_EXPIRY_GRACE_DAYS = config(
+    'SUBSCRIPTION_EXPIRY_GRACE_DAYS',
+    default=14,
+    cast=int,
+)
 
 # Session — keep Django session for JTI pointer only
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'

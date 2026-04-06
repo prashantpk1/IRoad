@@ -42,7 +42,40 @@
     </div>
   {% endif %}
 
-  {% if policies %}
+  <form method="get" action="{% url 'addons_policy_list' %}" class="eal-toolbar">
+    <div class="eal-toolbar-left" style="width: 100%; display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end">
+      <div class="eal-search" style="flex: 1; min-width: 260px;">
+        <i class="bi bi-search"></i>
+        <input
+          type="text"
+          name="q"
+          placeholder="{% translate 'Search by policy name...' %}"
+          value="{{ search_query }}"
+        />
+      </div>
+      <div style="min-width: 180px">
+        <select name="status" class="eal-select" style="width: 100%;">
+          <option value="All" {% if status_filter == 'All' %}selected{% endif %}>{% translate "All Status" %}</option>
+          <option value="Active" {% if status_filter == 'Active' %}selected{% endif %}>{% translate "Active" %}</option>
+          <option value="Inactive" {% if status_filter == 'Inactive' %}selected{% endif %}>{% translate "Inactive" %}</option>
+        </select>
+      </div>
+      <div>
+        <button type="submit" class="eal-btn eal-btn-primary">
+          <i class="bi bi-search"></i>
+          <span>{% translate "Filter" %}</span>
+        </button>
+      </div>
+      {% if search_query or status_filter != 'All' %}
+        <a href="{% url 'addons_policy_list' %}" class="eal-btn eal-btn-outline" style="border-style: dashed; color: var(--text-muted);">
+          <i class="bi bi-x-circle"></i>
+          <span>{% translate "Clear" %}</span>
+        </a>
+      {% endif %}
+    </div>
+  </form>
+
+  {% if policies.object_list %}
     <div class="eal-table-wrap" style="overflow-x: auto;">
       <table class="eal-table">
         <thead>
@@ -60,9 +93,9 @@
           </tr>
         </thead>
         <tbody>
-          {% for p in policies %}
+          {% for p in policies.object_list %}
             <tr style="{% if p.is_active %}border-left: 4px solid #22c55e;{% endif %}">
-              <td>{{ forloop.counter }}</td>
+              <td>{{ forloop.counter0|add:policies.start_index }}</td>
               <td>{{ p.policy_name }}</td>
               <td>{{ p.extra_internal_user_price }}</td>
               <td>{{ p.extra_internal_truck_price }}</td>
@@ -94,11 +127,27 @@
         </tbody>
       </table>
     </div>
+    {% include 'partials/pagination.html' with page_obj=policies %}
   {% else %}
-    <div class="notification-empty">
+    <div class="notification-empty list-filter-wrapper" style="margin-top: 8px;">
       <div class="empty-icon"><i class="bi bi-card-list"></i></div>
-      <h4 class="empty-title">No policy records found.</h4>
-      <p class="empty-text">Create a policy to manage add-on pricing.</p>
+      {% if search_query or status_filter != 'All' %}
+        <h4 class="empty-title">{% translate "No policies match your filters." %}</h4>
+        <p class="empty-text">{% translate "Try adjusting search or status, or clear filters." %}</p>
+        <a href="{% url 'addons_policy_list' %}" class="eal-btn eal-btn-outline" style="margin-top: 1rem;">
+          <i class="bi bi-x-circle"></i>
+          {% translate "Clear filters" %}
+        </a>
+      {% else %}
+        <h4 class="empty-title">{% translate "No policy records found." %}</h4>
+        <p class="empty-text">{% translate "Create a policy to manage add-on pricing." %}</p>
+        {% if request.user.is_root %}
+          <a href="{% url 'addons_policy_create' %}" class="eal-btn eal-btn-primary" style="margin-top: 1rem;">
+            <i class="bi bi-plus-lg"></i>
+            {% translate "Add Policy" %}
+          </a>
+        {% endif %}
+      {% endif %}
     </div>
   {% endif %}
 </div>

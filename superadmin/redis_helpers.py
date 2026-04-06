@@ -1,7 +1,6 @@
 import json
 import uuid
 
-import jwt
 import redis
 from datetime import timedelta
 
@@ -27,7 +26,10 @@ def redis_health_check():
 
 def create_admin_session(admin_user, ip_address, user_agent, timeout_minutes):
     """
-    Create Redis session for logged-in admin.
+    Create Redis session for logged-in **IRoad Control Panel staff** (Super Admin
+    / Sales / Support). Payload uses ``admin_id`` only — **no** subscriber
+    ``tenant_id`` (tenant UUID is for tenant workspace / API bridge only).
+
     Returns jti (session ID).
     Key: admin:session:{jti}
     """
@@ -146,9 +148,8 @@ def get_all_active_admin_sessions():
 def revoke_all_tenant_sessions(tenant_id):
     """
     Kill Switch: Destroy all sessions for a Tenant.
-    Phase 8: tenant session keys will follow pattern:
-    tenant:{tenant_id}:session:{jti}
-    This function is ready — keys will be populated in Phase 8.
+    Keys: tenant:{tenant_id}:session:{j}
+    Populated by create_tenant_session() or tenant workspace on login.
     """
     client = get_redis_client()
     pattern = f'tenant:{tenant_id}:session:*'
@@ -163,4 +164,66 @@ def revoke_all_tenant_sessions(tenant_id):
             break
 
     pipeline.execute()
+
+
+def create_tenant_session(
+        tenant_id,
+        user_domain,
+        reference_id,
+        reference_name,
+        ip_address,
+        user_agent,
+        timeout_minutes,
+        jti=None):
+    """
+    Register a **tenant** web user or driver session in Redis (Kill Switch).
+    Payload **includes** ``tenant_id`` so revokes and monitoring are scoped to
+    the subscriber. Do not use this shape for CP admin sessions — use
+    ``create_admin_session`` instead.
+
+    If the tenant app issues JWTs after login, carry the same subscriber UUID
+    in claims (e.g. ``tenant_id``) for this domain only — never mix into admin
+    tokens.
+
+    Returns JTI string (UUID).
+    """
+    client = get_redis_client()
+    token = jti or str(uuid.uuid4())
+    now = timezone.now().isoformat()
+    session_data = {
+        'jti': token,
+        'tenant_id': str(tenant_id),
+        'user_domain': user_domain,
+        'reference_id': str(reference_id),
+        'reference_name': reference_name or '',
+        'ip_address': ip_address or '',
+        'user_agent': (user_agent or '')[:500],
+        'started_at': now,
+        'last_activity': now,
+    }
+    ttl_seconds = max(60, int(timeout_minutes) * 60)
+    key = f'tenant:{tenant_id}:session:{token}'
+    client.setex(key, ttl_seconds, json.dumps(session_data))
+    return token
+
+
+def refresh_tenant_session(tenant_id, jti, timeout_minutes):
+    client = get_redis_client()
+    key = f'tenant:{tenant_id}:session:{jti}'
+    data = client.get(key)
+    if not data:
+        return False
+    session_data = json.loads(data)
+    session_data['last_activity'] = timezone.now().isoformat()
+    ttl_seconds = max(60, int(timeout_minutes) * 60)
+    client.setex(key, ttl_seconds, json.dumps(session_data))
+    return True
+
+
+def revoke_tenant_session_key(tenant_id, jti):
+    """Delete one tenant/driver session from Redis."""
+    if not jti:
+        return
+    client = get_redis_client()
+    client.delete(f'tenant:{tenant_id}:session:{jti}')
 

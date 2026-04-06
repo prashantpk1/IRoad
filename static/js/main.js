@@ -11,6 +11,7 @@ document.addEventListener("DOMContentLoaded", function () {
     initSidebarCollapse();
     initTimeValidation();
     initFormValidation();
+    initConfirmForms();
     initUserProfile();
     initNotificationPanel();
     initHeaderDateTime();
@@ -328,6 +329,21 @@ function validateTimeRange() {
     }
   }
   return true;
+}
+
+/* ============================================
+   Forms with data-confirm (safe for i18n / apostrophes)
+   ============================================ */
+function initConfirmForms() {
+  document.querySelectorAll("form[data-confirm]").forEach(function (form) {
+    form.addEventListener("submit", function (e) {
+      var msg = form.getAttribute("data-confirm");
+      if (!msg || window.confirm(msg)) {
+        return;
+      }
+      e.preventDefault();
+    });
+  });
 }
 
 /* ============================================
