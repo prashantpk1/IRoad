@@ -15,14 +15,11 @@
       <p class="page-subtitle">{% translate "Manage your records here" %}</p>
     </div>
     <div class="page-header-right">
-      <div class="eal-header-actions">
-        <!-- Actions here -->
-      </div>
+      <div class="eal-header-actions"></div>
     </div>
   </div>
 </div>
 
-  
   {% if form.instance.pk and form.instance.updated_at %}
   <div class="edit-info-bar">
     <i class="bi bi-clock-history"></i>
@@ -44,7 +41,7 @@
         <div style="margin-bottom: 16px; color: #b91c1c; font-weight: 600">{{ form.non_field_errors }}</div>
       {% endif %}
 
-      <form method="post" action="">
+      <form method="post" action="" id="gateway-form">
         {% csrf_token %}
         <div class="fields-grid cols-2">
           <div class="field"><label class="form-label">Gateway Type</label>{{ form.gateway_type }}</div>
@@ -55,22 +52,38 @@
           <div class="field"><label class="form-label">Password/Secret</label>{{ form.password_secret }}</div>
           <div class="field"><label class="form-label">Sender ID</label>{{ form.sender_id }}</div>
           <div class="field" id="enc-wrap"><label class="form-label">Encryption</label>{{ form.encryption_type }}</div>
-          <div class="field"><label class="form-label">Status</label>{{ form.is_active }}</div>
+          <div class="field">
+            <label class="form-label">Active</label>
+            <div class="form-check form-switch" style="padding-left: 0;">
+              {{ form.is_active }}
+            </div>
           </div>
-      </div>
-      <button type="button" id="test-connection-btn" class="eal-btn eal-btn-outline" style="margin-top: 16px; margin-bottom: 24px;">
-        <i class="bi bi-broadcast"></i>
-        <span id="test-btn-text">{% translate "Test Connection" %}</span>
-        <div id="test-spinner" class="spinner-border spinner-border-sm ms-2" role="status" style="display: none;">
-          <span class="visually-hidden">Loading...</span>
         </div>
-      </button>
-      <div id="test-result-area" style="margin-bottom: 24px; display: none;">
-        <div id="test-alert" class="alert" role="alert" style="border-radius: 10px; font-weight: 500"></div>
-      </div>
-    </div>
 
-        <div class="form-actions-bar">
+        <div id="test-result-area" style="margin-top: 16px; margin-bottom: 16px; display: none;">
+          <div id="test-alert" class="alert" role="alert" style="border-radius: 10px; font-weight: 500"></div>
+        </div>
+      
+    </div>
+  </div>
+
+        <div class="form-actions-bar d-flex flex-wrap gap-2 align-items-center" style="margin-top: 8px;">
+          <button type="button" id="test-connection-btn" class="eal-btn eal-btn-outline">
+            <i class="bi bi-broadcast"></i>
+            <span id="test-btn-text">{% translate "Test Connection" %}</span>
+            <span id="test-spinner" class="spinner-border spinner-border-sm ms-2" role="status" style="display: none;">
+              <span class="visually-hidden">Loading...</span>
+            </span>
+          </button>
+          <button type="submit" class="eal-btn eal-btn-primary">
+            <i class="bi bi-check-lg me-1"></i>
+            {% if is_edit %}{% translate "Save changes" %}{% else %}{% translate "Save gateway" %}{% endif %}
+          </button>
+          <a href="{% url 'comm_gateway_list' %}" class="eal-btn eal-btn-outline ms-auto">{% translate "Cancel" %}</a>
+        </div>
+      </form>
+    </div>
+  </div>
 {% endblock %}
 
 {% block extra_js %}
@@ -86,9 +99,9 @@
     const resultArea = document.getElementById('test-result-area');
     const resultAlert = document.getElementById('test-alert');
 
-    // Handle Edit Mode password masking
     if (secretField && {{ is_edit|yesno:"true,false" }}) {
       secretField.value = '********';
+      secretField.setAttribute('autocomplete', 'new-password');
     }
 
     function toggleEmailFields() {
@@ -103,10 +116,17 @@
       toggleEmailFields();
     }
 
-    // Test Connection Logic
+    const activeField = document.getElementById('id_is_active');
+    if (activeField) {
+      activeField.classList.add('form-check-input');
+      activeField.style.marginLeft = '0';
+      activeField.style.width = '2.5rem';
+      activeField.style.height = '1.25rem';
+      activeField.style.cursor = 'pointer';
+    }
+
     if (testBtn) {
-      testBtn.addEventListener('click', function() {
-        // Reset UI
+      testBtn.addEventListener('click', function () {
         resultArea.style.display = 'none';
         testBtn.disabled = true;
         testSpinner.style.display = 'inline-block';
@@ -114,14 +134,17 @@
 
         const formData = new FormData();
         formData.append('csrfmiddlewaretoken', document.querySelector('[name="csrfmiddlewaretoken"]').value);
-        formData.append('gateway_type', typeField.value);
+        formData.append('gateway_type', typeField ? typeField.value : '');
+        formData.append('provider_name', document.querySelector('[name="provider_name"]').value);
         formData.append('host_url', document.querySelector('[name="host_url"]').value);
-        formData.append('port', document.querySelector('[name="port"]').value);
+        const portEl = document.querySelector('[name="port"]');
+        formData.append('port', portEl ? portEl.value : '');
         formData.append('username_key', document.querySelector('[name="username_key"]').value);
-        formData.append('password_secret', secretField.value);
+        formData.append('password_secret', secretField ? secretField.value : '');
         formData.append('sender_id', document.querySelector('[name="sender_id"]').value);
-        formData.append('encryption_type', document.querySelector('[name="encryption_type"]').value);
-        
+        const encEl = document.querySelector('[name="encryption_type"]');
+        formData.append('encryption_type', encEl ? encEl.value : '');
+
         {% if is_edit %}
         formData.append('gateway_id', '{{ gateway.gateway_id }}');
         {% endif %}
@@ -129,30 +152,29 @@
         fetch('{% url "comm_gateway_test_connection" %}', {
           method: 'POST',
           body: formData,
-          headers: {
-            'X-Requested-With': 'XMLHttpRequest'
-          }
+          headers: { 'X-Requested-With': 'XMLHttpRequest' },
         })
-        .then(response => response.json())
-        .then(data => {
-          resultArea.style.display = 'block';
-          resultAlert.className = 'alert ' + (data.success ? 'alert-success' : 'alert-danger');
-          resultAlert.innerHTML = '<i class="bi ' + (data.success ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill') + ' me-2"></i>' + data.message;
-        })
-        .catch(error => {
-          resultArea.style.display = 'block';
-          resultAlert.className = 'alert alert-danger';
-          resultAlert.innerText = 'System error occurred while testing connection.';
-          console.error('Error:', error);
-        })
-        .finally(() => {
-          testBtn.disabled = false;
-          testSpinner.style.display = 'none';
-          testBtnText.innerText = 'Test Connection';
-        });
+          .then(function (response) { return response.json(); })
+          .then(function (data) {
+            resultArea.style.display = 'block';
+            resultAlert.className = 'alert ' + (data.success ? 'alert-success' : 'alert-danger');
+            resultAlert.innerHTML = '<i class="bi ' + (data.success ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill') + ' me-2"></i>' + data.message;
+            if (data.success) {
+              resultArea.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+          })
+          .catch(function () {
+            resultArea.style.display = 'block';
+            resultAlert.className = 'alert alert-danger';
+            resultAlert.innerText = 'System error occurred while testing connection.';
+          })
+          .finally(function () {
+            testBtn.disabled = false;
+            testSpinner.style.display = 'none';
+            testBtnText.innerText = 'Test Connection';
+          });
       });
     }
   })();
 </script>
 {% endblock %}
-

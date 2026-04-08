@@ -23,16 +23,6 @@
   </div>
 </div>
 
-  
-
-  <div class="list-page-actions">
-    <a href="{% url 'gateway_list' %}" class="eal-btn">
-          <i class="bi bi-arrow-left"></i>
-          <span>Cancel</span>
-        </a>
-  </div>
-</div>
-
   {% if is_edit and gateway and gateway.updated_at %}
   <div class="edit-info-bar">
     <i class="bi bi-clock-history"></i>
@@ -46,67 +36,91 @@
 
   <div class="form-card">
     <div class="form-card-body">
-      <div style="margin-bottom: 16px; padding: 12px 14px; border-radius: 10px" class="alert alert-warning">
-        <p style="margin: 0; font-weight: 600">
+      <div class="alert alert-warning mb-3">
+        <p class="mb-0 fw-semibold">
           Credentials are sensitive. This data is stored securely and will not be displayed after saving.
         </p>
         {% if is_edit %}
-          <p style="margin: 8px 0 0 0; font-weight: 600">
+          <p class="mt-2 mb-0 fw-semibold">
             Leave credentials field as-is to keep existing credentials. Replace to update.
           </p>
         {% endif %}
       </div>
 
       {% if form.non_field_errors %}
-        <div style="margin-bottom: 16px; color: #b91c1c; font-weight: 600">
+        <div class="alert alert-danger mb-3">
           {{ form.non_field_errors }}
         </div>
       {% endif %}
 
-      <h3 style="margin: 0 0 12px 0">Gateway Details</h3>
+      <div class="form-card-header p-0 mb-3">
+        <div class="form-card-icon blue">
+          <i class="bi bi-shield-lock"></i>
+        </div>
+        <div class="form-card-header-text">
+          <h3 class="form-card-title mb-0">Gateway Details</h3>
+          <p class="form-card-desc mb-0">Configure provider environment and secure API credentials.</p>
+        </div>
+      </div>
 
       <form method="post" action="">
         {% csrf_token %}
 
-        <div style="margin-bottom: 16px">
-          <label class="form-label">Gateway Name</label>
-          {{ form.gateway_name }}
-          {% for error in form.gateway_name.errors %}
-            <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-          {% endfor %}
+        <div class="fields-grid cols-2">
+          <div class="field">
+            <label class="form-label">Gateway Name</label>
+            {{ form.gateway_name }}
+            {% for error in form.gateway_name.errors %}
+              <div class="text-danger mt-1 fw-semibold">{{ error }}</div>
+            {% endfor %}
+          </div>
+
+          <div class="field">
+            <label class="form-label">Environment</label>
+            {{ form.environment }}
+            {% for error in form.environment.errors %}
+              <div class="text-danger mt-1 fw-semibold">{{ error }}</div>
+            {% endfor %}
+          </div>
         </div>
 
-        <div style="margin-bottom: 16px">
-          <label class="form-label">Environment</label>
-          {{ form.environment }}
-          {% for error in form.environment.errors %}
-            <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-          {% endfor %}
+        <div class="form-card-header p-0 mb-3 mt-2">
+          <div class="form-card-icon" style="background: rgba(245, 158, 11, 0.12); color: var(--warning-color);">
+            <i class="bi bi-key"></i>
+          </div>
+          <div class="form-card-header-text">
+            <h3 class="form-card-title mb-0">API Credentials</h3>
+          </div>
         </div>
 
-        <h3 style="margin: 18px 0 12px 0">API Credentials</h3>
-
-        <div style="margin-bottom: 16px">
-          <label class="form-label">Credentials JSON</label>
-          {{ form.credentials_payload }}
-          <style>
-            #id_credentials_payload { min-height: 180px; }
-          </style>
-          <div style="margin-top: 6px; color: #6b7280; font-size: 13px">
-            {{ form.credentials_payload.help_text }}
+        <div class="field mb-3">
+          <label class="form-label">Credentials</label>
+          <div id="credentials-builder" class="vstack gap-2"></div>
+          <div class="d-flex justify-content-between align-items-center mt-2">
+            <button type="button" id="add-credential-row" class="eal-btn eal-btn-outline">
+              <i class="bi bi-plus-lg"></i>
+              <span>Add credential</span>
+            </button>
+            <small id="credentials-builder-hint" class="text-muted"></small>
+          </div>
+          <div style="display:none;">
+            {{ form.credentials_payload }}
+          </div>
+          <div class="mt-1 text-muted small">
+            Add key/value rows and the system will generate secure JSON automatically.
           </div>
           {% for error in form.credentials_payload.errors %}
-            <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+            <div class="text-danger mt-1 fw-semibold">{{ error }}</div>
           {% endfor %}
         </div>
 
-        <div style="margin-bottom: 16px">
+        <div class="field mb-3">
           <label class="form-label">Status</label>
-          <div style="display: flex; align-items: center; gap: 10px">
+          <div class="form-check form-switch ps-0">
             {{ form.is_active }}
           </div>
           {% for error in form.is_active.errors %}
-            <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+            <div class="text-danger mt-1 fw-semibold">{{ error }}</div>
           {% endfor %}
         </div>
 
@@ -128,15 +142,121 @@
     </div>
   </div>
 
-  {% if is_edit and masked_placeholder %}
-    <script>
-      (function () {
-        var textarea = document.getElementById('id_credentials_payload');
-        if (textarea) {
-          textarea.value = '{{ masked_placeholder|escapejs }}';
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  (function () {
+    var textarea = document.getElementById('id_credentials_payload');
+    var rowsWrap = document.getElementById('credentials-builder');
+    var addBtn = document.getElementById('add-credential-row');
+    var hintEl = document.getElementById('credentials-builder-hint');
+    var formEl = textarea ? textarea.form : null;
+    var masked = '{{ masked_placeholder|default:""|escapejs }}';
+    var keepExisting = false;
+
+    if (!textarea || !rowsWrap || !addBtn || !formEl) return;
+
+    function rowTemplate(key, value) {
+      var row = document.createElement('div');
+      row.className = 'row g-2 align-items-end';
+      row.innerHTML =
+        '<div class="col-12 col-md-5">' +
+        '  <label class="form-label mb-1">Key</label>' +
+        '  <input type="text" class="form-control cred-key" placeholder="e.g. public_key">' +
+        '</div>' +
+        '<div class="col-12 col-md-6">' +
+        '  <label class="form-label mb-1">Value</label>' +
+        '  <input type="text" class="form-control cred-value" placeholder="Enter value">' +
+        '</div>' +
+        '<div class="col-12 col-md-1 d-grid">' +
+        '  <button type="button" class="eal-btn eal-btn-outline cred-remove" title="Remove">' +
+        '    <i class="bi bi-trash"></i>' +
+        '  </button>' +
+        '</div>';
+      row.querySelector('.cred-key').value = key || '';
+      row.querySelector('.cred-value').value = value || '';
+      row.querySelector('.cred-key').addEventListener('input', onRowChange);
+      row.querySelector('.cred-value').addEventListener('input', onRowChange);
+      row.querySelector('.cred-remove').addEventListener('click', function () {
+        row.remove();
+        if (!rowsWrap.children.length) {
+          rowsWrap.appendChild(rowTemplate('', ''));
         }
-      })();
-    </script>
-  {% endif %}
+        onRowChange();
+      });
+      return row;
+    }
+
+    function parseCurrentPayload() {
+      var raw = (textarea.value || '').trim();
+      if (!raw || raw === 'null') return null;
+      if (masked && raw === masked) {
+        keepExisting = true;
+        return null;
+      }
+      try {
+        var parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          return parsed;
+        }
+      } catch (e) {
+        return null;
+      }
+      return null;
+    }
+
+    function updateHint() {
+      if (keepExisting) {
+        hintEl.textContent = 'Existing credentials will stay unchanged unless you edit rows.';
+      } else {
+        hintEl.textContent = '';
+      }
+    }
+
+    function syncTextareaFromRows() {
+      if (keepExisting) {
+        textarea.value = masked;
+        return;
+      }
+      var payload = {};
+      rowsWrap.querySelectorAll('.row').forEach(function (row) {
+        var key = (row.querySelector('.cred-key').value || '').trim();
+        var value = row.querySelector('.cred-value').value || '';
+        if (key) payload[key] = value;
+      });
+      textarea.value = JSON.stringify(payload);
+    }
+
+    function onRowChange() {
+      keepExisting = false;
+      updateHint();
+      syncTextareaFromRows();
+    }
+
+    var initialPayload = parseCurrentPayload();
+    if (initialPayload) {
+      Object.keys(initialPayload).forEach(function (key) {
+        rowsWrap.appendChild(rowTemplate(key, String(initialPayload[key])));
+      });
+    }
+    if (!rowsWrap.children.length) {
+      rowsWrap.appendChild(rowTemplate('', ''));
+    }
+    updateHint();
+    syncTextareaFromRows();
+
+    addBtn.addEventListener('click', function () {
+      keepExisting = false;
+      updateHint();
+      rowsWrap.appendChild(rowTemplate('', ''));
+      syncTextareaFromRows();
+    });
+
+    formEl.addEventListener('submit', function () {
+      syncTextareaFromRows();
+    });
+  })();
+</script>
 {% endblock %}
 

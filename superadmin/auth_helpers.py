@@ -6,6 +6,8 @@ from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 from django.conf import settings
 
+from superadmin.communication_helpers import send_named_notification_email
+
 
 def get_security_settings():
     from superadmin.models import AdminSecuritySettings
@@ -141,13 +143,28 @@ def send_auth_email(user, email_type, context):
     if email_type == 'password_reset':
         subject = 'Reset Your iRoad Password'
         template_name = 'auth/emails/password_reset.html'
+        notif_template_name = 'AUTH_PASSWORD_RESET'
     elif email_type == 'invite':
         subject = 'Activate Your iRoad Admin Account'
         template_name = 'auth/emails/user_invite.html'
+        notif_template_name = 'AUTH_ADMIN_INVITE'
     else:
         return False
 
     try:
+        # Prefer Notification Templates configured from CP UI.
+        if send_named_notification_email(
+            notif_template_name,
+            recipient_email=user.email,
+            context_dict=context,
+            language='en',
+            default_subject=subject,
+            trigger_source=f'TemplateName: {notif_template_name}',
+            # Auth flows should stay on Django SMTP defaults for consistency.
+            force_django_smtp=True,
+        ):
+            return True
+
         html_content = render_to_string(template_name, context)
         text_content = strip_tags(html_content)
 

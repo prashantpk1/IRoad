@@ -129,7 +129,7 @@
 </div>
 {% endif %}
 
-<form method="post" action="" autocomplete="off">
+<form method="post" action="" autocomplete="off" novalidate>
   {% csrf_token %}
   {% if form.non_field_errors %}
     <div class="alert alert-danger mb-4 shadow-sm border-0" style="border-radius: 12px">{{ form.non_field_errors }}</div>
@@ -223,7 +223,7 @@
       <span class="text-muted small ms-2">{% translate "(Click to insert at cursor position)" %}</span>
     </div>
     <div style="display: flex; gap: 12px; flex-wrap: wrap;">
-      {% with vars="client_name otp_code invoice_amount invoice_number plan_name expiry_date company_name support_email" %}
+      {% with vars="client_name otp_code invoice_amount invoice_number plan_name expiry_date company_name support_email admin_user reset_url invite_url api_bridge_key portal_bootstrap_password portal_login_url tenant.company_name" %}
       {% for var in vars.split %}
         <button type="button" class="var-chip" onclick="insertVar('{% templatetag openvariable %}{{ var }}{% templatetag closevariable %}')">
           <i class="bi bi-code-slash"></i>
@@ -295,6 +295,19 @@
     const channel = document.getElementById('id_channel_type');
     if (channel) channel.addEventListener('change', toggleSubjects);
     toggleSubjects();
+
+    // Ensure TinyMCE content is synced to the underlying textarea before submit.
+    // Also bypasses "required hidden textarea" browser validation edge-cases.
+    const form = document.querySelector('form');
+    if (form) {
+      form.addEventListener('submit', function () {
+        try {
+          if (window.tinymce && typeof window.tinymce.triggerSave === 'function') {
+            window.tinymce.triggerSave();
+          }
+        } catch (e) {}
+      });
+    }
   })();
 
   function insertVar(v) {

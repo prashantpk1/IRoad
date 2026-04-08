@@ -14,6 +14,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.core.paginator import Paginator
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.html import strip_tags
+from django.template.loader import render_to_string
 from django.utils.dateparse import parse_date
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import ensure_csrf_cookie
@@ -25,6 +27,8 @@ import json
 import logging
 import uuid
 import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +61,7 @@ from .audit_helpers import (
     log_audit_action,
 )
 from .redis_helpers import create_admin_session
+from .communication_helpers import ensure_default_notification_templates
 from .forms import (
     AddOnsPricingPolicyForm,
     AdminSecuritySettingsForm,
@@ -953,7 +958,7 @@ class AuditLogListView(LoginRequiredMixin, View):
             )
 
         qs = qs.order_by('-timestamp')
-        paginator = Paginator(qs, 25)
+        paginator = Paginator(qs, 5)
         page_number = request.GET.get('page', 1)
         page_obj = paginator.get_page(page_number)
 
@@ -1153,7 +1158,7 @@ class ActiveSessionListView(LoginRequiredMixin, View):
             )
 
         qs = qs.order_by('-started_at')
-        paginator = Paginator(qs, 20)
+        paginator = Paginator(qs, 5)
         page_number = request.GET.get('page', 1)
         sessions_page = paginator.get_page(page_number)
 
@@ -1611,13 +1616,22 @@ class AdminUserCreateView(LoginRequiredMixin, View):
             reverse('set_password', args=[auth_token.token])
         )
 
-        send_auth_email(user, 'invite', {'admin_user': user, 'invite_url': invite_url})
-
-        return render(
-            request,
-            'system_users/admin_users/invite_success.html',
-            {'invite_url': invite_url},
+        sent = send_auth_email(
+            user,
+            'invite',
+            {'admin_user': user, 'invite_url': invite_url},
         )
+        if sent:
+            messages.success(
+                request,
+                f'Admin user created. Invitation email sent to {user.email}.',
+            )
+        else:
+            messages.warning(
+                request,
+                f'Admin user created, but invite email failed for {user.email}.',
+            )
+        return redirect(reverse('admin_user_list'))
 
 
 
@@ -1964,7 +1978,7 @@ class CountryListView(LoginRequiredMixin, View):
         countries_qs = countries_qs.order_by('name_en')
         total_count = countries_qs.count()
 
-        paginator = Paginator(countries_qs, 15)
+        paginator = Paginator(countries_qs, 5)
         page_number = request.GET.get('page', 1)
         countries_page = paginator.get_page(page_number)
 
@@ -2158,7 +2172,7 @@ class CurrencyListView(LoginRequiredMixin, View):
         currencies_qs = currencies_qs.order_by('name_en')
         total_count = currencies_qs.count()
 
-        paginator = Paginator(currencies_qs, 15)
+        paginator = Paginator(currencies_qs, 5)
         page_number = request.GET.get('page', 1)
         currencies_page = paginator.get_page(page_number)
 
@@ -2633,7 +2647,7 @@ class ExchangeRateListView(LoginRequiredMixin, View):
             qs = qs.filter(is_active=False)
 
         total_count = qs.count()
-        paginator = Paginator(qs, 15)
+        paginator = Paginator(qs, 5)
         page_number = request.GET.get('page', 1)
         rates_page = paginator.get_page(page_number)
 
@@ -2870,7 +2884,7 @@ class TaxCodeListView(LoginRequiredMixin, View):
             tax_codes_qs = tax_codes_qs.filter(is_active=False)
 
         total_count = tax_codes_qs.count()
-        paginator = Paginator(tax_codes_qs, 15)
+        paginator = Paginator(tax_codes_qs, 5)
         page_number = request.GET.get('page', 1)
         tax_codes_page = paginator.get_page(page_number)
 
@@ -3532,7 +3546,7 @@ class PromoCodeListView(LoginRequiredMixin, View):
         elif status_filter == 'Inactive':
             qs = qs.filter(is_active=False)
 
-        paginator = Paginator(qs, 15)
+        paginator = Paginator(qs, 5)
         page_number = request.GET.get('page', 1)
         promo_page = paginator.get_page(page_number)
 
@@ -3663,7 +3677,7 @@ class BankAccountListView(LoginRequiredMixin, View):
         elif status_filter == 'Inactive':
             qs = qs.filter(is_active=False)
 
-        paginator = Paginator(qs, 15)
+        paginator = Paginator(qs, 5)
         accounts = paginator.get_page(request.GET.get('page', 1))
 
         return render(
@@ -3791,7 +3805,7 @@ class PaymentGatewayListView(LoginRequiredMixin, View):
         elif status_filter == 'Inactive':
             qs = qs.filter(is_active=False)
 
-        paginator = Paginator(qs, 10)
+        paginator = Paginator(qs, 5)
         gateways = paginator.get_page(request.GET.get('page', 1))
 
         return render(
@@ -3933,7 +3947,7 @@ class PaymentMethodListView(LoginRequiredMixin, View):
         elif status_filter == 'Inactive':
             qs = qs.filter(is_active=False)
 
-        paginator = Paginator(qs, 10)
+        paginator = Paginator(qs, 5)
         methods = paginator.get_page(request.GET.get('page', 1))
 
         return render(
@@ -4044,7 +4058,7 @@ class CommGatewayListView(LoginRequiredMixin, View):
 
     def get(self, request):
         qs = CommGateway.objects.order_by('gateway_type', 'provider_name')
-        paginator = Paginator(qs, 10)
+        paginator = Paginator(qs, 5)
         gateways = paginator.get_page(request.GET.get('page', 1))
         return render(
             request,
@@ -4176,26 +4190,58 @@ class CommGatewayTestConnectionView(LoginRequiredMixin, View):
                     password = existing.password_secret
 
             if g_type == 'Email':
-                if not all([host, port, user, password]):
-                    return JsonResponse({'success': False, 'message': 'Incomplete SMTP credentials.'})
-                
+                if not all([host, user, password]):
+                    return JsonResponse({'success': False, 'message': 'Incomplete SMTP credentials (host, username, password required).'})
+                enc = (enc_type or 'TLS').strip() or 'TLS'
                 try:
-                    p = int(port)
+                    p = int(port) if str(port).strip() else None
                 except ValueError:
                     return JsonResponse({'success': False, 'message': 'Port must be a number.'})
+                if p is None:
+                    p = 465 if enc == 'SSL' else 587
 
+                host_clean = (host or '').strip()
+                test_recipient = (getattr(request.user, 'email', '') or '').strip()
+                if not test_recipient:
+                    return JsonResponse({
+                        'success': False,
+                        'message': 'Connection check requires your admin account to have an email address for dummy test delivery.',
+                    })
+                from_email = (sender or '').strip() or user.strip()
                 try:
-                    # Test SMTP connection
-                    if enc_type == 'SSL':
-                        server = smtplib.SMTP_SSL(host, p, timeout=10)
+                    # Match runtime send path in communication_helpers / DatabaseEmailBackend
+                    if enc == 'SSL':
+                        server = smtplib.SMTP_SSL(host_clean, p, timeout=15)
                     else:
-                        server = smtplib.SMTP(host, p, timeout=10)
-                        if enc_type == 'TLS':
+                        server = smtplib.SMTP(host_clean, p, timeout=15)
+                        if enc == 'TLS':
+                            server.ehlo()
                             server.starttls()
-                    
+                            server.ehlo()
                     server.login(user, password)
-                    server.quit()
-                    return JsonResponse({'success': True, 'message': 'SMTP Connection Successful!'})
+                    test_subject = 'iRoad Gateway Test Message'
+                    test_context = {
+                        'provider_name': (request.POST.get('provider_name') or '').strip() or 'N/A',
+                        'host': host_clean,
+                        'recipient_email': test_recipient,
+                    }
+                    html_body = render_to_string('comm/emails/gateway_test_message.html', test_context)
+                    text_body = strip_tags(html_body)
+                    mime_msg = MIMEMultipart('alternative')
+                    mime_msg['Subject'] = test_subject
+                    mime_msg['From'] = from_email
+                    mime_msg['To'] = test_recipient
+                    mime_msg.attach(MIMEText(text_body, 'plain', 'utf-8'))
+                    mime_msg.attach(MIMEText(html_body, 'html', 'utf-8'))
+                    server.sendmail(from_email, [test_recipient], mime_msg.as_string())
+                    try:
+                        server.quit()
+                    except Exception:
+                        pass
+                    return JsonResponse({
+                        'success': True,
+                        'message': f'SMTP connection successful and testing email sent to {test_recipient}.',
+                    })
                 except Exception as e:
                     return JsonResponse({'success': False, 'message': f'Connection failed: {str(e)}'})
 
@@ -4216,6 +4262,9 @@ class NotificationTemplateListView(LoginRequiredMixin, View):
     template_name = 'comm/templates/template_list.html'
 
     def get(self, request):
+        ensure_default_notification_templates(
+            created_by=request.user if getattr(request.user, 'is_authenticated', False) else None
+        )
         search_query = request.GET.get('q', '').strip()
         channel_filter = request.GET.get('channel', 'All')
         category_filter = request.GET.get('category', 'All')
@@ -4233,7 +4282,7 @@ class NotificationTemplateListView(LoginRequiredMixin, View):
         elif status_filter == 'Inactive':
             qs = qs.filter(is_active=False)
 
-        paginator = Paginator(qs, 15)
+        paginator = Paginator(qs, 5)
         templates = paginator.get_page(request.GET.get('page', 1))
         return render(
             request,
@@ -4348,7 +4397,7 @@ class EventMappingListView(LoginRequiredMixin, View):
         qs = EventMapping.objects.select_related(
             'primary_template', 'fallback_template'
         ).order_by('system_event')
-        paginator = Paginator(qs, 15)
+        paginator = Paginator(qs, 5)
         mappings = paginator.get_page(request.GET.get('page', 1))
         configured_events = set(qs.values_list('system_event', flat=True))
         event_labels = dict(EventMapping.SYSTEM_EVENT_CHOICES)
@@ -4451,7 +4500,7 @@ class PushNotificationListView(LoginRequiredMixin, View):
             qs = qs.filter(trigger_mode=trigger_mode)
         if dispatch_status in ['Draft', 'Scheduled', 'Completed']:
             qs = qs.filter(dispatch_status=dispatch_status)
-        paginator = Paginator(qs, 15)
+        paginator = Paginator(qs, 5)
         push_items = paginator.get_page(request.GET.get('page', 1))
         return render(
             request,
@@ -4545,7 +4594,7 @@ class SystemBannerListView(LoginRequiredMixin, View):
             qs = qs.filter(is_active=True)
         elif status_filter == 'Inactive':
             qs = qs.filter(is_active=False)
-        paginator = Paginator(qs, 10)
+        paginator = Paginator(qs, 5)
         banners = paginator.get_page(request.GET.get('page', 1))
         return render(
             request,
@@ -4624,7 +4673,7 @@ class InternalAlertRouteListView(LoginRequiredMixin, View):
 
     def get(self, request):
         qs = InternalAlertRoute.objects.select_related('notify_role').order_by('trigger_event')
-        paginator = Paginator(qs, 10)
+        paginator = Paginator(qs, 5)
         routes = paginator.get_page(request.GET.get('page', 1))
         return render(request, self.template_name, {'routes': routes})
 
@@ -4716,7 +4765,7 @@ class CommLogListView(LoginRequiredMixin, View):
             if parsed_to:
                 qs = qs.filter(dispatched_at__date__lte=parsed_to)
 
-        paginator = Paginator(qs, 20)
+        paginator = Paginator(qs, 5)
         logs = paginator.get_page(request.GET.get('page', 1))
         return render(
             request,
@@ -5114,7 +5163,7 @@ class OrderListView(LoginRequiredMixin, View):
         st = request.GET.get('order_status', '').strip()
         if st:
             qs = qs.filter(order_status=st)
-        paginator = Paginator(qs, 15)
+        paginator = Paginator(qs, 5)
         page = paginator.get_page(request.GET.get('page'))
         return render(request, self.template_name, {
             'orders': page,
@@ -5178,6 +5227,8 @@ class OrderCreateView(RootRequiredMixin, View):
             'addon_action_choices': OrderAddonLine.ACTION_TYPE_CHOICES,
             'addon_type_choices': OrderAddonLine.ADDON_TYPE_CHOICES,
             'tenant_preselect': str(tenant_obj.tenant_id) if tenant_obj else '',
+            'tenant_preselect_name': tenant_obj.company_name if tenant_obj else '',
+            'tenant_locked': bool(tenant_obj),
             'pricing_data': pricing_json,
             'addons_data': addons_json,
             'upgrade_credits_by_currency': upgrade_credits_by_currency,
@@ -5413,6 +5464,210 @@ class OrderCreateView(RootRequiredMixin, View):
         return redirect('order_detail', pk=order.pk)
 
 
+class OrderPreviewAjaxView(RootRequiredMixin, View):
+    """Realtime order calculator for create form projected preview."""
+
+    def get(self, request):
+        tenant_id = (request.GET.get('tenant') or '').strip()
+        classification = (request.GET.get('order_classification') or '').strip()
+        currency_id = (request.GET.get('currency') or '').strip()
+        plan_id = (request.GET.get('plan') or '').strip()
+        try:
+            cycles = int((request.GET.get('number_of_cycles') or '1').strip())
+        except ValueError:
+            cycles = 1
+        cycles = max(1, cycles)
+
+        tenant = TenantProfile.objects.filter(tenant_id=tenant_id).first()
+        if not tenant:
+            return JsonResponse({'ok': False, 'error': 'Select a valid tenant.'}, status=400)
+        currency = Currency.objects.filter(
+            currency_code=currency_id,
+            is_active=True,
+        ).first()
+        if not currency:
+            return JsonResponse({'ok': False, 'error': 'Select a valid currency.'}, status=400)
+        if classification not in dict(SubscriptionOrder.CLASSIFICATION_CHOICES):
+            return JsonResponse({'ok': False, 'error': 'Invalid order classification.'}, status=400)
+
+        tax = get_tax_code_for_tenant(tenant, client_ip=get_client_ip(request))
+        tax_rate = tax.rate_percent if tax else Decimal('0.00')
+        fx = get_fx_snapshot(currency_id)
+
+        sub_total = Decimal('0.00')
+        plan_price = Decimal('0.00')
+        pro_rata = Decimal('0.00')
+        plan_line_total = Decimal('0.00')
+        selected_plan = None
+        addon_preview_rows = []
+
+        if classification in _PLAN_CLASSIFICATIONS:
+            if plan_id:
+                selected_plan = SubscriptionPlan.objects.filter(
+                    plan_id=plan_id,
+                    is_active=True,
+                ).first()
+            if selected_plan:
+                ppc = PlanPricingCycle.objects.filter(
+                    plan=selected_plan,
+                    currency=currency,
+                    number_of_cycles=cycles,
+                ).first()
+                if ppc:
+                    plan_price = ppc.price
+                    if classification == 'Upgrade' and tenant.current_plan:
+                        old_px = resolve_upgrade_credit_basis_price(
+                            tenant.current_plan,
+                            currency.currency_code,
+                        )
+                        pro_rata = calculate_pro_rata_credit(tenant, old_px)
+                    plan_line_total = (plan_price + pro_rata).quantize(Decimal('0.01'))
+                    sub_total += plan_line_total
+
+        elif classification == 'Add_ons':
+            policy = AddOnsPricingPolicy.objects.filter(is_active=True).first()
+            if policy:
+                actions = request.GET.getlist('addon_action')
+                types = request.GET.getlist('addon_add_on_type')
+                qtys = request.GET.getlist('addon_quantity')
+                base_days = (
+                    tenant.current_plan.base_cycle_days
+                    if tenant.current_plan else 30
+                )
+                expiry = tenant.subscription_expiry_date or timezone.now().date()
+                for action, add_type, qty_s in zip(actions, types, qtys):
+                    if not add_type:
+                        continue
+                    try:
+                        qty = int(qty_s)
+                    except ValueError:
+                        qty = 1
+                    qty = max(1, qty)
+                    if action not in dict(OrderAddonLine.ACTION_TYPE_CHOICES):
+                        action = 'Add'
+                    unit = _billing_addon_unit_price(policy, add_type)
+                    cycles_fr, prorata_unit_total = calculate_addon_prorata(
+                        unit,
+                        base_days,
+                        expiry,
+                    )
+                    signed_qty = qty if action == 'Add' else -qty
+                    line_total = (
+                        Decimal(str(signed_qty)) *
+                        prorata_unit_total
+                    ).quantize(Decimal('0.01'))
+                    sub_total += line_total
+                    addon_preview_rows.append({
+                        'action_type': action,
+                        'add_on_type': add_type,
+                        'quantity': qty,
+                        'unit_price': str(unit.quantize(Decimal('0.01'))),
+                        'number_of_cycles': str(cycles_fr.quantize(Decimal('0.01'))),
+                        'pro_rata_adjustment': '0.00',
+                        'line_total': str(line_total),
+                    })
+
+        discount = Decimal('0.00')
+        taxable_base = (sub_total - discount).quantize(Decimal('0.01'))
+        if taxable_base < 0:
+            taxable_base = Decimal('0.00')
+        tax_amount = (taxable_base * tax_rate / Decimal('100')).quantize(Decimal('0.01'))
+        grand_total = (taxable_base + tax_amount).quantize(Decimal('0.01'))
+        base_equiv = (grand_total * fx).quantize(Decimal('0.01'))
+
+        proj_plan = tenant.current_plan
+        proj_expiry = tenant.subscription_expiry_date
+        proj_u = tenant.active_max_users
+        proj_it = tenant.active_max_internal_trucks
+        proj_et = tenant.active_max_external_trucks
+        proj_d = tenant.active_max_drivers
+
+        if classification == 'New_Subscription' and selected_plan:
+            proj_plan = selected_plan
+            proj_expiry = date.today() + timedelta(
+                days=selected_plan.base_cycle_days * cycles,
+            )
+            if selected_plan.max_internal_users != -1:
+                proj_u = selected_plan.max_internal_users
+            if selected_plan.max_internal_trucks != -1:
+                proj_it = selected_plan.max_internal_trucks
+            if selected_plan.max_external_trucks != -1:
+                proj_et = selected_plan.max_external_trucks
+            if selected_plan.max_active_drivers != -1:
+                proj_d = selected_plan.max_active_drivers
+        elif classification == 'Renewal' and selected_plan:
+            proj_plan = selected_plan
+            extra = selected_plan.base_cycle_days * cycles
+            if tenant.subscription_expiry_date:
+                proj_expiry = tenant.subscription_expiry_date + timedelta(days=extra)
+            else:
+                proj_expiry = date.today() + timedelta(days=extra)
+        elif classification == 'Upgrade' and selected_plan:
+            proj_plan = selected_plan
+            proj_expiry = date.today() + timedelta(
+                days=selected_plan.base_cycle_days * cycles,
+            )
+            if selected_plan.max_internal_users != -1:
+                proj_u = selected_plan.max_internal_users
+            if selected_plan.max_internal_trucks != -1:
+                proj_it = selected_plan.max_internal_trucks
+            if selected_plan.max_external_trucks != -1:
+                proj_et = selected_plan.max_external_trucks
+            if selected_plan.max_active_drivers != -1:
+                proj_d = selected_plan.max_active_drivers
+        elif classification == 'Downgrade' and selected_plan:
+            proj_plan = selected_plan
+            proj_expiry = tenant.subscription_expiry_date
+            if selected_plan.max_internal_users != -1:
+                proj_u = selected_plan.max_internal_users
+            if selected_plan.max_internal_trucks != -1:
+                proj_it = selected_plan.max_internal_trucks
+            if selected_plan.max_external_trucks != -1:
+                proj_et = selected_plan.max_external_trucks
+            if selected_plan.max_active_drivers != -1:
+                proj_d = selected_plan.max_active_drivers
+        elif classification == 'Add_ons':
+            for row in addon_preview_rows:
+                qty = int(row['quantity'])
+                if row['action_type'] == 'Reduce':
+                    qty = -qty
+                if row['add_on_type'] == 'Extra_User':
+                    proj_u += qty
+                elif row['add_on_type'] == 'Extra_Internal_Truck':
+                    proj_it += qty
+                elif row['add_on_type'] == 'Extra_External_Truck':
+                    proj_et += qty
+                elif row['add_on_type'] == 'Extra_Driver':
+                    proj_d += qty
+
+        return JsonResponse({
+            'ok': True,
+            'totals': {
+                'sub_total': str(sub_total.quantize(Decimal('0.01'))),
+                'discount_amount': str(discount),
+                'tax_amount': str(tax_amount),
+                'grand_total': str(grand_total),
+                'exchange_rate_snapshot': str(fx),
+                'base_currency_equivalent': str(base_equiv),
+            },
+            'plan_preview': {
+                'plan_price': str(plan_price.quantize(Decimal('0.01'))),
+                'pro_rata_adjustment': str(pro_rata.quantize(Decimal('0.01'))),
+                'line_total': str(plan_line_total.quantize(Decimal('0.01'))),
+            },
+            'projected': {
+                'plan_id': str(proj_plan.plan_id) if proj_plan else '',
+                'plan_name': proj_plan.plan_name_en if proj_plan else '',
+                'expiry_date': proj_expiry.isoformat() if proj_expiry else '',
+                'max_users': proj_u,
+                'max_internal_trucks': proj_it,
+                'max_external_trucks': proj_et,
+                'max_drivers': proj_d,
+            },
+            'addon_rows': addon_preview_rows,
+        })
+
+
 class OrderDetailView(LoginRequiredMixin, View):
     template_name = 'crm/orders/order_detail.html'
 
@@ -5567,7 +5822,7 @@ class TransactionListView(LoginRequiredMixin, View):
         cur = request.GET.get('currency', '').strip()
         if cur:
             qs = qs.filter(currency_id=cur)
-        paginator = Paginator(qs, 15)
+        paginator = Paginator(qs, 5)
         page = paginator.get_page(request.GET.get('page'))
         return render(request, self.template_name, {
             'transactions': page,
@@ -5776,7 +6031,7 @@ class InvoiceListView(LoginRequiredMixin, View):
                 Q(invoice_number__icontains=q) |
                 Q(customer_name__icontains=q)
             )
-        paginator = Paginator(qs, 15)
+        paginator = Paginator(qs, 5)
         page = paginator.get_page(request.GET.get('page'))
         return render(request, self.template_name, {
             'invoices': page,
@@ -5837,7 +6092,7 @@ class SupportCategoryListView(LoginRequiredMixin, View):
             qs = qs.filter(is_active=True)
         elif status_filter == 'Inactive':
             qs = qs.filter(is_active=False)
-        paginator = Paginator(qs, 15)
+        paginator = Paginator(qs, 5)
         categories = paginator.get_page(request.GET.get('page'))
         return render(
             request,
@@ -5965,7 +6220,7 @@ class CannedResponseListView(LoginRequiredMixin, View):
             qs = qs.filter(is_active=True)
         elif status_filter == 'Inactive':
             qs = qs.filter(is_active=False)
-        paginator = Paginator(qs, 15)
+        paginator = Paginator(qs, 5)
         canned_responses = paginator.get_page(request.GET.get('page'))
         return render(
             request,
@@ -6100,7 +6355,7 @@ class TicketListView(LoginRequiredMixin, View):
         elif assigned_filter:
             tickets_qs = tickets_qs.filter(assigned_to_id=assigned_filter)
 
-        paginator = Paginator(tickets_qs, 15)
+        paginator = Paginator(tickets_qs, 5)
         tickets = paginator.get_page(request.GET.get('page'))
 
         context = {

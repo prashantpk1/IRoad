@@ -101,9 +101,21 @@
 
         <div style="margin-bottom: 16px">
           <label class="form-label">Supported Currencies</label>
-          {{ form.supported_currencies }}
+          <div class="vstack gap-2">
+            <div class="d-flex gap-2">
+              <input type="text" id="currency-code-input" class="form-control" placeholder="Type currency code (e.g. SAR)">
+              <button type="button" id="add-currency-btn" class="eal-btn eal-btn-outline">
+                <i class="bi bi-plus-lg"></i>
+                <span>Add</span>
+              </button>
+            </div>
+            <div id="currency-chip-list" class="d-flex flex-wrap gap-2"></div>
+            <div style="display:none;">
+              {{ form.supported_currencies }}
+            </div>
+          </div>
           <div style="margin-top: 6px; color: #6b7280; font-size: 13px">
-            Enter as JSON array: ["SAR", "USD", "AED"]
+            Add one or more currency codes. JSON is generated automatically.
           </div>
           {% for error in form.supported_currencies.errors %}
             <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
@@ -168,6 +180,11 @@
       var methodType = document.getElementById('id_method_type');
       var gatewayWrap = document.getElementById('gateway-wrapper');
       var bankWrap = document.getElementById('bank-wrapper');
+      var currenciesField = document.getElementById('id_supported_currencies');
+      var currencyInput = document.getElementById('currency-code-input');
+      var addCurrencyBtn = document.getElementById('add-currency-btn');
+      var currencyChipList = document.getElementById('currency-chip-list');
+      var selectedCurrencies = [];
 
       function toggleFields() {
         var value = methodType ? methodType.value : '';
@@ -187,6 +204,89 @@
         methodType.addEventListener('change', toggleFields);
       }
       toggleFields();
+
+      function normalizeCode(value) {
+        return String(value || '').trim().toUpperCase();
+      }
+
+      function syncSupportedCurrenciesField() {
+        if (!currenciesField) return;
+        currenciesField.value = JSON.stringify(selectedCurrencies);
+      }
+
+      function removeCurrency(code) {
+        selectedCurrencies = selectedCurrencies.filter(function (item) {
+          return item !== code;
+        });
+        renderCurrencyChips();
+        syncSupportedCurrenciesField();
+      }
+
+      function renderCurrencyChips() {
+        if (!currencyChipList) return;
+        currencyChipList.innerHTML = '';
+        selectedCurrencies.forEach(function (code) {
+          var chip = document.createElement('span');
+          chip.className = 'badge bg-light text-dark border d-inline-flex align-items-center gap-2';
+          chip.style.padding = '8px 10px';
+          chip.innerHTML =
+            '<span>' + code + '</span>' +
+            '<button type="button" class="btn btn-sm p-0 border-0 bg-transparent" title="Remove" aria-label="Remove ' + code + '">' +
+            '<i class="bi bi-x-lg"></i>' +
+            '</button>';
+          chip.querySelector('button').addEventListener('click', function () {
+            removeCurrency(code);
+          });
+          currencyChipList.appendChild(chip);
+        });
+      }
+
+      function addCurrency(code) {
+        var normalized = normalizeCode(code);
+        if (!normalized) return;
+        if (selectedCurrencies.indexOf(normalized) === -1) {
+          selectedCurrencies.push(normalized);
+          renderCurrencyChips();
+          syncSupportedCurrenciesField();
+        }
+      }
+
+      function parseInitialCurrencies() {
+        if (!currenciesField) return;
+        var raw = String(currenciesField.value || '').trim();
+        if (!raw || raw === '[]') return;
+        try {
+          var parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            parsed.forEach(function (code) { addCurrency(code); });
+          }
+        } catch (e) {
+          // Keep existing validation behavior on backend if malformed.
+        }
+      }
+
+      if (addCurrencyBtn) {
+        addCurrencyBtn.addEventListener('click', function () {
+          addCurrency(currencyInput ? currencyInput.value : '');
+          if (currencyInput) {
+            currencyInput.value = '';
+            currencyInput.focus();
+          }
+        });
+      }
+
+      if (currencyInput) {
+        currencyInput.addEventListener('keydown', function (event) {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            addCurrency(currencyInput.value);
+            currencyInput.value = '';
+          }
+        });
+      }
+
+      parseInitialCurrencies();
+      syncSupportedCurrenciesField();
     })();
   </script>
 {% endblock %}

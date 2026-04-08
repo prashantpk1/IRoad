@@ -42,12 +42,17 @@
         <div class="row g-3">
           <div class="col-12 col-md-6">
             <label class="form-label">{% translate "Tenant" %}</label>
-            <select name="tenant" class="form-select" required id="id_tenant">
-              <option value="">---------</option>
-              {% for t in tenants %}
-                <option value="{{ t.tenant_id }}" {% if tenant_preselect == t.tenant_id|stringformat:"s" %}selected{% endif %}>{{ t.company_name }}</option>
-              {% endfor %}
-            </select>
+            {% if tenant_locked %}
+              <input type="text" class="form-control" value="{{ tenant_preselect_name }}" readonly>
+              <input type="hidden" name="tenant" id="id_tenant" value="{{ tenant_preselect }}">
+            {% else %}
+              <select name="tenant" class="form-select" required id="id_tenant">
+                <option value="">---------</option>
+                {% for t in tenants %}
+                  <option value="{{ t.tenant_id }}" {% if tenant_preselect == t.tenant_id|stringformat:"s" %}selected{% endif %}>{{ t.company_name }}</option>
+                {% endfor %}
+              </select>
+            {% endif %}
           </div>
           <div class="col-12 col-md-6">
             <label class="form-label">{% translate "Classification" %}</label>
@@ -164,10 +169,17 @@
         <div class="col-12 col-md-4"><label class="form-label">{% translate "Discount" %}</label><input class="form-control" id="pv_disc_input" readonly value="0.00"></div>
         <div class="col-12 col-md-4"><label class="form-label">{% translate "Tax" %}</label><input class="form-control" id="pv_tax_input" readonly value="0.00"></div>
         <div class="col-12 col-md-4"><label class="form-label fw-semibold">{% translate "Grand total" %}</label><input class="form-control fw-bold" id="pv_grand_input" readonly value="0.00"></div>
-        <div class="col-12 col-md-8"><label class="form-label">{% translate "Base currency equivalent" %}</label><input class="form-control" id="pv_base_input" readonly value="0.00"></div>
+        <div class="col-12 col-md-4"><label class="form-label">{% translate "Exchange rate snapshot" %}</label><input class="form-control" id="pv_fx_input" readonly value="1.000000"></div>
+        <div class="col-12 col-md-4"><label class="form-label">{% translate "Base currency equivalent" %}</label><input class="form-control" id="pv_base_input" readonly value="0.00"></div>
+        <div class="col-12 col-md-4"><label class="form-label">{% translate "Projected plan" %}</label><input class="form-control" id="pv_projected_plan" readonly value=""></div>
+        <div class="col-12 col-md-4"><label class="form-label">{% translate "Projected expiry date" %}</label><input class="form-control" id="pv_projected_expiry" readonly value=""></div>
+        <div class="col-12 col-md-4"><label class="form-label">{% translate "Projected max users" %}</label><input class="form-control" id="pv_projected_users" readonly value=""></div>
+        <div class="col-12 col-md-4"><label class="form-label">{% translate "Projected max trucks (internal)" %}</label><input class="form-control" id="pv_projected_it" readonly value=""></div>
+        <div class="col-12 col-md-4"><label class="form-label">{% translate "Projected max trucks (external)" %}</label><input class="form-control" id="pv_projected_et" readonly value=""></div>
+        <div class="col-12 col-md-4"><label class="form-label">{% translate "Projected max drivers" %}</label><input class="form-control" id="pv_projected_drivers" readonly value=""></div>
         <div class="col-12 mt-2">
           <label class="form-label">{% translate "Projected state preview" %}</label>
-          <p class="small text-muted mb-0" id="projected_hint">{% translate "After save, open the order detail to see full projected plan, expiry, and limits from the server." %}</p>
+          <p class="small text-muted mb-0" id="projected_hint">{% translate "Projected values are calculated in real-time using billing backend logic." %}</p>
         </div>
       </div>
 
@@ -236,6 +248,18 @@
       <input type="text" class="form-control form-control-sm addon-unit" readonly value="0.00">
     </div>
     <div class="col-md-1">
+      <label class="form-label small">{% translate "Cycles" %}</label>
+      <input type="text" name="addon_number_of_cycles" class="form-control form-control-sm addon-cycles" readonly value="0.00">
+    </div>
+    <div class="col-md-2">
+      <label class="form-label small">{% translate "Pro-rata" %}</label>
+      <input type="text" name="addon_pro_rata_adjustment" class="form-control form-control-sm addon-prorata" readonly value="0.00">
+    </div>
+    <div class="col-md-2">
+      <label class="form-label small">{% translate "Line total" %}</label>
+      <input type="text" name="addon_line_total" class="form-control form-control-sm addon-total" readonly value="0.00">
+    </div>
+    <div class="col-md-1">
       <button type="button" class="btn btn-sm btn-outline-danger w-100 btn-remove-addon" title="{% translate 'Remove' %}">&times;</button>
     </div>
   </div>
@@ -270,6 +294,7 @@
   const uiStrings = document.getElementById('order-form-ui-strings');
   const tenantEl = document.getElementById('id_tenant');
   const orderCreateBaseUrl = '{% url "order_create" %}';
+  const orderPreviewUrl = '{% url "order_preview_ajax" %}';
 
   function normUuid(s) {
     return String(s || '').replace(/-/g, '').toLowerCase();
@@ -377,6 +402,21 @@
     upgradeCreditHintLine.textContent = base + ' ' + cur + ': ' + pr.toFixed(2);
   }
 
+  function hasSelectedTenant() {
+    return !!(tenantEl && String(tenantEl.value || '').trim());
+  }
+
+  function applyPreviewToAddonRows(rows) {
+    const domRows = addonRows.querySelectorAll('.addon-row');
+    domRows.forEach(function (row, idx) {
+      const data = rows[idx] || {};
+      row.querySelector('.addon-unit').value = (parseFloat(data.unit_price || 0)).toFixed(2);
+      row.querySelector('.addon-cycles').value = (parseFloat(data.number_of_cycles || 0)).toFixed(2);
+      row.querySelector('.addon-prorata').value = (parseFloat(data.pro_rata_adjustment || 0)).toFixed(2);
+      row.querySelector('.addon-total').value = (parseFloat(data.line_total || 0)).toFixed(2);
+    });
+  }
+
   function refreshPlanPreview() {
     if (!planIds.includes(clsEl.value)) {
       document.getElementById('preview_plan_price').value = '0.00';
@@ -397,7 +437,7 @@
     refreshUpgradeCreditHint(proRata);
     const line = price + proRata;
     document.getElementById('preview_plan_line_total').value = line.toFixed(2);
-    refreshTotalsPreview();
+    refreshTotalsPreviewServer();
   }
 
   function addAddonRow() {
@@ -421,7 +461,7 @@
     const t = row.querySelector('.addon-type').value;
     const u = t && addons[t] !== undefined ? parseFloat(addons[t]) : 0;
     row.querySelector('.addon-unit').value = u.toFixed(2);
-    refreshTotalsPreview();
+    refreshTotalsPreviewServer();
   }
 
   function sumAddonPreview() {
@@ -437,39 +477,82 @@
     return s;
   }
 
-  function refreshTotalsPreview() {
-    let sub = 0;
-    if (planIds.includes(clsEl.value)) {
-      sub += parseFloat(document.getElementById('preview_plan_line_total').value || '0');
-    } else if (clsEl.value === 'Add_ons') {
-      sub += sumAddonPreview();
-    }
-    const disc = 0;
-    const taxRate = 0;
-    const taxable = Math.max(0, sub - disc);
-    const tax = taxable * (taxRate / 100);
-    const grand = taxable + tax;
-    // Update both hidden spans (legacy) and new inputs
+  function setTotalsPreviewValues(sub, disc, tax, grand, fx, base, projected) {
     document.getElementById('pv_sub').textContent = sub.toFixed(2);
     document.getElementById('pv_disc').textContent = disc.toFixed(2);
     document.getElementById('pv_tax').textContent = tax.toFixed(2);
     document.getElementById('pv_grand').textContent = grand.toFixed(2);
-    document.getElementById('pv_base').textContent = grand.toFixed(2);
+    document.getElementById('pv_base').textContent = base.toFixed(2);
     var subI = document.getElementById('pv_sub_input');
     var discI = document.getElementById('pv_disc_input');
     var taxI = document.getElementById('pv_tax_input');
     var grandI = document.getElementById('pv_grand_input');
+    var fxI = document.getElementById('pv_fx_input');
     var baseI = document.getElementById('pv_base_input');
     if (subI) subI.value = sub.toFixed(2);
     if (discI) discI.value = disc.toFixed(2);
     if (taxI) taxI.value = tax.toFixed(2);
     if (grandI) grandI.value = grand.toFixed(2);
-    if (baseI) baseI.value = grand.toFixed(2);
+    if (fxI) fxI.value = fx.toFixed(6);
+    if (baseI) baseI.value = base.toFixed(2);
+    var pPlan = document.getElementById('pv_projected_plan');
+    var pExp = document.getElementById('pv_projected_expiry');
+    var pUsers = document.getElementById('pv_projected_users');
+    var pIt = document.getElementById('pv_projected_it');
+    var pEt = document.getElementById('pv_projected_et');
+    var pDr = document.getElementById('pv_projected_drivers');
+    if (pPlan) pPlan.value = projected.plan_name || '';
+    if (pExp) pExp.value = projected.expiry_date || '';
+    if (pUsers) pUsers.value = projected.max_users != null ? String(projected.max_users) : '';
+    if (pIt) pIt.value = projected.max_internal_trucks != null ? String(projected.max_internal_trucks) : '';
+    if (pEt) pEt.value = projected.max_external_trucks != null ? String(projected.max_external_trucks) : '';
+    if (pDr) pDr.value = projected.max_drivers != null ? String(projected.max_drivers) : '';
+  }
+
+  function refreshTotalsPreviewServer() {
+    if (!hasSelectedTenant()) {
+      setTotalsPreviewValues(0, 0, 0, 0, 1, 0, {});
+      return;
+    }
+    const params = new URLSearchParams();
+    params.set('tenant', String(tenantEl.value || ''));
+    params.set('order_classification', String(clsEl.value || ''));
+    params.set('currency', String(currencyEl.value || ''));
+    params.set('plan', String(planEl.value || ''));
+    params.set('number_of_cycles', String(cyclesEl.value || '1'));
+    addonRows.querySelectorAll('.addon-row').forEach(function (row) {
+      params.append('addon_action', row.querySelector('.addon-action').value || 'Add');
+      params.append('addon_add_on_type', row.querySelector('.addon-type').value || '');
+      params.append('addon_quantity', row.querySelector('.addon-qty').value || '1');
+    });
+    fetch(orderPreviewUrl + '?' + params.toString(), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (!data || !data.ok) {
+          return;
+        }
+        const totals = data.totals || {};
+        const planPv = data.plan_preview || {};
+        document.getElementById('preview_plan_price').value = (parseFloat(planPv.plan_price || 0)).toFixed(2);
+        document.getElementById('preview_pro_rata').value = (parseFloat(planPv.pro_rata_adjustment || 0)).toFixed(2);
+        document.getElementById('preview_plan_line_total').value = (parseFloat(planPv.line_total || 0)).toFixed(2);
+        applyPreviewToAddonRows(data.addon_rows || []);
+        setTotalsPreviewValues(
+          parseFloat(totals.sub_total || 0),
+          parseFloat(totals.discount_amount || 0),
+          parseFloat(totals.tax_amount || 0),
+          parseFloat(totals.grand_total || 0),
+          parseFloat(totals.exchange_rate_snapshot || 1),
+          parseFloat(totals.base_currency_equivalent || 0),
+          data.projected || {},
+        );
+      });
   }
 
   function onClassificationOrSectionsChange() {
     showSections();
     refreshPlanPreview();
+    refreshTotalsPreviewServer();
   }
 
   if (tenantEl) {
@@ -484,15 +567,28 @@
   }
 
   clsEl.addEventListener('change', onClassificationOrSectionsChange);
-  currencyEl.addEventListener('change', refreshPlanPreview);
-  planEl.addEventListener('change', refreshPlanPreview);
-  planEl.addEventListener('input', refreshPlanPreview);
-  cyclesEl.addEventListener('input', refreshPlanPreview);
-  cyclesEl.addEventListener('change', refreshPlanPreview);
+  currencyEl.addEventListener('change', function () { refreshPlanPreview(); refreshTotalsPreviewServer(); });
+  planEl.addEventListener('change', function () { refreshPlanPreview(); refreshTotalsPreviewServer(); });
+  planEl.addEventListener('input', function () { refreshPlanPreview(); refreshTotalsPreviewServer(); });
+  cyclesEl.addEventListener('input', function () { refreshPlanPreview(); refreshTotalsPreviewServer(); });
+  cyclesEl.addEventListener('change', function () { refreshPlanPreview(); refreshTotalsPreviewServer(); });
   document.getElementById('btn-add-addon-row').addEventListener('click', addAddonRow);
+  if (tenantEl) {
+    tenantEl.addEventListener('change', refreshTotalsPreviewServer);
+  }
+  const orderFormEl = document.getElementById('order-form');
+  if (orderFormEl) {
+    orderFormEl.addEventListener('submit', function (ev) {
+      if (!hasSelectedTenant()) {
+        ev.preventDefault();
+        alert('Select a tenant before continuing with billing operations.');
+      }
+    });
+  }
 
   showSections();
   refreshPlanPreview();
+  refreshTotalsPreviewServer();
 })();
 </script>
 {% endblock %}

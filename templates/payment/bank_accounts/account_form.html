@@ -23,16 +23,6 @@
   </div>
 </div>
 
-  
-
-  <div class="list-page-actions">
-    <a href="{% url 'bank_account_list' %}" class="eal-btn">
-          <i class="bi bi-arrow-left"></i>
-          <span>Cancel</span>
-        </a>
-  </div>
-</div>
-
   {% if is_edit and account and account.updated_at %}
   <div class="edit-info-bar">
     <i class="bi bi-clock-history"></i>
@@ -46,77 +36,87 @@
 
   <div class="form-card">
     <div class="form-card-body">
-      <div class="alert alert-info" style="border-radius: 10px; margin-bottom: 16px">
-        <p style="margin: 0; font-weight: 600">IBAN stored uppercase, spaces removed</p>
+      <div class="alert alert-info mb-3">
+        <p class="mb-0 fw-semibold">IBAN stored uppercase, spaces removed.</p>
       </div>
 
       {% if form.non_field_errors %}
-        <div style="margin-bottom: 16px; color: #b91c1c; font-weight: 600">
+        <div class="alert alert-danger mb-3">
           {{ form.non_field_errors }}
         </div>
       {% endif %}
 
-      <h3 style="margin: 0 0 12px 0">Bank Details</h3>
+      <div class="form-card-header p-0 mb-3">
+        <div class="form-card-icon blue">
+          <i class="bi bi-bank"></i>
+        </div>
+        <div class="form-card-header-text">
+          <h3 class="form-card-title mb-0">Bank Details</h3>
+          <p class="form-card-desc mb-0">Enter the bank account information used for offline payments.</p>
+        </div>
+      </div>
 
       <form method="post" action="">
         {% csrf_token %}
 
-        <div style="margin-bottom: 16px">
-          <label class="form-label">Bank Name</label>
-          {{ form.bank_name }}
-          {% for error in form.bank_name.errors %}
-            <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-          {% endfor %}
-        </div>
-
-        <div style="margin-bottom: 16px">
-          <label class="form-label">Account Holder Name</label>
-          {{ form.account_holder_name }}
-          {% for error in form.account_holder_name.errors %}
-            <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-          {% endfor %}
-        </div>
-
-        <div style="margin-bottom: 16px">
-          <label class="form-label">IBAN Number</label>
-          {{ form.iban_number }}
-          {% for error in form.iban_number.errors %}
-            <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-          {% endfor %}
-        </div>
-
-        <div style="margin-bottom: 16px">
-          <label class="form-label">Account Number</label>
-          {{ form.account_number }}
-          {% for error in form.account_number.errors %}
-            <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-          {% endfor %}
-        </div>
-
-        <div style="margin-bottom: 16px">
-          <label class="form-label">SWIFT Code</label>
-          {{ form.swift_code }}
-          {% for error in form.swift_code.errors %}
-            <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-          {% endfor %}
-        </div>
-
-        <div style="margin-bottom: 16px">
-          <label class="form-label">Currency</label>
-          {{ form.currency }}
-          {% for error in form.currency.errors %}
-            <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-          {% endfor %}
-        </div>
-
-        <div style="margin-bottom: 16px">
-          <label class="form-label">Status</label>
-          <div style="display: flex; align-items: center; gap: 10px">
-            {{ form.is_active }}
+        <div class="fields-grid cols-2">
+          <div class="field">
+            <label class="form-label">Bank Name</label>
+            {{ form.bank_name }}
+            {% for error in form.bank_name.errors %}
+              <div class="text-danger mt-1 fw-semibold">{{ error }}</div>
+            {% endfor %}
           </div>
-          {% for error in form.is_active.errors %}
-            <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-          {% endfor %}
+
+          <div class="field">
+            <label class="form-label">Account Holder Name</label>
+            {{ form.account_holder_name }}
+            {% for error in form.account_holder_name.errors %}
+              <div class="text-danger mt-1 fw-semibold">{{ error }}</div>
+            {% endfor %}
+          </div>
+
+          <div class="field">
+            <label class="form-label">IBAN Number</label>
+            {{ form.iban_number }}
+            {% for error in form.iban_number.errors %}
+              <div class="text-danger mt-1 fw-semibold">{{ error }}</div>
+            {% endfor %}
+          </div>
+
+          <div class="field">
+            <label class="form-label">Account Number</label>
+            {{ form.account_number }}
+            {% for error in form.account_number.errors %}
+              <div class="text-danger mt-1 fw-semibold">{{ error }}</div>
+            {% endfor %}
+          </div>
+
+          <div class="field">
+            <label class="form-label">SWIFT Code</label>
+            {{ form.swift_code }}
+            {% for error in form.swift_code.errors %}
+              <div class="text-danger mt-1 fw-semibold">{{ error }}</div>
+            {% endfor %}
+          </div>
+
+          <div class="field">
+            <label class="form-label">Currency</label>
+            {{ form.currency }}
+            {% for error in form.currency.errors %}
+              <div class="text-danger mt-1 fw-semibold">{{ error }}</div>
+            {% endfor %}
+          </div>
+
+          <div class="field">
+            <label class="form-label">Status</label>
+            <div class="form-check form-switch ps-0">
+              {{ form.is_active }}
+            </div>
+            {% for error in form.is_active.errors %}
+              <div class="text-danger mt-1 fw-semibold">{{ error }}</div>
+            {% endfor %}
+          </div>
         </div>
 
         <div class="form-actions-bar">

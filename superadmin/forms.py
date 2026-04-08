@@ -750,6 +750,7 @@ class BankAccountForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        apply_premium_styling(self)
         self.fields['currency'].queryset = (
             Currency.objects.filter(is_active=True).order_by('name_en')
         )

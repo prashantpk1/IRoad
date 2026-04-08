@@ -23,6 +23,603 @@ from django.utils.html import strip_tags
 
 logger = logging.getLogger(__name__)
 
+# ---------------------------------------------------------------------------
+# Reusable HTML email fragments – header / footer / wrapper
+# ---------------------------------------------------------------------------
+_EMAIL_HEADER = (
+    '<div style="background:linear-gradient(135deg,#4f46e5 0%,#6366f1 50%,#818cf8 100%);'
+    'padding:36px 40px 32px;text-align:center;border-radius:16px 16px 0 0;">'
+    '<h1 style="color:#fff;margin:0;font-size:26px;font-weight:800;'
+    'letter-spacing:-0.03em;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;">'
+    'iRoad</h1>'
+    '<p style="color:rgba(255,255,255,.75);font-size:13px;font-weight:500;'
+    'margin:6px 0 0;letter-spacing:0.02em;font-family:Inter,sans-serif;">'
+    'Logistics Management Platform</p>'
+    '</div>'
+    '<div style="height:4px;background:linear-gradient(90deg,#f59e0b 0%,#fbbf24 35%,'
+    '#34d399 65%,#10b981 100%);"></div>'
+)
+
+_EMAIL_FOOTER = (
+    '<div style="background:#f8fafc;border-top:1px solid #e2e8f0;'
+    'padding:28px 44px 32px;text-align:center;border-radius:0 0 16px 16px;">'
+    '<p style="font-size:16px;font-weight:800;color:#4f46e5;'
+    'letter-spacing:-0.02em;margin:0 0 8px;font-family:Inter,sans-serif;">iRoad</p>'
+    '<p style="font-size:12px;color:#94a3b8;line-height:1.8;margin:0;'
+    'font-family:Inter,sans-serif;">'
+    '&copy; 2026 iRoad Logistics. All rights reserved.<br>'
+    'This is an automated system notification. Please do not reply.</p>'
+    '<div style="margin:14px 0 0;">'
+    '<span style="display:inline-block;background:linear-gradient(135deg,#4f46e5,#6366f1);'
+    'color:#fff;font-size:10px;font-weight:700;padding:4px 12px;border-radius:20px;'
+    'letter-spacing:0.05em;text-transform:uppercase;">Secured &amp; Encrypted</span>'
+    '</div>'
+    '</div>'
+)
+
+
+def _wrap_email_body(inner_html, email_title="iRoad Logistics", preheader="iRoad Logistics — Secure notification", use_rtl=False):
+    base_html = r"""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>{% block email_title %}iRoad Logistics{% endblock %}</title>
+    <!--[if mso]>
+    <noscript>
+        <xml>
+            <o:OfficeDocumentSettings>
+                <o:PixelsPerInch>96</o:PixelsPerInch>
+            </o:OfficeDocumentSettings>
+        </xml>
+    </noscript>
+    <![endif]-->
+    <style>
+        /* Reset */
+        body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+        table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+        img { -ms-interpolation-mode: bicubic; border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; }
+        body { margin: 0 !important; padding: 0 !important; width: 100% !important; }
+
+        /* Typography */
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            color: #334155;
+            background-color: #f1f5f9;
+        }
+
+        /* Wrapper */
+        .email-wrapper {
+            width: 100%;
+            max-width: 640px;
+            margin: 0 auto;
+            background: #ffffff;
+        }
+
+        /* Header */
+        .email-header {
+            background: linear-gradient(135deg, #4f46e5 0%, #6366f1 50%, #818cf8 100%);
+            padding: 0;
+            text-align: center;
+        }
+        .email-header-inner {
+            padding: 36px 40px 32px;
+        }
+        .email-logo {
+            width: 52px;
+            height: 52px;
+            border-radius: 14px;
+            margin-bottom: 14px;
+        }
+        .email-brand {
+            color: #ffffff;
+            margin: 0;
+            font-size: 26px;
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            line-height: 1.2;
+        }
+        .email-brand-sub {
+            color: rgba(255, 255, 255, 0.75);
+            font-size: 13px;
+            font-weight: 500;
+            margin: 6px 0 0;
+            letter-spacing: 0.02em;
+        }
+        .header-divider {
+            height: 4px;
+            background: linear-gradient(90deg, #f59e0b 0%, #fbbf24 35%, #34d399 65%, #10b981 100%);
+        }
+
+        /* Body */
+        .email-body {
+            padding: 40px 44px;
+        }
+        .email-body h2 {
+            color: #1e293b;
+            margin: 0 0 16px;
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+        .email-body p {
+            margin: 0 0 16px;
+            font-size: 15px;
+            color: #475569;
+            line-height: 1.7;
+        }
+
+        /* Button */
+        .button-wrapper { text-align: center; margin: 28px 0; }
+        .button {
+            background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+            color: #ffffff !important;
+            padding: 14px 32px;
+            text-decoration: none;
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 15px;
+            display: inline-block;
+            letter-spacing: 0.01em;
+            box-shadow: 0 4px 14px rgba(79, 70, 229, 0.3);
+        }
+
+        /* Info box */
+        .invite-info {
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            padding: 20px 22px;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+            margin-bottom: 20px;
+        }
+
+        /* Secret / code box */
+        .secret-box {
+            background-color: #1e293b;
+            color: #e2e8f0;
+            padding: 14px 18px;
+            border-radius: 10px;
+            font-family: 'SF Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 13px;
+            word-break: break-all;
+            margin: 12px 0;
+            letter-spacing: 0.02em;
+            border: 1px solid #334155;
+        }
+
+        /* Labels */
+        .label {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: #6366f1;
+            margin-bottom: 6px;
+        }
+
+        /* Warning / expiry */
+        .expiry {
+            font-size: 13px;
+            color: #ef4444;
+            margin-top: 20px;
+            font-weight: 600;
+        }
+
+        /* Muted text */
+        .muted {
+            font-size: 13px;
+            color: #94a3b8;
+            margin-top: 12px;
+            line-height: 1.6;
+        }
+
+        /* Divider */
+        .email-divider {
+            height: 1px;
+            background: #e2e8f0;
+            margin: 28px 0;
+            border: none;
+        }
+
+        /* Footer */
+        .email-footer {
+            background: #f8fafc;
+            border-top: 1px solid #e2e8f0;
+            padding: 28px 44px 32px;
+            text-align: center;
+        }
+        .footer-logo-text {
+            font-size: 16px;
+            font-weight: 800;
+            color: #4f46e5;
+            letter-spacing: -0.02em;
+            margin-bottom: 8px;
+        }
+        .footer-text {
+            font-size: 12px;
+            color: #94a3b8;
+            line-height: 1.8;
+            margin: 0;
+        }
+        .footer-links {
+            margin: 12px 0 0;
+        }
+        .footer-links a {
+            color: #6366f1;
+            text-decoration: none;
+            font-size: 12px;
+            font-weight: 600;
+            margin: 0 8px;
+        }
+        .footer-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+            color: #ffffff;
+            font-size: 10px;
+            font-weight: 700;
+            padding: 4px 12px;
+            border-radius: 20px;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            margin-top: 14px;
+        }
+
+        /* Responsive */
+        @media only screen and (max-width: 600px) {
+            .email-wrapper { width: 100% !important; }
+            .email-body { padding: 28px 24px !important; }
+            .email-header-inner { padding: 28px 24px 24px !important; }
+            .email-footer { padding: 24px 24px 28px !important; }
+            .email-brand { font-size: 22px !important; }
+        }
+    </style>
+    {% block extra_head %}{% endblock %}
+</head>
+<body style="margin: 0; padding: 0; background-color: #f1f5f9;">
+
+    <!-- Preheader (hidden preview text for email clients) -->
+    <div style="display: none; font-size: 1px; color: #f1f5f9; line-height: 1px; max-height: 0px; max-width: 0px; opacity: 0; overflow: hidden;">
+        {% block preheader %}iRoad Logistics — Secure notification{% endblock %}
+    </div>
+
+    <!-- Outer container -->
+    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f1f5f9;">
+        <tr>
+            <td align="center" style="padding: 40px 16px;">
+
+                <!-- Email card -->
+                <table role="presentation" border="0" cellpadding="0" cellspacing="0" class="email-wrapper" style="max-width: 640px; width: 100%; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04);">
+
+                    <!-- HEADER -->
+                    <tr>
+                        <td class="email-header">
+                            <div class="email-header-inner">
+                                {% load static %}
+                                <img src="https://iroad-assets.s3.amazonaws.com/logo.png" alt="iRoad" class="email-logo" style="width: 52px; height: 52px; border-radius: 14px;">
+                                <h1 class="email-brand">iRoad</h1>
+                                <p class="email-brand-sub">Logistics Management Platform</p>
+                            </div>
+                            <div class="header-divider"></div>
+                        </td>
+                    </tr>
+
+                    <!-- BODY -->
+                    <tr>
+                        <td class="email-body">
+                            {% block content %}{% endblock %}
+                        </td>
+                    </tr>
+
+                    <!-- FOOTER -->
+                    <tr>
+                        <td class="email-footer">
+                            <div class="footer-logo-text">iRoad</div>
+                            <p class="footer-text">
+                                &copy; 2026 iRoad Logistics. All rights reserved.<br>
+                                This is an automated system notification. Please do not reply to this email.
+                            </p>
+                            <div class="footer-links">
+                                <a href="#">Privacy Policy</a>
+                                <span style="color: #cbd5e1;">&middot;</span>
+                                <a href="#">Terms of Service</a>
+                                <span style="color: #cbd5e1;">&middot;</span>
+                                <a href="#">Support</a>
+                            </div>
+                            <div class="footer-badge">Secured &amp; Encrypted</div>
+                        </td>
+                    </tr>
+
+                </table>
+                <!-- /Email card -->
+
+            </td>
+        </tr>
+    </table>
+
+</body>
+</html>
+
+"""
+    import re
+    if use_rtl:
+        inner_html = '<div dir="rtl" style="text-align:right;">' + inner_html + '</div>'
+    
+    html = base_html
+    html = re.sub(r'{%\s*block\s+email_title\s*%}.*?{%\s*endblock\s*%}', email_title, html, flags=re.DOTALL)
+    html = re.sub(r'{%\s*block\s+preheader\s*%}.*?{%\s*endblock\s*%}', preheader, html, flags=re.DOTALL)
+    html = re.sub(r'{%\s*block\s+content\s*%}.*?{%\s*endblock\s*%}', inner_html, html, flags=re.DOTALL)
+    html = re.sub(r'{%\s*block\s+extra_head\s*%}{%\s*endblock\s*%}', '', html)
+    
+    return html
+
+DEFAULT_NOTIFICATION_EMAIL_TEMPLATES = [
+    {
+        'template_name': 'AUTH_PASSWORD_RESET',
+        'category': 'Transactional',
+        'subject_en': 'Reset Your iRoad Password',
+        'subject_ar': 'إعادة تعيين كلمة مرور iRoad',
+        'body_en': _wrap_email_body(
+            '<h2 style="color:#1e293b;margin:0 0 16px;font-size:22px;font-weight:700;">'
+            'Reset Your Password 🔐</h2>'
+            '<p style="font-size:15px;color:#475569;line-height:1.7;margin:0 0 16px;">'
+            'Hello {{ admin_user.first_name|default:"Admin" }},</p>'
+            '<p style="font-size:15px;color:#475569;line-height:1.7;margin:0 0 24px;">'
+            'We received a request to reset the password for your iRoad admin account. '
+            'Click the button below to set a new password:</p>'
+            '<div style="text-align:center;margin:28px 0;">'
+            '<a href="{{ reset_url }}" style="background:linear-gradient(135deg,#4f46e5,#6366f1);'
+            'color:#fff!important;padding:14px 32px;text-decoration:none;border-radius:10px;'
+            'font-weight:700;font-size:15px;display:inline-block;'
+            'box-shadow:0 4px 14px rgba(79,70,229,.3);">Reset Password &rarr;</a>'
+            '</div>'
+            '<div style="height:1px;background:#e2e8f0;margin:28px 0;"></div>'
+            '<p style="font-size:13px;color:#94a3b8;line-height:1.6;">'
+            'If you did not request this password reset, you can safely ignore this email. '
+            'Your password will not be changed.</p>'
+        ),
+        'body_ar': _wrap_email_body(
+            '<div dir="rtl" style="text-align:right;">'
+            '<h2 style="color:#1e293b;margin:0 0 16px;font-size:22px;font-weight:700;">'
+            'إعادة تعيين كلمة المرور 🔐</h2>'
+            '<p style="font-size:15px;color:#475569;line-height:1.7;margin:0 0 16px;">'
+            'مرحباً {{ admin_user.first_name|default:"Admin" }}،</p>'
+            '<p style="font-size:15px;color:#475569;line-height:1.7;margin:0 0 24px;">'
+            'تلقينا طلباً لإعادة تعيين كلمة المرور لحسابك في iRoad. '
+            'اضغط الزر أدناه لتعيين كلمة مرور جديدة:</p>'
+            '<div style="text-align:center;margin:28px 0;">'
+            '<a href="{{ reset_url }}" style="background:linear-gradient(135deg,#4f46e5,#6366f1);'
+            'color:#fff!important;padding:14px 32px;text-decoration:none;border-radius:10px;'
+            'font-weight:700;font-size:15px;display:inline-block;'
+            'box-shadow:0 4px 14px rgba(79,70,229,.3);">إعادة تعيين كلمة المرور &larr;</a>'
+            '</div>'
+            '<div style="height:1px;background:#e2e8f0;margin:28px 0;"></div>'
+            '<p style="font-size:13px;color:#94a3b8;line-height:1.6;">'
+            'إذا لم تطلب ذلك، يمكنك تجاهل هذه الرسالة. لن يتم تغيير كلمة المرور.</p>'
+            '</div>'
+        ),
+    },
+    {
+        'template_name': 'AUTH_ADMIN_INVITE',
+        'category': 'Transactional',
+        'subject_en': 'Activate Your iRoad Admin Account',
+        'subject_ar': 'تفعيل حساب مدير iRoad',
+        'body_en': _wrap_email_body(
+            '<h2 style="color:#1e293b;margin:0 0 16px;font-size:22px;font-weight:700;">'
+            'You\'re Invited! 🎉</h2>'
+            '<p style="font-size:15px;color:#475569;line-height:1.7;margin:0 0 16px;">'
+            'Hello {{ admin_user.first_name|default:"Admin" }},</p>'
+            '<p style="font-size:15px;color:#475569;line-height:1.7;margin:0 0 24px;">'
+            'You have been invited to join the <strong>iRoad</strong> admin panel. '
+            'Click the button below to activate your account and set up your credentials:</p>'
+            '<div style="text-align:center;margin:28px 0;">'
+            '<a href="{{ invite_url }}" style="background:linear-gradient(135deg,#4f46e5,#6366f1);'
+            'color:#fff!important;padding:14px 32px;text-decoration:none;border-radius:10px;'
+            'font-weight:700;font-size:15px;display:inline-block;'
+            'box-shadow:0 4px 14px rgba(79,70,229,.3);">Activate Account &rarr;</a>'
+            '</div>'
+            '<div style="height:1px;background:#e2e8f0;margin:28px 0;"></div>'
+            '<p style="font-size:13px;color:#94a3b8;line-height:1.6;">'
+            'If you did not expect this invitation, please contact your system administrator.</p>'
+        ),
+        'body_ar': _wrap_email_body(
+            '<div dir="rtl" style="text-align:right;">'
+            '<h2 style="color:#1e293b;margin:0 0 16px;font-size:22px;font-weight:700;">'
+            'لقد تمت دعوتك! 🎉</h2>'
+            '<p style="font-size:15px;color:#475569;line-height:1.7;margin:0 0 16px;">'
+            'مرحباً {{ admin_user.first_name|default:"Admin" }}،</p>'
+            '<p style="font-size:15px;color:#475569;line-height:1.7;margin:0 0 24px;">'
+            'تمت دعوتك للانضمام إلى لوحة تحكم <strong>iRoad</strong>. '
+            'اضغط الزر أدناه لتفعيل حسابك وإعداد بيانات الدخول:</p>'
+            '<div style="text-align:center;margin:28px 0;">'
+            '<a href="{{ invite_url }}" style="background:linear-gradient(135deg,#4f46e5,#6366f1);'
+            'color:#fff!important;padding:14px 32px;text-decoration:none;border-radius:10px;'
+            'font-weight:700;font-size:15px;display:inline-block;'
+            'box-shadow:0 4px 14px rgba(79,70,229,.3);">تفعيل الحساب &larr;</a>'
+            '</div>'
+            '<div style="height:1px;background:#e2e8f0;margin:28px 0;"></div>'
+            '<p style="font-size:13px;color:#94a3b8;line-height:1.6;">'
+            'إذا لم تكن تتوقع هذه الدعوة، يرجى التواصل مع مدير النظام.</p>'
+            '</div>'
+        ),
+    },
+    {
+        'template_name': 'TENANT_WELCOME_EMAIL',
+        'category': 'Transactional',
+        'subject_en': 'Welcome to iRoad — {{ company_name }}',
+        'subject_ar': 'مرحباً بك في iRoad — {{ company_name }}',
+        'body_en': _wrap_email_body(
+            '<h2 style="color:#1e293b;margin:0 0 16px;font-size:22px;font-weight:700;">'
+            'Welcome, {{ company_name }}! 🚀</h2>'
+            '<p style="font-size:15px;color:#475569;line-height:1.7;margin:0 0 20px;">'
+            'Your subscriber workspace is ready. Below are your credentials and '
+            'integration keys to get started.</p>'
+            '<div style="background:linear-gradient(135deg,#f8fafc,#f1f5f9);'
+            'padding:20px 22px;border-radius:12px;border:1px solid #e2e8f0;margin-bottom:20px;">'
+            '<p style="font-size:11px;font-weight:700;text-transform:uppercase;'
+            'letter-spacing:0.06em;color:#6366f1;margin:0 0 6px;">API Bridge Key</p>'
+            '<div style="background:#1e293b;color:#e2e8f0;padding:14px 18px;border-radius:10px;'
+            'font-family:monospace;font-size:13px;word-break:break-all;margin:0;'
+            'border:1px solid #334155;">{{ api_bridge_key }}</div>'
+            '</div>'
+            '<div style="background:linear-gradient(135deg,#f8fafc,#f1f5f9);'
+            'padding:20px 22px;border-radius:12px;border:1px solid #e2e8f0;margin-bottom:20px;">'
+            '<p style="font-size:11px;font-weight:700;text-transform:uppercase;'
+            'letter-spacing:0.06em;color:#6366f1;margin:0 0 6px;">Portal Password</p>'
+            '<div style="background:#1e293b;color:#e2e8f0;padding:14px 18px;border-radius:10px;'
+            'font-family:monospace;font-size:13px;word-break:break-all;margin:0;'
+            'border:1px solid #334155;">{{ portal_bootstrap_password }}</div>'
+            '</div>'
+            '<div style="text-align:center;margin:28px 0;">'
+            '<a href="{{ portal_login_url }}" style="background:linear-gradient(135deg,#4f46e5,#6366f1);'
+            'color:#fff!important;padding:14px 32px;text-decoration:none;border-radius:10px;'
+            'font-weight:700;font-size:15px;display:inline-block;'
+            'box-shadow:0 4px 14px rgba(79,70,229,.3);">Open Portal Login &rarr;</a>'
+            '</div>'
+        ),
+        'body_ar': _wrap_email_body(
+            '<div dir="rtl" style="text-align:right;">'
+            '<h2 style="color:#1e293b;margin:0 0 16px;font-size:22px;font-weight:700;">'
+            'مرحباً، {{ company_name }}! 🚀</h2>'
+            '<p style="font-size:15px;color:#475569;line-height:1.7;margin:0 0 20px;">'
+            'مساحة العمل الخاصة بك جاهزة. فيما يلي بيانات الاعتماد ومفاتيح التكامل.</p>'
+            '<div style="background:linear-gradient(135deg,#f8fafc,#f1f5f9);'
+            'padding:20px 22px;border-radius:12px;border:1px solid #e2e8f0;margin-bottom:20px;">'
+            '<p style="font-size:11px;font-weight:700;text-transform:uppercase;'
+            'letter-spacing:0.06em;color:#6366f1;margin:0 0 6px;">مفتاح الربط البرمجي</p>'
+            '<div style="background:#1e293b;color:#e2e8f0;padding:14px 18px;border-radius:10px;'
+            'font-family:monospace;font-size:13px;word-break:break-all;margin:0;'
+            'border:1px solid #334155;">{{ api_bridge_key }}</div>'
+            '</div>'
+            '<div style="background:linear-gradient(135deg,#f8fafc,#f1f5f9);'
+            'padding:20px 22px;border-radius:12px;border:1px solid #e2e8f0;margin-bottom:20px;">'
+            '<p style="font-size:11px;font-weight:700;text-transform:uppercase;'
+            'letter-spacing:0.06em;color:#6366f1;margin:0 0 6px;">كلمة مرور البوابة</p>'
+            '<div style="background:#1e293b;color:#e2e8f0;padding:14px 18px;border-radius:10px;'
+            'font-family:monospace;font-size:13px;word-break:break-all;margin:0;'
+            'border:1px solid #334155;">{{ portal_bootstrap_password }}</div>'
+            '</div>'
+            '<div style="text-align:center;margin:28px 0;">'
+            '<a href="{{ portal_login_url }}" style="background:linear-gradient(135deg,#4f46e5,#6366f1);'
+            'color:#fff!important;padding:14px 32px;text-decoration:none;border-radius:10px;'
+            'font-weight:700;font-size:15px;display:inline-block;'
+            'box-shadow:0 4px 14px rgba(79,70,229,.3);">فتح بوابة الدخول &larr;</a>'
+            '</div>'
+            '</div>'
+        ),
+    },
+    {
+        'template_name': 'TENANT_BRIDGE_ROTATED',
+        'category': 'Transactional',
+        'subject_en': 'iRoad — API bridge key rotated — {{ company_name }}',
+        'subject_ar': 'iRoad — تم تغيير مفتاح الربط — {{ company_name }}',
+        'body_en': _wrap_email_body(
+            '<h2 style="color:#1e293b;margin:0 0 16px;font-size:22px;font-weight:700;">'
+            'API Bridge Key Rotated 🔑</h2>'
+            '<p style="font-size:15px;color:#475569;line-height:1.7;margin:0 0 20px;">'
+            'Hello {{ company_name }}, your API bridge key was rotated successfully. '
+            'Your previous key has been revoked.</p>'
+            '<div style="background:linear-gradient(135deg,#f8fafc,#f1f5f9);'
+            'padding:20px 22px;border-radius:12px;border:1px solid #e2e8f0;margin-bottom:20px;">'
+            '<p style="font-size:11px;font-weight:700;text-transform:uppercase;'
+            'letter-spacing:0.06em;color:#6366f1;margin:0 0 6px;">New API Bridge Key</p>'
+            '<div style="background:#1e293b;color:#e2e8f0;padding:14px 18px;border-radius:10px;'
+            'font-family:monospace;font-size:13px;word-break:break-all;margin:0;'
+            'border:1px solid #334155;">{{ api_bridge_key }}</div>'
+            '</div>'
+            '<p style="font-size:13px;color:#ef4444;font-weight:600;margin-top:20px;">'
+            '⚠️ Older keys no longer work. Update all integrations immediately.</p>'
+        ),
+        'body_ar': _wrap_email_body(
+            '<div dir="rtl" style="text-align:right;">'
+            '<h2 style="color:#1e293b;margin:0 0 16px;font-size:22px;font-weight:700;">'
+            'تم تغيير مفتاح الربط البرمجي 🔑</h2>'
+            '<p style="font-size:15px;color:#475569;line-height:1.7;margin:0 0 20px;">'
+            'مرحباً {{ company_name }}، تم تغيير مفتاح الربط البرمجي بنجاح. '
+            'تم إلغاء المفتاح السابق.</p>'
+            '<div style="background:linear-gradient(135deg,#f8fafc,#f1f5f9);'
+            'padding:20px 22px;border-radius:12px;border:1px solid #e2e8f0;margin-bottom:20px;">'
+            '<p style="font-size:11px;font-weight:700;text-transform:uppercase;'
+            'letter-spacing:0.06em;color:#6366f1;margin:0 0 6px;">المفتاح الجديد</p>'
+            '<div style="background:#1e293b;color:#e2e8f0;padding:14px 18px;border-radius:10px;'
+            'font-family:monospace;font-size:13px;word-break:break-all;margin:0;'
+            'border:1px solid #334155;">{{ api_bridge_key }}</div>'
+            '</div>'
+            '<p style="font-size:13px;color:#ef4444;font-weight:600;margin-top:20px;">'
+            '⚠️ المفاتيح القديمة لم تعد تعمل. قم بتحديث جميع التكاملات فوراً.</p>'
+            '</div>'
+        ),
+    },
+    {
+        'template_name': 'TESTING_EMAIL',
+        'category': 'Transactional',
+        'subject_en': 'iRoad — Test Email Notification',
+        'subject_ar': 'iRoad — بريد إلكتروني تجريبي',
+        'body_en': _wrap_email_body(
+            '<h2 style="color:#1e293b;margin:0 0 16px;font-size:22px;font-weight:700;">'
+            'Test Email Successful ✅</h2>'
+            '<p style="font-size:15px;color:#475569;line-height:1.7;margin:0 0 20px;">'
+            'This is a <strong>test email</strong> sent from the iRoad Communication module '
+            'to verify that the email delivery pipeline is working correctly.</p>'
+            '<div style="background:linear-gradient(135deg,#f8fafc,#f1f5f9);'
+            'padding:20px 22px;border-radius:12px;border:1px solid #e2e8f0;margin-bottom:20px;">'
+            '<table style="width:100%;border-collapse:collapse;font-size:14px;color:#334155;">'
+            '<tr><td style="padding:8px 0;font-weight:700;color:#6366f1;width:140px;">'
+            'Sent To:</td><td style="padding:8px 0;">{{ recipient_email }}</td></tr>'
+            '<tr><td style="padding:8px 0;border-top:1px solid #e2e8f0;font-weight:700;'
+            'color:#6366f1;">Sent At:</td>'
+            '<td style="padding:8px 0;border-top:1px solid #e2e8f0;">{{ sent_at }}</td></tr>'
+            '<tr><td style="padding:8px 0;border-top:1px solid #e2e8f0;font-weight:700;'
+            'color:#6366f1;">Gateway:</td>'
+            '<td style="padding:8px 0;border-top:1px solid #e2e8f0;">{{ gateway_name|default:"Django SMTP" }}</td></tr>'
+            '</table>'
+            '</div>'
+            '<div style="text-align:center;margin:24px 0 8px;">'
+            '<span style="display:inline-block;background:linear-gradient(135deg,#10b981,#34d399);'
+            'color:#fff;font-size:13px;font-weight:700;padding:10px 24px;border-radius:10px;'
+            'letter-spacing:0.01em;">✓ Email Delivery Pipeline Operational</span>'
+            '</div>'
+            '<div style="height:1px;background:#e2e8f0;margin:28px 0;"></div>'
+            '<p style="font-size:13px;color:#94a3b8;line-height:1.6;">'
+            'If you received this email, the SMTP configuration and notification template system '
+            'are fully operational. No action is required.</p>'
+        ),
+        'body_ar': _wrap_email_body(
+            '<div dir="rtl" style="text-align:right;">'
+            '<h2 style="color:#1e293b;margin:0 0 16px;font-size:22px;font-weight:700;">'
+            'البريد التجريبي ناجح ✅</h2>'
+            '<p style="font-size:15px;color:#475569;line-height:1.7;margin:0 0 20px;">'
+            'هذا <strong>بريد إلكتروني تجريبي</strong> تم إرساله من وحدة الاتصالات في iRoad '
+            'للتحقق من أن خط أنابيب تسليم البريد يعمل بشكل صحيح.</p>'
+            '<div style="background:linear-gradient(135deg,#f8fafc,#f1f5f9);'
+            'padding:20px 22px;border-radius:12px;border:1px solid #e2e8f0;margin-bottom:20px;">'
+            '<table style="width:100%;border-collapse:collapse;font-size:14px;color:#334155;">'
+            '<tr><td style="padding:8px 0;font-weight:700;color:#6366f1;width:140px;">'
+            'أُرسل إلى:</td><td style="padding:8px 0;">{{ recipient_email }}</td></tr>'
+            '<tr><td style="padding:8px 0;border-top:1px solid #e2e8f0;font-weight:700;'
+            'color:#6366f1;">وقت الإرسال:</td>'
+            '<td style="padding:8px 0;border-top:1px solid #e2e8f0;">{{ sent_at }}</td></tr>'
+            '<tr><td style="padding:8px 0;border-top:1px solid #e2e8f0;font-weight:700;'
+            'color:#6366f1;">البوابة:</td>'
+            '<td style="padding:8px 0;border-top:1px solid #e2e8f0;">{{ gateway_name|default:"Django SMTP" }}</td></tr>'
+            '</table>'
+            '</div>'
+            '<div style="text-align:center;margin:24px 0 8px;">'
+            '<span style="display:inline-block;background:linear-gradient(135deg,#10b981,#34d399);'
+            'color:#fff;font-size:13px;font-weight:700;padding:10px 24px;border-radius:10px;'
+            'letter-spacing:0.01em;">✓ خط أنابيب تسليم البريد يعمل</span>'
+            '</div>'
+            '<div style="height:1px;background:#e2e8f0;margin:28px 0;"></div>'
+            '<p style="font-size:13px;color:#94a3b8;line-height:1.6;">'
+            'إذا تلقيت هذا البريد، فإن إعدادات SMTP ونظام قوالب الإشعارات '
+            'يعملان بشكل كامل. لا يلزم اتخاذ أي إجراء.</p>'
+            '</div>'
+        ),
+    },
+]
+
 
 def _log_comm_delivery(
     *,
@@ -289,6 +886,33 @@ def _render_template_text(raw_text, context_dict=None):
     return Template(raw_text or '').render(Context(context_dict or {}))
 
 
+def ensure_default_notification_templates(created_by=None):
+    """
+    Ensure required email templates exist for auth + tenant notifications.
+    Returns number of newly created templates.
+    """
+    from superadmin.models import NotificationTemplate
+
+    created = 0
+    for item in DEFAULT_NOTIFICATION_EMAIL_TEMPLATES:
+        _obj, was_created = NotificationTemplate.objects.get_or_create(
+            template_name=item['template_name'],
+            defaults={
+                'channel_type': 'Email',
+                'category': item['category'],
+                'subject_en': item['subject_en'],
+                'subject_ar': item['subject_ar'],
+                'body_en': item['body_en'],
+                'body_ar': item['body_ar'],
+                'is_active': True,
+                'created_by': created_by,
+            },
+        )
+        if was_created:
+            created += 1
+    return created
+
+
 def render_notification_template(template_obj, context_dict=None, language='en'):
     """
     Render subject/body from NotificationTemplate with context replacement.
@@ -308,6 +932,60 @@ def render_notification_template(template_obj, context_dict=None, language='en')
     subject = _render_template_text(subject_raw, context_dict).strip()
     body = _render_template_text(body_raw, context_dict)
     return subject, body
+
+
+def send_named_notification_email(
+    template_name,
+    *,
+    recipient_email,
+    context_dict=None,
+    language='en',
+    default_subject='Notification',
+    trigger_source=None,
+    force_django_smtp=False,
+):
+    """
+    Send an Email NotificationTemplate selected by ``template_name``.
+    Returns True when sent, False when no active template is found.
+    """
+    from superadmin.models import NotificationTemplate
+
+    template_obj = (
+        NotificationTemplate.objects.filter(
+            template_name=template_name,
+            channel_type='Email',
+            is_active=True,
+        )
+        .order_by('-created_at')
+        .first()
+    )
+    if not template_obj:
+        return False
+
+    subject, body = render_notification_template(
+        template_obj,
+        context_dict=context_dict,
+        language=language,
+    )
+    subject = (subject or default_subject).strip() or default_subject
+    text_body = strip_tags(body).strip() or body
+    source = trigger_source or f'TemplateName: {template_name}'
+
+    if force_django_smtp:
+        return send_email_via_django_smtp(
+            recipient_email,
+            subject,
+            text_body,
+            body,
+            trigger_source=source,
+        )
+    return send_transactional_email(
+        recipient_email,
+        subject,
+        text_body,
+        body,
+        trigger_source=source,
+    )
 
 
 def dispatch_event_notification(
@@ -502,6 +1180,19 @@ def send_tenant_welcome_email(
             getattr(settings, 'TENANT_PORTAL_LOGIN_URL', '') or ''
         ).strip(),
     }
+    # Preferred path: explicit named template from Notification Templates screen.
+    # This lets ops edit content without code changes.
+    if send_named_notification_email(
+        'TENANT_WELCOME_EMAIL',
+        recipient_email=tenant.primary_email,
+        context_dict=ctx,
+        language='en',
+        default_subject=f'Welcome to iRoad — {tenant.company_name}',
+        trigger_source='TemplateName: TENANT_WELCOME_EMAIL',
+        force_django_smtp=True,
+    ):
+        return True
+
     try:
         sent = dispatch_event_notification(
             'Welcome_Email',
@@ -532,6 +1223,17 @@ def send_tenant_bridge_rotated_email(tenant, api_bridge_key_plain):
         'api_bridge_key': api_bridge_key_plain,
         'company_name': tenant.company_name,
     }
+    if send_named_notification_email(
+        'TENANT_BRIDGE_ROTATED',
+        recipient_email=tenant.primary_email,
+        context_dict=ctx,
+        language='en',
+        default_subject=f'iRoad — API bridge key rotated — {tenant.company_name}',
+        trigger_source='TemplateName: TENANT_BRIDGE_ROTATED',
+        force_django_smtp=True,
+    ):
+        return True
+
     html = render_to_string('tenant/emails/api_bridge_rotated.html', ctx)
     text = strip_tags(html)
     subject = f'iRoad — API bridge key rotated — {tenant.company_name}'

@@ -26,21 +26,22 @@ class DatabaseEmailBackend(EmailBackend):
             ).first()
 
             if not gateway:
-                logger.warning("No active Email Gateway found in DB. Falling back to settings.py or failing.")
-                # If no gateway in DB, we can either fail or use settings.py
-                # Spec says "All email in the system will go according the SMTP configuration"
-                # so we probably shouldn't fall back to hardcoded settings if we want to enforce this.
+                logger.warning(
+                    'No active Email CommGateway in DB; using EMAIL_* from settings.py.',
+                )
                 if not self.host:
                     return False
             else:
-                self.host = gateway.host_url
-                self.port = gateway.port
+                self.host = gateway.host_url.strip()
+                enc = gateway.encryption_type or 'TLS'
+                port = gateway.port
+                if port is None:
+                    port = 465 if enc == 'SSL' else 587
+                self.port = port
                 self.username = gateway.username_key
                 self.password = gateway.password_secret
-                
-                # encryption_type enum: [TLS, SSL, None]
-                self.use_tls = (gateway.encryption_type == 'TLS')
-                self.use_ssl = (gateway.encryption_type == 'SSL')
+                self.use_tls = enc == 'TLS'
+                self.use_ssl = enc == 'SSL'
                 
                 # Timeout can be added if needed from a global setting
                 self.timeout = getattr(settings, 'EMAIL_TIMEOUT', None)

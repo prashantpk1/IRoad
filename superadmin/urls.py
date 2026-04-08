@@ -71,6 +71,7 @@ from .views import (
     OrderCreateView,
     OrderDetailView,
     OrderListView,
+    OrderPreviewAjaxView,
     OrderStatusUpdateView,
     ResetPasswordConfirmView,
     SetPasswordView,
@@ -741,6 +742,11 @@ urlpatterns = [
     ),
     path('crm/orders/', OrderListView.as_view(), name='order_list'),
     path('crm/orders/create/', OrderCreateView.as_view(), name='order_create'),
+    path(
+        'crm/orders/preview/',
+        OrderPreviewAjaxView.as_view(),
+        name='order_preview_ajax',
+    ),
     path(
         'crm/orders/<uuid:pk>/status/',
         OrderStatusUpdateView.as_view(),
