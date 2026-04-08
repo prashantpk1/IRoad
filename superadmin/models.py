@@ -1125,6 +1125,17 @@ class CommGateway(models.Model):
     def __str__(self):
         return f"{self.provider_name} ({self.gateway_type})"
 
+    def save(self, *args, **kwargs):
+        """Spec CP-PCS-P6 §5.1.3: The system can store multiple gateways,
+        but only ONE gateway per gateway_type can have is_active = True.
+        """
+        if self.is_active:
+            # Atomic update of others of same type to False
+            CommGateway.objects.filter(
+                gateway_type=self.gateway_type
+            ).exclude(pk=self.pk).update(is_active=False)
+        super().save(*args, **kwargs)
+
     class Meta:
         db_table = 'comm_gateways'
         ordering = ['gateway_type']
@@ -1283,6 +1294,31 @@ class PushNotification(models.Model):
     class Meta:
         db_table = 'comm_push_notifications'
         ordering = ['-created_at']
+
+
+class PushDeviceToken(models.Model):
+    DOMAIN_CHOICES = [
+        ('Tenant_User', 'Tenant User'),
+        ('Driver', 'Driver'),
+        ('Admin', 'Admin'),
+    ]
+
+    token_id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    user_domain = models.CharField(max_length=20, choices=DOMAIN_CHOICES)
+    reference_id = models.CharField(
+        max_length=100,
+        help_text='Domain entity ID, e.g. tenant user ID or driver ID',
+    )
+    device_token = models.CharField(max_length=512, unique=True)
+    is_active = models.BooleanField(default=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f'{self.user_domain} - {self.reference_id}'
+
+    class Meta:
+        db_table = 'comm_push_device_tokens'
+        ordering = ['-updated_at']
 
 
 class SystemBanner(models.Model):

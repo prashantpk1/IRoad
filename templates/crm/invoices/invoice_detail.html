@@ -8,6 +8,7 @@
 {% endblock %}
 
 {% block content %}
+{% translate "Void this invoice?" as confirm_void_invoice %}
 <div class="page-header">
   <div class="page-header-row">
     <div class="page-header-left">
@@ -55,6 +56,18 @@
     </div>
     <div class="row g-3 mt-1">
       <div class="col-12 col-md-4">
+        <label class="form-label">{% translate "Order" %}</label>
+        <a href="{% url 'order_detail' invoice.order.order_id %}" class="form-control d-block text-decoration-none" style="color: var(--primary-color); background: #f8fafc;">
+          {{ invoice.order.order_id }}
+        </a>
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label">{% translate "Subscriber" %}</label>
+        <a href="{% url 'tenant_detail' invoice.tenant.tenant_id %}" class="form-control d-block text-decoration-none" style="color: var(--primary-color); background: #f8fafc;">
+          {{ invoice.tenant.company_name }}
+        </a>
+      </div>
+      <div class="col-12 col-md-4">
         <label class="form-label">{% translate "Issue date" %}</label>
         <input class="form-control" value="{{ invoice.issue_date|date:'d M Y' }}" readonly>
       </div>
@@ -69,7 +82,9 @@
       {% if invoice.tax_code %}
       <div class="col-12 col-md-4">
         <label class="form-label">{% translate "Tax code" %}</label>
-        <input class="form-control" value="{{ invoice.tax_code.tax_code }} ({{ invoice.tax_code.rate_percent }}%)" readonly>
+        <a href="{% url 'tax_code_list' %}" class="form-control d-block text-decoration-none" style="color: var(--primary-color); background: #f8fafc;">
+          {{ invoice.tax_code.tax_code }} ({{ invoice.tax_code.rate_percent }}%)
+        </a>
       </div>
       {% endif %}
     </div>
@@ -164,7 +179,7 @@
 
 {% if invoice.status == 'Issued' and request.user.is_root %}
 <div class="d-flex flex-wrap gap-2 mb-4">
-  <form method="post" action="{% url 'invoice_void' invoice.invoice_id %}" onsubmit="return confirm('{% translate "Void this invoice?" %}');">
+  <form method="post" action="{% url 'invoice_void' invoice.invoice_id %}" data-confirm="{{ confirm_void_invoice|escape }}">
     {% csrf_token %}
     <button type="submit" class="eal-btn eal-btn-outline" style="color: var(--danger-color); border-color: var(--danger-color);">
       <i class="bi bi-slash-circle"></i>

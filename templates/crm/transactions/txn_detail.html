@@ -8,6 +8,7 @@
 {% endblock %}
 
 {% block content %}
+{% translate "Approve this payment?" as confirm_approve_payment %}
 <div class="page-header">
   <div class="page-header-row">
     <div class="page-header-left">
@@ -149,9 +150,9 @@
     </div>
   </div>
   <div class="form-card-body">
-    <form method="post" action="{% url 'transaction_approve' txn.transaction_id %}" class="mb-4">
+    <form method="post" action="{% url 'transaction_approve' txn.transaction_id %}" class="mb-4" data-confirm="{{ confirm_approve_payment|escape }}">
       {% csrf_token %}
-      <button type="submit" class="eal-btn eal-btn-primary" onclick="return confirm('{% translate "Approve this payment?" %}');">
+      <button type="submit" class="eal-btn eal-btn-primary">
         <i class="bi bi-check-lg"></i>
         <span>{% translate "Approve" %}</span>
       </button>

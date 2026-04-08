@@ -5,16 +5,23 @@
 
 document.addEventListener("DOMContentLoaded", function () {
   ensureUnifiedSidebar().then(function () {
-    // Initialize all components after sidebar is unified
-    initSidebar();
-    // initSidebarActiveState(); // Disabled: relying on server-side active state logic in sidebar.html
-    initSidebarCollapse();
-    initTimeValidation();
-    initFormValidation();
-    initConfirmForms();
-    initUserProfile();
-    initNotificationPanel();
-    initHeaderDateTime();
+    // Initialize all components after sidebar is unified (isolated so one failure cannot block the rest)
+    [
+      initSidebar,
+      initSidebarCollapse,
+      initTimeValidation,
+      initFormValidation,
+      initConfirmForms,
+      initUserProfile,
+      initNotificationPanel,
+      initHeaderDateTime,
+    ].forEach(function (fn) {
+      try {
+        fn();
+      } catch (err) {
+        console.error("iRoad UI init:", fn.name || "anonymous", err);
+      }
+    });
   });
 });
 
@@ -177,6 +184,10 @@ function initSidebar() {
   const navItems = document.querySelectorAll(".nav-item.has-submenu");
   const sidebarNav = document.querySelector(".sidebar-nav");
 
+  if (!sidebar) {
+    return;
+  }
+
   // Restore sidebar scroll position
   if (sidebarNav) {
     const savedScrollPos = sessionStorage.getItem("sidebarScrollPos");
@@ -226,6 +237,9 @@ function initSidebar() {
   // Sidebar dropdown toggles
   navItems.forEach(function (item) {
     const link = item.querySelector(".nav-link");
+    if (!link) {
+      return;
+    }
 
     link.addEventListener("click", function (e) {
       e.preventDefault();
@@ -338,10 +352,12 @@ function initConfirmForms() {
   document.querySelectorAll("form[data-confirm]").forEach(function (form) {
     form.addEventListener("submit", function (e) {
       var msg = form.getAttribute("data-confirm");
-      if (!msg || window.confirm(msg)) {
+      if (!msg) {
         return;
       }
-      e.preventDefault();
+      if (!window.confirm(msg)) {
+        e.preventDefault();
+      }
     });
   });
 }

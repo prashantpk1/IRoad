@@ -17,6 +17,7 @@ from .views import (
     CommGatewayListView,
     CommGatewayToggleStatusView,
     CommGatewayUpdateView,
+    CommGatewayTestConnectionView,
     CommLogListView,
     CannedResponseCreateView,
     CannedResponseDeleteView,
@@ -145,6 +146,7 @@ from .views import (
     ActiveSessionsView,
     RevokeSessionView,
     GlobalSearchView,
+    CommGatewayTestConnectionView,
 )
 
 urlpatterns = [
@@ -541,6 +543,11 @@ urlpatterns = [
         'comm/gateways/<uuid:pk>/delete/',
         CommGatewayDeleteView.as_view(),
         name='comm_gateway_delete',
+    ),
+    path(
+        'comm/gateways/test-connection/',
+        CommGatewayTestConnectionView.as_view(),
+        name='comm_gateway_test_connection',
     ),
     path(
         'comm/templates/',

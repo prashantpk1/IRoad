@@ -372,6 +372,28 @@ def get_next_invoice_number():
     return f"{prefix}{str(new_seq).zfill(4)}"
 
 
+def get_next_credit_note_number():
+    """
+    Generate sequential credit note number.
+    Format: CN-YYYY-NNNN
+    e.g. CN-2026-0001
+    """
+    from django.utils import timezone
+    from .models import StandardInvoice
+
+    year = timezone.now().year
+    prefix = f"CN-{year}-"
+    last = StandardInvoice.objects.filter(
+        invoice_number__startswith=prefix
+    ).order_by('-invoice_number').first()
+    if last:
+        last_seq = int(last.invoice_number.split('-')[-1])
+        new_seq = last_seq + 1
+    else:
+        new_seq = 1
+    return f"{prefix}{str(new_seq).zfill(4)}"
+
+
 def get_fx_snapshot(currency_code):
     """
     Get current FX rate snapshot for a currency.
@@ -762,37 +784,97 @@ def generate_invoice_from_order(order, admin_user):
     )
     invoice.save()
 
-    # Create line items from plan lines
+    # Create line items from plan lines (line_total includes tax per CP-PCS-P5)
     for plan_line in order.plan_lines.all():
+        qty = Decimal('1.00')
+        unit = (plan_line.line_total or Decimal('0.00')).quantize(Decimal('0.01'))
+        tax_amt = ((qty * unit) * tax_rate / 100).quantize(Decimal('0.01'))
         InvoiceLineItem(
             invoice=invoice,
             item_description=plan_line_invoice_label(plan_line),
-            quantity=Decimal('1.00'),
-            unit_price=plan_line.plan_price,
+            quantity=qty,
+            unit_price=unit,
             tax_rate=tax_rate,
-            tax_amount=(
-                plan_line.line_total *
-                tax_rate / 100
-            ).quantize(Decimal('0.01')),
-            line_total=plan_line.line_total,
+            tax_amount=tax_amt,
+            line_total=(qty * unit + tax_amt).quantize(Decimal('0.01')),
         ).save()
 
-    # Create line items from addon lines
+    # Create line items from addon lines (support Reduce by negative quantity)
     for addon_line in order.addon_lines.all():
+        sign = Decimal('-1.00') if addon_line.action_type == 'Reduce' else Decimal('1.00')
+        qty = (Decimal(str(addon_line.quantity or 0)) * sign).quantize(Decimal('0.01'))
+        if qty == 0:
+            continue
+        raw_total = (addon_line.line_total or Decimal('0.00')).quantize(Decimal('0.01'))
+        unit = (raw_total / qty).quantize(Decimal('0.01'))
+        tax_amt = ((qty * unit) * tax_rate / 100).quantize(Decimal('0.01'))
         InvoiceLineItem(
             invoice=invoice,
             item_description=addon_line_invoice_label(addon_line),
-            quantity=Decimal(str(addon_line.quantity)),
-            unit_price=addon_line.unit_price,
+            quantity=qty,
+            unit_price=unit,
             tax_rate=tax_rate,
-            tax_amount=(
-                addon_line.line_total *
-                tax_rate / 100
-            ).quantize(Decimal('0.01')),
-            line_total=addon_line.line_total,
+            tax_amount=tax_amt,
+            line_total=(qty * unit + tax_amt).quantize(Decimal('0.01')),
         ).save()
 
     return invoice
+
+
+def generate_credit_note_from_invoice(original_invoice, admin_user=None):
+    """
+    Create a negative StandardInvoice as a credit note for an existing invoice.
+    (Implements CP-PCS-P5 §4.5.4 'Credit Note' concept without changing UI.)
+    """
+    from .models import InvoiceLineItem, StandardInvoice
+
+    if not original_invoice:
+        return None
+    # Avoid duplicates: only one credit note per original invoice number
+    existing = StandardInvoice.objects.filter(
+        invoice_number__icontains=f"FOR-{original_invoice.invoice_number}",
+        order=original_invoice.order,
+    ).first()
+    if existing:
+        return existing
+
+    credit = StandardInvoice(
+        invoice_number=f"{get_next_credit_note_number()}-FOR-{original_invoice.invoice_number}",
+        order=original_invoice.order,
+        tenant=original_invoice.tenant,
+        tax_code=original_invoice.tax_code,
+        due_date=date.today(),
+        status='Issued',
+        supplier_name=original_invoice.supplier_name,
+        supplier_tax_number=original_invoice.supplier_tax_number,
+        customer_name=original_invoice.customer_name,
+        customer_tax_number=original_invoice.customer_tax_number,
+        customer_address=original_invoice.customer_address,
+        sub_total=(-original_invoice.sub_total).quantize(Decimal('0.01')),
+        discount_amount=(-original_invoice.discount_amount).quantize(Decimal('0.01')),
+        taxable_amount=(-original_invoice.taxable_amount).quantize(Decimal('0.01')),
+        tax_amount=(-original_invoice.tax_amount).quantize(Decimal('0.01')),
+        grand_total=(-original_invoice.grand_total).quantize(Decimal('0.01')),
+        currency=original_invoice.currency,
+        exchange_rate_snapshot=original_invoice.exchange_rate_snapshot,
+        base_currency_equivalent_amount=(
+            -original_invoice.base_currency_equivalent_amount
+        ).quantize(Decimal('0.01')),
+    )
+    credit.save()
+
+    for li in original_invoice.line_items.all():
+        InvoiceLineItem(
+            invoice=credit,
+            item_description=f"Credit: {li.item_description}",
+            quantity=(-li.quantity).quantize(Decimal('0.01')),
+            unit_price=li.unit_price,
+            tax_rate=li.tax_rate,
+            tax_amount=(-li.tax_amount).quantize(Decimal('0.01')),
+            line_total=(-li.line_total).quantize(Decimal('0.01')),
+        ).save()
+
+    return credit
 
 
 def provision_tenant_from_order(order):

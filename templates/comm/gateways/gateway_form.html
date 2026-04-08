@@ -58,47 +58,101 @@
           <div class="field"><label class="form-label">Status</label>{{ form.is_active }}</div>
           </div>
       </div>
-      <button type="button" class="btn" disabled title="Test Connection (Available in Phase 11)" style="border-width: 1px; opacity: 0.5; cursor: not-allowed;">
-        <i class="bi bi-wifi"></i>
-        Test Connection
+      <button type="button" id="test-connection-btn" class="eal-btn eal-btn-outline" style="margin-top: 16px; margin-bottom: 24px;">
+        <i class="bi bi-broadcast"></i>
+        <span id="test-btn-text">{% translate "Test Connection" %}</span>
+        <div id="test-spinner" class="spinner-border spinner-border-sm ms-2" role="status" style="display: none;">
+          <span class="visually-hidden">Loading...</span>
+        </div>
       </button>
+      <div id="test-result-area" style="margin-bottom: 24px; display: none;">
+        <div id="test-alert" class="alert" role="alert" style="border-radius: 10px; font-weight: 500"></div>
+      </div>
     </div>
 
         <div class="form-actions-bar">
-  <div class="eal-header-actions">
+{% endblock %}
 
-          <div class="footer-left">
-            <a href="{% url 'comm_gateway_list' %}" class="eal-btn eal-btn-outline">
-              <i class="bi bi-arrow-left"></i>
-              Cancel
-            </a>
-          
-  </div>
-</div>
-          <div class="footer-right">
-            <button type="submit" class="eal-btn eal-btn-primary"><i class="bi bi-save"></i> Save</button>
-          </div>
-        </div>
-      </form>
-    </div>
-  </div>
+{% block extra_js %}
+<script>
+  (function () {
+    const typeField = document.querySelector('[name="gateway_type"]');
+    const portWrap = document.getElementById('port-wrap');
+    const encWrap = document.getElementById('enc-wrap');
+    const secretField = document.querySelector('[name="password_secret"]');
+    const testBtn = document.getElementById('test-connection-btn');
+    const testSpinner = document.getElementById('test-spinner');
+    const testBtnText = document.getElementById('test-btn-text');
+    const resultArea = document.getElementById('test-result-area');
+    const resultAlert = document.getElementById('test-alert');
 
-  <script>
-    (function () {
-      var type = document.getElementById('id_gateway_type');
-      var portWrap = document.getElementById('port-wrap');
-      var encWrap = document.getElementById('enc-wrap');
-      var secret = document.getElementById('id_password_secret');
-      if (secret && {{ is_edit|yesno:"true,false" }}) { secret.value = '********'; }
-      function toggleEmailFields() {
-        if (!type) return;
-        var isEmail = type.value === 'Email';
-        portWrap.style.display = isEmail ? 'block' : 'none';
-        encWrap.style.display = isEmail ? 'block' : 'none';
-      }
-      if (type) type.addEventListener('change', toggleEmailFields);
+    // Handle Edit Mode password masking
+    if (secretField && {{ is_edit|yesno:"true,false" }}) {
+      secretField.value = '********';
+    }
+
+    function toggleEmailFields() {
+      if (!typeField) return;
+      const isEmail = typeField.value === 'Email';
+      if (portWrap) portWrap.style.display = isEmail ? 'block' : 'none';
+      if (encWrap) encWrap.style.display = isEmail ? 'block' : 'none';
+    }
+
+    if (typeField) {
+      typeField.addEventListener('change', toggleEmailFields);
       toggleEmailFields();
-    })();
-  </script>
+    }
+
+    // Test Connection Logic
+    if (testBtn) {
+      testBtn.addEventListener('click', function() {
+        // Reset UI
+        resultArea.style.display = 'none';
+        testBtn.disabled = true;
+        testSpinner.style.display = 'inline-block';
+        testBtnText.innerText = 'Testing...';
+
+        const formData = new FormData();
+        formData.append('csrfmiddlewaretoken', document.querySelector('[name="csrfmiddlewaretoken"]').value);
+        formData.append('gateway_type', typeField.value);
+        formData.append('host_url', document.querySelector('[name="host_url"]').value);
+        formData.append('port', document.querySelector('[name="port"]').value);
+        formData.append('username_key', document.querySelector('[name="username_key"]').value);
+        formData.append('password_secret', secretField.value);
+        formData.append('sender_id', document.querySelector('[name="sender_id"]').value);
+        formData.append('encryption_type', document.querySelector('[name="encryption_type"]').value);
+        
+        {% if is_edit %}
+        formData.append('gateway_id', '{{ gateway.gateway_id }}');
+        {% endif %}
+
+        fetch('{% url "comm_gateway_test_connection" %}', {
+          method: 'POST',
+          body: formData,
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+          }
+        })
+        .then(response => response.json())
+        .then(data => {
+          resultArea.style.display = 'block';
+          resultAlert.className = 'alert ' + (data.success ? 'alert-success' : 'alert-danger');
+          resultAlert.innerHTML = '<i class="bi ' + (data.success ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill') + ' me-2"></i>' + data.message;
+        })
+        .catch(error => {
+          resultArea.style.display = 'block';
+          resultAlert.className = 'alert alert-danger';
+          resultAlert.innerText = 'System error occurred while testing connection.';
+          console.error('Error:', error);
+        })
+        .finally(() => {
+          testBtn.disabled = false;
+          testSpinner.style.display = 'none';
+          testBtnText.innerText = 'Test Connection';
+        });
+      });
+    }
+  })();
+</script>
 {% endblock %}
 

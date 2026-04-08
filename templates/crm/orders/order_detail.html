@@ -8,6 +8,8 @@
 {% endblock %}
 
 {% block content %}
+{% translate "Cancel this order?" as confirm_cancel_order %}
+{% translate "Record payment and update subscriber plan, limits, and LTV?" as confirm_record_payment %}
 <div class="page-header">
   <div class="page-header-row">
     <div class="page-header-left">
@@ -232,7 +234,7 @@
           <span>{% translate "Mark as Pending Payment" %}</span>
         </button>
       </form>
-      <form method="post" action="{% url 'order_status_update' order.order_id %}" data-confirm="{% translate 'Cancel this order?' %}">
+      <form method="post" action="{% url 'order_status_update' order.order_id %}" data-confirm="{{ confirm_cancel_order|escape }}">
         {% csrf_token %}
         <input type="hidden" name="action" value="cancel">
         <button type="submit" class="eal-btn eal-btn-outline" style="color: var(--danger-color); border-color: var(--danger-color);">
@@ -243,7 +245,7 @@
     </div>
   {% elif order.order_status == 'Pending_Payment' %}
     <div class="d-flex flex-wrap gap-2 mb-4">
-      <form method="post" action="{% url 'order_status_update' order.order_id %}" data-confirm="{% translate 'Record payment and update subscriber plan, limits, and LTV?' %}">
+      <form method="post" action="{% url 'order_status_update' order.order_id %}" data-confirm="{{ confirm_record_payment|escape }}">
         {% csrf_token %}
         <input type="hidden" name="action" value="mark_paid">
         <button type="submit" class="eal-btn eal-btn-primary">
@@ -257,7 +259,7 @@
           <span>{% translate "View Transaction" %}</span>
         </a>
       {% endif %}
-      <form method="post" action="{% url 'order_status_update' order.order_id %}" data-confirm="{% translate 'Cancel this order?' %}">
+      <form method="post" action="{% url 'order_status_update' order.order_id %}" data-confirm="{{ confirm_cancel_order|escape }}">
         {% csrf_token %}
         <input type="hidden" name="action" value="cancel">
         <button type="submit" class="eal-btn eal-btn-outline" style="color: var(--danger-color); border-color: var(--danger-color);">

@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 from decouple import config
 from pathlib import Path
+from celery.schedules import crontab
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -172,7 +173,7 @@ AUTH_USER_MODEL = 'superadmin.AdminUser'
 
 # Email Configuration (SMTP). Tenant API bridge welcome/rotation emails use this
 # backend only—see superadmin.communication_helpers.send_email_via_django_smtp.
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_BACKEND = 'superadmin.email_backend.DatabaseEmailBackend'
 EMAIL_HOST = config('EMAIL_HOST', default='smtp.gmail.com')
 EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
 EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
@@ -192,6 +193,17 @@ CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'Asia/Riyadh'
 CELERY_TASK_TRACK_STARTED = True
 CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
+CELERY_BEAT_SCHEDULE = {
+    'archive-old-comm-logs-daily': {
+        'task': 'iroad.communication.archive_old_comm_logs',
+        'schedule': crontab(hour=2, minute=0),
+        'args': (90,),
+    },
+}
+
+# Push notifications (FCM legacy HTTP)
+FCM_SERVER_KEY = config('FCM_SERVER_KEY', default='')
+FCM_SEND_URL = config('FCM_SEND_URL', default='https://fcm.googleapis.com/fcm/send')
 
 # Tenant API bridge (CP Type B): require X-Tenant-API-Key by default.
 # Set TENANT_API_REQUIRE_KEY=False only for local/dev while migrating clients.

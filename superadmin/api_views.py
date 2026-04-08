@@ -400,6 +400,7 @@ def tenant_profile_sync(request):
 
     allowed = (
         'company_name',
+        'registration_number',
         'primary_email',
         'primary_phone',
         'tax_number',
@@ -419,6 +420,20 @@ def tenant_profile_sync(request):
         if len(name) > 100:
             return JsonResponse({'error': 'company_name too long'}, status=400)
         tenant.company_name = name
+
+    if 'registration_number' in updates:
+        reg = (updates['registration_number'] or '').strip()
+        if not reg:
+            return JsonResponse(
+                {'error': 'registration_number cannot be empty'},
+                status=400,
+            )
+        if len(reg) > 50:
+            return JsonResponse(
+                {'error': 'registration_number too long'},
+                status=400,
+            )
+        tenant.registration_number = reg
 
     if 'primary_email' in updates:
         email = (updates['primary_email'] or '').strip()
@@ -463,6 +478,7 @@ def tenant_profile_sync(request):
     return JsonResponse({
         'tenant_id': str(tenant.tenant_id),
         'company_name': tenant.company_name,
+        'registration_number': tenant.registration_number,
         'primary_email': tenant.primary_email,
         'primary_phone': tenant.primary_phone,
         'tax_number': tenant.tax_number or '',

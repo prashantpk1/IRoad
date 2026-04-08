@@ -1,7 +1,9 @@
 from django.contrib import messages
 from django.contrib.sessions.models import Session
 from django.contrib.auth import login, logout
+from django.contrib.auth.hashers import check_password
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.conf import settings
 from django.db import transaction as db_transaction
 from django.db.models import Sum, Count, F, Q
 from django.db.models.expressions import ExpressionWrapper
@@ -22,6 +24,7 @@ from decimal import Decimal
 import json
 import logging
 import uuid
+import smtplib
 
 logger = logging.getLogger(__name__)
 
@@ -192,17 +195,74 @@ class LoginView(View):
                 email=form.cleaned_data['email'].lower().strip()
             )
         except AdminUser.DoesNotExist:
-            record_failed_attempt(email)
-            log_access('Login', 'Failed', email, ip)
-            return render(
-                request,
-                self.template_name,
-                {
-                    'form': form,
-                    'error': 'Invalid email or password.',
-                    'failed_count': check_brute_force(email)['failed_count'],
-                },
+            tenant = TenantProfile.objects.filter(primary_email__iexact=email).first()
+            if not tenant:
+                record_failed_attempt(email)
+                log_access('Login', 'Failed', email, ip)
+                return render(
+                    request,
+                    self.template_name,
+                    {
+                        'form': form,
+                        'error': 'Invalid email or password.',
+                        'failed_count': check_brute_force(email)['failed_count'],
+                    },
+                )
+            if tenant.account_status != 'Active':
+                log_access('Login', 'Failed', email, ip)
+                return render(
+                    request,
+                    self.template_name,
+                    {
+                        'form': form,
+                        'error': 'Tenant account is not active.',
+                    },
+                )
+            if not (tenant.portal_bootstrap_password_hash or '').strip():
+                log_access('Login', 'Failed', email, ip)
+                return render(
+                    request,
+                    self.template_name,
+                    {
+                        'form': form,
+                        'error': 'Tenant password is not provisioned yet.',
+                    },
+                )
+            if not check_password(
+                form.cleaned_data['password'],
+                tenant.portal_bootstrap_password_hash,
+            ):
+                record_failed_attempt(email)
+                log_access('Login', 'Failed', email, ip)
+                return render(
+                    request,
+                    self.template_name,
+                    {
+                        'form': form,
+                        'error': 'Invalid email or password.',
+                    },
+                )
+
+            from .tenant_jwt import sign_tenant_access_jwt
+
+            ttl = max(60, int(getattr(settings, 'TENANT_BOOTSTRAP_JWT_TTL_SECONDS', 3600)))
+            token_str, jti = sign_tenant_access_jwt(
+                tenant_id=tenant.tenant_id,
+                subject=tenant.primary_email,
+                token_type='tenant_bootstrap',
+                ttl_seconds=ttl,
             )
+            request.session['tenant_bootstrap_token'] = token_str
+            request.session['tenant_bootstrap_tenant_id'] = str(tenant.tenant_id)
+            request.session['tenant_bootstrap_jti'] = jti
+            request.session['tenant_bootstrap_expires_in'] = ttl
+            reset_failed_attempts(email)
+            log_access('Login', 'Success', email, ip)
+            messages.success(
+                request,
+                'Tenant authenticated successfully. Access token generated in backend.',
+            )
+            return render(request, self.template_name, {'form': LoginForm()})
 
         # STEP 3: Check status
         if user.status == 'Suspended':
@@ -1193,7 +1253,7 @@ class SessionRevokeView(LoginRequiredMixin, View):
         old_obj = ActiveSession.objects.get(session_id=pk)
         if not session.is_active:
             messages.info(request, 'Session is already revoked.')
-            return redirect(reverse('session_list'))
+            return redirect(reverse('active_sessions'))
 
         session.is_active = False
         session.revoked_at = timezone.now()
@@ -1221,7 +1281,7 @@ class SessionRevokeView(LoginRequiredMixin, View):
             if tid:
                 revoke_tenant_session_key(tid, rj)
         messages.success(request, 'Session revoked successfully.')
-        return redirect(reverse('session_list'))
+        return redirect(reverse('active_sessions'))
 
 
 class MassRevokeView(LoginRequiredMixin, View):
@@ -1237,10 +1297,18 @@ class MassRevokeView(LoginRequiredMixin, View):
         redirect_resp = self._require_root(request)
         if redirect_resp:
             return redirect_resp
+        selected_tenant_id = request.GET.get('tenant_id', '').strip()
         tenants = TenantProfile.objects.filter(
             account_status='Active'
         ).order_by('company_name')
-        return render(request, self.template_name, {'tenants': tenants})
+        return render(
+            request,
+            self.template_name,
+            {
+                'tenants': tenants,
+                'selected_tenant_id': selected_tenant_id,
+            },
+        )
 
     def post(self, request):
         redirect_resp = self._require_root(request)
@@ -4011,11 +4079,7 @@ class CommGatewayCreateView(LoginRequiredMixin, View):
             return render(request, self.template_name, {'form': form, 'is_edit': False})
         instance = form.save(commit=False)
         instance.updated_by = request.user
-        instance.save()
-        if instance.is_active:
-            CommGateway.objects.filter(
-                gateway_type=form.cleaned_data['gateway_type']
-            ).exclude(gateway_id=instance.gateway_id).update(is_active=False)
+        instance.save() # Model now handles singularity
         messages.success(request, 'Communication gateway saved successfully.')
         return redirect(reverse('comm_gateway_list'))
 
@@ -4053,11 +4117,7 @@ class CommGatewayUpdateView(LoginRequiredMixin, View):
             )
         instance = form.save(commit=False)
         instance.updated_by = request.user
-        instance.save()
-        if instance.is_active:
-            CommGateway.objects.filter(
-                gateway_type=form.cleaned_data['gateway_type']
-            ).exclude(gateway_id=instance.gateway_id).update(is_active=False)
+        instance.save() # Model now handles singularity
         messages.success(request, 'Communication gateway updated successfully.')
         return redirect(reverse('comm_gateway_list'))
 
@@ -4070,11 +4130,7 @@ class CommGatewayToggleStatusView(LoginRequiredMixin, View):
         gateway = get_object_or_404(CommGateway, pk=pk)
         gateway.is_active = not gateway.is_active
         gateway.updated_by = request.user
-        gateway.save(update_fields=['is_active', 'updated_by', 'updated_at'])
-        if gateway.is_active:
-            CommGateway.objects.filter(gateway_type=gateway.gateway_type).exclude(
-                gateway_id=gateway.gateway_id
-            ).update(is_active=False)
+        gateway.save() # Model now handles singularity
         messages.success(request, 'Gateway status updated successfully.')
         return redirect(reverse('comm_gateway_list'))
 
@@ -4090,6 +4146,70 @@ class CommGatewayDeleteView(LoginRequiredMixin, View):
 
     def get(self, request, pk):
         return self.post(request, pk)
+
+
+class CommGatewayTestConnectionView(LoginRequiredMixin, View):
+    """
+    Spec CP-PCS-P6 §5.1.3: UI must include a "Test Connection" button 
+    that attempts to send a dummy message using the entered credentials 
+    before saving.
+    """
+    def post(self, request):
+        redirect_resp = _require_root_or_redirect(request)
+        if redirect_resp:
+            return JsonResponse({'success': False, 'message': 'Permission denied.'})
+
+        try:
+            g_type = request.POST.get('gateway_type')
+            host = request.POST.get('host_url')
+            port = request.POST.get('port')
+            user = request.POST.get('username_key')
+            password = request.POST.get('password_secret')
+            enc_type = request.POST.get('encryption_type')
+            sender = request.POST.get('sender_id')
+
+            # If password is masked '********', use the existing password from record (if ID supplied)
+            record_id = request.POST.get('gateway_id')
+            if record_id and password == '********':
+                existing = CommGateway.objects.filter(pk=record_id).first()
+                if existing:
+                    password = existing.password_secret
+
+            if g_type == 'Email':
+                if not all([host, port, user, password]):
+                    return JsonResponse({'success': False, 'message': 'Incomplete SMTP credentials.'})
+                
+                try:
+                    p = int(port)
+                except ValueError:
+                    return JsonResponse({'success': False, 'message': 'Port must be a number.'})
+
+                try:
+                    # Test SMTP connection
+                    if enc_type == 'SSL':
+                        server = smtplib.SMTP_SSL(host, p, timeout=10)
+                    else:
+                        server = smtplib.SMTP(host, p, timeout=10)
+                        if enc_type == 'TLS':
+                            server.starttls()
+                    
+                    server.login(user, password)
+                    server.quit()
+                    return JsonResponse({'success': True, 'message': 'SMTP Connection Successful!'})
+                except Exception as e:
+                    return JsonResponse({'success': False, 'message': f'Connection failed: {str(e)}'})
+
+            elif g_type == 'SMS':
+                # Dummy successful for now as per plan
+                return JsonResponse({
+                    'success': True, 
+                    'message': 'SMS Gateway configuration validated (Dummy Success).'
+                })
+
+            return JsonResponse({'success': False, 'message': 'Invalid gateway type.'})
+
+        except Exception as e:
+            return JsonResponse({'success': False, 'message': f'Server error: {str(e)}'})
 
 
 class NotificationTemplateListView(LoginRequiredMixin, View):
@@ -4362,8 +4482,11 @@ class PushNotificationCreateView(LoginRequiredMixin, View):
             return render(request, self.template_name, {'form': form, 'is_edit': False})
         obj = form.save(commit=False)
         obj.created_by = request.user
-        # TODO Phase 11: Queue actual FCM push dispatch here
         obj.save()
+        from superadmin.push_helpers import queue_push_notification
+
+        if obj.trigger_mode == 'Manual_Broadcast':
+            queue_push_notification(obj)
         messages.success(request, 'Push notification created successfully.')
         return redirect(reverse('push_notif_list'))
 
@@ -4400,7 +4523,11 @@ class PushNotificationUpdateView(LoginRequiredMixin, View):
                 self.template_name,
                 {'form': form, 'is_edit': True, 'push_item': push_item},
             )
-        form.save()
+        updated = form.save()
+        from superadmin.push_helpers import queue_push_notification
+
+        if updated.trigger_mode == 'Manual_Broadcast' and updated.dispatch_status != 'Completed':
+            queue_push_notification(updated)
         messages.success(request, 'Push notification updated successfully.')
         return redirect(reverse('push_notif_list'))
 
@@ -5089,6 +5216,13 @@ class OrderCreateView(RootRequiredMixin, View):
             return redirect('order_create')
 
         tax = get_tax_code_for_tenant(tenant, client_ip=get_client_ip(request))
+        if tax is None:
+            messages.error(
+                request,
+                'No active tax setting found. Configure Global Tax Settings '
+                'before creating orders.',
+            )
+            return redirect('order_create')
         fx = get_fx_snapshot(currency_id)
         tax_rate = tax.rate_percent if tax else Decimal('0.00')
 
@@ -5373,26 +5507,34 @@ class OrderStatusUpdateView(RootRequiredMixin, View):
                             'No pending payment transaction found for this order.',
                         )
                     else:
-                        txn.status = 'Completed'
-                        txn.reviewed_by = request.user
-                        txn.review_notes = None
-                        txn.save(update_fields=[
-                            'status', 'reviewed_by', 'review_notes',
-                            'updated_at',
-                        ])
-                        ord_row.order_status = 'Paid'
-                        ord_row.save(update_fields=[
-                            'order_status', 'updated_at',
-                        ])
-                        fulfill_paid_order(ord_row, request.user, txn.amount)
-                        log_audit_action(
-                            request,
-                            'Status_Change',
-                            'Order Marked Paid',
-                            str(ord_row.order_id),
-                            new_instance=ord_row,
-                        )
-                        fulfilled = True
+                        pm = ord_row.payment_method
+                        if pm and pm.method_type == 'Offline_Bank' and not txn.attachment:
+                            messages.error(
+                                request,
+                                'Offline bank payments require an attachment/receipt '
+                                'before recording payment.',
+                            )
+                        else:
+                            txn.status = 'Completed'
+                            txn.reviewed_by = request.user
+                            txn.review_notes = None
+                            txn.save(update_fields=[
+                                'status', 'reviewed_by', 'review_notes',
+                                'updated_at',
+                            ])
+                            ord_row.order_status = 'Paid'
+                            ord_row.save(update_fields=[
+                                'order_status', 'updated_at',
+                            ])
+                            fulfill_paid_order(ord_row, request.user, txn.amount)
+                            log_audit_action(
+                                request,
+                                'Status_Change',
+                                'Order Marked Paid',
+                                str(ord_row.order_id),
+                                new_instance=ord_row,
+                            )
+                            fulfilled = True
                 if fulfilled:
                     messages.success(
                         request,
@@ -5476,13 +5618,32 @@ class TransactionCreateView(RootRequiredMixin, View):
         fx = get_fx_snapshot(currency_id)
         base_equiv = (amount * fx).quantize(Decimal('0.01'))
         attachment = request.FILES.get('attachment')
+        payment_method = (
+            PaymentMethod.objects.filter(
+                is_active=True,
+                supported_currencies__contains=[currency_id],
+            )
+            .order_by('display_order')
+            .first()
+        )
+        if not payment_method:
+            payment_method = PaymentMethod.objects.filter(
+                is_active=True
+            ).order_by('display_order').first()
+        if not payment_method:
+            messages.error(
+                request,
+                'No active payment method is configured. '
+                'Configure at least one method before recording top-up.',
+            )
+            return redirect('transaction_create')
 
         with db_transaction.atomic():
             txn = Transaction.objects.create(
                 tenant=tenant,
                 order=None,
                 transaction_type='Wallet_TopUp',
-                payment_method=None,
+                payment_method=payment_method,
                 currency=currency,
                 amount=amount,
                 exchange_rate_snapshot=fx,
@@ -5531,6 +5692,12 @@ class TransactionApproveView(RootRequiredMixin, View):
                 messages.error(
                     request,
                     'Only offline bank transfers use manual approval.',
+                )
+                return redirect('transaction_detail', pk=pk)
+            if not txn.attachment:
+                messages.error(
+                    request,
+                    'Offline bank transfers require an attachment/receipt before approval.',
                 )
                 return redirect('transaction_detail', pk=pk)
             order = txn.order
@@ -5639,14 +5806,21 @@ class InvoiceDetailView(LoginRequiredMixin, View):
 
 class InvoiceVoidView(RootRequiredMixin, View):
     def post(self, request, pk):
-        # TODO: Generate Credit Note for voided invoice
-        invoice = get_object_or_404(StandardInvoice, invoice_id=pk)
+        from superadmin.billing_helpers import generate_credit_note_from_invoice
+
+        invoice = get_object_or_404(
+            StandardInvoice.objects.prefetch_related('line_items'),
+            invoice_id=pk,
+        )
         if invoice.status != 'Issued':
             messages.error(request, 'Only issued invoices can be voided.')
             return redirect('invoice_detail', pk=pk)
-        invoice.status = 'Void'
-        invoice.save(update_fields=['status', 'updated_at'])
-        messages.success(request, 'Invoice voided.')
+        with db_transaction.atomic():
+            inv_row = StandardInvoice.objects.select_for_update().get(pk=invoice.pk)
+            inv_row.status = 'Void'
+            inv_row.save(update_fields=['status', 'updated_at'])
+            generate_credit_note_from_invoice(inv_row, request.user)
+        messages.success(request, 'Invoice voided (credit note generated).')
         return redirect('invoice_detail', pk=pk)
 
 
