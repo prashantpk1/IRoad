@@ -1,0 +1,99 @@
+Internal Alerts Routing - Real-time Manual Walkthrough
+Module: FRM-CP-05-06
+Date: 2026-04-09
+
+Goal
+- Validate list pagination/filter/search behavior.
+- Validate real-time routing from trigger event to internal recipients.
+
+========================================
+1) UI Verification (List: Search/Filter/Pagination)
+========================================
+
+1. Open: Communication -> Internal Alerts Routing
+2. Confirm list page behavior:
+   - Search box visible (Search by role or email)
+   - Trigger Event filter dropdown visible
+   - Status filter dropdown visible
+   - Pagination visible
+3. Confirm page size:
+   - Page shows max 5 rows
+4. Test search:
+   - Search by partial custom email (e.g., "alerts")
+   - Search by role name (e.g., "Support")
+   - Click Apply
+   - Expected: rows filtered correctly, pagination query params preserved
+5. Test trigger filter:
+   - Select one trigger event (e.g., High_Priority_Ticket)
+   - Click Apply
+   - Expected: only rows for selected trigger
+6. Test status filter:
+   - Select Active / Inactive
+   - Click Apply
+   - Expected: only matching status rows
+7. Move page next/prev
+   - Expected: filter/search values stay in URL and remain applied
+
+========================================
+2) Data Setup for Real-time Routing
+========================================
+
+Create at least one active route:
+- Trigger Event: High_Priority_Ticket
+- Notify Role: choose active role (optional but recommended)
+- Custom Email: set a valid recipient mailbox
+- Is Active: True
+
+Important prerequisites:
+- Celery worker is running
+- SMTP/email gateway works (or Django SMTP configured)
+- Trigger event is actually fired in code path
+
+========================================
+3) Real-time Functional Test
+========================================
+
+Test A: Event-driven route dispatch
+1. Trigger an action in system that maps to the selected event
+   (example: create/update high-priority ticket flow if wired to High_Priority_Ticket)
+2. Immediately open Communication Logs
+3. Filter by Channel=Email and recent time window
+4. Expected:
+   - New log rows with trigger source related to internal alert event
+   - delivery_status should be Sent (or Failed with error_details if SMTP problem)
+
+Test B: Direct function trigger (developer test)
+If event trigger is hard to produce from UI, run Django shell:
+
+python manage.py shell
+
+from superadmin.communication_helpers import dispatch_internal_alerts
+dispatch_internal_alerts("High_Priority_Ticket", {"tenant_id":"demo","note":"manual realtime test"})
+
+Expected:
+- Returns count > 0 when matching active routes exist.
+- Corresponding email tasks are queued and logs appear.
+
+========================================
+4) Troubleshooting
+========================================
+
+If no email/log appears:
+1. Check route is active.
+2. Check trigger_event exact match with backend enum.
+3. Check role has active admin users with emails.
+4. Check custom email format is valid.
+5. Check Celery worker is running.
+6. Check SMTP settings / active email gateway credentials.
+7. Check Communication Logs for "Failed" and inspect error_details.
+
+========================================
+5) Pass Criteria
+========================================
+
+PASS when all are true:
+- List page supports search/filter and keeps them across pagination.
+- Pagination is 5 rows per page.
+- Triggering an event dispatches internal alert emails to configured recipients.
+- Communication Logs capture sent/failed outcomes in near real-time.
+

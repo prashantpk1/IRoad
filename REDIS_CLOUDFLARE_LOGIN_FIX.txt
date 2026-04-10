@@ -1,0 +1,94 @@
+REDIS FIX FOR CLOUDFLARE TUNNEL LOGIN ERROR
+===========================================
+
+Problem
+-------
+Your Django app is trying to connect to Redis at:
+redis://127.0.0.1:6379/0
+
+Error:
+ConnectionError 10061 (target machine actively refused it)
+
+This means Redis server is NOT running (or wrong REDIS_URL).
+
+
+Important Cloudflare Tunnel Note
+--------------------------------
+Cloudflare tunnel only exposes your Django HTTP port (example: 8000).
+It does NOT expose Redis for your app.
+
+So for this setup, Redis must be reachable by Django locally (or via a cloud Redis URL).
+
+
+OPTION A (Recommended now): Run Redis locally on Windows
+-------------------------------------------------------
+1) Start Redis using Docker Desktop:
+
+   docker run -d --name iroad-redis -p 6379:6379 redis:7-alpine
+
+2) Check Redis is alive:
+
+   docker ps
+   docker exec -it iroad-redis redis-cli ping
+
+   Expected response: PONG
+
+3) In your .env, keep/add:
+
+   REDIS_URL=redis://127.0.0.1:6379/0
+   CELERY_BROKER_URL=redis://127.0.0.1:6379/1
+   CELERY_RESULT_BACKEND=redis://127.0.0.1:6379/2
+
+4) Restart Django server after updating .env.
+
+5) Test:
+   - Open tunnel URL
+   - Login again
+
+
+OPTION B (Production/share-safe): Use managed Redis (Upstash/Redis Cloud)
+---------------------------------------------------------------------------
+If your app may run on machines where local Redis is not guaranteed, use a hosted Redis.
+
+1) Create a Redis database (Upstash or Redis Cloud).
+2) Copy the provider URL (usually rediss://... with password).
+3) Set in .env:
+
+   REDIS_URL=rediss://<username>:<password>@<host>:<port>/0
+   CELERY_BROKER_URL=rediss://<username>:<password>@<host>:<port>/1
+   CELERY_RESULT_BACKEND=rediss://<username>:<password>@<host>:<port>/2
+
+4) Restart Django + Celery workers.
+
+
+Quick Health Check Command
+--------------------------
+Run in project venv:
+
+python manage.py shell -c "from superadmin.redis_helpers import redis_health_check; print(redis_health_check())"
+
+Expected:
+True
+
+
+Why this fails on /login/
+-------------------------
+Your login flow creates admin session in Redis:
+superadmin.redis_helpers.create_admin_session(...)
+
+If Redis is down, login raises ConnectionError and returns 500.
+
+
+Minimum Checklist Before Sharing Tunnel Link
+--------------------------------------------
+[ ] Redis is running and reachable
+[ ] REDIS_URL in .env is correct
+[ ] Django restarted after .env change
+[ ] (If using Celery) worker can connect to broker/backend
+[ ] redis_health_check() returns True
+
+
+If you want, next step I can add a "graceful fallback" in login:
+- show friendly "System temporarily unavailable" message
+- avoid Django debug stack trace to public users
+- keep app from hard-crashing when Redis is down

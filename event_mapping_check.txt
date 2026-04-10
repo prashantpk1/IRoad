@@ -1,0 +1,99 @@
+CP-PCS-P6 / FRM-CP-05-03 - System Events Mapping Engine
+Implementation Check (YES/NO + Reason)
+Date: 2026-04-09
+
+Scope checked:
+- Model: superadmin.models.EventMapping
+- Form: superadmin.forms.EventMappingForm
+- Views: superadmin.views.EventMapping*
+- Runtime dispatch: superadmin.communication_helpers.dispatch_event_notification
+- UI form: templates/comm/events/event_form.html
+
+==================================================
+5.3.2 Main Fields (Data Dictionary)
+==================================================
+
+1) mapping_id (Primary Key, auto, required)
+Status: YES (partial variance)
+Reason: Implemented as UUID primary key with default uuid4 in EventMapping model.
+Note: Spec says "Auto-number Text"; implementation uses UUID PK. Still auto-generated and unique.
+
+2) system_event (Enum, required, fixed backend list)
+Status: YES
+Reason: Field uses choices from hardcoded SYSTEM_EVENT_CHOICES and is required in model/form.
+
+3) primary_channel (Enum Email/SMS, required)
+Status: YES
+Reason: Implemented with CHANNEL_CHOICES and required in model/form.
+
+4) primary_template_id (FK NotificationTemplate, required, filtered by primary_channel)
+Status: YES
+Reason: Required FK in model and validated in form clean() to match selected primary_channel.
+Also filtered queryset in EventMappingForm based on selected/posted channel.
+
+5) fallback_channel (Enum Email/SMS, optional)
+Status: YES
+Reason: Nullable/blank field in model and optional in form.
+
+6) fallback_template_id (FK NotificationTemplate, conditional required if fallback selected)
+Status: YES
+Reason: Form clean() enforces fallback_template required when fallback_channel is set and validates channel match.
+
+7) is_active (Boolean, required, default True)
+Status: YES
+Reason: BooleanField(default=True) in model; available on form/UI.
+
+8) updated_by (FK UserAccount, required as audit field)
+Status: NO (strictly against "required")
+Reason: Model currently allows null=True for updated_by.
+View sets updated_by on create/update/toggle, but DB-level field is not mandatory.
+
+==================================================
+5.3.3 Business Rules & Logic
+==================================================
+
+A) Event Immutability Rule:
+   "System event list is hardcoded; Super Admin cannot create new event types from UI."
+Status: YES
+Reason:
+- system_event is a fixed choices enum in model.
+- UI form uses dropdown from those choices only.
+- No endpoint/UI for dynamic event creation.
+
+B) One mapping per event (architectural expectation)
+Status: YES
+Reason: system_event has unique=True in model; create view also blocks duplicates with explicit check.
+
+C) Fallback Protocol:
+   "If primary channel fails/timeout, instantly dispatch fallback template/channel."
+Status: NO (for async path)
+Reason:
+- In dispatch_event_notification(), fallback is triggered only if _send() raises exception.
+- For async sends, _send() queues Celery task and returns True immediately.
+- Later delivery failures happen inside task, so main dispatcher does not catch them and cannot trigger fallback instantly.
+- Fallback works for synchronous path (use_async_tasks=False), but not reliably for async production flow.
+
+==================================================
+UI/Operational Notes (Observed)
+==================================================
+
+1) Event form layout quality
+Status: NO (UX issue, not logic)
+Reason: templates/comm/events/event_form.html has malformed nested action markup causing alignment issues.
+
+2) Dynamic dropdown behavior on the form page
+Status: PARTIAL
+Reason:
+- Server-side filtering and validation are correct.
+- Client-side JS only toggles fallback template visibility; it does not dynamically repopulate template options when channels change without submit.
+
+==================================================
+Overall verdict for FRM-CP-05-03
+==================================================
+
+Core data model + validation: MOSTLY IMPLEMENTED.
+Gaps to close for full compliance:
+1) Make updated_by mandatory at DB/model level (or enforce before save in all code paths).
+2) Implement true fallback-on-failure for async delivery (e.g., fallback decision in worker/task after provider response/timeout).
+3) Clean event form template structure and optional client-side dependent-dropdown UX.
+

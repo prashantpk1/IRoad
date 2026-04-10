@@ -1,0 +1,114 @@
+IROAD DOCKER RUN GUIDE (DJANGO + REDIS)
+=======================================
+
+What this setup does
+--------------------
+- Runs Django in one container (`iroad-web`)
+- Runs Redis in one container (`iroad-redis`)
+- Maps Django to: http://localhost:8000
+- Uses Redis service name inside Docker network:
+  redis://redis:6379
+
+
+Files added
+-----------
+- Dockerfile
+- docker-compose.yml
+
+
+Before first run
+----------------
+1) Install and open Docker Desktop.
+2) Keep your PostgreSQL running on Windows host.
+3) Confirm `.env` has your DB_USER / DB_PASSWORD / DB_NAME.
+
+Note:
+- In Docker compose, DB host is overridden to `host.docker.internal`
+  so Django container can reach PostgreSQL on your Windows machine.
+
+
+Run commands (inside project folder: D:/iroad)
+----------------------------------------------
+1) Build and start:
+
+   docker compose up -d --build
+
+2) Check status:
+
+   docker compose ps
+
+3) Check logs:
+
+   docker compose logs -f web
+   docker compose logs -f redis
+
+
+Open app
+--------
+- http://localhost:8000
+- Your Cloudflare tunnel can still point to localhost:8000
+
+
+Redis verification
+------------------
+1) Ping Redis in container:
+
+   docker exec -it iroad-redis redis-cli ping
+
+   Expected: PONG
+
+2) Django Redis health check:
+
+   docker compose exec web python manage.py shell -c "from superadmin.redis_helpers import redis_health_check; print(redis_health_check())"
+
+   Expected: True
+
+
+After PC restart
+----------------
+- Because restart policy is `unless-stopped`, containers auto-start
+  when Docker Desktop starts.
+- If not running:
+
+  docker compose up -d
+
+
+If port 6379 already in use
+---------------------------
+If you already started a standalone Redis container earlier, stop/remove it:
+
+  docker stop iroad-redis
+  docker rm iroad-redis
+
+Then run:
+
+  docker compose up -d --build
+
+
+Useful commands
+---------------
+- Stop:
+  docker compose down
+
+- Restart:
+  docker compose restart
+
+- Rebuild web only:
+  docker compose up -d --build web
+
+
+Troubleshooting
+---------------
+1) DB connection fails from web container:
+   - Ensure PostgreSQL is running on host.
+   - Ensure PostgreSQL accepts TCP on port 5432.
+   - Ensure `.env` DB credentials are correct.
+
+2) Login still shows Redis error:
+   - Run `docker compose ps` and confirm redis is Up.
+   - Run Redis ping command above and confirm PONG.
+   - Restart web container: `docker compose restart web`
+
+3) Cloudflare link still errors:
+   - Keep tunnel pointing to `http://localhost:8000`
+   - Confirm local login works first on localhost before sharing link.
