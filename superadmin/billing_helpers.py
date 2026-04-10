@@ -26,6 +26,9 @@ def refresh_order_projected_fields(order):
     (preview of post-payment state).
     """
     tenant = order.tenant
+    customer_address_snapshot = ''
+    if getattr(tenant, 'country_id', None) and getattr(tenant, 'country', None):
+        customer_address_snapshot = tenant.country.name_en or ''
     classification = order.order_classification
     plan_line = order.plan_lines.first() if order.plan_lines.exists() else None
 
@@ -252,7 +255,13 @@ def create_automated_renewal_after_scheduled_downgrade(tenant, new_plan):
 
     tax = get_tax_code_for_tenant(tenant, client_ip=None)
     tax_rate = tax.rate_percent if tax else Decimal('0.00')
-    fx = get_fx_snapshot(currency.currency_code)
+    fx = get_fx_snapshot(currency.currency_code, strict=True)
+    if fx is None:
+        logger.error(
+            'Downgrade renewal: missing active FX rate for currency %s',
+            currency.currency_code,
+        )
+        return None
     pm = PaymentMethod.objects.filter(is_active=True).first()
 
     plan_price = ppc.price
@@ -394,19 +403,22 @@ def get_next_credit_note_number():
     return f"{prefix}{str(new_seq).zfill(4)}"
 
 
-def get_fx_snapshot(currency_code):
+def get_fx_snapshot(currency_code, strict=False):
     """
     Get current FX rate snapshot for a currency.
     Returns 1.000000 if currency is base currency.
+    For non-base currencies, when ``strict=True`` and no active FX row exists,
+    returns None so callers can block invalid financial postings.
     """
     from .models import BaseCurrencyConfig, ExchangeRate
 
     try:
         base_config = BaseCurrencyConfig.objects.get(
             setting_id='GLOBAL-BASE-CURRENCY')
-        if base_config.base_currency_id == currency_code:
-            return Decimal('1.000000')
     except Exception:
+        return Decimal('1.000000')
+
+    if base_config.base_currency_id == currency_code:
         return Decimal('1.000000')
 
     try:
@@ -414,6 +426,8 @@ def get_fx_snapshot(currency_code):
             currency_id=currency_code, is_active=True)
         return fx.exchange_rate
     except ExchangeRate.DoesNotExist:
+        if strict:
+            return None
         return Decimal('1.000000')
 
 
@@ -769,7 +783,7 @@ def generate_invoice_from_order(order, admin_user):
         # Customer snapshot
         customer_name=tenant.company_name,
         customer_tax_number=tenant.tax_number or '',
-        customer_address='',
+        customer_address=customer_address_snapshot,
         # Financials
         sub_total=order.sub_total,
         discount_amount=order.discount_amount,

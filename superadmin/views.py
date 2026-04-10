@@ -5365,7 +5365,14 @@ class OrderCreateView(RootRequiredMixin, View):
                 'before creating orders.',
             )
             return redirect('order_create')
-        fx = get_fx_snapshot(currency_id)
+        fx = get_fx_snapshot(currency_id, strict=True)
+        if fx is None:
+            messages.error(
+                request,
+                'No active FX rate found for selected currency. '
+                'Configure Exchange Rates before creating orders.',
+            )
+            return redirect('order_create')
         tax_rate = tax.rate_percent if tax else Decimal('0.00')
 
         promo_obj = None
@@ -5583,7 +5590,15 @@ class OrderPreviewAjaxView(RootRequiredMixin, View):
 
         tax = get_tax_code_for_tenant(tenant, client_ip=get_client_ip(request))
         tax_rate = tax.rate_percent if tax else Decimal('0.00')
-        fx = get_fx_snapshot(currency_id)
+        fx = get_fx_snapshot(currency_id, strict=True)
+        if fx is None:
+            return JsonResponse(
+                {
+                    'ok': False,
+                    'error': 'No active FX rate found for selected currency.',
+                },
+                status=400,
+            )
 
         sub_total = Decimal('0.00')
         plan_price = Decimal('0.00')
@@ -5961,7 +5976,14 @@ class TransactionCreateView(RootRequiredMixin, View):
             messages.error(request, 'Enter a valid amount.')
             return redirect('transaction_create')
 
-        fx = get_fx_snapshot(currency_id)
+        fx = get_fx_snapshot(currency_id, strict=True)
+        if fx is None:
+            messages.error(
+                request,
+                'No active FX rate found for selected currency. '
+                'Configure Exchange Rates before recording transaction.',
+            )
+            return redirect('transaction_create')
         base_equiv = (amount * fx).quantize(Decimal('0.01'))
         attachment = request.FILES.get('attachment')
         payment_method = (
@@ -6147,7 +6169,19 @@ class InvoiceDetailView(LoginRequiredMixin, View):
             ).prefetch_related('line_items'),
             invoice_id=pk,
         )
-        return render(request, self.template_name, {'invoice': invoice})
+        base_cfg = BaseCurrencyConfig.objects.filter(
+            setting_id='GLOBAL-BASE-CURRENCY',
+        ).first()
+        return render(
+            request,
+            self.template_name,
+            {
+                'invoice': invoice,
+                'base_currency_code': (
+                    base_cfg.base_currency_id if base_cfg and base_cfg.base_currency_id else None
+                ),
+            },
+        )
 
 
 class InvoiceVoidView(RootRequiredMixin, View):

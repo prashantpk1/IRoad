@@ -51,7 +51,11 @@
       <div class="col-12 col-md-6">
         <label class="form-label fw-semibold">{% translate "Bill To" %}</label>
         <input class="form-control" value="{{ invoice.customer_name }}" readonly>
-        <div class="field-hint">{% translate "Tax" %}: {{ invoice.customer_tax_number|default:'—' }}{% if invoice.customer_address %} · {{ invoice.customer_address }}{% endif %}</div>
+        <div class="field-hint">{% translate "Tax" %}: {{ invoice.customer_tax_number|default:'—' }}</div>
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">{% translate "Customer address" %}</label>
+        <input class="form-control" value="{{ invoice.customer_address|default:'—' }}" readonly>
       </div>
     </div>
     <div class="row g-3 mt-1">
@@ -70,6 +74,10 @@
       <div class="col-12 col-md-4">
         <label class="form-label">{% translate "Issue date" %}</label>
         <input class="form-control" value="{{ invoice.issue_date|date:'d M Y' }}" readonly>
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label">{% translate "Currency code" %}</label>
+        <input class="form-control" value="{{ invoice.currency_id }}" readonly>
       </div>
       <div class="col-12 col-md-4">
         <label class="form-label">{% translate "Due date" %}</label>
@@ -167,11 +175,11 @@
       </div>
       <div class="col-12 col-md-4">
         <label class="form-label">{% translate "Base currency equivalent" %}</label>
-        <input class="form-control" value="{{ invoice.base_currency_equivalent_amount|floatformat:2 }}" readonly>
+        <input class="form-control" value="{{ invoice.base_currency_equivalent_amount|floatformat:2 }}{% if base_currency_code %} {{ base_currency_code }}{% endif %}" readonly>
       </div>
       <div class="col-12 col-md-4">
         <label class="form-label">{% translate "FX snapshot" %}</label>
-        <input class="form-control" value="{{ invoice.exchange_rate_snapshot }}" readonly>
+        <input class="form-control" value="{{ invoice.exchange_rate_snapshot|floatformat:6 }}" readonly>
       </div>
     </div>
   </div>
