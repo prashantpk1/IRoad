@@ -53,5 +53,20 @@ urlpatterns = [
         api_views.tenant_bootstrap_auth,
         name='api_tenant_bootstrap_auth',
     ),
+    path(
+        'push/tokens/upsert/',
+        api_views.tenant_push_token_upsert,
+        name='api_push_token_upsert',
+    ),
+    path(
+        'push/tokens/deactivate/',
+        api_views.tenant_push_token_deactivate,
+        name='api_push_token_deactivate',
+    ),
+    path(
+        'push/notifications/',
+        api_views.tenant_push_notifications,
+        name='api_push_notifications',
+    ),
 ]
 

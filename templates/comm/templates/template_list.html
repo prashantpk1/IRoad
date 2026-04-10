@@ -59,9 +59,15 @@
                 <td>
                   {% if request.user.is_root %}
                     <div class="eal-actions-cell">
-                      <a href="{% url 'notif_template_edit' t.template_id %}" class="eal-row-btn"><i class="bi bi-pencil"></i></a>
+                      <button type="button" class="eal-row-btn preview-template-btn" 
+                              data-template-id="{{ t.template_id }}" 
+                              data-template-name="{{ t.template_name }}"
+                              title="Preview Template">
+                        <i class="bi bi-eye"></i>
+                      </button>
+                      <a href="{% url 'notif_template_edit' t.template_id %}" class="eal-row-btn" title="Edit Template"><i class="bi bi-pencil"></i></a>
                       <form method="post" action="{% url 'notif_template_toggle' t.template_id %}" style="display:inline">{% csrf_token %}
-                        <button type="submit" class="eal-row-btn"><i class="bi bi-arrow-repeat"></i></button>
+                        <button type="submit" class="eal-row-btn" title="Toggle Status"><i class="bi bi-arrow-repeat"></i></button>
                       </form>
                     </div>
                   {% endif %}
@@ -76,4 +82,165 @@
     {% endif %}
     {% include 'partials/pagination.html' with page_obj=templates_page %}
   </div>
+
+  <!-- Template Preview Modal -->
+  <div class="modal fade" id="templatePreviewModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+      <div class="modal-content border-0 shadow-lg overflow-hidden" style="border-radius: 20px;">
+        <div class="modal-header bg-dark text-white px-4 py-3 border-0">
+          <div class="d-flex align-items-center gap-3">
+            <div class="bg-primary bg-opacity-25 p-2 rounded-3 text-primary">
+              <i class="bi bi-eye-fill fs-5"></i>
+            </div>
+            <div>
+              <h5 class="modal-title fw-bold mb-0" id="previewModalLabel">Template Preview</h5>
+              <p class="small text-white text-opacity-75 mb-0" id="previewModalSubtitle"></p>
+            </div>
+          </div>
+          
+          <div class="ms-auto d-flex align-items-center gap-2 me-3">
+            <!-- Language Toggle -->
+            <div class="btn-group btn-group-sm bg-white bg-opacity-10 p-1 rounded-pill">
+              <input type="radio" class="btn-check lang-toggle" name="preview_lang" id="lang_en" value="en" checked>
+              <label class="btn btn-sm btn-outline-light border-0 rounded-pill px-3" for="lang_en">EN</label>
+              
+              <input type="radio" class="btn-check lang-toggle" name="preview_lang" id="lang_ar" value="ar">
+              <label class="btn btn-sm btn-outline-light border-0 rounded-pill px-3" for="lang_ar">AR</label>
+            </div>
+            
+            <!-- Device Toggle -->
+            <div class="btn-group btn-group-sm bg-white bg-opacity-10 p-1 rounded-pill ms-2 d-none d-md-flex">
+              <button type="button" class="btn btn-sm btn-outline-light border-0 rounded-pill px-2 device-toggle active" data-device="desktop">
+                <i class="bi bi-display"></i>
+              </button>
+              <button type="button" class="btn btn-sm btn-outline-light border-0 rounded-pill px-2 device-toggle" data-device="mobile">
+                <i class="bi bi-smartphone"></i>
+              </button>
+            </div>
+          </div>
+          
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body p-0 bg-light" style="min-height: 600px; position: relative;">
+          <div id="previewLoader" class="position-absolute top-50 start-50 translate-middle d-none">
+            <div class="spinner-border text-primary" role="status">
+              <span class="visually-hidden">Loading...</span>
+            </div>
+          </div>
+          <div id="previewIframeContainer" class="h-100 transition-all" style="transition: width 0.3s ease; margin: 0 auto;">
+            <iframe id="templatePreviewIframe" src="" frameborder="0" style="width: 100%; height: 600px; display: block;"></iframe>
+          </div>
+        </div>
+        <div class="modal-footer bg-white border-0 px-4 py-3">
+          <span class="text-muted small me-auto">
+            <i class="bi bi-info-circle me-1"></i> Previews may vary slightly depending on email clients.
+          </span>
+          <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Close</button>
+          <a id="editTemplateBtn" href="#" class="btn btn-primary rounded-pill px-4">Edit Template</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  #previewIframeContainer.mobile-view {
+    max-width: 375px;
+    border-left: 12px solid #334155;
+    border-right: 12px solid #334155;
+    border-top: 40px solid #334155;
+    border-bottom: 40px solid #334155;
+    border-radius: 40px;
+    margin: 40px auto !important;
+    height: 700px !important;
+  }
+  #previewIframeContainer.mobile-view iframe {
+    height: 100% !important;
+  }
+  .lang-toggle:checked + label {
+    background: var(--primary-color) !important;
+    color: white !important;
+  }
+  .device-toggle.active {
+    background: white !important;
+    color: var(--text-dark) !important;
+  }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const previewModal = new bootstrap.Modal(document.getElementById('templatePreviewModal'));
+    const iframe = document.getElementById('templatePreviewIframe');
+    const loader = document.getElementById('previewLoader');
+    const container = document.getElementById('previewIframeContainer');
+    const subtitle = document.getElementById('previewModalSubtitle');
+    const editBtn = document.getElementById('editTemplateBtn');
+    
+    let currentTemplateId = null;
+    let currentLang = 'en';
+
+    function loadPreview(templateId, lang) {
+      currentTemplateId = templateId;
+      currentLang = lang;
+      
+      loader.classList.remove('d-none');
+      iframe.style.opacity = '0.3';
+      
+      const url = `{% url 'notif_template_preview' '00000000-0000-0000-0000-000000000000' %}`.replace('00000000-0000-0000-0000-000000000000', templateId);
+      iframe.src = `${url}?lang=${lang}`;
+      
+      iframe.onload = function() {
+        loader.classList.add('d-none');
+        iframe.style.opacity = '1';
+      };
+    }
+
+    document.querySelectorAll('.preview-template-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const tid = this.getAttribute('data-template-id');
+        const tname = this.getAttribute('data-template-name');
+        
+        subtitle.textContent = tname;
+        editBtn.href = `{% url 'notif_template_edit' '00000000-0000-0000-0000-000000000000' %}`.replace('00000000-0000-0000-0000-000000000000', tid);
+        
+        // Reset toggles
+        document.getElementById('lang_en').checked = true;
+        currentLang = 'en';
+        container.classList.remove('mobile-view');
+        document.querySelectorAll('.device-toggle').forEach(b => b.classList.remove('active'));
+        document.querySelector('.device-toggle[data-device="desktop"]').classList.add('active');
+        
+        loadPreview(tid, 'en');
+        previewModal.show();
+      });
+    });
+
+    // Language Toggle logic
+    document.querySelectorAll('.lang-toggle').forEach(radio => {
+      radio.addEventListener('change', function() {
+        if (this.checked && currentTemplateId) {
+          loadPreview(currentTemplateId, this.value);
+        }
+      });
+    });
+
+    // Device Toggle logic
+    document.querySelectorAll('.device-toggle').forEach(btn => {
+      btn.addEventListener('click', function() {
+        document.querySelectorAll('.device-toggle').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        
+        if (this.getAttribute('data-device') === 'mobile') {
+          container.classList.add('mobile-view');
+        } else {
+          container.classList.remove('mobile-view');
+        }
+      });
+    });
+  });
+</script>
 {% endblock %}

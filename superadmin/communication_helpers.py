@@ -13,6 +13,7 @@ from email.mime.text import MIMEText
 from pathlib import Path
 
 import urllib.request
+import urllib.parse
 from base64 import b64encode
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
@@ -454,60 +455,155 @@ DEFAULT_NOTIFICATION_EMAIL_TEMPLATES = [
             '<h2 style="color:#1e293b;margin:0 0 16px;font-size:22px;font-weight:700;">'
             'Welcome, {{ company_name }}! 🚀</h2>'
             '<p style="font-size:15px;color:#475569;line-height:1.7;margin:0 0 20px;">'
-            'Your subscriber workspace is ready. Below are your credentials and '
-            'integration keys to get started.</p>'
+            'Your subscriber workspace has been provisioned and is ready to use. '
+            'Below are your sign-in credentials and integration keys.</p>'
+            
             '<div style="background:linear-gradient(135deg,#f8fafc,#f1f5f9);'
             'padding:20px 22px;border-radius:12px;border:1px solid #e2e8f0;margin-bottom:20px;">'
             '<p style="font-size:11px;font-weight:700;text-transform:uppercase;'
-            'letter-spacing:0.06em;color:#6366f1;margin:0 0 6px;">API Bridge Key</p>'
+            'letter-spacing:0.06em;color:#6366f1;margin:0 0 6px;">Portal Credentials</p>'
+            '<p style="margin:8px 0 4px;font-size:14px;color:#334155;">'
+            '<strong>Login email:</strong> {{ tenant.primary_email }}</p>'
+            '<p style="margin:4px 0 0;font-size:14px;color:#334155;">'
+            '<strong>Initial password:</strong> <span style="color:#ef4444;font-size:12px;">(change after sign-in)</span></p>'
             '<div style="background:#1e293b;color:#e2e8f0;padding:14px 18px;border-radius:10px;'
-            'font-family:monospace;font-size:13px;word-break:break-all;margin:0;'
-            'border:1px solid #334155;">{{ api_bridge_key }}</div>'
-            '</div>'
-            '<div style="background:linear-gradient(135deg,#f8fafc,#f1f5f9);'
-            'padding:20px 22px;border-radius:12px;border:1px solid #e2e8f0;margin-bottom:20px;">'
-            '<p style="font-size:11px;font-weight:700;text-transform:uppercase;'
-            'letter-spacing:0.06em;color:#6366f1;margin:0 0 6px;">Portal Password</p>'
-            '<div style="background:#1e293b;color:#e2e8f0;padding:14px 18px;border-radius:10px;'
-            'font-family:monospace;font-size:13px;word-break:break-all;margin:0;'
+            'font-family:monospace;font-size:13px;word-break:break-all;margin:12px 0;'
             'border:1px solid #334155;">{{ portal_bootstrap_password }}</div>'
             '</div>'
+
             '<div style="text-align:center;margin:28px 0;">'
             '<a href="{{ portal_login_url }}" style="background:linear-gradient(135deg,#4f46e5,#6366f1);'
             'color:#fff!important;padding:14px 32px;text-decoration:none;border-radius:10px;'
             'font-weight:700;font-size:15px;display:inline-block;'
-            'box-shadow:0 4px 14px rgba(79,70,229,.3);">Open Portal Login &rarr;</a>'
+            'box-shadow:0 4px 14px rgba(79,70,229,.3);">Open Workspace Sign-in &rarr;</a>'
             '</div>'
+
+            '<div style="height:1px;background:#e2e8f0;margin:28px 0;"></div>'
+
+            '<div style="background:linear-gradient(135deg,#f8fafc,#f1f5f9);'
+            'padding:20px 22px;border-radius:12px;border:1px solid #e2e8f0;margin-bottom:20px;">'
+            '<p style="font-size:11px;font-weight:700;text-transform:uppercase;'
+            'letter-spacing:0.06em;color:#6366f1;margin:0 0 6px;">Tenant Identifier</p>'
+            '<p style="margin:4px 0 8px;font-size:13px;color:#64748b;">'
+            'Use with <code>X-Tenant-ID</code> header on API calls:</p>'
+            '<div style="background:#1e293b;color:#e2e8f0;padding:14px 18px;border-radius:10px;'
+            'font-family:monospace;font-size:13px;word-break:break-all;margin:0;'
+            'border:1px solid #334155;">{{ tenant.tenant_id }}</div>'
+            '</div>'
+
+            '<p style="font-size:11px;font-weight:700;text-transform:uppercase;color:#6366f1;margin:0 0 6px;">API Bridge Key</p>'
+            '<p style="font-size:13px;color:#64748b;margin-bottom:12px;">'
+            'Authentication secret for the bridge endpoint. Store this securely — it is never shown again.</p>'
+            '<div style="background:#1e293b;color:#e2e8f0;padding:14px 18px;border-radius:10px;'
+            'font-family:monospace;font-size:13px;word-break:break-all;margin:0;'
+            'border:1px solid #334155;">{{ api_bridge_key }}</div>'
         ),
         'body_ar': _wrap_email_body(
             '<div dir="rtl" style="text-align:right;">'
             '<h2 style="color:#1e293b;margin:0 0 16px;font-size:22px;font-weight:700;">'
-            'مرحباً، {{ company_name }}! 🚀</h2>'
+            'مرحباً بك في iRoad، {{ company_name }}! 🚀</h2>'
             '<p style="font-size:15px;color:#475569;line-height:1.7;margin:0 0 20px;">'
-            'مساحة العمل الخاصة بك جاهزة. فيما يلي بيانات الاعتماد ومفاتيح التكامل.</p>'
+            'تم تجهيز مساحة العمل الخاصة بك وهي جاهزة للاستخدام الآن. أدناه بيانات الدخول ومفاتيح التكامل.</p>'
+            
             '<div style="background:linear-gradient(135deg,#f8fafc,#f1f5f9);'
             'padding:20px 22px;border-radius:12px;border:1px solid #e2e8f0;margin-bottom:20px;">'
             '<p style="font-size:11px;font-weight:700;text-transform:uppercase;'
-            'letter-spacing:0.06em;color:#6366f1;margin:0 0 6px;">مفتاح الربط البرمجي</p>'
+            'letter-spacing:0.06em;color:#6366f1;margin:0 0 6px;">بيانات دخول البوابة</p>'
+            '<p style="margin:8px 0 4px;font-size:14px;color:#334155;">'
+            '<strong>البريد الإلكتروني:</strong> {{ tenant.primary_email }}</p>'
+            '<p style="margin:4px 0 0;font-size:14px;color:#334155;">'
+            '<strong>كلمة المرور الأولية:</strong> <span style="color:#ef4444;font-size:12px;">(يرجى تغييرها بعد الدخول)</span></p>'
             '<div style="background:#1e293b;color:#e2e8f0;padding:14px 18px;border-radius:10px;'
-            'font-family:monospace;font-size:13px;word-break:break-all;margin:0;'
-            'border:1px solid #334155;">{{ api_bridge_key }}</div>'
-            '</div>'
-            '<div style="background:linear-gradient(135deg,#f8fafc,#f1f5f9);'
-            'padding:20px 22px;border-radius:12px;border:1px solid #e2e8f0;margin-bottom:20px;">'
-            '<p style="font-size:11px;font-weight:700;text-transform:uppercase;'
-            'letter-spacing:0.06em;color:#6366f1;margin:0 0 6px;">كلمة مرور البوابة</p>'
-            '<div style="background:#1e293b;color:#e2e8f0;padding:14px 18px;border-radius:10px;'
-            'font-family:monospace;font-size:13px;word-break:break-all;margin:0;'
+            'font-family:monospace;font-size:13px;word-break:break-all;margin:12px 0;'
             'border:1px solid #334155;">{{ portal_bootstrap_password }}</div>'
             '</div>'
+
             '<div style="text-align:center;margin:28px 0;">'
             '<a href="{{ portal_login_url }}" style="background:linear-gradient(135deg,#4f46e5,#6366f1);'
             'color:#fff!important;padding:14px 32px;text-decoration:none;border-radius:10px;'
             'font-weight:700;font-size:15px;display:inline-block;'
             'box-shadow:0 4px 14px rgba(79,70,229,.3);">فتح بوابة الدخول &larr;</a>'
             '</div>'
+
+            '<div style="height:1px;background:#e2e8f0;margin:28px 0;"></div>'
+
+            '<div style="background:linear-gradient(135deg,#f8fafc,#f1f5f9);'
+            'padding:20px 22px;border-radius:12px;border:1px solid #e2e8f0;margin-bottom:20px;">'
+            '<p style="font-size:11px;font-weight:700;text-transform:uppercase;'
+            'letter-spacing:0.06em;color:#6366f1;margin:0 0 6px;">معرف المستأجر (Tenant ID)</p>'
+            '<p style="margin:4px 0 8px;font-size:13px;color:#64748b;">'
+            'استخدمه مع خاصية <code>X-Tenant-ID</code> في ترويسة طلبات API:</p>'
+            '<div style="background:#1e293b;color:#e2e8f0;padding:14px 18px;border-radius:10px;'
+            'font-family:monospace;font-size:13px;word-break:break-all;margin:0;'
+            'border:1px solid #334155;">{{ tenant.tenant_id }}</div>'
             '</div>'
+
+            '<p style="font-size:11px;font-weight:700;text-transform:uppercase;color:#6366f1;margin:0 0 6px;">مفتاح الربط البرمجي (API)</p>'
+            '<p style="font-size:13px;color:#64748b;margin-bottom:12px;">'
+            'سر المصادقة لنقطة نهاية الجسر. يرجى الاحتفاظ به بشكل آمن - لن يتم عرضه مرة أخرى.</p>'
+            '<div style="background:#1e293b;color:#e2e8f0;padding:14px 18px;border-radius:10px;'
+            'font-family:monospace;font-size:13px;word-break:break-all;margin:0;'
+            'border:1px solid #334155;">{{ api_bridge_key }}</div>'
+            '</div>',
+            use_rtl=True
+        ),
+    },
+    {
+        'template_name': 'SUBADMIN_WELCOME',
+        'category': 'Transactional',
+        'subject_en': 'Welcome to iRoad - Your Admin Credentials',
+        'subject_ar': 'مرحباً بك في iRoad - بيانات الدخول الخاصة بك',
+        'body_en': _wrap_email_body(
+            '<h2 style="color:#1e293b;margin:0 0 16px;font-size:22px;font-weight:700;">'
+            'Welcome, {{ name }}! 🎉</h2>'
+            '<p style="font-size:15px;color:#475569;line-height:1.7;margin:0 0 16px;">'
+            'Your iRoad admin account has been created successfully. Below are your login credentials '
+            'to access the Control Panel.</p>'
+            '<div style="background:linear-gradient(135deg,#f8fafc,#f1f5f9);'
+            'padding:20px 22px;border-radius:12px;border:1px solid #e2e8f0;margin-bottom:20px;">'
+            '<p style="margin:0 0 8px;font-size:14px;color:#334155;">'
+            '<strong>Login Email:</strong> {{ email }}</p>'
+            '<p style="margin:0;font-size:14px;color:#334155;">'
+            '<strong>Temporary Password:</strong></p>'
+            '<div style="background:#1e293b;color:#e2e8f0;padding:12px 16px;border-radius:8px;'
+            'font-family:monospace;font-size:14px;margin-top:8px;'
+            'border:1px solid #334155;">{{ password }}</div>'
+            '</div>'
+            '<div style="text-align:center;margin:28px 0;">'
+            '<a href="{{ login_url }}" style="background:linear-gradient(135deg,#4f46e5,#6366f1);'
+            'color:#fff!important;padding:14px 32px;text-decoration:none;border-radius:10px;'
+            'font-weight:700;font-size:15px;display:inline-block;'
+            'box-shadow:0 4px 14px rgba(79,70,229,.3);">Access Control Panel &rarr;</a>'
+            '</div>'
+            '<p style="font-size:13px;color:#94a3b8;">'
+            'Please change your password immediately after your first login for security reasons.</p>'
+        ),
+        'body_ar': _wrap_email_body(
+            '<div dir="rtl" style="text-align:right;">'
+            '<h2 style="color:#1e293b;margin:0 0 16px;font-size:22px;font-weight:700;">'
+            'مرحباً بك، {{ name }}! 🎉</h2>'
+            '<p style="font-size:15px;color:#475569;line-height:1.7;margin:0 0 16px;">'
+            'تم إنشاء حساب المسؤول الخاص بك بنجاح في iRoad. فيما يلي بيانات الدخول الخاصة بك للوصول إلى لوحة التحكم.</p>'
+            '<div style="background:linear-gradient(135deg,#f8fafc,#f1f5f9);'
+            'padding:20px 22px;border-radius:12px;border:1px solid #e2e8f0;margin-bottom:20px;">'
+            '<p style="margin:0 0 8px;font-size:14px;color:#334155;">'
+            '<strong>البريد الإلكتروني:</strong> {{ email }}</p>'
+            '<p style="margin:0;font-size:14px;color:#334155;">'
+            '<strong>كلمة المرور المؤقتة:</strong></p>'
+            '<div style="background:#1e293b;color:#e2e8f0;padding:12px 16px;border-radius:8px;'
+            'font-family:monospace;font-size:14px;margin-top:8px;'
+            'border:1px solid #334155;">{{ password }}</div>'
+            '</div>'
+            '<div style="text-align:center;margin:28px 0;">'
+            '<a href="{{ login_url }}" style="background:linear-gradient(135deg,#4f46e5,#6366f1);'
+            'color:#fff!important;padding:14px 32px;text-decoration:none;border-radius:10px;'
+            'font-weight:700;font-size:15px;display:inline-block;'
+            'box-shadow:0 4px 14px rgba(79,70,229,.3);">الدخول إلى لوحة التحكم &larr;</a>'
+            '</div>'
+            '<p style="font-size:13px;color:#94a3b8;">'
+            'يرجى تغيير كلمة المرور الخاصة بك فور تسجيل الدخول لأول مرة لدواعٍ أمنية.</p>'
+            '</div>',
+            use_rtl=True
         ),
     },
     {
@@ -811,17 +907,37 @@ def send_sms_http_gateway(
     client_id=None,
 ):
     """
-    Generic JSON POST to ``gateway.host_url`` for SMS aggregators.
+    Send SMS through the configured active gateway.
 
-    Payload: {"to": "<phone>", "message": "<text>"}
-    Auth: Basic ``username_key`` / ``password_secret`` if both set.
+    Supported payload styles:
+    - Twilio API endpoints (form-encoded with account SID + auth token)
+    - Generic providers (JSON POST: {"to": "...", "message": "...", "from": "..."})
     """
-    url = gateway.host_url.strip()
-    payload = json.dumps({
-        'to': recipient_phone,
-        'message': message,
-    }).encode('utf-8')
-    headers = {'Content-Type': 'application/json'}
+    url = (gateway.host_url or '').strip()
+    provider = (gateway.provider_name or '').strip().lower()
+    headers = {}
+    payload = None
+
+    # Twilio-style endpoints: /2010-04-01/Accounts/{SID}/Messages.json
+    # We also treat providers named "twilio" as Twilio payload mode.
+    if 'twilio' in provider or 'api.twilio.com' in url:
+        twilio_sender = (gateway.sender_id or '').strip()
+        form_data = {
+            'To': recipient_phone,
+            'Body': message,
+        }
+        if twilio_sender:
+            form_data['From'] = twilio_sender
+        payload = urllib.parse.urlencode(form_data).encode('utf-8')
+        headers['Content-Type'] = 'application/x-www-form-urlencoded'
+    else:
+        payload = json.dumps({
+            'to': recipient_phone,
+            'message': message,
+            'from': (gateway.sender_id or '').strip(),
+        }).encode('utf-8')
+        headers['Content-Type'] = 'application/json'
+
     if gateway.username_key and gateway.password_secret:
         token = b64encode(
             f'{gateway.username_key}:{gateway.password_secret}'.encode('utf-8'),
@@ -1006,6 +1122,21 @@ def dispatch_event_notification(
     """
     from superadmin.models import EventMapping
 
+    # Queue the entire event dispatch as one background job so
+    # fallback logic runs in the same execution context.
+    if use_async_tasks:
+        from superadmin.tasks import dispatch_event_notification_task
+
+        dispatch_event_notification_task.delay(
+            event_code,
+            recipient_email=recipient_email,
+            recipient_phone=recipient_phone,
+            context_dict=context_dict or {},
+            language=language,
+            force_django_smtp=force_django_smtp,
+        )
+        return True
+
     mapping = (
         EventMapping.objects.select_related('primary_template', 'fallback_template')
         .filter(system_event=event_code, is_active=True)
@@ -1020,16 +1151,6 @@ def dispatch_event_notification(
         if channel == 'Email':
             if not recipient_email:
                 raise ValueError('recipient_email is required for Email channel')
-            if use_async_tasks and not force_django_smtp:
-                from superadmin.tasks import send_email_task
-
-                send_email_task.delay(
-                    recipient_email,
-                    subject or 'Notification',
-                    strip_tags(body),
-                    str(template_obj.template_id),
-                )
-                return True
             if force_django_smtp:
                 return send_email_via_django_smtp(
                     recipient_email,
@@ -1048,15 +1169,6 @@ def dispatch_event_notification(
             if not recipient_phone:
                 raise ValueError('recipient_phone is required for SMS channel')
             sms_text = strip_tags(body).strip() or body.strip()
-            if use_async_tasks:
-                from superadmin.tasks import send_sms_task
-
-                send_sms_task.delay(
-                    recipient_phone,
-                    sms_text,
-                    str(template_obj.template_id),
-                )
-                return True
             return send_transactional_sms(recipient_phone, sms_text)
         raise ValueError(f'Unsupported channel: {channel}')
 

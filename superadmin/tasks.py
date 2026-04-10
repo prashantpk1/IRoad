@@ -105,6 +105,38 @@ def send_sms_task(self, recipient_phone, message, template_id=None):
         raise self.retry(exc=exc, countdown=60)
 
 
+@shared_task(name='iroad.communication.dispatch_event_notification', bind=True, max_retries=3)
+def dispatch_event_notification_task(
+    self,
+    event_code,
+    recipient_email=None,
+    recipient_phone=None,
+    context_dict=None,
+    language='en',
+    force_django_smtp=False,
+):
+    """
+    Real event dispatcher with fallback in one worker execution.
+    This ensures primary failure/timeout can immediately trigger fallback.
+    """
+    try:
+        from superadmin.communication_helpers import dispatch_event_notification
+
+        result = dispatch_event_notification(
+            event_code,
+            recipient_email=recipient_email,
+            recipient_phone=recipient_phone,
+            context_dict=context_dict or {},
+            language=language,
+            force_django_smtp=force_django_smtp,
+            use_async_tasks=False,
+        )
+        return {'event_code': event_code, 'status': 'completed', 'result': bool(result)}
+    except Exception as exc:
+        logger.error(f'dispatch_event_notification_task failed: {exc}')
+        raise self.retry(exc=exc, countdown=30)
+
+
 @shared_task(name='iroad.communication.dispatch_push', bind=True, max_retries=3)
 def dispatch_push_notification_task(self, push_notification_id, context_dict=None):
     """

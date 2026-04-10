@@ -9,7 +9,7 @@ from django.db.models import Sum, Count, F, Q
 from django.db.models.expressions import ExpressionWrapper
 from django.db.models.fields import DecimalField
 from django.db.models.functions import Abs
-from django.http import HttpResponseRedirect, JsonResponse
+from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.core.paginator import Paginator
 from django.urls import reverse
@@ -4181,6 +4181,8 @@ class CommGatewayTestConnectionView(LoginRequiredMixin, View):
             password = request.POST.get('password_secret')
             enc_type = request.POST.get('encryption_type')
             sender = request.POST.get('sender_id')
+            provider_name = request.POST.get('provider_name')
+            test_recipient_phone = (request.POST.get('test_recipient_phone') or '').strip()
 
             # If password is masked '********', use the existing password from record (if ID supplied)
             record_id = request.POST.get('gateway_id')
@@ -4246,10 +4248,56 @@ class CommGatewayTestConnectionView(LoginRequiredMixin, View):
                     return JsonResponse({'success': False, 'message': f'Connection failed: {str(e)}'})
 
             elif g_type == 'SMS':
-                # Dummy successful for now as per plan
+                if not all([host, user, password, sender]):
+                    return JsonResponse({
+                        'success': False,
+                        'message': (
+                            'Incomplete SMS credentials (Host/API URL, API Key, '
+                            'Secret, and Sender ID are required).'
+                        ),
+                    })
+
+                if not test_recipient_phone:
+                    test_recipient_phone = (getattr(request.user, 'phone_number', '') or '').strip()
+                if not test_recipient_phone:
+                    return JsonResponse({
+                        'success': False,
+                        'message': (
+                            'Enter a Test Recipient Phone, or set your admin phone number '
+                            'to run SMS test delivery.'
+                        ),
+                    })
+
+                from types import SimpleNamespace
+                from superadmin.communication_helpers import send_sms_http_gateway
+
+                # Build unsaved in-memory gateway for testing entered credentials.
+                test_gateway = SimpleNamespace(
+                    provider_name=(provider_name or '').strip(),
+                    host_url=(host or '').strip(),
+                    username_key=(user or '').strip(),
+                    password_secret=password,
+                    sender_id=(sender or '').strip(),
+                )
+                test_message = 'iRoad SMS gateway test: configuration validated.'
+                try:
+                    send_sms_http_gateway(
+                        test_gateway,
+                        test_recipient_phone,
+                        test_message,
+                        trigger_source='Gateway Test: SMS',
+                    )
+                except Exception as exc:
+                    return JsonResponse({
+                        'success': False,
+                        'message': f'SMS test failed: {str(exc)}',
+                    })
                 return JsonResponse({
-                    'success': True, 
-                    'message': 'SMS Gateway configuration validated (Dummy Success).'
+                    'success': True,
+                    'message': (
+                        f'SMS test successful. Dummy message sent to '
+                        f'{test_recipient_phone}.'
+                    ),
                 })
 
             return JsonResponse({'success': False, 'message': 'Invalid gateway type.'})
@@ -4388,6 +4436,49 @@ class NotificationTemplateDeleteView(LoginRequiredMixin, View):
     def get(self, request, pk):
         messages.error(request, 'Templates cannot be deleted. Deactivate instead.')
         return redirect(reverse('notif_template_list'))
+
+
+class NotificationTemplatePreviewView(LoginRequiredMixin, View):
+    def get(self, request, pk):
+        """
+        Renders a full HTML preview of the notification template.
+        Supports 'lang' query param (en|ar) and device simulation context (todo).
+        """
+        template_obj = get_object_or_404(NotificationTemplate, pk=pk)
+        lang = request.GET.get('lang', 'en').lower()
+
+        subject = template_obj.subject_ar if lang == 'ar' else template_obj.subject_en
+        body_html = template_obj.body_ar if lang == 'ar' else template_obj.body_en
+
+        if template_obj.channel_type == 'Email':
+            from superadmin.communication_helpers import _wrap_email_body
+
+            # Check if the body already contains the system wrapper.
+            # If not (e.g. user manually edited and stripped it), re-wrap it.
+            if 'email-wrapper' not in (body_html or ''):
+                wrapped_content = _wrap_email_body(
+                    inner_html=body_html or '<p>No content provided.</p>',
+                    email_title=subject or 'iRoad Logistics',
+                    use_rtl=(lang == 'ar'),
+                )
+            else:
+                # Still need to handle RTL if the body is already wrapped but doesn't have dir="rtl"
+                wrapped_content = body_html or ''
+                if lang == 'ar' and 'dir="rtl"' not in wrapped_content:
+                    wrapped_content = wrapped_content.replace('<html lang="en">', '<html lang="ar" dir="rtl">')
+
+            return HttpResponse(wrapped_content)
+        else:
+            # SMS Preview: Simple styled box
+            from django.template.loader import render_to_string
+            context = {
+                'body_text': body_html,
+                'lang': lang,
+                'is_sms': True,
+            }
+            # Create a simple container for SMS preview
+            sms_html = render_to_string('comm/templates/sms_preview_wrapper.html', context)
+            return HttpResponse(sms_html)
 
 
 class EventMappingListView(LoginRequiredMixin, View):

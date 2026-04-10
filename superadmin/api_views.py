@@ -19,7 +19,10 @@ from .api_auth import resolve_tenant_api_request
 from .audit_helpers import get_client_ip
 from .models import (
     ActiveSession,
+    CommLog,
     Country,
+    PushDeviceToken,
+    PushNotificationReceipt,
     SubscriptionOrder,
     SupportCategory,
     SupportTicket,
@@ -542,4 +545,168 @@ def tenant_bootstrap_auth(request):
         'expires_in': ttl,
         'tenant_id': str(tenant.tenant_id),
         'jti': jti,
+    }, status=200)
+
+
+@csrf_exempt
+@require_http_methods(["POST", "PATCH"])
+def tenant_push_token_upsert(request):
+    """
+    Register or update tenant-user/driver push token for FCM delivery.
+    """
+    tenant, err = _tenant_or_error(request)
+    if err:
+        return err
+
+    try:
+        body = json.loads(request.body or '{}')
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+
+    token = (body.get('device_token') or '').strip()
+    user_domain = (body.get('user_domain') or 'Tenant_User').strip()
+    reference_id = (body.get('reference_id') or '').strip()
+    is_active = body.get('is_active', True)
+
+    if not token:
+        return JsonResponse({'error': 'device_token is required'}, status=400)
+    if user_domain not in ('Tenant_User', 'Driver'):
+        return JsonResponse({'error': 'user_domain must be Tenant_User or Driver'}, status=400)
+    if not reference_id:
+        return JsonResponse({'error': 'reference_id is required'}, status=400)
+
+    obj, _created = PushDeviceToken.objects.update_or_create(
+        device_token=token,
+        defaults={
+            'tenant': tenant,
+            'user_domain': user_domain,
+            'reference_id': reference_id,
+            'is_active': bool(is_active),
+        },
+    )
+    return JsonResponse({
+        'token_id': str(obj.token_id),
+        'device_token': obj.device_token,
+        'user_domain': obj.user_domain,
+        'reference_id': obj.reference_id,
+        'is_active': obj.is_active,
+        'updated_at': obj.updated_at.isoformat(),
+    }, status=200)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def tenant_push_token_deactivate(request):
+    tenant, err = _tenant_or_error(request)
+    if err:
+        return err
+
+    try:
+        body = json.loads(request.body or '{}')
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+
+    token = (body.get('device_token') or '').strip()
+    if not token:
+        return JsonResponse({'error': 'device_token is required'}, status=400)
+
+    qs = PushDeviceToken.objects.filter(tenant=tenant, device_token=token)
+    updated = qs.update(is_active=False)
+    if not updated:
+        return JsonResponse({'error': 'Token not found for tenant'}, status=404)
+    return JsonResponse({'status': 'deactivated', 'device_token': token}, status=200)
+
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def tenant_push_notifications(request):
+    """
+    Fetch recently dispatched push notifications for the authenticated tenant.
+    Supports filters: user_domain, reference_id, limit, offset.
+    """
+    tenant, err = _tenant_or_error(request)
+    if err:
+        return err
+
+    user_domain = (request.GET.get('user_domain') or '').strip()
+    reference_id = (request.GET.get('reference_id') or '').strip()
+    try:
+        limit = max(1, min(100, int(request.GET.get('limit', 20))))
+    except ValueError:
+        limit = 20
+    try:
+        offset = max(0, int(request.GET.get('offset', 0)))
+    except ValueError:
+        offset = 0
+
+    qs = PushNotificationReceipt.objects.filter(tenant=tenant).order_by('-created_at')
+    if user_domain in ('Tenant_User', 'Driver'):
+        qs = qs.filter(user_domain=user_domain)
+    if reference_id:
+        qs = qs.filter(reference_id=reference_id)
+
+    total = qs.count()
+    rows = qs[offset:offset + limit]
+
+    data = [
+        {
+            'receipt_id': str(r.receipt_id),
+            'notification_id': str(r.notification_id) if r.notification_id else None,
+            'title': r.title,
+            'message': r.message,
+            'action_link': r.action_link,
+            'event_code': r.event_code,
+            'delivery_status': r.delivery_status,
+            'error_details': r.error_details or '',
+            'user_domain': r.user_domain,
+            'reference_id': r.reference_id,
+            'created_at': r.created_at.isoformat(),
+        }
+        for r in rows
+    ]
+
+    # Backward-compatible fallback: if receipt table is empty, return recent push logs.
+    if total == 0:
+        tokens_qs = PushDeviceToken.objects.filter(tenant=tenant, is_active=True)
+        if user_domain in ('Tenant_User', 'Driver'):
+            tokens_qs = tokens_qs.filter(user_domain=user_domain)
+        if reference_id:
+            tokens_qs = tokens_qs.filter(reference_id=reference_id)
+        token_values = list(tokens_qs.values_list('device_token', flat=True))
+        log_qs = CommLog.objects.filter(
+            channel_type='Push',
+            recipient__in=token_values,
+        ).order_by('-dispatched_at')
+        log_total = log_qs.count()
+        log_rows = log_qs[offset:offset + limit]
+        data = [
+            {
+                'receipt_id': str(l.log_id),
+                'notification_id': None,
+                'title': l.trigger_source,
+                'message': '',
+                'action_link': None,
+                'event_code': None,
+                'delivery_status': l.delivery_status,
+                'error_details': l.error_details or '',
+                'user_domain': user_domain or '',
+                'reference_id': reference_id or '',
+                'created_at': l.dispatched_at.isoformat() if l.dispatched_at else '',
+            }
+            for l in log_rows
+        ]
+        return JsonResponse({
+            'count': len(data),
+            'total': log_total,
+            'limit': limit,
+            'offset': offset,
+            'notifications': data,
+        }, status=200)
+
+    return JsonResponse({
+        'count': len(data),
+        'total': total,
+        'limit': limit,
+        'offset': offset,
+        'notifications': data,
     }, status=200)

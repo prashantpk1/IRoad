@@ -31,9 +31,9 @@
         <div style="width:170px"><select class="eal-select" name="status"><option value="All" {% if status_filter == 'All' %}selected{% endif %}>All Statuses</option><option value="Sent" {% if status_filter == 'Sent' %}selected{% endif %}>Sent</option><option value="Failed" {% if status_filter == 'Failed' %}selected{% endif %}>Failed</option><option value="Bounced" {% if status_filter == 'Bounced' %}selected{% endif %}>Bounced</option></select></div>
         <input type="date" name="date_from" value="{{ date_from }}" class="form-control form-control-sm" style="width:150px">
         <input type="date" name="date_to" value="{{ date_to }}" class="form-control form-control-sm" style="width:150px">
-        <div class="eal-search" style="flex:1;min-width:200px;max-width:280px">
+        <div class="eal-search" style="flex:1;min-width:240px;max-width:320px">
           <i class="bi bi-search"></i>
-          <input type="text" name="q" value="{{ search_query }}" placeholder="Search recipient" />
+          <input type="text" name="q" value="{{ search_query }}" placeholder="Search recipient, trigger, client, error..." />
         </div>
         <button type="submit" class="eal-btn eal-btn-primary"><i class="bi bi-funnel"></i><span>{% translate "Apply" %}</span></button>
       </div>
@@ -48,7 +48,7 @@
             <td>{{ forloop.counter0|add:logs.start_index }}</td>
             <td>{{ row.recipient }}</td>
             <td>{% if row.channel_type == 'Email' %}<span class="status-badge inactive">Email</span>{% elif row.channel_type == 'SMS' %}<span class="status-badge active">SMS</span>{% else %}<span class="status-badge warning">Push</span>{% endif %}</td>
-            <td>{{ row.get_trigger_source_display }}</td>
+            <td>{{ row.trigger_source }}</td>
             <td>{% if row.delivery_status == 'Sent' %}<span class="status-badge active">Sent</span>{% elif row.delivery_status == 'Failed' %}<span class="status-badge warning">Failed</span>{% else %}<span class="status-badge pending">Bounced</span>{% endif %}</td>
             <td>{{ row.error_details|default:'-'|truncatechars:70 }}</td>
             <td>{{ row.dispatched_at|date:'Y-m-d H:i:s' }}</td>

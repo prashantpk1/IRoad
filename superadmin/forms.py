@@ -942,8 +942,9 @@ class CommGatewayForm(forms.ModelForm):
 
     def clean(self):
         cleaned = super().clean()
-        gateway_type = cleaned.get('gateway_type')
+        gateway_type = (cleaned.get('gateway_type') or '').strip()
         port = cleaned.get('port')
+        host_url = (cleaned.get('host_url') or '').strip()
         encryption_type = cleaned.get('encryption_type')
 
         if gateway_type == 'Email':
@@ -954,6 +955,14 @@ class CommGatewayForm(forms.ModelForm):
             if port not in [25, 465, 587, 2525]:
                 raise forms.ValidationError(
                     'Common SMTP ports: 25, 465, 587, 2525.'
+                )
+        elif gateway_type == 'SMS':
+            # SMS APIs do not use SMTP fields.
+            cleaned['port'] = None
+            cleaned['encryption_type'] = None
+            if not host_url.lower().startswith(('http://', 'https://')):
+                raise forms.ValidationError(
+                    'SMS Host / API URL must start with http:// or https://'
                 )
 
         return cleaned
@@ -999,6 +1008,10 @@ class NotificationTemplateForm(forms.ModelForm):
                     'Subject (Arabic) is required for '
                     'Email templates.'
                 )
+        elif channel_type == 'SMS':
+            # Keep subject fields empty for SMS templates.
+            cleaned['subject_en'] = ''
+            cleaned['subject_ar'] = ''
 
         return cleaned
 
@@ -1040,6 +1053,25 @@ class EventMappingForm(forms.ModelForm):
                         channel_type=self.instance.fallback_channel,
                     )
                 )
+
+        # Also filter while creating/updating from posted form data.
+        posted_primary_channel = (self.data.get('primary_channel') or '').strip()
+        if posted_primary_channel in ['Email', 'SMS']:
+            self.fields['primary_template'].queryset = (
+                NotificationTemplate.objects.filter(
+                    is_active=True,
+                    channel_type=posted_primary_channel,
+                )
+            )
+
+        posted_fallback_channel = (self.data.get('fallback_channel') or '').strip()
+        if posted_fallback_channel in ['Email', 'SMS']:
+            self.fields['fallback_template'].queryset = (
+                NotificationTemplate.objects.filter(
+                    is_active=True,
+                    channel_type=posted_fallback_channel,
+                )
+            )
 
     def clean(self):
         cleaned = super().clean()
@@ -1110,6 +1142,7 @@ class PushNotificationForm(forms.ModelForm):
         linked_event = cleaned.get('linked_event')
         target_audience = cleaned.get('target_audience')
         specific_target_id = cleaned.get('specific_target_id')
+        scheduled_at = cleaned.get('scheduled_at')
 
         if trigger_mode == 'System_Event':
             if not linked_event:
@@ -1117,6 +1150,11 @@ class PushNotificationForm(forms.ModelForm):
                     'Linked event is required for '
                     'System Event mode.'
                 )
+            # System-event rules act like active routing definitions, not campaigns.
+            cleaned['target_audience'] = None
+            cleaned['specific_target_id'] = ''
+            cleaned['scheduled_at'] = None
+            cleaned['dispatch_status'] = 'Draft'
 
         if trigger_mode == 'Manual_Broadcast':
             if not target_audience:
@@ -1129,6 +1167,16 @@ class PushNotificationForm(forms.ModelForm):
                     'Specific target ID is required when '
                     'audience is Specific.'
                 )
+            if target_audience != 'Specific':
+                cleaned['specific_target_id'] = ''
+            # Manual broadcast does not use linked_event/is_active rule flags.
+            cleaned['linked_event'] = None
+            cleaned['is_active'] = True
+            # Scheduled campaigns are marked Scheduled; otherwise Draft until queued.
+            if scheduled_at:
+                cleaned['dispatch_status'] = 'Scheduled'
+            elif not cleaned.get('dispatch_status'):
+                cleaned['dispatch_status'] = 'Draft'
 
         return cleaned
 

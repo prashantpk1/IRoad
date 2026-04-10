@@ -66,6 +66,7 @@ from .views import (
     NotificationTemplateCreateView,
     NotificationTemplateDeleteView,
     NotificationTemplateListView,
+    NotificationTemplatePreviewView,
     NotificationTemplateToggleStatusView,
     NotificationTemplateUpdateView,
     OrderCreateView,
@@ -574,6 +575,11 @@ urlpatterns = [
         'comm/templates/<uuid:pk>/delete/',
         NotificationTemplateDeleteView.as_view(),
         name='notif_template_delete',
+    ),
+    path(
+        'comm/templates/<uuid:pk>/preview/',
+        NotificationTemplatePreviewView.as_view(),
+        name='notif_template_preview',
     ),
     path(
         'comm/events/',

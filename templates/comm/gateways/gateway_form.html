@@ -41,7 +41,13 @@
         <div style="margin-bottom: 16px; color: #b91c1c; font-weight: 600">{{ form.non_field_errors }}</div>
       {% endif %}
 
-      <form method="post" action="" id="gateway-form">
+      <form
+        method="post"
+        action=""
+        id="gateway-form"
+        data-is-edit="{{ is_edit|yesno:'true,false' }}"
+        data-gateway-id="{% if gateway %}{{ gateway.gateway_id }}{% endif %}"
+      >
         {% csrf_token %}
         <div class="fields-grid cols-2">
           <div class="field"><label class="form-label">Gateway Type</label>{{ form.gateway_type }}</div>
@@ -52,6 +58,17 @@
           <div class="field"><label class="form-label">Password/Secret</label>{{ form.password_secret }}</div>
           <div class="field"><label class="form-label">Sender ID</label>{{ form.sender_id }}</div>
           <div class="field" id="enc-wrap"><label class="form-label">Encryption</label>{{ form.encryption_type }}</div>
+          <div class="field" id="sms-test-phone-wrap" style="display:none;">
+            <label class="form-label">Test Recipient Phone</label>
+            <input
+              type="text"
+              class="form-control"
+              id="test-recipient-phone"
+              name="test_recipient_phone"
+              placeholder="+9665XXXXXXXX"
+            />
+            <small class="text-muted">Used only by the Test Connection button for SMS gateways.</small>
+          </div>
           <div class="field">
             <label class="form-label">Active</label>
             <div class="form-check form-switch" style="padding-left: 0;">
@@ -92,14 +109,17 @@
     const typeField = document.querySelector('[name="gateway_type"]');
     const portWrap = document.getElementById('port-wrap');
     const encWrap = document.getElementById('enc-wrap');
+    const smsTestPhoneWrap = document.getElementById('sms-test-phone-wrap');
     const secretField = document.querySelector('[name="password_secret"]');
     const testBtn = document.getElementById('test-connection-btn');
     const testSpinner = document.getElementById('test-spinner');
     const testBtnText = document.getElementById('test-btn-text');
     const resultArea = document.getElementById('test-result-area');
     const resultAlert = document.getElementById('test-alert');
+    const gatewayFormEl = document.getElementById('gateway-form');
+    const isEdit = gatewayFormEl && gatewayFormEl.dataset.isEdit === 'true';
 
-    if (secretField && {{ is_edit|yesno:"true,false" }}) {
+    if (secretField && isEdit) {
       secretField.value = '********';
       secretField.setAttribute('autocomplete', 'new-password');
     }
@@ -107,8 +127,10 @@
     function toggleEmailFields() {
       if (!typeField) return;
       const isEmail = typeField.value === 'Email';
+      const isSms = typeField.value === 'SMS';
       if (portWrap) portWrap.style.display = isEmail ? 'block' : 'none';
       if (encWrap) encWrap.style.display = isEmail ? 'block' : 'none';
+      if (smsTestPhoneWrap) smsTestPhoneWrap.style.display = isSms ? 'block' : 'none';
     }
 
     if (typeField) {
@@ -144,10 +166,13 @@
         formData.append('sender_id', document.querySelector('[name="sender_id"]').value);
         const encEl = document.querySelector('[name="encryption_type"]');
         formData.append('encryption_type', encEl ? encEl.value : '');
+        const smsPhoneEl = document.getElementById('test-recipient-phone');
+        formData.append('test_recipient_phone', smsPhoneEl ? smsPhoneEl.value : '');
 
-        {% if is_edit %}
-        formData.append('gateway_id', '{{ gateway.gateway_id }}');
-        {% endif %}
+        const gatewayId = gatewayFormEl ? gatewayFormEl.dataset.gatewayId : '';
+        if (gatewayId) {
+          formData.append('gateway_id', gatewayId);
+        }
 
         fetch('{% url "comm_gateway_test_connection" %}', {
           method: 'POST',

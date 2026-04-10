@@ -1304,6 +1304,13 @@ class PushDeviceToken(models.Model):
     ]
 
     token_id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    tenant = models.ForeignKey(
+        'TenantProfile',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='push_device_tokens',
+    )
     user_domain = models.CharField(max_length=20, choices=DOMAIN_CHOICES)
     reference_id = models.CharField(
         max_length=100,
@@ -1319,6 +1326,43 @@ class PushDeviceToken(models.Model):
     class Meta:
         db_table = 'comm_push_device_tokens'
         ordering = ['-updated_at']
+
+
+class PushNotificationReceipt(models.Model):
+    STATUS_CHOICES = [
+        ('Sent', 'Sent'),
+        ('Failed', 'Failed'),
+    ]
+
+    receipt_id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    tenant = models.ForeignKey(
+        'TenantProfile',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='push_receipts',
+    )
+    notification = models.ForeignKey(
+        PushNotification,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='receipts',
+    )
+    device_token = models.CharField(max_length=512)
+    user_domain = models.CharField(max_length=20, choices=PushDeviceToken.DOMAIN_CHOICES)
+    reference_id = models.CharField(max_length=100)
+    title = models.CharField(max_length=255)
+    message = models.TextField()
+    action_link = models.URLField(null=True, blank=True)
+    event_code = models.CharField(max_length=50, null=True, blank=True)
+    delivery_status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Sent')
+    error_details = models.TextField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'comm_push_receipts'
+        ordering = ['-created_at']
 
 
 class SystemBanner(models.Model):

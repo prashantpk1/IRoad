@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Iroad | Notification Template Previewer</title>
+    <!-- Premium Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #006397;
+            --primary-light: #3498db;
+            --secondary: #2c3e50;
+            --surface: #f7f9ff;
+            --surface-low: #edf4ff;
+            --surface-lowest: #ffffff;
+            --text-main: #091d2e;
+            --text-variant: #3f4850;
+            --accent: #815600;
+            --radius-md: 8px;
+            --radius-lg: 12px;
+            --radius-xl: 16px;
+            --shadow-subtle: 0 4px 20px rgba(9, 29, 46, 0.04);
+            --shadow-float: 0 10px 40px rgba(9, 29, 46, 0.08);
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--surface);
+            color: var(--text-main);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+        }
+
+        h1, h2, h3, h4 {
+            font-family: 'Manrope', sans-serif;
+        }
+
+        /* Sidebar Styling */
+        .sidebar {
+            width: 320px;
+            background-color: var(--surface-low);
+            border-right: 1px solid rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+            padding: 24px;
+            z-index: 10;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 40px;
+        }
+
+        .brand-logo {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 800;
+        }
+
+        .brand-name {
+            font-size: 1.25rem;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+        }
+
+        .section-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-variant);
+            margin-bottom: 12px;
+            font-weight: 600;
+        }
+
+        .template-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            overflow-y: auto;
+            flex-grow: 1;
+        }
+
+        .template-item {
+            padding: 12px 16px;
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            background: transparent;
+        }
+
+        .template-item:hover {
+            background: rgba(0, 99, 151, 0.05);
+        }
+
+        .template-item.active {
+            background: var(--surface-lowest);
+            box-shadow: var(--shadow-subtle);
+        }
+
+        .template-item.active .template-title {
+            color: var(--primary);
+        }
+
+        .template-title {
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: var(--text-main);
+        }
+
+        .template-meta {
+            font-size: 0.75rem;
+            color: var(--text-variant);
+        }
+
+        /* Main Preview Content */
+        .main-content {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .header-toolbar {
+            height: 72px;
+            background: var(--surface-lowest);
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 40px;
+        }
+
+        .toolbar-group {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+        }
+
+        .toggle-container {
+            display: flex;
+            background: var(--surface-low);
+            padding: 4px;
+            border-radius: 30px;
+        }
+
+        .toggle-btn {
+            border: none;
+            background: transparent;
+            padding: 6px 16px;
+            border-radius: 30px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            color: var(--text-variant);
+        }
+
+        .toggle-btn.active {
+            background: var(--surface-lowest);
+            color: var(--primary);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+
+        .preview-area {
+            flex-grow: 1;
+            display: flex;
+            background: #f0f2f5;
+            padding: 40px;
+            justify-content: center;
+            align-items: flex-start;
+            overflow-y: auto;
+            perspective: 1000px;
+        }
+
+        /* Device Wrappers */
+        .device-mobile {
+            width: 375px;
+            height: 700px;
+            background: white;
+            border-radius: 40px;
+            border: 12px solid #1a1a1a;
+            box-shadow: var(--shadow-float);
+            position: relative;
+            overflow: hidden;
+            flex-shrink: 0;
+            transition: var(--transition);
+        }
+
+        .device-desktop {
+            width: 100%;
+            max-width: 900px;
+            min-height: 100%;
+            background: white;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-float);
+            overflow: hidden;
+            transition: var(--transition);
+        }
+
+        .phone-notch {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 150px;
+            height: 25px;
+            background: #1a1a1a;
+            border-bottom-left-radius: 20px;
+            border-bottom-right-radius: 20px;
+            z-index: 5;
+        }
+
+        .preview-frame {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: white;
+        }
+
+        /* Controls Panel */
+        .controls-panel {
+            width: 350px;
+            background: var(--surface-lowest);
+            border-left: 1px solid rgba(0,0,0,0.05);
+            padding: 32px;
+            overflow-y: auto;
+        }
+
+        .control-section {
+            margin-bottom: 32px;
+        }
+
+        .placeholder-group {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .input-item {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .input-item label {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-variant);
+        }
+
+        .input-item input, .input-item textarea {
+            padding: 10px 14px;
+            border: 1px solid rgba(0,0,0,0.1);
+            border-radius: var(--radius-md);
+            font-family: inherit;
+            font-size: 0.9rem;
+            background: var(--surface-low);
+            transition: var(--transition);
+        }
+
+        .input-item input:focus {
+            outline: none;
+            border-color: var(--primary-light);
+            background: white;
+            box-shadow: 0 0 0 4px rgba(52, 152, 219, 0.1);
+        }
+
+        .subject-line {
+            padding: 16px;
+            background: var(--surface-low);
+            border-radius: var(--radius-md);
+            margin-bottom: 24px;
+            border-left: 4px solid var(--primary);
+        }
+
+        .subject-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            color: var(--text-variant);
+            margin-bottom: 4px;
+            display: block;
+        }
+
+        .subject-text {
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+
+        /* RTL Specifics */
+        [dir="rtl"] .preview-area {
+            direction: rtl;
+        }
+
+        /* Status Orb */
+        .status-orb {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: var(--primary);
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(0,0,0,0.1);
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+    <aside class="sidebar">
+        <div class="brand">
+            <div class="brand-logo">i</div>
+            <div class="brand-name">iroad communication</div>
+        </div>
+
+        <h3 class="section-label">Email Templates</h3>
+        <ul class="template-list" id="templateList">
+            <!-- Templates will be injected here -->
+        </ul>
+    </aside>
+
+    <main class="main-content">
+        <header class="header-toolbar">
+            <div class="toolbar-group">
+                <div class="toggle-container" id="deviceToggle">
+                    <button class="toggle-btn active" data-device="desktop">Desktop</button>
+                    <button class="toggle-btn" data-device="mobile">Mobile</button>
+                </div>
+            </div>
+
+            <div class="toolbar-group">
+                <div class="toggle-container" id="langToggle">
+                    <button class="toggle-btn active" data-lang="en">English</button>
+                    <button class="toggle-btn" data-lang="ar">Arabic</button>
+                </div>
+                <button class="toggle-btn active" style="background: var(--primary); color: white;">Send Test</button>
+            </div>
+        </header>
+
+        <div class="preview-area">
+            <div id="deviceWrapper" class="device-desktop">
+                <div class="phone-notch" id="notch" style="display: none;"></div>
+                <iframe id="previewFrame" class="preview-frame"></iframe>
+            </div>
+        </div>
+    </main>
+
+    <section class="controls-panel">
+        <div class="control-section">
+            <h3 class="section-label">Subject Line</h3>
+            <div class="subject-line">
+                <span class="subject-label">Preview Subject</span>
+                <div class="subject-text" id="subjectPreview">Select a template</div>
+            </div>
+        </div>
+
+        <div class="control-section">
+            <h3 class="section-label">Dynamic Placeholders</h3>
+            <div class="placeholder-group" id="placeholderList">
+                <p style="color: var(--text-variant); font-size: 0.85rem;">No placeholders for this template.</p>
+            </div>
+        </div>
+    </section>
+
+    <script>
+        const templates = [
+          {
+            "template_code": "subadmin_welcome",
+            "template_name": "Subadmin Welcome & Credentials",
+            "module": "superadmin",
+            "trigger_event": "subadmin_created",
+            "supported_placeholders": [
+              { "key": "name", "description": "Name of the subadmin", "default": "John Doe" },
+              { "key": "email", "description": "Login email address", "default": "john.admin@iroad.com" },
+              { "key": "password", "description": "Temporary or assigned password", "default": "SecureP@ss123" },
+              { "key": "login_url", "description": "URL to the login portal", "default": "https://iroad.com/login" },
+              { "key": "company_logo", "description": "Company Logo URL", "default": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRz-8Z4m_ZkXy9_f8h1_Z4_v3_b2_j3_u4_s5&s" }
+            ],
+            "contents": {
+              "en": {
+                "subject": "Welcome to Iroad - Your Admin Credentials",
+                "body_html": `<div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05); font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; border: 1px solid #eaeaea;"><div style="background-color: #2c3e50; padding: 30px; text-align: center;"><img src="{{company_logo}}" alt="Iroad Logo" style="max-height: 40px; margin-bottom: 15px;"><h1 style="color: #ffffff; margin: 0; font-size: 24px; letter-spacing: 1px;">Iroad Admin Portal</h1></div><div style="padding: 40px 30px; color: #333333; line-height: 1.6;"><h2 style="color: #2c3e50; font-size: 20px; margin-top: 0;">Welcome, {{name}}!</h2><p>An administrative account has been securely created for you. You can now access the Iroad admin portal using the credentials provided below.</p><div style="background-color: #f8f9fa; border-left: 4px solid #3498db; padding: 20px; margin: 25px 0; border-radius: 4px;"><ul style="list-style: none; padding: 0; margin: 0;"><li style="margin-bottom: 10px; font-size: 15px;"><strong style="color: #2c3e50; display: inline-block; width: 90px;">Email:</strong> {{email}}</li><li style="margin-bottom: 10px; font-size: 15px;"><strong style="color: #2c3e50; display: inline-block; width: 90px;">Password:</strong> {{password}}</li></ul></div><p>For security purposes, we highly recommend changing your password immediately after your first login.</p><div style="text-align: center; margin: 35px 0 20px 0;"><a href="{{login_url}}" style="background-color: #3498db; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 4px; font-weight: bold; display: inline-block; text-transform: uppercase; font-size: 14px; letter-spacing: 0.5px;">Login to Portal</a></div><p style="margin-top: 30px;">If you have any questions or did not request this account, please contact our support team immediately.</p><p>Regards,<br><strong style="color: #2c3e50;">The Iroad Team</strong></p></div><div style="background-color: #ecf0f1; padding: 25px 30px; text-align: center; color: #7f8c8d; font-size: 13px; border-top: 1px solid #e0e6ed;"><p style="margin: 5px 0;">&copy; 2026 Iroad. All rights reserved.</p><p style="margin: 5px 0;">This is an automated message, please do not reply directly to this email.</p><p style="margin: 5px 0; margin-top: 10px;"><a href="#" style="color: #3498db; text-decoration: none;">Privacy Policy</a> | <a href="#" style="color: #3498db; text-decoration: none;">Terms of Service</a></p></div></div>`
+              },
+              "ar": {
+                "subject": "مرحباً بك في آيرود - بيانات دخول المسؤول الخاص بك",
+                "body_html": `<div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05); font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; border: 1px solid #eaeaea; direction: rtl; text-align: right;"><div style="background-color: #2c3e50; padding: 30px; text-align: center;"><img src="{{company_logo}}" alt="شعار آيرود" style="max-height: 40px; margin-bottom: 15px;"><h1 style="color: #ffffff; margin: 0; font-size: 24px; letter-spacing: 1px;">بوابة مسؤول آيرود</h1></div><div style="padding: 40px 30px; color: #333333; line-height: 1.6;"><h2 style="color: #2c3e50; font-size: 20px; margin-top: 0;">مرحباً، {{name}}!</h2><p>تم إنشاء حساب مسؤول لك بشكل آمن. يمكنك الآن الوصول إلى بوابة مسؤول آيرود باستخدام البيانات الموضحة أدناه.</p><div style="background-color: #f8f9fa; border-right: 4px solid #3498db; padding: 20px; margin: 25px 0; border-radius: 4px;"><ul style="list-style: none; padding: 0; margin: 0;"><li style="margin-bottom: 10px; font-size: 15px;"><strong style="color: #2c3e50; display: inline-block; width: 120px;">البريد الإلكتروني:</strong> {{email}}</li><li style="margin-bottom: 10px; font-size: 15px;"><strong style="color: #2c3e50; display: inline-block; width: 120px;">كلمة المرور:</strong> {{password}}</li></ul></div><p>لأغراض أمنية، نوصي بشدة بتغيير كلمة المرور الخاصة بك فور تسجيل الدخول لأول مرة.</p><div style="text-align: center; margin: 35px 0 20px 0;"><a href="{{login_url}}" style="background-color: #3498db; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 4px; font-weight: bold; display: inline-block; text-transform: uppercase; font-size: 14px; letter-spacing: 0.5px;">تسجيل الدخول إلى البوابة</a></div><p style="margin-top: 30px;">إذا كان لديك أي أسئلة أو لم تطلب هذا الحساب، يرجى الاتصال بفريق الدعم لدينا فورا.</p><p>مع التحية،<br><strong style="color: #2c3e50;">فريق آيرود</strong></p></div><div style="background-color: #ecf0f1; padding: 25px 30px; text-align: center; color: #7f8c8d; font-size: 13px; border-top: 1px solid #e0e6ed;"><p style="margin: 5px 0;">&copy; 2026 آيرود. جميع الحقوق محفوظة.</p><p style="margin: 5px 0;">هذه رسالة تلقائية، يرجى عدم الرد مباشرة على هذا البريد.</p><p style="margin: 5px 0; margin-top: 10px;"><a href="#" style="color: #3498db; text-decoration: none;">سياسة الخصوصية</a> | <a href="#" style="color: #3498db; text-decoration: none;">شروط الخدمة</a></p></div></div>`
+              }
+            }
+          },
+          {
+            "template_code": "password_reset_otp",
+            "template_name": "Password Reset OTP",
+            "module": "auth",
+            "trigger_event": "password_reset_otp",
+            "supported_placeholders": [
+              { "key": "name", "description": "Name of the user", "default": "Sarah Miller" },
+              { "key": "otp", "description": "6-digit verification code", "default": "482 910" },
+              { "key": "company_logo", "description": "Company Logo URL", "default": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRz-8Z4m_ZkXy9_f8h1_Z4_v3_b2_j3_u4_s5&s" }
+            ],
+            "contents": {
+              "en": {
+                "subject": "Iroad - Password Reset Verification Code",
+                "body_html": `<div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05); font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; border: 1px solid #eaeaea;"><div style="background-color: #2c3e50; padding: 30px; text-align: center;"><img src="{{company_logo}}" alt="Iroad Logo" style="max-height: 40px; margin-bottom: 15px;"><h1 style="color: #ffffff; margin: 0; font-size: 24px; letter-spacing: 1px;">Security Verification</h1></div><div style="padding: 40px 30px; color: #333333; line-height: 1.6;"><h2 style="color: #2c3e50; font-size: 20px; margin-top: 0;">Hello, {{name}}!</h2><p>We received a request to reset your password. Use the verification code below to complete the process. This code will expire in 10 minutes.</p><div style="background-color: #f8f9fa; border-left: 4px solid #3498db; padding: 30px; margin: 25px 0; border-radius: 4px; text-align: center;"><span style="font-size: 32px; font-weight: bold; color: #2c3e50; letter-spacing: 8px; font-family: monospace;">{{otp}}</span></div><p>If you did not request a password reset, please ignore this email or contact support if you have concerns.</p><p>Regards,<br><strong style="color: #2c3e50;">The Iroad Team</strong></p></div><div style="background-color: #ecf0f1; padding: 25px 30px; text-align: center; color: #7f8c8d; font-size: 13px; border-top: 1px solid #e0e6ed;"><p style="margin: 5px 0;">&copy; 2026 Iroad. All rights reserved.</p><p style="margin: 5px 0;">This is an automated security message.</p></div></div>`
+              },
+              "ar": {
+                "subject": "آيرود - رمز التحقق لإعادة تعيين كلمة المرور",
+                "body_html": `<div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05); font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; border: 1px solid #eaeaea; direction: rtl; text-align: right;"><div style="background-color: #2c3e50; padding: 30px; text-align: center;"><img src="{{company_logo}}" alt="شعار آيرود" style="max-height: 40px; margin-bottom: 15px;"><h1 style="color: #ffffff; margin: 0; font-size: 24px; letter-spacing: 1px;">التحقق الأمني</h1></div><div style="padding: 40px 30px; color: #333333; line-height: 1.6;"><h2 style="color: #2c3e50; font-size: 20px; margin-top: 0;">مرحباً، {{name}}!</h2><p>لقد تلقينا طلباً لإعادة تعيين كلمة المرور الخاصة بك. استخدم رمز التحقق أدناه لإكمال العملية. ستنتهي صلاحية هذا الرمز خلال 10 دقائق.</p><div style="background-color: #f8f9fa; border-right: 4px solid #3498db; padding: 30px; margin: 25px 0; border-radius: 4px; text-align: center;"><span style="font-size: 32px; font-weight: bold; color: #2c3e50; letter-spacing: 8px; font-family: monospace;">{{otp}}</span></div><p>إذا لم تطلب إعادة تعيين كلمة المرور، يرجى تجاهل هذا البريد أو الاتصال بالدعم إذا كان لديك أي مخاوف.</p><p>مع التحية،<br><strong style="color: #2c3e50;">فريق آيرود</strong></p></div><div style="background-color: #ecf0f1; padding: 25px 30px; text-align: center; color: #7f8c8d; font-size: 13px; border-top: 1px solid #e0e6ed;"><p style="margin: 5px 0;">&copy; 2026 آيرود. جميع الحقوق محفوظة.</p><p style="margin: 5px 0;">هذه رسالة أمنية تلقائية.</p></div></div>`
+              }
+            }
+          },
+          {
+            "template_code": "addon_order_invoice",
+            "template_name": "Add-on Order Invoice",
+            "module": "subscriptions",
+            "trigger_event": "addon_order_paid",
+            "supported_placeholders": [
+              { "key": "company_name", "description": "Name of the company", "default": "TechFlow Systems" },
+              { "key": "plan_name", "description": "Active subscription plan name", "default": "Enterprise Plus" },
+              { "key": "order_id", "description": "Unique order reference number", "default": "INV-2026-9844" },
+              { "key": "addon_lines", "description": "HTML table of add-on line items", "default": "<table style='width: 100%; border-collapse: collapse;'><tr style='background: #f8f9fa;'><th style='padding: 10px; border: 1px solid #eee; text-align: left;'>Item</th><th style='padding: 10px; border: 1px solid #eee; text-align: right;'>Price</th></tr><tr><td style='padding: 10px; border: 1px solid #eee;'>SMS Bundle (5000 units)</td><td style='padding: 10px; border: 1px solid #eee; text-align: right;'>150.00 SAR</td></tr><tr><td style='padding: 10px; border: 1px solid #eee;'>Premium Support (Add-on)</td><td style='padding: 10px; border: 1px solid #eee; text-align: right;'>50.00 SAR</td></tr></table>" },
+              { "key": "sub_total", "description": "Sub total before tax", "default": "200.00" },
+              { "key": "tax_amount", "description": "Tax amount", "default": "30.00" },
+              { "key": "grand_total", "description": "Final grand total", "default": "230.00" },
+              { "key": "currency", "description": "Currency code e.g. SAR", "default": "SAR" },
+              { "key": "billing_period", "description": "Start date to end date", "default": "Apr 01 - Apr 30, 2026" },
+              { "key": "invoice_date", "description": "Date invoice was generated", "default": "April 09, 2026" },
+              { "key": "login_url", "description": "URL to the portal", "default": "https://iroad.com/billing" },
+              { "key": "company_logo", "description": "Company Logo URL", "default": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRz-8Z4m_ZkXy9_f8h1_Z4_v3_b2_j3_u4_s5&s" }
+            ],
+            "contents": {
+              "en": {
+                "subject": "Iroad - Add-on Invoice #{{order_id}}",
+                "body_html": `<div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05); font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; border: 1px solid #eaeaea;"><div style="background-color: #2c3e50; padding: 30px; text-align: center;"><h1 style="color: #ffffff; margin: 0; font-size: 24px; letter-spacing: 1px;">Add-on Invoice</h1></div><div style="padding: 40px 30px; color: #333333; line-height: 1.6;"><h2 style="color: #2c3e50; font-size: 20px; margin-top: 0;">Hello, {{company_name}}!</h2><p>Thank you for your add-on purchase. Below are the details of your invoice for the period {{billing_period}}.</p><div style="background-color: #f8f9fa; padding: 20px; margin: 25px 0; border-radius: 4px;"><p><strong>Order ID:</strong> #{{order_id}}<br><strong>Plan:</strong> {{plan_name}}<br><strong>Date:</strong> {{invoice_date}}</p></div><div style="margin: 25px 0;">{{addon_lines}}</div><div style="border-top: 2px solid #eee; padding-top: 15px; margin-top: 20px; text-align: right;"><p style="margin: 5px 0;">Subtotal: <strong>{{sub_total}} {{currency}}</strong></p><p style="margin: 5px 0;">Tax (15%): <strong>{{tax_amount}} {{currency}}</strong></p><h3 style="color: #2c3e50; margin: 10px 0;">Grand Total: {{grand_total}} {{currency}}</h3></div><div style="text-align: center; margin: 35px 0 20px 0;"><a href="{{login_url}}" style="background-color: #3498db; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 4px; font-weight: bold; display: inline-block; text-transform: uppercase; font-size: 14px; letter-spacing: 0.5px;">Login to Portal</a></div></div><div style="background-color: #ecf0f1; padding: 25px 30px; text-align: center; color: #7f8c8d; font-size: 13px; border-top: 1px solid #e0e6ed;"><p>&copy; 2026 Iroad. All rights reserved.</p></div></div>`
+              },
+              "ar": {
+                "subject": "آيرود - فاتورة الإضافات #{{order_id}}",
+                "body_html": `<div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05); font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; border: 1px solid #eaeaea; direction: rtl; text-align: right;"><div style="background-color: #2c3e50; padding: 30px; text-align: center;"><h1 style="color: #ffffff; margin: 0; font-size: 24px; letter-spacing: 1px;">فاتورة الإضافات</h1></div><div style="padding: 40px 30px; color: #333333; line-height: 1.6;"><h2 style="color: #2c3e50; font-size: 20px; margin-top: 0;">مرحباً، {{company_name}}!</h2><p>شكراً لشرائك الإضافات. فيما يلي تفاصيل فاتورتك للفترة {{billing_period}}.</p><div style="background-color: #f8f9fa; padding: 20px; margin: 25px 0; border-radius: 4px;"><p><strong>رقم الطلب:</strong> #{{order_id}}<br><strong>الخطة:</strong> {{plan_name}}<br><strong>التاريخ:</strong> {{invoice_date}}</p></div><div style="margin: 25px 0;">{{addon_lines}}</div><div style="border-top: 2px solid #eee; padding-top: 15px; margin-top: 20px; text-align: left;"><p style="margin: 5px 0;">المجموع الفرعي: <strong>{{sub_total}} {{currency}}</strong></p><p style="margin: 5px 0;">الضريبة (15%): <strong>{{tax_amount}} {{currency}}</strong></p><h3 style="color: #2c3e50; margin: 10px 0;">المجموع الإجمالي: {{grand_total}} {{currency}}</h3></div><div style="text-align: center; margin: 35px 0 20px 0;"><a href="{{login_url}}" style="background-color: #3498db; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 4px; font-weight: bold; display: inline-block; text-transform: uppercase; font-size: 14px; letter-spacing: 0.5px;">تسجيل الدخول إلى البوابة</a></div></div><div style="background-color: #ecf0f1; padding: 25px 30px; text-align: center; color: #7f8c8d; font-size: 13px; border-top: 1px solid #e0e6ed;"><p>&copy; 2026 آيرود. جميع الحقوق محفوظة.</p></div></div>`
+              }
+            }
+          },
+          {
+            "template_code": "company_admin_welcome",
+            "template_name": "Company Admin Welcome & Credentials",
+            "module": "companies",
+            "trigger_event": "company_admin_created",
+            "supported_placeholders": [
+              { "key": "name", "description": "Name of the admin", "default": "Ahmed Hassan" },
+              { "key": "email", "description": "Login email address", "default": "admin@flowcorp.com" },
+              { "key": "password", "description": "Generated password", "default": "FL0w_2026!" },
+              { "key": "login_url", "description": "URL to the portal", "default": "https://iroad.com/portal/login" },
+              { "key": "company_logo", "description": "Company Logo URL", "default": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRz-8Z4m_ZkXy9_f8h1_Z4_v3_b2_j3_u4_s5&s" }
+            ],
+            "contents": {
+              "en": {
+                "subject": "Welcome to Iroad - Your Company Admin Credentials",
+                "body_html": `<div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05); font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; border: 1px solid #eaeaea;"><div style="background-color: #2c3e50; padding: 30px; text-align: center;"><h1 style="color: #ffffff; margin: 0; font-size: 24px; letter-spacing: 1px;">Company Admin Portal</h1></div><div style="padding: 40px 30px; color: #333333; line-height: 1.6;"><h2 style="color: #2c3e50; font-size: 20px; margin-top: 0;">Welcome, {{name}}!</h2><p>Your company has been registered on Iroad. We have created a company administrator account for you.</p><div style="background-color: #f8f9fa; border-left: 4px solid #3498db; padding: 20px; margin: 25px 0; border-radius: 4px;"><ul style="list-style: none; padding: 0; margin: 0;"><li style="margin-bottom: 10px; font-size: 15px;"><strong style="color: #2c3e50; display: inline-block; width: 90px;">Email:</strong> {{email}}</li><li style="margin-bottom: 10px; font-size: 15px;"><strong style="color: #2c3e50; display: inline-block; width: 90px;">Password:</strong> {{password}}</li></ul></div><p>Please login and complete your company setup.</p><div style="text-align: center; margin: 35px 0 20px 0;"><a href="{{login_url}}" style="background-color: #3498db; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 4px; font-weight: bold; display: inline-block; text-transform: uppercase; font-size: 14px; letter-spacing: 0.5px;">Login to Portal</a></div></div><div style="background-color: #ecf0f1; padding: 25px 30px; text-align: center; color: #7f8c8d; font-size: 13px;"><p>&copy; 2026 Iroad. All rights reserved.</p></div></div>`
+              },
+              "ar": {
+                "subject": "مرحباً بك في آيرود - بيانات دخول مسؤول الشركة",
+                "body_html": `<div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05); font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; border: 1px solid #eaeaea; direction: rtl; text-align: right;"><div style="background-color: #2c3e50; padding: 30px; text-align: center;"><h1 style="color: #ffffff; margin: 0; font-size: 24px; letter-spacing: 1px;">بوابة مسؤول الشركة</h1></div><div style="padding: 40px 30px; color: #333333; line-height: 1.6;"><h2 style="color: #2c3e50; font-size: 20px; margin-top: 0;">مرحباً، {{name}}!</h2><p>تم تسجيل شركتك في آيرود. لقد قمنا بإنشاء حساب مسؤول شركة لك.</p><div style="background-color: #f8f9fa; border-right: 4px solid #3498db; padding: 20px; margin: 25px 0; border-radius: 4px;"><ul style="list-style: none; padding: 0; margin: 0;"><li style="margin-bottom: 10px; font-size: 15px;"><strong style="color: #2c3e50; display: inline-block; width: 120px;">البريد الإلكتروني:</strong> {{email}}</li><li style="margin-bottom: 10px; font-size: 15px;"><strong style="color: #2c3e50; display: inline-block; width: 120px;">كلمة المرور:</strong> {{password}}</li></ul></div><p>يرجى تسجيل الدخول وإكمال إعداد شركتك.</p><div style="text-align: center; margin: 35px 0 20px 0;"><a href="{{login_url}}" style="background-color: #3498db; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 4px; font-weight: bold; display: inline-block; text-transform: uppercase; font-size: 14px; letter-spacing: 0.5px;">تسجيل الدخول إلى البوابة</a></div></div><div style="background-color: #ecf0f1; padding: 25px 30px; text-align: center; color: #7f8c8d; font-size: 13px;"><p>&copy; 2026 آيرود. جميع الحقوق محفوظة.</p></div></div>`
+              }
+            }
+          }
+        ];
+
+        let currentTemplate = templates[0];
+        let currentLang = 'en';
+        let placeholderValues = {};
+
+        function init() {
+            renderTemplateList();
+            setupToggles();
+            loadTemplate(templates[0]);
+        }
+
+        function renderTemplateList() {
+            const list = document.getElementById('templateList');
+            list.innerHTML = '';
+            templates.forEach(t => {
+                const li = document.createElement('li');
+                li.className = `template-item ${t === currentTemplate ? 'active' : ''}`;
+                li.innerHTML = `
+                    <span class="template-title">${t.template_name}</span>
+                    <span class="template-meta">${t.module} | ${t.trigger_event}</span>
+                `;
+                li.onclick = () => loadTemplate(t);
+                list.appendChild(li);
+            });
+        }
+
+        function setupToggles() {
+            const deviceBtns = document.querySelectorAll('#deviceToggle .toggle-btn');
+            deviceBtns.forEach(btn => {
+                btn.onclick = () => {
+                    deviceBtns.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    const device = btn.dataset.device;
+                    const wrapper = document.getElementById('deviceWrapper');
+                    const notch = document.getElementById('notch');
+                    
+                    if(device === 'mobile') {
+                        wrapper.className = 'device-mobile';
+                        notch.style.display = 'block';
+                    } else {
+                        wrapper.className = 'device-desktop';
+                        notch.style.display = 'none';
+                    }
+                };
+            });
+
+            const langBtns = document.querySelectorAll('#langToggle .toggle-btn');
+            langBtns.forEach(btn => {
+                btn.onclick = () => {
+                    langBtns.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    currentLang = btn.dataset.lang;
+                    updatePreview();
+                };
+            });
+        }
+
+        function loadTemplate(t) {
+            currentTemplate = t;
+            renderTemplateList();
+            
+            // Re-render placeholders
+            const pList = document.getElementById('placeholderList');
+            pList.innerHTML = '';
+            
+            placeholderValues = {};
+            t.supported_placeholders.forEach(p => {
+                placeholderValues[p.key] = p.default;
+                
+                const div = document.createElement('div');
+                div.className = 'input-item';
+                div.innerHTML = `
+                    <label>${p.key} (${p.description})</label>
+                    <input type="text" value="${p.default}" data-key="${p.key}">
+                `;
+                const input = div.querySelector('input');
+                input.oninput = (e) => {
+                    placeholderValues[p.key] = e.target.value;
+                    updatePreview();
+                };
+                pList.appendChild(div);
+            });
+
+            updatePreview();
+        }
+
+        function updatePreview() {
+            const content = currentTemplate.contents[currentLang];
+            let html = content.body_html;
+            let subject = content.subject;
+
+            // Simple template engine
+            for(let key in placeholderValues) {
+                const regex = new RegExp(`{{${key}}}`, 'g');
+                html = html.replace(regex, placeholderValues[key]);
+                subject = subject.replace(regex, placeholderValues[key]);
+            }
+
+            document.getElementById('subjectPreview').innerText = subject;
+            
+            const frame = document.getElementById('previewFrame');
+            const doc = frame.contentDocument || frame.contentWindow.document;
+            doc.open();
+            doc.write(html);
+            doc.close();
+
+            // Set direction for frame
+            doc.body.dir = currentLang === 'ar' ? 'rtl' : 'ltr';
+            doc.body.style.margin = '0';
+            doc.body.style.padding = '20px';
+            doc.body.style.background = '#ffffff';
+        }
+
+        init();
+    </script>
+</body>
+</html>

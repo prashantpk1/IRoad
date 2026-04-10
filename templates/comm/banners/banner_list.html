@@ -27,6 +27,10 @@
     <form method="get">
       <div class="eal-toolbar">
         <div class="eal-toolbar-left" style="width:100%; display:flex; gap:12px; flex-wrap:wrap;">
+          <div class="eal-search" style="flex:1; min-width:240px; max-width:320px;">
+            <i class="bi bi-search"></i>
+            <input type="text" name="q" value="{{ search_query }}" placeholder="Search by title or message" />
+          </div>
           <div style="width:220px"><select class="eal-select" name="severity"><option value="All" {% if severity_filter == 'All' %}selected{% endif %}>All Severities</option><option value="Info" {% if severity_filter == 'Info' %}selected{% endif %}>Info</option><option value="Warning" {% if severity_filter == 'Warning' %}selected{% endif %}>Warning</option><option value="Critical" {% if severity_filter == 'Critical' %}selected{% endif %}>Critical</option></select></div>
           <div style="width:220px"><select class="eal-select" name="status"><option value="All" {% if status_filter == 'All' %}selected{% endif %}>All Statuses</option><option value="Active" {% if status_filter == 'Active' %}selected{% endif %}>Active</option><option value="Inactive" {% if status_filter == 'Inactive' %}selected{% endif %}>Inactive</option></select></div>
           <button type="submit" class="eal-btn eal-btn-primary"><i class="bi bi-funnel"></i><span>{% translate "Apply" %}</span></button>

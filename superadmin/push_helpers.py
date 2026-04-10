@@ -7,7 +7,12 @@ from django.conf import settings
 from django.template import Context, Template
 from django.utils import timezone
 
-from superadmin.models import CommLog, PushDeviceToken, PushNotification
+from superadmin.models import (
+    CommLog,
+    PushDeviceToken,
+    PushNotification,
+    PushNotificationReceipt,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -85,18 +90,20 @@ def queue_push_notification(push_item):
         push_item.dispatch_status = 'Scheduled'
     else:
         dispatch_push_notification_task.delay(str(push_item.notification_id))
-        push_item.dispatch_status = 'Completed'
+        push_item.dispatch_status = 'Scheduled'
     push_item.save(update_fields=['dispatch_status'])
     return True
 
 
 def execute_push_notification(push_notification_id, context_dict=None):
     push_item = PushNotification.objects.get(pk=push_notification_id)
-    if not push_item.is_active:
+    if push_item.trigger_mode == 'System_Event' and not push_item.is_active:
         return {'status': 'inactive'}
 
-    title = _render_text(push_item.title_en, context_dict)
-    body = _render_text(push_item.message_en, context_dict)
+    ctx = context_dict or {}
+    title = _render_text(push_item.title_en, ctx)
+    body = _render_text(push_item.message_en, ctx)
+    event_code = (ctx.get('event_code') or '').strip() or None
     tokens = _resolve_tokens(push_item)
 
     if not tokens:
@@ -112,6 +119,14 @@ def execute_push_notification(push_notification_id, context_dict=None):
     sent = 0
     failed = 0
     for token in tokens:
+        token_row = PushDeviceToken.objects.filter(device_token=token).first()
+        token_domain = (
+            token_row.user_domain if token_row else 'Tenant_User'
+        )
+        token_reference_id = (
+            token_row.reference_id if token_row else ''
+        )
+        token_tenant = token_row.tenant if token_row else None
         try:
             _fcm_send(token, title, body, push_item.action_link)
             CommLog.objects.create(
@@ -120,12 +135,37 @@ def execute_push_notification(push_notification_id, context_dict=None):
                 trigger_source=f'Push: {push_item.internal_name}',
                 delivery_status='Sent',
             )
+            PushNotificationReceipt.objects.create(
+                tenant=token_tenant,
+                notification=push_item,
+                device_token=token,
+                user_domain=token_domain,
+                reference_id=token_reference_id,
+                title=title,
+                message=body,
+                action_link=push_item.action_link,
+                event_code=event_code,
+                delivery_status='Sent',
+            )
             sent += 1
         except Exception as exc:
             CommLog.objects.create(
                 recipient=token,
                 channel_type='Push',
                 trigger_source=f'Push: {push_item.internal_name}',
+                delivery_status='Failed',
+                error_details=str(exc)[:1000],
+            )
+            PushNotificationReceipt.objects.create(
+                tenant=token_tenant,
+                notification=push_item,
+                device_token=token,
+                user_domain=token_domain,
+                reference_id=token_reference_id,
+                title=title,
+                message=body,
+                action_link=push_item.action_link,
+                event_code=event_code,
                 delivery_status='Failed',
                 error_details=str(exc)[:1000],
             )
@@ -150,16 +190,18 @@ def dispatch_system_event_pushes(event_code, context_dict=None):
 
     count = 0
     for push_item in qs.iterator():
+        payload = dict(context_dict or {})
+        payload['event_code'] = event_code
         scheduled_at = push_item.scheduled_at
         if scheduled_at and scheduled_at > timezone.now() + timedelta(seconds=5):
             dispatch_push_notification_task.apply_async(
-                args=[str(push_item.notification_id), context_dict or {}],
+                args=[str(push_item.notification_id), payload],
                 eta=scheduled_at,
             )
         else:
             dispatch_push_notification_task.delay(
                 str(push_item.notification_id),
-                context_dict or {},
+                payload,
             )
         count += 1
     return count
