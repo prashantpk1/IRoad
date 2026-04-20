@@ -11,8 +11,8 @@
     </div>
   </div>
   <div class="toolbar-right d-flex align-items-center gap-3">
-    <div class="live-status-badge">
-        <span class="heartbeat"></span>
+    <div class="status-badge-premium status-badge-success">
+        <span class="heartbeat-dot success"></span>
         <span class="status-text">LIVE DATA</span>
     </div>
     <div class="text-end border-start ps-3">
@@ -21,13 +21,6 @@
     </div>
   </div>
 </div>
-<style>
-  .live-status-badge { display: flex; align-items: center; gap: 8px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); padding: 4px 12px; border-radius: 20px; color: #10b981; font-size: 11px; font-weight: 700; letter-spacing: 0.5px; }
-  .heartbeat { width: 8px; height: 8px; background: #10b981; border-radius: 50%; box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); animation: heartbeat 2s infinite; }
-  @keyframes heartbeat { 0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); } 70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); } 100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); } }
-  .kpi-card { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-  .kpi-card:hover { transform: translateY(-3px); box-shadow: 0 12px 24px rgba(0,0,0,0.05); }
-</style>
 
 <div class="kpi-grid">
   <a href="#" class="text-decoration-none">

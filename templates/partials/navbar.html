@@ -4,9 +4,25 @@
   <span class="header-time" id="headerTime"></span>
 </div>
 <div class="header-right">
-  <button type="button" class="header-icon-btn" title="{% translate 'Switch Language' %}">
-    <i class="bi bi-translate"></i>
-  </button>
+  {% with active_lang=request.LANGUAGE_CODE|default:'en'|slice:':2' %}
+  <form action="{% url 'set_language' %}" method="post" class="d-inline">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+    <input
+      type="hidden"
+      name="language"
+      value="{% if active_lang == 'ar' %}en{% else %}ar{% endif %}"
+    >
+    <button type="submit" class="header-icon-btn header-lang-btn" title="{% translate 'Switch Language' %}">
+      <i class="bi bi-translate"></i>
+    </button>
+  </form>
+
+  <div class="status-badge-premium status-badge-primary ms-2">
+    <span class="heartbeat-dot primary"></span>
+    <span class="status-text">{% if active_lang == 'ar' %}AR{% else %}EN{% endif %}</span>
+  </div>
+  {% endwith %}
   <!-- <button type="button" class="header-icon-btn" title="{% translate 'Notifications' %}">
     <i class="bi bi-bell"></i>
     <span class="badge">3</span>

@@ -1,3 +1,152 @@
+Manual Walkthrough - FRM-CP-05-03 (System Events Mapping Engine)
+Goal: Verify fields, rules, and fallback behavior manually
+
+Prerequisites
+1) Login as Root Admin.
+2) At least one active Email template and one active SMS template exist in Notification Templates.
+3) At least one active Email gateway and one active SMS gateway exist in Communication Gateways.
+
+--------------------------------------------------
+A. Field-Level Verification
+--------------------------------------------------
+
+Step A1: Open Event Mapping create page
+- Navigate: Communication -> System Events Mapping -> Add Event Mapping.
+- Expected:
+  - system_event is dropdown only (no free text).
+  - primary_channel dropdown has Email/SMS.
+  - primary_template dropdown exists.
+  - fallback_channel optional.
+  - fallback_template shown only when fallback channel selected.
+  - is_active defaults checked/true.
+
+Step A2: Verify "hardcoded events only"
+- Try to input custom event text from browser (inspect element/manual value).
+- Submit.
+- Expected:
+  - Form rejects invalid value not in model choices, or ignores custom value.
+
+Step A3: Verify primary template required
+- Select system_event + primary_channel, leave primary_template empty.
+- Submit.
+- Expected:
+  - Validation error for primary_template required.
+
+Step A4: Verify channel-template match (primary)
+- Pick primary_channel=SMS and select Email template (if possible via tampering/devtools).
+- Submit.
+- Expected:
+  - Validation error: primary template channel type must match primary channel.
+
+Step A5: Verify fallback conditional rule
+- Select fallback_channel but keep fallback_template empty.
+- Submit.
+- Expected:
+  - Validation error: fallback template required.
+
+Step A6: Verify fallback cannot equal primary
+- Set primary_channel=Email and fallback_channel=Email.
+- Submit.
+- Expected:
+  - Validation error: fallback channel cannot be same as primary.
+
+Step A7: Verify fallback template channel match
+- Set fallback_channel=SMS and choose Email fallback template (if possible).
+- Submit.
+- Expected:
+  - Validation error: fallback template channel type must match fallback channel.
+
+Step A8: Save valid mapping
+- Choose valid system_event + primary_channel/template + optional valid fallback.
+- Submit.
+- Expected:
+  - Success message and row appears in mapping list.
+
+Step A9: Verify uniqueness (one mapping per event)
+- Try creating second mapping with same system_event.
+- Expected:
+  - Rejected with duplicate mapping error.
+
+--------------------------------------------------
+B. Audit/Status Verification
+--------------------------------------------------
+
+Step B1: Edit mapping and save
+- Change template/channel.
+- Expected:
+  - Save succeeds.
+  - "Last updated by" banner reflects current user and timestamp.
+
+Step B2: Toggle status in list
+- Toggle mapping active/inactive.
+- Expected:
+  - is_active changes.
+  - Mapping remains linked to same event.
+
+--------------------------------------------------
+C. Runtime Routing Verification (Primary + Fallback)
+--------------------------------------------------
+
+Important note:
+- Current code supports fallback immediately only when send happens synchronously and throws exception.
+- If async tasks are used, fallback may not trigger instantly after downstream provider failure.
+
+Step C1: Create mapping for OTP_Requested
+- primary_channel=SMS
+- primary_template=valid SMS template
+- fallback_channel=Email
+- fallback_template=valid Email template
+- Save active.
+
+Step C2: Force primary failure
+- Temporarily set SMS gateway host_url to invalid endpoint or invalid credentials.
+- Keep Email gateway valid.
+
+Step C3: Trigger event
+- Use shell/Django command or relevant app action that calls dispatch_event_notification("OTP_Requested", ...).
+- Provide recipient_phone and recipient_email.
+
+Step C4: Validate outcome
+- Check Communication Logs:
+  - Primary SMS should log Failed.
+  - Fallback Email should log Sent (expected for synchronous dispatch path).
+
+Step C5: Re-test with async path enabled
+- Trigger through normal runtime path (Celery enabled).
+- Expected (current behavior):
+  - SMS task may fail later.
+  - Fallback may NOT auto-run instantly.
+
+--------------------------------------------------
+D. Quick SQL/ORM Checks (optional)
+--------------------------------------------------
+
+In Django shell:
+
+1) Ensure no duplicate event mappings:
+   from superadmin.models import EventMapping
+   from django.db.models import Count
+   EventMapping.objects.values('system_event').annotate(c=Count('mapping_id')).filter(c__gt=1)
+   Expected: empty queryset
+
+2) Check mapping has updater:
+   EventMapping.objects.filter(updated_by__isnull=True).count()
+   Expected for strict compliance: 0
+   Current implementation may return >0 for legacy rows.
+
+--------------------------------------------------
+Pass Criteria Summary
+--------------------------------------------------
+
+PASS if:
+- All form validations in section A behave exactly as expected.
+- Duplicate event mappings are blocked.
+- Mapping edit/toggle works and timestamps update.
+- Fallback delivery is confirmed at least in synchronous failure path.
+
+KNOWN GAP:
+- Async failure fallback is not guaranteed to execute instantly in current implementation.
+
 # Subscriber CRM & Billing (CP-PCS-P5) Manual Walkthrough
 
 This guide provides step-by-step instructions for manually verifying the Subscribers CRM & Billing module in the iRoad Control Panel.

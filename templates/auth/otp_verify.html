@@ -101,6 +101,15 @@
             </div>
             {% endif %}
 
+            <div class="auth-field" id="js-error-wrapper" style="display: none;">
+              <div class="auth-alert auth-alert-error">
+                <i class="bi bi-exclamation-circle"></i>
+                <div class="auth-alert-content">
+                  <p class="auth-text" id="js-error-message"></p>
+                </div>
+              </div>
+            </div>
+
             {% if form.errors or error %}
             <div class="auth-field">
               <div class="auth-alert auth-alert-error">
@@ -137,24 +146,12 @@
               <input type="hidden" id="otp" name="otp" value="{{ form.otp.value|default:'' }}">
             </div>
 
-            <div class="otp-attempts-info">
-              <div class="otp-attempts-left {% if attempts_left <= 2 %}danger{% elif attempts_left <= 3 %}warning{% endif %}">
-                <i class="bi bi-shield-exclamation"></i>
-                <span>{{ attempts_left }} attempts remaining</span>
-              </div>
+            <div class="otp-info-row">
+              <span>Expires in <span class="otp-timer-value" id="otp-timer">00:00</span></span>
+              <span>{{ attempts_left }} attempts remaining</span>
             </div>
-
-            <div class="otp-timer-wrapper">
-              <div class="otp-timer-info">
-                <div class="otp-timer-label">
-                  <i class="bi bi-clock-history"></i>
-                  <span>Security Code Expires in</span>
-                </div>
-                <div class="otp-timer-value" id="otp-timer">00:00</div>
-              </div>
-              <div class="otp-timer-bar-bg">
-                <div class="otp-timer-bar-fill" id="otp-timer-bar"></div>
-              </div>
+            <div class="otp-timer-bar-bg">
+              <div class="otp-timer-bar-fill" id="otp-timer-bar"></div>
             </div>
 
             <button type="submit" class="auth-btn auth-btn-primary">
@@ -197,6 +194,17 @@
         digits.forEach((input, index) => {
           // Handle typing
           input.addEventListener('input', (e) => {
+            // Strictly allow only digits
+            const originalValue = input.value;
+            input.value = input.value.replace(/\D/g, '');
+            
+            // If user tried to enter non-digit, show custom error
+            if (originalValue !== input.value) {
+              showError('Please enter numbers only.');
+            } else {
+              hideError();
+            }
+
             if (e.inputType === 'deleteContentBackward') return;
             
             const value = e.target.value;
@@ -204,6 +212,12 @@
               digits[index + 1].focus();
             }
             updateHiddenField();
+          });
+
+          // Suppress native HTML bubbles but keep validation
+          input.addEventListener('invalid', (e) => {
+            e.preventDefault();
+            showError('Please fill in all digits correctly.');
           });
 
           // Handle Backspace and Navigation
@@ -237,6 +251,19 @@
             updateHiddenField();
           });
         });
+
+        // Error handling helpers
+        const errorWrapper = document.getElementById('js-error-wrapper');
+        const errorMessage = document.getElementById('js-error-message');
+
+        const showError = (msg) => {
+          if (errorMessage) errorMessage.innerText = msg;
+          if (errorWrapper) errorWrapper.style.display = 'block';
+        };
+
+        const hideError = () => {
+          if (errorWrapper) errorWrapper.style.display = 'none';
+        };
 
         // Autofocus first field
         digits[0].focus();

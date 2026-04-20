@@ -1,0 +1,168 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: iRoad\n"
+"POT-Creation-Date: 2026-04-20 00:00+0000\n"
+"PO-Revision-Date: 2026-04-20 00:00+0000\n"
+"Language: ar\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "Actions"
+msgstr "الإجراءات"
+
+msgid "Active"
+msgstr "نشط"
+
+msgid "Active Subscribers"
+msgstr "المشتركين النشطين"
+
+msgid "Add"
+msgstr "إضافة"
+
+msgid "Analytics"
+msgstr "التحليلات"
+
+msgid "Back"
+msgstr "رجوع"
+
+msgid "Cancel"
+msgstr "إلغاء"
+
+msgid "Close"
+msgstr "إغلاق"
+
+msgid "Companies"
+msgstr "الشركات"
+
+msgid "Company List"
+msgstr "قائمة الشركات"
+
+msgid "Configuration"
+msgstr "الإعدادات"
+
+msgid "Dashboard"
+msgstr "لوحة القيادة"
+
+msgid "Delete"
+msgstr "حذف"
+
+msgid "Description"
+msgstr "الوصف"
+
+msgid "Done"
+msgstr "تم"
+
+msgid "Dropdown Master"
+msgstr "إدارة القوائم"
+
+msgid "Edit"
+msgstr "تعديل"
+
+msgid "Email"
+msgstr "البريد الإلكتروني"
+
+msgid "Email Configuration"
+msgstr "إعدادات البريد"
+
+msgid "Email Templates"
+msgstr "قوالب البريد"
+
+msgid "Here's what's happening with your system today"
+msgstr "نظرة عامة على نشاط نظامك اليوم"
+
+msgid "Inactive"
+msgstr "غير نشط"
+
+msgid "Languages"
+msgstr "اللغات"
+
+msgid "My Account"
+msgstr "حسابي"
+
+msgid "Name"
+msgstr "الاسم"
+
+msgid "Next"
+msgstr "التالي"
+
+msgid "No data available"
+msgstr "لا توجد بيانات"
+
+msgid "No notifications"
+msgstr "لا توجد إشعارات"
+
+msgid "No records found"
+msgstr "لم يتم العثور على سجلات"
+
+msgid "Notifications"
+msgstr "الإشعارات"
+
+msgid "Pending Approvals"
+msgstr "الموافقات المعلقة"
+
+msgid "Pending Liquidity"
+msgstr "السيولة المعلقة"
+
+msgid "Previous"
+msgstr "السابق"
+
+msgid "Reports"
+msgstr "التقارير"
+
+msgid "Revenue Forecast & Trend"
+msgstr "توقعات الإيرادات والاتجاه"
+
+msgid "Save"
+msgstr "حفظ"
+
+msgid "Search shipments, clients, addresses..."
+msgstr "ابحث عن الشحنات والعملاء والعناوين..."
+
+msgid "Search..."
+msgstr "بحث..."
+
+msgid "Settings"
+msgstr "الإعدادات"
+
+msgid "Sign out"
+msgstr "تسجيل الخروج"
+
+msgid "Status"
+msgstr "الحالة"
+
+msgid "Subadmin"
+msgstr "مسؤول فرعي"
+
+msgid "Subscription Packages"
+msgstr "باقات الاشتراك"
+
+msgid "Subscription Report"
+msgstr "تقرير الاشتراكات"
+
+msgid "Subscriptions"
+msgstr "الاشتراكات"
+
+msgid "Super Admin"
+msgstr "المشرف العام"
+
+msgid "Super Admin Dashboard"
+msgstr "لوحة تحكم المشرف العام"
+
+msgid "Switch Language"
+msgstr "تبديل اللغة"
+
+msgid "Ticket Health"
+msgstr "صحة التذاكر"
+
+msgid "Total Revenue This Month"
+msgstr "إجمالي الإيرادات هذا الشهر"
+
+msgid "User Management"
+msgstr "إدارة المستخدمين"
+
+msgid "Welcome back"
+msgstr "مرحباً بعودتك"
+
+msgid "You are yet to receive notifications"
+msgstr "لم تصلك إشعارات بعد"

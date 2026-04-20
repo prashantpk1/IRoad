@@ -92,6 +92,8 @@ function initSidebarCollapse() {
 function initHeaderDateTime() {
   const dateElement = document.getElementById("headerDate");
   const timeElement = document.getElementById("headerTime");
+  const docLang = (document.documentElement.lang || "en").toLowerCase();
+  const locale = docLang.startsWith("ar") ? "ar-SA" : "en-US";
 
   if (!dateElement || !timeElement) return;
 
@@ -105,11 +107,11 @@ function initHeaderDateTime() {
       month: "long",
       year: "numeric",
     };
-    const formattedDate = now.toLocaleDateString("en-US", options);
+    const formattedDate = now.toLocaleDateString(locale, options);
 
     // Format time: 3:52 PM
     const timeOptions = { hour: "numeric", minute: "2-digit", hour12: true };
-    const formattedTime = now.toLocaleTimeString("en-US", timeOptions);
+    const formattedTime = now.toLocaleTimeString(locale, timeOptions);
 
     dateElement.textContent = formattedDate;
     timeElement.textContent = formattedTime;
