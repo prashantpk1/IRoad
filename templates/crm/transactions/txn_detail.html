@@ -150,37 +150,38 @@
     </div>
   </div>
   <div class="form-card-body">
-    {% if not txn.attachment %}
-    <form method="post" action="{% url 'transaction_upload_attachment' txn.transaction_id %}" class="mb-4" enctype="multipart/form-data">
+    <form id="approve-transaction-form" method="post" action="{% url 'transaction_approve' txn.transaction_id %}" class="mb-3" data-confirm="{{ confirm_approve_payment|escape }}" enctype="multipart/form-data">
       {% csrf_token %}
+      {% if not txn.attachment %}
       <div class="mb-3">
         <label class="form-label">{% translate "Attachment / Receipt" %}</label>
         <input type="file" name="attachment" class="form-control" required>
-        <div class="field-hint">{% translate "Upload receipt first, then approve." %}</div>
+        <div class="field-hint">{% translate "Choose receipt then click Approve." %}</div>
       </div>
-      <button type="submit" class="eal-btn eal-btn-outline">
-        <i class="bi bi-upload"></i>
-        <span>{% translate "Upload Receipt" %}</span>
-      </button>
+      {% endif %}
     </form>
-    {% endif %}
 
-    <form method="post" action="{% url 'transaction_approve' txn.transaction_id %}" class="mb-4" data-confirm="{{ confirm_approve_payment|escape }}">
-      {% csrf_token %}
-      <button type="submit" class="eal-btn eal-btn-primary" {% if not txn.attachment %}disabled title="{% translate 'Upload receipt first' %}"{% endif %}>
-        <i class="bi bi-check-lg"></i>
-        <span>{% translate "Approve" %}</span>
-      </button>
-    </form>
-    <form method="post" action="{% url 'transaction_reject' txn.transaction_id %}">
+    <form id="reject-transaction-form" method="post" action="{% url 'transaction_reject' txn.transaction_id %}" class="mb-0">
       {% csrf_token %}
       <label class="form-label" style="color: var(--danger-color);">{% translate "Reject — review notes required" %}</label>
-      <textarea name="review_notes" class="form-control mb-2" rows="3" required placeholder="{% translate 'Reason for rejection' %}"></textarea>
-      <button type="submit" class="eal-btn eal-btn-outline" style="color: var(--danger-color); border-color: var(--danger-color);">
-        <i class="bi bi-x-circle"></i>
-        <span>{% translate "Reject" %}</span>
-      </button>
+      <textarea name="review_notes" class="form-control mb-3" rows="3" required placeholder="{% translate 'Reason for rejection' %}"></textarea>
     </form>
+</div>
+</div>
+    <div class="form-actions-bar">
+      <div class="form-actions-left">
+        <button type="submit" form="reject-transaction-form" class="eal-btn eal-btn-outline" style="color: var(--danger-color); border-color: var(--danger-color);">
+          <i class="bi bi-x-circle"></i>
+          <span>{% translate "Reject" %}</span>
+        </button>
+      </div>
+      <div class="form-actions-right">
+        <button type="submit" form="approve-transaction-form" class="eal-btn eal-btn-primary">
+          <i class="bi bi-check-lg"></i>
+          <span>{% translate "Approve" %}</span>
+        </button>
+      </div>
+    </div>
   </div>
 </div>
 {% endif %}

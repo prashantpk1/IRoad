@@ -50,6 +50,39 @@
          border-color: var(--primary-color);
          color: var(--primary-color);
       }
+      .otp-info-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 10px;
+        font-size: 13px;
+        color: var(--text-muted);
+        font-weight: 500;
+        margin-bottom: 4px;
+      }
+      .otp-timer-text i {
+        margin-right: 4px;
+        color: var(--primary-color);
+      }
+      .otp-timer-value {
+        font-weight: 700;
+        color: var(--text-dark);
+        font-variant-numeric: tabular-nums;
+      }
+      .otp-timer-bar-bg {
+        height: 6px;
+        background: var(--bg-gray);
+        border-radius: 10px;
+        margin-bottom: 24px;
+        overflow: hidden;
+      }
+      .otp-timer-bar-fill {
+        height: 100%;
+        background: var(--primary-gradient);
+        width: 100%;
+        border-radius: 10px;
+        transition: width 1s linear;
+      }
       @media (max-width: 480px) {
         .otp-digit-input {
           width: 42px;
@@ -57,6 +90,19 @@
           font-size: 20px;
         }
         .otp-digit-group { gap: 8px; }
+        .otp-info-row {
+          flex-direction: column;
+          gap: 8px;
+          text-align: center;
+        }
+      }
+      @media (max-width: 360px) {
+        .otp-digit-input {
+          width: 36px;
+          height: 46px;
+          font-size: 18px;
+        }
+        .otp-digit-group { gap: 6px; }
       }
     </style>
   </head>
@@ -147,8 +193,8 @@
             </div>
 
             <div class="otp-info-row">
-              <span>Expires in <span class="otp-timer-value" id="otp-timer">00:00</span></span>
-              <span>{{ attempts_left }} attempts remaining</span>
+              <span class="otp-timer-text"><i class="bi bi-clock-history"></i> Expires in <span class="otp-timer-value" id="otp-timer">05:00</span></span>
+              <span class="otp-attempts-text">{{ attempts_left }} attempts remaining</span>
             </div>
             <div class="otp-timer-bar-bg">
               <div class="otp-timer-bar-fill" id="otp-timer-bar"></div>

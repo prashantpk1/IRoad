@@ -34,13 +34,12 @@
 }
 
 .toolbar-left .toolbar-title {
-  font-size: 17px;
-  font-weight: 700;
-  color: var(--text-dark);
-  letter-spacing: -0.2px;
-  line-height: 1.3;
+    font-size: 24px;
+    font-weight: 600;
+    color: var(--text-dark);
+    letter-spacing: -0.2px;
+    line-height: 1.3;
 }
-
 .toolbar-left .toolbar-subtitle {
   font-size: 12.5px;
   color: var(--text-light);
@@ -767,6 +766,40 @@
 .status-badge.delivered { background: var(--success-bg); color: var(--success); }
 .status-badge.pending { background: var(--warning-bg); color: var(--warning); }
 .status-badge.cancelled { background: var(--danger-bg); color: var(--danger); }
+
+/* Dashboard audit action badges (same visual family as list status badges) */
+.action-badge {
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+
+.action-badge i {
+  font-size: 7px;
+}
+
+.action-badge-create {
+  background: var(--success-bg);
+  color: var(--success);
+  border-color: color-mix(in srgb, var(--success) 25%, transparent);
+}
+
+.action-badge-update {
+  background: var(--primary-bg);
+  color: var(--primary-color);
+  border-color: color-mix(in srgb, var(--primary-color) 25%, transparent);
+}
+
+.action-badge-delete {
+  background: var(--danger-bg);
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 25%, transparent);
+}
+
+.action-badge-status {
+  background: var(--warning-bg);
+  color: var(--warning);
+  border-color: color-mix(in srgb, var(--warning) 25%, transparent);
+}
 
 .pod-st { font-weight: 500; font-size: 12px; }
 .pod-st.received { color: var(--success); }

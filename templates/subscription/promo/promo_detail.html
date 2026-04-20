@@ -1,0 +1,158 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block title %}{% translate "Promo Code Details" %}{% endblock %}
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item"><a href="{% url 'promo_code_list' %}">{% translate "Promo Codes" %}</a></li>
+<li class="breadcrumb-item active" aria-current="page">{% translate "Details" %}</li>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">{% translate "Promo Code Details" %}</h1>
+      <p class="page-subtitle">{% translate "Review promo configuration, validity, and plan scope." %}</p>
+    </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <a href="{% url 'promo_code_list' %}" class="eal-btn eal-btn-outline">
+          <i class="bi bi-arrow-left"></i>
+          <span>{% translate "Back to list" %}</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="form-card mb-3">
+  <div class="form-card-header">
+    <div class="form-card-icon indigo" style="background: #2929ff96;">
+      <i class="bi bi-ticket-perforated"></i>
+    </div>
+    <div class="form-card-header-text">
+      <h3 class="form-card-title">{% translate "Code Details" %}</h3>
+      <p class="form-card-desc">{% translate "Discount type, amount, and promo behavior." %}</p>
+    </div>
+  </div>
+  <div class="form-card-body">
+    <div class="row g-3">
+      <div class="col-12 col-md-6 col-lg-3">
+        <label class="form-label">{% translate "Code" %}</label>
+        <input class="form-control" value="{{ promo.code }}" readonly>
+      </div>
+      <div class="col-12 col-md-6 col-lg-3">
+        <label class="form-label">{% translate "Discount type" %}</label>
+        <input class="form-control" value="{{ promo.get_discount_type_display }}" readonly>
+      </div>
+      <div class="col-12 col-md-6 col-lg-3">
+        <label class="form-label">{% translate "Discount duration" %}</label>
+        <input class="form-control" value="{{ promo.get_discount_duration_display }}" readonly>
+      </div>
+      <div class="col-12 col-md-6 col-lg-3">
+        <label class="form-label">{% translate "Discount value" %}</label>
+        <input class="form-control" value="{{ promo.discount_value }}" readonly>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="form-card mb-3">
+  <div class="form-card-header">
+    <div class="form-card-icon" style="background: rgba(99, 102, 241, 0.12); color: #6366f1;">
+      <i class="bi bi-calendar-event"></i>
+    </div>
+    <div class="form-card-header-text">
+      <h3 class="form-card-title">{% translate "Validity & Usage" %}</h3>
+      <p class="form-card-desc">{% translate "Date window, usage limits, and current status." %}</p>
+    </div>
+  </div>
+  <div class="form-card-body">
+    <div class="row g-3">
+      <div class="col-12 col-md-6 col-lg-3">
+        <label class="form-label">{% translate "Valid from" %}</label>
+        <input class="form-control" value="{{ promo.valid_from|date:'d M Y, H:i' }}" readonly>
+      </div>
+      <div class="col-12 col-md-6 col-lg-3">
+        <label class="form-label">{% translate "Valid until" %}</label>
+        <input class="form-control" value="{% if promo.valid_until %}{{ promo.valid_until|date:'d M Y, H:i' }}{% else %}—{% endif %}" readonly>
+      </div>
+      <div class="col-12 col-md-6 col-lg-3">
+        <label class="form-label">{% translate "Usage" %}</label>
+        <input class="form-control" value="{{ promo.current_uses }} / {% if promo.max_uses %}{{ promo.max_uses }}{% else %}∞{% endif %}" readonly>
+      </div>
+      <div class="col-12 col-md-6 col-lg-3">
+        <label class="form-label">{% translate "Status" %}</label>
+        <div>
+          {% if promo.valid_until and promo.valid_until < now %}
+            <span class="status-badge expired">{% translate "Expired" %}</span>
+          {% elif promo.valid_from > now %}
+            <span class="status-badge warning">{% translate "Scheduled" %}</span>
+          {% elif promo.is_active %}
+            <span class="status-badge active">{% translate "Active" %}</span>
+          {% else %}
+            <span class="status-badge inactive">{% translate "Inactive" %}</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="form-card mb-4">
+  <div class="form-card-header">
+    <div class="form-card-icon" style="background: rgba(16, 185, 129, 0.12); color: var(--success-color);">
+      <i class="bi bi-layers"></i>
+    </div>
+    <div class="form-card-header-text">
+      <h3 class="form-card-title">{% translate "Applicable Plans" %}</h3>
+      <p class="form-card-desc">{% translate "Plans this promo can be applied to." %}</p>
+    </div>
+  </div>
+  <div class="form-card-body">
+    {% if all_active_plans %}
+      <p class="text-muted small mb-3">
+        {% if applies_all_plans %}
+          {% translate "This promo applies to all active plans." %}
+        {% else %}
+          {% translate "Selected plans this promo can be applied to." %}
+        {% endif %}
+      </p>
+      <div class="selectable-grid">
+        {% for plan in all_active_plans %}
+          <label class="selectable-item">
+            <input type="checkbox" {% if applies_all_plans or plan.plan_id in selected_plan_ids %}checked{% endif %} disabled>
+            <div class="selectable-card">
+              <div class="card-check">
+                <i class="bi bi-check-lg" style="color: white; margin-bottom: 0; font-size: 10px;"></i>
+              </div>
+              <i class="bi bi-layers"></i>
+              <span class="card-label">{{ plan.plan_name_en }}</span>
+            </div>
+          </label>
+        {% endfor %}
+      </div>
+    {% else %}
+      <span class="text-muted">{% translate "No active plans available." %}</span>
+    {% endif %}
+  </div>
+</div>
+
+<div class="form-actions-bar">
+  <div class="form-actions-left">
+    <a href="{% url 'promo_code_list' %}" class="eal-btn eal-btn-outline">
+      <i class="bi bi-arrow-left"></i>
+      <span>{% translate "Back to list" %}</span>
+    </a>
+  </div>
+  <div class="form-actions-right">
+    {% if request.user.is_root %}
+      <a href="{% url 'promo_code_edit' promo.promo_code_id %}" class="eal-btn eal-btn-primary">
+        <i class="bi bi-pencil"></i>
+        <span>{% translate "Edit Promo" %}</span>
+      </a>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -72,7 +72,8 @@
           </div>
           <div class="col-12 col-md-4">
             <label class="form-label">{% translate "Promo code (optional)" %}</label>
-            <input type="text" name="promo_code" class="form-control" maxlength="40" autocomplete="off">
+            <input type="text" name="promo_code" class="form-control" id="id_promo_code" maxlength="40" autocomplete="off">
+            <p class="small mb-0 mt-1 text-muted" id="promo-code-hint" aria-live="polite"></p>
           </div>
           <div class="col-12 col-md-4">
             <label class="form-label">{% translate "Payment method" %}</label>
@@ -291,10 +292,14 @@
   const addonRows = document.getElementById('addon-rows');
   const planPriceHintEl = document.getElementById('plan-price-match-hint');
   const upgradeCreditHintLine = document.getElementById('upgrade_credit_hint_line');
+  const projectedHintEl = document.getElementById('projected_hint');
+  const defaultProjectedHint = projectedHintEl ? projectedHintEl.textContent : '';
   const uiStrings = document.getElementById('order-form-ui-strings');
   const tenantEl = document.getElementById('id_tenant');
   const orderCreateBaseUrl = '{% url "order_create" %}';
   const orderPreviewUrl = '{% url "order_preview_ajax" %}';
+  const promoEl = document.getElementById('id_promo_code');
+  const promoHintEl = document.getElementById('promo-code-hint');
 
   function normUuid(s) {
     return String(s || '').replace(/-/g, '').toLowerCase();
@@ -417,6 +422,40 @@
     });
   }
 
+  function updatePromoHint(data) {
+    if (!promoHintEl) return;
+    const promoData = data && data.promo ? data.promo : null;
+    const raw = promoEl ? String(promoEl.value || '').trim() : '';
+    if (!raw) {
+      promoHintEl.textContent = '';
+      promoHintEl.classList.remove('text-danger', 'text-success', 'text-muted');
+      promoHintEl.classList.add('text-muted');
+      return;
+    }
+    if (!promoData) {
+      promoHintEl.textContent = 'Promo check is temporarily unavailable.';
+      promoHintEl.classList.remove('text-success', 'text-danger');
+      promoHintEl.classList.add('text-muted');
+      return;
+    }
+    if (promoData && promoData.valid) {
+      var discount = parseFloat(promoData.discount_amount || 0) || 0;
+      var sub = parseFloat((document.getElementById('pv_sub_input') || {}).value || '0') || 0;
+      if (discount <= 0 && sub <= 0) {
+        promoHintEl.textContent = 'Promo is valid. Select plan/add-ons to calculate discount.';
+      } else {
+      promoHintEl.textContent = 'Promo applied. Discount: ' + discount.toFixed(2);
+      }
+      promoHintEl.classList.remove('text-danger', 'text-muted');
+      promoHintEl.classList.add('text-success');
+      return;
+    }
+    var msg = (promoData && promoData.error) ? promoData.error : 'Invalid or Expired Code.';
+    promoHintEl.textContent = msg;
+    promoHintEl.classList.remove('text-success', 'text-muted');
+    promoHintEl.classList.add('text-danger');
+  }
+
   function refreshPlanPreview() {
     if (!planIds.includes(clsEl.value)) {
       document.getElementById('preview_plan_price').value = '0.00';
@@ -509,9 +548,29 @@
     if (pDr) pDr.value = projected.max_drivers != null ? String(projected.max_drivers) : '';
   }
 
+  function setProjectedHint(message, isError) {
+    if (!projectedHintEl) return;
+    projectedHintEl.textContent = message || defaultProjectedHint || '';
+    projectedHintEl.classList.toggle('text-danger', !!isError);
+    projectedHintEl.classList.toggle('text-muted', !isError);
+  }
+
+  function refreshTotalsPreview() {
+    const planLine = parseFloat(document.getElementById('preview_plan_line_total').value || '0') || 0;
+    const addonLine = sumAddonPreview();
+    const sub = planLine + addonLine;
+    const disc = 0;
+    const tax = 0;
+    const grand = sub;
+    const fx = parseFloat((document.getElementById('pv_fx_input') || {}).value || '1') || 1;
+    const base = grand * fx;
+    setTotalsPreviewValues(sub, disc, tax, grand, fx, base, {});
+  }
+
   function refreshTotalsPreviewServer() {
     if (!hasSelectedTenant()) {
       setTotalsPreviewValues(0, 0, 0, 0, 1, 0, {});
+      setProjectedHint(defaultProjectedHint, false);
       return;
     }
     const params = new URLSearchParams();
@@ -520,15 +579,29 @@
     params.set('currency', String(currencyEl.value || ''));
     params.set('plan', String(planEl.value || ''));
     params.set('number_of_cycles', String(cyclesEl.value || '1'));
+    params.set('promo_code', String((promoEl && promoEl.value) || '').trim());
     addonRows.querySelectorAll('.addon-row').forEach(function (row) {
       params.append('addon_action', row.querySelector('.addon-action').value || 'Add');
       params.append('addon_add_on_type', row.querySelector('.addon-type').value || '');
       params.append('addon_quantity', row.querySelector('.addon-qty').value || '1');
     });
     fetch(orderPreviewUrl + '?' + params.toString(), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-      .then(function (r) { return r.json(); })
-      .then(function (data) {
-        if (!data || !data.ok) {
+      .then(function (r) {
+        return r.json().then(function (data) {
+          return { httpOk: r.ok, data: data };
+        }).catch(function () {
+          return { httpOk: r.ok, data: null };
+        });
+      })
+      .then(function (resp) {
+        const data = resp.data;
+        if (!resp.httpOk || !data || !data.ok) {
+          refreshTotalsPreview();
+          updatePromoHint(null);
+          setProjectedHint(
+            (data && data.error) ? ('Live preview warning: ' + data.error) : 'Live preview is temporarily unavailable. Showing local estimate only.',
+            true,
+          );
           return;
         }
         const totals = data.totals || {};
@@ -546,6 +619,13 @@
           parseFloat(totals.base_currency_equivalent || 0),
           data.projected || {},
         );
+        updatePromoHint(data);
+        setProjectedHint(defaultProjectedHint, false);
+      })
+      .catch(function () {
+        refreshTotalsPreview();
+        updatePromoHint(null);
+        setProjectedHint('Live preview is temporarily unavailable. Showing local estimate only.', true);
       });
   }
 
@@ -575,6 +655,10 @@
   document.getElementById('btn-add-addon-row').addEventListener('click', addAddonRow);
   if (tenantEl) {
     tenantEl.addEventListener('change', refreshTotalsPreviewServer);
+  }
+  if (promoEl) {
+    promoEl.addEventListener('input', refreshTotalsPreviewServer);
+    promoEl.addEventListener('change', refreshTotalsPreviewServer);
   }
   const orderFormEl = document.getElementById('order-form');
   if (orderFormEl) {

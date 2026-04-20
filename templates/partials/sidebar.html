@@ -296,11 +296,11 @@
 
       <!-- Global Master Data -->
       <li
-        class="nav-item has-submenu{% if 'country' in request.resolver_match.url_name or 'currency' in request.resolver_match.url_name %} open{% endif %}"
+        class="nav-item has-submenu{% if 'country' in request.resolver_match.url_name or request.resolver_match.url_name == 'currency_list' or request.resolver_match.url_name == 'currency_create' or request.resolver_match.url_name == 'currency_edit' or request.resolver_match.url_name == 'currency_toggle_status' or request.resolver_match.url_name == 'currency_delete' %} open{% endif %}"
       >
         <a
           href="#"
-          class="nav-link{% if 'country' in request.resolver_match.url_name or 'currency' in request.resolver_match.url_name %} active{% endif %}"
+          class="nav-link{% if 'country' in request.resolver_match.url_name or request.resolver_match.url_name == 'currency_list' or request.resolver_match.url_name == 'currency_create' or request.resolver_match.url_name == 'currency_edit' or request.resolver_match.url_name == 'currency_toggle_status' or request.resolver_match.url_name == 'currency_delete' %} active{% endif %}"
           data-tooltip="{% translate 'Global Master Data' %}"
         >
           <i class="bi bi-map"></i>
@@ -320,7 +320,7 @@
           <li class="submenu-item">
             <a
               href="{% url 'currency_list' %}"
-              class="submenu-link{% if 'currency' in request.resolver_match.url_name %} active{% endif %}"
+              class="submenu-link{% if request.resolver_match.url_name == 'currency_list' or request.resolver_match.url_name == 'currency_create' or request.resolver_match.url_name == 'currency_edit' or request.resolver_match.url_name == 'currency_toggle_status' or request.resolver_match.url_name == 'currency_delete' %} active{% endif %}"
               data-tooltip="{% translate 'Currencies Master' %}"
             >
               <i class="bi bi-currency-exchange"></i>

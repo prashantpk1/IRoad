@@ -1,6 +1,6 @@
 from django.contrib import messages
 from django.template import Context, Template
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.contrib.sessions.models import Session
 from django.contrib.auth import login, logout
 from django.contrib.auth.hashers import check_password
@@ -4319,6 +4319,35 @@ class PromoCodeListView(LoginRequiredMixin, View):
         )
 
 
+class PromoCodeDetailView(LoginRequiredMixin, View):
+    template_name = 'subscription/promo/promo_detail.html'
+
+    def get(self, request, pk):
+        promo = get_object_or_404(
+            PromoCode.objects.prefetch_related('applicable_plans'),
+            pk=pk,
+        )
+        selected_plan_ids = list(
+            promo.applicable_plans.values_list('plan_id', flat=True),
+        )
+        applies_all_plans = len(selected_plan_ids) == 0
+        all_active_plans = SubscriptionPlan.objects.filter(
+            is_active=True,
+        ).order_by('plan_name_en')
+        now = timezone.now()
+        return render(
+            request,
+            self.template_name,
+            {
+                'promo': promo,
+                'now': now,
+                'all_active_plans': all_active_plans,
+                'selected_plan_ids': selected_plan_ids,
+                'applies_all_plans': applies_all_plans,
+            },
+        )
+
+
 class PromoCodeCreateView(LoginRequiredMixin, View):
     template_name = 'subscription/promo/promo_form.html'
 
@@ -6902,6 +6931,7 @@ class OrderPreviewAjaxView(RootRequiredMixin, View):
         classification = (request.GET.get('order_classification') or '').strip()
         currency_id = (request.GET.get('currency') or '').strip()
         plan_id = (request.GET.get('plan') or '').strip()
+        promo_input = (request.GET.get('promo_code') or '').strip()
         try:
             cycles = int((request.GET.get('number_of_cycles') or '1').strip())
         except ValueError:
@@ -6937,6 +6967,7 @@ class OrderPreviewAjaxView(RootRequiredMixin, View):
         pro_rata = Decimal('0.00')
         plan_line_total = Decimal('0.00')
         selected_plan = None
+        promo_obj = None
         addon_preview_rows = []
 
         if classification in _PLAN_CLASSIFICATIONS:
@@ -7005,7 +7036,22 @@ class OrderPreviewAjaxView(RootRequiredMixin, View):
                         'line_total': str(line_total),
                     })
 
-        discount = Decimal('0.00')
+        promo_error = ''
+        if promo_input:
+            promo_obj = PromoCode.objects.filter(code__iexact=promo_input).first()
+            if not promo_obj:
+                promo_error = 'Invalid or Expired Code.'
+            else:
+                ok, err = promo_obj.is_valid_for_use(for_plan=selected_plan)
+                if not ok:
+                    promo_obj = None
+                    promo_error = err or 'Invalid or Expired Code.'
+
+        discount = calculate_promo_discount(
+            promo_obj,
+            sub_total,
+            for_plan=selected_plan,
+        ).quantize(Decimal('0.01'))
         taxable_base = (sub_total - discount).quantize(Decimal('0.01'))
         if taxable_base < 0:
             taxable_base = Decimal('0.00')
@@ -7103,6 +7149,12 @@ class OrderPreviewAjaxView(RootRequiredMixin, View):
                 'max_drivers': proj_d,
             },
             'addon_rows': addon_preview_rows,
+            'promo': {
+                'code': promo_obj.code if promo_obj else '',
+                'valid': bool(promo_obj) and not promo_error,
+                'error': promo_error,
+                'discount_amount': str(discount),
+            },
         })
 
 

@@ -118,6 +118,7 @@ from .views import (
     AddOnsPolicyUpdateView,
     AddOnsPolicyDeleteView,
     PromoCodeListView,
+    PromoCodeDetailView,
     PromoCodeCreateView,
     PromoCodeUpdateView,
     PromoCodeToggleStatusView,
@@ -432,6 +433,11 @@ urlpatterns = [
         'subscription/promo-codes/',
         PromoCodeListView.as_view(),
         name='promo_code_list',
+    ),
+    path(
+        'subscription/promo-codes/<uuid:pk>/',
+        PromoCodeDetailView.as_view(),
+        name='promo_code_detail',
     ),
     path(
         'subscription/promo-codes/create/',

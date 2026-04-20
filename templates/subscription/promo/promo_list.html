@@ -193,7 +193,7 @@
                 {% endif %}
               </a>
             </th>
-            <th style="width: 120px; text-align: right">ACTIONS</th>
+            <th style="width: 120px;"">ACTIONS</th>
           </tr>
         </thead>
         <tbody>
@@ -203,11 +203,11 @@
               <td><span class="fw-bold" style="font-family: monospace; color: #4338ca;">{{ p.code }}</span></td>
               <td>
                 <span class="status-badge" style="background: #f1f5f9; color: #475569; border: none;">
-                  {{ p.discount_type }}
+                  {{ p.get_discount_type_display }}
                 </span>
               </td>
               <td><span class="fw-bold">{{ p.discount_value }}</span></td>
-              <td>{{ p.discount_duration }}</td>
+              <td>{{ p.get_discount_duration_display }}</td>
               <td><small class="text-muted">{{ p.valid_from|date:"M d, Y" }}</small></td>
               <td>
                 {% if p.valid_until %}
@@ -233,8 +233,11 @@
                 {% endif %}
               </td>
               <td>
-                {% if request.user.is_root %}
-                  <div class="eal-actions-cell">
+                <div class="eal-actions-cell">
+                  <a href="{% url 'promo_code_detail' p.promo_code_id %}" class="eal-row-btn" title="View details">
+                    <i class="bi bi-eye"></i>
+                  </a>
+                  {% if request.user.is_root %}
                     <a href="{% url 'promo_code_edit' p.promo_code_id %}" class="eal-row-btn" title="Edit">
                       <i class="bi bi-pencil"></i>
                     </a>
@@ -244,8 +247,8 @@
                         <i class="bi bi-arrow-repeat"></i>
                       </button>
                     </form>
-                  </div>
-                {% endif %}
+                  {% endif %}
+                </div>
               </td>
             </tr>
           {% empty %}

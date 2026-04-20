@@ -303,6 +303,15 @@ function initSidebar() {
       document.body.style.overflow = "";
     }
   });
+
+  // Tidy up submenus when mouse leaves collapsed sidebar (expansion hover)
+  sidebar.addEventListener("mouseleave", function () {
+    if (sidebar.classList.contains("collapsed")) {
+      sidebar.querySelectorAll(".nav-item.open").forEach(function (item) {
+        item.classList.remove("open");
+      });
+    }
+  });
 }
 
 /* ============================================

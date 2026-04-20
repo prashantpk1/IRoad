@@ -30,23 +30,26 @@
   </div>
   {% endif %}
 
+  <div class="alert alert-info" style="border-radius: 10px;">
+    All prices are per 1 standard billing cycle.
+  </div>
+  <div class="alert alert-warning" style="border-radius: 10px;">
+    Activating this will deactivate all other policies.
+  </div>
   <div class="form-card">
     <div class="form-card-body">
-      <div class="alert alert-info" style="border-radius: 10px;">
-        All prices are per 1 standard billing cycle.
-      </div>
-      <div class="alert alert-warning" style="border-radius: 10px;">
-        Activating this will deactivate all other policies.
-      </div>
 
 
-      <form method="post" action="">
+      <form method="post" action="" novalidate id="addons-policy-form">
         {% csrf_token %}
         {% if form.non_field_errors %}
           <div style="color:#b91c1c; font-weight:600; margin-bottom:10px">
             {{ form.non_field_errors }}
           </div>
         {% endif %}
+        <div id="addons-policy-client-error" class="alert alert-danger d-none" style="border-radius: 10px;">
+          {% translate "Please fill all required fields before submitting." %}
+        </div>
 
         <h3 style="margin: 18px 0 12px 0">{% translate "Policy Details" %}</h3>
         <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:12px">
@@ -111,5 +114,65 @@
       </form>
     </div>
   </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var form = document.getElementById('addons-policy-form');
+  if (!form) return;
+
+  var errorBox = document.getElementById('addons-policy-client-error');
+  var requiredFields = form.querySelectorAll('[required]');
+
+  function clearClientError() {
+    if (errorBox) {
+      errorBox.classList.add('d-none');
+      errorBox.textContent = 'Please fill all required fields before submitting.';
+    }
+    requiredFields.forEach(function (field) {
+      field.classList.remove('is-invalid');
+    });
+  }
+
+  form.addEventListener('submit', function (e) {
+    clearClientError();
+    var firstInvalid = null;
+
+    requiredFields.forEach(function (field) {
+      var value = (field.value || '').trim();
+      if (!value) {
+        field.classList.add('is-invalid');
+        if (!firstInvalid) firstInvalid = field;
+      }
+    });
+
+    if (firstInvalid) {
+      e.preventDefault();
+      if (errorBox) {
+        errorBox.textContent = 'Please fill all required fields before submitting.';
+        errorBox.classList.remove('d-none');
+      }
+      firstInvalid.focus();
+    }
+  });
+
+  requiredFields.forEach(function (field) {
+    field.addEventListener('input', function () {
+      if ((field.value || '').trim()) {
+        field.classList.remove('is-invalid');
+      }
+      if (errorBox && !errorBox.classList.contains('d-none')) {
+        var hasEmpty = Array.prototype.some.call(requiredFields, function (f) {
+          return !(f.value || '').trim();
+        });
+        if (!hasEmpty) {
+          errorBox.classList.add('d-none');
+        }
+      }
+    });
+  });
+});
+</script>
 {% endblock %}
 

@@ -249,9 +249,9 @@
             <td>{{ txn.currency_id }}</td>
             <td>
               {% if txn.status == 'Failed' %}
-                <span class="badge bg-danger">Failed</span>
+                <span class="status-badge suspended">Failed</span>
               {% else %}
-                <span class="badge bg-warning text-dark">Rejected</span>
+                <span class="status-badge warning">Rejected</span>
               {% endif %}
             </td>
             <td>{{ txn.created_at }}</td>
@@ -280,15 +280,15 @@
             <td>{{ tenant.company_name }}</td>
             <td>
               {% if tenant.account_status == 'Suspended_Billing' %}
-                <span class="badge bg-warning text-dark">Suspended Billing</span>
+                <span class="status-badge warning">Suspended Billing</span>
               {% elif tenant.account_status == 'Suspended_Violation' %}
-                <span class="badge bg-danger">Suspended Violation</span>
+                <span class="status-badge suspended">Suspended Violation</span>
               {% elif tenant.account_status == 'Churned' %}
-                <span class="badge bg-secondary">Churned</span>
+                <span class="status-badge inactive">Churned</span>
               {% elif tenant.account_status == 'Active' %}
-                 <span class="badge bg-success">Active</span>
+                 <span class="status-badge active">Active</span>
               {% else %}
-                <span class="badge bg-secondary">{{ tenant.account_status }}</span>
+                <span class="status-badge inactive">{{ tenant.account_status }}</span>
               {% endif %}
             </td>
             <td>{{ tenant.updated_at }}</td>
@@ -433,19 +433,19 @@
           <td>{{ forloop.counter }}</td>
           <td>
             <div class="d-flex align-items-center gap-2">
-                <img src="https://ui-avatars.com/api/?name={{ item.admin.first_name }}&background=f1f5f9&color=64748b&size=24" class="rounded-circle" width="24">
+              
                 <span class="fw-bold">{% if item.admin %}{{ item.admin.first_name }} {{ item.admin.last_name }}{% else %}System{% endif %}</span>
             </div>
           </td>
           <td>
             {% if item.action_type == 'Create' %}
-                <span class="eal-status"><i class="bi bi-circle-fill text-success" style="font-size: 8px"></i> <span>Create</span></span>
+                <span class="status-badge active">Create</span>
             {% elif item.action_type == 'Update' %}
-                <span class="eal-status"><i class="bi bi-circle-fill text-primary" style="font-size: 8px"></i> <span>Update</span></span>
+                <span class="status-badge primary">Update</span>
             {% elif item.action_type == 'Delete' %}
-                <span class="eal-status"><i class="bi bi-circle-fill text-danger" style="font-size: 8px"></i> <span>Delete</span></span>
+                <span class="status-badge suspended">Delete</span>
             {% else %}
-                <span class="eal-status"><i class="bi bi-circle-fill text-warning" style="font-size: 8px"></i> <span>{{ item.action_type }}</span></span>
+                <span class="status-badge warning">{{ item.action_type }}</span>
             {% endif %}
           </td>
           <td><span class="text-muted small">{{ item.module_name }}</span></td>

@@ -15,7 +15,6 @@
   <div class="page-header-row">
     <div class="page-header-left">
       <h1 class="page-title">{{ role.role_name_en }}</h1>
-      <p class="page-subtitle arabic-text">{{ role.role_name_ar }}</p>
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
@@ -34,16 +33,16 @@
   </div>
 </div>
 
-<div class="form-card">
+<div class="form-card mb-3">
   <div class="form-card-header">
     <div class="form-card-icon blue"><i class="bi bi-shield-lock"></i></div>
     <div class="form-card-header-text">
       <h3 class="form-card-title">{% translate "Role information" %}</h3>
-      <p class="form-card-desc">{% translate "Read-only view of this access level." %}</p>
+      <p class="form-card-desc">{% translate "Core role settings used by access control." %}</p>
     </div>
   </div>
-  <div class="form-card-body row g-2">
- 
+  <div class="form-card-body">
+    <div class="row g-3">
     <div class="col-12 col-md-6">
       <label class="form-label">{% translate "Role EN" %}</label>
       <input type="text" class="form-control" value="{{ role.role_name_en }}" readonly>
@@ -52,26 +51,23 @@
       <label class="form-label">{% translate "Role AR" %}</label>
       <input type="text" class="form-control arabic-text" value="{{ role.role_name_ar }}" readonly>
     </div>
+
     <div class="col-12">
       <label class="form-label">{% translate "Description" %}</label>
-      <textarea
-        class="form-control"
-        rows="4"
-        readonly
-        aria-readonly="true"
-        style="resize: vertical; min-height: 5rem; "
-      >{% if role.description %}{{ role.description }}{% else %}—{% endif %}</textarea>
+      <textarea class="form-control" rows="4" readonly aria-readonly="true" style="resize: none;">{% if role.description %}{{ role.description }}{% else %}—{% endif %}</textarea>
     </div>
+
     <div class="col-12 col-md-6">
-      <label class="form-label">{% translate "System default" %}</label>
+      <label class="form-label">{% translate "Role type" %}</label>
       <div>
         {% if role.is_system_default %}
-          <span class="status-badge active" style="background: rgba(100, 116, 139, 0.1); color: #64748b;">{% translate "Immutable" %}</span>
+          <span class="status-badge info">{% translate "System default (immutable)" %}</span>
         {% else %}
-          <span class="status-badge inactive">{% translate "Custom" %}</span>
+          <span class="status-badge primary">{% translate "Custom role" %}</span>
         {% endif %}
       </div>
     </div>
+
     <div class="col-12 col-md-6">
       <label class="form-label">{% translate "Status" %}</label>
       <div>
@@ -82,22 +78,56 @@
         {% endif %}
       </div>
     </div>
-    <div class="col-12 col-md-6">
-      <label class="form-label">{% translate "Created by" %}</label>
-      <input type="text" class="form-control" value="{% if role.created_by %}{{ role.created_by.first_name }} {{ role.created_by.last_name }}{% else %}—{% endif %}" readonly>
     </div>
-    <div class="col-12 col-md-6">
-      <label class="form-label">{% translate "Updated by" %}</label>
-      <input type="text" class="form-control" value="{% if role.updated_by %}{{ role.updated_by.first_name }} {{ role.updated_by.last_name }}{% else %}—{% endif %}" readonly>
+  </div>
+</div>
+
+<div class="form-card mb-4">
+  <div class="form-card-header">
+    <div class="form-card-icon" style="background: rgba(99, 102, 241, 0.12); color: #6366f1;">
+      <i class="bi bi-clock-history"></i>
     </div>
-    <div class="col-12 col-md-6">
-      <label class="form-label">{% translate "Created at" %}</label>
-      <input type="text" class="form-control" value="{{ role.created_at|default:'—' }}" readonly>
+    <div class="form-card-header-text">
+      <h3 class="form-card-title">{% translate "Audit information" %}</h3>
+      <p class="form-card-desc">{% translate "Creation and last update metadata." %}</p>
     </div>
-    <div class="col-12 col-md-6">
-      <label class="form-label">{% translate "Updated at" %}</label>
-      <input type="text" class="form-control" value="{{ role.updated_at|default:'—' }}" readonly>
+  </div>
+  <div class="form-card-body">
+    <div class="row g-3">
+      <div class="col-12 col-md-6">
+        <label class="form-label">{% translate "Created by" %}</label>
+        <input type="text" class="form-control" value="{% if role.created_by %}{{ role.created_by.first_name }} {{ role.created_by.last_name }}{% else %}—{% endif %}" readonly>
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">{% translate "Updated by" %}</label>
+        <input type="text" class="form-control" value="{% if role.updated_by %}{{ role.updated_by.first_name }} {{ role.updated_by.last_name }}{% else %}—{% endif %}" readonly>
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">{% translate "Created at" %}</label>
+        <input type="text" class="form-control" value="{% if role.created_at %}{{ role.created_at|date:'d M Y, H:i' }}{% else %}—{% endif %}" readonly>
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">{% translate "Updated at" %}</label>
+        <input type="text" class="form-control" value="{% if role.updated_at %}{{ role.updated_at|date:'d M Y, H:i' }}{% else %}—{% endif %}" readonly>
+      </div>
     </div>
+  </div>
+</div>
+
+<div class="form-actions-bar">
+  <div class="form-actions-left">
+    <a href="{% url 'role_list' %}" class="eal-btn eal-btn-outline">
+      <i class="bi bi-arrow-left"></i>
+      <span>{% translate "Back to list" %}</span>
+    </a>
+  </div>
+  <div class="form-actions-right">
+    {% if request.user.is_root and not role.is_system_default %}
+      <a href="{% url 'role_edit' role.pk %}" class="eal-btn eal-btn-primary">
+        <i class="bi bi-pencil"></i>
+        <span>{% translate "Edit Role" %}</span>
+      </a>
+    {% endif %}
   </div>
 </div>
 {% endblock %}

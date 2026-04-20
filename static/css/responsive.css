@@ -494,8 +494,19 @@
   }
 
   .eal-table thead th {
-    padding: 10px 12px;
+    padding: 12px 14px;
     font-size: 11px;
+    white-space: nowrap;
+  }
+
+  .main-content {
+    padding: 16px;
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
+
+  .page-header {
+    padding: 0 4px;
   }
 
   .eal-pagination {
@@ -600,6 +611,30 @@
 
   .header-user-chevron {
     display: none;
+  }
+
+  /* Compact Status Badges for Mobile */
+  .status-badge-premium {
+    padding: 4px 8px;
+    gap: 4px;
+  }
+
+  .status-badge-premium span:not(.heartbeat-dot) {
+    font-size: 10px;
+  }
+
+  /* Hide badge labels on ultra-small screens */
+  @media (max-width: 400px) {
+    .status-badge-premium .status-text {
+      display: none;
+    }
+    .status-badge-premium {
+      padding: 6px;
+      border-radius: 50%;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+    }
   }
 
   /* ------ Page header ------ */

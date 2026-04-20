@@ -30,16 +30,16 @@
   {% endif %}
 
   <div class="form-card">
-    <!-- <div class="form-card-body">
-       <div class="alert alert-info" style="border-radius:10px"> -->
-        <!-- {% if is_edit and promo %}
-          <p class="mb-2">{% translate "Code is immutable and cannot be changed." %}</p>
-        {% endif %} -->
-        <!-- <p class="mb-0">
-          {% translate "Percentage max 100. Alphanumeric only. No spaces." %}
-          {% translate "Leave applicable plans empty to apply to ALL plans." %}
-        </p>  
-      </div> -->
+    <div class="form-card-header">
+      <div class="form-card-icon indigo" style="background: #2929ff96;">
+        <i class="bi bi-ticket-perforated"></i>
+      </div>
+      <div class="form-card-header-text">
+        <h3 class="form-card-title">{% translate "Promo Configuration" %}</h3>
+        <p class="form-card-desc">{% translate "Set discount rules, validity window, and applicable plans." %}</p>
+      </div>
+    </div>
+    <div class="form-card-body">
 
       <form method="post" action="" id="promo-code-form" novalidate>
         {% csrf_token %}
@@ -60,17 +60,17 @@
           </div>
         {% endif %}
 
-        <h3 style="margin: 18px 0 12px 0">Code Details</h3>
-        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:12px">
+        <h3 class="form-card-title mb-3">{% translate "Code Details" %}</h3>
+        <div class="row g-3 mb-1">
           {% for field in form %}
             {% if field.name == 'code' or field.name == 'discount_type' or field.name == 'discount_duration' %}
-              <div>
+              <div class="col-12 col-md-6 col-lg-3">
                 <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
                 {{ field }}
               </div>
             {% endif %}
           {% endfor %}
-          <div>
+          <div class="col-12 col-md-6 col-lg-3">
             <label class="form-label" for="{{ form.discount_value.id_for_label }}">{{ form.discount_value.label }}</label>
             {{ form.discount_value }}
             <small class="text-muted d-block mt-1" id="discount-value-hint">
@@ -79,17 +79,17 @@
           </div>
         </div>
 
-        <h3 style="margin: 18px 0 12px 0">Validity & Limits</h3>
-        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:12px">
+        <h3 class="form-card-title mb-3 mt-3">{% translate "Validity & Limits" %}</h3>
+        <div class="row g-3 mb-1">
           {% for field in form %}
             {% if field.name == 'valid_from' or field.name == 'valid_until' or field.name == 'max_uses' %}
-              <div>
+              <div class="col-12 col-md-6 col-lg-3">
                 <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
                 {{ field }}
               </div>
             {% endif %}
           {% endfor %}
-          <div class="d-flex flex-column justify-content-end">
+          <div class="col-12 col-md-6 col-lg-3 d-flex flex-column justify-content-end">
             <div class="form-label d-block mb-0">{% translate "Status" %}</div>
             <div class="form-check form-switch mt-2">
               {{ form.is_active }}
@@ -101,7 +101,7 @@
           </div>
         </div>
 
-        <h3 style="margin: 18px 0 12px 0">{% translate "Applicable Plans" %}</h3>
+        <h3 class="form-card-title mb-3 mt-3">{% translate "Applicable Plans" %}</h3>
         <div class="field-group">
           <p class="text-muted small mb-3">{% translate "Select one or more plans this promo code applies to. Leave empty to apply to ALL plans." %}</p>
 
@@ -124,13 +124,8 @@
             {% endif %}
           {% endfor %}
         </div>
-
-        {% if is_edit and promo %}
-          <div style="margin-top:12px; padding:10px 12px; border:1px solid #e5e7eb; border-radius:8px; background:#f8fafc">
-            <strong>Current Uses (read-only):</strong> {{ promo.current_uses }}
-          </div>
-        {% endif %}
-
+      </div>
+      </div>
         <div class="form-actions-bar">
           <div class="form-actions-left">
             <a href="{% url 'promo_code_list' %}" class="eal-btn eal-btn-outline">
