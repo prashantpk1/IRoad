@@ -124,29 +124,27 @@
           </div>
           <div class="col-12 col-md-6">
             <label class="form-label">{% translate "Defaults & Status" %}</label>
-            <div class="d-flex flex-column gap-2 mt-1">
-              <div class="form-check">
+            <div class="field-container d-flex flex-column gap-3 mt-2">
+              <div class="form-check d-flex align-items-center m-0">
                 {{ form.is_default_for_country }}
-                <label class="form-check-label small ms-1" for="{{ form.is_default_for_country.id_for_label }}">
+                <label class="form-check-label fw-medium ms-2" for="{{ form.is_default_for_country.id_for_label }}">
                   {% translate "Set as Country Default" %}
                 </label>
               </div>
-              <div class="form-check">
+              <div class="form-check d-flex align-items-center m-0">
                 {{ form.is_international_default }}
-                <label class="form-check-label small ms-1" for="{{ form.is_international_default.id_for_label }}">
+                <label class="form-check-label fw-medium ms-2" for="{{ form.is_international_default.id_for_label }}">
                   {% translate "Set as International Default" %}
                 </label>
               </div>
-              <div class="field d-flex align-items-center mt-1">
-                <label class="eal-switch">
-                  {{ form.is_active }}
-                  <span class="eal-slider"></span>
-                </label>
-                <label class="form-check-label small ms-3" for="{{ form.is_active.id_for_label }}">
+              <div class="form-check form-switch d-flex align-items-center m-0">
+                {{ form.is_active }}
+                <label class="form-check-label fw-medium ms-2" for="id_taxcode_is_active">
                   {% translate "Active Status" %}
                 </label>
               </div>
             </div>
+            {% for error in form.is_active.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
           </div>
         </div>
       </div>

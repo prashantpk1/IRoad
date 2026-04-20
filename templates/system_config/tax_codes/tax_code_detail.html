@@ -1,0 +1,151 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block page_title %}{% translate "Tax Code Details" %} - {{ tax_code.tax_code }}{% endblock %}
+
+{% block breadcrumb_items %}
+  <li class="breadcrumb-item"><a href="{% url 'tax_code_list' %}">{% translate "Tax Codes" %}</a></li>
+  <li class="breadcrumb-item active" aria-current="page">{{ tax_code.tax_code }}</li>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">{{ tax_code.tax_code }}</h1>
+      <p class="page-subtitle">{% translate "Rate percentage, regional defaults, and status." %}</p>
+    </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        {% if request.user.is_root %}
+          <a href="{% url 'tax_code_edit' tax_code.tax_code %}" class="eal-btn eal-btn-primary">
+            <i class="bi bi-pencil"></i>
+            <span>{% translate "Edit" %}</span>
+          </a>
+        {% endif %}
+        <a href="{% url 'tax_code_list' %}" class="eal-btn eal-btn-outline">
+          <i class="bi bi-arrow-left"></i>
+          <span>{% translate "Back to List" %}</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4 mt-1">
+  <div class="col-12 col-lg-8">
+    <div class="eal-table-card db-fade p-4">
+      <div class="form-card-header mb-4 p-0" style="border: none;">
+        <div class="form-card-icon indigo">
+          <i class="bi bi-percent"></i>
+        </div>
+        <div class="form-card-header-text">
+          <h3 class="form-card-title">{% translate "Tax Configuration" %}</h3>
+          <p class="form-card-desc">{% translate "Identity and localization details." %}</p>
+        </div>
+      </div>
+
+      <div class="detail-grid">
+        <div class="detail-item">
+          <label>{% translate "Tax Code" %}</label>
+          <div class="value fw-bold text-primary">{{ tax_code.tax_code }}</div>
+        </div>
+        <div class="detail-item">
+          <label>{% translate "Rate Percentage" %}</label>
+          <div class="value">{{ tax_code.rate_percent }}%</div>
+        </div>
+        <div class="detail-item">
+          <label>{% translate "English Name" %}</label>
+          <div class="value">{{ tax_code.name_en }}</div>
+        </div>
+        <div class="detail-item">
+          <label>{% translate "Arabic Name" %}</label>
+          <div class="value font-arabic" dir="rtl">{{ tax_code.name_ar|default:"-" }}</div>
+        </div>
+        <div class="detail-item">
+          <label>{% translate "Applicable Country" %}</label>
+          <div class="value">{{ tax_code.applicable_country_code.name_en|default:"-" }} ({{ tax_code.applicable_country_code.country_code|default:"-" }})</div>
+        </div>
+        <div class="detail-item">
+          <label>{% translate "Status" %}</label>
+          <div class="value">
+            {% if tax_code.is_active %}
+              <span class="status-badge active">{% translate "Active" %}</span>
+            {% else %}
+              <span class="status-badge inactive">{% translate "Inactive" %}</span>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-4">
+    <div class="eal-table-card db-fade p-4 h-100">
+      <h3 class="form-card-title mb-4">{% translate "System Defaults" %}</h3>
+      <div class="d-flex flex-column gap-3">
+        <div class="p-3 rounded-4 border {% if tax_code.is_default_for_country %}border-primary bg-primary-light{% else %}border-light bg-light{% endif %} d-flex align-items-center gap-3">
+          <div class="icon-box {% if tax_code.is_default_for_country %}bg-primary text-white{% else %}bg-white text-muted{% endif %} p-2 rounded-3 shadow-sm">
+            <i class="bi bi-geo-alt"></i>
+          </div>
+          <div>
+            <div class="fw-bold small">{% translate "Country Default" %}</div>
+            <div class="small {% if tax_code.is_default_for_country %}text-primary{% else %}text-muted{% endif %}">
+              {% if tax_code.is_default_for_country %}{% translate "Yes, used for this country" %}{% else %}{% translate "No" %}{% endif %}
+            </div>
+          </div>
+        </div>
+
+        <div class="p-3 rounded-4 border {% if tax_code.is_international_default %}border-primary bg-primary-light{% else %}border-light bg-light{% endif %} d-flex align-items-center gap-3">
+          <div class="icon-box {% if tax_code.is_international_default %}bg-primary text-white{% else %}bg-white text-muted{% endif %} p-2 rounded-3 shadow-sm">
+            <i class="bi bi-globe"></i>
+          </div>
+          <div>
+            <div class="fw-bold small">{% translate "International Default" %}</div>
+            <div class="small {% if tax_code.is_international_default %}text-primary{% else %}text-muted{% endif %}">
+              {% if tax_code.is_international_default %}{% translate "Yes, fallback for other regions" %}{% else %}{% translate "No" %}{% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-auto pt-4 border-top">
+        <div class="d-flex align-items-center gap-2 text-muted small">
+          <i class="bi bi-clock-history"></i>
+          <span>{% translate "Created at" %} {{ tax_code.created_at|date:"d M Y, H:i" }}</span>
+        </div>
+        {% if tax_code.updated_at %}
+        <div class="d-flex align-items-center gap-2 text-muted small mt-1">
+          <i class="bi bi-pencil-square"></i>
+          <span>{% translate "Last updated" %} {{ tax_code.updated_at|date:"d M Y, H:i" }}</span>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .detail-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 24px;
+  }
+  .detail-item label {
+    display: block;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+    font-weight: 600;
+  }
+  .detail-item .value {
+    font-size: 15px;
+    color: var(--text-dark);
+  }
+  .bg-primary-light {
+    background-color: rgba(80, 81, 249, 0.05) !important;
+  }
+</style>
+{% endblock %}
