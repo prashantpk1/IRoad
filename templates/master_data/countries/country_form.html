@@ -101,14 +101,12 @@
             {% endfor %}
           </div>
           <div class="col-12 col-md-6">
-            <label class="form-label" for="{{ form.is_active.id_for_label }}">{{ form.is_active.label }}</label>
-            <div class="field d-flex align-items-center mt-2">
-              <label class="eal-switch">
-                {{ form.is_active }}
-                <span class="eal-slider"></span>
-              </label>
-              <label class="form-check-label ms-3" for="{{ form.is_active.id_for_label }}">
-                {% translate "Active Status" %}
+            <div class="form-label d-block mb-0">{% translate "Status" %}</div>
+            <div class="form-check form-switch mt-2">
+              {{ form.is_active }}
+              <label class="form-check-label ms-1" for="id_country_is_active">
+                <span class="fw-medium">{% translate "Active Status" %}</span>
+                <span class="text-muted small d-block">{% translate "Enable or disable this country for logistics and registration." %}</span>
               </label>
             </div>
             {% for error in form.is_active.errors %}

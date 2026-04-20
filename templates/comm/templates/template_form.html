@@ -174,11 +174,12 @@
       <div class="field">
         <label class="form-label text-center d-block w-100 mb-2">{% translate "Status" %}</label>
         <div class="status-field">
-          <label class="eal-switch">
+          <div class="form-check form-switch m-0 d-flex align-items-center">
             {{ form.is_active }}
-            <span class="eal-slider"></span>
-          </label>
-          <span class="small text-muted mt-2" style="font-weight: 600; letter-spacing: 0.5px; font-size: 11px; text-transform: uppercase;">{% translate "Active" %}</span>
+            <label class="form-check-label fw-bold small ms-2 mb-0" for="id_template_is_active">
+              {% translate "Active Status" %}
+            </label>
+          </div>
         </div>
       </div>
     </div>

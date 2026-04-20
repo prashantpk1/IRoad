@@ -1543,6 +1543,29 @@ class TenantProfile(models.Model):
         db_index=True,
         help_text='PostgreSQL schema name for isolated tenant workspace (CP 4.3.2).',
     )
+    db_schema_name = models.CharField(
+        max_length=63,
+        blank=True,
+        null=True,
+        default=None,
+        help_text='Legacy schema name column kept for backward compatibility.',
+    )
+    provisioning_error = models.TextField(
+        blank=True,
+        default='',
+        help_text='Last provisioning error message (empty when none).',
+    )
+    provisioning_status = models.CharField(
+        max_length=30,
+        blank=True,
+        default='Pending',
+        help_text='Provisioning lifecycle status for tenant workspace setup.',
+    )
+    registered_address = models.TextField(
+        blank=True,
+        default='',
+        help_text='Registered legal address for subscriber profile.',
+    )
     registered_at = models.DateTimeField(auto_now_add=True)
     total_ltv = models.DecimalField(
         max_digits=12,
@@ -1585,6 +1608,9 @@ class TenantProfile(models.Model):
 
     def save(self, *args, **kwargs):
         """Ref: CP-PCS-P1 §5.1 - Centralized Session Kill Switch."""
+        if self.db_schema_name == '':
+            self.db_schema_name = None
+
         SUSPEND_STATUSES = ['Suspended_Billing', 'Suspended_Violation']
         is_new_suspension = (
             self.account_status in SUSPEND_STATUSES

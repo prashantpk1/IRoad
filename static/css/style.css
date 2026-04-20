@@ -3224,28 +3224,36 @@ textarea.form-control {
   text-decoration: none;
 }
 
+.auth-btn i {
+  font-size: 18px;
+}
+
 .auth-btn-primary {
-  background: var(--primary-color);
+  background: var(--primary-gradient);
   color: #ffffff;
   border: none;
+  box-shadow: 0 4px 14px rgba(80, 81, 249, 0.25);
 }
 
 .auth-btn-primary:hover {
-  background: var(--primary-hover);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(80, 81, 249, 0.3);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(80, 81, 249, 0.35);
+  filter: brightness(1.05);
 }
 
 .auth-btn-outline {
-  background: transparent;
-  color: var(--text-muted);
-  border: 1px solid var(--border-color);
+  background: var(--bg-white);
+  color: var(--text-dark);
+  border: 1.5px solid var(--border-color);
+  box-shadow: var(--shadow-sm);
 }
 
 .auth-btn-outline:hover {
-  background: var(--bg-light);
-  border-color: var(--text-muted);
-  color: var(--text-dark);
+  border-color: var(--primary-color);
+  background: var(--primary-light);
+  color: var(--primary-color);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 15px rgba(80, 81, 249, 0.1);
 }
 
 /* OTP Container */

@@ -219,6 +219,9 @@
               </td>
               <td>
                 <div class="eal-actions-cell">
+                  <a href="{% url 'currency_detail' cur.currency_code %}" class="eal-row-btn" title="{% translate 'View Detail' %}">
+                    <i class="bi bi-eye"></i>
+                  </a>
                   {% if request.user.is_root %}
                     <a href="{% url 'currency_edit' cur.currency_code %}" class="eal-row-btn" title="{% translate 'Edit' %}">
                       <i class="bi bi-pencil"></i>

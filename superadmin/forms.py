@@ -346,6 +346,13 @@ class CountryForm(forms.ModelForm):
                 'Country code cannot be changed once saved.'
             )
 
+        if 'is_active' in self.fields:
+            self.fields['is_active'].widget.attrs.update({
+                'class': 'form-check-input',
+                'role': 'switch',
+                'id': 'id_country_is_active'
+            })
+
     def clean_country_code(self):
         # Disabled fields are not included in `cleaned_data`, so fallback to
         # the instance value when editing.
@@ -388,6 +395,13 @@ class CurrencyForm(forms.ModelForm):
             self.fields['currency_code'].help_text = (
                 'Currency code cannot be changed once saved.'
             )
+
+        if 'is_active' in self.fields:
+            self.fields['is_active'].widget.attrs.update({
+                'class': 'form-check-input',
+                'role': 'switch',
+                'id': 'id_currency_is_active'
+            })
 
     def clean_currency_code(self):
         value = self.cleaned_data.get('currency_code')
@@ -439,6 +453,13 @@ class TaxCodeForm(forms.ModelForm):
         self.fields['applicable_country_code'].queryset = (
             Country.objects.filter(is_active=True).order_by('name_en')
         )
+
+        if 'is_active' in self.fields:
+            self.fields['is_active'].widget.attrs.update({
+                'class': 'form-check-input',
+                'role': 'switch',
+                'id': 'id_taxcode_is_active'
+            })
 
     def clean(self):
         cleaned = super().clean()
@@ -1085,6 +1106,12 @@ class NotificationTemplateForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         apply_premium_styling(self)
+        if 'is_active' in self.fields:
+            self.fields['is_active'].widget.attrs.update({
+                'class': 'form-check-input',
+                'role': 'switch',
+                'id': 'id_template_is_active'
+            })
 
     def clean(self):
         cleaned = super().clean()

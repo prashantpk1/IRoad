@@ -2492,6 +2492,18 @@ class CountryListView(LoginRequiredMixin, View):
         return render(request, self.template_name, context)
 
 
+class CountryDetailView(LoginRequiredMixin, View):
+    template_name = 'master_data/countries/country_detail.html'
+
+    def get(self, request, pk):
+        country = get_object_or_404(Country, pk=pk)
+        return render(
+            request,
+            self.template_name,
+            {'country': country, 'page_title': 'Country Details'},
+        )
+
+
 class CountryCreateView(LoginRequiredMixin, View):
     template_name = 'master_data/countries/country_form.html'
 
@@ -2718,6 +2730,18 @@ class CurrencyListView(LoginRequiredMixin, View):
             'page_title': 'Currencies Master',
         }
         return render(request, self.template_name, context)
+
+
+class CurrencyDetailView(LoginRequiredMixin, View):
+    template_name = 'master_data/currencies/currency_detail.html'
+
+    def get(self, request, pk):
+        currency = get_object_or_404(Currency, pk=pk)
+        return render(
+            request,
+            self.template_name,
+            {'currency': currency, 'page_title': 'Currency Details'},
+        )
 
 
 class CurrencyCreateView(LoginRequiredMixin, View):
@@ -3548,6 +3572,23 @@ class TaxCodeListView(LoginRequiredMixin, View):
             'page_title': 'Tax Codes Master',
         }
         return render(request, self.template_name, context)
+
+
+class TaxCodeDetailView(LoginRequiredMixin, View):
+    template_name = 'system_config/tax_codes/tax_code_detail.html'
+
+    def get(self, request, pk):
+        tax_code = get_object_or_404(
+            TaxCode.objects.select_related(
+                'applicable_country_code', 'created_by', 'updated_by'
+            ),
+            pk=pk,
+        )
+        return render(
+            request,
+            self.template_name,
+            {'tax_code': tax_code, 'page_title': 'Tax Code Details'},
+        )
 
 
 class TaxCodeCreateView(LoginRequiredMixin, View):
@@ -5441,7 +5482,10 @@ class NotificationTemplatePreviewView(LoginRequiredMixin, View):
             logger.error(f"Error rendering mock preview: {e}")
 
         if template_obj.channel_type == 'Email':
-            from superadmin.communication_helpers import _wrap_email_body
+            from superadmin.communication_helpers import (
+                _merge_template_context,
+                _wrap_email_body,
+            )
 
             body_lower = (body_html or '').lower()
             is_full_email_document = '<html' in body_lower and '<body' in body_lower
@@ -5461,6 +5505,11 @@ class NotificationTemplatePreviewView(LoginRequiredMixin, View):
                 wrapped_content = body_html or ''
                 if lang == 'ar' and 'dir="rtl"' not in wrapped_content:
                     wrapped_content = wrapped_content.replace('<html lang="en">', '<html lang="ar" dir="rtl">')
+
+            # Resolve wrapper branding placeholders (company logo/name initials).
+            wrapped_content = Template(wrapped_content).render(
+                Context(_merge_template_context(mock_ctx)),
+            )
 
             return HttpResponse(wrapped_content)
         else:

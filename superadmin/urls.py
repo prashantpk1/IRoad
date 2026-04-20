@@ -40,11 +40,13 @@ from .views import (
     CountryCreateView,
     CountryDeleteView,
     CountryListView,
+    CountryDetailView,
     CountryToggleStatusView,
     CountryUpdateView,
     CurrencyCreateView,
     CurrencyDeleteView,
     CurrencyListView,
+    CurrencyDetailView,
     CurrencyToggleStatusView,
     CurrencyUpdateView,
     DashboardView,
@@ -101,6 +103,7 @@ from .views import (
     TaxCodeCreateView,
     TaxCodeDeleteView,
     TaxCodeListView,
+    TaxCodeDetailView,
     TaxCodeToggleStatusView,
     TaxCodeUpdateView,
     ExchangeRateListView,
@@ -270,6 +273,11 @@ urlpatterns = [
         name='country_list',
     ),
     path(
+        'master-data/countries/<str:pk>/',
+        CountryDetailView.as_view(),
+        name='country_detail',
+    ),
+    path(
         'master-data/countries/create/',
         CountryCreateView.as_view(),
         name='country_create',
@@ -293,6 +301,11 @@ urlpatterns = [
         'master-data/currencies/',
         CurrencyListView.as_view(),
         name='currency_list',
+    ),
+    path(
+        'master-data/currencies/<str:pk>/',
+        CurrencyDetailView.as_view(),
+        name='currency_detail',
     ),
     path(
         'master-data/currencies/create/',
@@ -338,6 +351,11 @@ urlpatterns = [
         'system-config/tax-codes/',
         TaxCodeListView.as_view(),
         name='tax_code_list',
+    ),
+    path(
+        'system-config/tax-codes/<str:pk>/',
+        TaxCodeDetailView.as_view(),
+        name='tax_code_detail',
     ),
     path(
         'system-config/tax-codes/create/',

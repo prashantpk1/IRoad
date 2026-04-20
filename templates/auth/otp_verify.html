@@ -209,7 +209,7 @@
           <form method="post" action="{% url 'otp_verify' %}" style="margin-top: 10px">
             {% csrf_token %}
             <input type="hidden" name="action" value="resend" />
-            <button type="submit" class="auth-btn" style="width: 100%">
+            <button type="submit" class="auth-btn auth-btn-outline" style="width: 100%">
               <i class="bi bi-arrow-clockwise"></i>
               Resend OTP
             </button>

@@ -1,0 +1,108 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block page_title %}{% translate "Currency Details" %} - {{ currency.currency_code }}{% endblock %}
+
+{% block breadcrumb_items %}
+  <li class="breadcrumb-item"><a href="{% url 'currency_list' %}">{% translate "Currencies" %}</a></li>
+  <li class="breadcrumb-item active" aria-current="page">{{ currency.currency_code }}</li>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">{{ currency.name_en }} ({{ currency.currency_code }})</h1>
+      <p class="page-subtitle">{% translate "Global currency identifiers and status." %}</p>
+    </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        {% if request.user.is_root %}
+          <a href="{% url 'currency_edit' currency.currency_code %}" class="eal-btn eal-btn-primary">
+            <i class="bi bi-pencil"></i>
+            <span>{% translate "Edit" %}</span>
+          </a>
+        {% endif %}
+        <a href="{% url 'currency_list' %}" class="eal-btn eal-btn-outline">
+          <i class="bi bi-arrow-left"></i>
+          <span>{% translate "Back to List" %}</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="eal-table-card db-fade p-4 mt-3">
+  <div class="form-card-header mb-4 p-0" style="border: none;">
+    <div class="form-card-icon indigo">
+      <i class="bi bi-cash-stack"></i>
+    </div>
+    <div class="form-card-header-text">
+      <h3 class="form-card-title">{% translate "Currency Configuration" %}</h3>
+      <p class="form-card-desc">{% translate "ISO codes and regional localization." %}</p>
+    </div>
+  </div>
+
+  <div class="detail-grid">
+    <div class="detail-item">
+      <label>{% translate "ISO Currency Code" %}</label>
+      <div class="value fw-bold text-primary">{{ currency.currency_code }}</div>
+    </div>
+    <div class="detail-item">
+      <label>{% translate "English Name" %}</label>
+      <div class="value">{{ currency.name_en }}</div>
+    </div>
+    <div class="detail-item">
+      <label>{% translate "Arabic Name" %}</label>
+      <div class="value font-arabic" dir="rtl">{{ currency.name_ar|default:"-" }}</div>
+    </div>
+    <div class="detail-item">
+      <label>{% translate "English Sub-Unit" %}</label>
+      <div class="value">{{ currency.subunit_en|default:"-" }}</div>
+    </div>
+    <div class="detail-item">
+      <label>{% translate "Arabic Sub-Unit" %}</label>
+      <div class="value font-arabic" dir="rtl">{{ currency.subunit_ar|default:"-" }}</div>
+    </div>
+    <div class="detail-item">
+      <label>{% translate "Symbol" %}</label>
+      <div class="value fw-bold">{{ currency.symbol|default:"-" }}</div>
+    </div>
+    <div class="detail-item">
+      <label>{% translate "Decimal Places" %}</label>
+      <div class="value">{{ currency.decimal_places }}</div>
+    </div>
+    <div class="detail-item">
+      <label>{% translate "Status" %}</label>
+      <div class="value">
+        {% if currency.is_active %}
+          <span class="status-badge active">{% translate "Active" %}</span>
+        {% else %}
+          <span class="status-badge inactive">{% translate "Inactive" %}</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .detail-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 32px;
+  }
+  .detail-item label {
+    display: block;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+    font-weight: 600;
+  }
+  .detail-item .value {
+    font-size: 15px;
+    color: var(--text-dark);
+  }
+</style>
+{% endblock %}

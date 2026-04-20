@@ -197,6 +197,9 @@
               </td>
               <td>
                 <div class="eal-actions-cell">
+                  <a href="{% url 'country_detail' c.country_code %}" class="eal-row-btn" title="{% translate 'View Detail' %}">
+                    <i class="bi bi-eye"></i>
+                  </a>
                   <a href="{% url 'country_edit' c.country_code %}" class="eal-row-btn" title="{% translate 'Edit' %}">
                     <i class="bi bi-pencil"></i>
                   </a>

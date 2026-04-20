@@ -1,57 +1,111 @@
 {% extends 'base.html' %}
-{% block title %}Mass Revoke — Tenant Kill Switch{% endblock %}
+{% load i18n %}
+
+{% block title %}{% translate "Mass Revoke — Tenant Kill Switch" %}{% endblock %}
+
+{% block page_title %}{% translate "Mass Revoke" %}{% endblock %}
+
+{% block breadcrumb_items %}
+  <li class="breadcrumb-item"><a href="{% url 'active_sessions' %}">{% translate "Sessions" %}</a></li>
+  <li class="breadcrumb-item active" aria-current="page">{% translate "Mass Revoke" %}</li>
+{% endblock %}
+
 {% block content %}
-<div class="container py-3">
-  <div class="page-header">
-    <nav aria-label="breadcrumb">
-      <ol class="breadcrumb">
-        <li class="breadcrumb-item"><a href="{% url 'active_sessions' %}">Sessions</a></li>
-        <li class="breadcrumb-item active" aria-current="page">Mass Revoke</li>
-      </ol>
-    </nav>
-    <div class="page-header-row"><div class="page-header-left"><h1 class="page-title">Mass Revoke — Tenant Kill Switch</h1></div></div>
+<div class="page-header">
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">{% translate "Mass Revoke — Tenant Kill Switch" %}</h1>
+      <p class="page-subtitle">{% translate "Forcefully invalidate all active sessions for a specific tenant." %}</p>
+    </div>
   </div>
+</div>
 
-  <div class="alert alert-danger">
-    This will immediately invalidate ALL active sessions for the selected Tenant and their Drivers. This action is irreversible.
+<div class="alert alert-danger d-flex align-items-center p-3 mb-4 shadow-sm border-0" style="border-radius: 12px; background: rgba(220, 38, 38, 0.05); color: #dc2626;">
+  <i class="bi bi-exclamation-triangle-fill fs-4 me-3"></i>
+  <div>
+    <div class="fw-bold fs-6">{% translate "Critical Security Action" %}</div>
+    <div class="small">{% translate "This will immediately invalidate ALL active sessions for the selected Tenant and their Drivers. This action is irreversible." %}</div>
   </div>
+</div>
 
-  <form id="massRevokeForm" class="form-card">
-    <div class="form-card-body">
-      {% csrf_token %}
-      <div class="mb-3">
-        <label class="form-label">Tenant</label>
-        <select name="tenant_id" class="form-select" required>
-          <option value="">Select active tenant</option>
-          {% for tenant in tenants %}
-            <option value="{{ tenant.tenant_id }}" {% if selected_tenant_id == tenant.tenant_id|stringformat:'s' %}selected{% endif %}>
-              {{ tenant.company_name }}
-            </option>
-          {% endfor %}
-        </select>
+<form id="massRevokeForm" novalidate autocomplete="off">
+  {% csrf_token %}
+  
+  <div class="form-card">
+    <div class="form-card-header">
+      <div class="form-card-icon" style="background: rgba(220, 38, 38, 0.1); color: #dc2626;">
+        <i class="bi bi-shield-lock-fill"></i>
       </div>
-      <div class="form-check mb-3">
-        <input class="form-check-input" type="checkbox" id="confirmKillSwitch" required>
-        <label class="form-check-label" for="confirmKillSwitch">
-          I confirm I want to revoke all sessions for this tenant.
-        </label>
-      </div>
-      <div class="d-flex gap-2">
-        <button type="submit" class="btn btn-danger">Execute Kill Switch</button>
-        <a href="{% url 'active_sessions' %}" class="btn btn-secondary">Back to Sessions</a>
+      <div class="form-card-header-text">
+        <h3 class="form-card-title">{% translate "Kill Switch Configuration" %}</h3>
+        <p class="form-card-desc">{% translate "Target tenant and confirmation steps." %}</p>
       </div>
     </div>
-  </form>
 
-  <div id="resultBox" class="alert alert-info mt-3 d-none"></div>
-</div>
+    <div class="form-card-body">
+      <div class="field-group">
+        <div class="row g-4">
+          <div class="col-12 col-md-6">
+            <label class="form-label">{% translate "Target Tenant" %}</label>
+            <select name="tenant_id" class="form-select" required>
+              <option value="">{% translate "Select active tenant..." %}</option>
+              {% for tenant in tenants %}
+                <option value="{{ tenant.tenant_id }}" {% if selected_tenant_id == tenant.tenant_id|stringformat:'s' %}selected{% endif %}>
+                  {{ tenant.company_name }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="col-12 col-md-6 d-flex align-items-center">
+            <div class="form-check mt-3">
+              <input class="form-check-input" type="checkbox" id="confirmKillSwitch" required>
+              <label class="form-check-label fw-medium" for="confirmKillSwitch">
+                {% translate "I confirm I want to revoke all sessions for this tenant." %}
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="resultBox" class="alert d-none mt-4" style="border-radius: 10px; font-weight: 500;"></div>
+    </div>
+  </div>
+
+  <div class="form-actions-bar">
+    <div class="form-actions-left">
+      <a href="{% url 'active_sessions' %}" class="eal-btn eal-btn-outline">
+        <i class="bi bi-arrow-left"></i>
+        <span>{% translate "Back to Sessions" %}</span>
+      </a>
+    </div>
+    <div class="form-actions-right">
+      <button type="submit" class="eal-btn eal-btn-primary" style="background: #dc2626; border-color: #dc2626;">
+        <i class="bi bi-lightning-charge-fill"></i>
+        <span>{% translate "Execute Kill Switch" %}</span>
+      </button>
+    </div>
+  </div>
+</form>
 
 <script>
   (function () {
     const form = document.getElementById('massRevokeForm');
     const resultBox = document.getElementById('resultBox');
+    const submitBtn = form.querySelector('button[type="submit"]');
+
     form.addEventListener('submit', async function (e) {
       e.preventDefault();
+      
+      if (!form.checkValidity()) {
+        form.reportValidity();
+        return;
+      }
+
+      const originalBtnContent = submitBtn.innerHTML;
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Executing...';
+      
       const data = new FormData(form);
       try {
         const res = await fetch("{% url 'session_mass_revoke' %}", {
@@ -62,19 +116,24 @@
           },
           body: data
         });
+        
         const payload = await res.json();
-        resultBox.classList.remove('d-none', 'alert-danger', 'alert-info');
+        resultBox.classList.remove('d-none', 'alert-danger', 'alert-success', 'alert-info');
+        
         if (res.ok) {
-          resultBox.classList.add('alert-info');
-          resultBox.textContent = 'Revoked sessions count: ' + payload.revoked_count;
+          resultBox.classList.add('alert-success');
+          resultBox.innerHTML = `<i class="bi bi-check-circle-fill me-2"></i> ${payload.message || 'Succesfully revoked.'} <strong>Revoked count: ${payload.revoked_count}</strong>`;
         } else {
           resultBox.classList.add('alert-danger');
-          resultBox.textContent = payload.error || 'Mass revoke failed.';
+          resultBox.innerHTML = `<i class="bi bi-exclamation-octagon-fill me-2"></i> ${payload.error || 'Mass revoke failed.'}`;
         }
       } catch (err) {
-        resultBox.classList.remove('d-none', 'alert-info');
+        resultBox.classList.remove('d-none', 'alert-success', 'alert-info');
         resultBox.classList.add('alert-danger');
-        resultBox.textContent = 'Mass revoke failed.';
+        resultBox.innerHTML = `<i class="bi bi-exclamation-octagon-fill me-2"></i> Mass revoke failed. Please try again.`;
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalBtnContent;
       }
     });
   })();

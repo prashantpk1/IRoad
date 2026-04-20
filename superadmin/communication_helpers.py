@@ -24,6 +24,103 @@ from django.utils.html import strip_tags
 
 logger = logging.getLogger(__name__)
 
+
+def _build_branding_context():
+    """
+    Resolve branding values from Legal Identity for email wrappers.
+    Falls back to default IR/iRoad when no logo/name configured.
+    """
+    brand_name = 'iRoad'
+    brand_logo_url = ''
+
+    try:
+        from superadmin.models import LegalIdentity
+
+        legal = LegalIdentity.objects.filter(
+            identity_id='GLOBAL-LEGAL-IDENTITY',
+        ).first()
+        if legal:
+            if (legal.company_name_en or '').strip():
+                brand_name = legal.company_name_en.strip()
+            if getattr(legal, 'company_logo', None):
+                try:
+                    brand_logo_url = legal.company_logo.url or ''
+                except Exception:
+                    brand_logo_url = ''
+    except Exception:
+        # Keep email delivery resilient even if branding lookup fails.
+        brand_name = 'iRoad'
+        brand_logo_url = ''
+
+    letters = ''.join(ch for ch in brand_name if ch.isalnum()).upper()
+    brand_initials = (letters[:2] if letters else 'IR')
+
+    return {
+        'brand_company_name': brand_name,
+        'brand_logo_url': brand_logo_url,
+        'brand_initials': brand_initials,
+    }
+
+
+def _merge_template_context(context_dict=None):
+    merged = _build_branding_context()
+    if context_dict:
+        merged.update(context_dict)
+    return merged
+
+
+def _resolve_safe_from_email(preferred_from=''):
+    """
+    Ensure SMTP sender aligns with authenticated account for Gmail providers.
+    Prevents SMTPSenderRefused when placeholder/default sender is configured.
+    """
+    fallback_user = (getattr(settings, 'FALLBACK_EMAIL_HOST_USER', '') or '').strip()
+    candidate = (preferred_from or '').strip()
+    if not fallback_user:
+        return candidate
+    lower_candidate = candidate.lower()
+    if (not candidate) or ('your-email@gmail.com' in lower_candidate):
+        return fallback_user
+    return candidate
+
+
+def _send_via_fallback_smtp(to_email, subject, text_body, html_body=None):
+    fallback_user = (getattr(settings, 'FALLBACK_EMAIL_HOST_USER', '') or '').strip()
+    fallback_pass = (getattr(settings, 'FALLBACK_EMAIL_HOST_PASSWORD', '') or '').strip()
+    if not fallback_user or not fallback_pass:
+        raise ValueError('Fallback SMTP credentials are not configured')
+
+    host = getattr(settings, 'FALLBACK_EMAIL_HOST', 'smtp.gmail.com')
+    port = int(getattr(settings, 'FALLBACK_EMAIL_PORT', 587))
+    use_ssl = bool(getattr(settings, 'FALLBACK_EMAIL_USE_SSL', False))
+    use_tls = bool(getattr(settings, 'FALLBACK_EMAIL_USE_TLS', True))
+    sender = _resolve_safe_from_email(
+        getattr(settings, 'DEFAULT_FROM_EMAIL', '') or fallback_user,
+    )
+
+    msg = MIMEMultipart('alternative')
+    msg['Subject'] = subject
+    msg['From'] = sender
+    msg['To'] = to_email
+    msg.attach(MIMEText(text_body or '', 'plain', 'utf-8'))
+    if html_body:
+        msg.attach(MIMEText(html_body, 'html', 'utf-8'))
+
+    if use_ssl:
+        server = smtplib.SMTP_SSL(host, port, timeout=60)
+    else:
+        server = smtplib.SMTP(host, port, timeout=60)
+        if use_tls:
+            server.starttls()
+    try:
+        server.login(fallback_user, fallback_pass)
+        server.sendmail(sender, [to_email], msg.as_string())
+    finally:
+        try:
+            server.quit()
+        except Exception:
+            pass
+
 # ---------------------------------------------------------------------------
 # Reusable HTML email fragments – header / footer / wrapper
 # ---------------------------------------------------------------------------
@@ -58,8 +155,7 @@ _EMAIL_FOOTER = (
     '</div>'
 )
 
-
-def _wrap_email_body(inner_html, email_title="iRoad Logistics", preheader="iRoad Logistics — Secure notification", use_rtl=False):
+def _wrap_email_body(inner_html, email_title="Notification", preheader="Secure notification from iRoad", use_rtl=False):
     base_html = r"""
 <!DOCTYPE html>
 <html lang="en">
@@ -67,7 +163,7 @@ def _wrap_email_body(inner_html, email_title="iRoad Logistics", preheader="iRoad
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <title>{% block email_title %}iRoad Logistics{% endblock %}</title>
+    <title>{{ brand_company_name|default:"iRoad Logistics" }}</title>
     <!--[if mso]>
     <noscript>
         <xml>
@@ -82,38 +178,42 @@ def _wrap_email_body(inner_html, email_title="iRoad Logistics", preheader="iRoad
         body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
         table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
         img { -ms-interpolation-mode: bicubic; border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; }
-        body { margin: 0 !important; padding: 0 !important; width: 100% !important; }
-
-        /* Typography */
-        body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            line-height: 1.6;
-            color: #334155;
-            background-color: #f1f5f9;
-        }
+        body { margin: 0 !important; padding: 0 !important; width: 100% !important; font-family: 'Inter', -apple-system, sans-serif; background-color: #f1f5f9; }
 
         /* Wrapper */
         .email-wrapper {
             width: 100%;
             max-width: 640px;
-            margin: 0 auto;
+            margin: 40px auto;
             background: #ffffff;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04);
         }
 
         /* Header */
         .email-header {
             background: linear-gradient(135deg, #4f46e5 0%, #6366f1 50%, #818cf8 100%);
-            padding: 0;
+            padding: 36px 40px 32px;
             text-align: center;
         }
-        .email-header-inner {
-            padding: 36px 40px 32px;
-        }
-        .email-logo {
+        .email-logo-box {
             width: 52px;
             height: 52px;
+            line-height: 52px;
+            margin: 0 auto 14px;
             border-radius: 14px;
-            margin-bottom: 14px;
+            background: rgba(255, 255, 255, 0.2);
+            color: #ffffff;
+            font-size: 20px;
+            font-weight: 800;
+            overflow: hidden;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+        .email-logo-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
         }
         .email-brand {
             color: #ffffff;
@@ -152,79 +252,7 @@ def _wrap_email_body(inner_html, email_title="iRoad Logistics", preheader="iRoad
             color: #475569;
             line-height: 1.7;
         }
-
-        /* Button */
-        .button-wrapper { text-align: center; margin: 28px 0; }
-        .button {
-            background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
-            color: #ffffff !important;
-            padding: 14px 32px;
-            text-decoration: none;
-            border-radius: 10px;
-            font-weight: 700;
-            font-size: 15px;
-            display: inline-block;
-            letter-spacing: 0.01em;
-            box-shadow: 0 4px 14px rgba(79, 70, 229, 0.3);
-        }
-
-        /* Info box */
-        .invite-info {
-            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-            padding: 20px 22px;
-            border-radius: 12px;
-            border: 1px solid #e2e8f0;
-            margin-bottom: 20px;
-        }
-
-        /* Secret / code box */
-        .secret-box {
-            background-color: #1e293b;
-            color: #e2e8f0;
-            padding: 14px 18px;
-            border-radius: 10px;
-            font-family: 'SF Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-            font-size: 13px;
-            word-break: break-all;
-            margin: 12px 0;
-            letter-spacing: 0.02em;
-            border: 1px solid #334155;
-        }
-
-        /* Labels */
-        .label {
-            font-size: 11px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.06em;
-            color: #6366f1;
-            margin-bottom: 6px;
-        }
-
-        /* Warning / expiry */
-        .expiry {
-            font-size: 13px;
-            color: #ef4444;
-            margin-top: 20px;
-            font-weight: 600;
-        }
-
-        /* Muted text */
-        .muted {
-            font-size: 13px;
-            color: #94a3b8;
-            margin-top: 12px;
-            line-height: 1.6;
-        }
-
-        /* Divider */
-        .email-divider {
-            height: 1px;
-            background: #e2e8f0;
-            margin: 28px 0;
-            border: none;
-        }
-
+        
         /* Footer */
         .email-footer {
             background: #f8fafc;
@@ -245,16 +273,6 @@ def _wrap_email_body(inner_html, email_title="iRoad Logistics", preheader="iRoad
             line-height: 1.8;
             margin: 0;
         }
-        .footer-links {
-            margin: 12px 0 0;
-        }
-        .footer-links a {
-            color: #6366f1;
-            text-decoration: none;
-            font-size: 12px;
-            font-weight: 600;
-            margin: 0 8px;
-        }
         .footer-badge {
             display: inline-block;
             background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
@@ -268,93 +286,52 @@ def _wrap_email_body(inner_html, email_title="iRoad Logistics", preheader="iRoad
             margin-top: 14px;
         }
 
-        /* Responsive */
-        @media only screen and (max-width: 600px) {
-            .email-wrapper { width: 100% !important; }
-            .email-body { padding: 28px 24px !important; }
-            .email-header-inner { padding: 28px 24px 24px !important; }
-            .email-footer { padding: 24px 24px 28px !important; }
-            .email-brand { font-size: 22px !important; }
-        }
+        /* RTL support */
+        .rtl { direction: rtl; text-align: right; }
     </style>
-    {% block extra_head %}{% endblock %}
 </head>
-<body style="margin: 0; padding: 0; background-color: #f1f5f9;">
-
-    <!-- Preheader (hidden preview text for email clients) -->
+<body>
     <div style="display: none; font-size: 1px; color: #f1f5f9; line-height: 1px; max-height: 0px; max-width: 0px; opacity: 0; overflow: hidden;">
-        {% block preheader %}iRoad Logistics — Secure notification{% endblock %}
+        """ + preheader + r"""
     </div>
 
-    <!-- Outer container -->
-    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f1f5f9;">
+    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
         <tr>
-            <td align="center" style="padding: 40px 16px;">
+            <td align="center" style="padding: 0 16px;">
+                <div class="email-wrapper">
+                    <div class="email-header">
+                        <div class="email-logo-box">
+                            {% if brand_logo_url %}
+                                <img src="{{ brand_logo_url }}" class="email-logo-img" alt="{{ brand_company_name }}">
+                            {% else %}
+                                {{ brand_initials|default:"IR" }}
+                            {% endif %}
+                        </div>
+                        <h1 class="email-brand">{{ brand_company_name|default:"iRoad" }}</h1>
+                        <p class="email-brand-sub">Logistics Management Platform</p>
+                    </div>
+                    <div class="header-divider"></div>
 
-                <!-- Email card -->
-                <table role="presentation" border="0" cellpadding="0" cellspacing="0" class="email-wrapper" style="max-width: 640px; width: 100%; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04);">
+                    <div class="email-body """ + ("rtl" if use_rtl else "") + r"""">
+                        """ + inner_html + r"""
+                    </div>
 
-                    <!-- HEADER -->
-                    <tr>
-                        <td class="email-header">
-                            <div class="email-header-inner">
-                                {% load static %}
-                                <img src="https://ui-avatars.com/api/?name=iR&background=4f46e5&color=fff&rounded=true&size=128&bold=true" alt="iRoad" class="email-logo" style="width: 52px; height: 52px; border-radius: 14px;">
-                                <h1 class="email-brand">iRoad</h1>
-                                <p class="email-brand-sub">Logistics Management Platform</p>
-                            </div>
-                            <div class="header-divider"></div>
-                        </td>
-                    </tr>
-
-                    <!-- BODY -->
-                    <tr>
-                        <td class="email-body">
-                            {% block content %}{% endblock %}
-                        </td>
-                    </tr>
-
-                    <!-- FOOTER -->
-                    <tr>
-                        <td class="email-footer">
-                            <div class="footer-logo-text">iRoad</div>
-                            <p class="footer-text">
-                                &copy; 2026 iRoad Logistics. All rights reserved.<br>
-                                This is an automated system notification. Please do not reply to this email.
-                            </p>
-                            <div class="footer-links">
-                                <a href="#">Privacy Policy</a>
-                                <span style="color: #cbd5e1;">&middot;</span>
-                                <a href="#">Terms of Service</a>
-                                <span style="color: #cbd5e1;">&middot;</span>
-                                <a href="#">Support</a>
-                            </div>
-                            <div class="footer-badge">Secured &amp; Encrypted</div>
-                        </td>
-                    </tr>
-
-                </table>
-                <!-- /Email card -->
-
+                    <div class="email-footer">
+                        <div class="footer-logo-text">{{ brand_company_name|default:"iRoad" }}</div>
+                        <p class="footer-text">
+                            &copy; 2026 {{ brand_company_name|default:"iRoad Logistics" }}. All rights reserved.<br>
+                            This is an automated system notification. Please do not reply.
+                        </p>
+                        <div class="footer-badge">Secured &amp; Encrypted</div>
+                    </div>
+                </div>
             </td>
         </tr>
     </table>
-
 </body>
 </html>
-
 """
-    import re
-    if use_rtl:
-        inner_html = '<div dir="rtl" style="text-align:right;">' + inner_html + '</div>'
-    
-    html = base_html
-    html = re.sub(r'{%\s*block\s+email_title\s*%}.*?{%\s*endblock\s*%}', email_title, html, flags=re.DOTALL)
-    html = re.sub(r'{%\s*block\s+preheader\s*%}.*?{%\s*endblock\s*%}', preheader, html, flags=re.DOTALL)
-    html = re.sub(r'{%\s*block\s+content\s*%}.*?{%\s*endblock\s*%}', inner_html, html, flags=re.DOTALL)
-    html = re.sub(r'{%\s*block\s+extra_head\s*%}{%\s*endblock\s*%}', '', html)
-    
-    return html
+    return base_html
 
 DEFAULT_NOTIFICATION_EMAIL_TEMPLATES = [
     {
@@ -467,12 +444,9 @@ DEFAULT_NOTIFICATION_EMAIL_TEMPLATES = [
         'subject_en': 'Reset Your iRoad Password',
         'subject_ar': 'إعادة تعيين كلمة مرور iRoad',
         'body_en': _wrap_email_body(
-            '<h2 style="color:#1e293b;margin:0 0 16px;font-size:22px;font-weight:700;">'
-            'Reset Your Password 🔐</h2>'
-            '<p style="font-size:15px;color:#475569;line-height:1.7;margin:0 0 16px;">'
-            'Hello {{ admin_user.first_name|default:"Admin" }},</p>'
-            '<p style="font-size:15px;color:#475569;line-height:1.7;margin:0 0 24px;">'
-            'We received a request to reset the password for your iRoad admin account. '
+            '<h2>Reset Your Password 🔐</h2>'
+            '<p>Hello {{ admin_user.first_name|default:"Admin" }},</p>'
+            '<p>We received a request to reset the password for your iRoad admin account. '
             'Click the button below to set a new password:</p>'
             '<div style="text-align:center;margin:28px 0;">'
             '<a href="{{ reset_url }}" style="background:linear-gradient(135deg,#4f46e5,#6366f1);'
@@ -487,12 +461,9 @@ DEFAULT_NOTIFICATION_EMAIL_TEMPLATES = [
         ),
         'body_ar': _wrap_email_body(
             '<div dir="rtl" style="text-align:right;">'
-            '<h2 style="color:#1e293b;margin:0 0 16px;font-size:22px;font-weight:700;">'
-            'إعادة تعيين كلمة المرور 🔐</h2>'
-            '<p style="font-size:15px;color:#475569;line-height:1.7;margin:0 0 16px;">'
-            'مرحباً {{ admin_user.first_name|default:"Admin" }}،</p>'
-            '<p style="font-size:15px;color:#475569;line-height:1.7;margin:0 0 24px;">'
-            'تلقينا طلباً لإعادة تعيين كلمة المرور لحسابك في iRoad. '
+            '<h2>إعادة تعيين كلمة المرور 🔐</h2>'
+            '<p>مرحباً {{ admin_user.first_name|default:"Admin" }}،</p>'
+            '<p>تلقينا طلباً لإعادة تعيين كلمة المرور لحسابك في iRoad. '
             'اضغط الزر أدناه لتعيين كلمة مرور جديدة:</p>'
             '<div style="text-align:center;margin:28px 0;">'
             '<a href="{{ reset_url }}" style="background:linear-gradient(135deg,#4f46e5,#6366f1);'
@@ -512,12 +483,9 @@ DEFAULT_NOTIFICATION_EMAIL_TEMPLATES = [
         'subject_en': 'Activate Your iRoad Admin Account',
         'subject_ar': 'تفعيل حساب مدير iRoad',
         'body_en': _wrap_email_body(
-            '<h2 style="color:#1e293b;margin:0 0 16px;font-size:22px;font-weight:700;">'
-            'You\'re Invited! 🎉</h2>'
-            '<p style="font-size:15px;color:#475569;line-height:1.7;margin:0 0 16px;">'
-            'Hello {{ admin_user.first_name|default:"Admin" }},</p>'
-            '<p style="font-size:15px;color:#475569;line-height:1.7;margin:0 0 24px;">'
-            'You have been invited to join the <strong>iRoad</strong> admin panel. '
+            '<h2>You\'re Invited! 🎉</h2>'
+            '<p>Hello {{ admin_user.first_name|default:"Admin" }},</p>'
+            '<p>You have been invited to join the <strong>iRoad</strong> admin panel. '
             'Click the button below to activate your account and set up your credentials:</p>'
             '<div style="text-align:center;margin:28px 0;">'
             '<a href="{{ invite_url }}" style="background:linear-gradient(135deg,#4f46e5,#6366f1);'
@@ -531,12 +499,9 @@ DEFAULT_NOTIFICATION_EMAIL_TEMPLATES = [
         ),
         'body_ar': _wrap_email_body(
             '<div dir="rtl" style="text-align:right;">'
-            '<h2 style="color:#1e293b;margin:0 0 16px;font-size:22px;font-weight:700;">'
-            'لقد تمت دعوتك! 🎉</h2>'
-            '<p style="font-size:15px;color:#475569;line-height:1.7;margin:0 0 16px;">'
-            'مرحباً {{ admin_user.first_name|default:"Admin" }}،</p>'
-            '<p style="font-size:15px;color:#475569;line-height:1.7;margin:0 0 24px;">'
-            'تمت دعوتك للانضمام إلى لوحة تحكم <strong>iRoad</strong>. '
+            '<h2>لقد تمت دعوتك! 🎉</h2>'
+            '<p>مرحباً {{ admin_user.first_name|default:"Admin" }}،</p>'
+            '<p>تمت دعوتك للانضمام إلى لوحة تحكم <strong>iRoad</strong>. '
             'اضغط الزر أدناه لتفعيل حسابك وإعداد بيانات الدخول:</p>'
             '<div style="text-align:center;margin:28px 0;">'
             '<a href="{{ invite_url }}" style="background:linear-gradient(135deg,#4f46e5,#6366f1);'
@@ -556,11 +521,9 @@ DEFAULT_NOTIFICATION_EMAIL_TEMPLATES = [
         'subject_en': 'Welcome to iRoad — {{ company_name }}',
         'subject_ar': 'مرحباً بك في iRoad — {{ company_name }}',
         'body_en': _wrap_email_body(
-            '<h2 style="color:#1e293b;margin:0 0 16px;font-size:22px;font-weight:700;">'
-            'Welcome, {{ company_name }}! 🚀</h2>'
-            '<p style="font-size:15px;color:#475569;line-height:1.7;margin:0 0 20px;">'
-            'Your subscriber workspace has been provisioned and is ready to use. '
-            'Below are your sign-in credentials and integration keys.</p>'
+            '<h2>Welcome, {{ company_name }}! 🚀</h2>'
+            '<p>Your subscriber workspace has been provisioned and is ready to use. '
+            'Below are your sign-in credentials.</p>'
             
             '<div style="background:linear-gradient(135deg,#f8fafc,#f1f5f9);'
             'padding:20px 22px;border-radius:12px;border:1px solid #e2e8f0;margin-bottom:20px;">'
@@ -581,33 +544,11 @@ DEFAULT_NOTIFICATION_EMAIL_TEMPLATES = [
             'font-weight:700;font-size:15px;display:inline-block;'
             'box-shadow:0 4px 14px rgba(79,70,229,.3);">Open Workspace Sign-in &rarr;</a>'
             '</div>'
-
-            '<div style="height:1px;background:#e2e8f0;margin:28px 0;"></div>'
-
-            '<div style="background:linear-gradient(135deg,#f8fafc,#f1f5f9);'
-            'padding:20px 22px;border-radius:12px;border:1px solid #e2e8f0;margin-bottom:20px;">'
-            '<p style="font-size:11px;font-weight:700;text-transform:uppercase;'
-            'letter-spacing:0.06em;color:#6366f1;margin:0 0 6px;">Tenant Identifier</p>'
-            '<p style="margin:4px 0 8px;font-size:13px;color:#64748b;">'
-            'Use with <code>X-Tenant-ID</code> header on API calls:</p>'
-            '<div style="background:#1e293b;color:#e2e8f0;padding:14px 18px;border-radius:10px;'
-            'font-family:monospace;font-size:13px;word-break:break-all;margin:0;'
-            'border:1px solid #334155;">{{ tenant.tenant_id }}</div>'
-            '</div>'
-
-            '<p style="font-size:11px;font-weight:700;text-transform:uppercase;color:#6366f1;margin:0 0 6px;">API Bridge Key</p>'
-            '<p style="font-size:13px;color:#64748b;margin-bottom:12px;">'
-            'Authentication secret for the bridge endpoint. Store this securely — it is never shown again.</p>'
-            '<div style="background:#1e293b;color:#e2e8f0;padding:14px 18px;border-radius:10px;'
-            'font-family:monospace;font-size:13px;word-break:break-all;margin:0;'
-            'border:1px solid #334155;">{{ api_bridge_key }}</div>'
         ),
         'body_ar': _wrap_email_body(
             '<div dir="rtl" style="text-align:right;">'
-            '<h2 style="color:#1e293b;margin:0 0 16px;font-size:22px;font-weight:700;">'
-            'مرحباً بك في iRoad، {{ company_name }}! 🚀</h2>'
-            '<p style="font-size:15px;color:#475569;line-height:1.7;margin:0 0 20px;">'
-            'تم تجهيز مساحة العمل الخاصة بك وهي جاهزة للاستخدام الآن. أدناه بيانات الدخول ومفاتيح التكامل.</p>'
+            '<h2>مرحباً بك في iRoad، {{ company_name }}! 🚀</h2>'
+            '<p>تم تجهيز مساحة العمل الخاصة بك وهي جاهزة للاستخدام الآن. أدناه بيانات الدخول.</p>'
             
             '<div style="background:linear-gradient(135deg,#f8fafc,#f1f5f9);'
             'padding:20px 22px;border-radius:12px;border:1px solid #e2e8f0;margin-bottom:20px;">'
@@ -628,26 +569,6 @@ DEFAULT_NOTIFICATION_EMAIL_TEMPLATES = [
             'font-weight:700;font-size:15px;display:inline-block;'
             'box-shadow:0 4px 14px rgba(79,70,229,.3);">فتح بوابة الدخول &larr;</a>'
             '</div>'
-
-            '<div style="height:1px;background:#e2e8f0;margin:28px 0;"></div>'
-
-            '<div style="background:linear-gradient(135deg,#f8fafc,#f1f5f9);'
-            'padding:20px 22px;border-radius:12px;border:1px solid #e2e8f0;margin-bottom:20px;">'
-            '<p style="font-size:11px;font-weight:700;text-transform:uppercase;'
-            'letter-spacing:0.06em;color:#6366f1;margin:0 0 6px;">معرف المستأجر (Tenant ID)</p>'
-            '<p style="margin:4px 0 8px;font-size:13px;color:#64748b;">'
-            'استخدمه مع خاصية <code>X-Tenant-ID</code> في ترويسة طلبات API:</p>'
-            '<div style="background:#1e293b;color:#e2e8f0;padding:14px 18px;border-radius:10px;'
-            'font-family:monospace;font-size:13px;word-break:break-all;margin:0;'
-            'border:1px solid #334155;">{{ tenant.tenant_id }}</div>'
-            '</div>'
-
-            '<p style="font-size:11px;font-weight:700;text-transform:uppercase;color:#6366f1;margin:0 0 6px;">مفتاح الربط البرمجي (API)</p>'
-            '<p style="font-size:13px;color:#64748b;margin-bottom:12px;">'
-            'سر المصادقة لنقطة نهاية الجسر. يرجى الاحتفاظ به بشكل آمن - لن يتم عرضه مرة أخرى.</p>'
-            '<div style="background:#1e293b;color:#e2e8f0;padding:14px 18px;border-radius:10px;'
-            'font-family:monospace;font-size:13px;word-break:break-all;margin:0;'
-            'border:1px solid #334155;">{{ api_bridge_key }}</div>'
             '</div>',
             use_rtl=True
         ),
@@ -867,7 +788,7 @@ def send_email_smtp_gateway(
 ):
     msg = MIMEMultipart('alternative')
     msg['Subject'] = subject
-    msg['From'] = gateway.sender_id
+    msg['From'] = _resolve_safe_from_email(gateway.sender_id)
     msg['To'] = to_email
     msg.attach(MIMEText(text_body, 'plain', 'utf-8'))
     if html_body:
@@ -879,15 +800,57 @@ def send_email_smtp_gateway(
     if port is None:
         port = 465 if enc == 'SSL' else 587
 
-    if enc == 'SSL':
-        server = smtplib.SMTP_SSL(host, port, timeout=60)
-    else:
-        server = smtplib.SMTP(host, port, timeout=60)
-        if enc == 'TLS':
-            server.starttls()
+    def _send_once(*, send_from, smtp_host, smtp_port, smtp_enc, smtp_user, smtp_pass):
+        if smtp_enc == 'SSL':
+            server = smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=60)
+        else:
+            server = smtplib.SMTP(smtp_host, smtp_port, timeout=60)
+            if smtp_enc == 'TLS':
+                server.starttls()
+        try:
+            server.login(smtp_user, smtp_pass)
+            server.sendmail(send_from, [to_email], msg.as_string())
+        finally:
+            try:
+                server.quit()
+            except Exception:
+                pass
+
     try:
-        server.login(gateway.username_key, gateway.password_secret)
-        server.sendmail(gateway.sender_id, [to_email], msg.as_string())
+        try:
+            _send_once(
+                send_from=gateway.sender_id,
+                smtp_host=host,
+                smtp_port=port,
+                smtp_enc=enc,
+                smtp_user=gateway.username_key,
+                smtp_pass=gateway.password_secret,
+            )
+        except smtplib.SMTPAuthenticationError:
+            fallback_user = getattr(settings, 'FALLBACK_EMAIL_HOST_USER', '')
+            fallback_pass = getattr(settings, 'FALLBACK_EMAIL_HOST_PASSWORD', '')
+            if not fallback_user or not fallback_pass:
+                raise
+
+            logger.warning(
+                'Primary CommGateway SMTP auth failed; retrying with fallback SMTP account.',
+            )
+            fallback_host = getattr(settings, 'FALLBACK_EMAIL_HOST', 'smtp.gmail.com')
+            fallback_port = getattr(settings, 'FALLBACK_EMAIL_PORT', 587)
+            fallback_enc = (
+                'SSL'
+                if bool(getattr(settings, 'FALLBACK_EMAIL_USE_SSL', False))
+                else ('TLS' if bool(getattr(settings, 'FALLBACK_EMAIL_USE_TLS', True)) else '')
+            )
+            fallback_from = _resolve_safe_from_email(fallback_user)
+            _send_once(
+                send_from=fallback_from,
+                smtp_host=fallback_host,
+                smtp_port=fallback_port,
+                smtp_enc=fallback_enc,
+                smtp_user=fallback_user,
+                smtp_pass=fallback_pass,
+            )
         _log_comm_delivery(
             recipient=to_email,
             channel_type='Email',
@@ -905,11 +868,6 @@ def send_email_smtp_gateway(
             client_id=client_id,
         )
         raise
-    finally:
-        try:
-            server.quit()
-        except Exception:
-            pass
     return True
 
 
@@ -932,6 +890,7 @@ def send_email_via_django_smtp(
         'EMAIL_HOST_USER',
         '',
     )
+    from_email = _resolve_safe_from_email(from_email)
     if not from_email:
         logger.error(
             'Cannot send email: set DEFAULT_FROM_EMAIL or EMAIL_HOST_USER in settings',
@@ -948,6 +907,17 @@ def send_email_via_django_smtp(
         msg.attach_alternative(html_body, 'text/html')
     try:
         msg.send(fail_silently=False)
+    except smtplib.SMTPException:
+        logger.warning(
+            'Django SMTP backend send failed; retrying via direct fallback SMTP.',
+        )
+        _send_via_fallback_smtp(
+            to_email=to_email,
+            subject=subject,
+            text_body=text_body,
+            html_body=html_body,
+        )
+    try:
         _log_comm_delivery(
             recipient=to_email,
             channel_type='Email',
@@ -1103,7 +1073,9 @@ def send_transactional_sms(
 
 def _render_template_text(raw_text, context_dict=None):
     """Render DB template text with Django template syntax, e.g. {{company_name}}."""
-    return Template(raw_text or '').render(Context(context_dict or {}))
+    return Template(raw_text or '').render(
+        Context(_merge_template_context(context_dict)),
+    )
 
 
 def ensure_default_notification_templates(created_by=None):
@@ -1412,6 +1384,7 @@ def send_tenant_welcome_email(
             getattr(settings, 'TENANT_PORTAL_LOGIN_URL', '') or ''
         ).strip(),
     }
+    ctx = _merge_template_context(ctx)
     # Preferred path: explicit named template from Notification Templates screen.
     # This lets ops edit content without code changes.
     if send_named_notification_email(
@@ -1455,6 +1428,7 @@ def send_tenant_bridge_rotated_email(tenant, api_bridge_key_plain):
         'api_bridge_key': api_bridge_key_plain,
         'company_name': tenant.company_name,
     }
+    ctx = _merge_template_context(ctx)
     if send_named_notification_email(
         'TENANT_BRIDGE_ROTATED',
         recipient_email=tenant.primary_email,

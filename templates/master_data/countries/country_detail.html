@@ -1,0 +1,92 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block page_title %}{% translate "Country Details" %} - {{ country.country_code }}{% endblock %}
+
+{% block breadcrumb_items %}
+  <li class="breadcrumb-item"><a href="{% url 'country_list' %}">{% translate "Countries" %}</a></li>
+  <li class="breadcrumb-item active" aria-current="page">{{ country.country_code }}</li>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">{{ country.name_en }} ({{ country.country_code }})</h1>
+      <p class="page-subtitle">{% translate "International country codes and regional status." %}</p>
+    </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        {% if request.user.is_root %}
+          <a href="{% url 'country_edit' country.country_code %}" class="eal-btn eal-btn-primary">
+            <i class="bi bi-pencil"></i>
+            <span>{% translate "Edit" %}</span>
+          </a>
+        {% endif %}
+        <a href="{% url 'country_list' %}" class="eal-btn eal-btn-outline">
+          <i class="bi bi-arrow-left"></i>
+          <span>{% translate "Back to List" %}</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="eal-table-card db-fade p-4 mt-3">
+  <div class="form-card-header mb-4 p-0" style="border: none;">
+    <div class="form-card-icon indigo">
+      <i class="bi bi-geo-alt"></i>
+    </div>
+    <div class="form-card-header-text">
+      <h3 class="form-card-title">{% translate "Country Configuration" %}</h3>
+      <p class="form-card-desc">{% translate "ISO standard identifiers and localization." %}</p>
+    </div>
+  </div>
+
+  <div class="detail-grid">
+    <div class="detail-item">
+      <label>{% translate "ISO Country Code" %}</label>
+      <div class="value fw-bold text-primary">{{ country.country_code }}</div>
+    </div>
+    <div class="detail-item">
+      <label>{% translate "English Name" %}</label>
+      <div class="value">{{ country.name_en }}</div>
+    </div>
+    <div class="detail-item">
+      <label>{% translate "Arabic Name" %}</label>
+      <div class="value font-arabic" dir="rtl">{{ country.name_ar|default:"-" }}</div>
+    </div>
+    <div class="detail-item">
+      <label>{% translate "Status" %}</label>
+      <div class="value">
+        {% if country.is_active %}
+          <span class="status-badge active">{% translate "Active" %}</span>
+        {% else %}
+          <span class="status-badge inactive">{% translate "Inactive" %}</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .detail-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 32px;
+  }
+  .detail-item label {
+    display: block;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+    font-weight: 600;
+  }
+  .detail-item .value {
+    font-size: 15px;
+    color: var(--text-dark);
+  }
+</style>
+{% endblock %}
