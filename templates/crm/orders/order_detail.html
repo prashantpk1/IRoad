@@ -245,9 +245,16 @@
     </div>
   {% elif order.order_status == 'Pending_Payment' %}
     <div class="d-flex flex-wrap gap-2 mb-4">
-      <form method="post" action="{% url 'order_status_update' order.order_id %}" data-confirm="{{ confirm_record_payment|escape }}">
+      <form method="post" action="{% url 'order_status_update' order.order_id %}" data-confirm="{{ confirm_record_payment|escape }}" enctype="multipart/form-data">
         {% csrf_token %}
         <input type="hidden" name="action" value="mark_paid">
+        {% if order.payment_method and order.payment_method.method_type == 'Offline_Bank' and payment_txn and not payment_txn.attachment %}
+          <div class="w-100 mb-2">
+            <label class="form-label">{% translate "Attachment / Receipt" %}</label>
+            <input type="file" name="attachment" class="form-control" required>
+            <div class="field-hint">{% translate "Required for offline bank payment." %}</div>
+          </div>
+        {% endif %}
         <button type="submit" class="eal-btn eal-btn-primary">
           <i class="bi bi-check-circle"></i>
           <span>{% translate "Record payment" %}</span>

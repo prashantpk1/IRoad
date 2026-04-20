@@ -1,0 +1,158 @@
+{# HTML fragments for AJAX refresh (KPI + table + pagination) #}
+{% load i18n %}
+
+<span class="kpi-value" id="active-sessions-kpi">{{ total_count }}</span>
+
+<div class="eal-table-wrap" id="active-sessions-table">
+  <table class="eal-table">
+    <thead>
+      <tr>
+        <th class="sortable" style="width: 60px">
+          <a href="?q={{ search_query|urlencode }}&scope={{ scope_filter|urlencode }}&role={{ role_filter|urlencode }}&sort=rank&dir={% if current_sort == 'rank' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+            <span>#</span>
+            {% if current_sort == 'rank' %}
+              <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+            {% else %}
+              <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+            {% endif %}
+          </a>
+        </th>
+        <th class="sortable">
+          <a href="?q={{ search_query|urlencode }}&scope={{ scope_filter|urlencode }}&role={{ role_filter|urlencode }}&sort=user&dir={% if current_sort == 'user' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+            <span>User</span>
+            {% if current_sort == 'user' %}
+              <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+            {% else %}
+              <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+            {% endif %}
+          </a>
+        </th>
+        <th class="sortable">
+          <a href="?q={{ search_query|urlencode }}&scope={{ scope_filter|urlencode }}&role={{ role_filter|urlencode }}&sort=role&dir={% if current_sort == 'role' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+            <span>Role</span>
+            {% if current_sort == 'role' %}
+              <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+            {% else %}
+              <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+            {% endif %}
+          </a>
+        </th>
+        <th class="sortable">
+          <a href="?q={{ search_query|urlencode }}&scope={{ scope_filter|urlencode }}&role={{ role_filter|urlencode }}&sort=ip&dir={% if current_sort == 'ip' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+            <span>IP Address</span>
+            {% if current_sort == 'ip' %}
+              <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+            {% else %}
+              <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+            {% endif %}
+          </a>
+        </th>
+        <th class="sortable">
+          <a href="?q={{ search_query|urlencode }}&scope={{ scope_filter|urlencode }}&role={{ role_filter|urlencode }}&sort=device&dir={% if current_sort == 'device' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+            <span>Device / Browser</span>
+            {% if current_sort == 'device' %}
+              <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+            {% else %}
+              <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+            {% endif %}
+          </a>
+        </th>
+        <th class="sortable">
+          <a href="?q={{ search_query|urlencode }}&scope={{ scope_filter|urlencode }}&role={{ role_filter|urlencode }}&sort=started_at&dir={% if current_sort == 'started_at' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+            <span>Started At</span>
+            {% if current_sort == 'started_at' %}
+              <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+            {% else %}
+              <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+            {% endif %}
+          </a>
+        </th>
+        <th class="sortable">
+          <a href="?q={{ search_query|urlencode }}&scope={{ scope_filter|urlencode }}&role={{ role_filter|urlencode }}&sort=last_activity&dir={% if current_sort == 'last_activity' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+            <span>Last Activity</span>
+            {% if current_sort == 'last_activity' %}
+              <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+            {% else %}
+              <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+            {% endif %}
+          </a>
+        </th>
+        <th class="sortable">
+          <a href="?q={{ search_query|urlencode }}&scope={{ scope_filter|urlencode }}&role={{ role_filter|urlencode }}&sort=ttl&dir={% if current_sort == 'ttl' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+            <span>TTL Remaining</span>
+            {% if current_sort == 'ttl' %}
+              <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+            {% else %}
+              <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+            {% endif %}
+          </a>
+        </th>
+        <th style="width: 140px">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for session in sessions %}
+        <tr {% if session.jti == current_jti %}class="table-info"{% endif %}>
+          <td>{{ sessions.start_index|add:forloop.counter0 }}</td>
+          <td>
+            <div class="eal-name-cell">
+              <span class="eal-name-text">
+                {{ session.first_name }} {{ session.last_name }}
+              </span>
+              <span class="eal-name-subtext">{{ session.email }}</span>
+            </div>
+            {% if session.jti == current_jti %}
+              <span class="status-badge active" style="margin-top: 4px">You</span>
+            {% endif %}
+          </td>
+          <td>{{ session.role }}</td>
+          <td>{{ session.ip_address }}</td>
+          <td>
+            <span class="small text-muted">
+              {{ session.user_agent|default:'-' }}
+            </span>
+          </td>
+          <td>{{ session.started_at }}</td>
+          <td>{{ session.last_activity }}</td>
+          <td>
+            {% if session.ttl_seconds and session.ttl_seconds > 0 %}
+              {{ session.ttl_seconds }}s
+            {% else %}
+              &lt; 1 min
+            {% endif %}
+          </td>
+          <td>
+            {% if session.jti != current_jti %}
+              <form
+                method="post"
+                action="{% url 'revoke_session' session.jti %}"
+                style="display:inline"
+                class="js-confirm-submit"
+              >
+                {% csrf_token %}
+                <button type="submit" class="eal-row-btn" title="Revoke Session">
+                  <i class="bi bi-x-circle"></i>
+                </button>
+              </form>
+            {% else %}
+              <span class="text-muted small">Current session</span>
+            {% endif %}
+          </td>
+        </tr>
+      {% empty %}
+        <tr class="eal-table-empty">
+          <td colspan="20">
+            <div class="eal-empty-icon"><i class="bi bi-activity"></i></div>
+            <div class="eal-empty-title">{% translate "No Data Found" %}</div>
+            <div class="eal-empty-text">No sessions match your current filters.</div>
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div id="active-sessions-pagination">
+  {% include 'partials/pagination.html' with page_obj=sessions %}
+</div>
+

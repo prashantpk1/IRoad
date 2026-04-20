@@ -10,13 +10,24 @@
       System overview — real-time platform insights
     </div>
   </div>
-  <div class="toolbar-right">
-    <div class="text-end">
-      <div id="dashDate" class="fw-semibold"></div>
-      <div id="dashTime" class="text-muted small"></div>
+  <div class="toolbar-right d-flex align-items-center gap-3">
+    <div class="live-status-badge">
+        <span class="heartbeat"></span>
+        <span class="status-text">LIVE DATA</span>
+    </div>
+    <div class="text-end border-start ps-3">
+      <div id="dashDate" class="fw-semibold" style="font-size: 13px;"></div>
+      <div id="dashTime" class="text-muted small" style="font-size: 11px;"></div>
     </div>
   </div>
 </div>
+<style>
+  .live-status-badge { display: flex; align-items: center; gap: 8px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); padding: 4px 12px; border-radius: 20px; color: #10b981; font-size: 11px; font-weight: 700; letter-spacing: 0.5px; }
+  .heartbeat { width: 8px; height: 8px; background: #10b981; border-radius: 50%; box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); animation: heartbeat 2s infinite; }
+  @keyframes heartbeat { 0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); } 70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); } 100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); } }
+  .kpi-card { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+  .kpi-card:hover { transform: translateY(-3px); box-shadow: 0 12px 24px rgba(0,0,0,0.05); }
+</style>
 
 <div class="kpi-grid">
   <a href="#" class="text-decoration-none">
@@ -89,6 +100,58 @@
     </div>
   </a>
 </div>
+<div class="row g-3 mt-1 mb-4">
+  <!-- Enhanced Revenue Chart -->
+  <div class="col-lg-6">
+    <div class="db-card db-fade h-100">
+      <div class="db-card-header">
+        <div class="db-card-title">Revenue Forecast & Trend</div>
+      </div>
+      <div class="db-card-body">
+        <div style="height: 300px;">
+          <canvas id="revenueChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ticket Health (Doughnut) -->
+  <div class="col-lg-3">
+    <div class="db-card db-fade h-100">
+      <div class="db-card-header">
+        <div class="db-card-title">Ticket Health</div>
+      </div>
+      <div class="db-card-body d-flex flex-column align-items-center justify-content-center">
+        <div style="height: 220px; width: 100%;">
+          <canvas id="ticketHealthChart"></canvas>
+        </div>
+        <div class="mt-3 text-center small text-muted">
+          <span class="me-2"><i class="bi bi-circle-fill" style="color: #6366f1;"></i> Open</span>
+          <span><i class="bi bi-circle-fill" style="color: #f43f5e;"></i> Overdue</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Financial Hub (Pie) -->
+  <div class="col-lg-3">
+    <div class="db-card db-fade h-100">
+      <div class="db-card-header">
+        <div class="db-card-title">Pending Liquidity</div>
+      </div>
+      <div class="db-card-body d-flex flex-column align-items-center justify-content-center">
+        <div style="height: 220px; width: 100%;">
+          <canvas id="financeHubChart"></canvas>
+        </div>
+        <div class="mt-3 text-center small text-muted">
+          <span class="me-2"><i class="bi bi-circle-fill" style="color: #10b981;"></i> Orders</span>
+          <span><i class="bi bi-circle-fill" style="color: #f59e0b;"></i> Transfers</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 
 <div class="db-grid-2 mt-3">
   <div class="db-card db-fade">
@@ -107,7 +170,11 @@
             <td>{{ order.grand_total|floatformat:2 }}</td>
             <td>{{ order.currency_id }}</td>
             <td>{{ order.created_at }}</td>
-            <td><a class="btn btn-sm btn-outline-primary" href="{% url 'order_detail' pk=order.order_id %}">View</a></td>
+            <td>
+              <div class="eal-actions-cell">
+                <a href="{% url 'order_detail' pk=order.order_id %}" class="eal-row-btn" title="View Detail"><i class="bi bi-eye"></i></a>
+              </div>
+            </td>
           </tr>
           {% empty %}
           <tr><td colspan="5" class="text-center text-muted">No pending orders. All clear!</td></tr>
@@ -134,7 +201,11 @@
             <td>{{ ticket.subject|truncatechars:40 }}</td>
             <td>{{ ticket.category.name_en }}</td>
             <td><span class="ticket-hours-old" data-created="{{ ticket.created_at|date:'c' }}">-</span></td>
-            <td><a class="btn btn-sm btn-outline-primary" href="{% url 'ticket_detail' pk=ticket.ticket_id %}">View</a></td>
+            <td>
+              <div class="eal-actions-cell">
+                <a href="{% url 'ticket_detail' pk=ticket.ticket_id %}" class="eal-row-btn" title="View Detail"><i class="bi bi-eye"></i></a>
+              </div>
+            </td>
           </tr>
           {% empty %}
           <tr><td colspan="6" class="text-center text-muted">No overdue tickets.</td></tr>
@@ -149,13 +220,25 @@
   <div class="db-card-header">
     <div class="db-card-title">Attention Center Shortcuts</div>
   </div>
-  <div class="d-flex flex-wrap gap-2">
-    <a class="btn btn-sm btn-outline-primary" href="{% url 'order_list' %}">Pending Orders Queue</a>
-    <a class="btn btn-sm btn-outline-warning" href="{% url 'transaction_list' %}">Pending Bank Transfers</a>
-    <a class="btn btn-sm btn-outline-danger" href="{% url 'ticket_list' %}">Overdue Tickets</a>
-    <a class="btn btn-sm btn-outline-secondary" href="{% url 'transaction_list' %}">Failed Transactions</a>
-    <a class="btn btn-sm btn-outline-dark" href="{% url 'tenant_list' %}">Suspended Tenants</a>
-    <a class="btn btn-sm btn-outline-info" href="{% url 'audit_log_list' %}">Recent Audit Activity</a>
+  <div class="d-flex flex-wrap gap-3">
+    <a class="btn btn-soft-primary d-inline-flex align-items-center gap-2 px-3" href="{% url 'order_list' %}">
+      <i class="bi bi-cart-check"></i> Pending Orders
+    </a>
+    <a class="btn btn-soft-warning d-inline-flex align-items-center gap-2 px-3" href="{% url 'transaction_list' %}">
+      <i class="bi bi-bank"></i> Bank Transfers
+    </a>
+    <a class="btn btn-soft-danger d-inline-flex align-items-center gap-2 px-3" href="{% url 'ticket_list' %}">
+      <i class="bi bi-exclamation-triangle"></i> Overdue Tickets
+    </a>
+    <a class="btn btn-soft-secondary d-inline-flex align-items-center gap-2 px-3" href="{% url 'transaction_list' %}">
+      <i class="bi bi-x-circle"></i> Failed TXNs
+    </a>
+    <a class="btn btn-soft-dark d-inline-flex align-items-center gap-2 px-3" href="{% url 'tenant_list' %}">
+      <i class="bi bi-person-slash"></i> Suspended Tenants
+    </a>
+    <a class="btn btn-soft-info d-inline-flex align-items-center gap-2 px-3" href="{% url 'audit_log_list' %}">
+      <i class="bi bi-journal-text"></i> Audit Logs
+    </a>
   </div>
 </div>
 
@@ -179,7 +262,11 @@
               {% endif %}
             </td>
             <td>{{ txn.created_at }}</td>
-            <td><a class="btn btn-sm btn-outline-primary" href="{% url 'transaction_detail' pk=txn.transaction_id %}">View</a></td>
+            <td>
+              <div class="eal-actions-cell">
+                <a href="{% url 'transaction_detail' pk=txn.transaction_id %}" class="eal-row-btn" title="View Detail"><i class="bi bi-eye"></i></a>
+              </div>
+            </td>
           </tr>
           {% empty %}
           <tr><td colspan="6" class="text-center text-muted">No failed transactions.</td></tr>
@@ -200,15 +287,23 @@
             <td>{{ tenant.company_name }}</td>
             <td>
               {% if tenant.account_status == 'Suspended_Billing' %}
-                <span class="badge bg-warning text-dark">{{ tenant.account_status }}</span>
+                <span class="badge bg-warning text-dark">Suspended Billing</span>
               {% elif tenant.account_status == 'Suspended_Violation' %}
-                <span class="badge bg-danger">{{ tenant.account_status }}</span>
+                <span class="badge bg-danger">Suspended Violation</span>
+              {% elif tenant.account_status == 'Churned' %}
+                <span class="badge bg-secondary">Churned</span>
+              {% elif tenant.account_status == 'Active' %}
+                 <span class="badge bg-success">Active</span>
               {% else %}
                 <span class="badge bg-secondary">{{ tenant.account_status }}</span>
               {% endif %}
             </td>
             <td>{{ tenant.updated_at }}</td>
-            <td><a class="btn btn-sm btn-outline-primary" href="{% url 'tenant_detail' pk=tenant.tenant_id %}">View</a></td>
+            <td>
+              <div class="eal-actions-cell">
+                <a href="{% url 'tenant_detail' pk=tenant.tenant_id %}" class="eal-row-btn" title="View Detail"><i class="bi bi-eye"></i></a>
+              </div>
+            </td>
           </tr>
           {% empty %}
           <tr><td colspan="4" class="text-center text-muted">No suspended tenants.</td></tr>
@@ -219,52 +314,104 @@
   </div>
 </div>
 
-<div class="db-grid-2 mt-3">
-  <div class="db-card db-fade">
-    <div class="db-card-header">
-      <div>
-        <div class="db-card-title">Revenue — Last 6 Months</div>
+<!-- Moved to new Analytics Row -->
+
+<div class="row g-3 mt-3">
+  <!-- Login Activity Heatmap -->
+  <div class="col-lg-6">
+    <div class="db-card db-fade h-100">
+      <div class="db-card-header">
+        <div class="db-card-title">Login Activity Heatmap</div>
       </div>
-    </div>
-    <div style="height: 320px;">
-      <canvas id="revenueChart"></canvas>
+      <div class="db-card-body">
+        <style>
+          .heatmap-container { display: flex; gap: 8px; font-size: 11px; color: #64748b; }
+          .heatmap-y-axis { display: flex; flex-direction: column; padding-bottom: 24px; text-align: right; width: 30px; font-weight: 500; }
+          .heatmap-y-axis span { height: 26px; line-height: 26px; margin-bottom: 4px; }
+          .heatmap-scrollable { flex: 1; overflow-x: auto; padding-bottom: 4px; }
+          .heatmap-grid { display: grid; grid-template-columns: repeat(24, minmax(18px, 1fr)); gap: 4px; }
+          .heatmap-cell { height: 26px; border-radius: 4px; cursor: pointer; transition: transform 0.1s; position: relative; background: #f1f5f9; }
+          .heatmap-cell:hover { transform: scale(1.15); z-index: 2; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+          .heatmap-cell::after { content: attr(data-tooltip); position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); background: #1e293b; color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 10px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity 0.2s; margin-bottom: 6px; z-index: 10; }
+          .heatmap-cell:hover::after { opacity: 1; }
+          .heatmap-x-axis { display: flex; justify-content: space-between; margin-top: 8px; font-weight: 500; }
+          .heatmap-legend { display: flex; align-items: center; justify-content: flex-end; gap: 4px; font-size: 11px; color: #64748b; margin-top: 8px; }
+          .legend-color { width: 14px; height: 14px; border-radius: 3px; }
+          .legend-label { margin: 0 4px; font-weight: 500; }
+        </style>
+        <div class="heatmap-container">
+          <div class="heatmap-y-axis">
+            <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+          </div>
+          <div class="heatmap-scrollable">
+            {{ heatmap_data|json_script:"heatmap-data" }}
+            <div class="heatmap-grid" id="loginHeatmapGrid"></div>
+            <div class="heatmap-x-axis">
+              <span>00:00</span><span>04:00</span><span>08:00</span><span>12:00</span><span>16:00</span><span>20:00</span><span>23:00</span>
+            </div>
+          </div>
+        </div>
+        <div class="heatmap-legend">
+          <span class="legend-label">Less</span>
+          <div class="legend-color" style="background: #f1f5f9"></div>
+          <div class="legend-color" style="background: #cbd5e1"></div>
+          <div class="legend-color" style="background: #818cf8"></div>
+          <div class="legend-color" style="background: #6366f1"></div>
+          <div class="legend-color" style="background: #4338ca"></div>
+          <span class="legend-label">More</span>
+        </div>
+      </div>
     </div>
   </div>
 
-  <div class="db-card db-fade">
-    <div class="db-card-header">
-      <div>
-        <div class="db-card-title">Staff Analytics</div>
+  <!-- Role Distribution Doughnut -->
+  <div class="col-lg-6">
+    <div class="db-card db-fade h-100">
+      <div class="db-card-header">
+        <div class="db-card-title">Staff Analytics — Role Distribution</div>
       </div>
-    </div>
-    <div class="mb-3">
-      <div class="fw-semibold mb-2">Role Distribution</div>
-      {% for role in role_distribution %}
-      <div class="mb-2">
-        <div class="d-flex justify-content-between">
-          <span>{{ role.role_name_en }}</span>
-          <span>{{ role.staff_count }}</span>
+      <div class="db-card-body">
+        <div class="row align-items-center">
+          <div class="col-md-6">
+            <div style="position: relative; height: 180px; width: 180px; margin: 0 auto;">
+              <canvas id="roleDistributionChart"></canvas>
+              <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; pointer-events: none;">
+                <div style="font-size: 24px; font-weight: 700; color: #1e293b;">{{ total_staff }}</div>
+                <div style="font-size: 10px; color: #64748b; font-weight: 600; text-transform: uppercase;">Total</div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div id="roleLegend" class="d-flex flex-column gap-2">
+              {% for role in role_distribution %}
+              <div class="d-flex align-items-center justify-content-between p-2 rounded" style="background: #f8fafc; border: 1px solid #e2e8f0;">
+                <div class="d-flex align-items-center gap-2">
+                  <span class="role-legend-dot" data-index="{{ forloop.counter0 }}" style="width: 8px; height: 8px; border-radius: 50%;"></span>
+                  <span style="font-size: 12px; font-weight: 500; color: #1e293b;">{{ role.role_name_en }}</span>
+                </div>
+                <div class="text-end">
+                   <div style="font-size: 13px; font-weight: 700; color: #1e293b;">{{ role.staff_count }}</div>
+                   <div style="font-size: 9px; color: #64748b;">{% if total_staff %}{% widthratio role.staff_count total_staff 100 %}{% else %}0{% endif %}%</div>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
         </div>
-        <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100">
-          <div class="progress-bar" style="width: {% if total_staff %}{% widthratio role.staff_count total_staff 100 %}{% else %}0{% endif %}%"></div>
+        <div class="row text-center mt-3 pt-3 border-top">
+          <div class="col-4">
+            <div class="small text-muted mb-1">Active</div>
+            <div class="fw-bold">{{ total_staff }}</div>
+          </div>
+          <div class="col-4">
+            <div class="small text-muted mb-1">Suspended</div>
+            <div class="fw-bold text-danger">{{ suspended_admins }}</div>
+          </div>
+          <div class="col-4">
+            <div class="small text-muted mb-1">Stale</div>
+            <div class="fw-bold text-warning">{{ stale_accounts }}</div>
+          </div>
         </div>
-      </div>
-      {% empty %}
-      <div class="text-muted">No role distribution data.</div>
-      {% endfor %}
-    </div>
-    <div class="row text-center">
-      <div class="col-4">
-        <div class="small text-muted">Total Staff</div>
-        <div class="h5">{{ total_staff }}</div>
-      </div>
-      <div class="col-4">
-        <div class="small text-muted">Suspended</div>
-        <div class="h5">{{ suspended_admins }}</div>
-      </div>
-      <div class="col-4">
-        <div class="small text-muted">Stale (30d)</div>
-        <div class="h5">{{ stale_accounts }}</div>
       </div>
     </div>
   </div>
@@ -272,99 +419,236 @@
 
 <div class="db-card db-fade mt-3">
   <div class="db-card-header">
-    <div>
-      <div class="db-card-title">Recent Admin Actions</div>
-    </div>
+    <div class="db-card-title">Recent Admin Actions</div>
   </div>
-  <div class="table-responsive">
-    <table class="table align-middle">
-      <thead><tr><th>#</th><th>Admin</th><th>Action</th><th>Module</th><th>Record ID</th><th>IP Address</th><th>Timestamp</th></tr></thead>
+  <div class="eal-table-wrap">
+    <table class="eal-table">
+      <thead>
+        <tr>
+          <th style="width: 50px">#</th>
+          <th>Admin</th>
+          <th>Action</th>
+          <th>Module</th>
+          <th>Record ID</th>
+          <th>IP Address</th>
+          <th class="text-end">Timestamp</th>
+        </tr>
+      </thead>
       <tbody>
         {% for item in recent_audit %}
         <tr>
           <td>{{ forloop.counter }}</td>
-          <td>{% if item.admin %}{{ item.admin.first_name }} {{ item.admin.last_name }}{% else %}System{% endif %}</td>
+          <td>
+            <div class="d-flex align-items-center gap-2">
+                <img src="https://ui-avatars.com/api/?name={{ item.admin.first_name }}&background=f1f5f9&color=64748b&size=24" class="rounded-circle" width="24">
+                <span class="fw-bold">{% if item.admin %}{{ item.admin.first_name }} {{ item.admin.last_name }}{% else %}System{% endif %}</span>
+            </div>
+          </td>
           <td>
             {% if item.action_type == 'Create' %}
-              <span class="badge bg-success">Create</span>
+                <span class="eal-status"><i class="bi bi-circle-fill text-success" style="font-size: 8px"></i> <span>Create</span></span>
             {% elif item.action_type == 'Update' %}
-              <span class="badge bg-primary">Update</span>
+                <span class="eal-status"><i class="bi bi-circle-fill text-primary" style="font-size: 8px"></i> <span>Update</span></span>
             {% elif item.action_type == 'Delete' %}
-              <span class="badge bg-danger">Delete</span>
+                <span class="eal-status"><i class="bi bi-circle-fill text-danger" style="font-size: 8px"></i> <span>Delete</span></span>
             {% else %}
-              <span class="badge bg-warning text-dark">Status_Change</span>
+                <span class="eal-status"><i class="bi bi-circle-fill text-warning" style="font-size: 8px"></i> <span>{{ item.action_type }}</span></span>
             {% endif %}
           </td>
-          <td>{{ item.module_name }}</td>
-          <td>{{ item.record_id }}</td>
-          <td>{{ item.ip_address }}</td>
-          <td>{{ item.timestamp }}</td>
+          <td><span class="text-muted small">{{ item.module_name }}</span></td>
+          <td class="small text-muted" style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ item.record_id }}</td>
+          <td class="small">{{ item.ip_address }}</td>
+          <td class="text-end text-muted small">{{ item.timestamp|date:'d M, H:i' }}</td>
         </tr>
         {% empty %}
-        <tr><td colspan="7" class="text-center text-muted">No audit entries yet.</td></tr>
+        <tr><td colspan="7" class="text-center text-muted py-4">No audit entries yet.</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
-  <div class="mt-2">
-    <a href="{% url 'audit_log_list' %}" class="btn btn-link p-0">View Full Audit Log →</a>
+  <div class="mt-3 text-center">
+    <a href="{% url 'audit_log_list' %}" class="eal-btn eal-btn-outline" style="font-size: 11px; padding: 4px 16px;">
+      <span>View Full Audit Log</span>
+      <i class="bi bi-arrow-right"></i>
+    </a>
   </div>
 </div>
 
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-// Revenue Bar Chart
-const revenueCanvas = document.getElementById('revenueChart');
-if (revenueCanvas && typeof Chart !== 'undefined') {
-    const ctx = revenueCanvas.getContext('2d');
-    new Chart(ctx, {
-        type: 'bar',
+document.addEventListener("DOMContentLoaded", function() {
+    initEnhancedCharts();
+});
+
+function initEnhancedCharts() {
+    if (typeof Chart === 'undefined') return;
+
+    // Common configurations
+    Chart.defaults.font.family = "'Inter', sans-serif";
+    Chart.defaults.color = "#64748b";
+    Chart.defaults.plugins.tooltip.backgroundColor = '#1e293b';
+    Chart.defaults.plugins.tooltip.padding = 12;
+    Chart.defaults.plugins.tooltip.cornerRadius = 8;
+    Chart.defaults.plugins.tooltip.titleFont = { size: 13, weight: 'bold' };
+
+    // 1. Revenue Chart (Enhanced)
+    const revCtx = document.getElementById('revenueChart').getContext('2d');
+    const revGradient = revCtx.createLinearGradient(0, 0, 0, 300);
+    revGradient.addColorStop(0, 'rgba(80, 81, 249, 0.2)');
+    revGradient.addColorStop(1, 'rgba(80, 81, 249, 0.0)');
+
+    new Chart(revCtx, {
+        type: 'line',
         data: {
-            labels: {{ revenue_labels|safe }},
+            labels: {{ revenue_labels|safe|default:"[]" }},
             datasets: [{
                 label: 'Revenue (SAR)',
-                data: {{ revenue_data|safe }},
-                backgroundColor: '#5051f9',
-                borderRadius: 6,
+                data: {{ revenue_data|safe|default:"[]" }},
+                borderColor: '#5051f9',
+                backgroundColor: revGradient,
+                fill: true,
+                tension: 0.4,
+                borderWidth: 3,
+                pointBackgroundColor: '#fff',
+                pointBorderColor: '#5051f9',
+                pointBorderWidth: 2,
+                pointRadius: 4,
+                pointHoverRadius: 6
             }]
         },
         options: {
             responsive: true,
+            maintainAspectRatio: false,
             plugins: { legend: { display: false } },
             scales: {
                 y: {
                     beginAtZero: true,
-                    ticks: {
-                        callback: v => 'SAR ' +
-                            v.toLocaleString()
-                    }
-                }
+                    grid: { color: 'rgba(226, 232, 240, 0.4)', drawBorder: false },
+                    ticks: { callback: v => v >= 1000 ? (v/1000) + 'k' : v }
+                },
+                x: { grid: { display: false } }
             }
         }
     });
+
+    // 2. Ticket Health Chart
+    const ticketCtx = document.getElementById('ticketHealthChart').getContext('2d');
+    new Chart(ticketCtx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Open', 'Overdue'],
+            datasets: [{
+                data: [{{ open_tickets|default:0 }}, {{ overdue_tickets|default:0 }}],
+                backgroundColor: ['#6366f1', '#f43f5e'],
+                borderWidth: 0,
+                hoverOffset: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '80%',
+            plugins: { legend: { display: false } }
+        }
+    });
+
+    // 3. Financial Hub Chart
+    const financeCtx = document.getElementById('financeHubChart').getContext('2d');
+    new Chart(financeCtx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Orders', 'Transfers'],
+            datasets: [{
+                data: [{{ pending_orders|default:0 }}, {{ pending_bank_txns|default:0 }}],
+                backgroundColor: ['#10b981', '#f59e0b'],
+                borderWidth: 0,
+                hoverOffset: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '80%',
+            plugins: { legend: { display: false } }
+        }
+    });
+
+    // 4. Role Distribution Chart
+    const roleCtx = document.getElementById('roleDistributionChart').getContext('2d');
+    const roleColors = ['#5051f9', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4'];
+    
+    document.querySelectorAll('.role-legend-dot').forEach((dot, idx) => {
+        dot.style.backgroundColor = roleColors[idx % roleColors.length];
+    });
+
+    new Chart(roleCtx, {
+        type: 'doughnut',
+        data: {
+            labels: [{% for r in role_distribution %}'{{ r.role_name_en }}',{% endfor %}],
+            datasets: [{
+                data: [{% for r in role_distribution %}{{ r.staff_count }},{% endfor %}],
+                backgroundColor: roleColors,
+                borderWidth: 4,
+                borderColor: '#ffffff',
+                hoverOffset: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '85%',
+            plugins: {
+                legend: { display: false },
+                tooltip: { callbacks: { label: (ctx) => ` ${ctx.label}: ${ctx.raw} Users` } }
+            }
+        }
+    });
+
+    // 5. Login Activity Heatmap Logic (Real Data)
+    const heatmapGrid = document.getElementById('loginHeatmapGrid');
+    const heatmapRaw = document.getElementById('heatmap-data');
+    if (heatmapGrid && heatmapRaw) {
+        const heatmapData = JSON.parse(heatmapRaw.textContent);
+        const days = 7;
+        const hours = 24;
+        let maxCount = 1;
+        heatmapData.forEach(day => day.forEach(count => { if(count > maxCount) maxCount = count; }));
+
+        for (let d = 0; d < days; d++) {
+            for (let h = 0; h < hours; h++) {
+                const count = heatmapData[d][h] || 0;
+                const cell = document.createElement('div');
+                cell.className = 'heatmap-cell';
+                let intensity = count > 0 ? Math.min(4, Math.ceil((count / maxCount) * 4)) : 0;
+                const colors = ['#f1f5f9', '#cbd5e1', '#818cf8', '#6366f1', '#4338ca'];
+                cell.style.backgroundColor = colors[intensity];
+                cell.setAttribute('data-tooltip', `${count} Login(s) at ${h}:00`);
+                heatmapGrid.appendChild(cell);
+            }
+        }
+    }
+
+    // 6. Auto-Refresh Logic (Live Data)
+    setInterval(() => {
+        window.location.reload();
+    }, 120000); // Refresh every 2 minutes
 }
 
-// Role Distribution progress bars
-// (rendered from Django template tags — no JS needed)
-
-// Date/time in toolbar (same as designer)
 function updateDateTime() {
     const now = new Date();
     const dateEl = document.getElementById('dashDate');
     const timeEl = document.getElementById('dashTime');
-    if (dateEl) dateEl.textContent =
-        now.toLocaleDateString('en-US', {
-            weekday: 'long', year: 'numeric',
-            month: 'long', day: 'numeric'
-        });
-    if (timeEl) timeEl.textContent =
-        now.toLocaleTimeString('en-US', {
-            hour: '2-digit', minute: '2-digit'
-        });
+    if (dateEl) {
+        dateEl.textContent = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    }
+    if (timeEl) {
+        timeEl.textContent = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
 }
 updateDateTime();
-setInterval(updateDateTime, 60000);
+setInterval(updateDateTime, 1000);
 
-// Overdue hours calculation
 document.querySelectorAll('.ticket-hours-old').forEach((el) => {
     const created = new Date(el.dataset.created);
     if (!Number.isNaN(created.getTime())) {
@@ -374,3 +658,5 @@ document.querySelectorAll('.ticket-hours-old').forEach((el) => {
 });
 </script>
 {% endblock %}
+{% endblock %}
+

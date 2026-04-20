@@ -55,10 +55,13 @@ from .views import (
     ForgotPasswordView,
     InvoiceDetailView,
     InvoiceListView,
+    InvoicePrintView,
+    InvoiceSendEmailView,
     InvoiceVoidView,
     LegalIdentityView,
     LoginView,
     LogoutView,
+    OTPVerificationView,
     InternalAlertRouteCreateView,
     InternalAlertRouteListView,
     InternalAlertRouteToggleStatusView,
@@ -143,8 +146,10 @@ from .views import (
     TransactionCreateView,
     TransactionDetailView,
     TransactionListView,
+    TransactionUploadAttachmentView,
     TransactionRejectView,
     MassRevokeView,
+    MyAccountView,
     ActiveSessionsView,
     RevokeSessionView,
     GlobalSearchView,
@@ -153,6 +158,7 @@ from .views import (
 
 urlpatterns = [
     path('login/', LoginView.as_view(), name='login'),
+    path('otp-verify/', OTPVerificationView.as_view(), name='otp_verify'),
     path('logout/', LogoutView.as_view(), name='logout'),
     path(
         'reset-password/',
@@ -171,6 +177,7 @@ urlpatterns = [
     ),
     path('', DashboardView.as_view(), name='dashboard'),
     path('dashboard/', DashboardView.as_view(), name='dashboard_alt'),
+    path('my-account/', MyAccountView.as_view(), name='my_account'),
     path('roles/', RoleListView.as_view(), name='role_list'),
     path('roles/create/', RoleCreateView.as_view(), name='role_create'),
     path('roles/<uuid:pk>/', RoleDetailView.as_view(), name='role_detail'),
@@ -775,6 +782,11 @@ urlpatterns = [
         name='transaction_approve',
     ),
     path(
+        'crm/transactions/<uuid:pk>/upload-attachment/',
+        TransactionUploadAttachmentView.as_view(),
+        name='transaction_upload_attachment',
+    ),
+    path(
         'crm/transactions/<uuid:pk>/reject/',
         TransactionRejectView.as_view(),
         name='transaction_reject',
@@ -785,6 +797,16 @@ urlpatterns = [
         name='transaction_detail',
     ),
     path('crm/invoices/', InvoiceListView.as_view(), name='invoice_list'),
+    path(
+        'crm/invoices/<uuid:pk>/print/',
+        InvoicePrintView.as_view(),
+        name='invoice_print',
+    ),
+    path(
+        'crm/invoices/<uuid:pk>/send-email/',
+        InvoiceSendEmailView.as_view(),
+        name='invoice_send_email',
+    ),
     path(
         'crm/invoices/<uuid:pk>/void/',
         InvoiceVoidView.as_view(),

@@ -8,6 +8,38 @@
 <li class="breadcrumb-item active" aria-current="page">{% translate "Invoices" %}</li>
 {% endblock %}
 
+{% block extra_css %}
+<style>
+  .eal-table th.sortable {
+    padding: 0 !important;
+  }
+  .eal-table th.sortable a {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    color: inherit;
+    text-decoration: none;
+    width: 100%;
+    transition: background 0.2s;
+  }
+  .eal-table th.sortable a:hover {
+    background: rgba(0,0,0,0.02);
+  }
+  .eal-table th.sortable i {
+    font-size: 10px;
+    margin-left: 5px;
+    color: var(--primary-color);
+    opacity: 0.8;
+  }
+  .db-table-filters {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
   <div class="page-header-row">
@@ -33,69 +65,171 @@
 {% endif %}
 
 <div class="eal-table-card">
-  <form method="get">
-    <div class="eal-toolbar">
-      <div class="eal-toolbar-left">
-        <div class="eal-search">
-          <i class="bi bi-search"></i>
-          <input type="text" name="q" placeholder="{% translate 'Invoice no. or customer...' %}" value="{{ search_query }}">
-        </div>
+  <form method="get" action="{% url 'invoice_list' %}" class="eal-toolbar">
+    <div class="eal-toolbar-left" style="width: 100%; display: flex; gap: 16px; align-items: center; flex-wrap: wrap">
+      <div class="eal-search" style="flex: 1; min-width: 250px; margin-bottom: 0">
+        <i class="bi bi-search"></i>
+        <input type="text" name="q" placeholder="{% translate 'Invoice no. or customer...' %}" value="{{ search_query }}">
+        <input type="hidden" name="sort" value="{{ current_sort }}">
+        <input type="hidden" name="dir" value="{{ current_dir }}">
       </div>
-      <div class="eal-toolbar-right">
-        <select class="eal-filter-select" name="status" onchange="this.form.submit()">
-          <option value="">{% translate "Status: All" %}</option>
-          {% for code, label in status_choices %}
-            <option value="{{ code }}" {% if status_filter == code %}selected{% endif %}>{{ label }}</option>
-          {% endfor %}
-        </select>
-        <select class="eal-filter-select" name="currency" onchange="this.form.submit()">
+
+      <div class="db-table-filters">
+        <a href="?q={{ search_query }}&status=All&currency={{ currency_filter }}&tenant={{ tenant_filter }}&sort={{ current_sort }}&dir={{ current_dir }}" 
+           class="filter-chip {% if status_filter == 'All' or not status_filter %}active{% endif %}">
+          {% translate "All" %}
+        </a>
+        <a href="?q={{ search_query }}&status=Issued&currency={{ currency_filter }}&tenant={{ tenant_filter }}&sort={{ current_sort }}&dir={{ current_dir }}" 
+           class="filter-chip {% if status_filter == 'Issued' %}active{% endif %}">
+          <i class="bi bi-circle-fill text-primary" style="font-size: 6px"></i> 
+          {% translate "Issued" %}
+        </a>
+        <a href="?q={{ search_query }}&status=Paid&currency={{ currency_filter }}&tenant={{ tenant_filter }}&sort={{ current_sort }}&dir={{ current_dir }}" 
+           class="filter-chip {% if status_filter == 'Paid' %}active{% endif %}">
+          <i class="bi bi-circle-fill text-success" style="font-size: 6px"></i>
+          {% translate "Paid" %}
+        </a>
+        <a href="?q={{ search_query }}&status=Void&currency={{ currency_filter }}&tenant={{ tenant_filter }}&sort={{ current_sort }}&dir={{ current_dir }}" 
+           class="filter-chip {% if status_filter == 'Void' %}active{% endif %}">
+          <i class="bi bi-circle-fill text-danger" style="font-size: 6px"></i>
+          {% translate "Void" %}
+        </a>
+      </div>
+
+      <div style="width: 150px">
+        <select class="eal-select" name="currency" onchange="this.form.submit()">
           <option value="">{% translate "Currency: All" %}</option>
           {% for c in currencies %}
             <option value="{{ c.currency_code }}" {% if currency_filter == c.currency_code %}selected{% endif %}>{{ c.currency_code }}</option>
           {% endfor %}
         </select>
-        <select class="eal-filter-select" name="tenant" onchange="this.form.submit()">
+      </div>
+
+      <div style="width: 180px">
+        <select class="eal-select" name="tenant" onchange="this.form.submit()">
           <option value="">{% translate "Tenant: All" %}</option>
           {% for t in tenants %}
             <option value="{{ t.tenant_id }}" {% if tenant_filter == t.tenant_id|stringformat:"s" %}selected{% endif %}>{{ t.company_name }}</option>
           {% endfor %}
         </select>
-
-        {% if search_query or status_filter or currency_filter or tenant_filter %}
-          <a href="{% url 'invoice_list' %}" class="eal-btn eal-btn-outline" style="border-style: dashed; color: var(--text-muted);">
-            <i class="bi bi-x-circle"></i>
-            <span>{% translate "Clear" %}</span>
-          </a>
-        {% endif %}
       </div>
+
+      {% if search_query or status_filter and status_filter != 'All' or currency_filter or tenant_filter %}
+        <a href="{% url 'invoice_list' %}" class="eal-btn eal-btn-outline" style="border-style: dashed; color: var(--text-muted); height: 32px; padding: 0 12px; font-size: 11px">
+          <i class="bi bi-x-circle"></i>
+          <span>{% translate "Clear" %}</span>
+        </a>
+      {% endif %}
     </div>
   </form>
 
-  <div class="eal-table-wrap">
+  <div class="eal-table-wrap" style="margin-top: 8px">
     <table class="eal-table">
       <thead>
         <tr>
-          <th>#</th>
-          <th>{% translate "Invoice No." %}</th>
-          <th>{% translate "Tenant" %}</th>
-          <th>{% translate "Grand Total" %}</th>
-          <th>{% translate "Currency" %}</th>
-          <th>{% translate "Tax Amount" %}</th>
-          <th>{% translate "Status" %}</th>
-          <th>{% translate "Issue Date" %}</th>
-          <th>{% translate "ACTIONS" %}</th>
+          <th class="sortable" style="width: 60px">
+            <a href="?q={{ search_query }}&status={{ status_filter }}&currency={{ currency_filter }}&tenant={{ tenant_filter }}&sort=rank&dir={% if current_sort == 'rank' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+              <span>#</span>
+              {% if current_sort == 'rank' %}
+                <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+              {% else %}
+                <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+              {% endif %}
+            </a>
+          </th>
+          <th class="sortable">
+            <a href="?q={{ search_query }}&status={{ status_filter }}&currency={{ currency_filter }}&tenant={{ tenant_filter }}&sort=number&dir={% if current_sort == 'number' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+              <span>{% translate "Invoice No." %}</span>
+              {% if current_sort == 'number' %}
+                <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+              {% else %}
+                <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+              {% endif %}
+            </a>
+          </th>
+          <th class="sortable">
+            <a href="?q={{ search_query }}&status={{ status_filter }}&currency={{ currency_filter }}&tenant={{ tenant_filter }}&sort=tenant&dir={% if current_sort == 'tenant' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+              <span>{% translate "Tenant" %}</span>
+              {% if current_sort == 'tenant' %}
+                <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+              {% else %}
+                <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+              {% endif %}
+            </a>
+          </th>
+          <th class="sortable">
+            <a href="?q={{ search_query }}&status={{ status_filter }}&currency={{ currency_filter }}&tenant={{ tenant_filter }}&sort=total&dir={% if current_sort == 'total' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+              <span>{% translate "Grand Total" %}</span>
+              {% if current_sort == 'total' %}
+                <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+              {% else %}
+                <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+              {% endif %}
+            </a>
+          </th>
+          <th class="sortable">
+            <a href="?q={{ search_query }}&status={{ status_filter }}&currency={{ currency_filter }}&tenant={{ tenant_filter }}&sort=currency&dir={% if current_sort == 'currency' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+              <span>{% translate "Currency" %}</span>
+              {% if current_sort == 'currency' %}
+                <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+              {% else %}
+                <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+              {% endif %}
+            </a>
+          </th>
+          <th class="sortable">
+            <a href="?q={{ search_query }}&status={{ status_filter }}&currency={{ currency_filter }}&tenant={{ tenant_filter }}&sort=tax&dir={% if current_sort == 'tax' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+              <span>{% translate "Tax Amount" %}</span>
+              {% if current_sort == 'tax' %}
+                <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+              {% else %}
+                <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+              {% endif %}
+            </a>
+          </th>
+          <th class="sortable" style="width: 120px">
+            <a href="?q={{ search_query }}&status={{ status_filter }}&currency={{ currency_filter }}&tenant={{ tenant_filter }}&sort=status&dir={% if current_sort == 'status' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+              <span>{% translate "Status" %}</span>
+              {% if current_sort == 'status' %}
+                <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+              {% else %}
+                <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+              {% endif %}
+            </a>
+          </th>
+          <th class="sortable" style="width: 150px">
+            <a href="?q={{ search_query }}&status={{ status_filter }}&currency={{ currency_filter }}&tenant={{ tenant_filter }}&sort=date&dir={% if current_sort == 'date' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+              <span>{% translate "Issue Date" %}</span>
+              {% if current_sort == 'date' %}
+                <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+              {% else %}
+                <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+              {% endif %}
+            </a>
+          </th>
+          <th style="width: 100px">{% translate "ACTIONS" %}</th>
         </tr>
       </thead>
       <tbody>
         {% for inv in invoices %}
           <tr>
-            <td>{{ forloop.counter0|add:invoices.start_index }}</td>
+            <td>{{ inv.default_rank }}</td>
             <td><span class="eal-entity-id">{{ inv.invoice_number }}</span></td>
             <td><span class="fw-bold">{{ inv.tenant.company_name }}</span></td>
             <td>{{ inv.grand_total|floatformat:2 }}</td>
-            <td>{{ inv.currency_id }}</td>
+            <td>{{ inv.currency.currency_code }}</td>
             <td>{{ inv.tax_amount|floatformat:2 }}</td>
-            <td>{% if inv.status == 'Issued' %}<span class="status-badge active">{{ inv.get_status_display }}</span>{% elif inv.status == 'Paid' %}<span class="status-badge active">{{ inv.get_status_display }}</span>{% elif inv.status == 'Void' %}<span class="status-badge inactive">{{ inv.get_status_display }}</span>{% else %}<span class="status-badge pending">{{ inv.get_status_display }}</span>{% endif %}</td>
+            <td>
+              {% if inv.status == 'Issued' %}
+                <span class="status-badge active">{{ inv.get_status_display }}</span>
+              {% elif inv.status == 'Paid' %}
+                <span class="status-badge active" style="background-color: var(--success-bg); color: var(--success-text);">{{ inv.get_status_display }}</span>
+              {% elif inv.status == 'Void' %}
+                <span class="status-badge inactive">{{ inv.get_status_display }}</span>
+              {% else %}
+                <span class="status-badge pending">{{ inv.get_status_display }}</span>
+              {% endif %}
+            </td>
             <td>{{ inv.issue_date|date:'d M Y' }}</td>
             <td>
               <div class="eal-actions-cell">

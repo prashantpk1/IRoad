@@ -8,6 +8,35 @@
 <li class="breadcrumb-item active" aria-current="page">{% translate "Subscription Orders" %}</li>
 {% endblock %}
 
+{% block extra_css %}
+<style>
+  .eal-table th.sortable {
+    padding: 0 !important;
+  }
+  .eal-table th.sortable a {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    color: inherit;
+    text-decoration: none;
+    width: 100%;
+    transition: background 0.2s;
+    gap: 10px;
+  }
+  .eal-table th.sortable a:hover {
+    background: rgba(0, 0, 0, 0.02);
+  }
+  .eal-table th.sortable i {
+    font-size: 10px;
+    margin-left: 5px;
+    color: var(--primary-color);
+    opacity: 0.8;
+    flex-shrink: 0;
+  }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
   <div class="page-header-row">
@@ -30,64 +59,197 @@
 
 
 <div class="eal-table-card">
-  <form method="get">
-    <div class="eal-toolbar">
-      <div class="eal-toolbar-left">
-        <div class="eal-search">
-          <i class="bi bi-search"></i>
-          <input type="text" name="q" placeholder="{% translate 'Search tenant company...' %}" value="{{ search_query }}">
-        </div>
+  <form method="get" action="{% url 'order_list' %}" class="eal-toolbar" style="margin-bottom: 20px;">
+    <div class="eal-toolbar-left" style="width: 100%; display: flex; gap: 16px; align-items: center; flex-wrap: wrap">
+      <div class="eal-search" style="flex: 1; min-width: 250px; margin-bottom: 0">
+        <i class="bi bi-search"></i>
+        <input
+          type="text"
+          name="q"
+          placeholder="{% translate 'Search tenant company...' %}"
+          value="{{ search_query }}"
+        />
+        <input type="hidden" name="order_status" value="{{ status_filter }}">
+        <input type="hidden" name="sort" value="{{ sort }}">
+        <input type="hidden" name="dir" value="{{ dir }}">
       </div>
-      <div class="eal-toolbar-right">
-        <select class="eal-filter-select" name="order_classification" onchange="this.form.submit()">
-          <option value="">{% translate "Classification: All" %}</option>
+      
+      <div class="db-table-filters">
+        <a href="?q={{ search_query }}&order_status=All&order_classification={{ classification_filter }}&sort={{ sort }}&dir={{ dir }}" 
+           class="filter-chip {% if status_filter == 'All' or not status_filter %}active{% endif %}">
+          {% translate "All Status" %}
+        </a>
+        <a href="?q={{ search_query }}&order_status=Paid&order_classification={{ classification_filter }}&sort={{ sort }}&dir={{ dir }}" 
+           class="filter-chip {% if status_filter == 'Paid' %}active{% endif %}">
+          <i class="bi bi-circle-fill text-success" style="font-size: 6px"></i> 
+          {% translate "Paid" %}
+        </a>
+        <a href="?q={{ search_query }}&order_status=Pending_Payment&order_classification={{ classification_filter }}&sort={{ sort }}&dir={{ dir }}" 
+           class="filter-chip {% if status_filter == 'Pending_Payment' %}active{% endif %}">
+          <i class="bi bi-circle-fill text-warning" style="font-size: 6px"></i> 
+          {% translate "Pending" %}
+        </a>
+        <a href="?q={{ search_query }}&order_status=Draft&order_classification={{ classification_filter }}&sort={{ sort }}&dir={{ dir }}" 
+           class="filter-chip {% if status_filter == 'Draft' %}active{% endif %}">
+          <i class="bi bi-circle-fill text-secondary" style="font-size: 6px"></i> 
+          {% translate "Draft" %}
+        </a>
+      </div>
+
+      <div style="width: 200px">
+        <select name="order_classification" class="eal-select" onchange="this.form.submit()">
+          <option value="">{% translate "All Classifications" %}</option>
           {% for code, label in classification_choices %}
             <option value="{{ code }}" {% if classification_filter == code %}selected{% endif %}>{{ label }}</option>
           {% endfor %}
         </select>
-        <select class="eal-filter-select" name="order_status" onchange="this.form.submit()">
-          <option value="">{% translate "Status: All" %}</option>
-          {% for code, label in status_choices %}
-            <option value="{{ code }}" {% if status_filter == code %}selected{% endif %}>{{ label }}</option>
-          {% endfor %}
-        </select>
-
-        {% if search_query or classification_filter or status_filter %}
-          <a href="{% url 'order_list' %}" class="eal-btn eal-btn-outline" style="border-style: dashed; color: var(--text-muted);">
-            <i class="bi bi-x-circle"></i>
-            <span>{% translate "Clear" %}</span>
-          </a>
-        {% endif %}
       </div>
+
+      {% if search_query or status_filter or classification_filter %}
+        <a href="{% url 'order_list' %}" class="eal-btn eal-btn-outline" style="border-style: dashed; color: var(--text-muted); height: 32px; padding: 0 12px; font-size: 11px">
+          <i class="bi bi-x-circle"></i>
+          <span>{% translate "Clear Filters" %}</span>
+        </a>
+      {% endif %}
     </div>
   </form>
 
-  <div class="eal-table-wrap">
+  <div class="eal-table-wrap" style="overflow-x: auto;">
     <table class="eal-table">
       <thead>
         <tr>
-          <th>#</th>
-          <th>{% translate "Tenant" %}</th>
-          <th>{% translate "Classification" %}</th>
-          <th>{% translate "Currency" %}</th>
-          <th>{% translate "Grand Total" %}</th>
-          <th>{% translate "Status" %}</th>
-          <th>{% translate "Created By" %}</th>
-          <th>{% translate "Date" %}</th>
+          <th class="sortable" style="width: 60px">
+            <a href="?q={{ search_query }}&order_status={{ status_filter }}&order_classification={{ classification_filter }}&sort=rank&dir={% if sort == 'rank' and dir == 'asc' %}desc{% else %}asc{% endif %}">
+              <span>#</span>
+              {% if sort == 'rank' %}
+                <i class="bi bi-caret-{% if dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+              {% else %}
+                <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+              {% endif %}
+            </a>
+          </th>
+          <th class="sortable">
+            <a href="?q={{ search_query }}&order_status={{ status_filter }}&order_classification={{ classification_filter }}&sort=tenant&dir={% if sort == 'tenant' and dir == 'asc' %}desc{% else %}asc{% endif %}">
+              <span>{% translate "Tenant" %}</span>
+              {% if sort == 'tenant' %}
+                <i class="bi bi-caret-{% if dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+              {% else %}
+                <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+              {% endif %}
+            </a>
+          </th>
+          <th class="sortable">
+            <a href="?q={{ search_query }}&order_status={{ status_filter }}&order_classification={{ classification_filter }}&sort=classification&dir={% if sort == 'classification' and dir == 'asc' %}desc{% else %}asc{% endif %}">
+              <span>{% translate "Classification" %}</span>
+              {% if sort == 'classification' %}
+                <i class="bi bi-caret-{% if dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+              {% else %}
+                <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+              {% endif %}
+            </a>
+          </th>
+          <th class="sortable">
+            <a href="?q={{ search_query }}&order_status={{ status_filter }}&order_classification={{ classification_filter }}&sort=currency&dir={% if sort == 'currency' and dir == 'asc' %}desc{% else %}asc{% endif %}">
+              <span>{% translate "Cur" %}</span>
+              {% if sort == 'currency' %}
+                <i class="bi bi-caret-{% if dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+              {% else %}
+                <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+              {% endif %}
+            </a>
+          </th>
+          <th class="sortable">
+            <a href="?q={{ search_query }}&order_status={{ status_filter }}&order_classification={{ classification_filter }}&sort=total&dir={% if sort == 'total' and dir == 'asc' %}desc{% else %}asc{% endif %}">
+              <span>{% translate "Grand Total" %}</span>
+              {% if sort == 'total' %}
+                <i class="bi bi-caret-{% if dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+              {% else %}
+                <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+              {% endif %}
+            </a>
+          </th>
+          <th class="sortable">
+            <a href="?q={{ search_query }}&order_status={{ status_filter }}&order_classification={{ classification_filter }}&sort=status&dir={% if sort == 'status' and dir == 'asc' %}desc{% else %}asc{% endif %}">
+              <span>{% translate "Status" %}</span>
+              {% if sort == 'status' %}
+                <i class="bi bi-caret-{% if dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+              {% else %}
+                <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+              {% endif %}
+            </a>
+          </th>
+          <th class="sortable">
+            <a href="?q={{ search_query }}&order_status={{ status_filter }}&order_classification={{ classification_filter }}&sort=created_by&dir={% if sort == 'created_by' and dir == 'asc' %}desc{% else %}asc{% endif %}">
+              <span>{% translate "Created By" %}</span>
+              {% if sort == 'created_by' %}
+                <i class="bi bi-caret-{% if dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+              {% else %}
+                <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+              {% endif %}
+            </a>
+          </th>
+          <th class="sortable">
+            <a href="?q={{ search_query }}&order_status={{ status_filter }}&order_classification={{ classification_filter }}&sort=date&dir={% if sort == 'date' and dir == 'asc' %}desc{% else %}asc{% endif %}">
+              <span>{% translate "Date" %}</span>
+              {% if sort == 'date' %}
+                <i class="bi bi-caret-{% if dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+              {% else %}
+                <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+              {% endif %}
+            </a>
+          </th>
           <th>{% translate "ACTIONS" %}</th>
         </tr>
       </thead>
       <tbody>
       {% for o in orders %}
         <tr>
-          <td>{{ forloop.counter0|add:orders.start_index }}</td>
+          <td>{{ o.default_rank }}</td>
           <td><span class="fw-bold">{{ o.tenant.company_name }}</span></td>
-          <td>{% if o.order_classification == 'New_Subscription' %}<span class="status-badge active">{{ o.get_order_classification_display }}</span>{% elif o.order_classification == 'Renewal' %}<span class="status-badge warning">{{ o.get_order_classification_display }}</span>{% elif o.order_classification == 'Upgrade' %}<span class="status-badge active">{{ o.get_order_classification_display }}</span>{% elif o.order_classification == 'Downgrade' %}<span class="status-badge pending">{{ o.get_order_classification_display }}</span>{% else %}<span class="status-badge inactive">{{ o.get_order_classification_display }}</span>{% endif %}</td>
-          <td>{{ o.currency_id }}</td>
-          <td><span class="eal-entity-id">{{ o.grand_total|floatformat:2 }}</span></td>
-          <td>{% if o.order_status == 'Draft' %}<span class="status-badge pending">{{ o.get_order_status_display }}</span>{% elif o.order_status == 'Pending_Payment' %}<span class="status-badge pending">{{ o.get_order_status_display }}</span>{% elif o.order_status == 'Paid' %}<span class="status-badge active">{{ o.get_order_status_display }}</span>{% else %}<span class="status-badge inactive">{{ o.get_order_status_display }}</span>{% endif %}</td>
-          <td>{% if o.created_by %}{{ o.created_by.first_name }} {{ o.created_by.last_name }}{% else %}-{% endif %}</td>
-          <td>{{ o.created_at|date:'d M Y' }}</td>
+          <td>
+            {% if o.order_classification == 'New_Subscription' %}
+              <span class="badge" style="background: rgba(80, 81, 249, 0.1); color: var(--primary-color);">{{ o.get_order_classification_display }}</span>
+            {% elif o.order_classification == 'Renewal' %}
+              <span class="badge" style="background: rgba(46, 204, 113, 0.1); color: #2ecc71;">{{ o.get_order_classification_display }}</span>
+            {% elif o.order_classification == 'Upgrade' %}
+              <span class="badge" style="background: rgba(155, 89, 182, 0.1); color: #9b59b6;">{{ o.get_order_classification_display }}</span>
+            {% elif o.order_classification == 'Downgrade' %}
+              <span class="badge" style="background: rgba(230, 126, 34, 0.1); color: #e67e22;">{{ o.get_order_classification_display }}</span>
+            {% else %}
+              <span class="badge" style="background: rgba(149, 165, 166, 0.1); color: #95a5a6;">{{ o.get_order_classification_display }}</span>
+            {% endif %}
+          </td>
+          <td><span class="text-muted small fw-bold">{{ o.currency_id }}</span></td>
+          <td><span class="fw-semibold text-primary">{{ o.grand_total|floatformat:2 }}</span></td>
+          <td>
+            {% if o.order_status == 'Paid' %}
+              <div class="eal-status" style="gap: 8px">
+                  <i class="bi bi-circle-fill text-success" style="font-size: 8px"></i>
+                  <span>{% translate "Paid" %}</span>
+              </div>
+            {% elif o.order_status == 'Pending_Payment' or o.order_status == 'Draft' %}
+              <div class="eal-status" style="gap: 8px">
+                  <i class="bi bi-circle-fill text-warning" style="font-size: 8px"></i>
+                  <span>{{ o.get_order_status_display }}</span>
+              </div>
+            {% else %}
+              <div class="eal-status" style="gap: 8px">
+                  <i class="bi bi-circle-fill text-secondary" style="font-size: 8px"></i>
+                  <span>{{ o.get_order_status_display }}</span>
+              </div>
+            {% endif %}
+          </td>
+          <td>
+            {% if o.created_by %}
+              <div class="d-flex align-items-center" style="gap: 8px">
+                <div class="eal-avatar-xs">{{ o.created_by.first_name|first }}{{ o.created_by.last_name|first }}</div>
+                <span class="small">{{ o.created_by.first_name }} {{ o.created_by.last_name }}</span>
+              </div>
+            {% else %}
+              <span class="text-muted">-</span>
+            {% endif %}
+          </td>
+          <td class="text-nowrap small text-muted">{{ o.created_at|date:'d M Y' }}</td>
           <td>
             <div class="eal-actions-cell">
               <a href="{% url 'order_detail' o.order_id %}" class="eal-row-btn" title="{% translate 'View' %}"><i class="bi bi-eye"></i></a>

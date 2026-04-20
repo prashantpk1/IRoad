@@ -7,6 +7,35 @@
   <li class="breadcrumb-item active" aria-current="page">{% translate "FX Rate Change Log" %}</li>
 {% endblock %}
 
+{% block extra_css %}
+<style>
+  .eal-table th.sortable {
+    padding: 0 !important;
+  }
+  .eal-table th.sortable a {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    color: inherit;
+    text-decoration: none;
+    width: 100%;
+    transition: background 0.2s;
+    gap: 10px;
+  }
+  .eal-table th.sortable a:hover {
+    background: rgba(0, 0, 0, 0.02);
+  }
+  .eal-table th.sortable i {
+    font-size: 10px;
+    margin-left: 5px;
+    color: var(--primary-color);
+    opacity: 0.8;
+    flex-shrink: 0;
+  }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
   <div class="page-header-row">
@@ -26,12 +55,21 @@
 </div>
 
 <div class="eal-table-card">
-  <form method="get" action="{% url 'fx_change_log' %}">
-    <div class="eal-toolbar">
-      <div class="eal-toolbar-left" style="width: 100%; gap: 12px; display: flex; flex-wrap: wrap; align-items: end;">
+  <form method="get" action="{% url 'fx_change_log' %}" class="eal-toolbar">
+      <div class="eal-toolbar-left" style="width: 100%; gap: 16px; display: flex; flex-wrap: wrap; align-items: center;">
+        <div class="eal-search" style="flex: 1; min-width: 260px; margin-bottom: 0">
+          <i class="bi bi-search"></i>
+          <input
+            type="text"
+            name="q"
+            placeholder="{% translate 'Search currency, notes, changed by...' %}"
+            value="{{ search_query }}"
+          />
+          <input type="hidden" name="sort" value="{{ current_sort }}">
+          <input type="hidden" name="dir" value="{{ current_dir }}">
+        </div>
         <div style="width: 340px">
-          <label class="form-label">Filter by Currency</label>
-          <select name="currency" class="form-select form-select-sm">
+          <select name="currency" class="eal-select" onchange="this.form.submit()">
             <option value="" {% if not selected_currency_code %}selected{% endif %}>All currencies</option>
             {% for c in currencies %}
               <option
@@ -43,14 +81,14 @@
             {% endfor %}
           </select>
         </div>
-        <div style="display: flex; gap: 8px;">
-          <button type="submit" class="eal-btn eal-btn-primary">
-            <i class="bi bi-funnel"></i>
-            <span>Filter</span>
-          </button>
-        </div>
+
+        {% if selected_currency_code or search_query %}
+          <a href="{% url 'fx_change_log' %}" class="eal-btn eal-btn-outline" style="border-style: dashed; color: var(--text-muted); height: 32px; padding: 0 12px; font-size: 11px">
+            <i class="bi bi-x-circle"></i>
+            <span>Clear Filters</span>
+          </a>
+        {% endif %}
       </div>
-    </div>
   </form>
 
   {% if fx_logs.object_list %}
@@ -58,20 +96,92 @@
       <table class="eal-table">
         <thead>
           <tr>
-            <th style="width: 60px">#</th>
-            <th style="width: 140px">Currency</th>
-            <th style="width: 160px">Old Rate</th>
-            <th style="width: 160px">New Rate</th>
-            <th style="width: 160px">Change±</th>
-            <th>Notes</th>
-            <th style="width: 160px">Changed By</th>
-            <th style="width: 190px">Changed At</th>
+            <th class="sortable" style="width: 60px">
+              <a href="?q={{ search_query|urlencode }}&currency={{ selected_currency_code }}&sort=rank&dir={% if current_sort == 'rank' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>#</span>
+                {% if current_sort == 'rank' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
+            <th class="sortable" style="width: 140px">
+              <a href="?q={{ search_query|urlencode }}&currency={{ selected_currency_code }}&sort=currency&dir={% if current_sort == 'currency' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>Currency</span>
+                {% if current_sort == 'currency' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
+            <th class="sortable" style="width: 160px">
+              <a href="?q={{ search_query|urlencode }}&currency={{ selected_currency_code }}&sort=old_rate&dir={% if current_sort == 'old_rate' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>Old Rate</span>
+                {% if current_sort == 'old_rate' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
+            <th class="sortable" style="width: 160px">
+              <a href="?q={{ search_query|urlencode }}&currency={{ selected_currency_code }}&sort=new_rate&dir={% if current_sort == 'new_rate' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>New Rate</span>
+                {% if current_sort == 'new_rate' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
+            <th class="sortable" style="width: 160px">
+              <a href="?q={{ search_query|urlencode }}&currency={{ selected_currency_code }}&sort=change&dir={% if current_sort == 'change' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>Change±</span>
+                {% if current_sort == 'change' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
+            <th class="sortable">
+              <a href="?q={{ search_query|urlencode }}&currency={{ selected_currency_code }}&sort=notes&dir={% if current_sort == 'notes' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>Notes</span>
+                {% if current_sort == 'notes' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
+            <th class="sortable" style="width: 160px">
+              <a href="?q={{ search_query|urlencode }}&currency={{ selected_currency_code }}&sort=changed_by&dir={% if current_sort == 'changed_by' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>Changed By</span>
+                {% if current_sort == 'changed_by' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
+            <th class="sortable" style="width: 190px">
+              <a href="?q={{ search_query|urlencode }}&currency={{ selected_currency_code }}&sort=changed_at&dir={% if current_sort == 'changed_at' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>Changed At</span>
+                {% if current_sort == 'changed_at' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
           </tr>
         </thead>
         <tbody>
           {% for log in fx_logs.object_list %}
             <tr>
-              <td>{{ forloop.counter0|add:fx_logs.start_index }}</td>
+              <td>{{ fx_logs.start_index|add:forloop.counter0 }}</td>
               <td><span class="eal-entity-id">{{ log.currency.currency_code }}</span></td>
               <td>{{ log.old_rate|floatformat:6 }}</td>
               <td>{{ log.new_rate|floatformat:6 }}</td>

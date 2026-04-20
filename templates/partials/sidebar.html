@@ -252,11 +252,11 @@
 
       <!-- Payment Infrastructure -->
       <li
-        class="nav-item has-submenu{% if 'bank_account' in request.resolver_match.url_name or 'gateway' in request.resolver_match.url_name or 'payment_method' in request.resolver_match.url_name %} open{% endif %}"
+        class="nav-item has-submenu{% if 'bank_account' in request.resolver_match.url_name or 'gateway' in request.resolver_match.url_name and 'comm_gateway' not in request.resolver_match.url_name or 'payment_method' in request.resolver_match.url_name %} open{% endif %}"
       >
         <a
           href="#"
-          class="nav-link{% if 'bank_account' in request.resolver_match.url_name or 'gateway' in request.resolver_match.url_name or 'payment_method' in request.resolver_match.url_name %} active{% endif %}"
+          class="nav-link{% if 'bank_account' in request.resolver_match.url_name or 'gateway' in request.resolver_match.url_name and 'comm_gateway' not in request.resolver_match.url_name or 'payment_method' in request.resolver_match.url_name %} active{% endif %}"
           data-tooltip="{% translate 'Payment Infrastructure' %}"
         >
           <i class="bi bi-building"></i>
@@ -276,7 +276,7 @@
           <li class="submenu-item">
             <a
               href="{% url 'gateway_list' %}"
-              class="submenu-link{% if 'gateway' in request.resolver_match.url_name %} active{% endif %}"
+              class="submenu-link{% if 'gateway' in request.resolver_match.url_name and 'comm_gateway' not in request.resolver_match.url_name %} active{% endif %}"
             >
               <i class="bi bi-shield-lock"></i>
               <span>{% translate "Payment Gateways" %}</span>

@@ -7,67 +7,256 @@
 <li class="breadcrumb-item active" aria-current="page">{% translate "Authentication Log" %}</li>
 {% endblock %}
 
+{% block extra_css %}
+<style>
+  .eal-table th.sortable {
+    padding: 0 !important;
+  }
+  .eal-table th.sortable a {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    color: inherit;
+    text-decoration: none;
+    width: 100%;
+    transition: background 0.2s;
+    gap: 10px;
+  }
+  .eal-table th.sortable a:hover {
+    background: rgba(0, 0, 0, 0.02);
+  }
+  .eal-table th.sortable i {
+    font-size: 10px;
+    margin-left: 5px;
+    color: var(--primary-color);
+    opacity: 0.8;
+    flex-shrink: 0;
+  }
+  .db-table-filters {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .eal-table tr:hover td {
+    background-color: #f8f9ff;
+  }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
   <div class="page-header-row">
     <div class="page-header-left">
       <h1 class="page-title">{% translate "Authentication Log" %}</h1>
-      <p class="page-subtitle">{% translate "Manage your records here" %}</p>
+      <p class="page-subtitle">{% translate "Monitor and audit all system authentication events across your domains." %}</p>
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
-        <!-- Actions here -->
+        {# Immutable log - no actions #}
       </div>
     </div>
   </div>
 </div>
 
-<div class="container py-3">
-  <div class="alert alert-info">
-    This log captures every login, logout, and token refresh attempt across all domains. Immutable — cannot be modified or deleted.
+  <div class="alert alert-info border-0 shadow-sm mb-4" style="background: #eef2ff; color: #4338ca; border-left: 4px solid #6366f1 !important;">
+    <div class="d-flex align-items-center">
+      <i class="bi bi-shield-lock-fill me-3 fs-4"></i>
+      <div>
+        <strong>{% translate "Audit Integrity" %}:</strong> {% translate "This log captures all login, logout, and token refresh attempts. Records are immutable and persist for security compliance." %}
+      </div>
+    </div>
   </div>
 
   <div class="eal-table-card">
-    <form method="get" class="eal-toolbar">
-      <div class="eal-toolbar-left" style="width:100%;display:flex;gap:8px;flex-wrap:wrap;">
-        <div style="width:170px"><select name="attempt_type" class="eal-select"><option value="All" {% if attempt_type_filter == 'All' %}selected{% endif %}>All Attempts</option><option value="Login" {% if attempt_type_filter == 'Login' %}selected{% endif %}>Login</option><option value="Logout" {% if attempt_type_filter == 'Logout' %}selected{% endif %}>Logout</option><option value="Token_Refresh" {% if attempt_type_filter == 'Token_Refresh' %}selected{% endif %}>Token Refresh</option></select></div>
-        <div style="width:170px"><select name="status" class="eal-select"><option value="All" {% if status_filter == 'All' %}selected{% endif %}>All Status</option><option value="Success" {% if status_filter == 'Success' %}selected{% endif %}>Success</option><option value="Failed" {% if status_filter == 'Failed' %}selected{% endif %}>Failed</option><option value="Blocked" {% if status_filter == 'Blocked' %}selected{% endif %}>Blocked</option></select></div>
-        <div style="width:170px"><select name="user_domain" class="eal-select"><option value="All" {% if domain_filter == 'All' %}selected{% endif %}>All Domains</option><option value="Admin" {% if domain_filter == 'Admin' %}selected{% endif %}>Admin</option><option value="Tenant_User" {% if domain_filter == 'Tenant_User' %}selected{% endif %}>Tenant User</option><option value="Driver" {% if domain_filter == 'Driver' %}selected{% endif %}>Driver</option></select></div>
-        <input type="date" name="from_date" value="{{ from_date }}" class="form-control form-control-sm" style="width:150px">
-        <input type="date" name="to_date" value="{{ to_date }}" class="form-control form-control-sm" style="width:150px">
-        <input type="text" name="q" value="{{ search_query }}" class="form-control form-control-sm" placeholder="Email or IP" style="width:180px">
-        <button class="eal-btn eal-btn-primary" type="submit"><i class="bi bi-funnel"></i><span>{% translate "Apply" %}</span></button>
+    <form method="get" action="" class="eal-toolbar">
+      <div class="eal-toolbar-left" style="width: 100%; display: flex; gap: 16px; align-items: center; flex-wrap: wrap">
+        <div class="eal-search" style="flex: 1; min-width: 250px; margin-bottom: 0">
+          <i class="bi bi-search"></i>
+          <input type="text" name="q" value="{{ search_query }}" placeholder="{% translate 'Search Email or IP...' %}">
+          <input type="hidden" name="sort" value="{{ current_sort }}">
+          <input type="hidden" name="dir" value="{{ current_dir }}">
+        </div>
+
+        <div class="db-table-filters">
+          <a href="?q={{ search_query|urlencode }}&attempt_type={{ attempt_type_filter }}&status=All&user_domain={{ domain_filter }}&from_date={{ from_date }}&to_date={{ to_date }}&sort={{ current_sort }}&dir={{ current_dir }}" 
+             class="eal-chip {% if status_filter == 'All' or not status_filter %}active{% endif %}">
+            {% translate "All" %}
+          </a>
+          <a href="?q={{ search_query|urlencode }}&attempt_type={{ attempt_type_filter }}&status=Success&user_domain={{ domain_filter }}&from_date={{ from_date }}&to_date={{ to_date }}&sort={{ current_sort }}&dir={{ current_dir }}" 
+             class="eal-chip {% if status_filter == 'Success' %}active{% endif %}">
+            <i class="bi bi-circle-fill text-success" style="font-size: 6px"></i>{% translate "Success" %}
+          </a>
+          <a href="?q={{ search_query|urlencode }}&attempt_type={{ attempt_type_filter }}&status=Failed&user_domain={{ domain_filter }}&from_date={{ from_date }}&to_date={{ to_date }}&sort={{ current_sort }}&dir={{ current_dir }}" 
+             class="eal-chip {% if status_filter == 'Failed' %}active{% endif %}">
+            <i class="bi bi-circle-fill text-danger" style="font-size: 6px"></i>{% translate "Failed" %}
+          </a>
+          <a href="?q={{ search_query|urlencode }}&attempt_type={{ attempt_type_filter }}&status=Blocked&user_domain={{ domain_filter }}&from_date={{ from_date }}&to_date={{ to_date }}&sort={{ current_sort }}&dir={{ current_dir }}" 
+             class="eal-chip {% if status_filter == 'Blocked' %}active{% endif %}">
+            <i class="bi bi-circle-fill text-warning" style="font-size: 6px"></i>{% translate "Blocked" %}
+          </a>
+        </div>
+
+        <div style="width: 160px">
+          <select name="attempt_type" class="eal-select" onchange="this.form.submit()">
+            <option value="All" {% if attempt_type_filter == 'All' %}selected{% endif %}>{% translate "All Attempts" %}</option>
+            <option value="Login" {% if attempt_type_filter == 'Login' %}selected{% endif %}>{% translate "Login" %}</option>
+            <option value="Logout" {% if attempt_type_filter == 'Logout' %}selected{% endif %}>{% translate "Logout" %}</option>
+            <option value="Token_Refresh" {% if attempt_type_filter == 'Token_Refresh' %}selected{% endif %}>{% translate "Token Refresh" %}</option>
+          </select>
+        </div>
+
+        <div style="width: 160px">
+          <select name="user_domain" class="eal-select" onchange="this.form.submit()">
+            <option value="All" {% if domain_filter == 'All' %}selected{% endif %}>{% translate "All Domains" %}</option>
+            <option value="Admin" {% if domain_filter == 'Admin' %}selected{% endif %}>{% translate "Admin" %}</option>
+            <option value="Tenant_User" {% if domain_filter == 'Tenant_User' %}selected{% endif %}>{% translate "Tenant User" %}</option>
+            <option value="Driver" {% if domain_filter == 'Driver' %}selected{% endif %}>{% translate "Driver" %}</option>
+          </select>
+        </div>
+
+        <div style="width: 140px">
+          <input type="date" name="from_date" value="{{ from_date }}" class="form-control form-control-sm" onchange="this.form.submit()" style="height: 38px; border-radius: 8px;">
+        </div>
+
+        {% if search_query or attempt_type_filter != 'All' or status_filter != 'All' or domain_filter != 'All' or from_date %}
+          <a href="{% url 'access_log' %}" class="eal-btn eal-btn-outline" style="border-style: dashed; color: var(--text-muted); height: 38px; padding: 0 12px; font-size: 11px">
+            <i class="bi bi-x-circle"></i>
+            <span>{% translate "Reset" %}</span>
+          </a>
+        {% endif %}
       </div>
     </form>
 
-    <div class="eal-table-wrap">
+    <div class="eal-table-wrap" style="margin-top: 8px">
       <table class="eal-table">
-        <thead><tr><th>#</th><th>Attempt Type badge</th><th>Status badge</th><th>Domain badge</th><th>Email</th><th>IP</th><th>Timestamp</th></tr></thead>
+        <thead>
+          <tr>
+            <th class="sortable" style="width: 60px">
+              <a href="?q={{ search_query|urlencode }}&attempt_type={{ attempt_type_filter }}&status={{ status_filter }}&user_domain={{ domain_filter }}&from_date={{ from_date }}&to_date={{ to_date }}&sort=rank&dir={% if current_sort == 'rank' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>#</span>
+                {% if current_sort == 'rank' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
+            <th class="sortable">
+              <a href="?q={{ search_query|urlencode }}&attempt_type={{ attempt_type_filter }}&status={{ status_filter }}&user_domain={{ domain_filter }}&from_date={{ from_date }}&to_date={{ to_date }}&sort=attempt_type&dir={% if current_sort == 'attempt_type' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>{% translate "Attempt Type" %}</span>
+                {% if current_sort == 'attempt_type' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
+            <th class="sortable">
+              <a href="?q={{ search_query|urlencode }}&attempt_type={{ attempt_type_filter }}&status={{ status_filter }}&user_domain={{ domain_filter }}&from_date={{ from_date }}&to_date={{ to_date }}&sort=status&dir={% if current_sort == 'status' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>{% translate "Status" %}</span>
+                {% if current_sort == 'status' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
+            <th class="sortable">
+              <a href="?q={{ search_query|urlencode }}&attempt_type={{ attempt_type_filter }}&status={{ status_filter }}&user_domain={{ domain_filter }}&from_date={{ from_date }}&to_date={{ to_date }}&sort=user_domain&dir={% if current_sort == 'user_domain' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>{% translate "User Domain" %}</span>
+                {% if current_sort == 'user_domain' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
+            <th class="sortable">
+              <a href="?q={{ search_query|urlencode }}&attempt_type={{ attempt_type_filter }}&status={{ status_filter }}&user_domain={{ domain_filter }}&from_date={{ from_date }}&to_date={{ to_date }}&sort=email&dir={% if current_sort == 'email' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>{% translate "Email Identity" %}</span>
+                {% if current_sort == 'email' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
+            <th class="sortable" style="width: 150px">
+              <a href="?q={{ search_query|urlencode }}&attempt_type={{ attempt_type_filter }}&status={{ status_filter }}&user_domain={{ domain_filter }}&from_date={{ from_date }}&to_date={{ to_date }}&sort=ip&dir={% if current_sort == 'ip' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>{% translate "IP Address" %}</span>
+                {% if current_sort == 'ip' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
+            <th class="sortable" style="width: 200px">
+              <a href="?q={{ search_query|urlencode }}&attempt_type={{ attempt_type_filter }}&status={{ status_filter }}&user_domain={{ domain_filter }}&from_date={{ from_date }}&to_date={{ to_date }}&sort=timestamp&dir={% if current_sort == 'timestamp' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>{% translate "Timestamp" %}</span>
+                {% if current_sort == 'timestamp' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
+          </tr>
+        </thead>
         <tbody>
           {% for log in access_logs %}
           <tr>
-            <td>{{ forloop.counter0|add:access_logs.start_index }}</td>
-            <td>{% if log.attempt_type == 'Login' %}<span class="badge status-badge status-issued">Login</span>{% elif log.attempt_type == 'Logout' %}<span class="badge status-badge status-inactive">Logout</span>{% else %}<span class="badge status-badge status-scheduled">Token Refresh</span>{% endif %}</td>
-            <td>{% if log.status == 'Success' %}<span class="badge status-badge status-active">Success</span>{% elif log.status == 'Failed' %}<span class="badge status-badge status-suspended">Failed</span>{% else %}<span class="badge status-badge status-pending">Blocked</span>{% endif %}</td>
-            <td>{% if log.user_domain == 'Admin' %}<span class="badge status-badge status-issued">Admin</span>{% elif log.user_domain == 'Tenant_User' %}<span class="badge status-badge status-active">Tenant User</span>{% else %}<span class="badge status-badge status-pending">Driver</span>{% endif %}</td>
-            <td>{{ log.email_used }}</td>
-            <td>{{ log.ip_address|default:'-' }}</td>
-            <td>{{ log.timestamp }}</td>
+            <td><span class="text-muted small">{{ forloop.counter0|add:access_logs.start_index }}</span></td>
+            <td>
+               {% if log.attempt_type == 'Login' %}
+                 <span class="eal-type-badge ind">{% translate "Login" %}</span>
+               {% elif log.attempt_type == 'Logout' %}
+                 <span class="eal-type-badge org">{% translate "Logout" %}</span>
+               {% else %}
+                 <span class="eal-type-badge gov">{% translate "Refresh" %}</span>
+               {% endif %}
+            </td>
+            <td>
+              {% if log.status == 'Success' %}
+                <span class="status-badge active">{% translate "Success" %}</span>
+              {% elif log.status == 'Failed' %}
+                <span class="status-badge inactive">{% translate "Failed" %}</span>
+              {% else %}
+                <span class="status-badge warning">{% translate "Blocked" %}</span>
+              {% endif %}
+            </td>
+            <td>
+              <span class="fw-medium text-dark">
+                {% if log.user_domain == 'Admin' %}
+                  <i class="bi bi-shield-lock me-1 text-primary"></i> 
+                {% elif log.user_domain == 'Tenant_User' %}
+                  <i class="bi bi-building me-1 text-info"></i>
+                {% else %}
+                  <i class="bi bi-truck me-1 text-success"></i>
+                {% endif %}
+                {{ log.get_user_domain_display|default:log.user_domain }}
+              </span>
+            </td>
+            <td><span class="fw-semibold text-primary-gradient">{{ log.email_used }}</span></td>
+            <td><code>{{ log.ip_address|default:'-' }}</code></td>
+            <td><span class="eal-date"><i class="bi bi-clock"></i> {{ log.timestamp|date:'d M Y, H:i:s' }}</span></td>
           </tr>
           {% empty %}
           <tr class="eal-table-empty">
-  <td colspan="20">
-    <div class="eal-empty-icon"><i class="bi bi-inbox"></i></div>
-    <div class="eal-empty-title">{% translate "No Data Found" %}</div>
-    <div class="eal-empty-text">No records found.</div>
-  </td>
-</tr>
+            <td colspan="7">
+              <div class="py-5 text-center">
+                <i class="bi bi-shield-slash text-muted" style="font-size: 3rem; opacity: 0.4;"></i>
+                <h4 class="mt-3 text-muted">{% translate "No logs found" %}</h4>
+                <p class="text-muted small">{% translate "Try adjusting your filters or search query." %}</p>
+              </div>
+            </td>
+          </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
     {% include 'partials/pagination.html' with page_obj=access_logs %}
   </div>
-</div>
 {% endblock %}
 

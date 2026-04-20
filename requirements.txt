@@ -1,0 +1,2 @@
+# Canonical dependency list is req.txt (used by the Dockerfile).
+-r req.txt

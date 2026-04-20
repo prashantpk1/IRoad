@@ -95,11 +95,25 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    background: var(--bg-light);
+    background: #f8fafc;
     border-radius: 12px;
-    padding: 10px;
+    padding: 12px;
     border: 1px solid var(--border-light);
     min-height: 100%;
+    transition: all 0.3s ease;
+  }
+  .status-field:hover {
+    border-color: var(--primary-light);
+    background: #f1f5f9;
+  }
+  
+  /* FORCE HIDE CHECKBOX */
+  .eal-switch input[type="checkbox"] {
+    position: absolute !important;
+    opacity: 0 !important;
+    width: 0 !important;
+    height: 0 !important;
+    pointer-events: none !important;
   }
 </style>
 {% endblock %}
@@ -160,8 +174,11 @@
       <div class="field">
         <label class="form-label text-center d-block w-100 mb-2">{% translate "Status" %}</label>
         <div class="status-field">
-          {{ form.is_active }}
-          <span class="small text-muted mt-1">{% translate "Active" %}</span>
+          <label class="eal-switch">
+            {{ form.is_active }}
+            <span class="eal-slider"></span>
+          </label>
+          <span class="small text-muted mt-2" style="font-weight: 600; letter-spacing: 0.5px; font-size: 11px; text-transform: uppercase;">{% translate "Active" %}</span>
         </div>
       </div>
     </div>
@@ -223,7 +240,7 @@
       <span class="text-muted small ms-2">{% translate "(Click to insert at cursor position)" %}</span>
     </div>
     <div style="display: flex; gap: 12px; flex-wrap: wrap;">
-      {% with vars="client_name otp_code invoice_amount invoice_number plan_name expiry_date company_name support_email admin_user reset_url invite_url api_bridge_key portal_bootstrap_password portal_login_url tenant.company_name" %}
+      {% with vars="client_name otp_code invoice_amount invoice_number plan_name expiry_date company_name company_logo company_logo_img support_email admin_user reset_url invite_url api_bridge_key portal_bootstrap_password portal_login_url tenant.company_name" %}
       {% for var in vars.split %}
         <button type="button" class="var-chip" onclick="insertVar('{% templatetag openvariable %}{{ var }}{% templatetag closevariable %}')">
           <i class="bi bi-code-slash"></i>

@@ -141,6 +141,20 @@ def get_all_active_admin_sessions():
     return sessions
 
 
+def count_active_admin_sessions():
+    """Count active admin sessions from Redis efficiently."""
+    client = get_redis_client()
+    pattern = 'admin:session:*'
+    count = 0
+    cursor = 0
+    while True:
+        cursor, keys = client.scan(cursor, match=pattern, count=1000)
+        count += len(keys)
+        if cursor == 0:
+            break
+    return count
+
+
 # ─────────────────────────────────────────
 # TENANT KILL SWITCH (Phase 8 ready)
 # ─────────────────────────────────────────

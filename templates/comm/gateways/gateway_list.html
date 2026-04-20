@@ -7,6 +7,40 @@
 <li class="breadcrumb-item active" aria-current="page">{% translate "Communication Gateways" %}</li>
 {% endblock %}
 
+{% block extra_css %}
+<style>
+  .eal-table th.sortable {
+    padding: 0 !important;
+  }
+  .eal-table th.sortable a {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    color: inherit;
+    text-decoration: none;
+    width: 100%;
+    transition: background 0.2s;
+    gap: 10px;
+  }
+  .eal-table th.sortable a:hover {
+    background: rgba(0, 0, 0, 0.02);
+  }
+  .eal-table th.sortable i {
+    font-size: 10px;
+    margin-left: 5px;
+    color: var(--primary-color);
+    opacity: 0.8;
+    flex-shrink: 0;
+  }
+  .db-table-filters {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
   <div class="page-header-row">
@@ -36,19 +70,141 @@
   {% endif %}
 
   <div class="eal-table-card">
+    <form method="get" action="{% url 'comm_gateway_list' %}" class="eal-toolbar">
+      <div class="eal-toolbar-left" style="width: 100%; display: flex; gap: 16px; align-items: center; flex-wrap: wrap">
+        <div class="eal-search" style="flex: 1; min-width: 250px; margin-bottom: 0">
+          <i class="bi bi-search"></i>
+          <input
+            type="text"
+            name="q"
+            placeholder="{% translate 'Search provider, host, sender...' %}"
+            value="{{ search_query }}"
+          />
+          <input type="hidden" name="gateway_type" value="{{ type_filter }}">
+          <input type="hidden" name="status" value="{{ status_filter }}">
+          <input type="hidden" name="sort" value="{{ current_sort }}">
+          <input type="hidden" name="dir" value="{{ current_dir }}">
+        </div>
+
+        <div class="db-table-filters">
+          <a href="?q={{ search_query }}&gateway_type={{ type_filter }}&status=All&sort={{ current_sort }}&dir={{ current_dir }}"
+             class="filter-chip {% if status_filter == 'All' %}active{% endif %}">
+            {% translate "All Status" %}
+          </a>
+          <a href="?q={{ search_query }}&gateway_type={{ type_filter }}&status=Active&sort={{ current_sort }}&dir={{ current_dir }}"
+             class="filter-chip {% if status_filter == 'Active' %}active{% endif %}">
+            <i class="bi bi-circle-fill text-success" style="font-size: 6px"></i>
+            {% translate "Active" %}
+          </a>
+          <a href="?q={{ search_query }}&gateway_type={{ type_filter }}&status=Inactive&sort={{ current_sort }}&dir={{ current_dir }}"
+             class="filter-chip {% if status_filter == 'Inactive' %}active{% endif %}">
+            <i class="bi bi-circle-fill text-danger" style="font-size: 6px"></i>
+            {% translate "Inactive" %}
+          </a>
+        </div>
+
+        <div style="width: 150px">
+          <select name="gateway_type" class="eal-select" onchange="this.form.submit()">
+            <option value="All" {% if type_filter == 'All' %}selected{% endif %}>{% translate "All Types" %}</option>
+            <option value="Email" {% if type_filter == 'Email' %}selected{% endif %}>{% translate "Email" %}</option>
+            <option value="SMS" {% if type_filter == 'SMS' %}selected{% endif %}>{% translate "SMS" %}</option>
+          </select>
+        </div>
+
+        {% if search_query or status_filter != 'All' or type_filter != 'All' %}
+          <a href="{% url 'comm_gateway_list' %}" class="eal-btn eal-btn-outline" style="border-style: dashed; color: var(--text-muted); height: 32px; padding: 0 12px; font-size: 11px">
+            <i class="bi bi-x-circle"></i>
+            <span>{% translate "Clear Filters" %}</span>
+          </a>
+        {% endif %}
+      </div>
+    </form>
+
     {% if gateways.object_list %}
       <div class="eal-table-wrap">
         <table class="eal-table">
           <thead>
             <tr>
-              <th>#</th>
-              <th>Type badge</th>
-              <th>Provider</th>
-              <th>Host</th>
-              <th>Port</th>
-              <th>Sender ID</th>
-              <th>Encryption</th>
-              <th>Status</th>
+              <th class="sortable" style="width: 60px">
+                <a href="?q={{ search_query }}&gateway_type={{ type_filter }}&status={{ status_filter }}&sort=rank&dir={% if current_sort == 'rank' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                  <span>#</span>
+                  {% if current_sort == 'rank' %}
+                    <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                  {% else %}
+                    <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                  {% endif %}
+                </a>
+              </th>
+              <th class="sortable">
+                <a href="?q={{ search_query }}&gateway_type={{ type_filter }}&status={{ status_filter }}&sort=type&dir={% if current_sort == 'type' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                  <span>{% translate "Type Badge" %}</span>
+                  {% if current_sort == 'type' %}
+                    <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                  {% else %}
+                    <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                  {% endif %}
+                </a>
+              </th>
+              <th class="sortable">
+                <a href="?q={{ search_query }}&gateway_type={{ type_filter }}&status={{ status_filter }}&sort=provider&dir={% if current_sort == 'provider' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                  <span>{% translate "Provider" %}</span>
+                  {% if current_sort == 'provider' %}
+                    <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                  {% else %}
+                    <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                  {% endif %}
+                </a>
+              </th>
+              <th class="sortable">
+                <a href="?q={{ search_query }}&gateway_type={{ type_filter }}&status={{ status_filter }}&sort=host&dir={% if current_sort == 'host' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                  <span>{% translate "Host" %}</span>
+                  {% if current_sort == 'host' %}
+                    <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                  {% else %}
+                    <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                  {% endif %}
+                </a>
+              </th>
+              <th class="sortable">
+                <a href="?q={{ search_query }}&gateway_type={{ type_filter }}&status={{ status_filter }}&sort=port&dir={% if current_sort == 'port' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                  <span>{% translate "Port" %}</span>
+                  {% if current_sort == 'port' %}
+                    <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                  {% else %}
+                    <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                  {% endif %}
+                </a>
+              </th>
+              <th class="sortable">
+                <a href="?q={{ search_query }}&gateway_type={{ type_filter }}&status={{ status_filter }}&sort=sender&dir={% if current_sort == 'sender' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                  <span>{% translate "Sender ID" %}</span>
+                  {% if current_sort == 'sender' %}
+                    <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                  {% else %}
+                    <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                  {% endif %}
+                </a>
+              </th>
+              <th class="sortable">
+                <a href="?q={{ search_query }}&gateway_type={{ type_filter }}&status={{ status_filter }}&sort=encryption&dir={% if current_sort == 'encryption' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                  <span>{% translate "Encryption" %}</span>
+                  {% if current_sort == 'encryption' %}
+                    <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                  {% else %}
+                    <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                  {% endif %}
+                </a>
+              </th>
+              <th class="sortable">
+                <a href="?q={{ search_query }}&gateway_type={{ type_filter }}&status={{ status_filter }}&sort=status&dir={% if current_sort == 'status' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                  <span>{% translate "Status" %}</span>
+                  {% if current_sort == 'status' %}
+                    <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                  {% else %}
+                    <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                  {% endif %}
+                </a>
+              </th>
               <th>ACTIONS</th>
             </tr>
           </thead>

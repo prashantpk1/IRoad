@@ -8,6 +8,40 @@
 <li class="breadcrumb-item active" aria-current="page">{% translate "Push Notifications" %}</li>
 {% endblock %}
 
+{% block extra_css %}
+<style>
+  .eal-table th.sortable {
+    padding: 0 !important;
+  }
+  .eal-table th.sortable a {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    color: inherit;
+    text-decoration: none;
+    width: 100%;
+    transition: background 0.2s;
+    gap: 10px;
+  }
+  .eal-table th.sortable a:hover {
+    background: rgba(0, 0, 0, 0.02);
+  }
+  .eal-table th.sortable i {
+    font-size: 10px;
+    margin-left: 5px;
+    color: var(--primary-color);
+    opacity: 0.8;
+    flex-shrink: 0;
+  }
+  .db-table-filters {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
   <div class="page-header-row">
@@ -24,23 +58,131 @@
 </div>
 
   <div class="eal-table-card">
-    <form method="get">
-      <div class="eal-toolbar">
-        <div class="eal-toolbar-left" style="width:100%; display:flex; gap:12px; flex-wrap:wrap;">
-          <div style="width:220px"><select class="eal-select" name="trigger_mode"><option value="All" {% if trigger_mode_filter == 'All' %}selected{% endif %}>All Trigger Modes</option><option value="Manual_Broadcast" {% if trigger_mode_filter == 'Manual_Broadcast' %}selected{% endif %}>Manual</option><option value="System_Event" {% if trigger_mode_filter == 'System_Event' %}selected{% endif %}>System</option></select></div>
-          <div style="width:220px"><select class="eal-select" name="dispatch_status"><option value="All" {% if dispatch_status_filter == 'All' %}selected{% endif %}>All Statuses</option><option value="Draft" {% if dispatch_status_filter == 'Draft' %}selected{% endif %}>Draft</option><option value="Scheduled" {% if dispatch_status_filter == 'Scheduled' %}selected{% endif %}>Scheduled</option><option value="Completed" {% if dispatch_status_filter == 'Completed' %}selected{% endif %}>Completed</option></select></div>
-          <button type="submit" class="eal-btn eal-btn-primary"><i class="bi bi-funnel"></i><span>{% translate "Apply" %}</span></button>
+    <form method="get" class="eal-toolbar">
+      <div class="eal-toolbar-left" style="width:100%; display:flex; gap:16px; align-items:center; flex-wrap:wrap;">
+        <div class="eal-search" style="flex: 1; min-width: 250px; margin-bottom: 0">
+          <i class="bi bi-search"></i>
+          <input
+            type="text"
+            name="q"
+            placeholder="{% translate 'Search name, audience, event...' %}"
+            value="{{ search_query }}"
+          />
+          <input type="hidden" name="trigger_mode" value="{{ trigger_mode_filter }}">
+          <input type="hidden" name="sort" value="{{ current_sort }}">
+          <input type="hidden" name="dir" value="{{ current_dir }}">
         </div>
+
+        <div class="db-table-filters">
+          <a href="?q={{ search_query }}&trigger_mode={{ trigger_mode_filter }}&dispatch_status=All&sort={{ current_sort }}&dir={{ current_dir }}"
+             class="filter-chip {% if dispatch_status_filter == 'All' %}active{% endif %}">
+            {% translate "All Status" %}
+          </a>
+          <a href="?q={{ search_query }}&trigger_mode={{ trigger_mode_filter }}&dispatch_status=Draft&sort={{ current_sort }}&dir={{ current_dir }}"
+             class="filter-chip {% if dispatch_status_filter == 'Draft' %}active{% endif %}">
+            <i class="bi bi-circle-fill text-secondary" style="font-size: 6px"></i>
+            {% translate "Draft" %}
+          </a>
+          <a href="?q={{ search_query }}&trigger_mode={{ trigger_mode_filter }}&dispatch_status=Scheduled&sort={{ current_sort }}&dir={{ current_dir }}"
+             class="filter-chip {% if dispatch_status_filter == 'Scheduled' %}active{% endif %}">
+            <i class="bi bi-circle-fill text-warning" style="font-size: 6px"></i>
+            {% translate "Scheduled" %}
+          </a>
+          <a href="?q={{ search_query }}&trigger_mode={{ trigger_mode_filter }}&dispatch_status=Completed&sort={{ current_sort }}&dir={{ current_dir }}"
+             class="filter-chip {% if dispatch_status_filter == 'Completed' %}active{% endif %}">
+            <i class="bi bi-circle-fill text-success" style="font-size: 6px"></i>
+            {% translate "Completed" %}
+          </a>
+        </div>
+
+        <div style="width:220px">
+          <select class="eal-select" name="trigger_mode" onchange="this.form.submit()">
+            <option value="All" {% if trigger_mode_filter == 'All' %}selected{% endif %}>All Trigger Modes</option>
+            <option value="Manual_Broadcast" {% if trigger_mode_filter == 'Manual_Broadcast' %}selected{% endif %}>Manual</option>
+            <option value="System_Event" {% if trigger_mode_filter == 'System_Event' %}selected{% endif %}>System</option>
+          </select>
+        </div>
+
+        {% if search_query or trigger_mode_filter != 'All' or dispatch_status_filter != 'All' %}
+          <a href="{% url 'push_notif_list' %}" class="eal-btn eal-btn-outline" style="border-style: dashed; color: var(--text-muted); height: 32px; padding: 0 12px; font-size: 11px">
+            <i class="bi bi-x-circle"></i>
+            <span>{% translate "Clear Filters" %}</span>
+          </a>
+        {% endif %}
       </div>
     </form>
 
     <div class="eal-table-wrap">
       <table class="eal-table">
-        <thead><tr><th>#</th><th>Name</th><th>Trigger Mode badge</th><th>Audience/Event</th><th>Scheduled At</th><th>Status</th><th>ACTIONS</th></tr></thead>
+        <thead>
+          <tr>
+            <th class="sortable" style="width: 60px">
+              <a href="?q={{ search_query }}&trigger_mode={{ trigger_mode_filter }}&dispatch_status={{ dispatch_status_filter }}&sort=rank&dir={% if current_sort == 'rank' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>#</span>
+                {% if current_sort == 'rank' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
+            <th class="sortable">
+              <a href="?q={{ search_query }}&trigger_mode={{ trigger_mode_filter }}&dispatch_status={{ dispatch_status_filter }}&sort=name&dir={% if current_sort == 'name' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>{% translate "Name" %}</span>
+                {% if current_sort == 'name' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
+            <th class="sortable">
+              <a href="?q={{ search_query }}&trigger_mode={{ trigger_mode_filter }}&dispatch_status={{ dispatch_status_filter }}&sort=trigger&dir={% if current_sort == 'trigger' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>{% translate "Trigger Mode Badge" %}</span>
+                {% if current_sort == 'trigger' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
+            <th class="sortable">
+              <a href="?q={{ search_query }}&trigger_mode={{ trigger_mode_filter }}&dispatch_status={{ dispatch_status_filter }}&sort=audience&dir={% if current_sort == 'audience' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>{% translate "Audience/Event" %}</span>
+                {% if current_sort == 'audience' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
+            <th class="sortable">
+              <a href="?q={{ search_query }}&trigger_mode={{ trigger_mode_filter }}&dispatch_status={{ dispatch_status_filter }}&sort=scheduled&dir={% if current_sort == 'scheduled' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>{% translate "Scheduled At" %}</span>
+                {% if current_sort == 'scheduled' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
+            <th class="sortable">
+              <a href="?q={{ search_query }}&trigger_mode={{ trigger_mode_filter }}&dispatch_status={{ dispatch_status_filter }}&sort=status&dir={% if current_sort == 'status' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>{% translate "Status" %}</span>
+                {% if current_sort == 'status' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
+            <th>{% translate "ACTIONS" %}</th>
+          </tr>
+        </thead>
         <tbody>
           {% for row in push_items %}
             <tr>
-              <td>{{ forloop.counter0|add:push_items.start_index }}</td>
+              <td>{{ row.default_rank }}</td>
               <td>{{ row.internal_name }}</td>
               <td>
                 {% if row.trigger_mode == 'Manual_Broadcast' %}

@@ -1,45 +1,117 @@
 {% extends 'base.html' %}
-{% block title %}Admin Security Settings{% endblock %}
-{% block content %}
-<div class="container py-3">
-  <h4 class="mb-3">Admin Security Settings</h4>
-  <div class="alert alert-info">
-    Configure session timeout and login lockout policy for admin accounts.
-  </div>
+{% load i18n %}
 
-  <div class="card">
-    <div class="card-body">
-      <form method="post" novalidate>
-        {% csrf_token %}
-        <div class="mb-3">
-          <label class="form-label" for="{{ form.session_timeout_minutes.id_for_label }}">{{ form.session_timeout_minutes.label }}</label>
-          {{ form.session_timeout_minutes }}
-          {% if form.session_timeout_minutes.errors %}
-          <div class="text-danger small mt-1">{{ form.session_timeout_minutes.errors|join:', ' }}</div>
-          {% endif %}
-        </div>
-        <div class="mb-3">
-          <label class="form-label" for="{{ form.max_failed_logins.id_for_label }}">{{ form.max_failed_logins.label }}</label>
-          {{ form.max_failed_logins }}
-          {% if form.max_failed_logins.errors %}
-          <div class="text-danger small mt-1">{{ form.max_failed_logins.errors|join:', ' }}</div>
-          {% endif %}
-        </div>
-        <div class="mb-3">
-          <label class="form-label" for="{{ form.lockout_duration_minutes.id_for_label }}">{{ form.lockout_duration_minutes.label }}</label>
-          {{ form.lockout_duration_minutes }}
-          {% if form.lockout_duration_minutes.errors %}
-          <div class="text-danger small mt-1">{{ form.lockout_duration_minutes.errors|join:', ' }}</div>
-          {% endif %}
-        </div>
-        <div class="text-muted small mb-3">
-          Last updated by:
-          {% if obj.updated_by %}{{ obj.updated_by.first_name }} {{ obj.updated_by.last_name }}{% else %}N/A{% endif %}
-          {% if obj.updated_at %} | {{ obj.updated_at }}{% endif %}
-        </div>
-        <button type="submit" class="btn btn-primary">Save</button>
-      </form>
+{% block page_title %}{% translate "Admin Security Settings" %}{% endblock %}
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard' %}">{% translate "Dashboard" %}</a></li>
+<li class="breadcrumb-item active" aria-current="page">{% translate "Security Settings" %}</li>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">{% translate "Admin Security Settings" %}</h1>
+      <p class="page-subtitle">{% translate "Configure session thresholds and login lockout policies to safeguard administrative access." %}</p>
     </div>
   </div>
 </div>
+
+<div class="alert alert-info border-0 shadow-sm mb-4" style="background: #eef2ff; color: #4338ca; border-left: 4px solid #6366f1 !important;">
+  <div class="d-flex align-items-center">
+    <i class="bi bi-shield-lock-fill me-3 fs-4"></i>
+    <div>
+      <strong>{% translate "Security Compliance" %}:</strong> {% translate "These settings apply globally to all admin users. Changes take effect on the next session initiation." %}
+    </div>
+  </div>
+</div>
+
+<form method="post" novalidate autocomplete="off">
+  {% csrf_token %}
+  
+  <div class="form-card mb-4">
+    <div class="form-card-header">
+      <div class="form-card-icon indigo">
+        <i class="bi bi-shield-check"></i>
+      </div>
+      <div class="form-card-header-text">
+        <h3 class="form-card-title">{% translate "Access & Lockout Policy" %}</h3>
+        <p class="form-card-desc">{% translate "Define how long sessions persist and when accounts should be locked after failed attempts." %}</p>
+      </div>
+    </div>
+    <div class="form-card-body">
+      <div class="row g-4">
+        <div class="col-12 col-md-4">
+          <div class="field-wrapper">
+            <label class="form-label" for="{{ form.session_timeout_minutes.id_for_label }}">
+              {% translate "Session Timeout" %} 
+              <span class="text-muted ms-1" style="font-weight: normal">({% translate "Minutes" %})</span>
+            </label>
+            {{ form.session_timeout_minutes }}
+            {% if form.session_timeout_minutes.errors %}
+              <div class="field-error"><i class="bi bi-info-circle"></i> {{ form.session_timeout_minutes.errors|join:', ' }}</div>
+            {% endif %}
+            <small class="text-muted d-block mt-1">{% translate "Recommended: 60 - 240 mins" %}</small>
+          </div>
+        </div>
+
+        <div class="col-12 col-md-4">
+          <div class="field-wrapper">
+            <label class="form-label" for="{{ form.max_failed_logins.id_for_label }}">
+              {% translate "Max Failed Logins" %}
+            </label>
+            {{ form.max_failed_logins }}
+            {% if form.max_failed_logins.errors %}
+              <div class="field-error"><i class="bi bi-info-circle"></i> {{ form.max_failed_logins.errors|join:', ' }}</div>
+            {% endif %}
+            <small class="text-muted d-block mt-1">{% translate "Attempts before lockout" %}</small>
+          </div>
+        </div>
+
+        <div class="col-12 col-md-4">
+          <div class="field-wrapper">
+            <label class="form-label" for="{{ form.lockout_duration_minutes.id_for_label }}">
+              {% translate "Lockout Duration" %}
+              <span class="text-muted ms-1" style="font-weight: normal">({% translate "Minutes" %})</span>
+            </label>
+            {{ form.lockout_duration_minutes }}
+            {% if form.lockout_duration_minutes.errors %}
+              <div class="field-error"><i class="bi bi-info-circle"></i> {{ form.lockout_duration_minutes.errors|join:', ' }}</div>
+            {% endif %}
+            <small class="text-muted d-block mt-1">{% translate "Cool-down period" %}</small>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="form-card-footer bg-light border-top p-3 d-flex align-items-center justify-content-between">
+      <div class="text-muted small">
+        <i class="bi bi-clock-history me-1"></i>
+        {% translate "Last updated by" %}: 
+        <strong>{% if obj.updated_by %}{{ obj.updated_by.get_full_name|default:obj.updated_by.email }}{% else %}System{% endif %}</strong>
+        {% if obj.updated_at %} | {{ obj.updated_at|date:'d M Y, H:i' }}{% endif %}
+      </div>
+      <div>
+        <span class="badge bg-secondary-soft text-secondary rounded-pill">
+          <i class="bi bi-gear-fill me-1"></i> Security Global
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-actions-bar">
+    <div class="form-actions-left">
+      <a href="{% url 'dashboard' %}" class="eal-btn eal-btn-outline">
+        <i class="bi bi-arrow-left"></i>
+        <span>{% translate "Return to Dashboard" %}</span>
+      </a>
+    </div>
+    <div class="form-actions-right">
+      <button type="submit" class="eal-btn eal-btn-primary">
+        <i class="bi bi-save"></i>
+        <span>{% translate "Apply Security Settings" %}</span>
+      </button>
+    </div>
+  </div>
+</form>
 {% endblock %}

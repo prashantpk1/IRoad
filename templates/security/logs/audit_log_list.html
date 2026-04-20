@@ -7,68 +7,230 @@
 <li class="breadcrumb-item active" aria-current="page">{% translate "Master Audit Log" %}</li>
 {% endblock %}
 
+{% block extra_css %}
+<style>
+  .eal-table th.sortable {
+    padding: 0 !important;
+  }
+  .eal-table th.sortable a {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    color: inherit;
+    text-decoration: none;
+    width: 100%;
+    transition: background 0.2s;
+    gap: 10px;
+  }
+  .eal-table th.sortable a:hover {
+    background: rgba(0, 0, 0, 0.02);
+  }
+  .eal-table th.sortable i {
+    font-size: 10px;
+    margin-left: 5px;
+    color: var(--primary-color);
+    opacity: 0.8;
+    flex-shrink: 0;
+  }
+  .eal-table tr:hover td {
+    background-color: #f8f9ff;
+  }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
   <div class="page-header-row">
     <div class="page-header-left">
       <h1 class="page-title">{% translate "Master Audit Log" %}</h1>
-      <p class="page-subtitle">{% translate "Manage your records here" %}</p>
+      <p class="page-subtitle">{% translate "Immutable trail of all administrative actions performed within the system." %}</p>
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
-        <!-- Actions here -->
+        {# Audit trail - no external actions #}
       </div>
     </div>
   </div>
 </div>
 
-<div class="container py-3">
-  <div class="alert alert-dark">
-    The Black Box. Every admin action recorded immutably. Cannot be modified or deleted.
+  <div class="alert alert-dark border-0 shadow-sm mb-4" style="background: #1e293b; color: #f1f5f9; border-left: 4px solid #64748b !important;">
+    <div class="d-flex align-items-center">
+      <i class="bi bi-shield-check-fill me-3 fs-4 text-info"></i>
+      <div>
+        <strong>{% translate "The Black Box" %}:</strong> {% translate "Every administrative action is recorded here immutably. These records cannot be modified or deleted, ensuring full accountability and security compliance." %}
+      </div>
+    </div>
   </div>
 
   <div class="eal-table-card">
-    <form method="get" class="eal-toolbar">
-      <div class="eal-toolbar-left" style="width:100%;display:flex;gap:8px;flex-wrap:wrap;">
-        <div style="width:170px"><select name="action_type" class="eal-select"><option value="All" {% if action_filter == 'All' %}selected{% endif %}>All Actions</option><option value="Create" {% if action_filter == 'Create' %}selected{% endif %}>Create</option><option value="Update" {% if action_filter == 'Update' %}selected{% endif %}>Update</option><option value="Delete" {% if action_filter == 'Delete' %}selected{% endif %}>Delete</option><option value="Status_Change" {% if action_filter == 'Status_Change' %}selected{% endif %}>Status Change</option></select></div>
-        <div style="width:180px"><select name="module_name" class="eal-select"><option value="">All Modules</option>{% for m in modules %}<option value="{{ m }}" {% if module_filter == m %}selected{% endif %}>{{ m }}</option>{% endfor %}</select></div>
-        <div style="width:180px"><select name="admin" class="eal-select"><option value="">All Admins</option>{% for a in admins %}<option value="{{ a.pk }}" {% if admin_filter == a.pk|stringformat:'s' %}selected{% endif %}>{{ a.first_name }} {{ a.last_name }}</option>{% endfor %}</select></div>
-        <input type="date" name="from_date" value="{{ from_date }}" class="form-control form-control-sm" style="width:150px">
-        <input type="date" name="to_date" value="{{ to_date }}" class="form-control form-control-sm" style="width:150px">
-        <input type="text" name="q" value="{{ search_query }}" class="form-control form-control-sm" placeholder="Module or Record ID" style="width:180px">
-        <button class="eal-btn eal-btn-primary" type="submit"><i class="bi bi-funnel"></i><span>{% translate "Apply" %}</span></button>
+    <form method="get" action="" class="eal-toolbar">
+      <div class="eal-toolbar-left" style="width: 100%; display: flex; gap: 12px; align-items: center; flex-wrap: wrap">
+        
+        <div class="eal-search" style="flex: 1; min-width: 250px; margin-bottom: 0">
+          <i class="bi bi-search"></i>
+          <input type="text" name="q" value="{{ search_query }}" placeholder="{% translate 'Search Module or Record ID...' %}">
+          <input type="hidden" name="sort" value="{{ current_sort }}">
+          <input type="hidden" name="dir" value="{{ current_dir }}">
+        </div>
+
+        <div style="width: 160px">
+          <select name="action_type" class="eal-select" onchange="this.form.submit()">
+            <option value="All" {% if action_filter == 'All' %}selected{% endif %}>{% translate "All Actions" %}</option>
+            <option value="Create" {% if action_filter == 'Create' %}selected{% endif %}>{% translate "Create" %}</option>
+            <option value="Update" {% if action_filter == 'Update' %}selected{% endif %}>{% translate "Update" %}</option>
+            <option value="Delete" {% if action_filter == 'Delete' %}selected{% endif %}>{% translate "Delete" %}</option>
+            <option value="Status_Change" {% if action_filter == 'Status_Change' %}selected{% endif %}>{% translate "Status Change" %}</option>
+          </select>
+        </div>
+
+        <div style="width: 160px">
+          <select name="module_name" class="eal-select" onchange="this.form.submit()">
+            <option value="">{% translate "All Modules" %}</option>
+            {% for m in modules %}
+              <option value="{{ m }}" {% if module_filter == m %}selected{% endif %}>{{ m }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div style="width: 160px">
+          <select name="admin" class="eal-select" onchange="this.form.submit()">
+            <option value="">{% translate "All Admins" %}</option>
+            {% for a in admins %}
+              <option value="{{ a.pk }}" {% if admin_filter == a.pk|stringformat:'s' %}selected{% endif %}>{{ a.get_full_name|default:a.email }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div style="width: 140px">
+          <input type="date" name="from_date" value="{{ from_date }}" class="form-control form-control-sm" onchange="this.form.submit()" style="height: 38px; border-radius: 8px;">
+        </div>
+
+        {% if search_query or action_filter != 'All' or module_filter or admin_filter or from_date %}
+          <a href="{% url 'audit_log' %}" class="eal-btn eal-btn-outline" style="border-style: dashed; color: var(--text-muted); height: 38px; padding: 0 12px; font-size: 11px">
+            <i class="bi bi-x-circle"></i>
+            <span>{% translate "Reset" %}</span>
+          </a>
+        {% endif %}
       </div>
     </form>
 
-    <div class="eal-table-wrap">
+    <div class="eal-table-wrap" style="margin-top: 8px">
       <table class="eal-table">
-        <thead><tr><th>#</th><th>Admin</th><th>Action badge</th><th>Module</th><th>Record ID</th><th>IP</th><th>Timestamp</th><th>Actions</th></tr></thead>
+        <thead>
+          <tr>
+            <th class="sortable" style="width: 60px">
+              <a href="?q={{ search_query|urlencode }}&action_type={{ action_filter }}&module_name={{ module_filter }}&admin={{ admin_filter }}&from_date={{ from_date }}&sort=rank&dir={% if current_sort == 'rank' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>#</span>
+                {% if current_sort == 'rank' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
+            <th class="sortable">
+              <a href="?q={{ search_query|urlencode }}&action_type={{ action_filter }}&module_name={{ module_filter }}&admin={{ admin_filter }}&from_date={{ from_date }}&sort=admin&dir={% if current_sort == 'admin' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>{% translate "Admin" %}</span>
+                {% if current_sort == 'admin' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
+            <th class="sortable">
+              <a href="?q={{ search_query|urlencode }}&action_type={{ action_filter }}&module_name={{ module_filter }}&admin={{ admin_filter }}&from_date={{ from_date }}&sort=action_type&dir={% if current_sort == 'action_type' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>{% translate "Action Badge" %}</span>
+                {% if current_sort == 'action_type' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
+            <th class="sortable">
+              <a href="?q={{ search_query|urlencode }}&action_type={{ action_filter }}&module_name={{ module_filter }}&admin={{ admin_filter }}&from_date={{ from_date }}&sort=module_name&dir={% if current_sort == 'module_name' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>{% translate "Module" %}</span>
+                {% if current_sort == 'module_name' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
+            <th class="sortable">
+               <span>{% translate "Record ID" %}</span>
+            </th>
+            <th class="sortable" style="width: 150px">
+              <a href="?q={{ search_query|urlencode }}&action_type={{ action_filter }}&module_name={{ module_filter }}&admin={{ admin_filter }}&from_date={{ from_date }}&sort=ip&dir={% if current_sort == 'ip' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>{% translate "IP Address" %}</span>
+                {% if current_sort == 'ip' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
+            <th class="sortable" style="width: 200px">
+              <a href="?q={{ search_query|urlencode }}&action_type={{ action_filter }}&module_name={{ module_filter }}&admin={{ admin_filter }}&from_date={{ from_date }}&sort=timestamp&dir={% if current_sort == 'timestamp' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>{% translate "Timestamp" %}</span>
+                {% if current_sort == 'timestamp' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
+            <th style="width: 100px">{% translate "Actions" %}</th>
+          </tr>
+        </thead>
         <tbody>
           {% for log in audit_logs %}
           <tr>
-            <td>{{ forloop.counter0|add:audit_logs.start_index }}</td>
-            <td>{{ log.admin|default:'N/A' }}</td>
-            <td>{% if log.action_type == 'Create' %}<span class="badge status-badge status-active">Create</span>{% elif log.action_type == 'Update' %}<span class="badge status-badge status-issued">Update</span>{% elif log.action_type == 'Delete' %}<span class="badge status-badge status-suspended">Delete</span>{% else %}<span class="badge status-badge status-pending">Status Change</span>{% endif %}</td>
-            <td>{{ log.module_name }}</td>
-            <td>{{ log.record_id }}</td>
-            <td>{{ log.ip_address }}</td>
-            <td>{{ log.timestamp }}</td>
-            <td><a href="{% url 'audit_log_detail' log.audit_id %}" class="btn btn-sm btn-outline-primary">View</a></td>
+            <td><span class="text-muted small">#{{ forloop.counter0|add:audit_logs.start_index }}</span></td>
+            <td>
+              <div class="d-flex flex-column">
+                <span class="fw-bold text-dark">{{ log.admin.get_full_name|default:log.admin.email|default:'N/A' }}</span>
+                <span class="text-muted extra-small" style="font-size: 10px">{{ log.admin.email }}</span>
+              </div>
+            </td>
+            <td>
+              {% if log.action_type == 'Create' %}
+                <span class="status-badge active">{% translate "Create" %}</span>
+              {% elif log.action_type == 'Update' %}
+                <span class="status-badge success" style="background: #eef2ff; color: #4338ca;">{% translate "Update" %}</span>
+              {% elif log.action_type == 'Delete' %}
+                <span class="status-badge inactive">{% translate "Delete" %}</span>
+              {% else %}
+                <span class="status-badge warning">{% translate "Status Change" %}</span>
+              {% endif %}
+            </td>
+            <td><span class="eal-type-badge ind">{{ log.module_name }}</span></td>
+            <td><span class="eal-entity-id" style="font-size: 11px">{{ log.record_id|truncatechars:12 }}</span></td>
+            <td><code>{{ log.ip_address|default:'-' }}</code></td>
+            <td><span class="eal-date"><i class="bi bi-calendar-event"></i> {{ log.timestamp|date:'d M Y, H:i' }}</span></td>
+            <td>
+              <div class="eal-actions-cell">
+                <a href="{% url 'audit_log_detail' log.audit_id %}" class="eal-row-btn" title="{% translate 'View Details' %}"><i class="bi bi-eye"></i></a>
+              </div>
+            </td>
           </tr>
           {% empty %}
           <tr class="eal-table-empty">
-  <td colspan="20">
-    <div class="eal-empty-icon"><i class="bi bi-inbox"></i></div>
-    <div class="eal-empty-title">{% translate "No Data Found" %}</div>
-    <div class="eal-empty-text">No records found.</div>
-  </td>
-</tr>
+            <td colspan="8">
+              <div class="py-5 text-center">
+                <div class="empty-icon"><i class="bi bi-shield-slash"></i></div>
+                <h4 class="empty-title">{% translate "No logs found" %}</h4>
+                <p class="empty-text">{% translate "No administrative actions match your current filters." %}</p>
+              </div>
+            </td>
+          </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
     {% include 'partials/pagination.html' with page_obj=audit_logs %}
   </div>
-</div>
 {% endblock %}
 

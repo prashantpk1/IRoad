@@ -7,6 +7,41 @@
   <li class="breadcrumb-item active" aria-current="page">{% translate "Admin Users" %}</li>
 {% endblock %}
 
+{% block extra_css %}
+<style>
+  .eal-table th.sortable {
+    padding: 0 !important;
+  }
+  .eal-table th.sortable a {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    color: inherit;
+    text-decoration: none;
+    width: 100%;
+    transition: background 0.2s;
+  }
+  .eal-table th.sortable a:hover {
+    background: rgba(0,0,0,0.02);
+  }
+  .eal-table th.sortable i {
+    font-size: 10px;
+    margin-left: 5px;
+    color: var(--primary-color);
+    opacity: 0.8;
+  }
+  .filter-chip {
+    text-decoration: none !important;
+  }
+  .db-table-filters {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
   <div class="page-header-row">
@@ -28,15 +63,9 @@
 </div>
 
 <div class="eal-table-card">
-  <div class="eal-toolbar">
-    <div class="eal-toolbar-left">
-      <span class="eal-result-badge">Total: <strong>{{ total_count }}</strong></span>
-    </div>
-  </div>
-
   <form method="get" action="{% url 'admin_user_list' %}" class="eal-toolbar">
-    <div class="eal-toolbar-left" style="width: 100%; display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap">
-      <div class="eal-search" style="flex: 1; min-width: 240px">
+    <div class="eal-toolbar-left" style="width: 100%; display: flex; gap: 16px; align-items: center; flex-wrap: wrap">
+      <div class="eal-search" style="flex: 1; min-width: 250px; margin-bottom: 0">
         <i class="bi bi-search"></i>
         <input
           type="text"
@@ -44,33 +73,49 @@
           placeholder="Search by name or email"
           value="{{ search_query }}"
         />
+        <input type="hidden" name="sort" value="{{ current_sort }}">
+        <input type="hidden" name="dir" value="{{ current_dir }}">
       </div>
-      <div style="width: 220px">
-        <select name="status" class="form-select form-select-sm">
-          <option value="All" {% if status_filter == 'All' %}selected{% endif %}>All</option>
-          <option value="Pending_Activation" {% if status_filter == 'Pending_Activation' %}selected{% endif %}>
-            Pending
-          </option>
-          <option value="Active" {% if status_filter == 'Active' %}selected{% endif %}>Active</option>
-          <option value="Suspended" {% if status_filter == 'Suspended' %}selected{% endif %}>Suspended</option>
-        </select>
+      
+      <div class="db-table-filters">
+        <a href="?q={{ search_query }}&status=All&role={{ role_filter }}&sort={{ current_sort }}&dir={{ current_dir }}" 
+           class="filter-chip {% if status_filter == 'All' %}active{% endif %}">
+          All
+        </a>
+        <a href="?q={{ search_query }}&status=Pending_Activation&role={{ role_filter }}&sort={{ current_sort }}&dir={{ current_dir }}" 
+           class="filter-chip {% if status_filter == 'Pending_Activation' %}active{% endif %}">
+          <i class="bi bi-circle-fill text-warning" style="font-size: 6px"></i> 
+          {% translate "Pending" %}
+        </a>
+        <a href="?q={{ search_query }}&status=Active&role={{ role_filter }}&sort={{ current_sort }}&dir={{ current_dir }}" 
+           class="filter-chip {% if status_filter == 'Active' %}active{% endif %}">
+          <i class="bi bi-circle-fill text-success" style="font-size: 6px"></i>
+          {% translate "Active" %}
+        </a>
+        <a href="?q={{ search_query }}&status=Suspended&role={{ role_filter }}&sort={{ current_sort }}&dir={{ current_dir }}" 
+           class="filter-chip {% if status_filter == 'Suspended' %}active{% endif %}">
+          <i class="bi bi-circle-fill text-danger" style="font-size: 6px"></i>
+          {% translate "Suspended" %}
+        </a>
       </div>
-      <div style="width: 220px">
-        <select name="role" class="form-select form-select-sm">
-          <option value="All" {% if role_filter == 'All' %}selected{% endif %}>All</option>
-          {% for role in roles %}
-            <option value="{{ role.pk }}" {% if role_filter == role.pk|stringformat:"s" %}selected{% endif %}>
-              {{ role.role_name_en }}
+
+      <div style="width: 180px">
+        <select name="role" class="eal-select" onchange="this.form.submit()">
+          <option value="All" {% if role_filter == 'All' %}selected{% endif %}>All Roles</option>
+          {% for r in roles %}
+            <option value="{{ r.pk }}" {% if role_filter == r.pk|stringformat:"s" %}selected{% endif %}>
+              {{ r.role_name_en }}
             </option>
           {% endfor %}
         </select>
       </div>
-      <div style="width: 120px">
-        <button type="submit" class="eal-btn eal-btn-primary" style="width: 100%">
-          <i class="bi bi-search"></i>
-          <span>Filter</span>
-        </button>
-      </div>
+
+      {% if search_query or status_filter != 'All' or role_filter != 'All' %}
+        <a href="{% url 'admin_user_list' %}" class="eal-btn eal-btn-outline" style="border-style: dashed; color: var(--text-muted); height: 32px; padding: 0 12px; font-size: 11px">
+          <i class="bi bi-x-circle"></i>
+          <span>Clear Filters</span>
+        </a>
+      {% endif %}
     </div>
   </form>
 
@@ -80,20 +125,74 @@
       <table class="eal-table">
         <thead>
           <tr>
-            <th style="width: 60px">#</th>
-            <th>Name</th>
-            <th>Email</th>
-            <th>Role</th>
-            <th style="width: 140px">Status badge</th>
+            <th class="sortable" style="width: 60px">
+              <a href="?q={{ search_query }}&status={{ status_filter }}&role={{ role_filter }}&sort=rank&dir={% if current_sort == 'rank' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>#</span>
+                {% if current_sort == 'rank' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
+            <th class="sortable">
+              <a href="?q={{ search_query }}&status={{ status_filter }}&role={{ role_filter }}&sort=name&dir={% if current_sort == 'name' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>Name</span>
+                {% if current_sort == 'name' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
+            <th class="sortable">
+              <a href="?q={{ search_query }}&status={{ status_filter }}&role={{ role_filter }}&sort=email&dir={% if current_sort == 'email' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>Email</span>
+                {% if current_sort == 'email' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
+            <th class="sortable">
+              <a href="?q={{ search_query }}&status={{ status_filter }}&role={{ role_filter }}&sort=role&dir={% if current_sort == 'role' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>Role</span>
+                {% if current_sort == 'role' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
+            <th class="sortable" style="width: 150px">
+              <a href="?q={{ search_query }}&status={{ status_filter }}&role={{ role_filter }}&sort=status&dir={% if current_sort == 'status' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>Status</span>
+                {% if current_sort == 'status' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
             <th style="width: 120px">2FA</th>
-            <th style="width: 170px">Last Login</th>
+            <th class="sortable" style="width: 170px">
+              <a href="?q={{ search_query }}&status={{ status_filter }}&role={{ role_filter }}&sort=last_login_at&dir={% if current_sort == 'last_login_at' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>Last Login</span>
+                {% if current_sort == 'last_login_at' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
             <th style="width: 300px">{% translate "Actions" %}</th>
           </tr>
         </thead>
         <tbody>
           {% for u in admin_users.object_list %}
             <tr>
-              <td>{{ forloop.counter0|add:admin_users.start_index }}</td>
+              <td>{{ u.default_rank }}</td>
               <td>
                 <div class="eal-name-cell">
                   <span class="eal-name-text">

@@ -1,0 +1,292 @@
+{% load static %}
+{% load i18n %}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="iRoad Admin Dashboard - OTP Verification" />
+    <title>OTP Verification | iRoad Admin</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="{% static 'css/style.css' %}" />
+    <link rel="stylesheet" href="{% static 'css/responsive.css' %}" />
+    <style>
+      .otp-digit-group {
+        display: flex;
+        gap: 12px;
+        justify-content: center;
+        margin-bottom: 24px;
+      }
+      .otp-digit-input {
+        width: 54px;
+        height: 64px;
+        text-align: center;
+        font-size: 26px;
+        font-weight: 700;
+        color: var(--text-dark);
+        border: 2px solid var(--border-light);
+        border-radius: var(--radius-md);
+        background: #ffffff;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+      }
+      .otp-digit-input:focus {
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 4px rgba(80, 81, 249, 0.12);
+        outline: none;
+        transform: translateY(-2px);
+      }
+      .otp-digit-input.filled {
+         background: var(--primary-light);
+         border-color: var(--primary-color);
+         color: var(--primary-color);
+      }
+      @media (max-width: 480px) {
+        .otp-digit-input {
+          width: 42px;
+          height: 52px;
+          font-size: 20px;
+        }
+        .otp-digit-group { gap: 8px; }
+      }
+    </style>
+  </head>
+  <body class="auth-body">
+    <div class="auth-container">
+      <div class="auth-left">
+        <div class="auth-left-content">
+          <h2 class="auth-tagline">
+            Streamline Your Logistics <br />Operations Effortlessly.
+          </h2>
+          <p class="auth-description">
+            Efficiently manage your fleet, cargo, accounts & deliveries with our
+            powerful admin dashboard.
+          </p>
+        </div>
+        <div class="auth-left-overlay"></div>
+      </div>
+
+      <div class="auth-right">
+        <div class="auth-form-container">
+          <div class="auth-form-header">
+            <div class="auth-brand">
+              <span class="auth-logo">i<span>Road</span></span>
+            </div>
+            <h1 class="auth-title">OTP Verification</h1>
+            <p class="auth-subtitle">Enter the code sent to {{ masked_email }}</p>
+          </div>
+
+          <form class="auth-form" method="post" action="{% url 'otp_verify' %}">
+            {% csrf_token %}
+
+            {% if messages %}
+            <div class="auth-field">
+              {% for message in messages %}
+              <div class="auth-alert auth-alert-{% if message.tags == 'error' %}error{% else %}{{ message.tags|default:'success' }}{% endif %}">
+                <i class="bi bi-{% if message.tags == 'error' %}exclamation-circle{% else %}check-circle{% endif %}"></i>
+                <div class="auth-alert-content">
+                  <p class="auth-text">{{ message }}</p>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+            {% endif %}
+
+            {% if form.errors or error %}
+            <div class="auth-field">
+              <div class="auth-alert auth-alert-error">
+                <i class="bi bi-exclamation-circle"></i>
+                <div class="auth-alert-content">
+                  {% if error %}
+                  <p class="auth-text">{{ error }}</p>
+                  {% endif %}
+                  {% if form.non_field_errors %}
+                    {% for error in form.non_field_errors %}
+                    <p class="auth-text">{{ error }}</p>
+                    {% endfor %}
+                  {% endif %}
+                  {% for field in form %}
+                    {% for error in field.errors %}
+                    <p class="auth-text">{{ error }}</p>
+                    {% endfor %}
+                  {% endfor %}
+                </div>
+              </div>
+            </div>
+            {% endif %}
+
+            <div class="auth-field">
+              <label class="auth-label" style="text-align: center; display: block; margin-bottom: 20px;">{% translate "One-Time Password" %}</label>
+              <div class="otp-digit-group">
+                <input type="text" class="otp-digit-input" id="digit-1" maxlength="1" inputmode="numeric" pattern="\d*" autocomplete="one-time-code">
+                <input type="text" class="otp-digit-input" id="digit-2" maxlength="1" inputmode="numeric" pattern="\d*">
+                <input type="text" class="otp-digit-input" id="digit-3" maxlength="1" inputmode="numeric" pattern="\d*">
+                <input type="text" class="otp-digit-input" id="digit-4" maxlength="1" inputmode="numeric" pattern="\d*">
+                <input type="text" class="otp-digit-input" id="digit-5" maxlength="1" inputmode="numeric" pattern="\d*">
+                <input type="text" class="otp-digit-input" id="digit-6" maxlength="1" inputmode="numeric" pattern="\d*">
+              </div>
+              <input type="hidden" id="otp" name="otp" value="{{ form.otp.value|default:'' }}">
+            </div>
+
+            <div class="otp-attempts-info">
+              <div class="otp-attempts-left {% if attempts_left <= 2 %}danger{% elif attempts_left <= 3 %}warning{% endif %}">
+                <i class="bi bi-shield-exclamation"></i>
+                <span>{{ attempts_left }} attempts remaining</span>
+              </div>
+            </div>
+
+            <div class="otp-timer-wrapper">
+              <div class="otp-timer-info">
+                <div class="otp-timer-label">
+                  <i class="bi bi-clock-history"></i>
+                  <span>Security Code Expires in</span>
+                </div>
+                <div class="otp-timer-value" id="otp-timer">00:00</div>
+              </div>
+              <div class="otp-timer-bar-bg">
+                <div class="otp-timer-bar-fill" id="otp-timer-bar"></div>
+              </div>
+            </div>
+
+            <button type="submit" class="auth-btn auth-btn-primary">
+              <i class="bi bi-shield-check"></i>
+              Verify OTP
+            </button>
+          </form>
+
+          <form method="post" action="{% url 'otp_verify' %}" style="margin-top: 10px">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="resend" />
+            <button type="submit" class="auth-btn" style="width: 100%">
+              <i class="bi bi-arrow-clockwise"></i>
+              Resend OTP
+            </button>
+          </form>
+
+          <div class="auth-footer">
+            <p>&copy; 2026 iRoad. All rights reserved.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script src="{% static 'js/main.js' %}"></script>
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        const digits = document.querySelectorAll('.otp-digit-input');
+        const otpHidden = document.getElementById('otp');
+
+        const updateHiddenField = () => {
+          let code = '';
+          digits.forEach(input => {
+            code += input.value;
+            if (input.value) input.classList.add('filled');
+            else input.classList.remove('filled');
+          });
+          otpHidden.value = code;
+        };
+
+        digits.forEach((input, index) => {
+          // Handle typing
+          input.addEventListener('input', (e) => {
+            if (e.inputType === 'deleteContentBackward') return;
+            
+            const value = e.target.value;
+            if (value && index < digits.length - 1) {
+              digits[index + 1].focus();
+            }
+            updateHiddenField();
+          });
+
+          // Handle Backspace and Navigation
+          input.addEventListener('keydown', (e) => {
+            if (e.key === 'Backspace') {
+              if (!input.value && index > 0) {
+                digits[index - 1].focus();
+              }
+            } else if (e.key === 'ArrowLeft' && index > 0) {
+              digits[index - 1].focus();
+            } else if (e.key === 'ArrowRight' && index < digits.length - 1) {
+              digits[index + 1].focus();
+            }
+          });
+
+          // Handle Paste
+          input.addEventListener('paste', (e) => {
+            e.preventDefault();
+            const data = (e.clipboardData || window.clipboardData).getData('text').trim();
+            if (!/^\d+$/.test(data)) return;
+
+            const chars = data.split('');
+            chars.forEach((char, i) => {
+              if (index + i < digits.length) {
+                digits[index + i].value = char;
+              }
+            });
+            
+            const nextIndex = Math.min(index + chars.length, digits.length - 1);
+            digits[nextIndex].focus();
+            updateHiddenField();
+          });
+        });
+
+        // Autofocus first field
+        digits[0].focus();
+
+        // TIMER LOGIC
+        const initialSeconds = {{ remaining_seconds|default:0 }};
+        const totalTTL = 300; // Match ADMIN_LOGIN_OTP_TTL_SECONDS in views.py
+        let secondsRemaining = initialSeconds;
+
+        const timerText = document.getElementById('otp-timer');
+        const timerBar = document.getElementById('otp-timer-bar');
+        const submitBtn = document.querySelector('.auth-btn-primary');
+
+        const formatTime = (seconds) => {
+          const mins = Math.floor(seconds / 60);
+          const secs = seconds % 60;
+          return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        };
+
+        const updateTimer = () => {
+          if (secondsRemaining <= 0) {
+            if (timerText) timerText.innerText = "00:00";
+            if (timerBar) timerBar.style.width = "0%";
+            if (submitBtn) {
+               submitBtn.disabled = true;
+               submitBtn.style.opacity = '0.6';
+               submitBtn.innerHTML = '<i class="bi bi-exclamation-triangle"></i> Code Expired';
+            }
+            clearInterval(timerInterval);
+            return;
+          }
+
+          if (timerText) timerText.innerText = formatTime(secondsRemaining);
+          const percent = (secondsRemaining / totalTTL) * 100;
+          if (timerBar) {
+            timerBar.style.width = `${percent}%`;
+            if (secondsRemaining < 30) {
+              timerBar.classList.add('danger');
+              timerText.style.color = 'var(--error-color, #ef4444)';
+            } else if (secondsRemaining < 120) {
+              timerBar.classList.add('warning');
+            }
+          }
+
+          secondsRemaining--;
+        };
+
+        const timerInterval = setInterval(updateTimer, 1000);
+        updateTimer();
+      });
+    </script>
+  </body>
+</html>

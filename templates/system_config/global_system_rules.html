@@ -2,7 +2,104 @@
 
 {% block page_title %}Global System Rules{% endblock %}
 
+{% block extra_css %}
+  <style>
+    .global-rules-shell .info-note {
+      margin-bottom: 16px;
+      padding: 12px 14px;
+      border-radius: 10px;
+      background: #eff6ff;
+      border: 1px solid #dbeafe;
+    }
+    .global-rules-shell .info-note p {
+      margin: 0;
+      font-weight: 700;
+      color: #1e3a8a;
+    }
+    .global-rules-shell .flash-message {
+      margin: 0;
+      font-weight: 600;
+    }
+    .global-rules-shell .flash-message.error {
+      color: #b91c1c;
+    }
+    .global-rules-shell .flash-message.success {
+      color: #15803d;
+    }
+    .global-rules-shell .field-error {
+      margin-top: 6px;
+      color: #b91c1c;
+      font-weight: 600;
+      font-size: 12px;
+    }
+    .global-rules-shell .form-card .form-card-body input[type="text"],
+    .global-rules-shell .form-card .form-card-body input[type="number"],
+    .global-rules-shell .form-card .form-card-body input[type="email"],
+    .global-rules-shell .form-card .form-card-body input[type="date"],
+    .global-rules-shell .form-card .form-card-body input[type="time"],
+    .global-rules-shell .form-card .form-card-body select,
+    .global-rules-shell .form-card .form-card-body textarea {
+      display: block;
+      width: 100%;
+      min-height: 42px;
+      padding: 10px 14px;
+      font-size: 14px;
+      color: #1e293b;
+      background-color: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .global-rules-shell .form-card .form-card-body input:focus,
+    .global-rules-shell .form-card .form-card-body select:focus,
+    .global-rules-shell .form-card .form-card-body textarea:focus {
+      outline: none;
+      border-color: #5051f9;
+      box-shadow: 0 0 0 4px rgba(80, 81, 249, 0.12);
+    }
+    .global-rules-shell .meta-note {
+      margin-top: 14px;
+      color: #64748b;
+      font-weight: 600;
+    }
+    .global-rules-shell .readonly-value {
+      display: flex;
+      align-items: center;
+      min-height: 42px;
+      width: 100%;
+      padding: 10px 14px;
+      font-size: 14px;
+      color: #475569;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      box-shadow: inset 0 1px 1px rgba(15, 23, 42, 0.03);
+    }
+    .global-rules-shell .audit-grid {
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 1px solid #e2e8f0;
+    }
+    .global-rules-shell .form-actions-bar {
+      position: static !important;
+      left: auto !important;
+      right: auto !important;
+      bottom: auto !important;
+      width: auto !important;
+      margin-top: 14px;
+      border-radius: 8px;
+    }
+    .global-rules-shell .form-actions-right {
+      display: flex;
+      justify-content: flex-end;
+      width: 100%;
+    }
+  </style>
+{% endblock %}
+
 {% block content %}
+  <div class="global-rules-shell">
   <div class="page-header">
     <nav aria-label="breadcrumb">
       <ol class="breadcrumb">
@@ -18,8 +115,8 @@
     </div>
   </div>
 
-  <div style="margin-bottom: 16px; padding: 12px 14px; border-radius: 10px; background: #eff6ff; border: 1px solid #dbeafe">
-    <p style="margin: 0; font-weight: 700; color: #1e3a8a">
+  <div class="info-note">
+    <p>
       These settings govern billing cycles and subscription expiry calculations.
     </p>
   </div>
@@ -27,7 +124,7 @@
   {% if messages %}
     <div style="margin-bottom: 16px">
       {% for message in messages %}
-        <p style="margin: 0; color: {% if message.tags == 'error' %}#b91c1c{% else %}#15803d{% endif %}; font-weight: 600">
+        <p class="flash-message {% if message.tags == 'error' %}error{% else %}success{% endif %}">
           {{ message }}
         </p>
       {% endfor %}
@@ -37,7 +134,7 @@
   <form method="post" action="">
     {% csrf_token %}
     {% if form.non_field_errors %}
-      <div style="margin-bottom: 16px; color: #b91c1c; font-weight: 600">
+      <div class="field-error" style="margin-bottom: 16px">
         {{ form.non_field_errors }}
       </div>
     {% endif %}
@@ -47,56 +144,73 @@
         <div class="field-group">
           <div class="fields-grid cols-2">
             <div class="field">
+              <label class="form-label">Rule ID</label>
+              <div class="readonly-value">{{ obj.rule_id }}</div>
+            </div>
+            <div class="field">
               <label class="form-label">System Timezone</label>
               {{ form.system_timezone }}
               {% for error in form.system_timezone.errors %}
-                <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+                <div class="field-error">{{ error }}</div>
               {% endfor %}
             </div>
             <div class="field">
               <label class="form-label">Default Date Format</label>
               {{ form.default_date_format }}
               {% for error in form.default_date_format.errors %}
-                <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+                <div class="field-error">{{ error }}</div>
               {% endfor %}
             </div>
             <div class="field">
               <label class="form-label">Grace Period Days</label>
               {{ form.grace_period_days }}
               {% for error in form.grace_period_days.errors %}
-                <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+                <div class="field-error">{{ error }}</div>
               {% endfor %}
             </div>
             <div class="field">
               <label class="form-label">Standard Billing Cycle</label>
               {{ form.standard_billing_cycle }}
               {% for error in form.standard_billing_cycle.errors %}
-                <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
+                <div class="field-error">{{ error }}</div>
               {% endfor %}
+            </div>
+          </div>
+        </div>
+        <div class="fields-grid cols-2 audit-grid">
+          <div class="field">
+            <label class="form-label">Updated By</label>
+            <div class="readonly-value">
+              {% if obj.updated_by %}
+                {{ obj.updated_by.email }}
+              {% else %}
+                Not updated yet
+              {% endif %}
+            </div>
+          </div>
+          <div class="field">
+            <label class="form-label">Updated At</label>
+            <div class="readonly-value">
+              {% if obj.updated_at %}
+                {{ obj.updated_at|date:"M d, Y, g:i a" }}
+              {% else %}
+                Not updated yet
+              {% endif %}
             </div>
           </div>
         </div>
       </div>
     </div>
 
-    <div class="form-actions-bar sticky-bottom">
+    <div class="form-actions-bar">
       <div class="form-actions-left"></div>
       <div class="form-actions-right">
-        <button type="submit" class="btn btn-primary">
+        <button type="submit" class="eal-btn eal-btn-primary">
           <i class="bi bi-save"></i>
           Save
         </button>
       </div>
     </div>
   </form>
-
-  <div style="margin-top: 14px; color: #64748b; font-weight: 600">
-    Last updated by:
-    {% if obj.updated_by %}
-      {{ obj.updated_by.email }}
-    {% else %}
-      Unknown
-    {% endif %}
-    at {{ obj.updated_at }}
   </div>
 {% endblock %}

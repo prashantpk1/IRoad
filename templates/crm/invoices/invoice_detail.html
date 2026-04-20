@@ -12,6 +12,7 @@
 <div class="page-header">
   <div class="page-header-row">
     <div class="page-header-left">
+      
       <h1 class="page-title">{{ invoice.invoice_number }}</h1>
       <p class="page-subtitle">{% translate "Supplier and customer snapshot with immutable totals." %}</p>
     </div>
@@ -21,10 +22,17 @@
           <i class="bi bi-arrow-left"></i>
           <span>{% translate "Back to list" %}</span>
         </a>
-        <button type="button" class="eal-btn eal-btn-outline" disabled title="{% translate 'Coming soon' %}">
+        <a href="{% url 'invoice_print' invoice.invoice_id %}" target="_blank" class="eal-btn eal-btn-outline" title="{% translate 'Open print view' %}">
           <i class="bi bi-printer"></i>
           <span>{% translate "Print / Download" %}</span>
-        </button>
+        </a>
+        <form method="post" action="{% url 'invoice_send_email' invoice.invoice_id %}">
+          {% csrf_token %}
+          <button type="submit" class="eal-btn eal-btn-outline">
+            <i class="bi bi-envelope"></i>
+            <span>{% translate "Send Email" %}</span>
+          </button>
+        </form>
       </div>
     </div>
   </div>

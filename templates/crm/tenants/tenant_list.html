@@ -8,6 +8,35 @@
 <li class="breadcrumb-item active" aria-current="page">{% translate "Subscribers" %}</li>
 {% endblock %}
 
+{% block extra_css %}
+<style>
+  .eal-table th.sortable {
+    padding: 0 !important;
+  }
+  .eal-table th.sortable a {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    color: inherit;
+    text-decoration: none;
+    width: 100%;
+    transition: background 0.2s;
+    gap: 10px;
+  }
+  .eal-table th.sortable a:hover {
+    background: rgba(0, 0, 0, 0.02);
+  }
+  .eal-table th.sortable i {
+    font-size: 10px;
+    margin-left: 5px;
+    color: var(--primary-color);
+    opacity: 0.8;
+    flex-shrink: 0;
+  }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
   <div class="page-header-row">
@@ -29,67 +58,171 @@
 </div>
 
 <div class="eal-table-card">
-  <form method="get" class="eal-filter-bar js-auto-submit">
-    <div class="eal-toolbar">
-      <div class="eal-toolbar-left">
-        <div class="eal-search">
-          <i class="bi bi-search"></i>
-          <input type="text" name="q" placeholder="{% translate 'Search company or email...' %}" value="{{ search_query }}">
-        </div>
+  <form method="get" action="{% url 'tenant_list' %}" class="eal-toolbar" style="margin-bottom: 20px;">
+    <div class="eal-toolbar-left" style="width: 100%; display: flex; gap: 16px; align-items: center; flex-wrap: wrap">
+      <div class="eal-search" style="flex: 1; min-width: 250px; margin-bottom: 0">
+        <i class="bi bi-search"></i>
+        <input
+          type="text"
+          name="q"
+          placeholder="{% translate 'Search company or email...' %}"
+          value="{{ search_query }}"
+        />
+        <input type="hidden" name="account_status" value="{{ status_filter }}">
+        <input type="hidden" name="sort" value="{{ sort }}">
+        <input type="hidden" name="dir" value="{{ dir }}">
+      </div>
+      
+      <div class="db-table-filters">
+        <a href="?q={{ search_query }}&account_status=All&assigned_sales_rep={{ rep_filter }}&current_plan={{ plan_filter }}&sort={{ sort }}&dir={{ dir }}" 
+           class="filter-chip {% if status_filter == 'All' %}active{% endif %}">
+          {% translate "All Status" %}
+        </a>
+        <a href="?q={{ search_query }}&account_status=Active&assigned_sales_rep={{ rep_filter }}&current_plan={{ plan_filter }}&sort={{ sort }}&dir={{ dir }}" 
+           class="filter-chip {% if status_filter == 'Active' %}active{% endif %}">
+          <i class="bi bi-circle-fill text-success" style="font-size: 6px"></i> 
+          {% translate "Active" %}
+        </a>
+        <a href="?q={{ search_query }}&account_status=Suspended&assigned_sales_rep={{ rep_filter }}&current_plan={{ plan_filter }}&sort={{ sort }}&dir={{ dir }}" 
+           class="filter-chip {% if status_filter == 'Suspended' %}active{% endif %}">
+          <i class="bi bi-circle-fill text-warning" style="font-size: 6px"></i> 
+          {% translate "Suspended" %}
+        </a>
+        <a href="?q={{ search_query }}&account_status=Churned&assigned_sales_rep={{ rep_filter }}&current_plan={{ plan_filter }}&sort={{ sort }}&dir={{ dir }}" 
+           class="filter-chip {% if status_filter == 'Churned' %}active{% endif %}">
+          <i class="bi bi-circle-fill text-secondary" style="font-size: 6px"></i> 
+          {% translate "Churned" %}
+        </a>
       </div>
 
-      <div class="eal-toolbar-right">
-        <select class="eal-filter-select" name="account_status" onchange="this.form.submit()">
-          <option value="All" {% if status_filter == 'All' %}selected{% endif %}>{% translate "Status: All" %}</option>
-          {% for code, label in status_choices %}
-            <option value="{{ code }}" {% if status_filter == code %}selected{% endif %}>{{ label }}</option>
-          {% endfor %}
-        </select>
-
-        <select class="eal-filter-select" name="assigned_sales_rep" onchange="this.form.submit()">
+      <div style="width: 180px">
+        <select name="assigned_sales_rep" class="eal-select" onchange="this.form.submit()">
           <option value="">{% translate "Rep: All" %}</option>
           {% for rep in sales_reps %}
             <option value="{{ rep.pk }}" {% if rep_filter == rep.pk|stringformat:"s" %}selected{% endif %}>{{ rep.first_name }} {{ rep.last_name }}</option>
           {% endfor %}
         </select>
+      </div>
 
-        <select class="eal-filter-select" name="current_plan" onchange="this.form.submit()">
+      <div style="width: 180px">
+        <select name="current_plan" class="eal-select" onchange="this.form.submit()">
           <option value="">{% translate "Plan: All" %}</option>
           {% for p in plans %}
             <option value="{{ p.plan_id }}" {% if plan_filter == p.plan_id|stringformat:"s" %}selected{% endif %}>{{ p.plan_name_en }}</option>
           {% endfor %}
         </select>
-
-        {% if search_query or status_filter != 'All' or rep_filter or plan_filter %}
-        <a href="{% url 'tenant_list' %}" class="eal-btn eal-btn-outline" style="border-style: dashed; color: var(--text-muted);">
-          <i class="bi bi-x-circle"></i>
-          <span>{% translate "Clear" %}</span>
-        </a>
-        {% endif %}
       </div>
+
+      {% if search_query or status_filter != 'All' or rep_filter or plan_filter %}
+        <a href="{% url 'tenant_list' %}" class="eal-btn eal-btn-outline" style="border-style: dashed; color: var(--text-muted); height: 32px; padding: 0 12px; font-size: 11px">
+          <i class="bi bi-x-circle"></i>
+          <span>{% translate "Clear Filters" %}</span>
+        </a>
+      {% endif %}
     </div>
   </form>
 
-  <div class="eal-table-wrap">
+  <div class="eal-table-wrap" style="overflow-x: auto;">
     <table class="eal-table">
       <thead>
         <tr>
-          <th>#</th>
-          <th>{% translate "Company" %}</th>
-          <th>{% translate "Email" %}</th>
-          <th>{% translate "Country" %}</th>
-          <th>{% translate "Current Plan" %}</th>
-          <th>{% translate "Expiry Date" %}</th>
-          <th>{% translate "Last modified" %}</th>
-          <th>{% translate "Status" %}</th>
-          <th>{% translate "Wallet Balance" %}</th>
+          <th class="sortable" style="width: 60px">
+            <a href="?q={{ search_query }}&account_status={{ status_filter }}&assigned_sales_rep={{ rep_filter }}&current_plan={{ plan_filter }}&sort=rank&dir={% if sort == 'rank' and dir == 'asc' %}desc{% else %}asc{% endif %}">
+              <span>#</span>
+              {% if sort == 'rank' %}
+                <i class="bi bi-caret-{% if dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+              {% else %}
+                <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+              {% endif %}
+            </a>
+          </th>
+          <th class="sortable">
+            <a href="?q={{ search_query }}&account_status={{ status_filter }}&assigned_sales_rep={{ rep_filter }}&current_plan={{ plan_filter }}&sort=company&dir={% if sort == 'company' and dir == 'asc' %}desc{% else %}asc{% endif %}">
+              <span>{% translate "Company" %}</span>
+              {% if sort == 'company' %}
+                <i class="bi bi-caret-{% if dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+              {% else %}
+                <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+              {% endif %}
+            </a>
+          </th>
+          <th class="sortable">
+            <a href="?q={{ search_query }}&account_status={{ status_filter }}&assigned_sales_rep={{ rep_filter }}&current_plan={{ plan_filter }}&sort=email&dir={% if sort == 'email' and dir == 'asc' %}desc{% else %}asc{% endif %}">
+              <span>{% translate "Email" %}</span>
+              {% if sort == 'email' %}
+                <i class="bi bi-caret-{% if dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+              {% else %}
+                <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+              {% endif %}
+            </a>
+          </th>
+          <th class="sortable">
+            <a href="?q={{ search_query }}&account_status={{ status_filter }}&assigned_sales_rep={{ rep_filter }}&current_plan={{ plan_filter }}&sort=country&dir={% if sort == 'country' and dir == 'asc' %}desc{% else %}asc{% endif %}">
+              <span>{% translate "Country" %}</span>
+              {% if sort == 'country' %}
+                <i class="bi bi-caret-{% if dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+              {% else %}
+                <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+              {% endif %}
+            </a>
+          </th>
+          <th class="sortable">
+            <a href="?q={{ search_query }}&account_status={{ status_filter }}&assigned_sales_rep={{ rep_filter }}&current_plan={{ plan_filter }}&sort=plan&dir={% if sort == 'plan' and dir == 'asc' %}desc{% else %}asc{% endif %}">
+              <span>{% translate "Current Plan" %}</span>
+              {% if sort == 'plan' %}
+                <i class="bi bi-caret-{% if dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+              {% else %}
+                <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+              {% endif %}
+            </a>
+          </th>
+          <th class="sortable">
+            <a href="?q={{ search_query }}&account_status={{ status_filter }}&assigned_sales_rep={{ rep_filter }}&current_plan={{ plan_filter }}&sort=expiry&dir={% if sort == 'expiry' and dir == 'asc' %}desc{% else %}asc{% endif %}">
+              <span>{% translate "Expiry Date" %}</span>
+              {% if sort == 'expiry' %}
+                <i class="bi bi-caret-{% if dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+              {% else %}
+                <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+              {% endif %}
+            </a>
+          </th>
+          <th class="sortable">
+            <a href="?q={{ search_query }}&account_status={{ status_filter }}&assigned_sales_rep={{ rep_filter }}&current_plan={{ plan_filter }}&sort=updated&dir={% if sort == 'updated' and dir == 'asc' %}desc{% else %}asc{% endif %}">
+              <span>{% translate "Last modified" %}</span>
+              {% if sort == 'updated' %}
+                <i class="bi bi-caret-{% if dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+              {% else %}
+                <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+              {% endif %}
+            </a>
+          </th>
+          <th class="sortable">
+            <a href="?q={{ search_query }}&account_status={{ status_filter }}&assigned_sales_rep={{ rep_filter }}&current_plan={{ plan_filter }}&sort=status&dir={% if sort == 'status' and dir == 'asc' %}desc{% else %}asc{% endif %}">
+              <span>{% translate "Status" %}</span>
+              {% if sort == 'status' %}
+                <i class="bi bi-caret-{% if dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+              {% else %}
+                <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+              {% endif %}
+            </a>
+          </th>
+          <th class="sortable">
+            <a href="?q={{ search_query }}&account_status={{ status_filter }}&assigned_sales_rep={{ rep_filter }}&current_plan={{ plan_filter }}&sort=wallet&dir={% if sort == 'wallet' and dir == 'asc' %}desc{% else %}asc{% endif %}">
+              <span>{% translate "Wallet" %}</span>
+              {% if sort == 'wallet' %}
+                <i class="bi bi-caret-{% if dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+              {% else %}
+                <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+              {% endif %}
+            </a>
+          </th>
           <th>{% translate "ACTIONS" %}</th>
         </tr>
       </thead>
       <tbody>
         {% for t in tenants %}
           <tr>
-            <td>{{ forloop.counter0|add:tenants.start_index }}</td>
+            <td>{{ t.default_rank }}</td>
             <td><span class="fw-bold">{{ t.company_name }}</span></td>
             <td>{{ t.primary_email }}</td>
             <td>{{ t.country.name_en|default:'-' }}</td>
@@ -110,14 +243,23 @@
             <td class="text-nowrap small text-muted">{{ t.updated_at|date:'d M Y, H:i' }}</td>
             <td>
               {% if t.account_status == 'Active' %}
-                <span class="status-badge active">{% translate "Active" %}</span>
+                <div class="eal-status" style="gap: 8px">
+                    <i class="bi bi-circle-fill text-success" style="font-size: 8px"></i>
+                    <span>{% translate "Active" %}</span>
+                </div>
               {% elif t.account_status == 'Suspended_Billing' or t.account_status == 'Suspended_Violation' %}
-                <span class="status-badge warning">{{ t.account_status }}</span>
+                <div class="eal-status" style="gap: 8px">
+                    <i class="bi bi-circle-fill text-warning" style="font-size: 8px"></i>
+                    <span>{{ t.account_status }}</span>
+                </div>
               {% else %}
-                <span class="status-badge inactive">{% translate "Churned" %}</span>
+                <div class="eal-status" style="gap: 8px">
+                    <i class="bi bi-circle-fill text-secondary" style="font-size: 8px"></i>
+                    <span>{% translate "Churned" %}</span>
+                </div>
               {% endif %}
             </td>
-            <td><span class="eal-entity-id">{{ t.wallet_balance|floatformat:2 }}</span></td>
+            <td><span class="fw-semibold text-primary">{{ t.wallet_balance|floatformat:2 }}</span></td>
             <td class="text-nowrap">
               <div class="eal-actions-cell">
                 <a href="{% url 'tenant_detail' t.tenant_id %}" class="eal-row-btn" title="{% translate 'View' %}"><i class="bi bi-eye"></i></a>

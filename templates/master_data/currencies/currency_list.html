@@ -7,6 +7,55 @@
   <li class="breadcrumb-item active" aria-current="page">{% translate "Currencies" %}</li>
 {% endblock %}
 
+{% block extra_css %}
+<style>
+  .eal-toolbar {
+    padding-bottom: 16px !important;
+  }
+  .eal-table th.sortable {
+    padding: 0 !important;
+  }
+  .eal-table th.sortable a {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    color: inherit;
+    text-decoration: none;
+    width: 100%;
+    transition: background 0.2s;
+    gap: 10px;
+  }
+  .eal-table th.sortable a:hover {
+    background: rgba(0, 0, 0, 0.02);
+  }
+  .eal-table th.sortable i {
+    font-size: 10px;
+    margin-left: 5px;
+    color: var(--primary-color);
+    opacity: 0.8;
+    flex-shrink: 0;
+  }
+  .db-table-filters {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .eal-actions-cell {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    justify-content: flex-start;
+  }
+  .eal-actions-cell form {
+    display: flex;
+    align-items: center;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
   <div class="page-header-row">
@@ -39,29 +88,39 @@
 {% endif %}
 
 <div class="eal-table-card">
-  <form method="get" action="{% url 'currency_list' %}">
-    <div class="eal-toolbar">
-      <div class="eal-toolbar-left">
-        <div class="eal-search">
+  <form method="get" action="{% url 'currency_list' %}" class="eal-toolbar">
+      <div class="eal-toolbar-left" style="width: 100%; display: flex; gap: 16px; align-items: center; flex-wrap: wrap">
+        <div class="eal-search" style="flex: 1; min-width: 250px; margin-bottom: 0">
           <i class="bi bi-search"></i>
           <input type="text" name="q" placeholder="{% translate 'Search by name, code...' %}" value="{{ search_query }}">
+          <input type="hidden" name="sort" value="{{ current_sort }}">
+          <input type="hidden" name="dir" value="{{ current_dir }}">
         </div>
-      </div>
-      <div class="eal-toolbar-right">
-        <select name="status" class="eal-filter-select" onchange="this.form.submit()">
-          <option value="All" {% if status_filter == 'All' %}selected{% endif %}>{% translate "Status: All" %}</option>
-          <option value="Active" {% if status_filter == 'Active' %}selected{% endif %}>{% translate "Active" %}</option>
-          <option value="Inactive" {% if status_filter == 'Inactive' %}selected{% endif %}>{% translate "Inactive" %}</option>
-        </select>
+
+        <div class="db-table-filters">
+          <a href="?q={{ search_query }}&status=All&sort={{ current_sort }}&dir={{ current_dir }}"
+             class="filter-chip {% if status_filter == 'All' %}active{% endif %}">
+            {% translate "All Status" %}
+          </a>
+          <a href="?q={{ search_query }}&status=Active&sort={{ current_sort }}&dir={{ current_dir }}"
+             class="filter-chip {% if status_filter == 'Active' %}active{% endif %}">
+            <i class="bi bi-circle-fill text-success" style="font-size: 6px"></i>
+            {% translate "Active" %}
+          </a>
+          <a href="?q={{ search_query }}&status=Inactive&sort={{ current_sort }}&dir={{ current_dir }}"
+             class="filter-chip {% if status_filter == 'Inactive' %}active{% endif %}">
+            <i class="bi bi-circle-fill text-danger" style="font-size: 6px"></i>
+            {% translate "Inactive" %}
+          </a>
+        </div>
 
         {% if search_query or status_filter != 'All' %}
-          <a href="{% url 'currency_list' %}" class="eal-btn eal-btn-outline" style="border-style: dashed; color: var(--text-muted);">
+          <a href="{% url 'currency_list' %}" class="eal-btn eal-btn-outline" style="border-style: dashed; color: var(--text-muted); height: 32px; padding: 0 12px; font-size: 11px">
             <i class="bi bi-x-circle"></i>
-            <span>{% translate "Clear" %}</span>
+            <span>{% translate "Clear Filters" %}</span>
           </a>
         {% endif %}
       </div>
-    </div>
   </form>
 
   {% if currencies.object_list %}
@@ -69,20 +128,83 @@
       <table class="eal-table">
         <thead>
           <tr>
-            <th style="width: 60px">#</th>
-            <th style="width: 130px">{% translate "Code" %}</th>
-            <th style="width: 110px">{% translate "Symbol" %}</th>
-            <th>{% translate "English Name" %}</th>
-            <th>{% translate "Arabic Name" %}</th>
-            <th style="width: 160px">{% translate "Decimal Places" %}</th>
-            <th style="width: 120px">{% translate "Status" %}</th>
-            <th style="width: 220px">{% translate "ACTIONS" %}</th>
+            <th class="sortable" style="width: 60px">
+              <a href="?q={{ search_query }}&status={{ status_filter }}&sort=rank&dir={% if current_sort == 'rank' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>#</span>
+                {% if current_sort == 'rank' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
+            <th class="sortable" style="width: 130px">
+              <a href="?q={{ search_query }}&status={{ status_filter }}&sort=code&dir={% if current_sort == 'code' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>{% translate "Code" %}</span>
+                {% if current_sort == 'code' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
+            <th class="sortable" style="width: 110px">
+              <a href="?q={{ search_query }}&status={{ status_filter }}&sort=symbol&dir={% if current_sort == 'symbol' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>{% translate "Symbol" %}</span>
+                {% if current_sort == 'symbol' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
+            <th class="sortable">
+              <a href="?q={{ search_query }}&status={{ status_filter }}&sort=name_en&dir={% if current_sort == 'name_en' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>{% translate "English Name" %}</span>
+                {% if current_sort == 'name_en' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
+            <th class="sortable">
+              <a href="?q={{ search_query }}&status={{ status_filter }}&sort=name_ar&dir={% if current_sort == 'name_ar' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>{% translate "Arabic Name" %}</span>
+                {% if current_sort == 'name_ar' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
+            <th class="sortable" style="width: 160px">
+              <a href="?q={{ search_query }}&status={{ status_filter }}&sort=decimal&dir={% if current_sort == 'decimal' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>{% translate "Decimal Places" %}</span>
+                {% if current_sort == 'decimal' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
+            <th class="sortable" style="width: 120px">
+              <a href="?q={{ search_query }}&status={{ status_filter }}&sort=status&dir={% if current_sort == 'status' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>{% translate "Status" %}</span>
+                {% if current_sort == 'status' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
+            <th style="width: 120px; text-align: left; padding-left: 16px;">{% translate "ACTIONS" %}</th>
           </tr>
         </thead>
         <tbody>
           {% for cur in currencies.object_list %}
             <tr>
-              <td>{{ forloop.counter0|add:currencies.start_index }}</td>
+              <td>{{ cur.default_rank }}</td>
               <td><span class="eal-entity-id">{{ cur.currency_code }}</span></td>
               <td>{{ cur.currency_symbol }}</td>
               <td>{{ cur.name_en }}</td>

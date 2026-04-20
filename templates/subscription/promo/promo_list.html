@@ -7,6 +7,35 @@
   <li class="breadcrumb-item active" aria-current="page">{% translate "Promo Codes" %}</li>
 {% endblock %}
 
+{% block extra_css %}
+<style>
+  .eal-table th.sortable {
+    padding: 0 !important;
+  }
+  .eal-table th.sortable a {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    color: inherit;
+    text-decoration: none;
+    width: 100%;
+    transition: background 0.2s;
+    gap: 10px;
+  }
+  .eal-table th.sortable a:hover {
+    background: rgba(0, 0, 0, 0.02);
+  }
+  .eal-table th.sortable i {
+    font-size: 10px;
+    margin-left: 5px;
+    color: var(--primary-color);
+    opacity: 0.8;
+    flex-shrink: 0;
+  }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
   <div class="page-header-row">
@@ -28,71 +57,175 @@
 </div>
 
 <div class="eal-table-card">
-  <form method="get" action="{% url 'promo_code_list' %}">
-    <div class="eal-toolbar">
-      <div class="eal-toolbar-left" style="width: 100%; gap: 12px; display: flex; flex-wrap: wrap; align-items: end;">
-        <div class="eal-search" style="flex: 1; min-width: 240px;">
-          <i class="bi bi-search"></i>
-          <input
-            type="text"
-            name="q"
-            value="{{ search_query }}"
-            placeholder="Search by name, code..."
-          />
-        </div>
-        <div style="width: 220px;">
-          <select name="status" class="form-select form-select-sm" aria-label="{% translate 'Status' %}">
-            <option value="All" {% if status_filter == 'All' %}selected{% endif %}>All</option>
-            <option value="Active" {% if status_filter == 'Active' %}selected{% endif %}>Active</option>
-            <option value="Inactive" {% if status_filter == 'Inactive' %}selected{% endif %}>Inactive</option>
-          </select>
-        </div>
-        <div style="display: flex; gap: 8px;">
-          <button type="submit" class="eal-btn eal-btn-primary">
-            <i class="bi bi-funnel"></i>
-            <span>Filter</span>
-          </button>
-        </div>
+  <form method="get" action="{% url 'promo_code_list' %}" class="eal-toolbar" style="margin-bottom: 20px;">
+    <div class="eal-toolbar-left" style="width: 100%; display: flex; gap: 16px; align-items: center; flex-wrap: wrap">
+      <div class="eal-search" style="flex: 1; min-width: 250px; margin-bottom: 0">
+        <i class="bi bi-search"></i>
+        <input
+          type="text"
+          name="q"
+          placeholder="Search by code or name"
+          value="{{ search_query }}"
+        />
+        <input type="hidden" name="status" value="{{ status_filter }}">
+        <input type="hidden" name="sort" value="{{ current_sort }}">
+        <input type="hidden" name="dir" value="{{ current_dir }}">
       </div>
+      
+      <div class="db-table-filters">
+        <a href="?q={{ search_query }}&status=All&sort={{ current_sort }}&dir={{ current_dir }}" 
+           class="filter-chip {% if status_filter == 'All' %}active{% endif %}">
+          All Status
+        </a>
+        <a href="?q={{ search_query }}&status=Active&sort={{ current_sort }}&dir={{ current_dir }}" 
+           class="filter-chip {% if status_filter == 'Active' %}active{% endif %}">
+          <i class="bi bi-circle-fill text-success" style="font-size: 6px"></i> 
+          Active
+        </a>
+        <a href="?q={{ search_query }}&status=Inactive&sort={{ current_sort }}&dir={{ current_dir }}" 
+           class="filter-chip {% if status_filter == 'Inactive' %}active{% endif %}">
+          <i class="bi bi-circle-fill text-secondary" style="font-size: 6px"></i> 
+          Inactive
+        </a>
+      </div>
+
+      {% if search_query or status_filter != 'All' %}
+        <a href="{% url 'promo_code_list' %}" class="eal-btn eal-btn-outline" style="border-style: dashed; color: var(--text-muted); height: 32px; padding: 0 12px; font-size: 11px">
+          <i class="bi bi-x-circle"></i>
+          <span>Clear Filters</span>
+        </a>
+      {% endif %}
     </div>
   </form>
 
-
   {% if promo_codes.object_list %}
-    <div class="eal-table-wrap" style="overflow-x: auto; margin-top: 16px;">
+    <div class="eal-table-wrap" style="overflow-x: auto;">
       <table class="eal-table">
         <thead>
           <tr>
-            <th>#</th>
-            <th>Code</th>
-            <th>Type</th>
-            <th>Value</th>
-            <th>Duration</th>
-            <th>Valid From</th>
-            <th>Valid Until</th>
-            <th>Uses</th>
-            <th>Status</th>
-            <th>ACTIONS</th>
+            <th class="sortable" style="width: 60px">
+              <a href="?q={{ search_query }}&status={{ status_filter }}&sort=rank&dir={% if current_sort == 'rank' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>#</span>
+                {% if current_sort == 'rank' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
+            <th class="sortable">
+              <a href="?q={{ search_query }}&status={{ status_filter }}&sort=code&dir={% if current_sort == 'code' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>Code</span>
+                {% if current_sort == 'code' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
+            <th class="sortable">
+              <a href="?q={{ search_query }}&status={{ status_filter }}&sort=type&dir={% if current_sort == 'type' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>Type</span>
+                {% if current_sort == 'type' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
+            <th class="sortable">
+              <a href="?q={{ search_query }}&status={{ status_filter }}&sort=value&dir={% if current_sort == 'value' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>Value</span>
+                {% if current_sort == 'value' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
+            <th class="sortable">
+              <a href="?q={{ search_query }}&status={{ status_filter }}&sort=duration&dir={% if current_sort == 'duration' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>Duration</span>
+                {% if current_sort == 'duration' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
+            <th class="sortable">
+              <a href="?q={{ search_query }}&status={{ status_filter }}&sort=valid_from&dir={% if current_sort == 'valid_from' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>Valid From</span>
+                {% if current_sort == 'valid_from' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
+            <th class="sortable">
+              <a href="?q={{ search_query }}&status={{ status_filter }}&sort=valid_until&dir={% if current_sort == 'valid_until' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>Valid Until</span>
+                {% if current_sort == 'valid_until' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
+            <th class="sortable" style="width: 100px">
+              <a href="?q={{ search_query }}&status={{ status_filter }}&sort=uses&dir={% if current_sort == 'uses' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>Uses</span>
+                {% if current_sort == 'uses' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
+            <th class="sortable" style="width: 140px">
+              <a href="?q={{ search_query }}&status={{ status_filter }}&sort=status&dir={% if current_sort == 'status' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>Status</span>
+                {% if current_sort == 'status' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
+            <th style="width: 120px; text-align: right">ACTIONS</th>
           </tr>
         </thead>
         <tbody>
           {% for p in promo_codes.object_list %}
             <tr>
-              <td>{{ forloop.counter0|add:promo_codes.start_index }}</td>
-              <td style="font-family: monospace">{{ p.code }}</td>
-              <td>{{ p.discount_type }}</td>
-              <td>{{ p.discount_value }}</td>
-              <td>{{ p.discount_duration }}</td>
-              <td>{{ p.valid_from }}</td>
-              <td>{{ p.valid_until|default:"-" }}</td>
+              <td>{{ p.default_rank }}</td>
+              <td><span class="fw-bold" style="font-family: monospace; color: #4338ca;">{{ p.code }}</span></td>
               <td>
-                {{ p.current_uses }} / {% if p.max_uses %}{{ p.max_uses }}{% else %}&#8734;{% endif %}
+                <span class="status-badge" style="background: #f1f5f9; color: #475569; border: none;">
+                  {{ p.discount_type }}
+                </span>
+              </td>
+              <td><span class="fw-bold">{{ p.discount_value }}</span></td>
+              <td>{{ p.discount_duration }}</td>
+              <td><small class="text-muted">{{ p.valid_from|date:"M d, Y" }}</small></td>
+              <td>
+                {% if p.valid_until %}
+                  <small class="text-muted">{{ p.valid_until|date:"M d, Y" }}</small>
+                {% else %}
+                  <span class="text-muted">&#8734;</span>
+                {% endif %}
+              </td>
+              <td>
+                <div style="font-size: 0.85rem">
+                  <span class="fw-bold">{{ p.current_uses }}</span><span class="text-muted"> / {% if p.max_uses %}{{ p.max_uses }}{% else %}&#8734;{% endif %}</span>
+                </div>
               </td>
               <td>
                 {% if p.valid_until and p.valid_until < now %}
                   <span class="status-badge expired">Expired</span>
                 {% elif p.valid_from > now %}
-                  <span class="status-badge warning">Scheduled</span>
+                  <span class="status-badge warning" style="background: #fef3c7; color: #92400e;">Scheduled</span>
                 {% elif p.is_active %}
                   <span class="status-badge active">Active</span>
                 {% else %}

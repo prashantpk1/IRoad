@@ -7,6 +7,43 @@
   <li class="breadcrumb-item active" aria-current="page">{% translate "Support Categories" %}</li>
 {% endblock %}
 
+{% block extra_css %}
+<style>
+  .db-table-filters {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .filter-chip {
+    text-decoration: none !important;
+  }
+  .eal-table th.sortable {
+    padding: 0 !important;
+  }
+  .eal-table th.sortable a {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    color: inherit;
+    text-decoration: none;
+    width: 100%;
+    transition: background 0.2s;
+    gap: 10px;
+  }
+  .eal-table th.sortable a:hover {
+    background: rgba(0, 0, 0, 0.02);
+  }
+  .eal-table th.sortable i {
+    font-size: 10px;
+    margin-left: 5px;
+    color: var(--primary-color);
+    opacity: 0.8;
+    flex-shrink: 0;
+  }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
   <div class="page-header-row">
@@ -39,14 +76,8 @@
 {% endif %}
 
 <div class="eal-table-card">
-  <div class="eal-toolbar">
-    <div class="eal-toolbar-left">
-      <span class="eal-result-badge">Total Categories: <strong>{{ categories.paginator.count }}</strong></span>
-    </div>
-  </div>
-
   <form method="get" class="eal-toolbar">
-    <div class="eal-toolbar-left" style="width: 100%; display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap">
+    <div class="eal-toolbar-left" style="width: 100%; display: flex; gap: 16px; align-items: center; flex-wrap: wrap">
       <div class="eal-search" style="flex: 1; min-width: 240px">
         <i class="bi bi-search"></i>
         <input
@@ -55,20 +86,30 @@
           placeholder="{% translate 'Search by English or Arabic name' %}"
           value="{{ search_query }}"
         />
+        <input type="hidden" name="sort" value="{{ current_sort }}">
+        <input type="hidden" name="dir" value="{{ current_dir }}">
       </div>
-      <div style="width: 200px">
-        <select name="is_active" class="form-select form-select-sm">
-          <option value="All" {% if status_filter == 'All' %}selected{% endif %}>{% translate "All Statuses" %}</option>
-          <option value="Active" {% if status_filter == 'Active' %}selected{% endif %}>{% translate "Active" %}</option>
-          <option value="Inactive" {% if status_filter == 'Inactive' %}selected{% endif %}>{% translate "Inactive" %}</option>
-        </select>
+
+      <div class="db-table-filters">
+        <a href="?q={{ search_query|urlencode }}&is_active=All&sort={{ current_sort }}&dir={{ current_dir }}" class="filter-chip {% if status_filter == 'All' %}active{% endif %}">
+          {% translate "All" %}
+        </a>
+        <a href="?q={{ search_query|urlencode }}&is_active=Active&sort={{ current_sort }}&dir={{ current_dir }}" class="filter-chip {% if status_filter == 'Active' %}active{% endif %}">
+          <i class="bi bi-circle-fill text-success" style="font-size: 6px"></i>
+          {% translate "Active" %}
+        </a>
+        <a href="?q={{ search_query|urlencode }}&is_active=Inactive&sort={{ current_sort }}&dir={{ current_dir }}" class="filter-chip {% if status_filter == 'Inactive' %}active{% endif %}">
+          <i class="bi bi-circle-fill text-danger" style="font-size: 6px"></i>
+          {% translate "Inactive" %}
+        </a>
       </div>
-      <div style="width: 120px">
-        <button type="submit" class="eal-btn eal-btn-primary" style="width: 100%">
-          <i class="bi bi-funnel"></i>
-          <span>{% translate "Apply" %}</span>
-        </button>
-      </div>
+
+      {% if search_query or status_filter != 'All' %}
+        <a href="{% url 'support_category_list' %}" class="eal-btn eal-btn-outline" style="border-style: dashed; color: var(--text-muted); height: 32px; padding: 0 12px; font-size: 11px">
+          <i class="bi bi-x-circle"></i>
+          <span>{% translate "Clear Filters" %}</span>
+        </a>
+      {% endif %}
     </div>
   </form>
 
@@ -76,10 +117,56 @@
     <table class="eal-table">
       <thead>
         <tr>
-          <th style="width: 60px">#</th>
-          <th>{% translate "English Name" %}</th>
-          <th>{% translate "Arabic Name" %}</th>
-          <th style="width: 140px">{% translate "Status" %}</th>
+          <th class="sortable" style="width: 60px">
+            <a href="?q={{ search_query|urlencode }}&is_active={{ status_filter }}&sort=rank&dir={% if current_sort == 'rank' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+              <span>#</span>
+              {% if current_sort == 'rank' %}
+                <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+              {% else %}
+                <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+              {% endif %}
+            </a>
+          </th>
+          <th class="sortable" style="width: 220px">
+            <a href="?q={{ search_query|urlencode }}&is_active={{ status_filter }}&sort=category_id&dir={% if current_sort == 'category_id' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+              <span>{% translate "Category ID" %}</span>
+              {% if current_sort == 'category_id' %}
+                <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+              {% else %}
+                <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+              {% endif %}
+            </a>
+          </th>
+          <th class="sortable">
+            <a href="?q={{ search_query|urlencode }}&is_active={{ status_filter }}&sort=name_en&dir={% if current_sort == 'name_en' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+              <span>{% translate "English Name" %}</span>
+              {% if current_sort == 'name_en' %}
+                <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+              {% else %}
+                <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+              {% endif %}
+            </a>
+          </th>
+          <th class="sortable">
+            <a href="?q={{ search_query|urlencode }}&is_active={{ status_filter }}&sort=name_ar&dir={% if current_sort == 'name_ar' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+              <span>{% translate "Arabic Name" %}</span>
+              {% if current_sort == 'name_ar' %}
+                <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+              {% else %}
+                <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+              {% endif %}
+            </a>
+          </th>
+          <th class="sortable" style="width: 140px">
+            <a href="?q={{ search_query|urlencode }}&is_active={{ status_filter }}&sort=status&dir={% if current_sort == 'status' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+              <span>{% translate "Status" %}</span>
+              {% if current_sort == 'status' %}
+                <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+              {% else %}
+                <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+              {% endif %}
+            </a>
+          </th>
           <th style="width: 180px">{% translate "Actions" %}</th>
         </tr>
       </thead>
@@ -87,6 +174,9 @@
         {% for c in categories %}
           <tr>
             <td>{{ forloop.counter0|add:categories.start_index }}</td>
+            <td>
+              <span class="eal-entity-id" title="{{ c.category_id }}">{{ c.category_id }}</span>
+            </td>
             <td class="fw-semibold">{{ c.name_en }}</td>
             <td dir="rtl">{{ c.name_ar }}</td>
             <td>
@@ -116,7 +206,7 @@
           </tr>
         {% empty %}
           <tr>
-            <td colspan="5">
+            <td colspan="6">
               <div class="notification-empty py-5">
                 <div class="empty-icon">
                   <i class="bi bi-tags"></i>
@@ -133,5 +223,4 @@
   {% include 'partials/pagination.html' with page_obj=categories %}
 </div>
 {% endblock %}
-
 

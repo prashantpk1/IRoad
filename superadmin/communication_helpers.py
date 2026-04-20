@@ -299,7 +299,7 @@ def _wrap_email_body(inner_html, email_title="iRoad Logistics", preheader="iRoad
                         <td class="email-header">
                             <div class="email-header-inner">
                                 {% load static %}
-                                <img src="https://iroad-assets.s3.amazonaws.com/logo.png" alt="iRoad" class="email-logo" style="width: 52px; height: 52px; border-radius: 14px;">
+                                <img src="https://ui-avatars.com/api/?name=iR&background=4f46e5&color=fff&rounded=true&size=128&bold=true" alt="iRoad" class="email-logo" style="width: 52px; height: 52px; border-radius: 14px;">
                                 <h1 class="email-brand">iRoad</h1>
                                 <p class="email-brand-sub">Logistics Management Platform</p>
                             </div>
@@ -357,6 +357,110 @@ def _wrap_email_body(inner_html, email_title="iRoad Logistics", preheader="iRoad
     return html
 
 DEFAULT_NOTIFICATION_EMAIL_TEMPLATES = [
+    {
+        'template_name': 'AUTH_LOGIN_OTP',
+        'category': 'Transactional',
+        'subject_en': 'Your iRoad Login Verification Code',
+        'subject_ar': 'رمز التحقق لتسجيل الدخول إلى iRoad',
+        'body_en': (
+            '<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f1f5f9;">'
+            '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" '
+            'style="background:#f1f5f9;padding:24px 12px;"><tr><td align="center">'
+            '<table role="presentation" width="640" cellspacing="0" cellpadding="0" border="0" '
+            'style="width:640px;max-width:640px;background:#ffffff;border-radius:16px;overflow:hidden;">'
+            '<tr><td style="background:#5b5ce2;padding:28px 24px;text-align:center;">'
+            '<div style="width:52px;height:52px;line-height:52px;margin:0 auto 12px;border-radius:50%;'
+            'background:#4b4cd6;color:#ffffff;font-size:30px;font-weight:700;font-family:Arial,sans-serif;">IR</div>'
+            '<div style="color:#ffffff;font-size:28px;line-height:1.1;font-weight:700;font-family:Arial,sans-serif;">iRoad</div>'
+            '<div style="color:#e6e8ff;font-size:14px;line-height:1.5;font-weight:600;'
+            'font-family:Arial,sans-serif;margin-top:6px;">Logistics Management Platform</div>'
+            '</td></tr>'
+            '<tr><td style="padding:34px 34px 28px;font-family:Arial,sans-serif;color:#1f2d3d;">'
+            '<h2 style="margin:0 0 16px;font-size:34px;line-height:1.2;font-weight:700;color:#102a56;">'
+            'OTP Verification Required 🔐</h2>'
+            '<p style="margin:0 0 16px;font-size:24px;line-height:1.6;color:#334e68;">'
+            'Hello {{ user_name|default:"Admin" }},</p>'
+            '<p style="margin:0 0 20px;font-size:24px;line-height:1.6;color:#334e68;">'
+            'Use the following one-time verification code to complete your iRoad login:</p>'
+            '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" '
+            'style="background:#dfe4f6;border:1px solid #b4c2f0;border-radius:14px;padding:16px 14px;">'
+            '<tr><td style="font-size:12px;font-weight:700;letter-spacing:1px;color:#4b4cd6;'
+            'text-transform:uppercase;padding-bottom:10px;font-family:Arial,sans-serif;">One-Time Password</td></tr>'
+            '<tr><td align="center" style="padding:6px 0 8px;">'
+            '<div style="display:inline-block;background:#1f2d49;color:#ffffff;border-radius:12px;'
+            'padding:14px 26px;font-family:Courier New,monospace;font-size:42px;letter-spacing:8px;'
+            'font-weight:700;">{{ otp_code|default:otp }}</div>'
+            '</td></tr>'
+            '<tr><td align="center" style="font-size:14px;color:#334e68;font-family:Arial,sans-serif;">'
+            'Valid for <strong>5 minutes</strong> only.</td></tr></table>'
+            '<p style="margin:18px 0 0;font-size:18px;line-height:1.7;color:#334e68;">'
+            'Do not share this code with anyone, including iRoad support staff.</p>'
+            '<hr style="border:none;border-top:1px solid #d9e2ec;margin:20px 0;">'
+            '<p style="margin:0;font-size:16px;line-height:1.7;color:#829ab1;">'
+            'If you did not attempt to sign in, please contact your administrator immediately.</p>'
+            '</td></tr>'
+            '<tr><td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:24px;text-align:center;'
+            'font-family:Arial,sans-serif;">'
+            '<div style="font-size:24px;font-weight:700;color:#4b4cd6;margin-bottom:8px;">iRoad</div>'
+            '<div style="font-size:13px;line-height:1.7;color:#829ab1;">'
+            '&copy; 2026 iRoad Logistics. All rights reserved.<br>'
+            'This is an automated system notification. Please do not reply to this email.</div>'
+            '<div style="font-size:13px;color:#4b4cd6;margin-top:12px;">Privacy Policy &nbsp; · &nbsp; Terms of Service &nbsp; · &nbsp; Support</div>'
+            '<div style="display:inline-block;margin-top:12px;background:#5b5ce2;color:#ffffff;'
+            'border-radius:18px;padding:6px 14px;font-size:11px;font-weight:700;letter-spacing:0.5px;">'
+            'SECURED &amp; ENCRYPTED</div>'
+            '</td></tr></table></td></tr></table></body></html>'
+        ),
+        'body_ar': (
+            '<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f1f5f9;">'
+            '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" '
+            'style="background:#f1f5f9;padding:24px 12px;"><tr><td align="center">'
+            '<table role="presentation" width="640" cellspacing="0" cellpadding="0" border="0" '
+            'style="width:640px;max-width:640px;background:#ffffff;border-radius:16px;overflow:hidden;">'
+            '<tr><td style="background:#5b5ce2;padding:28px 24px;text-align:center;">'
+            '<div style="width:52px;height:52px;line-height:52px;margin:0 auto 12px;border-radius:50%;'
+            'background:#4b4cd6;color:#ffffff;font-size:30px;font-weight:700;font-family:Arial,sans-serif;">IR</div>'
+            '<div style="color:#ffffff;font-size:28px;line-height:1.1;font-weight:700;font-family:Arial,sans-serif;">iRoad</div>'
+            '<div style="color:#e6e8ff;font-size:14px;line-height:1.5;font-weight:600;'
+            'font-family:Arial,sans-serif;margin-top:6px;">منصة إدارة الخدمات اللوجستية</div>'
+            '</td></tr>'
+            '<tr><td style="padding:34px 34px 28px;font-family:Arial,sans-serif;color:#1f2d3d;" dir="rtl">'
+            '<h2 style="margin:0 0 16px;font-size:34px;line-height:1.2;font-weight:700;color:#102a56;">'
+            'مطلوب التحقق برمز OTP 🔐</h2>'
+            '<p style="margin:0 0 16px;font-size:24px;line-height:1.6;color:#334e68;">'
+            'مرحباً {{ user_name|default:"Admin" }}،</p>'
+            '<p style="margin:0 0 20px;font-size:24px;line-height:1.6;color:#334e68;">'
+            'استخدم رمز التحقق التالي لإكمال تسجيل الدخول إلى iRoad:</p>'
+            '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" '
+            'style="background:#dfe4f6;border:1px solid #b4c2f0;border-radius:14px;padding:16px 14px;">'
+            '<tr><td style="font-size:12px;font-weight:700;letter-spacing:1px;color:#4b4cd6;'
+            'text-transform:uppercase;padding-bottom:10px;font-family:Arial,sans-serif;">رمز التحقق لمرة واحدة</td></tr>'
+            '<tr><td align="center" style="padding:6px 0 8px;">'
+            '<div style="display:inline-block;background:#1f2d49;color:#ffffff;border-radius:12px;'
+            'padding:14px 26px;font-family:Courier New,monospace;font-size:42px;letter-spacing:8px;'
+            'font-weight:700;">{{ otp_code|default:otp }}</div>'
+            '</td></tr>'
+            '<tr><td align="center" style="font-size:14px;color:#334e68;font-family:Arial,sans-serif;">'
+            'صالح لمدة <strong>5 دقائق</strong> فقط.</td></tr></table>'
+            '<p style="margin:18px 0 0;font-size:18px;line-height:1.7;color:#334e68;">'
+            'لا تشارك هذا الرمز مع أي شخص، بما في ذلك فريق دعم iRoad.</p>'
+            '<hr style="border:none;border-top:1px solid #d9e2ec;margin:20px 0;">'
+            '<p style="margin:0;font-size:16px;line-height:1.7;color:#829ab1;">'
+            'إذا لم تحاول تسجيل الدخول، يرجى التواصل مع المسؤول فوراً.</p>'
+            '</td></tr>'
+            '<tr><td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:24px;text-align:center;'
+            'font-family:Arial,sans-serif;">'
+            '<div style="font-size:24px;font-weight:700;color:#4b4cd6;margin-bottom:8px;">iRoad</div>'
+            '<div style="font-size:13px;line-height:1.7;color:#829ab1;">'
+            '&copy; 2026 iRoad Logistics. All rights reserved.<br>'
+            'هذه رسالة نظام آلية، يرجى عدم الرد على هذا البريد.</div>'
+            '<div style="font-size:13px;color:#4b4cd6;margin-top:12px;">الخصوصية &nbsp; · &nbsp; الشروط &nbsp; · &nbsp; الدعم</div>'
+            '<div style="display:inline-block;margin-top:12px;background:#5b5ce2;color:#ffffff;'
+            'border-radius:18px;padding:6px 14px;font-size:11px;font-weight:700;letter-spacing:0.5px;">'
+            'مؤمَّن ومشفَّر</div>'
+            '</td></tr></table></td></tr></table></body></html>'
+        ),
+    },
     {
         'template_name': 'AUTH_PASSWORD_RESET',
         'category': 'Transactional',
@@ -1007,7 +1111,7 @@ def ensure_default_notification_templates(created_by=None):
     Ensure required email templates exist for auth + tenant notifications.
     Returns number of newly created templates.
     """
-    from superadmin.models import NotificationTemplate
+    from superadmin.models import EventMapping, NotificationTemplate
 
     created = 0
     for item in DEFAULT_NOTIFICATION_EMAIL_TEMPLATES:
@@ -1026,6 +1130,22 @@ def ensure_default_notification_templates(created_by=None):
         )
         if was_created:
             created += 1
+
+    # Ensure OTP_Requested event is mapped to the default OTP template.
+    otp_template = NotificationTemplate.objects.filter(
+        template_name='AUTH_LOGIN_OTP',
+        channel_type='Email',
+    ).first()
+    if otp_template:
+        EventMapping.objects.update_or_create(
+            system_event='OTP_Requested',
+            defaults={
+                'primary_channel': 'Email',
+                'primary_template': otp_template,
+                'is_active': True,
+                'updated_by': created_by,
+            },
+        )
     return created
 
 

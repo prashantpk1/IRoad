@@ -30,15 +30,53 @@
   <div class="eal-table-card">
     <form method="get" action="{% url 'notif_template_list' %}">
       <div class="eal-toolbar">
-        <div class="eal-toolbar-left" style="width: 100%; gap: 12px; display:flex; flex-wrap:wrap; align-items:end;">
-          <div class="eal-search" style="flex: 1; min-width: 240px;">
+        <div class="eal-toolbar-left" style="width: 100%; display:flex; gap: 16px; align-items:center; flex-wrap:wrap;">
+          <div class="eal-search" style="flex: 1; min-width: 250px; margin-bottom: 0;">
             <i class="bi bi-search"></i>
             <input type="text" name="q" value="{{ search_query }}" placeholder="Template name" />
+            <input type="hidden" name="sort" value="{{ current_sort }}">
+            <input type="hidden" name="dir" value="{{ current_dir }}">
+            <input type="hidden" name="status" value="{{ status_filter }}">
           </div>
-          <div style="width: 180px"><label class="form-label">Channel</label><select name="channel" class="form-select form-select-sm"><option value="All" {% if channel_filter == 'All' %}selected{% endif %}>All</option><option value="Email" {% if channel_filter == 'Email' %}selected{% endif %}>Email</option><option value="SMS" {% if channel_filter == 'SMS' %}selected{% endif %}>SMS</option></select></div>
-          <div style="width: 200px"><label class="form-label">Category</label><select name="category" class="form-select form-select-sm"><option value="All" {% if category_filter == 'All' %}selected{% endif %}>All</option><option value="Transactional" {% if category_filter == 'Transactional' %}selected{% endif %}>Transactional</option><option value="Promotional" {% if category_filter == 'Promotional' %}selected{% endif %}>Promotional</option></select></div>
-          <div style="width: 180px"><label class="form-label">Status</label><select name="status" class="form-select form-select-sm"><option value="All" {% if status_filter == 'All' %}selected{% endif %}>All</option><option value="Active" {% if status_filter == 'Active' %}selected{% endif %}>Active</option><option value="Inactive" {% if status_filter == 'Inactive' %}selected{% endif %}>Inactive</option></select></div>
-          <button type="submit" class="eal-btn eal-btn-primary"><i class="bi bi-funnel"></i><span>Filter</span></button>
+
+          <div class="db-table-filters">
+            <a href="?q={{ search_query }}&channel={{ channel_filter }}&category={{ category_filter }}&status=All&sort={{ current_sort }}&dir={{ current_dir }}"
+               class="filter-chip {% if status_filter == 'All' %}active{% endif %}">
+              {% translate "All Status" %}
+            </a>
+            <a href="?q={{ search_query }}&channel={{ channel_filter }}&category={{ category_filter }}&status=Active&sort={{ current_sort }}&dir={{ current_dir }}"
+               class="filter-chip {% if status_filter == 'Active' %}active{% endif %}">
+              <i class="bi bi-circle-fill text-success" style="font-size: 6px"></i>
+              {% translate "Active" %}
+            </a>
+            <a href="?q={{ search_query }}&channel={{ channel_filter }}&category={{ category_filter }}&status=Inactive&sort={{ current_sort }}&dir={{ current_dir }}"
+               class="filter-chip {% if status_filter == 'Inactive' %}active{% endif %}">
+              <i class="bi bi-circle-fill text-danger" style="font-size: 6px"></i>
+              {% translate "Inactive" %}
+            </a>
+          </div>
+
+          <div style="width: 180px">
+            <select name="channel" class="eal-select" onchange="this.form.submit()">
+              <option value="All" {% if channel_filter == 'All' %}selected{% endif %}>Channel: All</option>
+              <option value="Email" {% if channel_filter == 'Email' %}selected{% endif %}>Email</option>
+              <option value="SMS" {% if channel_filter == 'SMS' %}selected{% endif %}>SMS</option>
+            </select>
+          </div>
+          <div style="width: 200px">
+            <select name="category" class="eal-select" onchange="this.form.submit()">
+              <option value="All" {% if category_filter == 'All' %}selected{% endif %}>Category: All</option>
+              <option value="Transactional" {% if category_filter == 'Transactional' %}selected{% endif %}>Transactional</option>
+              <option value="Promotional" {% if category_filter == 'Promotional' %}selected{% endif %}>Promotional</option>
+            </select>
+          </div>
+
+          {% if search_query or channel_filter != 'All' or category_filter != 'All' or status_filter != 'All' %}
+            <a href="{% url 'notif_template_list' %}" class="eal-btn eal-btn-outline" style="border-style: dashed; color: var(--text-muted); height: 32px; padding: 0 12px; font-size: 11px">
+              <i class="bi bi-x-circle"></i>
+              <span>{% translate "Clear Filters" %}</span>
+            </a>
+          {% endif %}
         </div>
       </div>
     </form>
@@ -46,32 +84,127 @@
     {% if templates_page.object_list %}
       <div class="eal-table-wrap">
         <table class="eal-table">
-          <thead><tr><th>#</th><th>Name</th><th>Channel badge</th><th>Category badge</th><th>Subject EN</th><th>Status</th><th>ACTIONS</th></tr></thead>
+          <thead>
+            <tr>
+              <th class="sortable" style="width: 120px">
+                <a href="?q={{ search_query }}&channel={{ channel_filter }}&category={{ category_filter }}&status={{ status_filter }}&sort=rank&dir={% if current_sort == 'rank' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                  <span>Template ID</span>
+                  {% if current_sort == 'rank' %}
+                    <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                  {% else %}
+                    <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                  {% endif %}
+                </a>
+              </th>
+              <th class="sortable">
+                <a href="?q={{ search_query }}&channel={{ channel_filter }}&category={{ category_filter }}&status={{ status_filter }}&sort=name&dir={% if current_sort == 'name' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                  <span>{% translate "Template Name" %}</span>
+                  {% if current_sort == 'name' %}
+                    <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                  {% else %}
+                    <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                  {% endif %}
+                </a>
+              </th>
+              <th class="sortable" style="width: 130px">
+                <a href="?q={{ search_query }}&channel={{ channel_filter }}&category={{ category_filter }}&status={{ status_filter }}&sort=channel&dir={% if current_sort == 'channel' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                  <span>{% translate "Channel" %}</span>
+                  {% if current_sort == 'channel' %}
+                    <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                  {% else %}
+                    <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                  {% endif %}
+                </a>
+              </th>
+              <th class="sortable" style="width: 150px">
+                <a href="?q={{ search_query }}&channel={{ channel_filter }}&category={{ category_filter }}&status={{ status_filter }}&sort=category&dir={% if current_sort == 'category' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                  <span>{% translate "Category" %}</span>
+                  {% if current_sort == 'category' %}
+                    <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                  {% else %}
+                    <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                  {% endif %}
+                </a>
+              </th>
+              <th class="sortable">
+                <a href="?q={{ search_query }}&channel={{ channel_filter }}&category={{ category_filter }}&status={{ status_filter }}&sort=subject&dir={% if current_sort == 'subject' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                  <span>{% translate "Primary Subject" %}</span>
+                  {% if current_sort == 'subject' %}
+                    <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                  {% else %}
+                    <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                  {% endif %}
+                </a>
+              </th>
+              <th class="sortable" style="width: 120px">
+                <a href="?q={{ search_query }}&channel={{ channel_filter }}&category={{ category_filter }}&status={{ status_filter }}&sort=status&dir={% if current_sort == 'status' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                  <span>{% translate "Status" %}</span>
+                  {% if current_sort == 'status' %}
+                    <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                  {% else %}
+                    <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                  {% endif %}
+                </a>
+              </th>
+              {% if request.user.is_root %}
+              <th style="width: 120px; text-align: left; padding-left: 16px;">{% translate "ACTIONS" %}</th>
+              {% endif %}
+            </tr>
+          </thead>
           <tbody>
             {% for t in templates_page.object_list %}
               <tr>
-                <td>{{ forloop.counter0|add:templates_page.start_index }}</td>
-                <td>{{ t.template_name }}</td>
-                <td>{% if t.channel_type == 'Email' %}<span class="status-badge inactive">Email</span>{% else %}<span class="status-badge active">SMS</span>{% endif %}</td>
-                <td>{% if t.category == 'Transactional' %}<span class="status-badge warning">Transactional</span>{% else %}<span class="status-badge pending">Promotional</span>{% endif %}</td>
-                <td>{{ t.subject_en|default:'-' }}</td>
-                <td>{% if t.is_active %}<span class="status-badge active">Active</span>{% else %}<span class="status-badge inactive">Inactive</span>{% endif %}</td>
+                <td><span class="eal-entity-id">TPL-{{ t.template_id|slice:":8" }}</span></td>
+                <td><span class="fw-semibold text-dark">{{ t.template_name }}</span></td>
                 <td>
-                  {% if request.user.is_root %}
-                    <div class="eal-actions-cell">
-                      <button type="button" class="eal-row-btn preview-template-btn" 
-                              data-template-id="{{ t.template_id }}" 
-                              data-template-name="{{ t.template_name }}"
-                              title="Preview Template">
-                        <i class="bi bi-eye"></i>
-                      </button>
-                      <a href="{% url 'notif_template_edit' t.template_id %}" class="eal-row-btn" title="Edit Template"><i class="bi bi-pencil"></i></a>
-                      <form method="post" action="{% url 'notif_template_toggle' t.template_id %}" style="display:inline">{% csrf_token %}
-                        <button type="submit" class="eal-row-btn" title="Toggle Status"><i class="bi bi-arrow-repeat"></i></button>
-                      </form>
-                    </div>
+                  {% if t.channel_type == 'Email' %}
+                    <span class="eal-type-badge blue">Email</span>
+                  {% else %}
+                    <span class="eal-type-badge emerald">SMS</span>
                   {% endif %}
                 </td>
+                <td>
+                  {% if t.category == 'Transactional' %}
+                    <span class="eal-type-badge indigo">Transactional</span>
+                  {% else %}
+                    <span class="eal-type-badge org">Promotional</span>
+                  {% endif %}
+                </td>
+                <td><span class="text-muted small">{{ t.subject_en|default:'-'|truncatechars:40 }}</span></td>
+                <td>
+                  {% if t.is_active %}
+                    <span class="status-badge active">Active</span>
+                  {% else %}
+                    <span class="status-badge inactive">Inactive</span>
+                  {% endif %}
+                </td>
+                {% if request.user.is_root %}
+                <td>
+                  <div class="eal-actions-cell">
+                    <button type="button" class="eal-row-btn preview-template-btn icon-only-btn" 
+                            data-template-id="{{ t.template_id }}" 
+                            data-template-name="{{ t.template_name }}"
+                            title="Preview Template">
+                      <i class="bi bi-eye"></i>
+                    </button>
+                    <a href="{% url 'notif_template_edit' t.template_id %}" class="eal-row-btn icon-only-btn" title="Edit">
+                      <i class="bi bi-pencil"></i>
+                    </a>
+                    <form method="post" action="{% url 'notif_template_toggle' t.template_id %}" style="display:inline">
+                      {% csrf_token %}
+                      {% if t.is_active %}
+                        <button type="submit" class="eal-row-btn icon-only-btn" title="Deactivate">
+                          <i class="bi bi-slash-circle"></i>
+                        </button>
+                      {% else %}
+                        <button type="submit" class="eal-row-btn icon-only-btn" title="Activate">
+                          <i class="bi bi-check-circle"></i>
+                        </button>
+                      {% endif %}
+                    </form>
+                  </div>
+                </td>
+                {% endif %}
               </tr>
             {% endfor %}
           </tbody>
@@ -109,11 +242,11 @@
             </div>
             
             <!-- Device Toggle -->
-            <div class="btn-group btn-group-sm bg-white bg-opacity-10 p-1 rounded-pill ms-2 d-none d-md-flex">
-              <button type="button" class="btn btn-sm btn-outline-light border-0 rounded-pill px-2 device-toggle active" data-device="desktop">
+            <div class="btn-group btn-group-sm bg-white bg-opacity-10 p-1 rounded-pill ms-2 d-none d-md-flex" style="gap: 2px;">
+              <button type="button" class="btn btn-sm btn-outline-light border-0 rounded-pill device-toggle active" data-device="desktop" title="Desktop View">
                 <i class="bi bi-display"></i>
               </button>
-              <button type="button" class="btn btn-sm btn-outline-light border-0 rounded-pill px-2 device-toggle" data-device="mobile">
+              <button type="button" class="btn btn-sm btn-outline-light border-0 rounded-pill device-toggle" data-device="mobile" title="Mobile View">
                 <i class="bi bi-smartphone"></i>
               </button>
             </div>
@@ -146,6 +279,47 @@
 
 {% block extra_css %}
 <style>
+  .eal-table th.sortable {
+    padding: 0 !important;
+  }
+  .eal-table th.sortable a {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    color: inherit;
+    text-decoration: none;
+    width: 100%;
+    transition: background 0.2s;
+    gap: 10px;
+  }
+  .eal-table th.sortable a:hover {
+    background: rgba(0, 0, 0, 0.02);
+  }
+  .eal-table th.sortable i {
+    font-size: 10px;
+    margin-left: 5px;
+    color: var(--primary-color);
+    opacity: 0.8;
+    flex-shrink: 0;
+  }
+  .db-table-filters {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .eal-actions-cell {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    justify-content: flex-start;
+  }
+  .eal-actions-cell form {
+    display: flex;
+    align-items: center;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
   #previewIframeContainer.mobile-view {
     max-width: 375px;
     border-left: 12px solid #334155;
@@ -163,9 +337,25 @@
     background: var(--primary-color) !important;
     color: white !important;
   }
+  .device-toggle {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    border: none !important;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 !important;
+    color: rgba(255,255,255,0.7) !important;
+  }
+  .device-toggle:hover {
+    color: white !important;
+    background: rgba(255,255,255,0.05) !important;
+  }
   .device-toggle.active {
     background: white !important;
-    color: var(--text-dark) !important;
+    color: #4f46e5 !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
   }
 </style>
 {% endblock %}

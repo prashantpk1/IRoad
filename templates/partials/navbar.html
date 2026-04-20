@@ -7,10 +7,10 @@
   <button type="button" class="header-icon-btn" title="{% translate 'Switch Language' %}">
     <i class="bi bi-translate"></i>
   </button>
-  <button type="button" class="header-icon-btn" title="{% translate 'Notifications' %}">
+  <!-- <button type="button" class="header-icon-btn" title="{% translate 'Notifications' %}">
     <i class="bi bi-bell"></i>
     <span class="badge">3</span>
-  </button>
+  </button> -->
   <div class="header-divider"></div>
   <div class="header-user-wrapper">
     <div class="header-user" id="headerUserToggle">
@@ -90,7 +90,7 @@
       <div class="header-dropdown-divider"></div>
       <ul class="header-dropdown-menu">
         <li>
-          <a href="#" class="header-dropdown-item">
+          <a href="{% url 'my_account' %}" class="header-dropdown-item">
             <i class="bi bi-person"></i>
             <span>{% translate "My Account" %}</span>
           </a>

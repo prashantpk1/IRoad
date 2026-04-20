@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ invoice.invoice_number }}</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 24px; color: #111; }
+    .row { display: flex; justify-content: space-between; gap: 24px; margin-bottom: 16px; }
+    .col { flex: 1; }
+    .muted { color: #666; font-size: 12px; }
+    h1 { margin: 0 0 8px 0; font-size: 28px; }
+    h2 { margin: 0 0 8px 0; font-size: 18px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+    th, td { border: 1px solid #ddd; padding: 8px; font-size: 13px; }
+    th { background: #f3f4f6; text-align: left; }
+    .text-end { text-align: right; }
+    .totals { margin-top: 20px; width: 360px; margin-left: auto; }
+    .totals td { border: none; border-bottom: 1px solid #ddd; }
+    .actions { margin-top: 20px; display: flex; gap: 10px; }
+    @media print {
+      .actions { display: none; }
+      body { margin: 12px; }
+    }
+  </style>
+</head>
+<body>
+  {% if legal_identity and legal_identity.company_logo %}
+  <div style="margin-bottom: 12px;">
+    <img src="{{ legal_identity.company_logo.url }}" alt="Company Logo" style="max-height: 56px; width: auto;">
+  </div>
+  {% endif %}
+  <h1>{{ invoice.invoice_number }}</h1>
+  <div class="muted">Issue Date: {{ invoice.issue_date|date:'d M Y' }}</div>
+
+  <div class="row" style="margin-top: 20px;">
+    <div class="col">
+      <h2>Supplier</h2>
+      <div>{{ invoice.supplier_name }}</div>
+      <div class="muted">Tax: {{ invoice.supplier_tax_number|default:'—' }}</div>
+    </div>
+    <div class="col">
+      <h2>Bill To</h2>
+      <div>{{ invoice.customer_name }}</div>
+      <div class="muted">Tax: {{ invoice.customer_tax_number|default:'—' }}</div>
+      <div class="muted">Address: {{ invoice.customer_address|default:'—' }}</div>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Description</th>
+        <th class="text-end">Qty</th>
+        <th class="text-end">Unit Price</th>
+        <th class="text-end">Tax %</th>
+        <th class="text-end">Tax</th>
+        <th class="text-end">Line Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for line in invoice.line_items.all %}
+      <tr>
+        <td>{{ line.item_description }}</td>
+        <td class="text-end">{{ line.quantity|floatformat:2 }}</td>
+        <td class="text-end">{{ line.unit_price|floatformat:2 }}</td>
+        <td class="text-end">{{ line.tax_rate|floatformat:2 }}</td>
+        <td class="text-end">{{ line.tax_amount|floatformat:2 }}</td>
+        <td class="text-end">{{ line.line_total|floatformat:2 }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <table class="totals">
+    <tr><td>Sub total</td><td class="text-end">{{ invoice.sub_total|floatformat:2 }} {{ invoice.currency_id }}</td></tr>
+    <tr><td>Discount</td><td class="text-end">{{ invoice.discount_amount|floatformat:2 }}</td></tr>
+    <tr><td>Tax amount</td><td class="text-end">{{ invoice.tax_amount|floatformat:2 }}</td></tr>
+    <tr><td><strong>Grand total</strong></td><td class="text-end"><strong>{{ invoice.grand_total|floatformat:2 }} {{ invoice.currency_id }}</strong></td></tr>
+  </table>
+
+  <div class="actions">
+    <button onclick="window.print()">Print / Save PDF</button>
+    <button onclick="window.close()">Close</button>
+  </div>
+</body>
+</html>

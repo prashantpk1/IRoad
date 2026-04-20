@@ -8,6 +8,40 @@
 <li class="breadcrumb-item active" aria-current="page">{% translate "Internal Alerts Routing" %}</li>
 {% endblock %}
 
+{% block extra_css %}
+<style>
+  .eal-table th.sortable {
+    padding: 0 !important;
+  }
+  .eal-table th.sortable a {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    color: inherit;
+    text-decoration: none;
+    width: 100%;
+    transition: background 0.2s;
+    gap: 10px;
+  }
+  .eal-table th.sortable a:hover {
+    background: rgba(0, 0, 0, 0.02);
+  }
+  .eal-table th.sortable i {
+    font-size: 10px;
+    margin-left: 5px;
+    color: var(--primary-color);
+    opacity: 0.8;
+    flex-shrink: 0;
+  }
+  .db-table-filters {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
   <div class="page-header-row">
@@ -24,39 +58,112 @@
 </div>
 
 <div class="eal-table-card">
-  <form method="get">
-    <div class="eal-toolbar">
-      <div class="eal-toolbar-left" style="width:100%; display:flex; gap:12px; flex-wrap:wrap; align-items:end;">
-        <div class="eal-search" style="flex:1; min-width:240px; max-width:320px;">
+  <form method="get" class="eal-toolbar">
+      <div class="eal-toolbar-left" style="width:100%; display:flex; gap:16px; flex-wrap:wrap; align-items:center;">
+        <div class="eal-search" style="flex:1; min-width:240px; margin-bottom: 0;">
           <i class="bi bi-search"></i>
           <input type="text" name="q" value="{{ search_query }}" placeholder="Search by role or email" />
+          <input type="hidden" name="trigger_event" value="{{ trigger_filter }}">
+          <input type="hidden" name="status" value="{{ status_filter }}">
+          <input type="hidden" name="sort" value="{{ current_sort }}">
+          <input type="hidden" name="dir" value="{{ current_dir }}">
         </div>
+
+        <div class="db-table-filters">
+          <a href="?q={{ search_query }}&trigger_event={{ trigger_filter }}&status=All&sort={{ current_sort }}&dir={{ current_dir }}"
+             class="filter-chip {% if status_filter == 'All' %}active{% endif %}">
+            {% translate "All Status" %}
+          </a>
+          <a href="?q={{ search_query }}&trigger_event={{ trigger_filter }}&status=Active&sort={{ current_sort }}&dir={{ current_dir }}"
+             class="filter-chip {% if status_filter == 'Active' %}active{% endif %}">
+            <i class="bi bi-circle-fill text-success" style="font-size: 6px"></i>
+            {% translate "Active" %}
+          </a>
+          <a href="?q={{ search_query }}&trigger_event={{ trigger_filter }}&status=Inactive&sort={{ current_sort }}&dir={{ current_dir }}"
+             class="filter-chip {% if status_filter == 'Inactive' %}active{% endif %}">
+            <i class="bi bi-circle-fill text-danger" style="font-size: 6px"></i>
+            {% translate "Inactive" %}
+          </a>
+        </div>
+
         <div style="width:260px">
-          <select class="eal-select" name="trigger_event">
+          <select class="eal-select" name="trigger_event" onchange="this.form.submit()">
             <option value="All" {% if trigger_filter == 'All' %}selected{% endif %}>All Trigger Events</option>
             {% for code, label in trigger_choices %}
               <option value="{{ code }}" {% if trigger_filter == code %}selected{% endif %}>{{ label }}</option>
             {% endfor %}
           </select>
         </div>
-        <div style="width:180px">
-          <select class="eal-select" name="status">
-            <option value="All" {% if status_filter == 'All' %}selected{% endif %}>All Statuses</option>
-            <option value="Active" {% if status_filter == 'Active' %}selected{% endif %}>Active</option>
-            <option value="Inactive" {% if status_filter == 'Inactive' %}selected{% endif %}>Inactive</option>
-          </select>
-        </div>
-        <button type="submit" class="eal-btn eal-btn-primary"><i class="bi bi-funnel"></i><span>{% translate "Apply" %}</span></button>
+
+        {% if search_query or trigger_filter != 'All' or status_filter != 'All' %}
+          <a href="{% url 'alert_route_list' %}" class="eal-btn eal-btn-outline" style="border-style: dashed; color: var(--text-muted); height: 32px; padding: 0 12px; font-size: 11px">
+            <i class="bi bi-x-circle"></i>
+            <span>{% translate "Clear Filters" %}</span>
+          </a>
+        {% endif %}
       </div>
-    </div>
   </form>
   <div class="eal-table-wrap">
     <table class="eal-table">
-      <thead><tr><th>#</th><th>Trigger Event</th><th>Notify Role</th><th>Custom Email</th><th>Status</th><th>ACTIONS</th></tr></thead>
+      <thead>
+        <tr>
+          <th class="sortable" style="width: 60px">
+            <a href="?q={{ search_query }}&trigger_event={{ trigger_filter }}&status={{ status_filter }}&sort=rank&dir={% if current_sort == 'rank' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+              <span>#</span>
+              {% if current_sort == 'rank' %}
+                <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+              {% else %}
+                <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+              {% endif %}
+            </a>
+          </th>
+          <th class="sortable">
+            <a href="?q={{ search_query }}&trigger_event={{ trigger_filter }}&status={{ status_filter }}&sort=trigger&dir={% if current_sort == 'trigger' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+              <span>{% translate "Trigger Event" %}</span>
+              {% if current_sort == 'trigger' %}
+                <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+              {% else %}
+                <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+              {% endif %}
+            </a>
+          </th>
+          <th class="sortable">
+            <a href="?q={{ search_query }}&trigger_event={{ trigger_filter }}&status={{ status_filter }}&sort=role&dir={% if current_sort == 'role' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+              <span>{% translate "Notify Role" %}</span>
+              {% if current_sort == 'role' %}
+                <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+              {% else %}
+                <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+              {% endif %}
+            </a>
+          </th>
+          <th class="sortable">
+            <a href="?q={{ search_query }}&trigger_event={{ trigger_filter }}&status={{ status_filter }}&sort=email&dir={% if current_sort == 'email' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+              <span>{% translate "Custom Email" %}</span>
+              {% if current_sort == 'email' %}
+                <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+              {% else %}
+                <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+              {% endif %}
+            </a>
+          </th>
+          <th class="sortable">
+            <a href="?q={{ search_query }}&trigger_event={{ trigger_filter }}&status={{ status_filter }}&sort=status&dir={% if current_sort == 'status' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+              <span>{% translate "Status" %}</span>
+              {% if current_sort == 'status' %}
+                <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+              {% else %}
+                <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+              {% endif %}
+            </a>
+          </th>
+          <th>{% translate "ACTIONS" %}</th>
+        </tr>
+      </thead>
       <tbody>
         {% for row in routes %}
           <tr>
-            <td>{{ forloop.counter0|add:routes.start_index }}</td>
+            <td>{{ row.default_rank }}</td>
             <td>{{ row.get_trigger_event_display }}</td>
             <td>{{ row.notify_role.role_name_en|default:'-' }}</td>
             <td>{{ row.notify_custom_email|default:'-' }}</td>

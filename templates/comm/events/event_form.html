@@ -4,11 +4,45 @@
 
 {% block page_title %}{% if is_edit %}{% translate "Edit Event Mapping" %}{% else %}{% translate "Add Event Mapping" %}{% endif %}{% endblock %}
 
+{% block extra_css %}
+<style>
+  .event-form-shell .form-card,
+  .event-form-shell .form-card-body {
+    overflow: visible;
+  }
+  .event-form-shell .form-select {
+    background-color: #fff;
+    color: #1e293b;
+    min-height: 42px;
+    height: 42px;
+    line-height: 1.4;
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+  .event-form-shell .form-select option {
+    color: #1e293b;
+    background-color: #fff;
+    line-height: 1.5;
+    min-height: 32px;
+    padding: 8px 12px;
+    white-space: normal;
+  }
+  .event-form-shell .fields-grid .field {
+    position: relative;
+    z-index: 1;
+  }
+  .event-form-shell .fields-grid .field:focus-within {
+    z-index: 5;
+  }
+</style>
+{% endblock %}
+
 {% block breadcrumb_items %}
 <li class="breadcrumb-item active" aria-current="page">{% if is_edit %}{% translate "Edit Event Mapping" %}{% else %}{% translate "Add Event Mapping" %}{% endif %}</li>
 {% endblock %}
 
 {% block content %}
+<div class="event-form-shell">
 <div class="page-header">
   <div class="page-header-row">
     <div class="page-header-left">
@@ -49,28 +83,72 @@
           <div class="field" id="fallback-template-wrap">{{ form.fallback_template.label_tag }}{{ form.fallback_template }}{{ form.fallback_template.errors }}</div>
         </div>
         <div class="form-actions-bar">
-  <div class="eal-header-actions">
-
-          <div class="footer-left"><a href="{% url 'event_mapping_list' %}" class="eal-btn eal-btn-outline">Cancel</a>
-  </div>
-</div>
-          <div class="footer-right"><button type="submit" class="eal-btn eal-btn-primary">Save</button></div>
+          <div class="footer-left">
+            <a href="{% url 'event_mapping_list' %}" class="eal-btn eal-btn-outline">Cancel</a>
+          </div>
+          <div class="footer-right">
+            <button type="submit" class="eal-btn eal-btn-primary">Save</button>
+          </div>
         </div>
       </form>
     </div>
   </div>
+{{ channel_templates|json_script:"event-channel-templates" }}
 <script>
   (function () {
+    const catalogNode = document.getElementById('event-channel-templates');
+    const templateCatalog = catalogNode ? JSON.parse(catalogNode.textContent) : [];
+    const primaryChannel = document.getElementById('id_primary_channel');
+    const primaryTemplate = document.getElementById('id_primary_template');
     const fallbackChannel = document.getElementById('id_fallback_channel');
+    const fallbackTemplate = document.getElementById('id_fallback_template');
     const fallbackWrap = document.getElementById('fallback-template-wrap');
+
+    function fillTemplateOptions(selectEl, channelValue, selectedValue) {
+      if (!selectEl) return;
+      const existing = selectedValue || selectEl.value || '';
+      selectEl.innerHTML = '';
+      const emptyOption = document.createElement('option');
+      emptyOption.value = '';
+      emptyOption.textContent = '---------';
+      selectEl.appendChild(emptyOption);
+      if (!channelValue) {
+        selectEl.value = '';
+        return;
+      }
+      templateCatalog
+        .filter((item) => item.channel_type === channelValue)
+        .forEach((item) => {
+          const option = document.createElement('option');
+          option.value = item.template_id;
+          option.textContent = item.template_name;
+          selectEl.appendChild(option);
+        });
+      if (existing && Array.from(selectEl.options).some((o) => o.value === existing)) {
+        selectEl.value = existing;
+      } else {
+        selectEl.value = '';
+      }
+    }
+
     function toggleFallbackTemplate() {
       fallbackWrap.style.display = fallbackChannel && fallbackChannel.value ? '' : 'none';
     }
+    if (primaryChannel) {
+      fillTemplateOptions(primaryTemplate, primaryChannel.value, primaryTemplate ? primaryTemplate.value : '');
+      primaryChannel.addEventListener('change', function () {
+        fillTemplateOptions(primaryTemplate, primaryChannel.value, '');
+      });
+    }
     if (fallbackChannel) {
+      fillTemplateOptions(fallbackTemplate, fallbackChannel.value, fallbackTemplate ? fallbackTemplate.value : '');
       fallbackChannel.addEventListener('change', toggleFallbackTemplate);
+      fallbackChannel.addEventListener('change', function () {
+        fillTemplateOptions(fallbackTemplate, fallbackChannel.value, '');
+      });
       toggleFallbackTemplate();
     }
   })();
 </script>
+</div>
 {% endblock %}
-

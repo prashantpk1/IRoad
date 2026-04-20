@@ -258,6 +258,28 @@
   grid-template-columns: 0.85fr 1.15fr;
 }
 
+/* ── Soft Buttons ── */
+.btn-soft-primary { background: var(--primary-bg) !important; color: var(--primary-color) !important; border: 1px solid transparent !important; transition: all 0.2s; }
+.btn-soft-primary:hover { background: var(--primary-color) !important; color: #fff !important; transform: translateY(-1px); }
+
+.btn-soft-success { background: var(--success-bg) !important; color: var(--success) !important; border: 1px solid transparent !important; transition: all 0.2s; }
+.btn-soft-success:hover { background: var(--success) !important; color: #fff !important; transform: translateY(-1px); }
+
+.btn-soft-warning { background: var(--warning-bg) !important; color: var(--warning) !important; border: 1px solid transparent !important; transition: all 0.2s; }
+.btn-soft-warning:hover { background: var(--warning) !important; color: #fff !important; transform: translateY(-1px); }
+
+.btn-soft-danger { background: var(--danger-bg) !important; color: var(--danger) !important; border: 1px solid transparent !important; transition: all 0.2s; }
+.btn-soft-danger:hover { background: var(--danger) !important; color: #fff !important; transform: translateY(-1px); }
+
+.btn-soft-info { background: var(--info-bg) !important; color: var(--info) !important; border: 1px solid transparent !important; transition: all 0.2s; }
+.btn-soft-info:hover { background: var(--info) !important; color: #fff !important; transform: translateY(-1px); }
+
+.btn-soft-dark { background: var(--bg-gray) !important; color: var(--text-dark) !important; border: 1px solid transparent !important; transition: all 0.2s; }
+.btn-soft-dark:hover { background: var(--text-dark) !important; color: #fff !important; transform: translateY(-1px); }
+
+.btn-soft-secondary { background: var(--bg-light) !important; color: var(--text-muted) !important; border: 1px solid var(--border-light) !important; transition: all 0.2s; }
+.btn-soft-secondary:hover { border-color: var(--text-muted) !important; transform: translateY(-1px); }
+
 /* ── Dashboard Card ── */
 .db-card {
   background: var(--bg-white);

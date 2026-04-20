@@ -3,8 +3,47 @@ from datetime import date, timedelta
 import ipaddress
 import logging
 from pathlib import Path
+from urllib.parse import urlsplit
+
+from django.conf import settings
 
 logger = logging.getLogger(__name__)
+
+
+def get_global_system_rules():
+    """
+    Return the single global rules row, creating the default record if needed.
+    """
+    from .models import GlobalSystemRules
+
+    obj, _created = GlobalSystemRules.objects.get_or_create(
+        rule_id='GLOBAL-SYSTEM-RULES',
+        defaults={
+            'system_timezone': 'Asia/Riyadh',
+            'default_date_format': 'DD/MM/YYYY',
+            'grace_period_days': 3,
+            'standard_billing_cycle': 30,
+        },
+    )
+    return obj
+
+
+def get_subscription_grace_days():
+    """Grace period used by the expiry suspension job."""
+    return int(get_global_system_rules().grace_period_days or 0)
+
+
+def get_standard_billing_cycle_days():
+    """Default billing cycle used where no plan-specific cycle exists."""
+    return int(get_global_system_rules().standard_billing_cycle or 30)
+
+
+def get_plan_cycle_days(plan):
+    """Use plan cycle when available, otherwise fall back to global rules."""
+    cycle_days = getattr(plan, 'base_cycle_days', None)
+    if cycle_days:
+        return int(cycle_days)
+    return get_standard_billing_cycle_days()
 
 
 def calculate_promo_discount(promo, sub_total, for_plan=None):
@@ -43,7 +82,7 @@ def refresh_order_projected_fields(order):
         plan = plan_line.plan
         proj_plan = plan
         proj_expiry = date.today() + timedelta(
-            days=plan.base_cycle_days * plan_line.number_of_cycles)
+            days=get_plan_cycle_days(plan) * plan_line.number_of_cycles)
         if plan.max_internal_users != -1:
             proj_u = plan.max_internal_users
         if plan.max_internal_trucks != -1:
@@ -56,7 +95,7 @@ def refresh_order_projected_fields(order):
     elif classification == 'Renewal' and plan_line:
         plan = plan_line.plan
         proj_plan = plan
-        extra = plan.base_cycle_days * plan_line.number_of_cycles
+        extra = get_plan_cycle_days(plan) * plan_line.number_of_cycles
         if tenant.subscription_expiry_date:
             proj_expiry = tenant.subscription_expiry_date + timedelta(days=extra)
         else:
@@ -66,7 +105,7 @@ def refresh_order_projected_fields(order):
         plan = plan_line.plan
         proj_plan = plan
         proj_expiry = date.today() + timedelta(
-            days=plan.base_cycle_days * plan_line.number_of_cycles)
+            days=get_plan_cycle_days(plan) * plan_line.number_of_cycles)
         if plan.max_internal_users != -1:
             proj_u = plan.max_internal_users
         if plan.max_internal_trucks != -1:
@@ -762,6 +801,9 @@ def generate_invoice_from_order(order, admin_user):
         supplier_tax = ""
 
     tenant = order.tenant
+    customer_address_snapshot = ''
+    if getattr(tenant, 'country', None):
+        customer_address_snapshot = tenant.country.name_en or ''
 
     # Calculate taxable amount
     taxable = order.sub_total - order.discount_amount
@@ -833,6 +875,110 @@ def generate_invoice_from_order(order, admin_user):
         ).save()
 
     return invoice
+
+
+def send_invoice_paid_notification(invoice, use_async_tasks=False):
+    """
+    Dispatch Invoice_Paid notification to tenant billing email.
+    Uses Event Mapping engine when configured, with direct email fallback.
+    """
+    if not invoice or not getattr(invoice, 'tenant', None):
+        return False
+    recipient = (invoice.tenant.primary_email or '').strip()
+    if not recipient:
+        return False
+
+    context = {
+        'invoice_number': invoice.invoice_number,
+        'invoice_amount': str(invoice.grand_total),
+        'currency_code': invoice.currency_id,
+        'company_name': invoice.customer_name,
+        'tenant_name': invoice.customer_name,
+        'issue_date': invoice.issue_date.strftime('%Y-%m-%d') if invoice.issue_date else '',
+    }
+
+    try:
+        from .communication_helpers import dispatch_event_notification
+        from .models import LegalIdentity
+        legal = LegalIdentity.objects.filter(
+            identity_id='GLOBAL-LEGAL-IDENTITY',
+        ).first()
+        company_logo = ''
+        if legal and legal.company_logo:
+            try:
+                company_logo = legal.company_logo.url
+            except Exception:
+                company_logo = ''
+
+        # Email clients require absolute URLs for reliable image rendering.
+        absolute_logo = company_logo
+        if company_logo and not company_logo.startswith(('http://', 'https://')):
+            public_base = (
+                (getattr(settings, 'PUBLIC_BASE_URL', '') or '').strip()
+                or (getattr(settings, 'TENANT_PORTAL_LOGIN_URL', '') or '').strip()
+            )
+            origin = ''
+            if public_base:
+                parsed = urlsplit(public_base)
+                if parsed.scheme and parsed.netloc:
+                    origin = f'{parsed.scheme}://{parsed.netloc}'
+                else:
+                    origin = public_base.rstrip('/')
+            if origin:
+                if company_logo.startswith('/'):
+                    absolute_logo = f'{origin}{company_logo}'
+                else:
+                    absolute_logo = f'{origin}/{company_logo.lstrip("/")}'
+
+        context['company_logo'] = absolute_logo
+        context['company_logo_img'] = (
+            f'<img src="{absolute_logo}" alt="Company Logo" '
+            'style="max-height:60px;width:auto;">'
+            if absolute_logo else ''
+        )
+        sent = dispatch_event_notification(
+            'Invoice_Paid',
+            recipient_email=recipient,
+            context_dict=context,
+            use_async_tasks=use_async_tasks,
+        )
+        if sent:
+            return True
+    except Exception:
+        logger.exception(
+            'Invoice_Paid mapped notification failed for invoice %s',
+            invoice.invoice_number,
+        )
+
+    try:
+        from .communication_helpers import send_transactional_email
+        subject = f'Invoice {invoice.invoice_number} issued'
+        text_body = (
+            f'Hello,\n\n'
+            f'Your invoice {invoice.invoice_number} is issued.\n'
+            f'Amount: {invoice.grand_total} {invoice.currency_id}\n\n'
+            f'Thank you.'
+        )
+        html_body = (
+            '<p>Hello,</p>'
+            f'<p>Your invoice <strong>{invoice.invoice_number}</strong> is issued.</p>'
+            f'<p><strong>Amount:</strong> {invoice.grand_total} {invoice.currency_id}</p>'
+            '<p>Thank you.</p>'
+        )
+        return send_transactional_email(
+            recipient,
+            subject,
+            text_body,
+            html_body,
+            trigger_source='Event: Invoice_Paid',
+            client_id=str(invoice.tenant_id),
+        )
+    except Exception:
+        logger.exception(
+            'Fallback invoice email failed for invoice %s',
+            invoice.invoice_number,
+        )
+        return False
 
 
 def generate_credit_note_from_invoice(original_invoice, admin_user=None):
@@ -907,7 +1053,7 @@ def provision_tenant_from_order(order):
             tenant.subscription_start_date = date.today()
             tenant.subscription_expiry_date = (
                 date.today() + timedelta(
-                    days=plan.base_cycle_days *
+                    days=get_plan_cycle_days(plan) *
                     plan_line.number_of_cycles))
             if plan.max_internal_users != -1:
                 tenant.active_max_users = \
@@ -935,7 +1081,7 @@ def provision_tenant_from_order(order):
             tenant.subscription_start_date = date.today()
             tenant.subscription_expiry_date = (
                 date.today() + timedelta(
-                    days=plan.base_cycle_days *
+                    days=get_plan_cycle_days(plan) *
                     plan_line.number_of_cycles))
             if plan.max_internal_users != -1:
                 tenant.active_max_users = plan.max_internal_users
@@ -1009,8 +1155,9 @@ def fulfill_paid_order(order, admin_user, ltv_amount):
             al.add_on_type_label_snapshot = al.get_add_on_type_display()
             al.save(update_fields=['add_on_type_label_snapshot'])
 
+    created_invoice = None
     if not StandardInvoice.objects.filter(order=order).exists():
-        generate_invoice_from_order(order, admin_user)
+        created_invoice = generate_invoice_from_order(order, admin_user)
 
     provision_tenant_from_order(order)
 
@@ -1024,3 +1171,6 @@ def fulfill_paid_order(order, admin_user, ltv_amount):
         ten.total_ltv + ltv_amount
     ).quantize(Decimal('0.01'))
     ten.save(update_fields=['total_ltv', 'updated_at'])
+
+    if created_invoice is not None:
+        send_invoice_paid_notification(created_invoice, use_async_tasks=False)

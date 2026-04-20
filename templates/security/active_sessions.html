@@ -1,10 +1,58 @@
 {% extends 'base.html' %}
+{% load i18n %}
 
 {% block page_title %}Active Sessions Monitor{% endblock %}
 
-{% block content %}
-  <meta http-equiv="refresh" content="30" />
+{% block breadcrumb_items %}
+<li class="breadcrumb-item active" aria-current="page">{% translate "Active Sessions Monitor" %}</li>
+{% endblock %}
 
+{% block extra_css %}
+<style>
+  .eal-table-card form {
+    padding-bottom: 16px !important;
+  }
+  .db-table-filters {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .filter-chip {
+    text-decoration: none !important;
+  }
+  .active-session-toolbar .eal-select {
+    height: 32px;
+    font-size: 12px;
+  }
+  .eal-table th.sortable {
+    padding: 0 !important;
+  }
+  .eal-table th.sortable a {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    color: inherit;
+    text-decoration: none;
+    width: 100%;
+    transition: background 0.2s;
+    gap: 10px;
+  }
+  .eal-table th.sortable a:hover {
+    background: rgba(0, 0, 0, 0.02);
+  }
+  .eal-table th.sortable i {
+    font-size: 10px;
+    margin-left: 5px;
+    color: var(--primary-color);
+    opacity: 0.8;
+    flex-shrink: 0;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
   <div class="dashboard-toolbar">
     <div class="toolbar-left">
       <div class="toolbar-title">Active Sessions Monitor</div>
@@ -23,40 +71,140 @@
       </div>
       <div class="kpi-title">Active Sessions</div>
       <div class="kpi-bottom">
-        <span class="kpi-value">{{ total_count }}</span>
+        <span class="kpi-value" id="active-sessions-kpi">{{ total_count }}</span>
       </div>
     </div>
   </div>
 
-  {% if sessions %}
+  {% if sessions.object_list %}
     <div class="db-card db-fade">
-      <div class="db-card-header">
-        <div>
-          <div class="db-card-title">Current Active Sessions</div>
-          <div class="db-card-subtitle">
-            Revoke sessions to immediately terminate admin access.
+      <div class="eal-table-card">
+        <form method="get" class="eal-toolbar active-session-toolbar">
+          <div class="eal-toolbar-left" style="width: 100%; display: flex; gap: 16px; align-items: center; flex-wrap: wrap">
+            <div class="eal-search" style="flex: 1; min-width: 250px; margin-bottom: 0">
+              <i class="bi bi-search"></i>
+              <input type="text" name="q" value="{{ search_query }}" placeholder="Search user, email, IP..." />
+              <input type="hidden" name="scope" value="{{ scope_filter }}">
+              <input type="hidden" name="sort" value="{{ current_sort }}">
+              <input type="hidden" name="dir" value="{{ current_dir }}">
+            </div>
+
+            <div class="db-table-filters">
+              <a href="?q={{ search_query|urlencode }}&scope=All&role={{ role_filter|urlencode }}&sort={{ current_sort }}&dir={{ current_dir }}" class="filter-chip {% if scope_filter == 'All' %}active{% endif %}">All</a>
+              <a href="?q={{ search_query|urlencode }}&scope=Current&role={{ role_filter|urlencode }}&sort={{ current_sort }}&dir={{ current_dir }}" class="filter-chip {% if scope_filter == 'Current' %}active{% endif %}">Current</a>
+              <a href="?q={{ search_query|urlencode }}&scope=Others&role={{ role_filter|urlencode }}&sort={{ current_sort }}&dir={{ current_dir }}" class="filter-chip {% if scope_filter == 'Others' %}active{% endif %}">Others</a>
+            </div>
+
+            <div style="width: 200px">
+              <select name="role" class="eal-select" onchange="this.form.submit()">
+                <option value="All" {% if role_filter == 'All' %}selected{% endif %}>All Roles</option>
+                {% for role_name in roles %}
+                  <option value="{{ role_name }}" {% if role_filter == role_name %}selected{% endif %}>{{ role_name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            {% if search_query or role_filter != 'All' or scope_filter != 'All' %}
+              <a href="{% url 'active_sessions' %}" class="eal-btn eal-btn-outline" style="border-style: dashed; color: var(--text-muted); height: 32px; padding: 0 12px; font-size: 11px">
+                <i class="bi bi-x-circle"></i>
+                <span>Clear Filters</span>
+              </a>
+            {% endif %}
           </div>
-        </div>
+        </form>
       </div>
 
-      <div class="eal-table-wrap">
+      <div class="eal-table-wrap" id="active-sessions-table">
         <table class="eal-table">
           <thead>
             <tr>
-              <th>User</th>
-              <th>Role</th>
-              <th>IP Address</th>
-              <th>Device / Browser</th>
-              <th>Started At</th>
-              <th>Last Activity</th>
-              <th>TTL Remaining</th>
+              <th class="sortable" style="width: 60px">
+                <a href="?q={{ search_query|urlencode }}&scope={{ scope_filter|urlencode }}&role={{ role_filter|urlencode }}&sort=rank&dir={% if current_sort == 'rank' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                  <span>#</span>
+                  {% if current_sort == 'rank' %}
+                    <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                  {% else %}
+                    <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                  {% endif %}
+                </a>
+              </th>
+              <th class="sortable">
+                <a href="?q={{ search_query|urlencode }}&scope={{ scope_filter|urlencode }}&role={{ role_filter|urlencode }}&sort=user&dir={% if current_sort == 'user' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                  <span>User</span>
+                  {% if current_sort == 'user' %}
+                    <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                  {% else %}
+                    <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                  {% endif %}
+                </a>
+              </th>
+              <th class="sortable">
+                <a href="?q={{ search_query|urlencode }}&scope={{ scope_filter|urlencode }}&role={{ role_filter|urlencode }}&sort=role&dir={% if current_sort == 'role' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                  <span>Role</span>
+                  {% if current_sort == 'role' %}
+                    <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                  {% else %}
+                    <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                  {% endif %}
+                </a>
+              </th>
+              <th class="sortable">
+                <a href="?q={{ search_query|urlencode }}&scope={{ scope_filter|urlencode }}&role={{ role_filter|urlencode }}&sort=ip&dir={% if current_sort == 'ip' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                  <span>IP Address</span>
+                  {% if current_sort == 'ip' %}
+                    <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                  {% else %}
+                    <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                  {% endif %}
+                </a>
+              </th>
+              <th class="sortable">
+                <a href="?q={{ search_query|urlencode }}&scope={{ scope_filter|urlencode }}&role={{ role_filter|urlencode }}&sort=device&dir={% if current_sort == 'device' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                  <span>Device / Browser</span>
+                  {% if current_sort == 'device' %}
+                    <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                  {% else %}
+                    <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                  {% endif %}
+                </a>
+              </th>
+              <th class="sortable">
+                <a href="?q={{ search_query|urlencode }}&scope={{ scope_filter|urlencode }}&role={{ role_filter|urlencode }}&sort=started_at&dir={% if current_sort == 'started_at' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                  <span>Started At</span>
+                  {% if current_sort == 'started_at' %}
+                    <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                  {% else %}
+                    <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                  {% endif %}
+                </a>
+              </th>
+              <th class="sortable">
+                <a href="?q={{ search_query|urlencode }}&scope={{ scope_filter|urlencode }}&role={{ role_filter|urlencode }}&sort=last_activity&dir={% if current_sort == 'last_activity' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                  <span>Last Activity</span>
+                  {% if current_sort == 'last_activity' %}
+                    <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                  {% else %}
+                    <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                  {% endif %}
+                </a>
+              </th>
+              <th class="sortable">
+                <a href="?q={{ search_query|urlencode }}&scope={{ scope_filter|urlencode }}&role={{ role_filter|urlencode }}&sort=ttl&dir={% if current_sort == 'ttl' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                  <span>TTL Remaining</span>
+                  {% if current_sort == 'ttl' %}
+                    <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                  {% else %}
+                    <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                  {% endif %}
+                </a>
+              </th>
               <th style="width: 140px">Actions</th>
             </tr>
           </thead>
           <tbody>
             {% for session in sessions %}
-              {% if session.jti == current_jti %}
-                <tr class="table-info">
+                <tr {% if session.jti == current_jti %}class="table-info"{% endif %}>
+                  <td>{{ sessions.start_index|add:forloop.counter0 }}</td>
                   <td>
                     <div class="eal-name-cell">
                       <span class="eal-name-text">
@@ -79,8 +227,7 @@
                   <td>{{ session.last_activity }}</td>
                   <td>
                     {% if session.ttl_seconds and session.ttl_seconds > 0 %}
-                      {{ session.ttl_seconds|divisibleby:60 }}
-                      {{ session.ttl_seconds|floatformat:-2 }}
+                      {{ session.ttl_seconds }}s
                     {% else %}
                       &lt; 1 min
                     {% endif %}
@@ -90,16 +237,16 @@
                       <form
                         method="post"
                         action="{% url 'revoke_session' session.jti %}"
-                        style="display: inline"
+                        style="display:inline"
+                        class="js-confirm-submit"
                       >
                         {% csrf_token %}
                         <button
                           type="submit"
-                          class="btn btn-sm btn-danger"
-                          onclick="return confirm('Revoke this session now?');"
+                          class="eal-row-btn"
+                          title="Revoke Session"
                         >
                           <i class="bi bi-x-circle"></i>
-                          Revoke
                         </button>
                       </form>
                     {% else %}
@@ -107,10 +254,12 @@
                     {% endif %}
                   </td>
                 </tr>
-              {% endif %}
             {% endfor %}
           </tbody>
         </table>
+      </div>
+      <div id="active-sessions-pagination">
+        {% include 'partials/pagination.html' with page_obj=sessions %}
       </div>
     </div>
   {% else %}
@@ -126,5 +275,55 @@
       </div>
     </div>
   {% endif %}
+
+  <script>
+    (function () {
+      const POLL_MS = 30000;
+      const kpiElId = "active-sessions-kpi";
+      const tableElId = "active-sessions-table";
+      const paginationElId = "active-sessions-pagination";
+
+      function shouldSkipRefresh() {
+        if (document.hidden) return true;
+        const ae = document.activeElement;
+        if (!ae) return false;
+        return !!ae.closest(".active-session-toolbar");
+      }
+
+      async function refreshFragments() {
+        if (shouldSkipRefresh()) return;
+
+        const url = new URL(window.location.href);
+        url.searchParams.set("partial", "1");
+
+        let html;
+        try {
+          const resp = await fetch(url.toString(), {
+            headers: { "X-Requested-With": "XMLHttpRequest" },
+            cache: "no-store",
+          });
+          if (!resp.ok) return;
+          html = await resp.text();
+        } catch (e) {
+          return;
+        }
+
+        const doc = new DOMParser().parseFromString(html, "text/html");
+        const nextKpi = doc.getElementById(kpiElId);
+        const nextTable = doc.getElementById(tableElId);
+        const nextPagination = doc.getElementById(paginationElId);
+
+        const curKpi = document.getElementById(kpiElId);
+        const curTable = document.getElementById(tableElId);
+        const curPagination = document.getElementById(paginationElId);
+
+        if (curKpi && nextKpi) curKpi.textContent = nextKpi.textContent;
+        if (curTable && nextTable) curTable.outerHTML = nextTable.outerHTML;
+        if (curPagination && nextPagination) curPagination.outerHTML = nextPagination.outerHTML;
+      }
+
+      setInterval(refreshFragments, POLL_MS);
+    })();
+  </script>
 {% endblock %}
 

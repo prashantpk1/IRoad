@@ -1,0 +1,200 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block page_title %}{% translate "My Account" %}{% endblock %}
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item active" aria-current="page">{% translate "My Account" %}</li>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">{% translate "My Account" %}</h1>
+      <p class="page-subtitle">{% translate "Manage your personal profile, security credentials, and account metadata." %}</p>
+    </div>
+  </div>
+</div>
+
+{% if form.non_field_errors %}
+  <div class="alert alert-danger mb-4">
+    {% for error in form.non_field_errors %}
+      <div><i class="bi bi-exclamation-triangle me-2"></i>{{ error }}</div>
+    {% endfor %}
+  </div>
+{% endif %}
+
+<form method="post" action="" autocomplete="off">
+  {% csrf_token %}
+
+  <!-- Profile Details Card -->
+  <div class="form-card mb-4">
+    <div class="form-card-header">
+      <div class="form-card-icon blue">
+        <i class="bi bi-person-badge"></i>
+      </div>
+      <div class="form-card-header-text">
+        <h3 class="form-card-title">{% translate "Profile Information" %}</h3>
+        <p class="form-card-desc">{% translate "Basic identity and contact details used across the portal." %}</p>
+      </div>
+    </div>
+    <div class="form-card-body">
+      <div class="row g-4">
+        <div class="col-12 col-md-6">
+          <div class="field-wrapper">
+             <label class="form-label">{% translate "First Name" %}</label>
+             {{ form.first_name }}
+             {% for error in form.first_name.errors %}
+               <div class="field-error"><i class="bi bi-info-circle"></i> {{ error }}</div>
+             {% endfor %}
+          </div>
+        </div>
+        <div class="col-12 col-md-6">
+          <div class="field-wrapper">
+             <label class="form-label">{% translate "Last Name" %}</label>
+             {{ form.last_name }}
+             {% for error in form.last_name.errors %}
+               <div class="field-error"><i class="bi bi-info-circle"></i> {{ error }}</div>
+             {% endfor %}
+          </div>
+        </div>
+        <div class="col-12 col-md-6">
+          <div class="field-wrapper">
+             <label class="form-label">{% translate "Email Address" %}</label>
+             <div class="input-group">
+                <span class="input-group-text bg-light border-end-0"><i class="bi bi-envelope text-muted"></i></span>
+                {{ form.email }}
+             </div>
+             {% if request.user.is_root %}
+               <small class="text-muted mt-1 d-block"><i class="bi bi-shield-check me-1"></i>{% translate "As Root Admin, you can update this email." %}</small>
+               {% for error in form.email.errors %}
+                 <div class="field-error"><i class="bi bi-info-circle"></i> {{ error }}</div>
+               {% endfor %}
+             {% else %}
+               <small class="text-muted mt-1 d-block"><i class="bi bi-lock me-1"></i>{% translate "Email cannot be modified for security reasons." %}</small>
+             {% endif %}
+          </div>
+        </div>
+        <div class="col-12 col-md-6">
+          <div class="field-wrapper">
+             <label class="form-label">{% translate "Phone Number" %}</label>
+             <div class="input-group">
+                <span class="input-group-text bg-light border-end-0"><i class="bi bi-telephone text-muted"></i></span>
+                {{ form.phone_number }}
+             </div>
+             {% for error in form.phone_number.errors %}
+               <div class="field-error"><i class="bi bi-info-circle"></i> {{ error }}</div>
+             {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Security & Password Card -->
+  <div class="form-card mb-4">
+    <div class="form-card-header">
+      <div class="form-card-icon indigo">
+        <i class="bi bi-key"></i>
+      </div>
+      <div class="form-card-header-text">
+        <h3 class="form-card-title">{% translate "Security & Password" %}</h3>
+        <p class="form-card-desc">{% translate "Update your access credentials. Leave blank to keep your current password." %}</p>
+      </div>
+    </div>
+    <div class="form-card-body">
+      <div class="row g-4">
+        <div class="col-12 col-md-6">
+          <div class="field-wrapper">
+             <label class="form-label">{% translate "New Password" %}</label>
+             <div class="input-group">
+                <span class="input-group-text bg-light border-end-0"><i class="bi bi-shield-lock text-muted"></i></span>
+                {{ form.new_password }}
+             </div>
+             {% for error in form.new_password.errors %}
+               <div class="field-error"><i class="bi bi-info-circle"></i> {{ error }}</div>
+             {% endfor %}
+          </div>
+        </div>
+        <div class="col-12 col-md-6">
+          <div class="field-wrapper">
+             <label class="form-label">{% translate "Confirm New Password" %}</label>
+             <div class="input-group">
+                <span class="input-group-text bg-light border-end-0"><i class="bi bi-shield-check text-muted"></i></span>
+                {{ form.confirm_password }}
+             </div>
+             {% for error in form.confirm_password.errors %}
+               <div class="field-error"><i class="bi bi-info-circle"></i> {{ error }}</div>
+             {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Account Overview Card -->
+  <div class="form-card mb-4">
+    <div class="form-card-header">
+      <div class="form-card-icon amber">
+        <i class="bi bi-info-square"></i>
+      </div>
+      <div class="form-card-header-text">
+        <h3 class="form-card-title">{% translate "System & Meta Information" %}</h3>
+        <p class="form-card-desc">{% translate "Read-only metadata regarding your account permissions and status." %}</p>
+      </div>
+    </div>
+    <div class="form-card-body">
+      <div class="row g-4">
+        <div class="col-12 col-md-6 col-lg-3">
+          <label class="form-label text-muted small text-uppercase fw-bold">{% translate "Primary Role" %}</label>
+          <div class="p-2 border rounded bg-light">
+             <i class="bi bi-shield-fill-check text-primary me-2"></i>
+             {% if target_user.role %}{{ target_user.role.role_name_en }}{% else %}—{% endif %}
+          </div>
+        </div>
+        <div class="col-12 col-md-6 col-lg-3">
+          <label class="form-label text-muted small text-uppercase fw-bold">{% translate "Account Status" %}</label>
+          <div class="p-2 border rounded bg-light">
+             <span class="badge {% if target_user.status == 'Active' %}bg-success{% else %}bg-secondary{% endif %} rounded-pill">
+                {{ target_user.status }}
+             </span>
+          </div>
+        </div>
+        <div class="col-12 col-md-6 col-lg-3">
+          <label class="form-label text-muted small text-uppercase fw-bold">{% translate "Multi-Factor Auth" %}</label>
+          <div class="p-2 border rounded bg-light">
+             {% if target_user.two_factor_enabled %}
+               <i class="bi bi-check-circle-fill text-success me-1"></i> {% translate 'Active' %}
+             {% else %}
+               <i class="bi bi-dash-circle text-muted me-1"></i> {% translate 'Inactive' %}
+             {% endif %}
+          </div>
+        </div>
+        <div class="col-12 col-md-6 col-lg-3">
+          <label class="form-label text-muted small text-uppercase fw-bold">{% translate "Recent Activity" %}</label>
+          <div class="p-2 border rounded bg-light text-truncate">
+             <i class="bi bi-clock-history text-muted me-1"></i>
+             {% if target_user.last_login_at %}{{ target_user.last_login_at|date:'d M Y, H:i' }}{% else %}—{% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-actions-bar">
+    <div class="form-actions-left">
+      <a href="{% url 'dashboard' %}" class="eal-btn eal-btn-outline">
+        <i class="bi bi-arrow-left"></i>
+        <span>{% translate "Return to Dashboard" %}</span>
+      </a>
+    </div>
+    <div class="form-actions-right">
+      <button type="submit" class="eal-btn eal-btn-primary">
+        <i class="bi bi-save"></i>
+        <span>{% translate "Save All Changes" %}</span>
+      </button>
+    </div>
+  </div>
+</form>
+{% endblock %}

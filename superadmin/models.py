@@ -2205,6 +2205,11 @@ class SupportTicket(models.Model):
         related_name='support_tickets',
     )
     subject = models.CharField(max_length=255)
+    description = models.TextField(
+        blank=True,
+        default='',
+        help_text='Initial request detail',
+    )
     category = models.ForeignKey(
         SupportCategory,
         on_delete=models.PROTECT,

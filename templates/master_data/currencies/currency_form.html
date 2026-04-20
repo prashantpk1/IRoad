@@ -114,9 +114,12 @@
           </div>
           <div class="col-12 col-md-6">
             <label class="form-label" for="{{ form.is_active.id_for_label }}">{% translate "Status" %}</label>
-            <div class="form-check form-switch mt-2">
-              {{ form.is_active }}
-              <label class="form-check-label ms-2" for="{{ form.is_active.id_for_label }}">
+            <div class="field d-flex align-items-center mt-2">
+              <label class="eal-switch">
+                {{ form.is_active }}
+                <span class="eal-slider"></span>
+              </label>
+              <label class="form-check-label ms-3" for="{{ form.is_active.id_for_label }}">
                 {% translate "Active Status" %}
               </label>
             </div>

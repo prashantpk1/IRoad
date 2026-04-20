@@ -1,15 +1,23 @@
 from django.contrib import messages
+from django.template import Context, Template
+from django.http import HttpResponse
 from django.contrib.sessions.models import Session
 from django.contrib.auth import login, logout
 from django.contrib.auth.hashers import check_password
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.conf import settings
 from django.db import transaction as db_transaction
-from django.db.models import Sum, Count, F, Q
+from django.db.models import (
+    Sum, Count, F, Q, Window, Case, When, Value, IntegerField, DecimalField,
+    CharField,
+)
+from django.db.models.functions import Coalesce
 from django.db.models.expressions import ExpressionWrapper
 from django.db.models.fields import DecimalField
-from django.db.models.functions import Abs
-from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
+from django.db.models.functions import Abs, RowNumber, ExtractHour, ExtractWeekDay
+from superadmin.redis_helpers import (
+    count_active_admin_sessions
+)
 from django.shortcuts import get_object_or_404, redirect, render
 from django.core.paginator import Paginator
 from django.urls import reverse
@@ -19,12 +27,14 @@ from django.template.loader import render_to_string
 from django.utils.dateparse import parse_date
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import ensure_csrf_cookie
+from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.views import View
 from django.views.generic import TemplateView
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 import json
 import logging
+import secrets
 import uuid
 import smtplib
 from email.mime.multipart import MIMEMultipart
@@ -39,9 +49,12 @@ from .billing_helpers import (
     complete_order_payment_as_system,
     fulfill_paid_order,
     get_fx_snapshot,
+    get_plan_cycle_days,
+    get_standard_billing_cycle_days,
     get_tax_code_for_tenant,
     refresh_order_projected_fields,
     resolve_upgrade_credit_basis_price,
+    send_invoice_paid_notification,
     sync_or_create_order_payment_transaction,
     validate_downgrade_order,
 )
@@ -61,7 +74,12 @@ from .audit_helpers import (
     log_audit_action,
 )
 from .redis_helpers import create_admin_session
-from .communication_helpers import ensure_default_notification_templates
+from .communication_helpers import (
+    dispatch_event_notification,
+    ensure_default_notification_templates,
+    send_named_notification_email,
+    send_transactional_email,
+)
 from .forms import (
     AddOnsPricingPolicyForm,
     AdminSecuritySettingsForm,
@@ -75,6 +93,8 @@ from .forms import (
     EventMappingForm,
     ForgotPasswordForm,
     LoginForm,
+    MyAccountForm,
+    OTPVerificationForm,
     GeneralTaxSettingsForm,
     GlobalSystemRulesForm,
     RoleForm,
@@ -151,6 +171,65 @@ def _client_ip(request):
     if xff:
         return xff.split(',')[0].strip()
     return request.META.get('REMOTE_ADDR')
+
+
+ADMIN_LOGIN_OTP_SESSION_KEY = 'admin_login_otp'
+ADMIN_LOGIN_OTP_TTL_SECONDS = 300
+ADMIN_LOGIN_OTP_MAX_ATTEMPTS = 5
+
+
+def _issue_admin_login_otp(request, user):
+    ensure_default_notification_templates(
+        created_by=user if getattr(user, 'is_authenticated', False) else None
+    )
+    otp_code = f'{secrets.randbelow(1000000):06d}'
+    expires_at = timezone.now() + timezone.timedelta(seconds=ADMIN_LOGIN_OTP_TTL_SECONDS)
+    request.session[ADMIN_LOGIN_OTP_SESSION_KEY] = {
+        'admin_id': str(getattr(user, 'admin_id', user.id)),
+        'email': (user.email or '').strip().lower(),
+        'otp_code': otp_code,
+        'expires_at': expires_at.isoformat(),
+        'attempts': 0,
+    }
+    request.session.modified = True
+
+    ctx = {
+        'otp_code': otp_code,
+        'otp': otp_code,
+        'user_name': (getattr(user, 'full_name', '') or user.email or 'Admin User'),
+    }
+    sent = send_named_notification_email(
+        'AUTH_LOGIN_OTP',
+        recipient_email=user.email,
+        context_dict=ctx,
+        default_subject='Your iRoad Login Verification Code',
+        trigger_source='TemplateName: AUTH_LOGIN_OTP',
+        force_django_smtp=False,
+    )
+    if sent:
+        return True
+
+    sent = dispatch_event_notification(
+        'OTP_Requested',
+        recipient_email=user.email,
+        context_dict=ctx,
+        use_async_tasks=False,
+    )
+    if sent:
+        return True
+
+    # Fallback when EventMapping/template is not configured.
+    send_transactional_email(
+        user.email,
+        'Your iRoad OTP verification code',
+        f'Your verification code is {otp_code}. It expires in 5 minutes.',
+        (
+            f'<p>Your verification code is <strong>{otp_code}</strong>.</p>'
+            '<p>This code expires in 5 minutes.</p>'
+        ),
+        trigger_source='Direct: Login OTP',
+    )
+    return True
 
 
 @method_decorator(ensure_csrf_cookie, name='dispatch')
@@ -347,16 +426,158 @@ class LoginView(View):
                 },
             )
 
-        # STEP 5: All good — login
+        # STEP 5: Password verified — continue with OTP verification
+        request.session['pending_admin_id'] = str(getattr(user, 'admin_id', user.id))
+        request.session['pending_admin_email'] = (user.email or '').strip().lower()
+        request.session['pending_admin_ip'] = ip
+        request.session.modified = True
+        try:
+            _issue_admin_login_otp(request, user)
+        except Exception:
+            logger.exception('Failed to dispatch login OTP for %s', user.email)
+            return render(
+                request,
+                self.template_name,
+                {
+                    'form': form,
+                    'error': (
+                        'Could not send verification code right now. '
+                        'Please try again.'
+                    ),
+                },
+            )
+        messages.success(
+            request,
+            'A verification code has been sent to your email. Enter it to continue.',
+        )
+        return redirect('otp_verify')
+
+
+@method_decorator(ensure_csrf_cookie, name='dispatch')
+class OTPVerificationView(View):
+    template_name = 'auth/otp_verify.html'
+
+    @staticmethod
+    def _pending_state(request):
+        otp_payload = request.session.get(ADMIN_LOGIN_OTP_SESSION_KEY) or {}
+        admin_id = request.session.get('pending_admin_id')
+        email = (request.session.get('pending_admin_email') or '').strip().lower()
+        if not otp_payload or not admin_id or not email:
+            return None
+        expires_raw = otp_payload.get('expires_at')
+        try:
+            expires_at = datetime.fromisoformat(expires_raw)
+        except Exception:
+            return None
+        if timezone.is_naive(expires_at):
+            expires_at = timezone.make_aware(expires_at, timezone.get_current_timezone())
+        remaining = max(0, int((expires_at - timezone.now()).total_seconds()))
+        return otp_payload, admin_id, email, remaining
+
+    def get(self, request):
+        if request.user.is_authenticated:
+            return redirect('dashboard')
+        pending = self._pending_state(request)
+        if not pending:
+            messages.error(request, 'Your verification session has expired. Please sign in again.')
+            return redirect('login')
+        otp_payload, _, email, remaining = pending
+        if remaining <= 0:
+            request.session.pop(ADMIN_LOGIN_OTP_SESSION_KEY, None)
+            messages.error(request, 'OTP expired. Please sign in again to get a new code.')
+            return redirect('login')
+        return render(
+            request,
+            self.template_name,
+            {
+                'form': OTPVerificationForm(),
+                'masked_email': email,
+                'remaining_seconds': remaining,
+                'attempts_left': max(0, ADMIN_LOGIN_OTP_MAX_ATTEMPTS - int(otp_payload.get('attempts', 0))),
+            },
+        )
+
+    def post(self, request):
+        if request.user.is_authenticated:
+            return redirect('dashboard')
+        action = request.POST.get('action')
+        pending = self._pending_state(request)
+        if not pending:
+            messages.error(request, 'Your verification session has expired. Please sign in again.')
+            return redirect('login')
+        otp_payload, admin_id, email, remaining = pending
+        if remaining <= 0:
+            request.session.pop(ADMIN_LOGIN_OTP_SESSION_KEY, None)
+            messages.error(request, 'OTP expired. Please sign in again to get a new code.')
+            return redirect('login')
+
+        user = AdminUser.objects.filter(pk=admin_id, email__iexact=email).first()
+        if not user or user.status != 'Active':
+            request.session.pop(ADMIN_LOGIN_OTP_SESSION_KEY, None)
+            request.session.pop('pending_admin_id', None)
+            request.session.pop('pending_admin_email', None)
+            request.session.pop('pending_admin_ip', None)
+            messages.error(request, 'Account no longer eligible for login. Please contact administrator.')
+            return redirect('login')
+
+        if action == 'resend':
+            try:
+                _issue_admin_login_otp(request, user)
+            except Exception:
+                logger.exception('Failed to resend login OTP for %s', user.email)
+                messages.error(request, 'Failed to resend OTP right now. Please try again shortly.')
+            else:
+                messages.success(request, 'A new OTP has been sent to your email.')
+            return redirect('otp_verify')
+
+        form = OTPVerificationForm(request.POST)
+        if not form.is_valid():
+            return render(
+                request,
+                self.template_name,
+                {
+                    'form': form,
+                    'masked_email': email,
+                    'remaining_seconds': remaining,
+                    'attempts_left': max(0, ADMIN_LOGIN_OTP_MAX_ATTEMPTS - int(otp_payload.get('attempts', 0))),
+                },
+            )
+
+        if form.cleaned_data['otp'] != str(otp_payload.get('otp_code') or ''):
+            attempts = int(otp_payload.get('attempts', 0)) + 1
+            otp_payload['attempts'] = attempts
+            request.session[ADMIN_LOGIN_OTP_SESSION_KEY] = otp_payload
+            request.session.modified = True
+            attempts_left = max(0, ADMIN_LOGIN_OTP_MAX_ATTEMPTS - attempts)
+            if attempts >= ADMIN_LOGIN_OTP_MAX_ATTEMPTS:
+                request.session.pop(ADMIN_LOGIN_OTP_SESSION_KEY, None)
+                request.session.pop('pending_admin_id', None)
+                request.session.pop('pending_admin_email', None)
+                request.session.pop('pending_admin_ip', None)
+                messages.error(request, 'Too many invalid OTP attempts. Please sign in again.')
+                return redirect('login')
+            return render(
+                request,
+                self.template_name,
+                {
+                    'form': form,
+                    'error': f'Invalid OTP. {attempts_left} attempt(s) remaining.',
+                    'masked_email': email,
+                    'remaining_seconds': remaining,
+                    'attempts_left': attempts_left,
+                },
+            )
+
+        # OTP verified successfully -> complete admin login + session creation.
         reset_failed_attempts(email)
         user.last_login_at = timezone.now()
-        user.save(update_fields=['last_login_at'])
-
+        user.two_factor_enabled = True
+        user.save(update_fields=['last_login_at', 'two_factor_enabled'])
         login(request, user)
 
         settings_obj = get_security_settings()
         user_agent = request.META.get('HTTP_USER_AGENT', '')
-
+        ip = request.session.get('pending_admin_ip') or _client_ip(request)
         jti = create_admin_session(
             admin_user=user,
             ip_address=ip,
@@ -372,11 +593,14 @@ class LoginView(View):
             record_id=str(getattr(user, 'admin_id', user.id)),
             new_instance=None,
         )
-
         log_access('Login', 'Success', email, ip)
-        # Let other tabs (open /login/) reload via localStorage so CSRF matches
-        # after django.contrib.auth.login() rotates the token.
+
+        request.session.pop(ADMIN_LOGIN_OTP_SESSION_KEY, None)
+        request.session.pop('pending_admin_id', None)
+        request.session.pop('pending_admin_email', None)
+        request.session.pop('pending_admin_ip', None)
         request.session['notify_auth_tabs'] = True
+        messages.success(request, 'OTP verified successfully.')
         return redirect('dashboard')
 
 
@@ -663,10 +887,7 @@ class DashboardView(LoginRequiredMixin, View):
             created_at__lt=overdue_cutoff
         ).count()
 
-        active_admin_sessions = ActiveSession.objects.filter(
-            is_active=True,
-            user_domain='Admin'
-        ).count()
+        active_admin_sessions = count_active_admin_sessions()
 
         # ── ATTENTION CENTER ──
 
@@ -789,6 +1010,25 @@ class DashboardView(LoginRequiredMixin, View):
             'admin'
         ).order_by('-timestamp')[:10]
 
+        # ── ACCESS HEATMAP (Successful Logins last 30 days) ──
+        heatmap_qs = AccessLog.objects.filter(
+            attempt_type='Login',
+            status='Success',
+            timestamp__gte=now - timedelta(days=30)
+        ).annotate(
+            hour=ExtractHour('timestamp'),
+            weekday=ExtractWeekDay('timestamp') # 1=Sun, 7=Sat
+        ).values('hour', 'weekday').annotate(count=Count('id'))
+
+        # Prepare 7x24 matrix (Monday-Sunday)
+        heatmap_matrix = [[0] * 24 for _ in range(7)]
+        # Map Django Weekday (1=Sun...7=Sat) to Matrix Row (0=Mon...6=Sun)
+        day_map = {2:0, 3:1, 4:2, 5:3, 6:4, 7:5, 1:6}
+        for entry in heatmap_qs:
+            d_idx = day_map.get(entry['weekday'])
+            if d_idx is not None:
+                heatmap_matrix[d_idx][entry['hour']] = entry['count']
+
         context = {
             # KPIs
             'mrr': mrr,
@@ -816,6 +1056,8 @@ class DashboardView(LoginRequiredMixin, View):
             'stale_accounts': stale_accounts,
             'suspended_admins': suspended_admins,
             'total_staff': total_staff,
+            # Heatmap
+            'heatmap_data': heatmap_matrix,
             # Charts (Chart.js)
             'revenue_data': revenue_data,
             'revenue_labels': revenue_labels,
@@ -849,7 +1091,17 @@ class AccessLogListView(LoginRequiredMixin, View):
         if redirect_resp:
             return redirect_resp
 
-        qs = AccessLog.objects.all()
+        sort_by = request.GET.get('sort', 'rank').strip()
+        sort_dir = request.GET.get('dir', 'asc').strip().lower()
+        if sort_dir not in ('asc', 'desc'):
+            sort_dir = 'asc'
+
+        qs = AccessLog.objects.annotate(
+            default_rank=Window(
+                expression=RowNumber(),
+                order_by=F('timestamp').desc(),
+            )
+        )
 
         attempt_filter = request.GET.get('attempt_type', 'All')
         if attempt_filter in [
@@ -887,10 +1139,23 @@ class AccessLogListView(LoginRequiredMixin, View):
         if td:
             qs = qs.filter(timestamp__date__lte=td)
 
-        qs = qs.order_by('-timestamp')
+        sort_mapping = {
+            'rank': ['default_rank'],
+            'attempt_type': ['attempt_type'],
+            'status': ['status'],
+            'user_domain': ['user_domain'],
+            'email': ['email_used'],
+            'ip': ['ip_address'],
+            'timestamp': ['timestamp'],
+        }
+        active_sort_fields = sort_mapping.get(sort_by, ['default_rank'])
+        ordering = []
+        for f in active_sort_fields:
+            ordering.append(f if sort_dir == 'asc' else f'-{f}')
+        qs = qs.order_by(*ordering)
         total_count = qs.count()
 
-        paginator = Paginator(qs, 5)
+        paginator = Paginator(qs, 10)
         page_number = request.GET.get('page', 1)
         page_obj = paginator.get_page(page_number)
 
@@ -908,6 +1173,8 @@ class AccessLogListView(LoginRequiredMixin, View):
             'search_query': search_query,
             'from_date': from_date,
             'to_date': to_date,
+            'current_sort': sort_by,
+            'current_dir': sort_dir,
             'filter_query': query_params.urlencode(),
         }
         return render(request, self.template_name, context)
@@ -958,7 +1225,7 @@ class AuditLogListView(LoginRequiredMixin, View):
             )
 
         qs = qs.order_by('-timestamp')
-        paginator = Paginator(qs, 5)
+        paginator = Paginator(qs, 10)
         page_number = request.GET.get('page', 1)
         page_obj = paginator.get_page(page_number)
 
@@ -1203,15 +1470,84 @@ class ActiveSessionsView(LoginRequiredMixin, View):
         sessions = get_all_active_admin_sessions()
         current_jti = request.session.get('jti')
 
-        return render(
-            request,
-            'security/active_sessions.html',
+        search_query = request.GET.get('q', '').strip()
+        role_filter = request.GET.get('role', 'All').strip()
+        scope_filter = request.GET.get('scope', 'All').strip()
+        sort_by = request.GET.get('sort', 'rank').strip()
+        sort_dir = request.GET.get('dir', 'asc').strip().lower()
+        if sort_dir not in ('asc', 'desc'):
+            sort_dir = 'asc'
+
+        if search_query:
+            q = search_query.lower()
+            sessions = [
+                s for s in sessions
+                if q in (s.get('email', '') or '').lower()
+                or q in (s.get('first_name', '') or '').lower()
+                or q in (s.get('last_name', '') or '').lower()
+                or q in (s.get('ip_address', '') or '').lower()
+            ]
+
+        all_roles = sorted(
             {
-                'sessions': sessions,
-                'current_jti': current_jti,
-                'total_count': len(sessions),
-            },
+                (s.get('role', '') or '').strip()
+                for s in sessions
+                if (s.get('role', '') or '').strip()
+            }
         )
+        if role_filter != 'All':
+            sessions = [s for s in sessions if (s.get('role', '') or '') == role_filter]
+
+        if scope_filter == 'Current':
+            sessions = [s for s in sessions if s.get('jti') == current_jti]
+        elif scope_filter == 'Others':
+            sessions = [s for s in sessions if s.get('jti') != current_jti]
+
+        def _dt(value):
+            if not value:
+                return datetime.min
+            try:
+                return datetime.fromisoformat(str(value))
+            except Exception:
+                return datetime.min
+
+        sort_mapping = {
+            'rank': lambda s: _dt(s.get('started_at')),
+            'user': lambda s: (
+                f"{s.get('first_name', '')} {s.get('last_name', '')}".strip().lower(),
+                str(s.get('email', '')).lower(),
+            ),
+            'role': lambda s: str(s.get('role', '')).lower(),
+            'ip': lambda s: str(s.get('ip_address', '')).lower(),
+            'device': lambda s: str(s.get('user_agent', '')).lower(),
+            'started_at': lambda s: _dt(s.get('started_at')),
+            'last_activity': lambda s: _dt(s.get('last_activity')),
+            'ttl': lambda s: int(s.get('ttl_seconds') or 0),
+        }
+        sort_key = sort_mapping.get(sort_by, sort_mapping['rank'])
+        reverse = sort_dir == 'desc'
+        sessions.sort(key=sort_key, reverse=reverse)
+
+        paginator = Paginator(sessions, 10)
+        page_number = request.GET.get('page', 1)
+        sessions_page = paginator.get_page(page_number)
+
+        context = {
+            'sessions': sessions_page,
+            'current_jti': current_jti,
+            'total_count': len(sessions),
+            'search_query': search_query,
+            'role_filter': role_filter,
+            'scope_filter': scope_filter,
+            'roles': all_roles,
+            'current_sort': sort_by,
+            'current_dir': sort_dir,
+        }
+
+        if request.GET.get('partial') == '1':
+            return render(request, 'security/_active_sessions_fragments.html', context)
+
+        return render(request, 'security/active_sessions.html', context)
 
 
 class RevokeSessionView(LoginRequiredMixin, View):
@@ -1369,12 +1705,42 @@ class RoleListView(LoginRequiredMixin, View):
     def get(self, request):
         search_query = request.GET.get('q', '').strip()
         status_filter = request.GET.get('status', 'All')
+        sort_by = request.GET.get('sort', 'role_name_en')
+        sort_dir = request.GET.get('dir', 'asc')
 
-        roles_qs = Role.objects.all().order_by('role_name_en')
+        # Whitelist sortable fields
+        sortable_fields = {
+            'rank': 'default_rank',
+            'role_name_en': 'role_name_en',
+            'role_name_ar': 'role_name_ar',
+            'description': 'description',
+            'status': 'status',
+            'is_system_default': 'is_system_default'
+        }
+        db_field = sortable_fields.get(sort_by, 'role_name_en')
+        ordering = db_field if sort_dir == 'asc' else '-' + db_field
+
+        roles_qs = Role.objects.all()
+        
         if search_query:
-            roles_qs = roles_qs.filter(role_name_en__icontains=search_query)
+            roles_qs = roles_qs.filter(
+                Q(role_name_en__icontains=search_query) |
+                Q(role_name_ar__icontains=search_query)
+            )
+            
         if status_filter in ['Active', 'Inactive']:
             roles_qs = roles_qs.filter(status=status_filter)
+
+        # Annotate with stable rank based on default order (role_name_en)
+        # We do this after filtering but before final sorting
+        roles_qs = roles_qs.annotate(
+            default_rank=Window(
+                expression=RowNumber(),
+                order_by=F('role_name_en').asc()
+            )
+        )
+
+        roles_qs = roles_qs.order_by(ordering)
 
         total_count = roles_qs.count()
         paginator = Paginator(roles_qs, 10)
@@ -1385,6 +1751,8 @@ class RoleListView(LoginRequiredMixin, View):
             'roles': roles_page,
             'search_query': search_query,
             'status_filter': status_filter,
+            'current_sort': sort_by,
+            'current_dir': sort_dir,
             'total_count': total_count,
         }
         return render(request, self.template_name, context)
@@ -1543,8 +1911,25 @@ class AdminUserListView(LoginRequiredMixin, View):
         search_query = request.GET.get('q', '').strip()
         status_filter = request.GET.get('status', 'All')
         role_filter = request.GET.get('role', 'All')
+        sort_by = request.GET.get('sort', 'name')
+        sort_dir = request.GET.get('dir', 'asc')
 
         users_qs = AdminUser.objects.all().select_related('role', 'created_by', 'updated_by')
+
+        # Sortable fields whitelist and mapping
+        sort_mapping = {
+            'rank': ['default_rank'],
+            'name': ['first_name', 'last_name'],
+            'email': ['email'],
+            'role': ['role__role_name_en'],
+            'status': ['status'],
+            'last_login_at': ['last_login_at'],
+        }
+
+        active_sort_fields = sort_mapping.get(sort_by, ['first_name', 'last_name'])
+        ordering = []
+        for f in active_sort_fields:
+            ordering.append(f if sort_dir == 'asc' else '-' + f)
 
         if search_query:
             users_qs = users_qs.filter(
@@ -1559,10 +1944,18 @@ class AdminUserListView(LoginRequiredMixin, View):
         if role_filter != 'All' and role_filter:
             users_qs = users_qs.filter(role_id=role_filter)
 
-        users_qs = users_qs.order_by('first_name', 'last_name')
+        # Annotate with stable rank based on default order (-created_at)
+        users_qs = users_qs.annotate(
+            default_rank=Window(
+                expression=RowNumber(),
+                order_by=F('created_at').desc()
+            )
+        )
+
+        users_qs = users_qs.order_by(*ordering)
         total_count = users_qs.count()
 
-        paginator = Paginator(users_qs, 5)
+        paginator = Paginator(users_qs, 10)
         page_number = request.GET.get('page', 1)
         users_page = paginator.get_page(page_number)
 
@@ -1571,6 +1964,8 @@ class AdminUserListView(LoginRequiredMixin, View):
             'search_query': search_query,
             'status_filter': status_filter,
             'role_filter': role_filter,
+            'current_sort': sort_by,
+            'current_dir': sort_dir,
             'total_count': total_count,
             'roles': Role.objects.all().order_by('role_name_en'),
             'statuses': AdminUser.STATUS_CHOICES,
@@ -1633,6 +2028,79 @@ class AdminUserCreateView(LoginRequiredMixin, View):
             )
         return redirect(reverse('admin_user_list'))
 
+
+class MyAccountView(LoginRequiredMixin, View):
+    template_name = 'system_users/my_account.html'
+
+    def get(self, request):
+        form = MyAccountForm(instance=request.user)
+        return render(
+            request,
+            self.template_name,
+            {
+                'form': form,
+                'target_user': request.user,
+            },
+        )
+
+    def post(self, request):
+        form = MyAccountForm(request.POST, instance=request.user)
+        if not form.is_valid():
+            return render(
+                request,
+                self.template_name,
+                {
+                    'form': form,
+                    'target_user': request.user,
+                },
+            )
+
+        old_payload = {
+            'first_name': request.user.first_name,
+            'last_name': request.user.last_name,
+            'phone_number': request.user.phone_number,
+            'email': request.user.email,
+        }
+        
+        updated = form.save(commit=False)
+        updated.updated_by = request.user
+        
+        update_fields = [
+            'first_name',
+            'last_name',
+            'phone_number',
+            'updated_by',
+            'updated_at',
+        ]
+        if getattr(request.user, 'is_root', False):
+            update_fields.append('email')
+
+        new_password = form.cleaned_data.get('new_password')
+        if new_password:
+            updated.set_password(new_password)
+            update_fields.append('password')
+            old_payload['_security_event'] = 'Password Changed'
+
+        updated.save(update_fields=update_fields)
+
+        log_audit_action(
+            request=request,
+            action_type='Update',
+            module_name='My Account',
+            record_id=str(getattr(request.user, 'id', '')),
+            old_payload=old_payload,
+            new_instance=updated,
+        )
+
+        if new_password:
+            # Re-authenticate the user so they don't get logged out after password change
+            from django.contrib.auth import update_session_auth_hash
+            update_session_auth_hash(request, updated)
+            messages.success(request, 'Your account and password were updated successfully.')
+        else:
+            messages.success(request, 'Your account details were updated successfully.')
+
+        return redirect('my_account')
 
 
 class SetPasswordView(View):
@@ -1961,13 +2429,26 @@ class CountryListView(LoginRequiredMixin, View):
     def get(self, request):
         search_query = request.GET.get('q', '').strip()
         status_filter = request.GET.get('status', 'All')
+        sort = request.GET.get('sort', 'rank')
+        direction = request.GET.get('dir', 'asc')
 
-        countries_qs = Country.objects.all()
+        countries_qs = Country.objects.annotate(
+            default_rank=Window(
+                expression=RowNumber(),
+                order_by=F('name_en').asc(),
+            ),
+            status_sort=Case(
+                When(is_active=True, then=Value(1)),
+                default=Value(2),
+                output_field=IntegerField(),
+            ),
+        )
 
         if search_query:
             countries_qs = countries_qs.filter(
                 Q(name_en__icontains=search_query)
                 | Q(country_code__icontains=search_query)
+                | Q(name_ar__icontains=search_query)
             )
 
         if status_filter == 'Active':
@@ -1975,10 +2456,27 @@ class CountryListView(LoginRequiredMixin, View):
         elif status_filter == 'Inactive':
             countries_qs = countries_qs.filter(is_active=False)
 
-        countries_qs = countries_qs.order_by('name_en')
+        sort_mapping = {
+            'rank': 'default_rank',
+            'code': 'country_code',
+            'name_en': 'name_en',
+            'name_ar': 'name_ar',
+            'status': 'status_sort',
+        }
+        order_by_field = sort_mapping.get(sort, 'default_rank')
+        if direction == 'desc':
+            countries_qs = countries_qs.order_by(
+                F(order_by_field).desc(nulls_last=True),
+                '-default_rank',
+            )
+        else:
+            countries_qs = countries_qs.order_by(
+                F(order_by_field).asc(nulls_first=True),
+                'default_rank',
+            )
         total_count = countries_qs.count()
 
-        paginator = Paginator(countries_qs, 5)
+        paginator = Paginator(countries_qs, 10)
         page_number = request.GET.get('page', 1)
         countries_page = paginator.get_page(page_number)
 
@@ -1986,6 +2484,8 @@ class CountryListView(LoginRequiredMixin, View):
             'countries': countries_page,
             'search_query': search_query,
             'status_filter': status_filter,
+            'current_sort': sort,
+            'current_dir': direction,
             'total_count': total_count,
             'page_title': 'Countries Master',
         }
@@ -2155,13 +2655,26 @@ class CurrencyListView(LoginRequiredMixin, View):
     def get(self, request):
         search_query = request.GET.get('q', '').strip()
         status_filter = request.GET.get('status', 'All')
+        sort = request.GET.get('sort', 'rank')
+        direction = request.GET.get('dir', 'asc')
 
-        currencies_qs = Currency.objects.all()
+        currencies_qs = Currency.objects.annotate(
+            default_rank=Window(
+                expression=RowNumber(),
+                order_by=F('name_en').asc(),
+            ),
+            status_sort=Case(
+                When(is_active=True, then=Value(1)),
+                default=Value(2),
+                output_field=IntegerField(),
+            ),
+        )
 
         if search_query:
             currencies_qs = currencies_qs.filter(
                 Q(name_en__icontains=search_query)
                 | Q(currency_code__icontains=search_query)
+                | Q(name_ar__icontains=search_query)
             )
 
         if status_filter == 'Active':
@@ -2169,10 +2682,29 @@ class CurrencyListView(LoginRequiredMixin, View):
         elif status_filter == 'Inactive':
             currencies_qs = currencies_qs.filter(is_active=False)
 
-        currencies_qs = currencies_qs.order_by('name_en')
+        sort_mapping = {
+            'rank': 'default_rank',
+            'code': 'currency_code',
+            'symbol': 'currency_symbol',
+            'name_en': 'name_en',
+            'name_ar': 'name_ar',
+            'decimal': 'decimal_places',
+            'status': 'status_sort',
+        }
+        order_by_field = sort_mapping.get(sort, 'default_rank')
+        if direction == 'desc':
+            currencies_qs = currencies_qs.order_by(
+                F(order_by_field).desc(nulls_last=True),
+                '-default_rank',
+            )
+        else:
+            currencies_qs = currencies_qs.order_by(
+                F(order_by_field).asc(nulls_first=True),
+                'default_rank',
+            )
         total_count = currencies_qs.count()
 
-        paginator = Paginator(currencies_qs, 5)
+        paginator = Paginator(currencies_qs, 10)
         page_number = request.GET.get('page', 1)
         currencies_page = paginator.get_page(page_number)
 
@@ -2180,6 +2712,8 @@ class CurrencyListView(LoginRequiredMixin, View):
             'currencies': currencies_page,
             'search_query': search_query,
             'status_filter': status_filter,
+            'current_sort': sort,
+            'current_dir': direction,
             'total_count': total_count,
             'page_title': 'Currencies Master',
         }
@@ -2627,7 +3161,10 @@ class ExchangeRateListView(LoginRequiredMixin, View):
     template_name = 'system_config/exchange_rates/fx_list.html'
 
     def get(self, request):
+        search_query = request.GET.get('q', '').strip()
         status_filter = request.GET.get('status', 'All')
+        sort = request.GET.get('sort', 'rank')
+        direction = request.GET.get('dir', 'asc')
 
         base_code = _get_base_currency_code()
         base_config = BaseCurrencyConfig.objects.get_or_create(
@@ -2638,22 +3175,56 @@ class ExchangeRateListView(LoginRequiredMixin, View):
 
         qs = (
             ExchangeRate.objects.select_related('currency')
-            .order_by('-updated_at')
+            .annotate(
+                default_rank=Window(
+                    expression=RowNumber(),
+                    order_by=F('updated_at').desc(),
+                ),
+                status_sort=Case(
+                    When(is_active=True, then=Value(1)),
+                    default=Value(2),
+                    output_field=IntegerField(),
+                ),
+            )
         )
+
+        if search_query:
+            qs = qs.filter(
+                Q(currency__currency_code__icontains=search_query)
+                | Q(currency__name_en__icontains=search_query)
+            )
 
         if status_filter == 'Active':
             qs = qs.filter(is_active=True)
         elif status_filter == 'Inactive':
             qs = qs.filter(is_active=False)
 
+        sort_mapping = {
+            'rank': 'default_rank',
+            'code': 'currency__currency_code',
+            'name': 'currency__name_en',
+            'symbol': 'currency__currency_symbol',
+            'rate': 'exchange_rate',
+            'status': 'status_sort',
+            'updated': 'updated_at',
+        }
+        order_by_field = sort_mapping.get(sort, 'default_rank')
+        if direction == 'desc':
+            qs = qs.order_by(F(order_by_field).desc(nulls_last=True), '-default_rank')
+        else:
+            qs = qs.order_by(F(order_by_field).asc(nulls_first=True), 'default_rank')
+
         total_count = qs.count()
-        paginator = Paginator(qs, 5)
+        paginator = Paginator(qs, 10)
         page_number = request.GET.get('page', 1)
         rates_page = paginator.get_page(page_number)
 
         context = {
             'exchange_rates': rates_page,
+            'search_query': search_query,
             'status_filter': status_filter,
+            'current_sort': sort,
+            'current_dir': direction,
             'total_count': total_count,
             'base_currency': base_currency,
             'base_currency_code': base_code,
@@ -2830,15 +3401,31 @@ class FXRateChangeLogView(LoginRequiredMixin, View):
     template_name = 'system_config/exchange_rates/fx_log.html'
 
     def get(self, request):
+        search_query = request.GET.get('q', '').strip()
         currency_code = request.GET.get('currency', '').strip()
+        sort = request.GET.get('sort', 'rank')
+        direction = request.GET.get('dir', 'asc')
 
         qs = (
             FXRateChangeLog.objects.select_related('currency', 'changed_by')
-            .order_by('-changed_at')
+            .annotate(
+                default_rank=Window(
+                    expression=RowNumber(),
+                    order_by=F('changed_at').desc(),
+                ),
+            )
         )
 
         if currency_code:
             qs = qs.filter(currency__currency_code=currency_code)
+
+        if search_query:
+            qs = qs.filter(
+                Q(currency__currency_code__icontains=search_query)
+                | Q(currency__name_en__icontains=search_query)
+                | Q(notes__icontains=search_query)
+                | Q(changed_by__email__icontains=search_query)
+            )
 
         # Annotate delta so templates can display +/- with color.
         delta_expr = ExpressionWrapper(
@@ -2847,7 +3434,23 @@ class FXRateChangeLogView(LoginRequiredMixin, View):
         )
         qs = qs.annotate(delta=delta_expr, delta_abs=Abs(delta_expr))
 
-        paginator = Paginator(qs, 20)
+        sort_mapping = {
+            'rank': 'default_rank',
+            'currency': 'currency__currency_code',
+            'old_rate': 'old_rate',
+            'new_rate': 'new_rate',
+            'change': 'delta_abs',
+            'notes': 'notes',
+            'changed_by': 'changed_by__email',
+            'changed_at': 'changed_at',
+        }
+        order_by_field = sort_mapping.get(sort, 'default_rank')
+        if direction == 'desc':
+            qs = qs.order_by(F(order_by_field).desc(nulls_last=True), '-default_rank')
+        else:
+            qs = qs.order_by(F(order_by_field).asc(nulls_first=True), 'default_rank')
+
+        paginator = Paginator(qs, 10)
         page_number = request.GET.get('page', 1)
         log_page = paginator.get_page(page_number)
 
@@ -2856,7 +3459,10 @@ class FXRateChangeLogView(LoginRequiredMixin, View):
         context = {
             'fx_logs': log_page,
             'currencies': currencies,
+            'search_query': search_query,
             'selected_currency_code': currency_code,
+            'current_sort': sort,
+            'current_dir': direction,
         }
         return render(request, self.template_name, context)
 
@@ -2867,15 +3473,38 @@ class TaxCodeListView(LoginRequiredMixin, View):
     def get(self, request):
         search_query = request.GET.get('q', '').strip()
         status_filter = request.GET.get('status', 'All')
+        sort = request.GET.get('sort', 'rank')
+        direction = request.GET.get('dir', 'asc')
 
         tax_codes_qs = TaxCode.objects.select_related(
             'applicable_country_code'
-        ).order_by('tax_code')
+        ).annotate(
+            default_rank=Window(
+                expression=RowNumber(),
+                order_by=F('tax_code').asc(),
+            ),
+            country_default_sort=Case(
+                When(is_default_for_country=True, then=Value(1)),
+                default=Value(2),
+                output_field=IntegerField(),
+            ),
+            intl_default_sort=Case(
+                When(is_international_default=True, then=Value(1)),
+                default=Value(2),
+                output_field=IntegerField(),
+            ),
+            status_sort=Case(
+                When(is_active=True, then=Value(1)),
+                default=Value(2),
+                output_field=IntegerField(),
+            ),
+        )
 
         if search_query:
             tax_codes_qs = tax_codes_qs.filter(
                 Q(name_en__icontains=search_query)
                 | Q(tax_code__icontains=search_query)
+                | Q(applicable_country_code__name_en__icontains=search_query)
             )
 
         if status_filter == 'Active':
@@ -2883,8 +3512,29 @@ class TaxCodeListView(LoginRequiredMixin, View):
         elif status_filter == 'Inactive':
             tax_codes_qs = tax_codes_qs.filter(is_active=False)
 
+        sort_mapping = {
+            'rank': 'default_rank',
+            'code': 'tax_code',
+            'rate': 'rate_percent',
+            'country': 'applicable_country_code__name_en',
+            'country_default': 'country_default_sort',
+            'intl_default': 'intl_default_sort',
+            'status': 'status_sort',
+        }
+        order_by_field = sort_mapping.get(sort, 'default_rank')
+        if direction == 'desc':
+            tax_codes_qs = tax_codes_qs.order_by(
+                F(order_by_field).desc(nulls_last=True),
+                '-default_rank',
+            )
+        else:
+            tax_codes_qs = tax_codes_qs.order_by(
+                F(order_by_field).asc(nulls_first=True),
+                'default_rank',
+            )
+
         total_count = tax_codes_qs.count()
-        paginator = Paginator(tax_codes_qs, 5)
+        paginator = Paginator(tax_codes_qs, 10)
         page_number = request.GET.get('page', 1)
         tax_codes_page = paginator.get_page(page_number)
 
@@ -2892,6 +3542,8 @@ class TaxCodeListView(LoginRequiredMixin, View):
             'tax_codes': tax_codes_page,
             'search_query': search_query,
             'status_filter': status_filter,
+            'current_sort': sort,
+            'current_dir': direction,
             'total_count': total_count,
             'page_title': 'Tax Codes Master',
         }
@@ -3017,21 +3669,51 @@ class PlanListView(LoginRequiredMixin, View):
     def get(self, request):
         search_query = request.GET.get('q', '').strip()
         status_filter = request.GET.get('status', 'All')
+        sort_by = request.GET.get('sort', 'name_en')
+        sort_dir = request.GET.get('dir', 'asc')
 
         plans_qs = SubscriptionPlan.objects.annotate(
             pricing_rows_count=Count('pricing_cycles')
-        ).order_by('plan_name_en')
+        )
+
+        # Sortable fields whitelist and mapping
+        sort_mapping = {
+            'rank': ['default_rank'],
+            'name_en': ['plan_name_en'],
+            'name_ar': ['plan_name_ar'],
+            'cycle': ['base_cycle_days'],
+            'pricing': ['pricing_rows_count'],
+            'status': ['is_active'],
+        }
+
+        active_sort_fields = sort_mapping.get(sort_by, ['plan_name_en'])
+        ordering = []
+        for f in active_sort_fields:
+            ordering.append(f if sort_dir == 'asc' else '-' + f)
 
         if search_query:
-            plans_qs = plans_qs.filter(plan_name_en__icontains=search_query)
+            plans_qs = plans_qs.filter(
+                Q(plan_name_en__icontains=search_query)
+                | Q(plan_name_ar__icontains=search_query)
+            )
 
         if status_filter == 'Active':
             plans_qs = plans_qs.filter(is_active=True)
         elif status_filter == 'Inactive':
             plans_qs = plans_qs.filter(is_active=False)
 
+        # Annotate with stable rank based on default order (plan_name_en)
+        plans_qs = plans_qs.annotate(
+            default_rank=Window(
+                expression=RowNumber(),
+                order_by=F('plan_name_en').asc()
+            )
+        )
+
+        plans_qs = plans_qs.order_by(*ordering)
         total_count = plans_qs.count()
-        paginator = Paginator(plans_qs, 5)
+
+        paginator = Paginator(plans_qs, 10)
         page_number = request.GET.get('page', 1)
         plans_page = paginator.get_page(page_number)
 
@@ -3042,6 +3724,8 @@ class PlanListView(LoginRequiredMixin, View):
                 'plans': plans_page,
                 'search_query': search_query,
                 'status_filter': status_filter,
+                'current_sort': sort_by,
+                'current_dir': sort_dir,
                 'total_count': total_count,
             },
         )
@@ -3411,20 +4095,54 @@ class AddOnsPolicyListView(LoginRequiredMixin, View):
     def get(self, request):
         search_query = request.GET.get('q', '').strip()
         status_filter = request.GET.get('status', 'All')
+        sort_by = request.GET.get('sort', 'policy_name')
+        sort_dir = request.GET.get('dir', 'asc')
 
-        policies_qs = AddOnsPricingPolicy.objects.all().order_by('-updated_at')
+        policies_qs = AddOnsPricingPolicy.objects.all()
+
+        # Sortable fields whitelist and mapping
+        sort_mapping = {
+            'rank': ['default_rank'],
+            'policy_name': ['policy_name'],
+            'user_price': ['extra_internal_user_price'],
+            'truck_price': ['extra_internal_truck_price'],
+            'ext_truck_price': ['extra_external_truck_price'],
+            'driver_price': ['extra_driver_price'],
+            'shipment_price': ['extra_shipment_price'],
+            'storage_price': ['extra_storage_gb_price'],
+            'status': ['is_active'],
+        }
+
+        active_sort_fields = sort_mapping.get(sort_by, ['policy_name'])
+        ordering = []
+        for f in active_sort_fields:
+            ordering.append(f if sort_dir == 'asc' else '-' + f)
+
         if search_query:
             policies_qs = policies_qs.filter(
                 policy_name__icontains=search_query,
             )
+
         if status_filter == 'Active':
             policies_qs = policies_qs.filter(is_active=True)
         elif status_filter == 'Inactive':
             policies_qs = policies_qs.filter(is_active=False)
 
-        paginator = Paginator(policies_qs, 5)
+        # Annotate with stable rank based on default order (policy_name)
+        policies_qs = policies_qs.annotate(
+            default_rank=Window(
+                expression=RowNumber(),
+                order_by=F('policy_name').asc()
+            )
+        )
+
+        policies_qs = policies_qs.order_by(*ordering)
+        total_count = policies_qs.count()
+
+        paginator = Paginator(policies_qs, 10)
         page_number = request.GET.get('page', 1)
         policies_page = paginator.get_page(page_number)
+
         return render(
             request,
             self.template_name,
@@ -3432,6 +4150,9 @@ class AddOnsPolicyListView(LoginRequiredMixin, View):
                 'policies': policies_page,
                 'search_query': search_query,
                 'status_filter': status_filter,
+                'current_sort': sort_by,
+                'current_dir': sort_dir,
+                'total_count': total_count,
             },
         )
 
@@ -3537,16 +4258,49 @@ class PromoCodeListView(LoginRequiredMixin, View):
     def get(self, request):
         search_query = request.GET.get('q', '').strip()
         status_filter = request.GET.get('status', 'All')
+        sort_by = request.GET.get('sort', 'code')
+        sort_dir = request.GET.get('dir', 'asc')
 
-        qs = PromoCode.objects.prefetch_related('applicable_plans').order_by('-created_at')
+        qs = PromoCode.objects.prefetch_related('applicable_plans')
+
+        # Sortable fields whitelist and mapping
+        sort_mapping = {
+            'rank': ['default_rank'],
+            'code': ['code'],
+            'type': ['discount_type'],
+            'value': ['discount_value'],
+            'duration': ['discount_duration'],
+            'valid_from': ['valid_from'],
+            'valid_until': ['valid_until'],
+            'uses': ['current_uses'],
+            'status': ['is_active'],
+        }
+
+        active_sort_fields = sort_mapping.get(sort_by, ['code'])
+        ordering = []
+        for f in active_sort_fields:
+            ordering.append(f if sort_dir == 'asc' else '-' + f)
+
         if search_query:
             qs = qs.filter(code__icontains=search_query)
+
         if status_filter == 'Active':
             qs = qs.filter(is_active=True)
         elif status_filter == 'Inactive':
             qs = qs.filter(is_active=False)
 
-        paginator = Paginator(qs, 5)
+        # Annotate with stable rank based on default order (-created_at)
+        qs = qs.annotate(
+            default_rank=Window(
+                expression=RowNumber(),
+                order_by=F('created_at').desc()
+            )
+        )
+
+        qs = qs.order_by(*ordering)
+        total_count = qs.count()
+
+        paginator = Paginator(qs, 10)
         page_number = request.GET.get('page', 1)
         promo_page = paginator.get_page(page_number)
 
@@ -3558,6 +4312,8 @@ class PromoCodeListView(LoginRequiredMixin, View):
                 'promo_codes': promo_page,
                 'search_query': search_query,
                 'status_filter': status_filter,
+                'current_sort': sort_by,
+                'current_dir': sort_dir,
                 'now': now,
             },
         )
@@ -3664,11 +4420,21 @@ class BankAccountListView(LoginRequiredMixin, View):
         search_query = request.GET.get('q', '').strip()
         currency_filter = request.GET.get('currency', '').strip()
         status_filter = request.GET.get('status', 'All')
+        sort = request.GET.get('sort', 'display_order')
+        direction = request.GET.get('dir', 'asc')
 
-        qs = BankAccount.objects.select_related('currency').order_by('bank_name')
+        qs = BankAccount.objects.select_related('currency').annotate(
+            default_rank=Window(
+                expression=RowNumber(),
+                order_by=F('bank_name').asc(),
+            ),
+        )
         if search_query:
             qs = qs.filter(
-                Q(bank_name__icontains=search_query) | Q(iban_number__icontains=search_query)
+                Q(bank_name__icontains=search_query)
+                | Q(iban_number__icontains=search_query)
+                | Q(account_holder_name__icontains=search_query)
+                | Q(account_number__icontains=search_query)
             )
         if currency_filter:
             qs = qs.filter(currency_id=currency_filter)
@@ -3677,7 +4443,23 @@ class BankAccountListView(LoginRequiredMixin, View):
         elif status_filter == 'Inactive':
             qs = qs.filter(is_active=False)
 
-        paginator = Paginator(qs, 5)
+        sort_mapping = {
+            'rank': 'default_rank',
+            'bank': 'bank_name',
+            'holder': 'account_holder_name',
+            'iban': 'iban_number',
+            'account_no': 'account_number',
+            'currency': 'currency_id',
+            'swift': 'swift_code',
+            'status': 'is_active',
+        }
+        order_by_field = sort_mapping.get(sort, 'default_rank')
+        if direction == 'desc':
+            qs = qs.order_by(F(order_by_field).desc(nulls_last=True), '-default_rank')
+        else:
+            qs = qs.order_by(F(order_by_field).asc(nulls_first=True), 'default_rank')
+
+        paginator = Paginator(qs, 10)
         accounts = paginator.get_page(request.GET.get('page', 1))
 
         return render(
@@ -3689,6 +4471,8 @@ class BankAccountListView(LoginRequiredMixin, View):
                 'currency_filter': currency_filter,
                 'status_filter': status_filter,
                 'currencies': Currency.objects.filter(is_active=True).order_by('name_en'),
+                'current_sort': sort,
+                'current_dir': direction,
             },
         )
 
@@ -3794,10 +4578,20 @@ class PaymentGatewayListView(LoginRequiredMixin, View):
     template_name = 'payment/gateways/gateway_list.html'
 
     def get(self, request):
+        search_query = request.GET.get('q', '').strip()
         environment_filter = request.GET.get('environment', 'All')
         status_filter = request.GET.get('status', 'All')
+        sort = request.GET.get('sort', 'rank')
+        direction = request.GET.get('dir', 'asc')
 
-        qs = PaymentGateway.objects.order_by('gateway_name')
+        qs = PaymentGateway.objects.annotate(
+            default_rank=Window(
+                expression=RowNumber(),
+                order_by=F('gateway_name').asc(),
+            ),
+        )
+        if search_query:
+            qs = qs.filter(gateway_name__icontains=search_query)
         if environment_filter in ['Test', 'Live']:
             qs = qs.filter(environment=environment_filter)
         if status_filter == 'Active':
@@ -3805,7 +4599,20 @@ class PaymentGatewayListView(LoginRequiredMixin, View):
         elif status_filter == 'Inactive':
             qs = qs.filter(is_active=False)
 
-        paginator = Paginator(qs, 5)
+        sort_mapping = {
+            'rank': 'default_rank',
+            'name': 'gateway_name',
+            'environment': 'environment',
+            'status': 'is_active',
+            'created_at': 'created_at',
+        }
+        order_by_field = sort_mapping.get(sort, 'default_rank')
+        if direction == 'desc':
+            qs = qs.order_by(F(order_by_field).desc(nulls_last=True), '-default_rank')
+        else:
+            qs = qs.order_by(F(order_by_field).asc(nulls_first=True), 'default_rank')
+
+        paginator = Paginator(qs, 10)
         gateways = paginator.get_page(request.GET.get('page', 1))
 
         return render(
@@ -3813,8 +4620,11 @@ class PaymentGatewayListView(LoginRequiredMixin, View):
             self.template_name,
             {
                 'gateways': gateways,
+                'search_query': search_query,
                 'environment_filter': environment_filter,
                 'status_filter': status_filter,
+                'current_sort': sort,
+                'current_dir': direction,
             },
         )
 
@@ -3934,12 +4744,36 @@ class PaymentMethodListView(LoginRequiredMixin, View):
     template_name = 'payment/methods/method_list.html'
 
     def get(self, request):
+        search_query = request.GET.get('q', '').strip()
         type_filter = request.GET.get('method_type', 'All')
         status_filter = request.GET.get('status', 'All')
+        sort = request.GET.get('sort', 'rank')
+        direction = request.GET.get('dir', 'asc')
         qs = PaymentMethod.objects.select_related(
             'gateway',
             'dedicated_bank_account',
-        ).order_by('display_order', 'method_name_en')
+        ).annotate(
+            default_rank=Window(
+                expression=RowNumber(),
+                order_by=F('display_order').asc(),
+            ),
+            source_name=Case(
+                When(method_type='Online_Gateway', then=F('gateway__gateway_name')),
+                default=F('dedicated_bank_account__bank_name'),
+                output_field=CharField(),
+            ),
+            status_sort=Case(
+                When(is_active=True, then=Value(1)),
+                default=Value(2),
+                output_field=IntegerField(),
+            ),
+        )
+        if search_query:
+            qs = qs.filter(
+                Q(method_name_en__icontains=search_query)
+                | Q(gateway__gateway_name__icontains=search_query)
+                | Q(dedicated_bank_account__bank_name__icontains=search_query)
+            )
         if type_filter in ['Online_Gateway', 'Offline_Bank']:
             qs = qs.filter(method_type=type_filter)
         if status_filter == 'Active':
@@ -3947,7 +4781,21 @@ class PaymentMethodListView(LoginRequiredMixin, View):
         elif status_filter == 'Inactive':
             qs = qs.filter(is_active=False)
 
-        paginator = Paginator(qs, 5)
+        sort_mapping = {
+            'rank': 'method_id',
+            'display_order': 'display_order',
+            'name': 'method_name_en',
+            'type': 'method_type',
+            'source': 'source_name',
+            'status': 'status_sort',
+        }
+        order_by_field = sort_mapping.get(sort, 'display_order')
+        if direction == 'desc':
+            qs = qs.order_by(F(order_by_field).desc(nulls_last=True), '-method_id')
+        else:
+            qs = qs.order_by(F(order_by_field).asc(nulls_first=True), 'method_id')
+
+        paginator = Paginator(qs, 10)
         methods = paginator.get_page(request.GET.get('page', 1))
 
         return render(
@@ -3955,8 +4803,11 @@ class PaymentMethodListView(LoginRequiredMixin, View):
             self.template_name,
             {
                 'methods': methods,
+                'search_query': search_query,
                 'type_filter': type_filter,
                 'status_filter': status_filter,
+                'current_sort': sort,
+                'current_dir': direction,
             },
         )
 
@@ -4057,14 +4908,56 @@ class CommGatewayListView(LoginRequiredMixin, View):
     template_name = 'comm/gateways/gateway_list.html'
 
     def get(self, request):
-        qs = CommGateway.objects.order_by('gateway_type', 'provider_name')
-        paginator = Paginator(qs, 5)
+        qs = CommGateway.objects.all()
+
+        q = request.GET.get('q', '').strip()
+        if q:
+            qs = qs.filter(
+                Q(provider_name__icontains=q)
+                | Q(host_url__icontains=q)
+                | Q(sender_id__icontains=q)
+            )
+
+        type_filter = request.GET.get('gateway_type', 'All').strip() or 'All'
+        if type_filter != 'All':
+            qs = qs.filter(gateway_type=type_filter)
+
+        status_filter = request.GET.get('status', 'All').strip() or 'All'
+        if status_filter == 'Active':
+            qs = qs.filter(is_active=True)
+        elif status_filter == 'Inactive':
+            qs = qs.filter(is_active=False)
+
+        sort = request.GET.get('sort', 'rank')
+        direction = request.GET.get('dir', 'asc')
+        sort_mapping = {
+            'rank': 'gateway_type',
+            'type': 'gateway_type',
+            'provider': 'provider_name',
+            'host': 'host_url',
+            'port': 'port',
+            'sender': 'sender_id',
+            'encryption': 'encryption_type',
+            'status': 'is_active',
+        }
+        order_by_field = sort_mapping.get(sort, 'gateway_type')
+        if direction == 'desc':
+            qs = qs.order_by(F(order_by_field).desc(nulls_last=True), 'provider_name')
+        else:
+            qs = qs.order_by(F(order_by_field).asc(nulls_first=True), 'provider_name')
+
+        paginator = Paginator(qs, 10)
         gateways = paginator.get_page(request.GET.get('page', 1))
         return render(
             request,
             self.template_name,
             {
                 'gateways': gateways,
+                'search_query': q,
+                'type_filter': type_filter,
+                'status_filter': status_filter,
+                'current_sort': sort,
+                'current_dir': direction,
                 'active_email_id': CommGateway.objects.filter(
                     gateway_type='Email', is_active=True
                 ).values_list('gateway_id', flat=True).first(),
@@ -4318,7 +5211,7 @@ class NotificationTemplateListView(LoginRequiredMixin, View):
         category_filter = request.GET.get('category', 'All')
         status_filter = request.GET.get('status', 'All')
 
-        qs = NotificationTemplate.objects.order_by('template_name')
+        qs = NotificationTemplate.objects.all()
         if search_query:
             qs = qs.filter(template_name__icontains=search_query)
         if channel_filter in ['Email', 'SMS']:
@@ -4330,7 +5223,30 @@ class NotificationTemplateListView(LoginRequiredMixin, View):
         elif status_filter == 'Inactive':
             qs = qs.filter(is_active=False)
 
-        paginator = Paginator(qs, 5)
+        qs = qs.annotate(
+            default_rank=Window(
+                expression=RowNumber(),
+                order_by=F('template_name').asc(),
+            )
+        )
+
+        sort = request.GET.get('sort', 'name')
+        direction = request.GET.get('dir', 'asc')
+        sort_mapping = {
+            'rank': 'default_rank',
+            'name': 'template_name',
+            'channel': 'channel_type',
+            'category': 'category',
+            'subject': 'subject_en',
+            'status': 'is_active',
+        }
+        order_by_field = sort_mapping.get(sort, 'template_name')
+        if direction == 'desc':
+            qs = qs.order_by(F(order_by_field).desc(nulls_last=True), '-template_name')
+        else:
+            qs = qs.order_by(F(order_by_field).asc(nulls_first=True), 'template_name')
+
+        paginator = Paginator(qs, 10)
         templates = paginator.get_page(request.GET.get('page', 1))
         return render(
             request,
@@ -4341,6 +5257,8 @@ class NotificationTemplateListView(LoginRequiredMixin, View):
                 'channel_filter': channel_filter,
                 'category_filter': category_filter,
                 'status_filter': status_filter,
+                'current_sort': sort,
+                'current_dir': direction,
             },
         )
 
@@ -4438,6 +5356,34 @@ class NotificationTemplateDeleteView(LoginRequiredMixin, View):
         return redirect(reverse('notif_template_list'))
 
 
+def get_mock_preview_context():
+    """Returns a dictionary of mock data for notification template preview."""
+    return {
+        'admin_user': {'first_name': 'John', 'last_name': 'Doe'},
+        'company_name': 'Global Logistics Corp',
+        'tenant': {
+            'primary_email': 'admin@globallogistics.com',
+            'tenant_id': 'TNT-98721-XQ',
+        },
+        'portal_bootstrap_password': 'S3cure!Password@2026',
+        'api_bridge_key': 'br_live_51P2kL9H2j8mN4v6xYzQ1w2e3r4t5y6u',
+        'reset_url': 'http://127.0.0.1:8000/new-password/mock-token/',
+        'invite_url': 'http://127.0.0.1:8000/set-password/mock-token/',
+        'portal_login_url': 'http://subdomain.iroad.com/login/',
+        'name': 'Sarah Smith',
+        'email': 'sarah@example.com',
+        'password': 'TemporaryPassword123!',
+        'login_url': 'http://127.0.0.1:8000/login/',
+        'recipient_email': 'test@example.com',
+        'sent_at': '2026-04-16 11:15:00',
+        'gateway_name': 'Twilio SMS Gateway',
+        'otp_code': '483920',
+        'otp': '483920',
+        'user_name': 'John Doe',
+    }
+
+
+@method_decorator(xframe_options_sameorigin, name='get')
 class NotificationTemplatePreviewView(LoginRequiredMixin, View):
     def get(self, request, pk):
         """
@@ -4450,12 +5396,32 @@ class NotificationTemplatePreviewView(LoginRequiredMixin, View):
         subject = template_obj.subject_ar if lang == 'ar' else template_obj.subject_en
         body_html = template_obj.body_ar if lang == 'ar' else template_obj.body_en
 
+        # Render with mock data
+        try:
+            mock_ctx = get_mock_preview_context()
+            body_html = Template(body_html or "").render(Context(mock_ctx))
+            subject = Template(subject or "").render(Context(mock_ctx))
+
+            # Dynamic fix for legacy broken logo URL in hardcoded template bodies
+            old_logo = "https://iroad-assets.s3.amazonaws.com/logo.png"
+            new_logo = "https://ui-avatars.com/api/?name=iR&background=4f46e5&color=fff&rounded=true&size=128&bold=true"
+            if old_logo in body_html:
+                body_html = body_html.replace(old_logo, new_logo)
+
+        except Exception as e:
+            logger.error(f"Error rendering mock preview: {e}")
+
         if template_obj.channel_type == 'Email':
             from superadmin.communication_helpers import _wrap_email_body
 
+            body_lower = (body_html or '').lower()
+            is_full_email_document = '<html' in body_lower and '<body' in body_lower
+
             # Check if the body already contains the system wrapper.
             # If not (e.g. user manually edited and stripped it), re-wrap it.
-            if 'email-wrapper' not in (body_html or ''):
+            if is_full_email_document:
+                wrapped_content = body_html or ''
+            elif 'email-wrapper' not in (body_html or ''):
                 wrapped_content = _wrap_email_body(
                     inner_html=body_html or '<p>No content provided.</p>',
                     email_title=subject or 'iRoad Logistics',
@@ -4485,33 +5451,137 @@ class EventMappingListView(LoginRequiredMixin, View):
     template_name = 'comm/events/event_list.html'
 
     def get(self, request):
+        search_query = request.GET.get('q', '').strip()
+        status_filter = request.GET.get('status', 'All').strip() or 'All'
+        channel_filter = request.GET.get('channel', 'All').strip() or 'All'
+        sort = request.GET.get('sort', 'event')
+        direction = request.GET.get('dir', 'asc')
+
         qs = EventMapping.objects.select_related(
             'primary_template', 'fallback_template'
         ).order_by('system_event')
-        paginator = Paginator(qs, 5)
-        mappings = paginator.get_page(request.GET.get('page', 1))
-        configured_events = set(qs.values_list('system_event', flat=True))
-        event_labels = dict(EventMapping.SYSTEM_EVENT_CHOICES)
-        unmapped_events = [
-            event_labels[code]
-            for code, _label in EventMapping.SYSTEM_EVENT_CHOICES
-            if code not in configured_events
-        ]
+
+        # Construct rows of both mapped and unmapped events for the template
+        mappings_dict = {m.system_event: m for m in qs}
+        all_rows = []
+        for base_id, (code, label) in enumerate(EventMapping.SYSTEM_EVENT_CHOICES, start=1):
+            if code in mappings_dict:
+                mapping = mappings_dict[code]
+                all_rows.append({
+                    'row_id': base_id,
+                    'row_type': 'mapped',
+                    'mapping': mapping,
+                    'event_label': mapping.get_system_event_display(),
+                    'primary_channel_value': mapping.primary_channel or '',
+                    'primary_template_name': (
+                        mapping.primary_template.template_name
+                        if mapping.primary_template else ''
+                    ),
+                    'fallback_channel_value': mapping.fallback_channel or '',
+                    'fallback_template_name': (
+                        mapping.fallback_template.template_name
+                        if mapping.fallback_template else ''
+                    ),
+                    'status_label': 'Active' if mapping.is_active else 'Inactive',
+                })
+            else:
+                all_rows.append({
+                    'row_id': base_id,
+                    'row_type': 'unmapped',
+                    'event': {'code': code, 'label': label},
+                    'event_label': label,
+                    'primary_channel_value': '',
+                    'primary_template_name': '',
+                    'fallback_channel_value': '',
+                    'fallback_template_name': '',
+                    'status_label': 'Not Configured',
+                })
+
+        if search_query:
+            search_l = search_query.lower()
+            all_rows = [
+                r for r in all_rows
+                if search_l in (r.get('event_label') or '').lower()
+                or search_l in (r.get('primary_template_name') or '').lower()
+                or search_l in (r.get('fallback_template_name') or '').lower()
+            ]
+
+        if channel_filter in ['Email', 'SMS', 'Not Configured']:
+            if channel_filter == 'Not Configured':
+                all_rows = [
+                    r for r in all_rows if r.get('primary_channel_value') == ''
+                ]
+            else:
+                all_rows = [
+                    r for r in all_rows
+                    if r.get('primary_channel_value') == channel_filter
+                ]
+
+        if status_filter in ['Active', 'Inactive']:
+            all_rows = [
+                r for r in all_rows if r.get('status_label') == status_filter
+            ]
+
+        sort_mapping = {
+            'rank': lambda r: r.get('row_id') or 0,
+            'event': lambda r: (r.get('event_label') or '').lower(),
+            'primary_channel': lambda r: (r.get('primary_channel_value') or '').lower(),
+            'primary_template': lambda r: (r.get('primary_template_name') or '').lower(),
+            'fallback_channel': lambda r: (r.get('fallback_channel_value') or '').lower(),
+            'fallback_template': lambda r: (r.get('fallback_template_name') or '').lower(),
+            'status': lambda r: (r.get('status_label') or '').lower(),
+        }
+        key_fn = sort_mapping.get(sort, sort_mapping['event'])
+        all_rows = sorted(all_rows, key=key_fn, reverse=(direction == 'desc'))
+
+        paginator = Paginator(all_rows, 10)
+        page_number = request.GET.get('page', 1)
+        page_rows = paginator.get_page(page_number)
+
         return render(
             request,
             self.template_name,
-            {'mappings': mappings, 'unmapped_events': unmapped_events},
+            {
+                'page_rows': page_rows,
+                'search_query': search_query,
+                'status_filter': status_filter,
+                'channel_filter': channel_filter,
+                'current_sort': sort,
+                'current_dir': direction,
+            },
         )
 
 
 class EventMappingCreateView(LoginRequiredMixin, View):
     template_name = 'comm/events/event_form.html'
 
+    @staticmethod
+    def _channel_templates():
+        return list(
+            NotificationTemplate.objects.filter(
+                is_active=True,
+                channel_type__in=['Email', 'SMS'],
+            )
+            .order_by('template_name')
+            .values('template_id', 'template_name', 'channel_type')
+        )
+
     def get(self, request):
         redirect_resp = _require_root_or_redirect(request)
         if redirect_resp:
             return redirect_resp
-        return render(request, self.template_name, {'form': EventMappingForm(), 'is_edit': False})
+        
+        initial = {}
+        target_event = request.GET.get('system_event')
+        if target_event:
+            initial['system_event'] = target_event
+
+        return render(request, self.template_name, {
+            'form': EventMappingForm(initial=initial),
+            'is_edit': False,
+            'channel_templates': self._channel_templates(),
+        })
+
 
     def post(self, request):
         redirect_resp = _require_root_or_redirect(request)
@@ -4531,7 +5601,11 @@ class EventMappingCreateView(LoginRequiredMixin, View):
                 obj.save()
                 messages.success(request, 'Event mapping created successfully.')
                 return redirect(reverse('event_mapping_list'))
-        return render(request, self.template_name, {'form': form, 'is_edit': False})
+        return render(request, self.template_name, {
+            'form': form,
+            'is_edit': False,
+            'channel_templates': self._channel_templates(),
+        })
 
 
 class EventMappingUpdateView(LoginRequiredMixin, View):
@@ -4545,7 +5619,12 @@ class EventMappingUpdateView(LoginRequiredMixin, View):
         return render(
             request,
             self.template_name,
-            {'form': EventMappingForm(instance=mapping), 'is_edit': True, 'mapping': mapping},
+            {
+                'form': EventMappingForm(instance=mapping),
+                'is_edit': True,
+                'mapping': mapping,
+                'channel_templates': EventMappingCreateView._channel_templates(),
+            },
         )
 
     def post(self, request, pk):
@@ -4558,7 +5637,12 @@ class EventMappingUpdateView(LoginRequiredMixin, View):
             return render(
                 request,
                 self.template_name,
-                {'form': form, 'is_edit': True, 'mapping': mapping},
+                {
+                    'form': form,
+                    'is_edit': True,
+                    'mapping': mapping,
+                    'channel_templates': EventMappingCreateView._channel_templates(),
+                },
             )
         obj = form.save(commit=False)
         obj.updated_by = request.user
@@ -4584,22 +5668,74 @@ class PushNotificationListView(LoginRequiredMixin, View):
     template_name = 'comm/push/push_list.html'
 
     def get(self, request):
+        search_query = request.GET.get('q', '').strip()
         trigger_mode = request.GET.get('trigger_mode', 'All')
         dispatch_status = request.GET.get('dispatch_status', 'All')
-        qs = PushNotification.objects.order_by('-created_at')
+        sort = request.GET.get('sort', 'rank')
+        direction = request.GET.get('dir', 'asc')
+
+        qs = PushNotification.objects.all()
+
+        if search_query:
+            qs = qs.filter(
+                Q(internal_name__icontains=search_query)
+                | Q(linked_event__icontains=search_query)
+                | Q(target_audience__icontains=search_query)
+            )
+
         if trigger_mode in ['Manual_Broadcast', 'System_Event']:
             qs = qs.filter(trigger_mode=trigger_mode)
         if dispatch_status in ['Draft', 'Scheduled', 'Completed']:
             qs = qs.filter(dispatch_status=dispatch_status)
-        paginator = Paginator(qs, 5)
+
+        # Keep a lightweight stable row-id source (created_at descending), but
+        # avoid costly window functions on every request.
+        base_rank_ids = list(
+            qs.order_by('-created_at').values_list('notification_id', flat=True)
+        )
+        rank_map = {nid: idx for idx, nid in enumerate(base_rank_ids, start=1)}
+
+        if sort == 'audience':
+            qs = qs.annotate(
+                audience_event_sort=Case(
+                    When(trigger_mode='System_Event', then=F('linked_event')),
+                    default=F('target_audience'),
+                    output_field=CharField(),
+                ),
+            )
+            order_by_field = 'audience_event_sort'
+        elif sort == 'name':
+            order_by_field = 'internal_name'
+        elif sort == 'trigger':
+            order_by_field = 'trigger_mode'
+        elif sort == 'scheduled':
+            order_by_field = 'scheduled_at'
+        elif sort == 'status':
+            order_by_field = 'dispatch_status'
+        else:
+            # rank: base created ordering
+            order_by_field = 'created_at'
+            direction = 'desc' if direction == 'desc' else 'asc'
+
+        if direction == 'desc':
+            qs = qs.order_by(F(order_by_field).desc(nulls_last=True), '-created_at')
+        else:
+            qs = qs.order_by(F(order_by_field).asc(nulls_first=True), '-created_at')
+
+        paginator = Paginator(qs, 10)
         push_items = paginator.get_page(request.GET.get('page', 1))
+        for row in push_items:
+            row.default_rank = rank_map.get(row.notification_id, 0)
         return render(
             request,
             self.template_name,
             {
                 'push_items': push_items,
+                'search_query': search_query,
                 'trigger_mode_filter': trigger_mode,
                 'dispatch_status_filter': dispatch_status,
+                'current_sort': sort,
+                'current_dir': direction,
             },
         )
 
@@ -4676,24 +5812,58 @@ class SystemBannerListView(LoginRequiredMixin, View):
     template_name = 'comm/banners/banner_list.html'
 
     def get(self, request):
+        search_query = request.GET.get('q', '').strip()
         severity_filter = request.GET.get('severity', 'All')
         status_filter = request.GET.get('status', 'All')
-        qs = SystemBanner.objects.order_by('-valid_from')
+        sort = request.GET.get('sort', 'rank')
+        direction = request.GET.get('dir', 'asc')
+
+        qs = SystemBanner.objects.annotate(
+            default_rank=Window(
+                expression=RowNumber(),
+                order_by=F('valid_from').desc(),
+            ),
+        )
+
+        if search_query:
+            qs = qs.filter(
+                Q(title_en__icontains=search_query)
+                | Q(message_en__icontains=search_query)
+            )
         if severity_filter in ['Info', 'Warning', 'Critical']:
             qs = qs.filter(severity=severity_filter)
         if status_filter == 'Active':
             qs = qs.filter(is_active=True)
         elif status_filter == 'Inactive':
             qs = qs.filter(is_active=False)
-        paginator = Paginator(qs, 5)
+
+        sort_mapping = {
+            'rank': 'default_rank',
+            'title': 'title_en',
+            'severity': 'severity',
+            'dismissible': 'is_dismissible',
+            'valid_from': 'valid_from',
+            'valid_until': 'valid_until',
+            'status': 'is_active',
+        }
+        order_by_field = sort_mapping.get(sort, 'default_rank')
+        if direction == 'desc':
+            qs = qs.order_by(F(order_by_field).desc(nulls_last=True), '-valid_from')
+        else:
+            qs = qs.order_by(F(order_by_field).asc(nulls_first=True), '-valid_from')
+
+        paginator = Paginator(qs, 10)
         banners = paginator.get_page(request.GET.get('page', 1))
         return render(
             request,
             self.template_name,
             {
                 'banners': banners,
+                'search_query': search_query,
                 'severity_filter': severity_filter,
                 'status_filter': status_filter,
+                'current_sort': sort,
+                'current_dir': direction,
             },
         )
 
@@ -4763,10 +5933,68 @@ class InternalAlertRouteListView(LoginRequiredMixin, View):
     template_name = 'comm/alerts/alert_list.html'
 
     def get(self, request):
-        qs = InternalAlertRoute.objects.select_related('notify_role').order_by('trigger_event')
-        paginator = Paginator(qs, 5)
+        search_query = request.GET.get('q', '').strip()
+        trigger_filter = request.GET.get('trigger_event', 'All')
+        status_filter = request.GET.get('status', 'All')
+        sort = request.GET.get('sort', 'rank')
+        direction = request.GET.get('dir', 'asc')
+
+        qs = InternalAlertRoute.objects.select_related('notify_role').annotate(
+            default_rank=Window(
+                expression=RowNumber(),
+                order_by=F('trigger_event').asc(),
+            ),
+            status_sort=Case(
+                When(is_active=True, then=Value(1)),
+                default=Value(2),
+                output_field=IntegerField(),
+            ),
+        )
+
+        if search_query:
+            qs = qs.filter(
+                Q(notify_role__role_name_en__icontains=search_query)
+                | Q(notify_custom_email__icontains=search_query)
+                | Q(trigger_event__icontains=search_query)
+            )
+
+        trigger_codes = [code for code, _ in InternalAlertRoute.TRIGGER_EVENT_CHOICES]
+        if trigger_filter in trigger_codes:
+            qs = qs.filter(trigger_event=trigger_filter)
+
+        if status_filter == 'Active':
+            qs = qs.filter(is_active=True)
+        elif status_filter == 'Inactive':
+            qs = qs.filter(is_active=False)
+
+        sort_mapping = {
+            'rank': 'default_rank',
+            'trigger': 'trigger_event',
+            'role': 'notify_role__role_name_en',
+            'email': 'notify_custom_email',
+            'status': 'status_sort',
+        }
+        order_by_field = sort_mapping.get(sort, 'default_rank')
+        if direction == 'desc':
+            qs = qs.order_by(F(order_by_field).desc(nulls_last=True), '-default_rank')
+        else:
+            qs = qs.order_by(F(order_by_field).asc(nulls_first=True), 'default_rank')
+
+        paginator = Paginator(qs, 10)
         routes = paginator.get_page(request.GET.get('page', 1))
-        return render(request, self.template_name, {'routes': routes})
+        return render(
+            request,
+            self.template_name,
+            {
+                'routes': routes,
+                'search_query': search_query,
+                'trigger_filter': trigger_filter,
+                'status_filter': status_filter,
+                'trigger_choices': InternalAlertRoute.TRIGGER_EVENT_CHOICES,
+                'current_sort': sort,
+                'current_dir': direction,
+            },
+        )
 
 
 class InternalAlertRouteCreateView(LoginRequiredMixin, View):
@@ -4839,13 +6067,32 @@ class CommLogListView(LoginRequiredMixin, View):
         status_filter = request.GET.get('status', 'All')
         date_from = request.GET.get('date_from', '').strip()
         date_to = request.GET.get('date_to', '').strip()
+        sort = request.GET.get('sort', 'rank')
+        direction = request.GET.get('dir', 'asc')
 
-        qs = CommLog.objects.order_by('-dispatched_at')
+        qs = CommLog.objects.annotate(
+            default_rank=Window(
+                expression=RowNumber(),
+                order_by=F('dispatched_at').desc(),
+            ),
+            status_sort=Case(
+                When(delivery_status='Sent', then=Value(1)),
+                When(delivery_status='Failed', then=Value(2)),
+                default=Value(99),
+                output_field=IntegerField(),
+            ),
+        )
+        qs = qs.exclude(delivery_status='Bounced')
         if query:
-            qs = qs.filter(recipient__icontains=query)
+            qs = qs.filter(
+                Q(recipient__icontains=query)
+                | Q(trigger_source__icontains=query)
+                | Q(client_id__icontains=query)
+                | Q(error_details__icontains=query)
+            )
         if channel_filter in ['Email', 'SMS', 'Push']:
             qs = qs.filter(channel_type=channel_filter)
-        if status_filter in ['Sent', 'Failed', 'Bounced']:
+        if status_filter in ['Sent', 'Failed']:
             qs = qs.filter(delivery_status=status_filter)
         if date_from:
             parsed_from = parse_date(date_from)
@@ -4856,7 +6103,22 @@ class CommLogListView(LoginRequiredMixin, View):
             if parsed_to:
                 qs = qs.filter(dispatched_at__date__lte=parsed_to)
 
-        paginator = Paginator(qs, 5)
+        sort_mapping = {
+            'rank': 'default_rank',
+            'recipient': 'recipient',
+            'channel': 'channel_type',
+            'trigger': 'trigger_source',
+            'status': 'status_sort',
+            'error': 'error_details',
+            'dispatched': 'dispatched_at',
+        }
+        order_by_field = sort_mapping.get(sort, 'default_rank')
+        if direction == 'desc':
+            qs = qs.order_by(F(order_by_field).desc(nulls_last=True), '-default_rank')
+        else:
+            qs = qs.order_by(F(order_by_field).asc(nulls_first=True), 'default_rank')
+
+        paginator = Paginator(qs, 10)
         logs = paginator.get_page(request.GET.get('page', 1))
         return render(
             request,
@@ -4868,6 +6130,8 @@ class CommLogListView(LoginRequiredMixin, View):
                 'status_filter': status_filter,
                 'date_from': date_from,
                 'date_to': date_to,
+                'current_sort': sort,
+                'current_dir': direction,
             },
         )
 
@@ -4882,9 +6146,16 @@ class TenantListView(LoginRequiredMixin, View):
     template_name = 'crm/tenants/tenant_list.html'
 
     def get(self, request):
-        qs = TenantProfile.objects.select_related(
+        # Annotate with a stable rank based on registration date
+        qs = TenantProfile.objects.annotate(
+            default_rank=Window(
+                expression=RowNumber(),
+                order_by=F('registered_at').desc()
+            )
+        ).select_related(
             'country', 'current_plan', 'assigned_sales_rep'
-        ).order_by('company_name')
+        )
+
         search = request.GET.get('q', '').strip()
         status_filter = request.GET.get('account_status', 'All')
         rep_filter = request.GET.get('assigned_sales_rep', '').strip()
@@ -4896,7 +6167,9 @@ class TenantListView(LoginRequiredMixin, View):
                 | Q(primary_email__icontains=search)
             )
         codes = [c[0] for c in TenantProfile.STATUS_CHOICES]
-        if status_filter in codes:
+        if status_filter == 'Suspended':
+            qs = qs.filter(account_status__in=['Suspended_Billing', 'Suspended_Violation'])
+        elif status_filter in codes:
             qs = qs.filter(account_status=status_filter)
         if rep_filter:
             try:
@@ -4911,14 +6184,39 @@ class TenantListView(LoginRequiredMixin, View):
             except ValueError:
                 pass
 
-        paginator = Paginator(qs, 5)
+        # Advanced Sorting Logic
+        sort = request.GET.get('sort', 'company')
+        direction = request.GET.get('dir', 'asc')
+        
+        sort_mapping = {
+            'rank': 'default_rank',
+            'company': 'company_name',
+            'email': 'primary_email',
+            'country': 'country__name_en',
+            'plan': 'current_plan__plan_name_en',
+            'expiry': 'subscription_expiry_date',
+            'updated': 'updated_at',
+            'status': 'account_status',
+            'wallet': 'wallet_balance',
+        }
+        
+        order_by_field = sort_mapping.get(sort, 'company_name')
+        if direction == 'desc':
+            qs = qs.order_by(F(order_by_field).desc())
+        else:
+            qs = qs.order_by(F(order_by_field).asc())
+
+        # Pagination density: 10 per page
+        paginator = Paginator(qs, 10)
         tenants = paginator.get_page(request.GET.get('page', 1))
+        
         sales_reps = AdminUser.objects.filter(status='Active').order_by(
             'first_name', 'last_name'
         )
         plans = SubscriptionPlan.objects.filter(is_active=True).order_by(
             'plan_name_en'
         )
+        
         return render(
             request,
             self.template_name,
@@ -4932,6 +6230,8 @@ class TenantListView(LoginRequiredMixin, View):
                 'plans': plans,
                 'today': date.today(),
                 'status_choices': TenantProfile.STATUS_CHOICES,
+                'sort': sort,
+                'dir': direction,
             },
         )
 
@@ -5242,9 +6542,15 @@ class OrderListView(LoginRequiredMixin, View):
     template_name = 'crm/orders/order_list.html'
 
     def get(self, request):
-        qs = SubscriptionOrder.objects.select_related(
+        qs = SubscriptionOrder.objects.annotate(
+            default_rank=Window(
+                expression=RowNumber(),
+                order_by=F('created_at').desc()
+            )
+        ).select_related(
             'tenant', 'currency', 'created_by',
-        ).order_by('-created_at')
+        )
+
         q = request.GET.get('q', '').strip()
         if q:
             qs = qs.filter(tenant__company_name__icontains=q)
@@ -5254,8 +6560,32 @@ class OrderListView(LoginRequiredMixin, View):
         st = request.GET.get('order_status', '').strip()
         if st:
             qs = qs.filter(order_status=st)
-        paginator = Paginator(qs, 5)
+
+        # Advanced Sorting Logic
+        sort = request.GET.get('sort', 'date')
+        direction = request.GET.get('dir', 'desc')
+        
+        sort_mapping = {
+            'rank': 'default_rank',
+            'tenant': 'tenant__company_name',
+            'classification': 'order_classification',
+            'currency': 'currency_id',
+            'total': 'grand_total',
+            'status': 'order_status',
+            'created_by': 'created_by__first_name',
+            'date': 'created_at',
+        }
+        
+        order_by_field = sort_mapping.get(sort, 'created_at')
+        if direction == 'desc':
+            qs = qs.order_by(F(order_by_field).desc())
+        else:
+            qs = qs.order_by(F(order_by_field).asc())
+
+        # Increased pagination: 10 per page
+        paginator = Paginator(qs, 10)
         page = paginator.get_page(request.GET.get('page'))
+        
         return render(request, self.template_name, {
             'orders': page,
             'search_query': q,
@@ -5263,6 +6593,8 @@ class OrderListView(LoginRequiredMixin, View):
             'status_filter': st,
             'classification_choices': SubscriptionOrder.CLASSIFICATION_CHOICES,
             'status_choices': SubscriptionOrder.STATUS_CHOICES,
+            'sort': sort,
+            'dir': direction,
         })
 
 
@@ -5465,8 +6797,8 @@ class OrderCreateView(RootRequiredMixin, View):
                 types = request.POST.getlist('addon_add_on_type')
                 qtys = request.POST.getlist('addon_quantity')
                 base_days = (
-                    tenant.current_plan.base_cycle_days
-                    if tenant.current_plan else 30
+                    get_plan_cycle_days(tenant.current_plan)
+                    if tenant.current_plan else get_standard_billing_cycle_days()
                 )
                 expiry = tenant.subscription_expiry_date or timezone.now().date()
                 for action, add_type, qty_s in zip(actions, types, qtys):
@@ -5637,8 +6969,8 @@ class OrderPreviewAjaxView(RootRequiredMixin, View):
                 types = request.GET.getlist('addon_add_on_type')
                 qtys = request.GET.getlist('addon_quantity')
                 base_days = (
-                    tenant.current_plan.base_cycle_days
-                    if tenant.current_plan else 30
+                    get_plan_cycle_days(tenant.current_plan)
+                    if tenant.current_plan else get_standard_billing_cycle_days()
                 )
                 expiry = tenant.subscription_expiry_date or timezone.now().date()
                 for action, add_type, qty_s in zip(actions, types, qtys):
@@ -5691,7 +7023,7 @@ class OrderPreviewAjaxView(RootRequiredMixin, View):
         if classification == 'New_Subscription' and selected_plan:
             proj_plan = selected_plan
             proj_expiry = date.today() + timedelta(
-                days=selected_plan.base_cycle_days * cycles,
+                days=get_plan_cycle_days(selected_plan) * cycles,
             )
             if selected_plan.max_internal_users != -1:
                 proj_u = selected_plan.max_internal_users
@@ -5703,7 +7035,7 @@ class OrderPreviewAjaxView(RootRequiredMixin, View):
                 proj_d = selected_plan.max_active_drivers
         elif classification == 'Renewal' and selected_plan:
             proj_plan = selected_plan
-            extra = selected_plan.base_cycle_days * cycles
+            extra = get_plan_cycle_days(selected_plan) * cycles
             if tenant.subscription_expiry_date:
                 proj_expiry = tenant.subscription_expiry_date + timedelta(days=extra)
             else:
@@ -5711,7 +7043,7 @@ class OrderPreviewAjaxView(RootRequiredMixin, View):
         elif classification == 'Upgrade' and selected_plan:
             proj_plan = selected_plan
             proj_expiry = date.today() + timedelta(
-                days=selected_plan.base_cycle_days * cycles,
+                days=get_plan_cycle_days(selected_plan) * cycles,
             )
             if selected_plan.max_internal_users != -1:
                 proj_u = selected_plan.max_internal_users
@@ -5849,6 +7181,7 @@ class OrderStatusUpdateView(RootRequiredMixin, View):
                 )
             else:
                 fulfilled = False
+                uploaded_attachment = request.FILES.get('attachment')
                 with db_transaction.atomic():
                     ord_row = SubscriptionOrder.objects.select_for_update().get(
                         pk=order.pk)
@@ -5869,6 +7202,9 @@ class OrderStatusUpdateView(RootRequiredMixin, View):
                         )
                     else:
                         pm = ord_row.payment_method
+                        if uploaded_attachment:
+                            txn.attachment = uploaded_attachment
+                            txn.save(update_fields=['attachment', 'updated_at'])
                         if pm and pm.method_type == 'Offline_Bank' and not txn.attachment:
                             messages.error(
                                 request,
@@ -5910,9 +7246,23 @@ class TransactionListView(LoginRequiredMixin, View):
     template_name = 'crm/transactions/txn_list.html'
 
     def get(self, request):
-        qs = Transaction.objects.select_related(
+        # Keep payment transactions consistent with paid orders.
+        Transaction.objects.filter(
+            transaction_type='Order_Payment',
+            status='Pending',
+            order__isnull=False,
+            order__order_status='Paid',
+        ).update(status='Completed', updated_at=timezone.now())
+
+        qs = Transaction.objects.annotate(
+            default_rank=Window(
+                expression=RowNumber(),
+                order_by=F('created_at').desc()
+            )
+        ).select_related(
             'tenant', 'currency', 'payment_method',
-        ).order_by('-created_at')
+        )
+
         q = request.GET.get('q', '').strip()
         if q:
             qs = qs.filter(
@@ -5928,8 +7278,32 @@ class TransactionListView(LoginRequiredMixin, View):
         cur = request.GET.get('currency', '').strip()
         if cur:
             qs = qs.filter(currency_id=cur)
-        paginator = Paginator(qs, 5)
+
+        # Advanced Sorting Logic
+        sort = request.GET.get('sort', 'date')
+        direction = request.GET.get('dir', 'desc')
+        
+        sort_mapping = {
+            'rank': 'default_rank',
+            'tenant': 'tenant__company_name',
+            'type': 'transaction_type',
+            'currency': 'currency_id',
+            'amount': 'amount',
+            'base_equiv': 'base_currency_equivalent_amount',
+            'status': 'status',
+            'gateway_ref': 'gateway_ref',
+            'date': 'created_at',
+        }
+        
+        order_by_field = sort_mapping.get(sort, 'created_at')
+        if direction == 'desc':
+            qs = qs.order_by(F(order_by_field).desc())
+        else:
+            qs = qs.order_by(F(order_by_field).asc())
+
+        paginator = Paginator(qs, 10)
         page = paginator.get_page(request.GET.get('page'))
+        
         return render(request, self.template_name, {
             'transactions': page,
             'search_query': q,
@@ -5940,6 +7314,8 @@ class TransactionListView(LoginRequiredMixin, View):
             'status_choices': Transaction.STATUS_CHOICES,
             'currencies': Currency.objects.filter(is_active=True).order_by(
                 'currency_code'),
+            'sort': sort,
+            'dir': direction,
         })
 
 
@@ -6040,6 +7416,16 @@ class TransactionDetailView(LoginRequiredMixin, View):
             ),
             transaction_id=pk,
         )
+        if (
+            txn.transaction_type == 'Order_Payment'
+            and txn.status == 'Pending'
+            and txn.order_id
+            and txn.order
+            and txn.order.order_status == 'Paid'
+        ):
+            txn.status = 'Completed'
+            txn.save(update_fields=['status', 'updated_at'])
+            txn.refresh_from_db()
         return render(request, self.template_name, {'txn': txn})
 
 
@@ -6047,9 +7433,7 @@ class TransactionApproveView(RootRequiredMixin, View):
     def post(self, request, pk):
         with db_transaction.atomic():
             txn = get_object_or_404(
-                Transaction.objects.select_for_update().select_related(
-                    'order', 'tenant',
-                ),
+                Transaction.objects.select_for_update(),
                 transaction_id=pk,
             )
             if txn.status != 'Pending':
@@ -6062,23 +7446,41 @@ class TransactionApproveView(RootRequiredMixin, View):
                     'Only offline bank transfers use manual approval.',
                 )
                 return redirect('transaction_detail', pk=pk)
+            uploaded_attachment = request.FILES.get('attachment')
+            if uploaded_attachment:
+                txn.attachment = uploaded_attachment
+                txn.save(update_fields=['attachment', 'updated_at'])
             if not txn.attachment:
                 messages.error(
                     request,
                     'Offline bank transfers require an attachment/receipt before approval.',
                 )
                 return redirect('transaction_detail', pk=pk)
-            order = txn.order
+            order = None
+            if txn.order_id:
+                order = SubscriptionOrder.objects.select_for_update().filter(
+                    pk=txn.order_id
+                ).first()
             if not order or order.order_status != 'Pending_Payment':
                 messages.error(request, 'Order is not awaiting payment.')
                 return redirect('transaction_detail', pk=pk)
 
-            txn.status = 'Completed'
-            txn.reviewed_by = request.user
-            txn.review_notes = None
-            txn.save(update_fields=[
-                'status', 'reviewed_by', 'review_notes', 'updated_at',
-            ])
+            updated = Transaction.objects.filter(
+                pk=txn.pk,
+                status='Pending',
+            ).update(
+                status='Completed',
+                reviewed_by=request.user,
+                review_notes=None,
+                updated_at=timezone.now(),
+            )
+            if updated != 1:
+                messages.error(
+                    request,
+                    'Transaction status changed by another process. Please refresh.',
+                )
+                return redirect('transaction_detail', pk=pk)
+            txn.refresh_from_db()
 
             order.order_status = 'Paid'
             order.save(update_fields=['order_status', 'updated_at'])
@@ -6093,6 +7495,26 @@ class TransactionApproveView(RootRequiredMixin, View):
             )
 
         messages.success(request, 'Payment approved and order fulfilled.')
+        return redirect('transaction_detail', pk=pk)
+
+
+class TransactionUploadAttachmentView(RootRequiredMixin, View):
+    def post(self, request, pk):
+        txn = get_object_or_404(Transaction, transaction_id=pk)
+        if txn.status != 'Pending':
+            messages.error(request, 'Attachment upload is only allowed for pending transactions.')
+            return redirect('transaction_detail', pk=pk)
+        pm = txn.payment_method
+        if not pm or pm.method_type != 'Offline_Bank':
+            messages.error(request, 'Attachment upload is only required for offline bank transfers.')
+            return redirect('transaction_detail', pk=pk)
+        uploaded = request.FILES.get('attachment')
+        if not uploaded:
+            messages.error(request, 'Please choose a receipt file to upload.')
+            return redirect('transaction_detail', pk=pk)
+        txn.attachment = uploaded
+        txn.save(update_fields=['attachment', 'updated_at'])
+        messages.success(request, 'Receipt uploaded. You can now approve this transaction.')
         return redirect('transaction_detail', pk=pk)
 
 
@@ -6126,32 +7548,107 @@ class InvoiceListView(LoginRequiredMixin, View):
     template_name = 'crm/invoices/invoice_list.html'
 
     def get(self, request):
+        # 1. Base Queryset
         qs = StandardInvoice.objects.select_related(
             'tenant', 'currency',
-        ).order_by('-issue_date')
-        st = request.GET.get('status', '').strip()
-        if st:
+        )
+
+        # 2. Filtering
+        st = request.GET.get('status', 'All').strip()
+        if st and st != 'All':
             qs = qs.filter(status=st)
+
         cur = request.GET.get('currency', '').strip()
         if cur:
             qs = qs.filter(currency_id=cur)
+
         tenant_id = request.GET.get('tenant', '').strip()
         if tenant_id:
             qs = qs.filter(tenant_id=tenant_id)
+
         q = request.GET.get('q', '').strip()
         if q:
             qs = qs.filter(
                 Q(invoice_number__icontains=q) |
-                Q(customer_name__icontains=q)
+                Q(customer_name__icontains=q) |
+                Q(tenant__company_name__icontains=q)
             )
-        paginator = Paginator(qs, 5)
+
+        # 3. Stable Rank Annotation
+        qs = qs.annotate(
+            default_rank=Window(
+                expression=RowNumber(),
+                order_by=F('issue_date').desc()
+            )
+        )
+
+        # 4. Sorting logic
+        # Normalize values used by sorting to avoid null/blank inconsistencies.
+        qs = qs.annotate(
+            sort_currency_code=Coalesce(
+                F('currency__currency_code'),
+                Value(''),
+                output_field=CharField(),
+            ),
+            sort_tax_amount=Coalesce(
+                F('tax_amount'),
+                Value(0),
+                output_field=DecimalField(max_digits=12, decimal_places=2),
+            ),
+            sort_status_order=Case(
+                When(status='Issued', then=Value(1)),
+                When(status='Paid', then=Value(2)),
+                When(status='Void', then=Value(3)),
+                default=Value(99),
+                output_field=IntegerField(),
+            ),
+        )
+
+        sort_key = request.GET.get('sort', 'date')
+        direction = request.GET.get('dir', 'desc')
+
+        sort_mapping = {
+            'number': ['invoice_number'],
+            'tenant': ['tenant__company_name'],
+            'total': ['grand_total'],
+            'tax': ['sort_tax_amount'],
+            'status': ['sort_status_order', 'status'],
+            'date': ['issue_date'],
+            'currency': ['sort_currency_code'],
+            'rank': ['default_rank'],
+        }
+
+        active_sort_fields = sort_mapping.get(sort_key, ['issue_date'])
+        ordering = []
+        for field in active_sort_fields:
+            if direction == 'desc':
+                ordering.append(f'-{field}')
+            else:
+                ordering.append(field)
+        
+        # Secondary stable sort to prevent "shuffling" rows with same values.
+        # Use the same direction as the active sort so ASC/DESC clicks are visible
+        # even when many rows share the same primary value.
+        if 'invoice_number' not in active_sort_fields:
+            if direction == 'desc':
+                ordering.append('-invoice_number')
+            else:
+                ordering.append('invoice_number')
+        
+        qs = qs.order_by(*ordering)
+
+        # 4. Pagination
+        paginator = Paginator(qs, 10) # Increased to 10 for better list view
         page = paginator.get_page(request.GET.get('page'))
+
         return render(request, self.template_name, {
             'invoices': page,
             'status_filter': st,
             'currency_filter': cur,
             'tenant_filter': tenant_id,
             'search_query': q,
+            'current_sort': sort_key,
+            'current_dir': direction,
             'status_choices': StandardInvoice.STATUS_CHOICES,
             'currencies': Currency.objects.filter(is_active=True).order_by(
                 'currency_code'),
@@ -6172,16 +7669,67 @@ class InvoiceDetailView(LoginRequiredMixin, View):
         base_cfg = BaseCurrencyConfig.objects.filter(
             setting_id='GLOBAL-BASE-CURRENCY',
         ).first()
+        legal_identity = LegalIdentity.objects.filter(
+            identity_id='GLOBAL-LEGAL-IDENTITY',
+        ).first()
         return render(
             request,
             self.template_name,
             {
                 'invoice': invoice,
+                'legal_identity': legal_identity,
                 'base_currency_code': (
                     base_cfg.base_currency_id if base_cfg and base_cfg.base_currency_id else None
                 ),
             },
         )
+
+
+class InvoicePrintView(LoginRequiredMixin, View):
+    template_name = 'crm/invoices/invoice_print.html'
+
+    def get(self, request, pk):
+        invoice = get_object_or_404(
+            StandardInvoice.objects.select_related(
+                'tenant', 'currency', 'tax_code', 'order',
+            ).prefetch_related('line_items'),
+            invoice_id=pk,
+        )
+        legal_identity = LegalIdentity.objects.filter(
+            identity_id='GLOBAL-LEGAL-IDENTITY',
+        ).first()
+        response = render(
+            request,
+            self.template_name,
+            {
+                'invoice': invoice,
+                'legal_identity': legal_identity,
+            },
+        )
+        response['Content-Disposition'] = (
+            f'inline; filename="{invoice.invoice_number}.html"'
+        )
+        return response
+
+
+class InvoiceSendEmailView(LoginRequiredMixin, View):
+    def post(self, request, pk):
+        invoice = get_object_or_404(
+            StandardInvoice.objects.select_related('tenant', 'currency'),
+            invoice_id=pk,
+        )
+        sent = send_invoice_paid_notification(invoice, use_async_tasks=False)
+        if sent:
+            messages.success(
+                request,
+                f'Invoice email queued for {invoice.tenant.primary_email}.',
+            )
+        else:
+            messages.error(
+                request,
+                'Invoice email could not be sent. Check gateway/template configuration.',
+            )
+        return redirect('invoice_detail', pk=pk)
 
 
 class InvoiceVoidView(RootRequiredMixin, View):
@@ -6208,16 +7756,43 @@ class SupportCategoryListView(LoginRequiredMixin, View):
     template_name = 'support/categories/category_list.html'
 
     def get(self, request):
-        qs = SupportCategory.objects.order_by('name_en')
+        sort_by = request.GET.get('sort', 'rank').strip()
+        sort_dir = request.GET.get('dir', 'asc').strip().lower()
+        if sort_dir not in ('asc', 'desc'):
+            sort_dir = 'asc'
+
+        qs = SupportCategory.objects.annotate(
+            default_rank=Window(
+                expression=RowNumber(),
+                order_by=F('name_en').asc(),
+            )
+        )
         q = request.GET.get('q', '').strip()
         status_filter = request.GET.get('is_active', 'All').strip()
         if q:
-            qs = qs.filter(name_en__icontains=q)
+            qs = qs.filter(
+                Q(name_en__icontains=q) |
+                Q(name_ar__icontains=q)
+            )
         if status_filter == 'Active':
             qs = qs.filter(is_active=True)
         elif status_filter == 'Inactive':
             qs = qs.filter(is_active=False)
-        paginator = Paginator(qs, 5)
+
+        sort_mapping = {
+            'rank': ['default_rank'],
+            'category_id': ['category_id'],
+            'name_en': ['name_en'],
+            'name_ar': ['name_ar'],
+            'status': ['is_active'],
+        }
+        active_sort_fields = sort_mapping.get(sort_by, ['default_rank'])
+        ordering = []
+        for f in active_sort_fields:
+            ordering.append(f if sort_dir == 'asc' else f'-{f}')
+        qs = qs.order_by(*ordering)
+
+        paginator = Paginator(qs, 10)
         categories = paginator.get_page(request.GET.get('page'))
         return render(
             request,
@@ -6226,6 +7801,8 @@ class SupportCategoryListView(LoginRequiredMixin, View):
                 'categories': categories,
                 'search_query': q,
                 'status_filter': status_filter,
+                'current_sort': sort_by,
+                'current_dir': sort_dir,
             },
         )
 
@@ -6240,7 +7817,11 @@ class SupportCategoryCreateView(LoginRequiredMixin, View):
         return render(
             request,
             self.template_name,
-            {'form': SupportCategoryForm(), 'is_edit': False},
+            {
+                'form': SupportCategoryForm(),
+                'is_edit': False,
+                'category': None,
+            },
         )
 
     def post(self, request):
@@ -6257,7 +7838,11 @@ class SupportCategoryCreateView(LoginRequiredMixin, View):
         return render(
             request,
             self.template_name,
-            {'form': form, 'is_edit': False},
+            {
+                'form': form,
+                'is_edit': False,
+                'category': None,
+            },
         )
 
 
@@ -6272,7 +7857,11 @@ class SupportCategoryUpdateView(LoginRequiredMixin, View):
         return render(
             request,
             self.template_name,
-            {'form': SupportCategoryForm(instance=category), 'is_edit': True},
+            {
+                'form': SupportCategoryForm(instance=category),
+                'is_edit': True,
+                'category': category,
+            },
         )
 
     def post(self, request, pk):
@@ -6288,7 +7877,11 @@ class SupportCategoryUpdateView(LoginRequiredMixin, View):
         return render(
             request,
             self.template_name,
-            {'form': form, 'is_edit': True},
+            {
+                'form': form,
+                'is_edit': True,
+                'category': category,
+            },
         )
 
 
@@ -6333,7 +7926,17 @@ class CannedResponseListView(LoginRequiredMixin, View):
     template_name = 'support/canned/canned_list.html'
 
     def get(self, request):
-        qs = CannedResponse.objects.order_by('title')
+        sort_by = request.GET.get('sort', 'rank').strip()
+        sort_dir = request.GET.get('dir', 'asc').strip().lower()
+        if sort_dir not in ('asc', 'desc'):
+            sort_dir = 'asc'
+
+        qs = CannedResponse.objects.annotate(
+            default_rank=Window(
+                expression=RowNumber(),
+                order_by=F('title').asc(),
+            )
+        )
         q = request.GET.get('q', '').strip()
         status_filter = request.GET.get('is_active', 'All').strip()
         if q:
@@ -6345,7 +7948,21 @@ class CannedResponseListView(LoginRequiredMixin, View):
             qs = qs.filter(is_active=True)
         elif status_filter == 'Inactive':
             qs = qs.filter(is_active=False)
-        paginator = Paginator(qs, 5)
+
+        sort_mapping = {
+            'rank': ['default_rank'],
+            'template_id': ['template_id'],
+            'title': ['title'],
+            'message': ['message_body'],
+            'status': ['is_active'],
+        }
+        active_sort_fields = sort_mapping.get(sort_by, ['default_rank'])
+        ordering = []
+        for f in active_sort_fields:
+            ordering.append(f if sort_dir == 'asc' else f'-{f}')
+        qs = qs.order_by(*ordering)
+
+        paginator = Paginator(qs, 10)
         canned_responses = paginator.get_page(request.GET.get('page'))
         return render(
             request,
@@ -6354,6 +7971,8 @@ class CannedResponseListView(LoginRequiredMixin, View):
                 'canned_responses': canned_responses,
                 'search_query': q,
                 'status_filter': status_filter,
+                'current_sort': sort_by,
+                'current_dir': sort_dir,
             },
         )
 
@@ -6368,7 +7987,11 @@ class CannedResponseCreateView(LoginRequiredMixin, View):
         return render(
             request,
             self.template_name,
-            {'form': CannedResponseForm(), 'is_edit': False},
+            {
+                'form': CannedResponseForm(),
+                'is_edit': False,
+                'canned': None,
+            },
         )
 
     def post(self, request):
@@ -6385,7 +8008,11 @@ class CannedResponseCreateView(LoginRequiredMixin, View):
         return render(
             request,
             self.template_name,
-            {'form': form, 'is_edit': False},
+            {
+                'form': form,
+                'is_edit': False,
+                'canned': None,
+            },
         )
 
 
@@ -6400,7 +8027,11 @@ class CannedResponseUpdateView(LoginRequiredMixin, View):
         return render(
             request,
             self.template_name,
-            {'form': CannedResponseForm(instance=canned), 'is_edit': True},
+            {
+                'form': CannedResponseForm(instance=canned),
+                'is_edit': True,
+                'canned': canned,
+            },
         )
 
     def post(self, request, pk):
@@ -6416,7 +8047,11 @@ class CannedResponseUpdateView(LoginRequiredMixin, View):
         return render(
             request,
             self.template_name,
-            {'form': form, 'is_edit': True},
+            {
+                'form': form,
+                'is_edit': True,
+                'canned': canned,
+            },
         )
 
 
@@ -6451,11 +8086,21 @@ class TicketListView(LoginRequiredMixin, View):
     template_name = 'support/tickets/ticket_list.html'
 
     def get(self, request):
+        sort_by = request.GET.get('sort', 'rank').strip()
+        sort_dir = request.GET.get('dir', 'asc').strip().lower()
+        if sort_dir not in ('asc', 'desc'):
+            sort_dir = 'asc'
+
         tickets_qs = SupportTicket.objects.select_related(
             'tenant',
             'category',
             'assigned_to',
-        ).order_by('-created_at')
+        ).annotate(
+            default_rank=Window(
+                expression=RowNumber(),
+                order_by=F('created_at').desc(),
+            )
+        )
 
         q = request.GET.get('q', '').strip()
         status_filter = request.GET.get('status', '').strip()
@@ -6480,7 +8125,23 @@ class TicketListView(LoginRequiredMixin, View):
         elif assigned_filter:
             tickets_qs = tickets_qs.filter(assigned_to_id=assigned_filter)
 
-        paginator = Paginator(tickets_qs, 5)
+        sort_mapping = {
+            'rank': ['default_rank'],
+            'ticket_no': ['ticket_no'],
+            'subject': ['subject'],
+            'category': ['category__name_en'],
+            'priority': ['priority'],
+            'status': ['status'],
+            'assignee': ['assigned_to__first_name', 'assigned_to__last_name'],
+            'created': ['created_at'],
+        }
+        active_sort_fields = sort_mapping.get(sort_by, ['default_rank'])
+        ordering = []
+        for f in active_sort_fields:
+            ordering.append(f if sort_dir == 'asc' else f'-{f}')
+        tickets_qs = tickets_qs.order_by(*ordering)
+
+        paginator = Paginator(tickets_qs, 10)
         tickets = paginator.get_page(request.GET.get('page'))
 
         context = {
@@ -6496,6 +8157,8 @@ class TicketListView(LoginRequiredMixin, View):
             ),
             'status_choices': SupportTicket.STATUS_CHOICES,
             'priority_choices': SupportTicket.PRIORITY_CHOICES,
+            'current_sort': sort_by,
+            'current_dir': sort_dir,
         }
         return render(request, self.template_name, context)
 
@@ -6773,4 +8436,3 @@ class GlobalSearchView(LoginRequiredMixin, TemplateView):
         context['total_count'] = total_count
         context['page_title'] = f"Search results for '{query}'"
         return context
-

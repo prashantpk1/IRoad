@@ -7,6 +7,43 @@
   <li class="breadcrumb-item active" aria-current="page">{% translate "Support Inbox" %}</li>
 {% endblock %}
 
+{% block extra_css %}
+<style>
+  .db-table-filters {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .filter-chip {
+    text-decoration: none !important;
+  }
+  .eal-table th.sortable {
+    padding: 0 !important;
+  }
+  .eal-table th.sortable a {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    color: inherit;
+    text-decoration: none;
+    width: 100%;
+    transition: background 0.2s;
+    gap: 10px;
+  }
+  .eal-table th.sortable a:hover {
+    background: rgba(0, 0, 0, 0.02);
+  }
+  .eal-table th.sortable i {
+    font-size: 10px;
+    margin-left: 5px;
+    color: var(--primary-color);
+    opacity: 0.8;
+    flex-shrink: 0;
+  }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
   <div class="page-header-row">
@@ -28,42 +65,40 @@
 </div>
 
 <div class="eal-table-card">
-  <div class="eal-toolbar">
-    <div class="eal-toolbar-left">
-      <span class="eal-result-badge">Total Tickets: <strong>{{ tickets.paginator.count }}</strong></span>
-    </div>
-  </div>
-
-  <form method="get" class="eal-toolbar" style="padding: 16px;">
-    <div class="row g-3">
-      <div class="col-12 col-md-4">
-        <label class="form-label small fw-bold">{% translate "Search" %}</label>
-        <div class="eal-search w-100">
+  <form method="get" class="eal-toolbar">
+    <div class="eal-toolbar-left" style="width: 100%; display: flex; gap: 12px; align-items: center; flex-wrap: wrap">
+      <div class="eal-search" style="flex: 1; min-width: 260px; margin-bottom: 0">
           <i class="bi bi-search"></i>
           <input type="text" name="q" value="{{ search_query }}" placeholder="{% translate 'Ticket #, subject, or tenant' %}">
-        </div>
+          <input type="hidden" name="sort" value="{{ current_sort }}">
+          <input type="hidden" name="dir" value="{{ current_dir }}">
       </div>
-      <div class="col-6 col-md-2">
-        <label class="form-label small fw-bold">{% translate "Status" %}</label>
-        <select name="status" class="form-select form-select-sm">
-          <option value="">{% translate "All Statuses" %}</option>
-          {% for value, label in status_choices %}
-            <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
-          {% endfor %}
-        </select>
+
+      <div class="db-table-filters">
+        <a href="?q={{ search_query|urlencode }}&status=&priority={{ priority_filter }}&assigned_to={{ assigned_filter }}&sort={{ current_sort }}&dir={{ current_dir }}" class="filter-chip {% if not status_filter %}active{% endif %}">
+          {% translate "All" %}
+        </a>
+        <a href="?q={{ search_query|urlencode }}&status=New&priority={{ priority_filter }}&assigned_to={{ assigned_filter }}&sort={{ current_sort }}&dir={{ current_dir }}" class="filter-chip {% if status_filter == 'New' %}active{% endif %}">
+          {% translate "New" %}
+        </a>
+        <a href="?q={{ search_query|urlencode }}&status=In_Progress&priority={{ priority_filter }}&assigned_to={{ assigned_filter }}&sort={{ current_sort }}&dir={{ current_dir }}" class="filter-chip {% if status_filter == 'In_Progress' %}active{% endif %}">
+          {% translate "In Progress" %}
+        </a>
+        <a href="?q={{ search_query|urlencode }}&status=Closed&priority={{ priority_filter }}&assigned_to={{ assigned_filter }}&sort={{ current_sort }}&dir={{ current_dir }}" class="filter-chip {% if status_filter == 'Closed' %}active{% endif %}">
+          {% translate "Closed" %}
+        </a>
       </div>
-      <div class="col-6 col-md-2">
-        <label class="form-label small fw-bold">{% translate "Priority" %}</label>
-        <select name="priority" class="form-select form-select-sm">
+
+      <div style="width: 180px">
+        <select name="priority" class="form-select form-select-sm" onchange="this.form.submit()">
           <option value="">{% translate "All Priorities" %}</option>
           {% for value, label in priority_choices %}
             <option value="{{ value }}" {% if priority_filter == value %}selected{% endif %}>{{ label }}</option>
           {% endfor %}
         </select>
       </div>
-      <div class="col-6 col-md-2">
-        <label class="form-label small fw-bold">{% translate "Assignee" %}</label>
-        <select name="assigned_to" class="form-select form-select-sm">
+      <div style="width: 200px">
+        <select name="assigned_to" class="form-select form-select-sm" onchange="this.form.submit()">
           <option value="">{% translate "All Assignees" %}</option>
           <option value="unassigned" {% if assigned_filter == 'unassigned' %}selected{% endif %}>{% translate "Unassigned" %}</option>
           {% for admin in admins %}
@@ -71,33 +106,107 @@
           {% endfor %}
         </select>
       </div>
-      <div class="col-6 col-md-2">
-        <label class="form-label d-none d-md-block">&nbsp;</label>
-        <button type="submit" class="eal-btn eal-btn-primary w-100">
-          <i class="bi bi-funnel"></i>
-          <span>{% translate "Filter" %}</span>
-        </button>
+
+      {% if search_query or status_filter or priority_filter or assigned_filter %}
+        <a href="{% url 'ticket_list' %}" class="eal-btn eal-btn-outline" style="border-style: dashed; color: var(--text-muted); height: 32px; padding: 0 12px; font-size: 11px">
+          <i class="bi bi-x-circle"></i>
+          <span>{% translate "Clear Filters" %}</span>
+        </a>
+      {% endif %}
       </div>
-    </div>
   </form>
 
   <div class="eal-table-wrap">
     <table class="eal-table">
       <thead>
         <tr>
-          <th style="width: 100px">{% translate "Ticket #" %}</th>
-          <th>{% translate "Tenant & Subject" %}</th>
-          <th style="width: 140px">{% translate "Category" %}</th>
-          <th style="width: 120px">{% translate "Priority" %}</th>
-          <th style="width: 150px">{% translate "Status" %}</th>
-          <th style="width: 150px">{% translate "Assignee" %}</th>
-          <th style="width: 160px">{% translate "Created" %}</th>
+          <th class="sortable" style="width: 60px">
+            <a href="?q={{ search_query|urlencode }}&status={{ status_filter }}&priority={{ priority_filter }}&assigned_to={{ assigned_filter }}&sort=rank&dir={% if current_sort == 'rank' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+              <span>#</span>
+              {% if current_sort == 'rank' %}
+                <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+              {% else %}
+                <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+              {% endif %}
+            </a>
+          </th>
+          <th class="sortable" style="width: 100px">
+            <a href="?q={{ search_query|urlencode }}&status={{ status_filter }}&priority={{ priority_filter }}&assigned_to={{ assigned_filter }}&sort=ticket_no&dir={% if current_sort == 'ticket_no' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+              <span>{% translate "Ticket #" %}</span>
+              {% if current_sort == 'ticket_no' %}
+                <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+              {% else %}
+                <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+              {% endif %}
+            </a>
+          </th>
+          <th class="sortable">
+            <a href="?q={{ search_query|urlencode }}&status={{ status_filter }}&priority={{ priority_filter }}&assigned_to={{ assigned_filter }}&sort=subject&dir={% if current_sort == 'subject' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+              <span>{% translate "Tenant & Subject" %}</span>
+              {% if current_sort == 'subject' %}
+                <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+              {% else %}
+                <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+              {% endif %}
+            </a>
+          </th>
+          <th class="sortable" style="width: 140px">
+            <a href="?q={{ search_query|urlencode }}&status={{ status_filter }}&priority={{ priority_filter }}&assigned_to={{ assigned_filter }}&sort=category&dir={% if current_sort == 'category' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+              <span>{% translate "Category" %}</span>
+              {% if current_sort == 'category' %}
+                <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+              {% else %}
+                <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+              {% endif %}
+            </a>
+          </th>
+          <th class="sortable" style="width: 120px">
+            <a href="?q={{ search_query|urlencode }}&status={{ status_filter }}&priority={{ priority_filter }}&assigned_to={{ assigned_filter }}&sort=priority&dir={% if current_sort == 'priority' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+              <span>{% translate "Priority" %}</span>
+              {% if current_sort == 'priority' %}
+                <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+              {% else %}
+                <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+              {% endif %}
+            </a>
+          </th>
+          <th class="sortable" style="width: 150px">
+            <a href="?q={{ search_query|urlencode }}&status={{ status_filter }}&priority={{ priority_filter }}&assigned_to={{ assigned_filter }}&sort=status&dir={% if current_sort == 'status' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+              <span>{% translate "Status" %}</span>
+              {% if current_sort == 'status' %}
+                <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+              {% else %}
+                <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+              {% endif %}
+            </a>
+          </th>
+          <th class="sortable" style="width: 150px">
+            <a href="?q={{ search_query|urlencode }}&status={{ status_filter }}&priority={{ priority_filter }}&assigned_to={{ assigned_filter }}&sort=assignee&dir={% if current_sort == 'assignee' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+              <span>{% translate "Assignee" %}</span>
+              {% if current_sort == 'assignee' %}
+                <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+              {% else %}
+                <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+              {% endif %}
+            </a>
+          </th>
+          <th class="sortable" style="width: 160px">
+            <a href="?q={{ search_query|urlencode }}&status={{ status_filter }}&priority={{ priority_filter }}&assigned_to={{ assigned_filter }}&sort=created&dir={% if current_sort == 'created' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+              <span>{% translate "Created" %}</span>
+              {% if current_sort == 'created' %}
+                <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+              {% else %}
+                <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+              {% endif %}
+            </a>
+          </th>
           <th style="width: 80px">{% translate "View" %}</th>
         </tr>
       </thead>
       <tbody>
         {% for ticket in tickets %}
           <tr>
+            <td>{{ tickets.start_index|add:forloop.counter0 }}</td>
             <td class="fw-bold text-primary">{{ ticket.ticket_no }}</td>
             <td>
               <div class="d-flex flex-column">

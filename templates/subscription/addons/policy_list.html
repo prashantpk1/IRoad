@@ -7,6 +7,41 @@
   <li class="breadcrumb-item active" aria-current="page">{% translate "Add-ons Pricing Policy" %}</li>
 {% endblock %}
 
+{% block extra_css %}
+<style>
+  .eal-table th.sortable {
+    padding: 0 !important;
+  }
+  .eal-table th.sortable a {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    color: inherit;
+    text-decoration: none;
+    width: 100%;
+    transition: background 0.2s;
+  }
+  .eal-table th.sortable a:hover {
+    background: rgba(0,0,0,0.02);
+  }
+  .eal-table th.sortable i {
+    font-size: 10px;
+    margin-left: 5px;
+    color: var(--primary-color);
+    opacity: 0.8;
+  }
+  .filter-chip {
+    text-decoration: none !important;
+  }
+  .db-table-filters {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
   <div class="page-header-row">
@@ -28,12 +63,12 @@
 </div>
 
 <div class="eal-table-card">
-  <div class="alert alert-info" style="border-radius: 10px;">
+  <div class="alert alert-info" style="border-radius: 10px; margin-bottom: 20px;">
     Only ONE policy active at a time.
   </div>
 
   {% if messages %}
-    <div style="margin-top: 12px;">
+    <div style="margin-bottom: 20px;">
       {% for message in messages %}
         <p style="margin:0; color:{% if message.tags == 'error' %}#b91c1c{% else %}#15803d{% endif %}; font-weight:600">
           {{ message }}
@@ -43,8 +78,8 @@
   {% endif %}
 
   <form method="get" action="{% url 'addons_policy_list' %}" class="eal-toolbar">
-    <div class="eal-toolbar-left" style="width: 100%; display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end">
-      <div class="eal-search" style="flex: 1; min-width: 260px;">
+    <div class="eal-toolbar-left" style="width: 100%; display: flex; flex-wrap: wrap; gap: 16px; align-items: center">
+      <div class="eal-search" style="flex: 1; min-width: 250px; margin-bottom: 0">
         <i class="bi bi-search"></i>
         <input
           type="text"
@@ -52,51 +87,139 @@
           placeholder="{% translate 'Search by policy name...' %}"
           value="{{ search_query }}"
         />
+        <input type="hidden" name="sort" value="{{ current_sort }}">
+        <input type="hidden" name="dir" value="{{ current_dir }}">
       </div>
-      <div style="min-width: 180px">
-        <select name="status" class="eal-select" style="width: 100%;">
-          <option value="All" {% if status_filter == 'All' %}selected{% endif %}>{% translate "All Status" %}</option>
-          <option value="Active" {% if status_filter == 'Active' %}selected{% endif %}>{% translate "Active" %}</option>
-          <option value="Inactive" {% if status_filter == 'Inactive' %}selected{% endif %}>{% translate "Inactive" %}</option>
-        </select>
+
+      <div class="db-table-filters">
+        <a href="?q={{ search_query }}&status=All&sort={{ current_sort }}&dir={{ current_dir }}" 
+           class="filter-chip {% if status_filter == 'All' %}active{% endif %}">
+          All
+        </a>
+        <a href="?q={{ search_query }}&status=Active&sort={{ current_sort }}&dir={{ current_dir }}" 
+           class="filter-chip {% if status_filter == 'Active' %}active{% endif %}">
+          <i class="bi bi-circle-fill text-success" style="font-size: 6px"></i>
+          {% translate "Active" %}
+        </a>
+        <a href="?q={{ search_query }}&status=Inactive&sort={{ current_sort }}&dir={{ current_dir }}" 
+           class="filter-chip {% if status_filter == 'Inactive' %}active{% endif %}">
+          <i class="bi bi-circle-fill text-danger" style="font-size: 6px"></i>
+          {% translate "Inactive" %}
+        </a>
       </div>
-      <div>
-        <button type="submit" class="eal-btn eal-btn-primary">
-          <i class="bi bi-search"></i>
-          <span>{% translate "Filter" %}</span>
-        </button>
-      </div>
+
       {% if search_query or status_filter != 'All' %}
-        <a href="{% url 'addons_policy_list' %}" class="eal-btn eal-btn-outline" style="border-style: dashed; color: var(--text-muted);">
+        <a href="{% url 'addons_policy_list' %}" class="eal-btn eal-btn-outline" style="border-style: dashed; color: var(--text-muted); height: 32px; padding: 0 12px; font-size: 11px">
           <i class="bi bi-x-circle"></i>
-          <span>{% translate "Clear" %}</span>
+          <span>Clear Filters</span>
         </a>
       {% endif %}
     </div>
   </form>
 
-  {% if policies.object_list %}
-    <div class="eal-table-wrap" style="overflow-x: auto;">
+  {% if policies %}
+    <div class="eal-table-wrap" style="overflow-x: auto; margin-top: 8px;">
       <table class="eal-table">
         <thead>
           <tr>
-            <th>#</th>
-            <th>Policy Name</th>
-            <th>User</th>
-            <th>Truck</th>
-            <th>Ext.Truck</th>
-            <th>Driver</th>
-            <th>Shipment</th>
-            <th>Storage/GB</th>
-            <th>Status</th>
+            <th class="sortable" style="width: 60px">
+              <a href="?q={{ search_query }}&status={{ status_filter }}&sort=rank&dir={% if current_sort == 'rank' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>#</span>
+                {% if current_sort == 'rank' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
+            <th class="sortable">
+              <a href="?q={{ search_query }}&status={{ status_filter }}&sort=policy_name&dir={% if current_sort == 'policy_name' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>Policy Name</span>
+                {% if current_sort == 'policy_name' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
+            <th class="sortable">
+              <a href="?q={{ search_query }}&status={{ status_filter }}&sort=user_price&dir={% if current_sort == 'user_price' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>User</span>
+                {% if current_sort == 'user_price' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
+            <th class="sortable">
+              <a href="?q={{ search_query }}&status={{ status_filter }}&sort=truck_price&dir={% if current_sort == 'truck_price' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>Truck</span>
+                {% if current_sort == 'truck_price' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
+            <th class="sortable">
+              <a href="?q={{ search_query }}&status={{ status_filter }}&sort=ext_truck_price&dir={% if current_sort == 'ext_truck_price' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>Ext.Truck</span>
+                {% if current_sort == 'ext_truck_price' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
+            <th class="sortable">
+              <a href="?q={{ search_query }}&status={{ status_filter }}&sort=driver_price&dir={% if current_sort == 'driver_price' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>Driver</span>
+                {% if current_sort == 'driver_price' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
+            <th class="sortable">
+              <a href="?q={{ search_query }}&status={{ status_filter }}&sort=shipment_price&dir={% if current_sort == 'shipment_price' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>Shipment</span>
+                {% if current_sort == 'shipment_price' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
+            <th class="sortable">
+              <a href="?q={{ search_query }}&status={{ status_filter }}&sort=storage_price&dir={% if current_sort == 'storage_price' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>Storage/GB</span>
+                {% if current_sort == 'storage_price' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
+            <th class="sortable">
+              <a href="?q={{ search_query }}&status={{ status_filter }}&sort=status&dir={% if current_sort == 'status' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+                <span>Status</span>
+                {% if current_sort == 'status' %}
+                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                {% else %}
+                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+                {% endif %}
+              </a>
+            </th>
             <th>ACTIONS</th>
           </tr>
         </thead>
         <tbody>
-          {% for p in policies.object_list %}
+          {% for p in policies %}
             <tr style="{% if p.is_active %}border-left: 4px solid #22c55e;{% endif %}">
-              <td>{{ forloop.counter0|add:policies.start_index }}</td>
-              <td>{{ p.policy_name }}</td>
+              <td>{{ p.default_rank }}</td>
+              <td><span class="fw-bold">{{ p.policy_name }}</span></td>
               <td>{{ p.extra_internal_user_price }}</td>
               <td>{{ p.extra_internal_truck_price }}</td>
               <td>{{ p.extra_external_truck_price }}</td>
@@ -116,7 +239,7 @@
                     <a href="{% url 'addons_policy_edit' p.policy_id %}" class="eal-row-btn" title="Edit">
                       <i class="bi bi-pencil"></i>
                     </a>
-                    <a href="{% url 'addons_policy_edit' p.policy_id %}" class="eal-row-btn btn-toggle" title="{% if p.is_active %}Deactivate{% else %}Activate{% endif %}">
+                    <a href="{% url 'addons_policy_edit' p.policy_id %}" class="eal-row-btn" title="{% if p.is_active %}Deactivate{% else %}Activate{% endif %}">
                       <i class="bi bi-arrow-repeat"></i>
                     </a>
                   {% endif %}
@@ -129,7 +252,7 @@
     </div>
     {% include 'partials/pagination.html' with page_obj=policies %}
   {% else %}
-    <div class="notification-empty list-filter-wrapper" style="margin-top: 8px;">
+    <div class="notification-empty" style="margin-top: 8px;">
       <div class="empty-icon"><i class="bi bi-card-list"></i></div>
       {% if search_query or status_filter != 'All' %}
         <h4 class="empty-title">{% translate "No policies match your filters." %}</h4>

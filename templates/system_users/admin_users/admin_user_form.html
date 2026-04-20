@@ -114,18 +114,19 @@
     </div>
     <div class="form-card-body">
       <div class="row g-3">
-        <div class="col-12 col-md-6">
+        <div class="col-12 col-md-6 mb-4">
           <label class="form-label">{% translate "Assigned Role" %}</label>
           {{ form.role }}
           {% for error in form.role.errors %}
-            <div class="field-error">{{ error }}</div>
+            <div class="field-error text-danger small mt-1">{{ error }}</div>
           {% endfor %}
         </div>
-        <div class="col-12 col-md-6">
+
+        <div class="col-12 col-md-6 mb-4">
           <label class="form-label">{% translate "Account Status" %}</label>
           {{ form.status }}
           {% for error in form.status.errors %}
-            <div class="field-error">{{ error }}</div>
+            <div class="field-error text-danger small mt-1">{{ error }}</div>
           {% endfor %}
         </div>
       </div>

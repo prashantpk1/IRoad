@@ -8,6 +8,71 @@
 <li class="breadcrumb-item active" aria-current="page">{% translate "Communication Logs" %}</li>
 {% endblock %}
 
+{% block extra_css %}
+<style>
+  .eal-toolbar {
+    padding-bottom: 16px !important;
+  }
+  .eal-table th.sortable {
+    padding: 0 !important;
+  }
+  .eal-table th.sortable a {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    color: inherit;
+    text-decoration: none;
+    width: 100%;
+    transition: background 0.2s;
+    gap: 10px;
+  }
+  .eal-table th.sortable a:hover {
+    background: rgba(0, 0, 0, 0.02);
+  }
+  .eal-table th.sortable i {
+    font-size: 10px;
+    margin-left: 5px;
+    color: var(--primary-color);
+    opacity: 0.8;
+    flex-shrink: 0;
+  }
+  .db-table-filters {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .db-date-filters {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .db-filters-row {
+    width: 100%;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .db-filter-select {
+    width: 170px;
+    flex: 0 0 170px;
+  }
+  .db-filter-clear {
+    margin-left: auto;
+  }
+  .db-date-filters input[type="date"] {
+    height: 32px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0 10px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    background: var(--surface-bg);
+  }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
   <div class="page-header-row">
@@ -24,32 +89,133 @@
 </div>
 
 <div class="eal-table-card">
-  <form method="get">
-    <div class="eal-toolbar">
-      <div class="eal-toolbar-left" style="width:100%; display:flex; gap:8px; flex-wrap:wrap;">
-        <div style="width:170px"><select class="eal-select" name="channel"><option value="All" {% if channel_filter == 'All' %}selected{% endif %}>All Channels</option><option value="Email" {% if channel_filter == 'Email' %}selected{% endif %}>Email</option><option value="SMS" {% if channel_filter == 'SMS' %}selected{% endif %}>SMS</option><option value="Push" {% if channel_filter == 'Push' %}selected{% endif %}>Push</option></select></div>
-        <div style="width:170px"><select class="eal-select" name="status"><option value="All" {% if status_filter == 'All' %}selected{% endif %}>All Statuses</option><option value="Sent" {% if status_filter == 'Sent' %}selected{% endif %}>Sent</option><option value="Failed" {% if status_filter == 'Failed' %}selected{% endif %}>Failed</option><option value="Bounced" {% if status_filter == 'Bounced' %}selected{% endif %}>Bounced</option></select></div>
-        <input type="date" name="date_from" value="{{ date_from }}" class="form-control form-control-sm" style="width:150px">
-        <input type="date" name="date_to" value="{{ date_to }}" class="form-control form-control-sm" style="width:150px">
-        <div class="eal-search" style="flex:1;min-width:240px;max-width:320px">
+  <form method="get" class="eal-toolbar">
+      <div class="eal-toolbar-left db-filters-row">
+        <div class="eal-search" style="flex: 1; min-width: 250px; margin-bottom: 0;">
           <i class="bi bi-search"></i>
-          <input type="text" name="q" value="{{ search_query }}" placeholder="Search recipient, trigger, client, error..." />
+          <input type="text" name="q" value="{{ search_query }}" placeholder="Search recipient, trigger, client, error..." autocomplete="off" spellcheck="false" />
+          <input type="hidden" name="channel" value="{{ channel_filter }}">
+          <input type="hidden" name="status" value="{{ status_filter }}">
+          <input type="hidden" name="sort" value="{{ current_sort }}">
+          <input type="hidden" name="dir" value="{{ current_dir }}">
         </div>
-        <button type="submit" class="eal-btn eal-btn-primary"><i class="bi bi-funnel"></i><span>{% translate "Apply" %}</span></button>
+
+        <div class="db-table-filters">
+          <a href="?q={{ search_query }}&channel={{ channel_filter }}&status=All&date_from={{ date_from }}&date_to={{ date_to }}&sort={{ current_sort }}&dir={{ current_dir }}"
+             class="filter-chip {% if status_filter == 'All' %}active{% endif %}">
+            {% translate "All Status" %}
+          </a>
+          <a href="?q={{ search_query }}&channel={{ channel_filter }}&status=Sent&date_from={{ date_from }}&date_to={{ date_to }}&sort={{ current_sort }}&dir={{ current_dir }}"
+             class="filter-chip {% if status_filter == 'Sent' %}active{% endif %}">
+            <i class="bi bi-circle-fill text-success" style="font-size: 6px"></i>
+            {% translate "Sent" %}
+          </a>
+          <a href="?q={{ search_query }}&channel={{ channel_filter }}&status=Failed&date_from={{ date_from }}&date_to={{ date_to }}&sort={{ current_sort }}&dir={{ current_dir }}"
+             class="filter-chip {% if status_filter == 'Failed' %}active{% endif %}">
+            <i class="bi bi-circle-fill text-danger" style="font-size: 6px"></i>
+            {% translate "Failed" %}
+          </a>
+        </div>
+
+        <div class="db-date-filters">
+          <input type="date" name="date_from" value="{{ date_from }}" style="width:145px">
+          <input type="date" name="date_to" value="{{ date_to }}" style="width:145px">
+        </div>
+
+        <div class="db-filter-select"><select class="eal-select" name="channel" onchange="this.form.submit()"><option value="All" {% if channel_filter == 'All' %}selected{% endif %}>All Channels</option><option value="Email" {% if channel_filter == 'Email' %}selected{% endif %}>Email</option><option value="SMS" {% if channel_filter == 'SMS' %}selected{% endif %}>SMS</option><option value="Push" {% if channel_filter == 'Push' %}selected{% endif %}>Push</option></select></div>
+
+        {% if search_query or channel_filter != 'All' or status_filter != 'All' or date_from or date_to %}
+          <a href="{% url 'comm_log_list' %}" class="eal-btn eal-btn-outline db-filter-clear" style="border-style: dashed; color: var(--text-muted); height: 32px; padding: 0 12px; font-size: 11px">
+            <i class="bi bi-x-circle"></i>
+            <span>{% translate "Clear Filters" %}</span>
+          </a>
+        {% endif %}
       </div>
-    </div>
   </form>
   <div class="eal-table-wrap">
     <table class="eal-table">
-      <thead><tr><th>#</th><th>Recipient</th><th>Channel</th><th>Trigger Source</th><th>Delivery Status</th><th>Error Details</th><th>Dispatched At</th></tr></thead>
+      <thead>
+        <tr>
+          <th class="sortable" style="width: 60px">
+            <a href="?q={{ search_query }}&channel={{ channel_filter }}&status={{ status_filter }}&date_from={{ date_from }}&date_to={{ date_to }}&sort=rank&dir={% if current_sort == 'rank' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+              <span>#</span>
+              {% if current_sort == 'rank' %}
+                <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+              {% else %}
+                <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+              {% endif %}
+            </a>
+          </th>
+          <th class="sortable">
+            <a href="?q={{ search_query }}&channel={{ channel_filter }}&status={{ status_filter }}&date_from={{ date_from }}&date_to={{ date_to }}&sort=recipient&dir={% if current_sort == 'recipient' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+              <span>{% translate "Recipient" %}</span>
+              {% if current_sort == 'recipient' %}
+                <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+              {% else %}
+                <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+              {% endif %}
+            </a>
+          </th>
+          <th class="sortable">
+            <a href="?q={{ search_query }}&channel={{ channel_filter }}&status={{ status_filter }}&date_from={{ date_from }}&date_to={{ date_to }}&sort=channel&dir={% if current_sort == 'channel' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+              <span>{% translate "Channel" %}</span>
+              {% if current_sort == 'channel' %}
+                <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+              {% else %}
+                <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+              {% endif %}
+            </a>
+          </th>
+          <th class="sortable">
+            <a href="?q={{ search_query }}&channel={{ channel_filter }}&status={{ status_filter }}&date_from={{ date_from }}&date_to={{ date_to }}&sort=trigger&dir={% if current_sort == 'trigger' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+              <span>{% translate "Trigger Source" %}</span>
+              {% if current_sort == 'trigger' %}
+                <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+              {% else %}
+                <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+              {% endif %}
+            </a>
+          </th>
+          <th class="sortable">
+            <a href="?q={{ search_query }}&channel={{ channel_filter }}&status={{ status_filter }}&date_from={{ date_from }}&date_to={{ date_to }}&sort=status&dir={% if current_sort == 'status' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+              <span>{% translate "Delivery Status" %}</span>
+              {% if current_sort == 'status' %}
+                <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+              {% else %}
+                <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+              {% endif %}
+            </a>
+          </th>
+          <th class="sortable">
+            <a href="?q={{ search_query }}&channel={{ channel_filter }}&status={{ status_filter }}&date_from={{ date_from }}&date_to={{ date_to }}&sort=error&dir={% if current_sort == 'error' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+              <span>{% translate "Error Details" %}</span>
+              {% if current_sort == 'error' %}
+                <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+              {% else %}
+                <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+              {% endif %}
+            </a>
+          </th>
+          <th class="sortable">
+            <a href="?q={{ search_query }}&channel={{ channel_filter }}&status={{ status_filter }}&date_from={{ date_from }}&date_to={{ date_to }}&sort=dispatched&dir={% if current_sort == 'dispatched' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
+              <span>{% translate "Dispatched At" %}</span>
+              {% if current_sort == 'dispatched' %}
+                <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+              {% else %}
+                <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
+              {% endif %}
+            </a>
+          </th>
+        </tr>
+      </thead>
       <tbody>
         {% for row in logs %}
           <tr>
-            <td>{{ forloop.counter0|add:logs.start_index }}</td>
+            <td>{{ row.default_rank }}</td>
             <td>{{ row.recipient }}</td>
             <td>{% if row.channel_type == 'Email' %}<span class="status-badge inactive">Email</span>{% elif row.channel_type == 'SMS' %}<span class="status-badge active">SMS</span>{% else %}<span class="status-badge warning">Push</span>{% endif %}</td>
             <td>{{ row.trigger_source }}</td>
-            <td>{% if row.delivery_status == 'Sent' %}<span class="status-badge active">Sent</span>{% elif row.delivery_status == 'Failed' %}<span class="status-badge warning">Failed</span>{% else %}<span class="status-badge pending">Bounced</span>{% endif %}</td>
+            <td>{% if row.delivery_status == 'Sent' %}<span class="status-badge active">Sent</span>{% elif row.delivery_status == 'Failed' %}<span class="status-badge inactive">Failed</span>{% else %}<span class="status-badge inactive">{{ row.delivery_status }}</span>{% endif %}</td>
             <td>{{ row.error_details|default:'-'|truncatechars:70 }}</td>
             <td>{{ row.dispatched_at|date:'Y-m-d H:i:s' }}</td>
           </tr>

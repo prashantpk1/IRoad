@@ -7243,8 +7243,9 @@ th[data-sort]:hover {
   background-color: #ffffff;
   border: 1px solid #cbd5e1;
   border-radius: 8px;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition: all 0.2s ease;
   box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  cursor: pointer;
 }
 
 .form-control:focus,
@@ -7253,6 +7254,13 @@ th[data-sort]:hover {
   outline: none;
   box-shadow: 0 0 0 4px rgba(80, 81, 249, 0.12);
   background-color: #ffffff;
+}
+
+/* Fix for native select dropdown appearance */
+.form-select option {
+  background-color: #ffffff;
+  color: #1e293b;
+  padding: 10px;
 }
 
 .form-control::placeholder {
@@ -7353,7 +7361,7 @@ textarea.form-control {
 } */
 
 .eal-table-card form {
-  padding-bottom: 0px !important;
+  padding-bottom: 16px !important;
 }
 
 .form-actions-left {
@@ -7509,5 +7517,91 @@ textarea.form-control {
         padding: 12px;
         min-height: 80px;
     }
+}
+
+/* Premium Toggle Switch (iOS/Android Style) */
+.eal-switch {
+  position: relative;
+  display: inline-block;
+  width: 64px;
+  height: 32px;
+}
+
+.eal-switch input[type="checkbox"] {
+  position: absolute !important;
+  opacity: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  clip: rect(0 0 0 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+.eal-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #e2e8f0;
+  transition: .4s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 32px;
+  border: 1px solid #cbd5e1;
+}
+
+/* ON/OFF Labels */
+.eal-slider:after {
+  content: 'OFF';
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 800;
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  transition: .4s;
+}
+
+.eal-slider:before {
+  position: absolute;
+  content: "";
+  height: 24px;
+  width: 24px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: .4s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 50%;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+  z-index: 2;
+}
+
+.eal-switch input:checked + .eal-slider {
+  background-color: var(--primary-color);
+  border-color: var(--primary-color);
+  box-shadow: 0 0 15px rgba(80, 81, 249, 0.25);
+}
+
+.eal-switch input:checked + .eal-slider:after {
+  content: 'ON';
+  color: rgba(255, 255, 255, 0.9);
+  left: 10px;
+  right: auto;
+}
+
+.eal-switch input:checked + .eal-slider:before {
+  transform: translateX(32px);
+}
+
+.eal-switch:hover .eal-slider {
+  filter: brightness(0.95);
+}
+
+.eal-switch input:checked:hover + .eal-slider {
+  background-color: var(--primary-hover);
 }
 

@@ -195,12 +195,11 @@ def check_subscription_expiry_task(self):
     try:
         from datetime import date, timedelta
 
-        from django.conf import settings as dj_settings
-
         from superadmin.models import TenantProfile
+        from superadmin.billing_helpers import get_subscription_grace_days
         from superadmin.redis_helpers import revoke_all_tenant_sessions
 
-        grace = int(getattr(dj_settings, 'SUBSCRIPTION_EXPIRY_GRACE_DAYS', 14) or 14)
+        grace = get_subscription_grace_days()
         cutoff = date.today() - timedelta(days=grace)
         qs = TenantProfile.objects.filter(
             account_status='Active',
@@ -258,4 +257,3 @@ def proactive_renewal_scan_task(self):
     except Exception as exc:
         logger.error(f'proactive_renewal_scan_task failed: {exc}')
         raise self.retry(exc=exc, countdown=3600)
-

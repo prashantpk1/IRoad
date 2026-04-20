@@ -150,9 +150,24 @@
     </div>
   </div>
   <div class="form-card-body">
+    {% if not txn.attachment %}
+    <form method="post" action="{% url 'transaction_upload_attachment' txn.transaction_id %}" class="mb-4" enctype="multipart/form-data">
+      {% csrf_token %}
+      <div class="mb-3">
+        <label class="form-label">{% translate "Attachment / Receipt" %}</label>
+        <input type="file" name="attachment" class="form-control" required>
+        <div class="field-hint">{% translate "Upload receipt first, then approve." %}</div>
+      </div>
+      <button type="submit" class="eal-btn eal-btn-outline">
+        <i class="bi bi-upload"></i>
+        <span>{% translate "Upload Receipt" %}</span>
+      </button>
+    </form>
+    {% endif %}
+
     <form method="post" action="{% url 'transaction_approve' txn.transaction_id %}" class="mb-4" data-confirm="{{ confirm_approve_payment|escape }}">
       {% csrf_token %}
-      <button type="submit" class="eal-btn eal-btn-primary">
+      <button type="submit" class="eal-btn eal-btn-primary" {% if not txn.attachment %}disabled title="{% translate 'Upload receipt first' %}"{% endif %}>
         <i class="bi bi-check-lg"></i>
         <span>{% translate "Approve" %}</span>
       </button>

@@ -22,6 +22,8 @@ Before first run
 2) Keep your PostgreSQL running on Windows host.
 3) Confirm `.env` has your DB_USER / DB_PASSWORD / DB_NAME.
 
+OR RUN docker start iroad-redis
+
 Note:
 - In Docker compose, DB host is overridden to `host.docker.internal`
   so Django container can reach PostgreSQL on your Windows machine.

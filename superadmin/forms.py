@@ -70,6 +70,31 @@ class LoginForm(forms.Form):
     password = forms.CharField(widget=forms.PasswordInput)
 
 
+class OTPVerificationForm(forms.Form):
+    otp = forms.CharField(
+        max_length=6,
+        min_length=6,
+        widget=forms.TextInput(
+            attrs={
+                'class': 'auth-input',
+                'id': 'otp',
+                'placeholder': 'Enter 6-digit code',
+                'autocomplete': 'one-time-code',
+                'inputmode': 'numeric',
+                'pattern': r'\d{6}',
+            }
+        ),
+    )
+
+    def clean_otp(self):
+        otp = (self.cleaned_data.get('otp') or '').strip()
+        if not otp.isdigit():
+            raise ValidationError('OTP must contain digits only.')
+        if len(otp) != 6:
+            raise ValidationError('OTP must be exactly 6 digits.')
+        return otp
+
+
 class ForgotPasswordForm(forms.Form):
     email = forms.EmailField(
         max_length=100,
@@ -239,6 +264,64 @@ class AdminUserForm(forms.ModelForm):
         if qs.exists():
             raise ValidationError('Email must be unique.')
         return value
+
+
+class MyAccountForm(forms.ModelForm):
+    new_password = forms.CharField(
+        required=False,
+        label='New Password',
+        widget=forms.PasswordInput(
+            attrs={'placeholder': 'Leave blank to keep current', 'class': 'field-input'}
+        ),
+    )
+    confirm_password = forms.CharField(
+        required=False,
+        label='Confirm Password',
+        widget=forms.PasswordInput(
+            attrs={'placeholder': 'Re-type new password', 'class': 'field-input'}
+        ),
+    )
+
+    class Meta:
+        model = AdminUser
+        fields = ['first_name', 'last_name', 'email', 'phone_number']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        apply_premium_styling(self)
+        self.fields['email'].disabled = not bool(getattr(self.instance, 'is_root', False))
+
+    def clean_email(self):
+        if not bool(getattr(self.instance, 'is_root', False)):
+            return getattr(self.instance, 'email', '')
+
+        value = (self.cleaned_data.get('email') or '').strip().lower()
+        qs = AdminUser.objects.filter(email=value)
+        if self.instance.pk:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise ValidationError('Email must be unique.')
+        return value
+
+    def clean(self):
+        cleaned_data = super().clean()
+        new_password = cleaned_data.get('new_password')
+        confirm_password = cleaned_data.get('confirm_password')
+
+        if new_password or confirm_password:
+            if new_password != confirm_password:
+                raise ValidationError('Passwords do not match.')
+            if len(new_password) < 8:
+                raise ValidationError('Password must be at least 8 characters.')
+            if not re.search(r'[a-z]', new_password):
+                raise ValidationError('Password must include a lowercase letter.')
+            if not re.search(r'[A-Z]', new_password):
+                raise ValidationError('Password must include an uppercase letter.')
+            if not re.search(r'\d', new_password):
+                raise ValidationError('Password must include a number.')
+            if not re.search(r'[^A-Za-z0-9]', new_password):
+                raise ValidationError('Password must include a special character.')
+        return cleaned_data
 
 
 class CountryForm(forms.ModelForm):
@@ -448,12 +531,24 @@ class GlobalSystemRulesForm(forms.ModelForm):
             'standard_billing_cycle',
         ]
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        apply_premium_styling(self)
+
     def clean_system_timezone(self):
         value = self.cleaned_data.get('system_timezone')
         if value not in pytz.all_timezones:
             raise forms.ValidationError(
                 "Invalid timezone. Use format like "
                 "'Asia/Riyadh' or 'UTC'."
+            )
+        return value
+
+    def clean_standard_billing_cycle(self):
+        value = self.cleaned_data.get('standard_billing_cycle')
+        if value is not None and value < 1:
+            raise forms.ValidationError(
+                'Billing cycle must be at least 1 day.'
             )
         return value
 
@@ -1317,11 +1412,36 @@ class SupportCategoryForm(forms.ModelForm):
         model = SupportCategory
         fields = ['name_en', 'name_ar', 'is_active']
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        apply_premium_styling(self)
+        self.fields['name_en'].widget.attrs.update({
+            'placeholder': 'e.g., Billing & Invoices',
+            'maxlength': '100',
+        })
+        self.fields['name_ar'].widget.attrs.update({
+            'placeholder': 'e.g., الفوترة والفواتير',
+            'dir': 'rtl',
+            'maxlength': '100',
+        })
+        if 'is_active' in self.fields:
+            self.fields['is_active'].widget = forms.CheckboxInput(attrs={
+                'class': 'form-check-input',
+                'role': 'switch',
+            })
+
     def clean_name_en(self):
         value = self.cleaned_data.get('name_en', '').strip()
         if not value:
             raise forms.ValidationError(
                 'English name is required.'
+            )
+        qs = SupportCategory.objects.filter(name_en__iexact=value)
+        if self.instance.pk:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise forms.ValidationError(
+                'A support category with this English name already exists.'
             )
         return value
 
@@ -1330,6 +1450,13 @@ class SupportCategoryForm(forms.ModelForm):
         if not value:
             raise forms.ValidationError(
                 'Arabic name is required.'
+            )
+        qs = SupportCategory.objects.filter(name_ar__iexact=value)
+        if self.instance.pk:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise forms.ValidationError(
+                'A support category with this Arabic name already exists.'
             )
         return value
 
@@ -1342,6 +1469,42 @@ class CannedResponseForm(forms.ModelForm):
             'message_body': forms.Textarea(attrs={'rows': 8}),
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        apply_premium_styling(self)
+        self.fields['title'].widget.attrs.update({
+            'placeholder': 'e.g., Requesting Screenshot',
+            'maxlength': '100',
+        })
+        self.fields['message_body'].widget.attrs.update({
+            'placeholder': 'Write the standardized reply content here...',
+            'rows': 8,
+        })
+        if 'is_active' in self.fields:
+            self.fields['is_active'].widget = forms.CheckboxInput(attrs={
+                'class': 'form-check-input',
+                'role': 'switch',
+            })
+
+    def clean_title(self):
+        value = self.cleaned_data.get('title', '').strip()
+        if not value:
+            raise forms.ValidationError('Template title is required.')
+        qs = CannedResponse.objects.filter(title__iexact=value)
+        if self.instance.pk:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise forms.ValidationError(
+                'A canned response with this title already exists.'
+            )
+        return value
+
+    def clean_message_body(self):
+        value = self.cleaned_data.get('message_body', '').strip()
+        if not value:
+            raise forms.ValidationError('Message content is required.')
+        return value
+
 
 class SupportTicketForm(forms.ModelForm):
     class Meta:
@@ -1350,10 +1513,14 @@ class SupportTicketForm(forms.ModelForm):
             'tenant',
             'subject',
             'category',
+            'description',
             'priority',
             'status',
             'assigned_to',
         ]
+        widgets = {
+            'description': forms.Textarea(attrs={'rows': 4}),
+        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -1422,7 +1589,10 @@ class TenantReplyForm(forms.ModelForm):
 class TenantTicketCreateForm(forms.ModelForm):
     class Meta:
         model = SupportTicket
-        fields = ['subject', 'category']
+        fields = ['subject', 'category', 'description']
+        widgets = {
+            'description': forms.Textarea(attrs={'rows': 4}),
+        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -1507,4 +1677,3 @@ class AdminSecuritySettingsForm(forms.ModelForm):
                 'Lockout duration must be at least 1 minute.'
             )
         return value
-
