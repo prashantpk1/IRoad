@@ -1405,16 +1405,6 @@ class TenantProfileCreateForm(forms.ModelForm):
 
 
 class TenantProfileUpdateForm(forms.ModelForm):
-    rotate_bridge_api_key = forms.BooleanField(
-        label='Generate new API bridge key',
-        required=False,
-        help_text=(
-            'Creates a new secret for /api/v1/ bridge calls (Django SMTP from '
-            'config/settings.py). The new key is emailed to the subscriber primary '
-            'address only — it is not shown in the Control Panel.'
-        ),
-    )
-
     class Meta:
         model = TenantProfile
         fields = ['account_status', 'assigned_sales_rep']
@@ -1431,7 +1421,7 @@ class TenantProfileUpdateForm(forms.ModelForm):
         self.fields['assigned_sales_rep'].queryset = active_reps
         self.fields['assigned_sales_rep'].required = False
         if self.instance.pk:
-            self.fields['rotate_bridge_api_key'].initial = False
+            pass
 
 
 class SupportCategoryForm(forms.ModelForm):

@@ -1164,7 +1164,11 @@ def fulfill_paid_order(order, admin_user, ltv_amount):
     if order.promo_code_id:
         pc = PromoCode.objects.select_for_update().get(pk=order.promo_code_id)
         pc.current_uses = (pc.current_uses or 0) + 1
-        pc.save(update_fields=['current_uses'])
+        update_fields = ['current_uses']
+        if pc.max_uses is not None and pc.current_uses >= pc.max_uses:
+            pc.is_active = False
+            update_fields.append('is_active')
+        pc.save(update_fields=update_fields)
 
     ten = TenantProfile.objects.select_for_update().get(pk=order.tenant_id)
     ten.total_ltv = (

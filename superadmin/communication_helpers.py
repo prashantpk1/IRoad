@@ -347,8 +347,10 @@ DEFAULT_NOTIFICATION_EMAIL_TEMPLATES = [
             'style="width:640px;max-width:640px;background:#ffffff;border-radius:16px;overflow:hidden;">'
             '<tr><td style="background:#5b5ce2;padding:28px 24px;text-align:center;">'
             '<div style="width:52px;height:52px;line-height:52px;margin:0 auto 12px;border-radius:50%;'
-            'background:#4b4cd6;color:#ffffff;font-size:30px;font-weight:700;font-family:Arial,sans-serif;">IR</div>'
-            '<div style="color:#ffffff;font-size:28px;line-height:1.1;font-weight:700;font-family:Arial,sans-serif;">iRoad</div>'
+            'background:#4b4cd6;color:#ffffff;font-size:30px;font-weight:700;font-family:Arial,sans-serif;">'
+            '{{ brand_initials|default:"IR" }}</div>'
+            '<div style="color:#ffffff;font-size:28px;line-height:1.1;font-weight:700;font-family:Arial,sans-serif;">'
+            '{{ brand_company_name|default:"iRoad" }}</div>'
             '<div style="color:#e6e8ff;font-size:14px;line-height:1.5;font-weight:600;'
             'font-family:Arial,sans-serif;margin-top:6px;">Logistics Management Platform</div>'
             '</td></tr>'
@@ -522,52 +524,42 @@ DEFAULT_NOTIFICATION_EMAIL_TEMPLATES = [
         'subject_ar': 'مرحباً بك في iRoad — {{ company_name }}',
         'body_en': _wrap_email_body(
             '<h2>Welcome, {{ company_name }}! 🚀</h2>'
-            '<p>Your subscriber workspace has been provisioned and is ready to use. '
+            '<p>Your subscriber workspace has been provisioned and is ready for setup. '
             'Below are your sign-in credentials.</p>'
             
             '<div style="background:linear-gradient(135deg,#f8fafc,#f1f5f9);'
             'padding:20px 22px;border-radius:12px;border:1px solid #e2e8f0;margin-bottom:20px;">'
             '<p style="font-size:11px;font-weight:700;text-transform:uppercase;'
-            'letter-spacing:0.06em;color:#6366f1;margin:0 0 6px;">Portal Credentials</p>'
+            'letter-spacing:0.06em;color:#6366f1;margin:0 0 6px;">Portal Access</p>'
             '<p style="margin:8px 0 4px;font-size:14px;color:#334155;">'
             '<strong>Login email:</strong> {{ tenant.primary_email }}</p>'
-            '<p style="margin:4px 0 0;font-size:14px;color:#334155;">'
-            '<strong>Initial password:</strong> <span style="color:#ef4444;font-size:12px;">(change after sign-in)</span></p>'
-            '<div style="background:#1e293b;color:#e2e8f0;padding:14px 18px;border-radius:10px;'
-            'font-family:monospace;font-size:13px;word-break:break-all;margin:12px 0;'
-            'border:1px solid #334155;">{{ portal_bootstrap_password }}</div>'
             '</div>'
 
             '<div style="text-align:center;margin:28px 0;">'
-            '<a href="{{ portal_login_url }}" style="background:linear-gradient(135deg,#4f46e5,#6366f1);'
+            '<a href="{{ invite_url }}" style="background:linear-gradient(135deg,#4f46e5,#6366f1);'
             'color:#fff!important;padding:14px 32px;text-decoration:none;border-radius:10px;'
             'font-weight:700;font-size:15px;display:inline-block;'
-            'box-shadow:0 4px 14px rgba(79,70,229,.3);">Open Workspace Sign-in &rarr;</a>'
+            'box-shadow:0 4px 14px rgba(79,70,229,.3);">Complete Account Setup &rarr;</a>'
             '</div>'
         ),
         'body_ar': _wrap_email_body(
             '<div dir="rtl" style="text-align:right;">'
             '<h2>مرحباً بك في iRoad، {{ company_name }}! 🚀</h2>'
-            '<p>تم تجهيز مساحة العمل الخاصة بك وهي جاهزة للاستخدام الآن. أدناه بيانات الدخول.</p>'
+            '<p>تم تجهيز مساحة العمل الخاصة بك وهي جاهزة للإعداد الآن. أدناه تفاصيل الوصول الخاصة بك.</p>'
             
             '<div style="background:linear-gradient(135deg,#f8fafc,#f1f5f9);'
             'padding:20px 22px;border-radius:12px;border:1px solid #e2e8f0;margin-bottom:20px;">'
             '<p style="font-size:11px;font-weight:700;text-transform:uppercase;'
-            'letter-spacing:0.06em;color:#6366f1;margin:0 0 6px;">بيانات دخول البوابة</p>'
+            'letter-spacing:0.06em;color:#6366f1;margin:0 0 6px;">بيانات الوصول للبوابة</p>'
             '<p style="margin:8px 0 4px;font-size:14px;color:#334155;">'
             '<strong>البريد الإلكتروني:</strong> {{ tenant.primary_email }}</p>'
-            '<p style="margin:4px 0 0;font-size:14px;color:#334155;">'
-            '<strong>كلمة المرور الأولية:</strong> <span style="color:#ef4444;font-size:12px;">(يرجى تغييرها بعد الدخول)</span></p>'
-            '<div style="background:#1e293b;color:#e2e8f0;padding:14px 18px;border-radius:10px;'
-            'font-family:monospace;font-size:13px;word-break:break-all;margin:12px 0;'
-            'border:1px solid #334155;">{{ portal_bootstrap_password }}</div>'
             '</div>'
 
             '<div style="text-align:center;margin:28px 0;">'
-            '<a href="{{ portal_login_url }}" style="background:linear-gradient(135deg,#4f46e5,#6366f1);'
+            '<a href="{{ invite_url }}" style="background:linear-gradient(135deg,#4f46e5,#6366f1);'
             'color:#fff!important;padding:14px 32px;text-decoration:none;border-radius:10px;'
             'font-weight:700;font-size:15px;display:inline-block;'
-            'box-shadow:0 4px 14px rgba(79,70,229,.3);">فتح بوابة الدخول &larr;</a>'
+            'box-shadow:0 4px 14px rgba(79,70,229,.3);">إكمال إعداد الحساب &larr;</a>'
             '</div>'
             '</div>',
             use_rtl=True
@@ -641,17 +633,18 @@ DEFAULT_NOTIFICATION_EMAIL_TEMPLATES = [
             'API Bridge Key Rotated 🔑</h2>'
             '<p style="font-size:15px;color:#475569;line-height:1.7;margin:0 0 20px;">'
             'Hello {{ company_name }}, your API bridge key was rotated successfully. '
-            'Your previous key has been revoked.</p>'
+            'The previous key is now invalid. For security reasons, the new key is not shown here.</p>'
             '<div style="background:linear-gradient(135deg,#f8fafc,#f1f5f9);'
             'padding:20px 22px;border-radius:12px;border:1px solid #e2e8f0;margin-bottom:20px;">'
-            '<p style="font-size:11px;font-weight:700;text-transform:uppercase;'
-            'letter-spacing:0.06em;color:#6366f1;margin:0 0 6px;">New API Bridge Key</p>'
-            '<div style="background:#1e293b;color:#e2e8f0;padding:14px 18px;border-radius:10px;'
-            'font-family:monospace;font-size:13px;word-break:break-all;margin:0;'
-            'border:1px solid #334155;">{{ api_bridge_key }}</div>'
+            '<p style="font-size:14px;color:#334155;">'
+            'Please log in to your workspace portal to retrieve the new API bridge key.</p>'
             '</div>'
-            '<p style="font-size:13px;color:#ef4444;font-weight:600;margin-top:20px;">'
-            '⚠️ Older keys no longer work. Update all integrations immediately.</p>'
+            '<div style="text-align:center;margin:28px 0;">'
+            '<a href="{{ portal_login_url }}" style="background:linear-gradient(135deg,#4f46e5,#6366f1);'
+            'color:#fff!important;padding:14px 32px;text-decoration:none;border-radius:10px;'
+            'font-weight:700;font-size:15px;display:inline-block;'
+            'box-shadow:0 4px 14px rgba(79,70,229,.3);">Login to Portal &rarr;</a>'
+            '</div>'
         ),
         'body_ar': _wrap_email_body(
             '<div dir="rtl" style="text-align:right;">'
@@ -659,18 +652,20 @@ DEFAULT_NOTIFICATION_EMAIL_TEMPLATES = [
             'تم تغيير مفتاح الربط البرمجي 🔑</h2>'
             '<p style="font-size:15px;color:#475569;line-height:1.7;margin:0 0 20px;">'
             'مرحباً {{ company_name }}، تم تغيير مفتاح الربط البرمجي بنجاح. '
-            'تم إلغاء المفتاح السابق.</p>'
+            'تم إلغاء المفتاح السابق. لدواعٍ أمنية، لا يتم عرض المفتاح الجديد هنا.</p>'
             '<div style="background:linear-gradient(135deg,#f8fafc,#f1f5f9);'
             'padding:20px 22px;border-radius:12px;border:1px solid #e2e8f0;margin-bottom:20px;">'
-            '<p style="font-size:11px;font-weight:700;text-transform:uppercase;'
-            'letter-spacing:0.06em;color:#6366f1;margin:0 0 6px;">المفتاح الجديد</p>'
-            '<div style="background:#1e293b;color:#e2e8f0;padding:14px 18px;border-radius:10px;'
-            'font-family:monospace;font-size:13px;word-break:break-all;margin:0;'
-            'border:1px solid #334155;">{{ api_bridge_key }}</div>'
+            '<p style="font-size:14px;color:#334155;">'
+            'يرجى تسجيل الدخول إلى بوابة العمل الخاصة بك للحصول على مفتاح الربط الجديد.</p>'
             '</div>'
-            '<p style="font-size:13px;color:#ef4444;font-weight:600;margin-top:20px;">'
-            '⚠️ المفاتيح القديمة لم تعد تعمل. قم بتحديث جميع التكاملات فوراً.</p>'
+            '<div style="text-align:center;margin:28px 0;">'
+            '<a href="{{ portal_login_url }}" style="background:linear-gradient(135deg,#4f46e5,#6366f1);'
+            'color:#fff!important;padding:14px 32px;text-decoration:none;border-radius:10px;'
+            'font-weight:700;font-size:15px;display:inline-block;'
+            'box-shadow:0 4px 14px rgba(79,70,229,.3);">تسجيل الدخول إلى البوابة &larr;</a>'
             '</div>'
+            '</div>',
+            use_rtl=True
         ),
     },
     {
@@ -1368,6 +1363,7 @@ def send_tenant_welcome_email(
     tenant,
     api_bridge_key_plain,
     portal_bootstrap_password_plain=None,
+    invite_url='',
 ):
     """
     Welcome email after subscriber provisioning (CP-PCS-P1 §4 handover).
@@ -1375,14 +1371,12 @@ def send_tenant_welcome_email(
     Delivers bridge key and optional initial portal password via email only
     (never shown in Control Panel). SMTP from ``config/settings.py``.
     """
+    set_password_url = (invite_url or '').strip() or 'http://127.0.0.1:8000/set-password/'
     ctx = {
         'tenant': tenant,
-        'api_bridge_key': api_bridge_key_plain,
         'company_name': tenant.company_name,
-        'portal_bootstrap_password': portal_bootstrap_password_plain,
-        'portal_login_url': (
-            getattr(settings, 'TENANT_PORTAL_LOGIN_URL', '') or ''
-        ).strip(),
+        'invite_url': set_password_url,
+        'portal_login_url': set_password_url,
     }
     ctx = _merge_template_context(ctx)
     # Preferred path: explicit named template from Notification Templates screen.

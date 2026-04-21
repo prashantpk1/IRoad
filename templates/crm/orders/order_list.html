@@ -207,38 +207,20 @@
           <td>{{ o.default_rank }}</td>
           <td><span class="fw-bold">{{ o.tenant.company_name }}</span></td>
           <td>
-            {% if o.order_classification == 'New_Subscription' %}
-              <span class="badge" style="background: rgba(80, 81, 249, 0.1); color: var(--primary-color);">{{ o.get_order_classification_display }}</span>
-            {% elif o.order_classification == 'Renewal' %}
-              <span class="badge" style="background: rgba(46, 204, 113, 0.1); color: #2ecc71;">{{ o.get_order_classification_display }}</span>
-            {% elif o.order_classification == 'Upgrade' %}
-              <span class="badge" style="background: rgba(155, 89, 182, 0.1); color: #9b59b6;">{{ o.get_order_classification_display }}</span>
-            {% elif o.order_classification == 'Downgrade' %}
-              <span class="badge" style="background: rgba(230, 126, 34, 0.1); color: #e67e22;">{{ o.get_order_classification_display }}</span>
-            {% else %}
-              <span class="badge" style="background: rgba(149, 165, 166, 0.1); color: #95a5a6;">{{ o.get_order_classification_display }}</span>
-            {% endif %}
+            <span class="value-badge">{{ o.get_order_classification_display }}</span>
           </td>
           <td><span class="text-muted small fw-bold">{{ o.currency_id }}</span></td>
           <td><span class="fw-semibold text-primary">{{ o.grand_total|floatformat:2 }}</span></td>
           <td>
             {% if o.order_status == 'Paid' %}
-              <div class="eal-status" style="gap: 8px">
-                  <i class="bi bi-circle-fill text-success" style="font-size: 8px"></i>
-                  <span>{% translate "Paid" %}</span>
-              </div>
+              <span class="status-badge active">{% translate "Paid" %}</span>
             {% elif o.order_status == 'Pending_Payment' or o.order_status == 'Draft' %}
-              <div class="eal-status" style="gap: 8px">
-                  <i class="bi bi-circle-fill text-warning" style="font-size: 8px"></i>
-                  <span>{{ o.get_order_status_display }}</span>
-              </div>
+              <span class="status-badge warning">{{ o.get_order_status_display }}</span>
             {% else %}
-              <div class="eal-status" style="gap: 8px">
-                  <i class="bi bi-circle-fill text-secondary" style="font-size: 8px"></i>
-                  <span>{{ o.get_order_status_display }}</span>
-              </div>
+              <span class="status-badge neutral">{{ o.get_order_status_display }}</span>
             {% endif %}
           </td>
+
           <td>
             {% if o.created_by %}
               <div class="d-flex align-items-center" style="gap: 8px">

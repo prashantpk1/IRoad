@@ -1,0 +1,1121 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Action Log | iRoad Admin</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Bootstrap 5 CSS -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+
+    <!-- Bootstrap Icons -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css"
+      rel="stylesheet"
+    />
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="Style/style.css" />
+    <link rel="stylesheet" href="Style/responsive.css" />
+
+    <style>
+      /* Action Log: OperationActionMedia internal sub-table (no horizontal scroll) */
+      .oal-media-table {
+        table-layout: auto;
+      }
+
+      .oal-media-table th,
+      .oal-media-table td {
+        white-space: normal;
+        word-break: break-word;
+        vertical-align: middle;
+      }
+      .oal-media-table thead th {
+        white-space: nowrap;
+        font-size: 12px;
+      }
+
+      .oal-media-table .form-control,
+      .oal-media-table .form-select {
+        min-width: 0;
+      }
+      .oal-media-table td[data-col="actions"] {
+        text-align: center;
+      }
+      .oal-media-table td[data-col="actions"] .btn {
+        white-space: nowrap;
+        min-width: 72px;
+      }
+      .oal-media-sn {
+        font-weight: 600;
+        color: #34384a;
+      }
+      .oal-action-btn {
+        border-color: #d7dcef;
+        color: #49506b;
+      }
+      .oal-delete-btn {
+        min-width: 86px;
+      }
+
+      @media (max-width: 1200px) {
+        .oal-media-table thead {
+          display: none;
+        }
+
+        .oal-media-table tbody tr {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 10px 12px;
+          padding: 12px;
+          border: 1px solid rgba(0, 0, 0, 0.08);
+          border-radius: 12px;
+          margin-bottom: 12px;
+          background: #fff;
+        }
+
+        .oal-media-table tbody td {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          padding: 0;
+          border: 0;
+        }
+
+        .oal-media-table tbody td::before {
+          content: attr(data-label);
+          font-size: 12px;
+          font-weight: 600;
+          color: #6b7280;
+          line-height: 1.1;
+        }
+
+        .oal-media-table tbody td[data-col="actions"] {
+          align-items: flex-start;
+        }
+
+        .oal-media-table tbody td[data-col="actions"] button {
+          width: 100%;
+        }
+      }
+
+      @media (max-width: 576px) {
+        .oal-media-table tbody tr {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      /* Summary View section */
+      .oal-summary-section {
+        margin-top: 22px;
+        border: 1px solid #ecedf3;
+        border-radius: 16px;
+        background: #fff;
+        overflow: hidden;
+      }
+      .oal-summary-head {
+        padding: 16px 18px;
+        border-bottom: 1px solid #eef0f6;
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .oal-summary-title {
+        margin: 0;
+        font-size: 17px;
+        font-weight: 700;
+        color: #1f2432;
+      }
+      .oal-summary-subtitle {
+        margin: 4px 0 0;
+        font-size: 12.5px;
+        color: #7a8197;
+      }
+      .oal-summary-badges {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .oal-summary-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        color: #4f556a;
+        background: #f6f7fd;
+        border: 1px solid #e5e7f1;
+        border-radius: 999px;
+        padding: 5px 10px;
+      }
+      .oal-summary-table {
+        padding: 10px 14px 14px;
+      }
+      .oal-summary-table .eal-table th {
+        white-space: nowrap;
+      }
+      .oal-summary-table .btn {
+        min-width: 72px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <!-- Mobile Menu Toggle -->
+    <button class="mobile-menu-toggle" aria-label="Toggle menu">
+      <i class="bi bi-list"></i>
+    </button>
+
+    <!-- Sidebar Overlay -->
+    <div class="sidebar-overlay"></div>
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="appSidebar">
+      <!-- Sidebar Header -->
+      <div class="sidebar-header">
+        <a href="index.html" class="sidebar-logo">
+          <span class="logo-icon">i</span>
+          <span class="logo-label">Road</span>
+        </a>
+      </div>
+
+      <!-- Navigation -->
+      <nav class="sidebar-nav">
+        <ul class="nav-menu">
+          <!-- Dashboard -->
+          <li class="nav-item">
+            <a href="index.html" class="nav-link" data-tooltip="Dashboard">
+              <i class="bi bi-speedometer2"></i>
+              <span class="nav-text">Dashboard</span>
+            </a>
+          </li>
+
+          <!-- --- ADMINISTRATION --- -->
+          <li class="nav-section-title">
+            <span>Administration</span>
+          </li>
+
+          <!-- Account Management -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="Account Management">
+              <i class="bi bi-building"></i>
+              <span class="nav-text">Account Management</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Organization-profile.html" class="submenu-link">
+                  <i class="bi bi-card-heading"></i>
+                  <span>Organization Profile</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- User Management -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="User Management">
+              <i class="bi bi-people"></i>
+              <span class="nav-text">User Management</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Users-administration.html" class="submenu-link">
+                  <i class="bi bi-person-gear"></i>
+                  <span>Users Administration</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Roles--permissions.html" class="submenu-link">
+                  <i class="bi bi-person-lock"></i>
+                  <span>Roles & Permissions</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- Subscriptions Management -->
+          <li class="nav-item has-submenu open">
+            <a
+              href="#"
+              class="nav-link"
+              data-tooltip="Subscriptions Management"
+            >
+              <i class="bi bi-credit-card-2-front"></i>
+              <span class="nav-text">Subscriptions Management</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Subscription-plan.html" class="submenu-link">
+                  <i class="bi bi-card-checklist"></i>
+                  <span>Subscription Plan</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Subscription-billing.html" class="submenu-link">
+                  <i class="bi bi-receipt"></i>
+                  <span>Subscription Billing</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- Audit & Security Logs -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="Audit & Security Logs">
+              <i class="bi bi-shield-lock"></i>
+              <span class="nav-text">Audit & Security Logs</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Login--session-events.html" class="submenu-link">
+                  <i class="bi bi-shield-lock"></i>
+                  <span>Login / Session Events</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Role--permission-changes.html" class="submenu-link">
+                  <i class="bi bi-person-lock"></i>
+                  <span>Role / Permission Changes</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Critical-account-changes.html" class="submenu-link">
+                  <i class="bi bi-person-vcard"></i>
+                  <span>Critical Account Changes</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- Support Management -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="Support Management">
+              <i class="bi bi-headset"></i>
+              <span class="nav-text">Support Management</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Support-ticket-master.html" class="submenu-link">
+                  <i class="bi bi-ticket-detailed"></i>
+                  <span>Support Ticket Master</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- --- CRM --- -->
+          <li class="nav-section-title">
+            <span>CRM</span>
+          </li>
+
+          <!-- Clients Management -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="Clients Management">
+              <i class="bi bi-person-badge"></i>
+              <span class="nav-text">Clients Management</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Client-account.html" class="submenu-link">
+                  <i class="bi bi-person-vcard"></i>
+                  <span>Client Account</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Client-account-setting.html" class="submenu-link">
+                  <i class="bi bi-gear"></i>
+                  <span>Client Account Settings</span>
+                </a>
+              </li>
+
+              <li class="submenu-item">
+                <a href="Client-attachments.html" class="submenu-link">
+                  <i class="bi bi-paperclip"></i>
+                  <span>Client Attachments</span>
+                </a>
+              </li>
+
+              <li class="submenu-item">
+                <a href="Client-contacts.html" class="submenu-link">
+                  <i class="bi bi-person-rolodex"></i>
+                  <span>Client Contacts</span>
+                </a>
+              </li>
+
+              <li class="submenu-item">
+                <a href="Client-contract.html" class="submenu-link">
+                  <i class="bi bi-file-earmark-text"></i>
+                  <span>Client Contracts</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Client-contract-settings.html" class="submenu-link">
+                  <i class="bi bi-gear"></i>
+                  <span>Client Contract Settings</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- --- MASTER DATA --- -->
+          <li class="nav-section-title">
+            <span>Master Data</span>
+          </li>
+
+          <!-- Address Management -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="Address Management">
+              <i class="bi bi-map"></i>
+              <span class="nav-text">Address Management</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="addresses.html" class="submenu-link">
+                  <i class="bi bi-card-heading"></i>
+                  <span>Address Master</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- Cargo Management -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="Cargo Management">
+              <i class="bi bi-box-seam"></i>
+              <span class="nav-text">Cargo Management</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Cargo-master.html" class="submenu-link">
+                  <i class="bi bi-boxes"></i>
+                  <span>Cargo Master</span>
+                </a>
+              </li>
+
+              <li class="submenu-item">
+                <a href="Cargo-category-config.html" class="submenu-link">
+                  <i class="bi bi-boxes"></i>
+                  <span>Cargo Category Config</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- Route Management -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="Route Management">
+              <i class="bi bi-signpost-split"></i>
+              <span class="nav-text">Route Management</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Location-master.html" class="submenu-link">
+                  <i class="bi bi-pin-map"></i>
+                  <span>Location Master</span>
+                </a>
+              </li>
+
+              <li class="submenu-item">
+                <a href="Route-master.html" class="submenu-link">
+                  <i class="bi bi-signpost"></i>
+                  <span>Route Master</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- Services Management -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="Services Management">
+              <i class="bi bi-gear"></i>
+              <span class="nav-text">Services Management</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Service-item-master.html" class="submenu-link">
+                  <i class="bi bi-tools"></i>
+                  <span>Service Item Master</span>
+                </a>
+              </li>
+
+              <li class="submenu-item">
+                <a href="Price-list.html" class="submenu-link">
+                  <i class="bi bi-tags"></i>
+                  <span>Price List Master</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- --- OPERATIONS --- -->
+          <li class="nav-section-title">
+            <span>Operations</span>
+          </li>
+
+          <!-- Operations Management -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="Operations Management">
+              <i class="bi bi-activity"></i>
+              <span class="nav-text">Operations Management</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Booking.html" class="submenu-link">
+                  <i class="bi bi-calendar-check"></i>
+                  <span>Booking</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Shipment.html" class="submenu-link">
+                  <i class="bi bi-box-seam"></i>
+                  <span>Shipment</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Shipment-documents.html" class="submenu-link">
+                  <i class="bi bi-paperclip"></i>
+                  <span>Shipment Documents</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Surcharge-sales-transaction.html" class="submenu-link">
+                  <i class="bi bi-receipt"></i>
+
+                  <span>Surcharge Sales Transaction</span>
+                </a>
+              </li>
+
+              <li class="submenu-item">
+                <a href="Digital-pod-transaction.html" class="submenu-link">
+                  <i class="bi bi-file-earmark-check"></i>
+                  <span>Shipment POD Analysis</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Document-handover.html" class="submenu-link">
+                  <i class="bi bi-file-earmark-check"></i>
+                  <span>Document Handover</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Truck-movement-log.html" class="submenu-link">
+                  <i class="bi bi-truck"></i>
+                  <span>Truck Movement Log</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Operation-actions.html" class="submenu-link">
+                  <i class="bi bi-record-circle"></i>
+                  <span>Operation Actions</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- Fleet Management -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="Fleet Management">
+              <i class="bi bi-truck-front"></i>
+              <span class="nav-text">Fleet Management</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Truck-master.html" class="submenu-link">
+                  <i class="bi bi-truck"></i>
+                  <span>Truck Master</span>
+                </a>
+              </li>
+
+              <li class="submenu-item">
+                <a href="Truck-type-master.html" class="submenu-link">
+                  <i class="bi bi-truck-flatbed"></i>
+                  <span>Truck Type Master</span>
+                </a>
+              </li>
+
+              <li class="submenu-item">
+                <a href="Truck-attachments.html" class="submenu-link">
+                  <i class="bi bi-truck"></i>
+                  <span>Truck Attachments</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Truck-settings.html" class="submenu-link">
+                  <i class="bi bi-truck"></i>
+                  <span>Truck Settings</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- Drivers Management -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="Drivers Management">
+              <i class="bi bi-person-vcard"></i>
+              <span class="nav-text">Drivers Management</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Driver-master.html" class="submenu-link">
+                  <i class="bi bi-person-badge"></i>
+                  <span>Driver Master</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Driver-attachments.html" class="submenu-link">
+                  <i class="bi bi-person-badge"></i>
+                  <span>Driver Attachments</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Driver-settings.html" class="submenu-link">
+                  <i class="bi bi-person-badge"></i>
+                  <span>Driver Settings</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- --- FINANCE --- -->
+          <li class="nav-section-title">
+            <span>Finance</span>
+          </li>
+
+          <!-- Sales Invoicing -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="Sales Invoicing">
+              <i class="bi bi-receipt"></i>
+              <span class="nav-text">Sales Invoicing</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Sales-invoice-create.html" class="submenu-link">
+                  <i class="bi bi-receipt"></i>
+                  <span>Sales Invoice Reports</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- Treasury Management -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="Treasury Management">
+              <i class="bi bi-cash-coin"></i>
+              <span class="nav-text">Treasury Management</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Treasury-master.html" class="submenu-link">
+                  <i class="bi bi-card-heading"></i>
+                  <span>Treasury Master</span>
+                </a>
+              </li>
+
+              <li class="submenu-item">
+                <a href="Treasury-transaction-log.html" class="submenu-link">
+                  <i class="bi bi-clock-history"></i>
+                  <span>Treasury Transaction Log</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- --- SYSTEM --- -->
+          <li class="nav-section-title">
+            <span>System</span>
+          </li>
+
+          <!-- Configurations -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="Configurations">
+              <i class="bi bi-gear-wide-connected"></i>
+              <span class="nav-text">Configurations</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Auto-number-configuration.html" class="submenu-link">
+                  <i class="bi bi-gear"></i>
+                  <span>Auto Number Configuration</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+        </ul>
+      </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- Top Header (lightweight; relies on main.js behaviors) -->
+      <header class="top-header">
+        <div class="header-left">
+          <button
+            class="header-toggle-btn"
+            id="sidebarCollapseBtn"
+            title="Toggle Sidebar"
+          >
+            <i class="bi bi-list"></i>
+          </button>
+        </div>
+        <div class="header-datetime">
+          <span class="header-date" id="headerDate">—</span>
+          <span class="header-time" id="headerTime">—</span>
+        </div>
+      </header>
+
+      <!-- Page Header -->
+      <div class="page-header">
+        <nav aria-label="breadcrumb">
+          <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="index.html">Dashboard</a></li>
+            <li class="breadcrumb-item">Operations</li>
+            <li class="breadcrumb-item">Operations Management</li>
+            <li class="breadcrumb-item active" aria-current="page">
+              Action Log
+            </li>
+          </ol>
+        </nav>
+        <div class="page-header-row">
+          <div class="page-header-left">
+            <h1 class="page-title">Action Log</h1>
+            <p class="page-subtitle">
+              Record action events (OperationActionLog) and attach multiple
+              photos/videos (OperationActionMedia).
+            </p>
+          </div>
+          <div class="page-header-right">
+            <div class="eal-header-actions">
+              <a href="Operation-actions.html" class="eal-btn eal-btn-outline">
+                <i class="bi bi-gear"></i>
+                <span>Go to Action Master</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <form id="operationActionLogForm">
+        <div class="form-card" data-section="1">
+          <div class="form-card-header">
+            <div class="form-card-icon amber">
+              <i class="bi bi-clock-history"></i>
+            </div>
+            <div class="form-card-header-text">
+              <h2 class="form-card-title">Header</h2>
+              <p class="form-card-desc">Primary action log details.</p>
+            </div>
+          </div>
+          <div class="form-card-body">
+            <div class="fields-grid cols-3">
+              <div class="field">
+                <label for="logNo" class="form-label">Log No</label>
+                <input
+                  type="text"
+                  class="form-control"
+                  id="logNo"
+                  placeholder="Auto-generated"
+                  readonly
+                />
+              </div>
+              <div class="field">
+                <label for="logDate" class="form-label"
+                  >Log Date (Date-Time)</label
+                >
+                <input
+                  type="datetime-local"
+                  class="form-control"
+                  id="logDate"
+                  required
+                />
+              </div>
+              <div class="field">
+                <label for="actionLookup" class="form-label">Action</label>
+                <select class="form-select" id="actionLookup">
+                  <option value="" selected disabled>-Select action-</option>
+                  <option value="delivery">Delivery Confirmation</option>
+                  <option value="pickup">Pickup Completed</option>
+                  <option value="checkpoint">Checkpoint Reached</option>
+                </select>
+              </div>
+            </div>
+            <div class="fields-grid cols-3">
+              <div class="field">
+                <label for="sourceType" class="form-label">Source</label>
+                <select class="form-select" id="sourceType">
+                  <option value="auto">Auto</option>
+                  <option value="manual">Manual</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="userLookup" class="form-label">User</label>
+                <select class="form-select" id="userLookup">
+                  <option value="" selected disabled>-Select user-</option>
+                  <option value="u1">USR-001 - Dispatcher</option>
+                  <option value="u2">USR-002 - Driver App</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="notes" class="form-label">Notes</label>
+                <textarea
+                  class="form-control"
+                  id="notes"
+                  rows="1"
+                  placeholder="Enter notes"
+                ></textarea>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-card" data-section="2">
+          <div class="form-card-header">
+            <div class="form-card-icon blue">
+              <i class="bi bi-link-45deg"></i>
+            </div>
+            <div class="form-card-header-text">
+              <h2 class="form-card-title">References</h2>
+              <p class="form-card-desc">Link related operation entities.</p>
+            </div>
+          </div>
+          <div class="form-card-body">
+            <div class="fields-grid cols-3">
+              <div class="field">
+                <label for="bookingLookup" class="form-label">Booking</label>
+                <select class="form-select" id="bookingLookup">
+                  <option value="" selected disabled>-Select booking-</option>
+                  <option value="b1">BKG-2001</option>
+                  <option value="b2">BKG-2002</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="bookingItemLookup" class="form-label"
+                  >Booking Item</label
+                >
+                <select class="form-select" id="bookingItemLookup">
+                  <option value="" selected disabled>-Select booking item-</option>
+                  <option value="bi1">BKG-2001 / ITEM-01</option>
+                  <option value="bi2">BKG-2002 / ITEM-03</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="movementLookup" class="form-label">Movement</label>
+                <select class="form-select" id="movementLookup">
+                  <option value="" selected disabled>-Select movement-</option>
+                  <option value="m1">MOV-1301</option>
+                  <option value="m2">MOV-1302</option>
+                </select>
+              </div>
+            </div>
+            <div class="fields-grid cols-3">
+              <div class="field">
+                <label for="shipmentLookup" class="form-label">Shipment</label>
+                <select class="form-select" id="shipmentLookup">
+                  <option value="" selected disabled>-Select shipment-</option>
+                  <option value="s1">SHP-10045</option>
+                  <option value="s2">SHP-10044</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="truckLookup" class="form-label">Truck</label>
+                <select class="form-select" id="truckLookup">
+                  <option value="" selected disabled>-Select truck-</option>
+                  <option value="t1">TRK-901</option>
+                  <option value="t2">TRK-902</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="driverLookup" class="form-label">Driver</label>
+                <select class="form-select" id="driverLookup">
+                  <option value="" selected disabled>-Select driver-</option>
+                  <option value="d1">DRV-001 - Ahmed Ali</option>
+                  <option value="d2">DRV-002 - Mohammad Farooq</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-card" data-section="3">
+          <div class="form-card-header">
+            <div class="form-card-icon green">
+              <i class="bi bi-geo-alt"></i>
+            </div>
+            <div class="form-card-header-text">
+              <h2 class="form-card-title">Location Details</h2>
+              <p class="form-card-desc">Store geolocation and map reference.</p>
+            </div>
+          </div>
+          <div class="form-card-body">
+            <div class="fields-grid cols-3">
+              <div class="field">
+                <label for="latitude" class="form-label">Latitude</label>
+                <input
+                  type="text"
+                  class="form-control"
+                  id="latitude"
+                  placeholder="e.g. 24.7136"
+                />
+              </div>
+              <div class="field">
+                <label for="longitude" class="form-label">Longitude</label>
+                <input
+                  type="text"
+                  class="form-control"
+                  id="longitude"
+                  placeholder="e.g. 46.6753"
+                />
+              </div>
+              <div class="field">
+                <label for="coordinates" class="form-label"
+                  >Coordinates (Lat, Long)</label
+                >
+                <input
+                  type="text"
+                  class="form-control"
+                  id="coordinates"
+                  placeholder="24.7136, 46.6753"
+                />
+              </div>
+            </div>
+            <div class="fields-grid cols-1">
+              <div class="field">
+                <label for="mapLink" class="form-label">Map Link</label>
+                <input
+                  type="url"
+                  class="form-control"
+                  id="mapLink"
+                  placeholder="https://maps.google.com/..."
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-card" data-section="4">
+          <div class="form-card-header">
+            <div class="form-card-icon red">
+              <i class="bi bi-paperclip"></i>
+            </div>
+            <div class="form-card-header-text">
+              <h2 class="form-card-title">Evidence Attachments</h2>
+              <p class="form-card-desc">Sub-form for media evidence rows.</p>
+            </div>
+          </div>
+          <div class="form-card-body">
+            <div class="table-responsive">
+              <table
+                class="oal-media-table table table-sm table-hover align-middle mb-0"
+              >
+                <thead class="table-light">
+                  <tr>
+                    <th style="width: 56px">SN</th>
+                    <th style="min-width: 150px">Media Type (list)</th>
+                    <th style="min-width: 190px">Timestamp (Date-time)</th>
+                    <th style="min-width: 220px">File</th>
+                    <th style="width: 110px">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="oalMediaTbody"></tbody>
+              </table>
+            </div>
+            <template id="oalDeleteButtonTemplate">
+              <button
+                type="button"
+                class="btn btn-sm btn-outline-danger oal-delete-row oal-delete-btn"
+              >
+                <i class="bi bi-trash3"></i>
+                Delete
+              </button>
+            </template>
+            <div class="mt-3">
+              <button
+                type="button"
+                class="btn btn-outline-primary"
+                id="addOalMediaBtn"
+              >
+                <i class="bi bi-plus-lg"></i>
+                Add Row
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-actions-bar">
+          <div class="form-actions-left">
+            <button type="reset" class="btn btn-outline-secondary">
+              <i class="bi bi-arrow-counterclockwise"></i>
+              Reset Form
+            </button>
+          </div>
+          <div class="form-actions-right">
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-check-circle"></i>
+              Save Action Log
+            </button>
+          </div>
+        </div>
+      </form>
+
+      <section class="oal-summary-section" aria-label="Summary view section">
+        <div class="oal-summary-head">
+          <div>
+            <h2 class="oal-summary-title">Summary View</h2>
+            <p class="oal-summary-subtitle">
+              Quick list of action logs with linked booking and fleet references.
+            </p>
+          </div>
+          <div class="oal-summary-badges">
+            <span class="oal-summary-badge"
+              ><i class="bi bi-list-check"></i> Log Overview</span
+            >
+            <span class="oal-summary-badge"
+              ><i class="bi bi-eye"></i> View Details</span
+            >
+          </div>
+        </div>
+        <div class="oal-summary-table">
+          <div class="eal-table-wrap">
+            <table class="eal-table">
+              <thead>
+                <tr>
+                  <th>Log No</th>
+                  <th>Log Date</th>
+                  <th>Booking No</th>
+                  <th>Booking Item</th>
+                  <th>Movement</th>
+                  <th>Shipment</th>
+                  <th>Truck</th>
+                  <th>Driver</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>LOG-0001</td>
+                  <td>2026-04-15 10:30</td>
+                  <td>BKG-2001</td>
+                  <td>ITEM-01</td>
+                  <td>MOV-1301</td>
+                  <td>SHP-10045</td>
+                  <td>TRK-901</td>
+                  <td>DRV-001</td>
+                  <td>
+                    <button type="button" class="btn btn-sm btn-outline-primary">
+                      View
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Custom JS -->
+    <script src="Javascript/main.js"></script>
+    <script>
+      (function () {
+        var logDateEl = document.getElementById("logDate");
+        if (logDateEl && !logDateEl.value) {
+          var now = new Date();
+          now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+          logDateEl.value = now.toISOString().slice(0, 16);
+        }
+
+        var formEl = document.getElementById("operationActionLogForm");
+        if (formEl) {
+          formEl.addEventListener("submit", function (e) {
+            e.preventDefault();
+          });
+        }
+
+        var tbody = document.getElementById("oalMediaTbody");
+        var addBtn = document.getElementById("addOalMediaBtn");
+        var deleteBtnTemplate = document.getElementById("oalDeleteButtonTemplate");
+        if (!tbody || !addBtn || !deleteBtnTemplate) return;
+
+        function renumberRows() {
+          Array.prototype.slice.call(tbody.querySelectorAll("tr")).forEach(function (row, idx) {
+            var sn = row.querySelector(".oal-media-sn");
+            if (sn) sn.textContent = idx + 1;
+          });
+        }
+
+        function createMediaRow() {
+          var tr = document.createElement("tr");
+          var nextSn = tbody.querySelectorAll("tr").length + 1;
+          tr.innerHTML =
+            '<td data-label="SN"><span class="oal-media-sn">' +
+            nextSn +
+            "</span></td>" +
+            '<td data-label="Media Type">' +
+            '<select class="form-select form-select-sm">' +
+            '<option value="" selected disabled>-Select type-</option>' +
+            '<option value="photo">Photo</option>' +
+            '<option value="video">Video</option>' +
+            '<option value="document">Document</option>' +
+            "</select></td>" +
+            '<td data-label="Timestamp">' +
+            '<input type="datetime-local" class="form-control form-control-sm" />' +
+            "</td>" +
+            '<td data-label="File">' +
+            '<input type="file" class="form-control form-control-sm" />' +
+            "</td>" +
+            '<td data-label="Actions" data-col="actions"></td>';
+          var actionCell = tr.querySelector('td[data-col="actions"]');
+          if (actionCell) {
+            actionCell.appendChild(deleteBtnTemplate.content.cloneNode(true));
+          }
+          tbody.appendChild(tr);
+          renumberRows();
+        }
+
+        addBtn.addEventListener("click", createMediaRow);
+        tbody.addEventListener("click", function (e) {
+          var btn = e.target.closest(".oal-delete-row");
+          if (!btn) return;
+          var row = btn.closest("tr");
+          if (row) row.remove();
+          if (!tbody.querySelector("tr")) createMediaRow();
+          renumberRows();
+        });
+
+        createMediaRow();
+      })();
+    </script>
+  </body>
+</html>
+

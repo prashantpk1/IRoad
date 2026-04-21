@@ -68,6 +68,7 @@ class AdminUser(AbstractBaseUser):
     status = models.CharField(
         max_length=20, choices=STATUS_CHOICES, default='Pending_Activation'
     )
+    is_deleted = models.BooleanField(default=False)
     role = models.ForeignKey(
         'Role', on_delete=models.SET_NULL, null=True, blank=True, related_name='admin_users'
     )
@@ -499,6 +500,7 @@ class TaxCode(models.Model):
     is_default_for_country = models.BooleanField(default=False)
     is_international_default = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
+    is_deleted = models.BooleanField(default=False)
     created_by = models.ForeignKey(
         'AdminUser',
         null=True,
@@ -740,6 +742,7 @@ class SubscriptionPlan(models.Model):
         validators=[MinValueValidator(1)],
     )
     is_active = models.BooleanField(default=True)
+    is_deleted = models.BooleanField(default=False)
     max_internal_users = models.IntegerField(
         default=-1,
         help_text='-1 means Unlimited',
@@ -811,6 +814,7 @@ class AddOnsPricingPolicy(models.Model):
     policy_id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     policy_name = models.CharField(max_length=50)
     is_active = models.BooleanField(default=False)
+    is_deleted = models.BooleanField(default=False)
     extra_internal_user_price = models.DecimalField(
         max_digits=10,
         decimal_places=2,
@@ -884,6 +888,7 @@ class PromoCode(models.Model):
     max_uses = models.IntegerField(null=True, blank=True)
     current_uses = models.IntegerField(default=0)
     is_active = models.BooleanField(default=True)
+    is_deleted = models.BooleanField(default=False)
     applicable_plans = models.ManyToManyField(
         SubscriptionPlan,
         blank=True,
@@ -922,6 +927,10 @@ class PromoCode(models.Model):
         if self.valid_until and now > self.valid_until:
             return False, invalid_msg
         if self.max_uses is not None and self.current_uses >= self.max_uses:
+            # Keep status aligned with usage cap once exhausted.
+            if self.is_active:
+                self.is_active = False
+                self.save(update_fields=['is_active'])
             return False, invalid_msg
 
         plan_qs = self.applicable_plans.all()
@@ -994,6 +1003,7 @@ class PaymentGateway(models.Model):
         help_text='JSON object with gateway credentials'
     )
     is_active = models.BooleanField(default=False)
+    is_deleted = models.BooleanField(default=False)
     created_by = models.ForeignKey(
         'AdminUser',
         null=True,
@@ -1115,6 +1125,7 @@ class CommGateway(models.Model):
         blank=True,
     )
     is_active = models.BooleanField(default=False)
+    is_deleted = models.BooleanField(default=False)
     updated_by = models.ForeignKey(
         'AdminUser',
         null=True,
@@ -1160,6 +1171,7 @@ class NotificationTemplate(models.Model):
     body_en = models.TextField()
     body_ar = models.TextField()
     is_active = models.BooleanField(default=True)
+    is_deleted = models.BooleanField(default=False)
     created_by = models.ForeignKey(
         'AdminUser',
         null=True,
@@ -1511,6 +1523,7 @@ class TenantProfile(models.Model):
         choices=STATUS_CHOICES,
         default='Active',
     )
+    is_deleted = models.BooleanField(default=False)
     assigned_sales_rep = models.ForeignKey(
         'AdminUser',
         null=True,
@@ -1543,29 +1556,7 @@ class TenantProfile(models.Model):
         db_index=True,
         help_text='PostgreSQL schema name for isolated tenant workspace (CP 4.3.2).',
     )
-    db_schema_name = models.CharField(
-        max_length=63,
-        blank=True,
-        null=True,
-        default=None,
-        help_text='Legacy schema name column kept for backward compatibility.',
-    )
-    provisioning_error = models.TextField(
-        blank=True,
-        default='',
-        help_text='Last provisioning error message (empty when none).',
-    )
-    provisioning_status = models.CharField(
-        max_length=30,
-        blank=True,
-        default='Pending',
-        help_text='Provisioning lifecycle status for tenant workspace setup.',
-    )
-    registered_address = models.TextField(
-        blank=True,
-        default='',
-        help_text='Registered legal address for subscriber profile.',
-    )
+  
     registered_at = models.DateTimeField(auto_now_add=True)
     total_ltv = models.DecimalField(
         max_digits=12,
@@ -1608,8 +1599,7 @@ class TenantProfile(models.Model):
 
     def save(self, *args, **kwargs):
         """Ref: CP-PCS-P1 §5.1 - Centralized Session Kill Switch."""
-        if self.db_schema_name == '':
-            self.db_schema_name = None
+     
 
         SUSPEND_STATUSES = ['Suspended_Billing', 'Suspended_Violation']
         is_new_suspension = (

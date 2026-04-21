@@ -18,16 +18,7 @@
   </div>
 </div>
 
-{% if messages %}
-  <div style="margin-bottom: 24px">
-    {% for message in messages %}
-      <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags|default:'info' }}{% endif %} alert-dismissible fade show" role="alert" style="border-radius: 12px; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-        {{ message }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-      </div>
-    {% endfor %}
-  </div>
-{% endif %}
+
 
   <form method="post" action="" enctype="multipart/form-data">
     {% csrf_token %}
@@ -107,7 +98,7 @@
     </div>
   </div>
 
-  <div class="form-actions-bar sticky-bottom">
+  <div class="form-actions-bar">
     <div class="form-actions-left">
       {% if obj.updated_at %}
         <div class="small text-muted">

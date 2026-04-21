@@ -1,0 +1,40 @@
+{% extends 'iroad_tenants/base.html' %}
+
+{% block title %}My Account | iRoad{% endblock %}
+
+{% block content %}
+<div class="dashboard-toolbar">
+  <div class="toolbar-left">
+    <div class="page-title">My Account</div>
+    <div class="toolbar-subtitle">Tenant profile summary</div>
+  </div>
+</div>
+
+<div class="overview-shell" data-section="overview">
+  <div class="db-card db-fade">
+    <div class="db-card-header">
+      <div class="db-card-title">Account Details</div>
+    </div>
+    <div class="db-card-body" style="padding: 20px;">
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">Company Name</label>
+          <input type="text" class="form-control" value="{{ tenant.company_name }}" disabled />
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Primary Email</label>
+          <input type="text" class="form-control" value="{{ tenant.primary_email }}" disabled />
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Primary Phone</label>
+          <input type="text" class="form-control" value="{{ tenant.primary_phone }}" disabled />
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Account Status</label>
+          <input type="text" class="form-control" value="{{ tenant.account_status }}" disabled />
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

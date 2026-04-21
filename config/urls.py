@@ -23,5 +23,6 @@ urlpatterns = [
     path('i18n/', include('django.conf.urls.i18n')),
     path('admin/', admin.site.urls),
     path('api/v1/', include('superadmin.api_urls')),
+    path('tenant/', include(('iroad_tenants.urls', 'iroad_tenants'), namespace='iroad_tenants')),
     path('', include('superadmin.urls')),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

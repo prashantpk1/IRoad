@@ -1,0 +1,1251 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="iRoad Admin Dashboard - Price List Master"
+    />
+    <title>Price List Master | iRoad Admin</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Bootstrap 5 CSS -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+
+    <!-- Bootstrap Icons -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css"
+      rel="stylesheet"
+    />
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="Style/style.css" />
+    <link rel="stylesheet" href="Style/responsive.css" />
+    <style>
+      /* Price List Lines table helpers */
+      .pl-lines-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 12px;
+        flex-wrap: wrap;
+      }
+      .pl-lines-title {
+        font-weight: 600;
+        color: var(--text-dark, #111827);
+        margin: 0;
+        font-size: 1rem;
+      }
+      .pl-route-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 6px 12px;
+        border-radius: 10px;
+        border: 1px solid var(--border-light, #e5e7eb);
+        background: #fff;
+        font-weight: 600;
+        color: #111827;
+        white-space: nowrap;
+      }
+      .pl-route-chip .pl-route-arrow {
+        width: 26px;
+        height: 26px;
+        border-radius: 999px;
+        background: #e8f0fe;
+        color: #2563eb;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+      .pl-totals {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+        margin-top: 14px;
+      }
+      .pl-total-card {
+        border: 1px solid var(--border-light, #e5e7eb);
+        border-radius: 12px;
+        background: #fff;
+        padding: 12px 14px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+      .pl-total-label {
+        color: var(--text-muted, #6b7280);
+        font-weight: 600;
+        font-size: 0.85rem;
+      }
+      .pl-total-value {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: var(--text-dark, #111827);
+      }
+      @media (max-width: 992px) {
+        .pl-totals {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <!-- Mobile Menu Toggle -->
+    <button class="mobile-menu-toggle" aria-label="Toggle menu">
+      <i class="bi bi-list"></i>
+    </button>
+
+    <!-- Sidebar Overlay -->
+    <div class="sidebar-overlay"></div>
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="appSidebar">
+      <!-- Sidebar Header -->
+      <div class="sidebar-header">
+        <a href="index.html" class="sidebar-logo">
+          <span class="logo-icon">i</span>
+          <span class="logo-label">Road</span>
+        </a>
+      </div>
+
+      <!-- Navigation -->
+      <nav class="sidebar-nav">
+        <ul class="nav-menu">
+          <!-- Dashboard -->
+          <li class="nav-item">
+            <a href="index.html" class="nav-link" data-tooltip="Dashboard">
+              <i class="bi bi-speedometer2"></i>
+              <span class="nav-text">Dashboard</span>
+            </a>
+          </li>
+
+          <!-- --- ADMINISTRATION --- -->
+          <li class="nav-section-title">
+            <span>Administration</span>
+          </li>
+
+          <!-- Account Management -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="Account Management">
+              <i class="bi bi-building"></i>
+              <span class="nav-text">Account Management</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Organization-profile.html" class="submenu-link">
+                  <i class="bi bi-card-heading"></i>
+                  <span>Organization Profile</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- User Management -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="User Management">
+              <i class="bi bi-people"></i>
+              <span class="nav-text">User Management</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Users-administration.html" class="submenu-link">
+                  <i class="bi bi-person-gear"></i>
+                  <span>Users Administration</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Roles--permissions.html" class="submenu-link">
+                  <i class="bi bi-person-lock"></i>
+                  <span>Roles & Permissions</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- Subscriptions Management -->
+          <li class="nav-item has-submenu open">
+            <a
+              href="#"
+              class="nav-link"
+              data-tooltip="Subscriptions Management"
+            >
+              <i class="bi bi-credit-card-2-front"></i>
+              <span class="nav-text">Subscriptions Management</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Subscription-plan.html" class="submenu-link">
+                  <i class="bi bi-card-checklist"></i>
+                  <span>Subscription Plan</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Subscription-billing.html" class="submenu-link">
+                  <i class="bi bi-receipt"></i>
+                  <span>Subscription Billing</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- Audit & Security Logs -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="Audit & Security Logs">
+              <i class="bi bi-shield-lock"></i>
+              <span class="nav-text">Audit & Security Logs</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Login--session-events.html" class="submenu-link">
+                  <i class="bi bi-shield-lock"></i>
+                  <span>Login / Session Events</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Role--permission-changes.html" class="submenu-link">
+                  <i class="bi bi-person-lock"></i>
+                  <span>Role / Permission Changes</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Critical-account-changes.html" class="submenu-link">
+                  <i class="bi bi-person-vcard"></i>
+                  <span>Critical Account Changes</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- Support Management -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="Support Management">
+              <i class="bi bi-headset"></i>
+              <span class="nav-text">Support Management</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Support-ticket-master.html" class="submenu-link">
+                  <i class="bi bi-ticket-detailed"></i>
+                  <span>Support Ticket Master</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- --- CRM --- -->
+          <li class="nav-section-title">
+            <span>CRM</span>
+          </li>
+
+          <!-- Clients Management -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="Clients Management">
+              <i class="bi bi-person-badge"></i>
+              <span class="nav-text">Clients Management</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Client-account.html" class="submenu-link">
+                  <i class="bi bi-person-vcard"></i>
+                  <span>Client Account</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Client-account-setting.html" class="submenu-link">
+                  <i class="bi bi-gear"></i>
+                  <span>Client Account Settings</span>
+                </a>
+              </li>
+
+              <li class="submenu-item">
+                <a href="Client-attachments.html" class="submenu-link">
+                  <i class="bi bi-paperclip"></i>
+                  <span>Client Attachments</span>
+                </a>
+              </li>
+
+              <li class="submenu-item">
+                <a href="Client-contacts.html" class="submenu-link">
+                  <i class="bi bi-person-rolodex"></i>
+                  <span>Client Contacts</span>
+                </a>
+              </li>
+
+              <li class="submenu-item">
+                <a href="Client-contract.html" class="submenu-link">
+                  <i class="bi bi-file-earmark-text"></i>
+                  <span>Client Contracts</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Client-contract-settings.html" class="submenu-link">
+                  <i class="bi bi-gear"></i>
+                  <span>Client Contract Settings</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- --- MASTER DATA --- -->
+          <li class="nav-section-title">
+            <span>Master Data</span>
+          </li>
+
+          <!-- Address Management -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="Address Management">
+              <i class="bi bi-map"></i>
+              <span class="nav-text">Address Management</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="addresses.html" class="submenu-link">
+                  <i class="bi bi-card-heading"></i>
+                  <span>Address Master</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- Cargo Management -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="Cargo Management">
+              <i class="bi bi-box-seam"></i>
+              <span class="nav-text">Cargo Management</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Cargo-master.html" class="submenu-link">
+                  <i class="bi bi-boxes"></i>
+                  <span>Cargo Master</span>
+                </a>
+              </li>
+
+              <li class="submenu-item">
+                <a href="Cargo-category-config.html" class="submenu-link">
+                  <i class="bi bi-boxes"></i>
+                  <span>Cargo Category Config</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- Route Management -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="Route Management">
+              <i class="bi bi-signpost-split"></i>
+              <span class="nav-text">Route Management</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Location-master.html" class="submenu-link">
+                  <i class="bi bi-pin-map"></i>
+                  <span>Location Master</span>
+                </a>
+              </li>
+
+              <li class="submenu-item">
+                <a href="Route-master.html" class="submenu-link">
+                  <i class="bi bi-signpost"></i>
+                  <span>Route Master</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- Services Management -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="Services Management">
+              <i class="bi bi-gear"></i>
+              <span class="nav-text">Services Management</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Service-item-master.html" class="submenu-link">
+                  <i class="bi bi-tools"></i>
+                  <span>Service Item Master</span>
+                </a>
+              </li>
+
+              <li class="submenu-item">
+                <a href="Price-list.html" class="submenu-link">
+                  <i class="bi bi-tags"></i>
+                  <span>Price List Master</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- --- OPERATIONS --- -->
+          <li class="nav-section-title">
+            <span>Operations</span>
+          </li>
+
+          <!-- Operations Management -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="Operations Management">
+              <i class="bi bi-activity"></i>
+              <span class="nav-text">Operations Management</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Booking.html" class="submenu-link">
+                  <i class="bi bi-calendar-check"></i>
+                  <span>Booking</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Shipment.html" class="submenu-link">
+                  <i class="bi bi-box-seam"></i>
+                  <span>Shipment</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Shipment-documents.html" class="submenu-link">
+                  <i class="bi bi-paperclip"></i>
+                  <span>Shipment Documents</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Surcharge-sales-transaction.html" class="submenu-link">
+                  <i class="bi bi-receipt"></i>
+
+                  <span>Surcharge Sales Transaction</span>
+                </a>
+              </li>
+
+              <li class="submenu-item">
+                <a href="Digital-pod-transaction.html" class="submenu-link">
+                  <i class="bi bi-file-earmark-check"></i>
+                  <span>Shipment POD Analysis</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Document-handover.html" class="submenu-link">
+                  <i class="bi bi-file-earmark-check"></i>
+                  <span>Document Handover</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Truck-movement-log.html" class="submenu-link">
+                  <i class="bi bi-truck"></i>
+                  <span>Truck Movement Log</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Operation-actions.html" class="submenu-link">
+                  <i class="bi bi-record-circle"></i>
+                  <span>Operation Actions</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- Fleet Management -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="Fleet Management">
+              <i class="bi bi-truck-front"></i>
+              <span class="nav-text">Fleet Management</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Truck-master.html" class="submenu-link">
+                  <i class="bi bi-truck"></i>
+                  <span>Truck Master</span>
+                </a>
+              </li>
+
+              <li class="submenu-item">
+                <a href="Truck-type-master.html" class="submenu-link">
+                  <i class="bi bi-truck-flatbed"></i>
+                  <span>Truck Type Master</span>
+                </a>
+              </li>
+
+              <li class="submenu-item">
+                <a href="Truck-attachments.html" class="submenu-link">
+                  <i class="bi bi-truck"></i>
+                  <span>Truck Attachments</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Truck-settings.html" class="submenu-link">
+                  <i class="bi bi-truck"></i>
+                  <span>Truck Settings</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- Drivers Management -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="Drivers Management">
+              <i class="bi bi-person-vcard"></i>
+              <span class="nav-text">Drivers Management</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Driver-master.html" class="submenu-link">
+                  <i class="bi bi-person-badge"></i>
+                  <span>Driver Master</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Driver-attachments.html" class="submenu-link">
+                  <i class="bi bi-person-badge"></i>
+                  <span>Driver Attachments</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Driver-settings.html" class="submenu-link">
+                  <i class="bi bi-person-badge"></i>
+                  <span>Driver Settings</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- --- FINANCE --- -->
+          <li class="nav-section-title">
+            <span>Finance</span>
+          </li>
+
+          <!-- Sales Invoicing -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="Sales Invoicing">
+              <i class="bi bi-receipt"></i>
+              <span class="nav-text">Sales Invoicing</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Sales-invoice-create.html" class="submenu-link">
+                  <i class="bi bi-receipt"></i>
+                  <span>Sales Invoice Reports</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- Treasury Management -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="Treasury Management">
+              <i class="bi bi-cash-coin"></i>
+              <span class="nav-text">Treasury Management</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Treasury-master.html" class="submenu-link">
+                  <i class="bi bi-card-heading"></i>
+                  <span>Treasury Master</span>
+                </a>
+              </li>
+
+              <li class="submenu-item">
+                <a href="Treasury-transaction-log.html" class="submenu-link">
+                  <i class="bi bi-clock-history"></i>
+                  <span>Treasury Transaction Log</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- --- SYSTEM --- -->
+          <li class="nav-section-title">
+            <span>System</span>
+          </li>
+
+          <!-- Configurations -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="Configurations">
+              <i class="bi bi-gear-wide-connected"></i>
+              <span class="nav-text">Configurations</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Auto-number-configuration.html" class="submenu-link">
+                  <i class="bi bi-gear"></i>
+                  <span>Auto Number Configuration</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+        </ul>
+      </nav>
+    </aside>
+
+    <!-- Notification Panel -->
+    <div class="notification-panel" id="notificationPanel">
+      <!-- Panel Header -->
+      <div class="notification-header">
+        <h3 class="notification-title">Notifications</h3>
+        <button
+          class="notification-close"
+          id="notificationClose"
+          aria-label="Close"
+        >
+          <i class="bi bi-x-lg"></i>
+        </button>
+      </div>
+
+      <!-- Panel Content -->
+      <div class="notification-content">
+        <!-- Settings Button -->
+        <div class="notification-settings">
+          <button
+            class="settings-btn"
+            id="notificationSettingsBtn"
+            aria-label="Settings"
+          >
+            <i class="bi bi-gear"></i>
+          </button>
+        </div>
+
+        <!-- Preferences Popup -->
+        <div class="preferences-popup" id="preferencesPopup">
+          <h4 class="preferences-title">Preferences</h4>
+          <div class="ce-item">
+            <div class="preference-label">
+              <span>Allow Notifications</span>
+              <i
+                class="bi bi-info-circle"
+                title="Enable or disable all notifications"
+              ></i>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="allowNotifications" checked />
+              <span class="toggle-slider">
+                <span class="toggle-text-on">Enable</span>
+                <span class="toggle-text-off">Disable</span>
+              </span>
+            </label>
+          </div>
+          <div class="preference-item">
+            <label class="preference-checkbox">
+              <input type="checkbox" checked />
+              <span class="checkmark"></span>
+              <span>Record Comments</span>
+            </label>
+          </div>
+          <div class="preference-item">
+            <label class="preference-checkbox">
+              <input type="checkbox" checked />
+              <span class="checkmark"></span>
+              <span>Blueprint Transitions</span>
+            </label>
+          </div>
+          <button class="btn btn-primary preferences-done" id="preferencesDone">
+            Done
+          </button>
+        </div>
+
+        <!-- Empty State -->
+        <div class="notification-empty">
+          <div class="empty-icon">
+            <i class="bi bi-bell"></i>
+            <span class="sparkle sparkle-1">&#10022;</span>
+            <span class="sparkle sparkle-2">&#10023;</span>
+            <span class="sparkle sparkle-3">&#176;</span>
+          </div>
+          <h4 class="empty-title">No notifications</h4>
+          <p class="empty-text">You are yet to receive notifications</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notification Panel Overlay -->
+    <div class="notification-overlay" id="notificationOverlay"></div>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- Top Header -->
+      <header class="top-header">
+        <div class="header-left">
+          <button
+            class="header-toggle-btn"
+            id="sidebarCollapseBtn"
+            title="Toggle Sidebar"
+          >
+            <i class="bi bi-list"></i>
+          </button>
+          <div class="header-search">
+            <i class="bi bi-search"></i>
+            <input
+              type="text"
+              placeholder="Search shipments, clients, addresses..."
+            />
+          </div>
+        </div>
+        <div class="header-datetime">
+          <span class="header-date" id="headerDate"
+            >Tuesday, 28 January 2026</span
+          >
+          <span class="header-time" id="headerTime">3:52 PM</span>
+        </div>
+        <div class="header-right">
+          <button class="header-icon-btn" title="Switch Language">
+            <i class="bi bi-translate"></i>
+          </button>
+          <button class="header-icon-btn" title="Notifications">
+            <i class="bi bi-bell"></i>
+            <span class="badge">3</span>
+          </button>
+          <div class="header-divider"></div>
+          <div class="header-user-wrapper">
+            <div class="header-user" id="headerUserToggle">
+              <div class="header-user-avatar">
+                <img
+                  src="https://ui-avatars.com/api/?name=Mark&background=5051f9&color=fff&size=40"
+                  alt="User"
+                />
+              </div>
+              <div class="header-user-info">
+                <span class="header-user-name">Mark</span>
+                <span class="header-user-role">Administrator</span>
+              </div>
+              <i class="bi bi-chevron-down header-user-chevron"></i>
+            </div>
+
+            <!-- Header User Dropdown -->
+            <div class="header-user-dropdown" id="headerUserDropdown">
+              <div class="header-dropdown-profile">
+                <div class="header-dropdown-avatar">
+                  <img
+                    src="https://ui-avatars.com/api/?name=Mark&background=e8e8e8&color=888&size=80"
+                    alt="User"
+                  />
+                </div>
+                <div class="header-dropdown-name">mark</div>
+                <div class="header-dropdown-email">mark@redsparkinfo.com</div>
+              </div>
+              <div class="header-dropdown-divider"></div>
+              <ul class="header-dropdown-menu">
+                <li>
+                  <a href="#" class="header-dropdown-item">
+                    <i class="bi bi-person"></i>
+                    <span>My Account</span>
+                  </a>
+                </li>
+                <li>
+                  <a href="#" class="header-dropdown-item">
+                    <i class="bi bi-box-arrow-right"></i>
+                    <span>Sign out</span>
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- Page Header -->
+      <div class="page-header">
+        <nav aria-label="breadcrumb">
+          <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+              <a href="index.html">Dashboard</a>
+            </li>
+            <li class="breadcrumb-item">Master Data</li>
+            <li class="breadcrumb-item">Services Management</li>
+            <li class="breadcrumb-item active" aria-current="page">
+              Price List Master
+            </li>
+          </ol>
+        </nav>
+        <div class="page-header-row">
+          <div class="page-header-left">
+            <h1 class="page-title">Create Price List</h1>
+            <p class="page-subtitle">
+              Fill in the details below to register a new price list in the
+              system.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Price List Form -->
+      <form id="priceListForm">
+        <!-- Section 1: Header -->
+        <div class="form-card" data-section="1">
+          <div class="form-card-header">
+            <div class="form-card-icon blue">
+              <i class="bi bi-info-circle"></i>
+            </div>
+            <div class="form-card-header-text">
+              <h2 class="form-card-title">Header</h2>
+              <p class="form-card-desc">
+                Price list identity, target, status, currency, and validity.
+              </p>
+            </div>
+          </div>
+          <div class="form-card-body">
+            <div class="field-group">
+              <h3 class="field-group-title">
+                <i class="bi bi-fingerprint"></i>
+                Identity
+              </h3>
+              <div class="fields-grid cols-3">
+                <div class="field">
+                  <label for="priceListCode" class="form-label"
+                    >Price List Code
+                    <span class="required">*</span>
+                  </label>
+                  <div class="input-icon-wrapper">
+                    <i class="bi bi-hash"></i>
+                    <input
+                      type="text"
+                      class="form-control has-icon"
+                      id="priceListCode"
+                      placeholder="e.g. PL-001"
+                    />
+                  </div>
+                  <span class="field-hint">Unique price list identifier</span>
+                </div>
+                <div class="field">
+                  <label for="priceListNameEn" class="form-label"
+                    >Price List Name (English)
+                    <span class="required">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="priceListNameEn"
+                    placeholder="Enter English name"
+                  />
+                  <span class="field-hint">Shown in lists and reports</span>
+                </div>
+                <div class="field">
+                  <label for="priceListNameAr" class="form-label"
+                    >Price List Name (Arabic)</label
+                  >
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="priceListNameAr"
+                    placeholder="الاسم العربي"
+                    dir="rtl"
+                  />
+                </div>
+              </div>
+            </div>
+            <div class="field-group">
+              <h3 class="field-group-title">
+                <i class="bi bi-bullseye"></i>
+                Target &amp; Currency
+              </h3>
+              <div class="fields-grid cols-3">
+                <div class="field">
+                  <label for="targetClient" class="form-label"
+                    >Client
+                    <span class="required">*</span>
+                  </label>
+                  <select class="form-select" id="targetClient">
+                    <option value="" selected disabled>-Select client-</option>
+                    <option value="C-001">C-001 - Alsafa Transport Group</option>
+                    <option value="C-002">C-002 - Global Trans LLC</option>
+                    <option value="C-003">C-003 - Desert Logistics</option>
+                  </select>
+                  <span class="field-hint">Client this price list applies to.</span>
+                </div>
+                
+              </div>
+            </div>
+            <div class="field-group">
+              <h3 class="field-group-title">
+                <i class="bi bi-toggles"></i>
+                Status &amp; Validity
+              </h3>
+              <div class="fields-grid cols-3">
+                <div class="field">
+                  <label for="status" class="form-label"
+                    >Status
+                    <span class="required">*</span>
+                  </label>
+                  <select class="form-select" id="status">
+                    <option value="Active" selected>Active</option>
+                    <option value="Inactive">Inactive</option>
+                  </select>
+                  <span class="field-hint"
+                    >Inactive price lists are not available for selection.</span
+                  >
+                </div>
+                <div class="field">
+                  <label for="effectiveFrom" class="form-label"
+                    >Effective From
+                    <span class="required">*</span>
+                  </label>
+                  <div class="input-icon-wrapper">
+                    <i class="bi bi-calendar"></i>
+                    <input
+                      type="date"
+                      class="form-control has-icon"
+                      id="effectiveFrom"
+                    />
+                  </div>
+                  <span class="field-hint">Start date for this price list.</span>
+                </div>
+                <div class="field">
+                  <label for="effectiveTo" class="form-label"
+                    >Effective To</label
+                  >
+                  <div class="input-icon-wrapper">
+                    <i class="bi bi-calendar"></i>
+                    <input
+                      type="date"
+                      class="form-control has-icon"
+                      id="effectiveTo"
+                    />
+                  </div>
+                  <span class="field-hint">End date (leave empty for no end).</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 2: Item Lines (Sub-table) -->
+        <div class="form-card" data-section="2">
+          <div class="form-card-header">
+            <div class="form-card-icon amber">
+              <i class="bi bi-list-ul"></i>
+            </div>
+            <div class="form-card-header-text">
+              <h2 class="form-card-title">Item Lines</h2>
+              <p class="form-card-desc">
+                The price list consists of a header and multiple item lines.
+                Trip lines display route and inbound/outbound prices.
+              </p>
+            </div>
+          </div>
+          <div class="form-card-body">
+            <div class="pl-lines-toolbar">
+              <h3 class="pl-lines-title">Lines</h3>
+              <button
+                type="button"
+                class="eal-btn eal-btn-outline"
+                id="addLineBtn"
+              >
+                <i class="bi bi-plus-lg"></i>
+                <span>Add Line</span>
+              </button>
+            </div>
+
+            <div class="eal-table-wrap" style="box-shadow: none; border-radius: 0">
+              <table class="eal-table mb-0" id="priceListLinesTable">
+                <thead>
+                  <tr>
+                    <th style="width: 60px">SN</th>
+                    <th>Service Type</th>
+                    <th>Service Item</th>
+                    <th>Route</th>
+                    <th>Unit</th>
+                    <th>Sell Price</th>
+                    <th>Outbound Sell Price</th>
+                    <th>Inbound Sell Price</th>
+                    <th style="width: 120px">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="plLinesTbody">
+                  <tr class="pl-line" data-line>
+                    <td class="text-muted">1</td>
+                    <td>
+                      <select class="form-select form-select-sm pl-service-type" aria-label="Service Type">
+                        <option value="Service" selected>Service</option>
+                        <option value="Trip">Trip</option>
+                      </select>
+                    </td>
+                    <td>
+                      <select class="form-select form-select-sm" aria-label="Service Item">
+                        <option value="" selected disabled>-Select-</option>
+                        <option value="SV-003">SV-003 - Loading Service</option>
+                        <option value="SV-006">SV-006 - Doc Handling Fee</option>
+                      </select>
+                    </td>
+                    <td>
+                      <div class="pl-route-wrap" data-route-wrap style="display: none">
+                        <div class="pl-route-chip" title="JED ↔ RUH">
+                          <span>JED</span>
+                          <span class="pl-route-arrow" aria-hidden="true"
+                            ><i class="bi bi-arrow-left-right"></i
+                          ></span>
+                          <span>RUH</span>
+                        </div>
+                      </div>
+                      <span class="text-muted" data-route-na>&mdash;</span>
+                    </td>
+                    <td>
+                      <select class="form-select form-select-sm" aria-label="Unit">
+                        <option value="Service" selected>Service</option>
+                        <option value="Trip">Trip</option>
+                        <option value="Kg">Kg</option>
+                      </select>
+                    </td>
+                    <td>
+                      <input type="number" class="form-control form-control-sm pl-sell" placeholder="0.00" min="0" step="0.01" />
+                    </td>
+                    <td>
+                      <input type="number" class="form-control form-control-sm pl-out-sell" placeholder="0.00" min="0" step="0.01" disabled />
+                    </td>
+                    <td>
+                      <input type="number" class="form-control form-control-sm pl-in-sell" placeholder="0.00" min="0" step="0.01" disabled />
+                    </td>
+                    <td>
+                      <div class="eal-actions-cell">
+                        <button type="button" class="eal-row-btn danger pl-del" title="Delete row">
+                          <i class="bi bi-trash3"></i>
+                        </button>
+                        <button type="button" class="eal-row-btn pl-dup" title="Duplicate line">
+                          <i class="bi bi-files"></i>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+
+                  <tr class="pl-line" data-line>
+                    <td class="text-muted">2</td>
+                    <td>
+                      <select class="form-select form-select-sm pl-service-type" aria-label="Service Type">
+                        <option value="Service">Service</option>
+                        <option value="Trip" selected>Trip</option>
+                      </select>
+                    </td>
+                    <td>
+                      <select class="form-select form-select-sm" aria-label="Service Item">
+                        <option value="" disabled>-Select-</option>
+                        <option value="SV-001" selected>SV-001 - JED to RUH</option>
+                        <option value="SV-002">SV-002 - RUH to JED</option>
+                      </select>
+                    </td>
+                    <td>
+                      <div class="pl-route-wrap" data-route-wrap>
+                        <div class="pl-route-chip" title="JED ↔ RUH">
+                          <span>JED</span>
+                          <span class="pl-route-arrow" aria-hidden="true"
+                            ><i class="bi bi-arrow-left-right"></i
+                          ></span>
+                          <span>RUH</span>
+                        </div>
+                      </div>
+                      <span class="text-muted" data-route-na style="display: none">&mdash;</span>
+                    </td>
+                    <td>
+                      <select class="form-select form-select-sm" aria-label="Unit">
+                        <option value="Trip" selected>Trip</option>
+                        <option value="Service">Service</option>
+                        <option value="Kg">Kg</option>
+                      </select>
+                    </td>
+                    <td>
+                      <input type="number" class="form-control form-control-sm pl-sell" placeholder="0.00" min="0" step="0.01" value="950.00" />
+                    </td>
+                    <td>
+                      <input type="number" class="form-control form-control-sm pl-out-sell" placeholder="0.00" min="0" step="0.01" value="950.00" />
+                    </td>
+                    <td>
+                      <input type="number" class="form-control form-control-sm pl-in-sell" placeholder="0.00" min="0" step="0.01" value="1100.00" />
+                    </td>
+                    <td>
+                      <div class="eal-actions-cell">
+                        <button type="button" class="eal-row-btn danger pl-del" title="Delete row">
+                          <i class="bi bi-trash3"></i>
+                        </button>
+                        <button type="button" class="eal-row-btn pl-dup" title="Duplicate line">
+                          <i class="bi bi-files"></i>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="pl-totals">
+              <div class="pl-total-card">
+                <div class="pl-total-label">Total Items</div>
+                <div class="pl-total-value" id="totalItems">2</div>
+              </div>
+              <div class="pl-total-card">
+                <div class="pl-total-label">Total Service Items</div>
+                <div class="pl-total-value" id="totalServiceItems">1</div>
+              </div>
+              <div class="pl-total-card">
+                <div class="pl-total-label">Total Trip Item</div>
+                <div class="pl-total-value" id="totalTripItems">1</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-actions-bar">
+          <div class="form-actions-left">
+            <button type="reset" class="btn btn-outline-secondary">
+              <i class="bi bi-arrow-counterclockwise"></i>
+              Reset Form
+            </button>
+          </div>
+          <div class="form-actions-right">
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-check-circle"></i>
+              Save Price List
+            </button>
+          </div>
+        </div>
+      </form>
+    </main>
+
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Custom JS -->
+    <script src="Javascript/main.js"></script>
+
+    <script>
+      (function () {
+        const tbody = document.getElementById("plLinesTbody");
+        const addBtn = document.getElementById("addLineBtn");
+        const totalItemsEl = document.getElementById("totalItems");
+        const totalServiceEl = document.getElementById("totalServiceItems");
+        const totalTripEl = document.getElementById("totalTripItems");
+
+        if (!tbody) return;
+
+        function renumber() {
+          const rows = Array.from(tbody.querySelectorAll("tr[data-line]"));
+          rows.forEach((r, idx) => {
+            const snCell = r.querySelector("td");
+            if (snCell) snCell.textContent = String(idx + 1);
+          });
+        }
+
+        function updateTotals() {
+          const rows = Array.from(tbody.querySelectorAll("tr[data-line]"));
+          let serviceCount = 0;
+          let tripCount = 0;
+
+          rows.forEach((r) => {
+            const typeSel = r.querySelector(".pl-service-type");
+            const type = typeSel ? typeSel.value : "Service";
+            if (type === "Trip") tripCount += 1;
+            else serviceCount += 1;
+          });
+
+          if (totalItemsEl) totalItemsEl.textContent = String(rows.length);
+          if (totalServiceEl) totalServiceEl.textContent = String(serviceCount);
+          if (totalTripEl) totalTripEl.textContent = String(tripCount);
+        }
+
+        function applyTripVisibility(row) {
+          const typeSel = row.querySelector(".pl-service-type");
+          const isTrip = typeSel && typeSel.value === "Trip";
+
+          const routeWrap = row.querySelector("[data-route-wrap]");
+          const routeNa = row.querySelector("[data-route-na]");
+          const outSell = row.querySelector(".pl-out-sell");
+          const inSell = row.querySelector(".pl-in-sell");
+
+          if (routeWrap) routeWrap.style.display = isTrip ? "" : "none";
+          if (routeNa) routeNa.style.display = isTrip ? "none" : "";
+
+          if (outSell) {
+            outSell.disabled = !isTrip;
+            if (!isTrip) outSell.value = "";
+          }
+          if (inSell) {
+            inSell.disabled = !isTrip;
+            if (!isTrip) inSell.value = "";
+          }
+        }
+
+        function wireRow(row) {
+          const typeSel = row.querySelector(".pl-service-type");
+          const delBtn = row.querySelector(".pl-del");
+          const dupBtn = row.querySelector(".pl-dup");
+
+          if (typeSel) {
+            typeSel.addEventListener("change", function () {
+              applyTripVisibility(row);
+              updateTotals();
+            });
+          }
+
+          if (delBtn) {
+            delBtn.addEventListener("click", function () {
+              row.remove();
+              renumber();
+              updateTotals();
+            });
+          }
+
+          if (dupBtn) {
+            dupBtn.addEventListener("click", function () {
+              const clone = row.cloneNode(true);
+              tbody.insertBefore(clone, row.nextSibling);
+              // remove old listeners by rewiring
+              wireRow(clone);
+              applyTripVisibility(clone);
+              renumber();
+              updateTotals();
+            });
+          }
+
+          applyTripVisibility(row);
+        }
+
+        Array.from(tbody.querySelectorAll("tr[data-line]")).forEach(wireRow);
+        renumber();
+        updateTotals();
+
+        if (addBtn) {
+          addBtn.addEventListener("click", function () {
+            const first = tbody.querySelector("tr[data-line]");
+            if (!first) return;
+            const clone = first.cloneNode(true);
+
+            // clear inputs
+            clone.querySelectorAll("input").forEach((i) => (i.value = ""));
+            clone.querySelectorAll("select").forEach((s) => {
+              if (s.classList.contains("pl-service-type")) s.value = "Service";
+              else s.selectedIndex = 0;
+            });
+
+            tbody.appendChild(clone);
+            wireRow(clone);
+            renumber();
+            updateTotals();
+          });
+        }
+      })();
+    </script>
+  </body>
+</html>

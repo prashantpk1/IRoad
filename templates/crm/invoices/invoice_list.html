@@ -55,15 +55,6 @@
   </div>
 </div>
 
-{% if messages %}
-  {% for message in messages %}
-    <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">
-      {{ message }}
-      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
-  {% endfor %}
-{% endif %}
-
 <div class="eal-table-card">
   <form method="get" action="{% url 'invoice_list' %}" class="eal-toolbar">
     <div class="eal-toolbar-left" style="width: 100%; display: flex; gap: 16px; align-items: center; flex-wrap: wrap">
@@ -223,13 +214,14 @@
               {% if inv.status == 'Issued' %}
                 <span class="status-badge active">{{ inv.get_status_display }}</span>
               {% elif inv.status == 'Paid' %}
-                <span class="status-badge active" style="background-color: var(--success-bg); color: var(--success-text);">{{ inv.get_status_display }}</span>
+                <span class="status-badge success">{{ inv.get_status_display }}</span>
               {% elif inv.status == 'Void' %}
                 <span class="status-badge inactive">{{ inv.get_status_display }}</span>
               {% else %}
-                <span class="status-badge pending">{{ inv.get_status_display }}</span>
+                <span class="status-badge warning">{{ inv.get_status_display }}</span>
               {% endif %}
             </td>
+
             <td>{{ inv.issue_date|date:'d M Y' }}</td>
             <td>
               <div class="eal-actions-cell">

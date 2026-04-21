@@ -1,0 +1,158 @@
+﻿<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="iRoad Admin Dashboard - OTP Verification"
+    />
+    <title>Verify OTP | iRoad Admin</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Bootstrap Icons -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css"
+      rel="stylesheet"
+    />
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="Style/style.css" />
+    <link rel="stylesheet" href="Style/responsive.css" />
+  </head>
+
+  <body class="auth-body">
+    <div class="auth-container">
+      <!-- Left Panel - Decorative -->
+      <div class="auth-left">
+        <div class="auth-left-content">
+          <h2 class="auth-tagline">Verification <br />In Progress.</h2>
+          <p class="auth-description">
+            Enter the 6-digit code we sent to your email to verify your
+            identity.
+          </p>
+        </div>
+        <div class="auth-left-overlay"></div>
+      </div>
+
+      <!-- Right Panel - Form -->
+      <div class="auth-right">
+        <!-- Back Button Top Right -->
+        <a href="reset-password.html" class="auth-back-btn">
+          <i class="bi bi-arrow-left"></i>
+          Back
+        </a>
+        <div class="auth-form-container">
+          <div class="auth-form-header">
+            <div class="auth-brand">
+              <span class="auth-logo">i<span>Road</span></span>
+            </div>
+            <h1 class="auth-title">Enter Verification Code</h1>
+            <p class="auth-subtitle">
+              We've sent a 6-digit verification code to your email address.
+            </p>
+          </div>
+
+          <form class="auth-form" action="new-password.html" method="get">
+            <!-- OTP Fields -->
+            <div class="auth-field">
+              <label class="auth-label">Verification Code</label>
+              <div class="otp-container">
+                <input
+                  type="text"
+                  class="otp-input"
+                  maxlength="1"
+                  pattern="[0-9]"
+                  inputmode="numeric"
+                  required
+                />
+                <input
+                  type="text"
+                  class="otp-input"
+                  maxlength="1"
+                  pattern="[0-9]"
+                  inputmode="numeric"
+                  required
+                />
+                <input
+                  type="text"
+                  class="otp-input"
+                  maxlength="1"
+                  pattern="[0-9]"
+                  inputmode="numeric"
+                  required
+                />
+                <input
+                  type="text"
+                  class="otp-input"
+                  maxlength="1"
+                  pattern="[0-9]"
+                  inputmode="numeric"
+                  required
+                />
+                <input
+                  type="text"
+                  class="otp-input"
+                  maxlength="1"
+                  pattern="[0-9]"
+                  inputmode="numeric"
+                  required
+                />
+                <input
+                  type="text"
+                  class="otp-input"
+                  maxlength="1"
+                  pattern="[0-9]"
+                  inputmode="numeric"
+                  required
+                />
+              </div>
+            </div>
+
+            <!-- Resend OTP -->
+            <div class="auth-options auth-options-center">
+              <p class="auth-text">
+                Didn't receive the code?
+                <a href="#" class="auth-link">Resend OTP</a>
+              </p>
+            </div>
+
+            <!-- Submit Button -->
+            <button type="submit" class="auth-btn auth-btn-primary">
+              <i class="bi bi-check-lg"></i>
+              Verify
+            </button>
+          </form>
+
+          <div class="auth-footer">
+            <p>&copy; 2026 iRoad. All rights reserved.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // Auto-focus next OTP input
+      const otpInputs = document.querySelectorAll(".otp-input");
+      otpInputs.forEach((input, index) => {
+        input.addEventListener("input", (e) => {
+          if (e.target.value.length === 1 && index < otpInputs.length - 1) {
+            otpInputs[index + 1].focus();
+          }
+        });
+        input.addEventListener("keydown", (e) => {
+          if (e.key === "Backspace" && e.target.value === "" && index > 0) {
+            otpInputs[index - 1].focus();
+          }
+        });
+      });
+    </script>
+  </body>
+</html>

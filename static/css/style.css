@@ -2487,69 +2487,104 @@ textarea.form-control {
 
 /* ============================================
    Status Badges for Data Tables
-   Standardized, clean badge design
+/* ============================================
+   Premium Badge System (Status & Value)
    ============================================ */
 .status-badge {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 4px 10px;
+  gap: 8px;
+  padding: 4px 12px;
   font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  border-radius: 6px;
-  text-transform: uppercase;
+  font-weight: 600;
+  border-radius: 20px;
   white-space: nowrap;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   border: 1px solid transparent;
+  line-height: 1.2;
+}
+
+.status-badge::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  display: inline-block;
+  opacity: 0.8;
 }
 
 .status-badge:hover {
   transform: translateY(-1px);
   filter: brightness(0.95);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
-/* Enabled / Active / Success state */
-.status-badge.enabled,
+/* Success / Active / Enabled */
 .status-badge.active,
-.status-badge.success {
-  background: rgba(16, 185, 129, 0.12);
+.status-badge.success,
+.status-badge.enabled {
+  background: rgba(16, 185, 129, 0.08);
   color: #10b981;
-  border-color: rgba(16, 185, 129, 0.2);
+  border-color: rgba(16, 185, 129, 0.15);
 }
 
-/* Disabled / Inactive / Suspended state */
-.status-badge.disabled,
+/* Danger / Inactive / Disabled / Error */
 .status-badge.inactive,
-.status-badge.suspended {
-  background: rgba(239, 68, 68, 0.12);
-  color: #ef4444;
-  border-color: rgba(239, 68, 68, 0.2);
+.status-badge.disabled,
+.status-badge.danger,
+.status-badge.error {
+  background: rgba(244, 63, 94, 0.08);
+  color: #f43f5e;
+  border-color: rgba(244, 63, 94, 0.15);
 }
 
-/* Pending / Warning / Amber state */
+/* Warning / Pending / Suspended */
+.status-badge.warning,
 .status-badge.pending,
-.status-badge.warning {
-  background: rgba(245, 158, 11, 0.12);
+.status-badge.suspended {
+  background: rgba(245, 158, 11, 0.08);
   color: #f59e0b;
-  border-color: rgba(245, 158, 11, 0.2);
+  border-color: rgba(245, 158, 11, 0.15);
 }
 
-/* Blue / Info state */
+/* Info / Primary / Update / Create */
 .status-badge.info,
-.status-badge.primary {
-  background: rgba(80, 81, 249, 0.12);
-  color: var(--primary-color);
+.status-badge.primary,
+.status-badge.update,
+.status-badge.create {
+  background: rgba(80, 81, 249, 0.08);
+  color: #5051f9;
+  border-color: rgba(80, 81, 249, 0.15);
+}
+
+/* Expired / Neutral */
+.status-badge.expired,
+.status-badge.neutral {
+  background: rgba(100, 116, 139, 0.08);
+  color: #64748b;
+  border-color: rgba(100, 116, 139, 0.15);
+}
+
+/* Value Badge (for data counts, names, IDs) */
+.value-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 6px;
+  background: rgba(80, 81, 249, 0.06);
+  color: #5051f9;
+  border: 1px solid rgba(80, 81, 249, 0.1);
+  white-space: nowrap;
+}
+
+.value-badge:hover {
+  background: rgba(80, 81, 249, 0.1);
   border-color: rgba(80, 81, 249, 0.2);
 }
 
-/* Expired state */
-.status-badge.expired {
-  background: rgba(100, 116, 139, 0.12);
-  color: #64748b;
-  border-color: rgba(100, 116, 139, 0.2);
-}
 
 /* Settings-style layout reused across settings forms (Client, Location, Route, etc.) */
 .setting-row {

@@ -1,0 +1,3359 @@
+{% extends 'iroad_tenants/base.html' %}
+
+{% block title %}Dashboard | iRoad Admin{% endblock %}
+
+{% block content %}
+      <!-- ── Dashboard Toolbar ── -->
+      <div class="dashboard-toolbar">
+        <div class="toolbar-left">
+          <div class="page-title">Dashboard</div>
+          <div class="toolbar-subtitle">
+            Transport Company Command Center — Real-time insights
+          </div>
+        </div>
+        <div class="toolbar-right">
+          <div class="view-toggle">
+            <button class="vt-btn active" data-view="overview">Overview</button>
+            <button class="vt-btn" data-view="operations-hub">
+              Operations Hub
+            </button>
+            <button class="vt-btn" data-view="fleet-integrity-hub">
+              Fleet Integrity Hub
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="overview-shell" data-section="overview">
+        <div class="overview-topbar db-fade">
+          <div class="overview-search">
+            <i class="bi bi-search"></i>
+            <input
+              type="text"
+              placeholder="Search invoices, support tickets, or resource logs..."
+            />
+          </div>
+          <!-- <span class="overview-secure-pill">Environment Secured &amp; Monitored</span> -->
+        </div>
+
+        <div class="overview-actions db-fade">
+          <div class="fih-action-card">
+            <div class="fih-icon text-primary">
+              <i class="bi bi-bar-chart-line"></i>
+            </div>
+            <div class="fih-label">Upgrade Plan</div>
+          </div>
+          <div class="fih-action-card">
+            <div class="fih-icon text-primary">
+              <i class="bi bi-cart-dash"></i>
+            </div>
+            <div class="fih-label">Downgrade Plan</div>
+          </div>
+          <div class="fih-action-card">
+            <div class="fih-icon text-primary">
+              <i class="bi bi-receipt"></i>
+            </div>
+            <div class="fih-label">Billing Logs</div>
+          </div>
+          <div class="fih-action-card">
+            <div class="fih-icon text-primary">
+              <i class="bi bi-journal-check"></i>
+            </div>
+            <div class="fih-label">Payment Logs</div>
+          </div>
+          <div class="fih-action-card">
+            <div class="fih-icon text-success">
+              <i class="bi bi-person-plus"></i>
+            </div>
+            <div class="fih-label">Add Users</div>
+          </div>
+          <div class="fih-action-card">
+            <div class="fih-icon text-success">
+              <i class="bi bi-people"></i>
+            </div>
+            <div class="fih-label">Users</div>
+          </div>
+          <div class="fih-action-card">
+            <div class="fih-icon text-teal">
+              <i class="bi bi-ticket-detailed"></i>
+            </div>
+            <div class="fih-label">Create Support Ticket</div>
+          </div>
+          <div class="fih-action-card">
+            <div class="fih-icon text-teal">
+              <i class="bi bi-life-preserver"></i>
+            </div>
+            <div class="fih-label">Support Ticket</div>
+          </div>
+        </div>
+
+        <div class="db-card db-fade quota-analytics-card">
+          <div class="db-card-header">
+            <div class="db-card-title">Quota Analytics</div>
+            <span class="quota-analytics-badge">
+              <i class="bi bi-graph-up-arrow"></i> Last 4 Months
+            </span>
+          </div>
+
+          <div class="quota-grid">
+            <div class="quota-panel">
+              <div class="quota-panel-head">
+                <div class="quota-title">
+                  Total Fleet vs Active Drivers (Volume)
+                </div>
+                <span class="quota-chip">Monthly</span>
+              </div>
+              <div class="quota-chart-area">
+                <div class="quota-y-axis">
+                  <span>160</span>
+                  <span>120</span>
+                  <span>80</span>
+                  <span>40</span>
+                  <span>0</span>
+                </div>
+                <div class="quota-bars-wrap">
+                  <div class="quota-grid-lines"></div>
+                  <div class="quota-month-group">
+                    <div class="quota-bar truck" style="height: 50%"></div>
+                    <div class="quota-bar driver" style="height: 70%"></div>
+                    <span class="quota-month-label">Jan</span>
+                  </div>
+                  <div class="quota-month-group">
+                    <div class="quota-bar truck" style="height: 56%"></div>
+                    <div class="quota-bar driver" style="height: 78%"></div>
+                    <span class="quota-month-label">Feb</span>
+                  </div>
+                  <div class="quota-month-group">
+                    <div class="quota-bar truck" style="height: 62%"></div>
+                    <div class="quota-bar driver" style="height: 88%"></div>
+                    <span class="quota-month-label">Mar</span>
+                  </div>
+                  <div class="quota-month-group">
+                    <div class="quota-bar truck" style="height: 60%"></div>
+                    <div class="quota-bar driver" style="height: 90%"></div>
+                    <span class="quota-month-label">Apr</span>
+                  </div>
+                </div>
+              </div>
+              <div class="quota-legend">
+                <span><i class="dot truck"></i> Total Trucks</span>
+                <span><i class="dot driver"></i> Active Drivers</span>
+              </div>
+            </div>
+
+            <div class="quota-panel">
+              <div class="quota-panel-head">
+                <div class="quota-title">
+                  Global Package Consumption Mix (%)
+                </div>
+              </div>
+              <div class="quota-donut-wrap">
+                <div class="quota-donut"></div>
+              </div>
+              <div class="quota-legend multi">
+                <span><i class="dot purple"></i> Users</span>
+                <span><i class="dot indigo"></i> Trucks</span>
+                <span><i class="dot green"></i> Driver</span>
+                <span><i class="dot cyan"></i> Shipments</span>
+                <span><i class="dot amber"></i> Storage GB</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="db-card db-fade overview-intelligence">
+          <div class="db-card-header">
+            <div class="db-card-title">Plan &amp; Resources Intelligence</div>
+            <span class="active-package-badge"
+              ><i class="bi bi-box-seam"></i> Active Package</span
+            >
+          </div>
+          <div class="overview-intel-grid">
+            <div class="plan-panel">
+              <div class="plan-tier-card">
+                <div class="plan-tier-label">Active Subscriber Tier</div>
+                <div class="plan-tier-name">Professional Plan</div>
+                <div class="plan-tier-price">
+                  SAR 4,500.00 <span>/ month</span>
+                </div>
+                <div class="plan-renewal-label">Next Renewal Date</div>
+                <div class="plan-renewal-date">12 May 2026</div>
+                <i class="bi bi-crown-fill"></i>
+              </div>
+
+              <div class="plan-attributes-title">Package Attributes</div>
+              <div class="plan-attribute good">
+                <i class="bi bi-check2-square"></i>
+                <span>Driver App: Active</span>
+              </div>
+              <div class="plan-attribute good">
+                <i class="bi bi-cloud-check"></i>
+                <span>Backup Restore Level: Premium</span>
+              </div>
+            </div>
+
+            <div class="resource-panel">
+              <div class="resource-header">
+                <div class="resource-title">
+                  <i class="bi bi-grid-3x3-gap-fill"></i>
+                  <span>Resource Consumption Matrix</span>
+                </div>
+                <span class="resource-label">Live Usage Stats</span>
+              </div>
+
+              <div class="resource-grid">
+                <div class="resource-item">
+                  <div class="resource-top">
+                    <span>Internal Users</span>
+                    <strong>80%</strong>
+                  </div>
+                  <div class="resource-value">12 <span>/ 15</span></div>
+                  <div class="resource-progress">
+                    <span class="bar indigo" style="width: 80%"></span>
+                  </div>
+                </div>
+                <div class="resource-item">
+                  <div class="resource-top">
+                    <span>Internal Trucks</span>
+                    <strong>82%</strong>
+                  </div>
+                  <div class="resource-value">82 <span>/ 100</span></div>
+                  <div class="resource-progress">
+                    <span class="bar purple" style="width: 82%"></span>
+                  </div>
+                </div>
+                <!-- <div class="resource-item">
+                  <div class="resource-top">
+                    <span>External Trucks</span>
+                    <strong>40%</strong>
+                  </div>
+                  <div class="resource-value">4 <span>/ 10</span></div>
+                  <div class="resource-progress">
+                    <span class="bar blue" style="width: 40%"></span>
+                  </div>
+                </div> -->
+                <div class="resource-item">
+                  <div class="resource-top">
+                    <span>Active Drivers</span>
+                    <strong>96%</strong>
+                  </div>
+                  <div class="resource-value">145 <span>/ 150</span></div>
+                  <div class="resource-progress">
+                    <span class="bar green" style="width: 96%"></span>
+                  </div>
+                </div>
+                <div class="resource-item">
+                  <div class="resource-top">
+                    <span>Monthly Shipments</span>
+                    <strong>69%</strong>
+                  </div>
+                  <div class="resource-value">3,450 <span>/ 5,000</span></div>
+                  <div class="resource-progress">
+                    <span class="bar cyan" style="width: 69%"></span>
+                  </div>
+                </div>
+                <div class="resource-item">
+                  <div class="resource-top">
+                    <span>Storage GB</span>
+                    <strong>75%</strong>
+                  </div>
+                  <div class="resource-value">188 <span>/ 250</span></div>
+                  <div class="resource-progress">
+                    <span class="bar amber" style="width: 75%"></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="operations-hub-shell" data-section="operations-hub">
+        <div class="overview-topbar db-fade">
+          <div class="overview-search">
+            <i class="bi bi-search"></i>
+            <input
+              type="text"
+              placeholder="Search invoices, support tickets, or resource logs..."
+            />
+          </div>
+          <!-- <span class="overview-secure-pill">Environment Secured &amp; Monitored</span> -->
+        </div>
+        <div class="ops-action-grid">
+          <div class="fih-action-card">
+            <div class="fih-icon text-primary">
+              <i class="bi bi-calendar-plus"></i>
+            </div>
+            <div class="fih-label">Create Booking</div>
+          </div>
+          <div class="fih-action-card">
+            <div class="fih-icon text-primary">
+              <i class="bi bi-journal-check"></i>
+            </div>
+            <div class="fih-label">Bookings</div>
+          </div>
+          <div class="fih-action-card">
+            <div class="fih-icon text-primary">
+              <i class="bi bi-box-seam"></i>
+            </div>
+            <div class="fih-label">Create Shipments</div>
+          </div>
+          <div class="fih-action-card">
+            <div class="fih-icon text-primary">
+              <i class="bi bi-truck-front"></i>
+            </div>
+            <div class="fih-label">Shipments</div>
+          </div>
+          <div class="fih-action-card">
+            <div class="fih-icon text-success">
+              <i class="bi bi-cloud-arrow-up"></i>
+            </div>
+            <div class="fih-label">Upload POD</div>
+          </div>
+          <div class="fih-action-card">
+            <div class="fih-icon text-success">
+              <i class="bi bi-file-earmark-check"></i>
+            </div>
+            <div class="fih-label">PODs</div>
+          </div>
+          <div class="fih-action-card">
+            <div class="fih-icon text-teal">
+              <i class="bi bi-file-earmark-arrow-up"></i>
+            </div>
+            <div class="fih-label">Receive Hard POD</div>
+          </div>
+          <div class="fih-action-card">
+            <div class="fih-icon text-purple"><i class="bi bi-truck"></i></div>
+            <div class="fih-label">Create Movements</div>
+          </div>
+          <div class="fih-action-card">
+            <div class="fih-icon text-purple">
+              <i class="bi bi-arrow-repeat"></i>
+            </div>
+            <div class="fih-label">Movements</div>
+          </div>
+          <div class="fih-action-card">
+            <div class="fih-icon text-teal">
+              <i class="bi bi-pie-chart"></i>
+            </div>
+            <div class="fih-label">Reports</div>
+          </div>
+        </div>
+
+        <div class="db-card p-0 fih-tabs-card db-fade">
+          <div class="fih-tabs-header">
+            <button class="fih-tab ops-tab-btn active" data-ops-tab="bookings">
+              BOOKINGS
+            </button>
+            <button class="fih-tab ops-tab-btn" data-ops-tab="shipments">
+              SHIPMENTS
+            </button>
+            <button class="fih-tab ops-tab-btn" data-ops-tab="pod">POD</button>
+          </div>
+
+          <div class="fih-tabs-body">
+            <!-- Bookings Tab -->
+            <div class="fih-pane ops-pane active" data-ops-pane="bookings">
+              <div class="fih-metrics-grid">
+                <div class="fih-metric green">
+                  <div class="fih-m-title">ACTIVE BOOKINGS</div>
+                  <div class="fih-m-val count-up" data-target="84">0</div>
+                </div>
+                <div class="fih-metric blue">
+                  <div class="fih-m-title">EXECUTED BOOKINGS</div>
+                  <div class="fih-m-val count-up" data-target="312">0</div>
+                </div>
+                <div class="fih-metric red">
+                  <div class="fih-m-title">CANCELLED BOOKINGS</div>
+                  <div class="fih-m-val count-up" data-target="12">0</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Shipments Tab -->
+            <div class="fih-pane ops-pane" data-ops-pane="shipments">
+              <div class="fih-metrics-grid">
+                <div class="fih-metric green">
+                  <div class="fih-m-title">ACTIVE SHIPMENTS</div>
+                  <div class="fih-m-val count-up" data-target="124">0</div>
+                </div>
+                <div class="fih-metric blue">
+                  <div class="fih-m-title">EXECUTED SHIPMENTS</div>
+                  <div class="fih-m-val count-up" data-target="942">0</div>
+                </div>
+                <div class="fih-metric red">
+                  <div class="fih-m-title">CANCELLED SHIPMENTS</div>
+                  <div class="fih-m-val count-up" data-target="24">0</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- POD Tab -->
+            <div class="fih-pane ops-pane" data-ops-pane="pod">
+              <div class="fih-metrics-grid">
+                <div class="fih-metric green">
+                  <div class="fih-m-title">COMPLETED POD</div>
+                  <div class="fih-m-val count-up" data-target="856">0</div>
+                </div>
+                <div class="fih-metric orange">
+                  <div class="fih-m-title">INCOMPLETE POD</div>
+                  <div class="fih-m-val count-up" data-target="35">0</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Surveillance Section -->
+        <div class="db-card surveillance-card mt-4">
+          <div class="surveillance-header">
+            <h2 class="surveillance-title">Fleet GPS Surveillance</h2>
+            <div class="surveillance-tabs" role="tablist">
+              <button class="surv-tab-btn active" data-surv-tab="live-map">
+                Live Map
+              </button>
+              <button class="surv-tab-btn" data-surv-tab="detailed-tracking">
+                Detailed Tracking
+              </button>
+            </div>
+            <button
+              class="btn btn-primary d-flex align-items-center gap-2 refresh-ops-btn"
+            >
+              <i class="bi bi-arrow-repeat"></i> Refresh Ops
+            </button>
+          </div>
+
+          <div class="surveillance-content">
+            <!-- LIVE MAP PANE -->
+            <div class="surv-pane active" data-surv-pane="live-map">
+              <div class="map-container">
+                <iframe
+                  src="https://www.google.com/maps/embed?pb=!1m14!1m12!1m3!1d14408.825227749005!2d46.6753!3d24.7136!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!5e0!3m2!1sen!2ssa!4v1714000000000!5m2!1sen!2ssa"
+                  width="100%"
+                  height="100%"
+                  style="border: 0"
+                  allowfullscreen=""
+                  loading="lazy"
+                  referrerpolicy="no-referrer-when-downgrade"
+                ></iframe>
+
+                <div class="map-overlay-layer"></div>
+
+                <!-- Overlays -->
+                <div class="map-marker" style="top: 30%; left: 35%">
+                  <div class="marker-label">
+                    <i class="bi bi-truck"></i> 1234 ABC
+                  </div>
+                  <div class="marker-pin blue"></div>
+                </div>
+                <div class="map-marker" style="top: 25%; left: 65%">
+                  <div class="marker-label">
+                    <i class="bi bi-truck"></i> 7788 DMM
+                  </div>
+                  <div class="marker-pin blue"></div>
+                </div>
+                <div class="map-marker" style="top: 45%; left: 55%">
+                  <div class="marker-label">
+                    <i class="bi bi-truck"></i> 9901 KSA
+                  </div>
+                  <div class="marker-pin blue"></div>
+                </div>
+                <div
+                  class="map-marker orange-marker"
+                  style="top: 60%; left: 20%"
+                >
+                  <div class="marker-label border-orange">
+                    <i class="bi bi-truck"></i> 4422 JED
+                  </div>
+                  <div class="marker-pin orange"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- DETAILED TRACKING PANE -->
+            <div class="surv-pane" data-surv-pane="detailed-tracking">
+              <div class="detailed-layout">
+                <!-- LEFT SIDE -->
+                <div class="detailed-sidebar">
+                  <div class="det-subtitle">CURRENT SHIPMENT DETAIL</div>
+                  <div class="det-title">#TRP-2026-1284</div>
+                  <div class="det-statuses">
+                    <span class="badge-status in-transit">IN TRANSIT</span>
+                    <span class="badge-status on-time">ON TIME</span>
+                  </div>
+
+                  <div class="det-route">
+                    <div class="route-point">
+                      <div class="route-lbl">DEPARTURE</div>
+                      <div class="route-city">Riyadh Hub</div>
+                      <div class="route-time">05/04/2026 - 08:00 AM</div>
+                    </div>
+                    <div class="route-point text-end">
+                      <div class="route-lbl">ARRIVAL (EST)</div>
+                      <div class="route-city">Dammam Port</div>
+                      <div class="route-time">05/04/2026 - 14:30 PM</div>
+                    </div>
+                  </div>
+
+                  <div class="driver-card">
+                    <div class="driver-avatar dark">KR</div>
+                    <div class="driver-details">
+                      <div class="driver-name">Khalid Al-Rashidi</div>
+                      <div class="driver-plate">PLATE: 22101 ر ب ا</div>
+                    </div>
+                    <i class="bi bi-telephone-fill text-primary"></i>
+                  </div>
+
+                  <div class="shipment-history">
+                    <div class="hist-title">SHIPMENT HISTORY</div>
+                    <div class="hist-timeline">
+                      <div class="timeline-item completed">
+                        <div class="tl-icon"><i class="bi bi-check2"></i></div>
+                        <div class="tl-content">
+                          <div class="tl-head">
+                            <span class="tl-name">Pickup Complete</span>
+                            <span class="tl-time">08:15 AM</span>
+                          </div>
+                          <div class="tl-desc">Riyadh Industrial City</div>
+                        </div>
+                      </div>
+                      <div class="timeline-item current">
+                        <div class="tl-icon"><i class="bi bi-truck"></i></div>
+                        <div class="tl-content">
+                          <div class="tl-head">
+                            <span class="tl-name">Currently in Transit</span>
+                            <span class="tl-time">11:30 AM</span>
+                          </div>
+                          <div class="tl-desc">Near Hofuf Interchange</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- RIGHT SIDE: MAP -->
+                <div class="detailed-map-area">
+                  <!-- Search bar over map -->
+                  <div class="map-search-bar">
+                    <input type="text" value="SHP-2026-1284" disabled />
+                    <i class="bi bi-search search-icon"></i>
+                  </div>
+
+                  <div class="map-container">
+                    <iframe
+                      src="https://www.google.com/maps/embed?pb=!1m14!1m12!1m3!1d463325.2934005934!2d48.5!3d25.5!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!5e0!3m2!1sen!2ssa!4v1714000000000!5m2!1sen!2ssa"
+                      width="100%"
+                      height="100%"
+                      style="border: 0"
+                      allowfullscreen=""
+                      loading="lazy"
+                    ></iframe>
+
+                    <div class="map-overlay-layer"></div>
+
+                    <!-- Trajectory Graphic Overlay -->
+                    <svg
+                      class="trajectory-svg"
+                      width="100%"
+                      height="100%"
+                      viewBox="0 0 800 400"
+                      preserveAspectRatio="none"
+                      style="
+                        position: absolute;
+                        top: 0;
+                        left: 0;
+                        pointer-events: none;
+                      "
+                    >
+                      <path
+                        d="M 200,350 Q 500,100 700,200"
+                        fill="none"
+                        stroke="#8b5cf6"
+                        stroke-width="4"
+                        stroke-dasharray="8 8"
+                      />
+
+                      <!-- Start Dot -->
+                      <circle
+                        cx="200"
+                        cy="350"
+                        r="8"
+                        fill="#5051f9"
+                        stroke="#fff"
+                        stroke-width="3"
+                      />
+                      <!-- End Dot -->
+                      <circle
+                        cx="700"
+                        cy="200"
+                        r="10"
+                        fill="#ef4444"
+                        stroke="#fff"
+                        stroke-width="3"
+                      />
+
+                      <!-- Current Location marker -->
+                      <circle
+                        cx="560"
+                        cy="155"
+                        r="12"
+                        fill="#5051f9"
+                        fill-opacity="0.3"
+                      />
+                      <circle cx="560" cy="155" r="6" fill="#5051f9" />
+                    </svg>
+
+                    <!-- Hover label for current location -->
+                    <div
+                      class="location-popup"
+                      style="top: calc(39%); left: calc(63%)"
+                    >
+                      <div class="popup-speed">85 <span>km/h</span></div>
+                      <div class="popup-heading">HEADING<br />EAST</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Live Operations Management Section -->
+        <div class="db-card live-ops-card mt-4" style="padding: 0">
+          <div class="lom-header">
+            <h2 class="lom-title">Live Operations Management</h2>
+            <div class="lom-tabs">
+              <button class="lom-tab active" data-lom-tab="live-trips">
+                <i class="bi bi-truck"></i> Live Trips
+              </button>
+              <button class="lom-tab" data-lom-tab="live-movement">
+                <i class="bi bi-arrow-left-right"></i> Live Movement
+              </button>
+            </div>
+          </div>
+
+          <div class="live-ops-body" style="padding: 0; display: block">
+            <!-- Live Trips Tab -->
+            <div class="lom-pane active" data-lom-pane="live-trips">
+              <div class="table-responsive p-3">
+                <table class="eal-table m-0">
+                  <thead>
+                    <tr>
+                      <th>Booking Number</th>
+                      <th>Shipment Number</th>
+                      <th>Date</th>
+                      <th>Trip Type</th>
+                      <th>Route</th>
+                      <th>Truck</th>
+                      <th>Driver</th>
+                      <th style="text-align: right">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>
+                        <div class="lom-meta m-0">BOK-2026-440</div>
+                      </td>
+                      <td>
+                        <div class="lom-meta m-0">SHP-2026-1284</div>
+                      </td>
+                      <td>
+                        <div class="lom-meta m-0">
+                          <span style="color: #94a3b8">2 MINS AGO</span>
+                        </div>
+                      </td>
+                      <td>
+                        <div class="lom-badge blue d-inline-block">LOADED</div>
+                      </td>
+                      <td>
+                        <div class="lom-text">
+                          Yanbu Industrial
+                          <i class="bi bi-arrow-right"></i> Riyadh - Al Sulay
+                          Warehouse
+                        </div>
+                      </td>
+                      <td>
+                        <div class="lom-meta m-0">22101 RBA</div>
+                      </td>
+                      <td>
+                        <div class="lom-meta m-0">Driver Ahmed</div>
+                      </td>
+                      <td style="text-align: right">
+                        <div class="lom-badge blue d-inline-block">ON ROAD</div>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <div class="lom-meta m-0">BOK-2026-438</div>
+                      </td>
+                      <td>
+                        <div class="lom-meta m-0">SHP-2026-1290</div>
+                      </td>
+                      <td>
+                        <div class="lom-meta m-0">
+                          <span style="color: #94a3b8">15 MINS AGO</span>
+                        </div>
+                      </td>
+                      <td>
+                        <div class="lom-badge blue d-inline-block">EMPTY</div>
+                      </td>
+                      <td>
+                        <div class="lom-text">
+                          Jeddah Port <i class="bi bi-arrow-right"></i> Riyadh
+                          Dry Port
+                        </div>
+                      </td>
+                      <td>
+                        <div class="lom-meta m-0">9901 KSA</div>
+                      </td>
+                      <td>
+                        <div class="lom-meta m-0">Driver Khalid</div>
+                      </td>
+                      <td style="text-align: right">
+                        <div class="lom-badge blue d-inline-block">ON ROAD</div>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <div class="lom-meta m-0">BOK-2026-435</div>
+                      </td>
+                      <td>
+                        <div class="lom-meta m-0">SHP-2026-1305</div>
+                      </td>
+                      <td>
+                        <div class="lom-meta m-0">
+                          <span style="color: #94a3b8">1 H AGO</span>
+                        </div>
+                      </td>
+                      <td>
+                        <div class="lom-badge blue d-inline-block">LOADED</div>
+                      </td>
+                      <td>
+                        <div class="lom-text">
+                          Dammam Port <i class="bi bi-arrow-right"></i> Jubail
+                          Industrial
+                        </div>
+                      </td>
+                      <td>
+                        <div class="lom-meta m-0">1234 ABC</div>
+                      </td>
+                      <td>
+                        <div class="lom-meta m-0">Driver Mohammed</div>
+                      </td>
+                      <td style="text-align: right">
+                        <div class="lom-badge blue d-inline-block">ON ROAD</div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Live Movement Tab -->
+            <div class="lom-pane" data-lom-pane="live-movement">
+              <div class="table-responsive p-3">
+                <table class="eal-table m-0">
+                  <thead>
+                    <tr>
+                      <th>Movement No</th>
+                      <th>Date</th>
+                      <th>Type (loaded, Empty)</th>
+                      <th>Truck</th>
+                      <th>Driver</th>
+                      <th style="text-align: right">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>
+                        <div class="lom-meta m-0">MOV-24001</div>
+                      </td>
+                      <td>
+                        <div class="lom-meta m-0">
+                          <span style="color: #94a3b8">2 H AGO</span>
+                        </div>
+                      </td>
+                      <td>
+                        <div class="lom-badge blue d-inline-block">LOADED</div>
+                      </td>
+                      <td>
+                        <div class="lom-meta m-0">22101 RBA</div>
+                      </td>
+                      <td>
+                        <div class="lom-meta m-0">Driver Ahmed</div>
+                      </td>
+                      <td style="text-align: right">
+                        <div class="lom-badge blue d-inline-block">
+                          IN TRANSIT
+                        </div>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <div class="lom-meta m-0">MOV-24002</div>
+                      </td>
+                      <td>
+                        <div class="lom-meta m-0">
+                          <span style="color: #94a3b8">3 H AGO</span>
+                        </div>
+                      </td>
+                      <td>
+                        <div class="lom-badge green d-inline-block">EMPTY</div>
+                      </td>
+                      <td>
+                        <div class="lom-meta m-0">9901 KSA</div>
+                      </td>
+                      <td>
+                        <div class="lom-meta m-0">Driver Khalid</div>
+                      </td>
+                      <td style="text-align: right">
+                        <div class="lom-badge green d-inline-block">AT PICKUP</div>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <div class="lom-meta m-0">MOV-24003</div>
+                      </td>
+                      <td>
+                        <div class="lom-meta m-0">
+                          <span style="color: #94a3b8">1 H AGO</span>
+                        </div>
+                      </td>
+                      <td>
+                        <div class="lom-badge blue d-inline-block">LOADED</div>
+                      </td>
+                      <td>
+                        <div class="lom-meta m-0">1234 ABC</div>
+                      </td>
+                      <td>
+                        <div class="lom-meta m-0">Driver Mohammed</div>
+                      </td>
+                      <td style="text-align: right">
+                        <div class="lom-badge blue d-inline-block">IN TRANSIT</div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Recent Booking Tab -->
+            <div class="lom-pane" data-lom-pane="recent-booking">
+              <div class="table-responsive p-3">
+                <table class="eal-table m-0">
+                  <thead>
+                    <tr>
+                      <th style="width: 60px">Type</th>
+                      <th>Client</th>
+                      <th>Booking Ref & Time</th>
+                      <th style="text-align: right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>
+                        <div
+                          class="lom-icon purple mx-auto"
+                          style="width: 36px; height: 36px; font-size: 14px"
+                        >
+                          <i class="bi bi-calendar-event"></i>
+                        </div>
+                      </td>
+                      <td>
+                        <div class="lom-text">SABIC AGRI-NUTRIENTS</div>
+                      </td>
+                      <td>
+                        <div class="lom-meta m-0">
+                          BOK-2026-440 |
+                          <span style="color: #94a3b8">2 MINS AGO</span>
+                        </div>
+                      </td>
+                      <td style="text-align: right">
+                        <button class="lom-badge purple-btn">
+                          ALLOCATE FLEET
+                        </button>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <div
+                          class="lom-icon purple mx-auto"
+                          style="width: 36px; height: 36px; font-size: 14px"
+                        >
+                          <i class="bi bi-calendar-event"></i>
+                        </div>
+                      </td>
+                      <td><div class="lom-text">ARAMCO CHEMICALS</div></td>
+                      <td>
+                        <div class="lom-meta m-0">
+                          BOK-2026-438 |
+                          <span style="color: #94a3b8">15 MINS AGO</span>
+                        </div>
+                      </td>
+                      <td style="text-align: right">
+                        <button class="lom-badge purple-btn">
+                          ALLOCATE FLEET
+                        </button>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <div
+                          class="lom-icon purple mx-auto"
+                          style="width: 36px; height: 36px; font-size: 14px"
+                        >
+                          <i class="bi bi-calendar-event"></i>
+                        </div>
+                      </td>
+                      <td><div class="lom-text">MA'ADEN PHOSPHATE</div></td>
+                      <td>
+                        <div class="lom-meta m-0">
+                          BOK-2026-435 |
+                          <span style="color: #94a3b8">1 H AGO</span>
+                        </div>
+                      </td>
+                      <td style="text-align: right">
+                        <button class="lom-badge purple-btn">
+                          ALLOCATE FLEET
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Recent Shipment Tab -->
+            <div class="lom-pane" data-lom-pane="recent-shipment">
+              <div class="table-responsive p-3">
+                <table class="eal-table m-0">
+                  <thead>
+                    <tr>
+                      <th style="width: 60px">Type</th>
+                      <th>Route</th>
+                      <th>Shipment Ref</th>
+                      <th style="text-align: right">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>
+                        <div
+                          class="lom-icon green mx-auto"
+                          style="width: 36px; height: 36px; font-size: 14px"
+                        >
+                          <i class="bi bi-box-seam"></i>
+                        </div>
+                      </td>
+                      <td>
+                        <div class="lom-text">
+                          Riyadh Hub <i class="bi bi-arrow-right"></i> Jeddah
+                          Seaport
+                        </div>
+                      </td>
+                      <td>
+                        <div class="lom-meta m-0">
+                          SHP-2026-1284 |
+                          <span style="color: #94a3b8">DISPATCHED TODAY</span>
+                        </div>
+                      </td>
+                      <td style="text-align: right">
+                        <div class="lom-badge green d-inline-block">
+                          DISPATCHED
+                        </div>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <div
+                          class="lom-icon green mx-auto"
+                          style="width: 36px; height: 36px; font-size: 14px"
+                        >
+                          <i class="bi bi-box-seam"></i>
+                        </div>
+                      </td>
+                      <td>
+                        <div class="lom-text">
+                          Dammam DH <i class="bi bi-arrow-right"></i> Jubail
+                          Site
+                        </div>
+                      </td>
+                      <td><div class="lom-meta m-0">SHP-2026-1290</div></td>
+                      <td style="text-align: right">
+                        <div class="lom-badge green d-inline-block">
+                          DISPATCHED
+                        </div>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <div
+                          class="lom-icon green mx-auto"
+                          style="width: 36px; height: 36px; font-size: 14px"
+                        >
+                          <i class="bi bi-box-seam"></i>
+                        </div>
+                      </td>
+                      <td>
+                        <div class="lom-text">
+                          Rabigh WH <i class="bi bi-arrow-right"></i> KAUST Site
+                        </div>
+                      </td>
+                      <td><div class="lom-meta m-0">SHP-2026-1305</div></td>
+                      <td style="text-align: right">
+                        <div class="lom-badge green d-inline-block">
+                          DISPATCHED
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Pending POD Tab -->
+            <div class="lom-pane" data-lom-pane="pending-pod">
+              <div class="table-responsive p-3">
+                <table class="eal-table m-0">
+                  <thead>
+                    <tr>
+                      <th style="width: 60px">Type</th>
+                      <th>Client / Site</th>
+                      <th>Trip & Last Update</th>
+                      <th style="text-align: right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>
+                        <div
+                          class="lom-icon orange mx-auto"
+                          style="width: 36px; height: 36px; font-size: 14px"
+                        >
+                          <i class="bi bi-file-earmark-check"></i>
+                        </div>
+                      </td>
+                      <td>
+                        <div class="lom-text">
+                          SAUDI CEMENT CO. | RABIGH SITE
+                        </div>
+                      </td>
+                      <td>
+                        <div class="lom-meta m-0">
+                          <span class="lom-meta-red">TRP-0982</span> |
+                          <span style="color: #94a3b8">DELIVERED 48H AGO</span>
+                        </div>
+                      </td>
+                      <td style="text-align: right">
+                        <button class="lom-badge orange-btn">
+                          FORCE UPLOAD
+                        </button>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <div
+                          class="lom-icon orange mx-auto"
+                          style="width: 36px; height: 36px; font-size: 14px"
+                        >
+                          <i class="bi bi-file-earmark-check"></i>
+                        </div>
+                      </td>
+                      <td>
+                        <div class="lom-text">
+                          EL-SEIF CONST. | RIYADH METRO S3
+                        </div>
+                      </td>
+                      <td>
+                        <div class="lom-meta m-0">
+                          <span class="lom-meta-red">TRP-1105</span> |
+                          <span style="color: #94a3b8">DELIVERED 12H AGO</span>
+                        </div>
+                      </td>
+                      <td style="text-align: right">
+                        <button class="lom-badge orange-btn">
+                          FORCE UPLOAD
+                        </button>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <div
+                          class="lom-icon orange mx-auto"
+                          style="width: 36px; height: 36px; font-size: 14px"
+                        >
+                          <i class="bi bi-file-earmark-check"></i>
+                        </div>
+                      </td>
+                      <td>
+                        <div class="lom-text">ARAMCO SITE | SHAYBAH DH</div>
+                      </td>
+                      <td>
+                        <div class="lom-meta m-0">
+                          <span class="lom-meta-red">TRP-1150</span> |
+                          <span style="color: #94a3b8">DELIVERED 6H AGO</span>
+                        </div>
+                      </td>
+                      <td style="text-align: right">
+                        <button class="lom-badge orange-btn">
+                          FORCE UPLOAD
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ═══ FLEET INTEGRITY HUB ═══ -->
+      <div
+        class="fleet-integrity-shell"
+        data-section="fleet-integrity-hub"
+        style="display: none"
+      >
+        <!-- 1. Search Bars -->
+        <div class="fih-search-row db-fade">
+          <div class="fih-search-box">
+            <i class="bi bi-search"></i>
+            <input
+              type="text"
+              placeholder="Truck Search (Plate, VIN, Brand)..."
+            />
+          </div>
+          <div class="fih-search-box">
+            <i class="bi bi-search"></i>
+            <input
+              type="text"
+              placeholder="Driver Search (Name, IQAMA, License)..."
+            />
+          </div>
+        </div>
+
+        <!-- 2. Action Cards -->
+        <div class="fih-actions-row db-fade">
+          <div class="fih-action-card">
+            <div class="fih-icon text-primary"><i class="bi bi-truck"></i></div>
+            <div class="fih-label">ADD TRUCK</div>
+          </div>
+          <div class="fih-action-card">
+            <div class="fih-icon text-purple">
+              <i class="bi bi-file-earmark-plus"></i>
+            </div>
+            <div class="fih-label">ADD TRUCK ATT</div>
+          </div>
+          <div class="fih-action-card">
+            <div class="fih-icon text-primary">
+              <i class="bi bi-list-ul"></i>
+            </div>
+            <div class="fih-label">TRUCKS</div>
+          </div>
+          <div class="fih-action-card">
+            <div class="fih-icon text-success">
+              <i class="bi bi-person-plus"></i>
+            </div>
+            <div class="fih-label">ADD DRIVER</div>
+          </div>
+          <div class="fih-action-card">
+            <div class="fih-icon text-teal">
+              <i class="bi bi-person-vcard"></i>
+            </div>
+            <div class="fih-label">ADD DRIVER ATT</div>
+          </div>
+          <div class="fih-action-card">
+            <div class="fih-icon text-success">
+              <i class="bi bi-people"></i>
+            </div>
+            <div class="fih-label">DRIVERS</div>
+          </div>
+        </div>
+
+        <!-- 3. Tabs & Content -->
+        <div class="db-card p-0 fih-tabs-card db-fade">
+          <div class="fih-tabs-header">
+            <button class="fih-tab active" data-fih-tab="truck-assets">
+              TRUCK ASSETS
+            </button>
+            <button class="fih-tab" data-fih-tab="drivers">DRIVERS</button>
+            <button class="fih-tab" data-fih-tab="compliance-docs">
+              COMPLIANCE & DOCS
+            </button>
+          </div>
+
+          <div class="fih-tabs-body">
+            <!-- Tab 1 -->
+            <div class="fih-pane active" data-fih-pane="truck-assets">
+              <div class="fih-metrics-grid">
+                <div class="fih-metric blue">
+                  <div class="fih-m-title">TOTAL FLEET</div>
+                  <div class="fih-m-val count-up" data-target="124">0</div>
+                </div>
+                <div class="fih-metric green">
+                  <div class="fih-m-title">AVAILABLE</div>
+                  <div class="fih-m-val count-up" data-target="38">0</div>
+                </div>
+                <div class="fih-metric orange">
+                  <div class="fih-m-title">LOADED</div>
+                  <div class="fih-m-val count-up" data-target="74">0</div>
+                </div>
+                <div class="fih-metric red">
+                  <div class="fih-m-title">SUSPENDED</div>
+                  <div class="fih-m-val count-up" data-target="12">0</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Tab 2 -->
+            <div class="fih-pane" data-fih-pane="drivers">
+              <div class="fih-metrics-grid">
+                <div class="fih-metric blue">
+                  <div class="fih-m-title">TOTAL DRIVERS</div>
+                  <div class="fih-m-val count-up" data-target="145">0</div>
+                </div>
+                <div class="fih-metric green">
+                  <div class="fih-m-title">AVAILABLE</div>
+                  <div class="fih-m-val count-up" data-target="18">0</div>
+                </div>
+                <div class="fih-metric orange">
+                  <div class="fih-m-title">LOADED</div>
+                  <div class="fih-m-val count-up" data-target="112">0</div>
+                </div>
+                <div class="fih-metric red">
+                  <div class="fih-m-title">SUSPENDED</div>
+                  <div class="fih-m-val count-up" data-target="15">0</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Tab 3 -->
+            <div class="fih-pane" data-fih-pane="compliance-docs">
+              <div class="fih-metrics-grid">
+                <div class="fih-metric red">
+                  <div class="fih-m-title">TRUCK EXPIRED DOCS</div>
+                  <div class="fih-m-val count-up" data-target="5">0</div>
+                </div>
+                <div class="fih-metric orange">
+                  <div class="fih-m-title">TRUCK NEAR EXPIRY</div>
+                  <div class="fih-m-val count-up" data-target="14">0</div>
+                </div>
+                <div class="fih-metric red">
+                  <div class="fih-m-title">DRIVER EXPIRED DOCS</div>
+                  <div class="fih-m-val count-up" data-target="3">0</div>
+                </div>
+                <div class="fih-metric orange">
+                  <div class="fih-m-title">DRIVER NEAR EXPIRY</div>
+                  <div class="fih-m-val count-up" data-target="8">0</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4 Analytics Section -->
+        <div class="db-card db-fade quota-analytics-card mb-4">
+          <div class="db-card-header">
+            <div
+              class="db-card-title text-uppercase"
+              style="
+                font-size: 14px;
+                font-weight: 800;
+                color: #1e293b;
+                letter-spacing: 0;
+              "
+            >
+              Fleet Utilization
+            </div>
+            <span class="quota-analytics-badge" style="cursor: pointer">
+              ANALYTICS
+            </span>
+          </div>
+
+          <div class="quota-grid">
+            <!-- Fleet vs Driver Sync Chart -->
+            <div class="quota-panel">
+              <div
+                class="quota-panel-head justify-content-center border-0 mb-3"
+              >
+                <div
+                  class="quota-title text-center w-100"
+                  style="
+                    color: #94a3b8;
+                    font-size: 11px;
+                    letter-spacing: 0.5px;
+                    font-weight: 700;
+                  "
+                >
+                  FLEET VS DRIVER SYNCHRONIZATION
+                </div>
+              </div>
+              <div class="quota-chart-area">
+                <div class="quota-y-axis">
+                  <span>160</span>
+                  <span>140</span>
+                  <span>120</span>
+                  <span>100</span>
+                  <span>80</span>
+                  <span>60</span>
+                  <span>40</span>
+                  <span>20</span>
+                  <span>0</span>
+                </div>
+                <div class="quota-bars-wrap">
+                  <div class="quota-grid-lines"></div>
+                  <!-- Dec -->
+                  <div class="quota-month-group">
+                    <div
+                      class="quota-bar"
+                      style="height: 68.75%; background-color: #5051f9"
+                    ></div>
+                    <div
+                      class="quota-bar"
+                      style="height: 81.25%; background-color: #10b981"
+                    ></div>
+                    <span class="quota-month-label">Dec</span>
+                  </div>
+                  <!-- Jan -->
+                  <div class="quota-month-group">
+                    <div
+                      class="quota-bar"
+                      style="height: 71.87%; background-color: #5051f9"
+                    ></div>
+                    <div
+                      class="quota-bar"
+                      style="height: 84.37%; background-color: #10b981"
+                    ></div>
+                    <span class="quota-month-label">Jan</span>
+                  </div>
+                  <!-- Feb -->
+                  <div class="quota-month-group">
+                    <div
+                      class="quota-bar"
+                      style="height: 75%; background-color: #5051f9"
+                    ></div>
+                    <div
+                      class="quota-bar"
+                      style="height: 87.5%; background-color: #10b981"
+                    ></div>
+                    <span class="quota-month-label">Feb</span>
+                  </div>
+                  <!-- Mar -->
+                  <div class="quota-month-group">
+                    <div
+                      class="quota-bar"
+                      style="height: 78.12%; background-color: #5051f9"
+                    ></div>
+                    <div
+                      class="quota-bar"
+                      style="height: 90.62%; background-color: #10b981"
+                    ></div>
+                    <span class="quota-month-label">Mar</span>
+                  </div>
+                </div>
+              </div>
+              <div class="quota-legend justify-content-center mt-3">
+                <span
+                  ><i class="dot" style="background: #5051f9"></i> Total
+                  Trucks</span
+                >
+                <span
+                  ><i class="dot" style="background: #10b981"></i> Active
+                  Drivers</span
+                >
+              </div>
+            </div>
+
+            <!-- Global Status Distribution Donut -->
+            <div class="quota-panel">
+              <div
+                class="quota-panel-head justify-content-center border-0 mb-3"
+              >
+                <div
+                  class="quota-title text-center w-100"
+                  style="
+                    color: #94a3b8;
+                    font-size: 11px;
+                    letter-spacing: 0.5px;
+                    font-weight: 700;
+                  "
+                >
+                  GLOBAL STATUS DISTRIBUTION (%)
+                </div>
+              </div>
+              <div
+                class="quota-donut-wrap"
+                style="
+                  min-height: 200px;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                "
+              >
+                <div class="fih-donut"></div>
+              </div>
+              <div class="quota-legend justify-content-center mt-3">
+                <span style="font-size: 9px"
+                  ><i class="dot" style="background: #10b981"></i> Available
+                  (READY)</span
+                >
+                <span style="font-size: 9px"
+                  ><i class="dot" style="background: #f59e0b"></i> Loaded (IN
+                  TRIP)</span
+                >
+                <span style="font-size: 9px"
+                  ><i class="dot" style="background: #ef4444"></i> Suspended
+                  (OFF-RD)</span
+                >
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5. Fleet Integrity Hub — truck lists & live map -->
+        <div class="db-card p-0 fih-hub-list-card db-fade">
+          <div class="fi-list-hub-header">
+            <div class="fi-list-hub-title-group">
+              <h2 class="fi-list-hub-title">Trucks Hub</h2>
+            </div>
+            <div class="fih-search-box fi-list-search-box">
+              <i class="bi bi-search"></i>
+              <input
+                type="text"
+                data-truck-hub-search
+                placeholder="Search by any truck table value"
+              />
+            </div>
+          </div>
+
+          <div class="fi-list-hub-body">
+            <div class="fi-list-pane active" role="tabpanel">
+              <div class="eal-table-wrap">
+                <table class="eal-table" data-truck-hub-table>
+                  <thead>
+                    <tr>
+                      <th>
+                        Truck Code
+                        <span class="sort-indicator">
+                          <i class="bi bi-caret-up-fill"></i>
+                          <i class="bi bi-caret-down-fill"></i>
+                        </span>
+                      </th>
+                      <th>
+                        Plate Number
+                        <span class="sort-indicator">
+                          <i class="bi bi-caret-up-fill"></i>
+                          <i class="bi bi-caret-down-fill"></i>
+                        </span>
+                      </th>
+                      <th>
+                        Status
+                        <span class="sort-indicator">
+                          <i class="bi bi-caret-up-fill"></i>
+                          <i class="bi bi-caret-down-fill"></i>
+                        </span>
+                      </th>
+                      <th>
+                        Operational Status
+                        <span class="sort-indicator">
+                          <i class="bi bi-caret-up-fill"></i>
+                          <i class="bi bi-caret-down-fill"></i>
+                        </span>
+                      </th>
+                      <th>ACTIONS</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr data-truck-hub-row>
+                      <td>
+                        <div class="eal-name-cell">
+                          <span class="fi-truck-icon fi-truck-icon--sm"
+                            ><i class="bi bi-truck-front" aria-hidden="true"></i
+                          ></span>
+                          <div>
+                            <span class="eal-entity-id">TRK-9901</span>
+                            <!-- <div class="eal-pi-number">Mercedes Actros</div> -->
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <strong>J H A 9921</strong>
+                        <div class="eal-pi-number">Internal</div>
+                      </td>
+                      <td>
+                        <span class="status-badge success">Available</span>
+                      </td>
+                      <td>
+                        <span class="eal-pi-number">Ready for dispatch</span>
+                      </td>
+                      <td>
+                        <div class="eal-actions-cell">
+                          <button type="button" class="eal-row-btn" title="View">
+                            <i class="bi bi-eye"></i>
+                          </button>
+                          <button
+                            type="button"
+                            class="eal-row-btn"
+                            title="Location"
+                          >
+                            <i class="bi bi-geo-alt"></i>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                    <tr data-truck-hub-row>
+                      <td>
+                        <div class="eal-name-cell">
+                          <span class="fi-truck-icon fi-truck-icon--sm"
+                            ><i class="bi bi-truck-front" aria-hidden="true"></i
+                          ></span>
+                          <div>
+                            <span class="eal-entity-id">TRK-8844</span>
+                            <!-- <div class="eal-pi-number">Volvo FH</div> -->
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <strong>R R M 4410</strong>
+                        <div class="eal-pi-number">Internal</div>
+                      </td>
+                      <td>
+                        <span class="status-badge expired">Loaded</span>
+                      </td>
+                      <td><span class="eal-pi-number">On active trip</span></td>
+                      <td>
+                        <div class="eal-actions-cell">
+                          <button type="button" class="eal-row-btn" title="View">
+                            <i class="bi bi-eye"></i>
+                          </button>
+                          <button
+                            type="button"
+                            class="eal-row-btn"
+                            title="Location"
+                          >
+                            <i class="bi bi-geo-alt"></i>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                    <tr data-truck-hub-row>
+                      <td>
+                        <div class="eal-name-cell">
+                          <span class="fi-truck-icon fi-truck-icon--sm"
+                            ><i class="bi bi-truck-front" aria-hidden="true"></i
+                          ></span>
+                          <div>
+                            <span class="eal-entity-id">TRK-7712</span>
+                            <!-- <div class="eal-pi-number">Scania R450</div> -->
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <strong>K S A 2201</strong>
+                        <div class="eal-pi-number">Internal</div>
+                      </td>
+                      <td>
+                        <span class="status-badge success">Available</span>
+                      </td>
+                      <td>
+                        <span class="eal-pi-number">In service</span>
+                      </td>
+                      <td>
+                        <div class="eal-actions-cell">
+                          <button type="button" class="eal-row-btn" title="View">
+                            <i class="bi bi-eye"></i>
+                          </button>
+                          <button
+                            type="button"
+                            class="eal-row-btn"
+                            title="Location"
+                          >
+                            <i class="bi bi-geo-alt"></i>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                    <tr data-truck-hub-row>
+                      <td>
+                        <div class="eal-name-cell">
+                          <span class="fi-truck-icon fi-truck-icon--sm"
+                            ><i class="bi bi-truck-front" aria-hidden="true"></i
+                          ></span>
+                          <div>
+                            <span class="eal-entity-id">TRK-6603</span>
+                            <!-- <div class="eal-pi-number">MAN TGX</div> -->
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <strong>D M M 1188</strong>
+                        <div class="eal-pi-number">Internal</div>
+                      </td>
+                      <td>
+                        <span class="status-badge inactive">Suspended</span>
+                      </td>
+                      <td>
+                        <span class="eal-pi-number">Compliance hold</span>
+                      </td>
+                      <td>
+                        <div class="eal-actions-cell">
+                          <button type="button" class="eal-row-btn" title="View">
+                            <i class="bi bi-eye"></i>
+                          </button>
+                          <button
+                            type="button"
+                            class="eal-row-btn"
+                            title="Location"
+                          >
+                            <i class="bi bi-geo-alt"></i>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                    <tr data-truck-hub-row>
+                      <td>
+                        <div class="eal-name-cell">
+                          <span class="fi-truck-icon fi-truck-icon--sm"
+                            ><i class="bi bi-truck-front" aria-hidden="true"></i
+                          ></span>
+                          <div>
+                            <span class="eal-entity-id">TRK-5510</span>
+                            <!-- <div class="eal-pi-number">Mercedes Axor</div> -->
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <strong>H J K 9033</strong>
+                        <div class="eal-pi-number">Internal</div>
+                      </td>
+                      <td>
+                        <span class="status-badge expired">Loaded</span>
+                      </td>
+                      <td><span class="eal-pi-number">Awaiting unloading</span></td>
+                      <td>
+                        <div class="eal-actions-cell">
+                          <button type="button" class="eal-row-btn" title="View">
+                            <i class="bi bi-eye"></i>
+                          </button>
+                          <button
+                            type="button"
+                            class="eal-row-btn"
+                            title="Location"
+                          >
+                            <i class="bi bi-geo-alt"></i>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- 6. Fleet Integrity Hub — drivers, driver attachments & live map -->
+        <div class="db-card p-0 fih-drivers-hub-card db-fade">
+          <div class="fi-list-hub-header">
+            <div class="fi-list-hub-title-group">
+              <h2 class="fi-list-hub-title">Driver Hub</h2>
+            </div>
+            <div class="fih-search-box fi-list-search-box">
+              <i class="bi bi-search"></i>
+              <input
+                type="text"
+                data-driver-hub-search
+                placeholder="Search by any driver table value"
+              />
+            </div>
+          </div>
+
+          <div class="fi-drv-hub-body">
+            <div
+              class="fi-drv-pane active"
+              role="tabpanel"
+            >
+              <div class="eal-table-wrap">
+                <table class="eal-table" data-driver-hub-table>
+                  <thead>
+                    <tr>
+                      <th>
+                        Driver Code
+                        <span class="sort-indicator">
+                          <i class="bi bi-caret-up-fill"></i>
+                          <i class="bi bi-caret-down-fill"></i>
+                        </span>
+                      </th>
+                      <th>
+                        Driver ID
+                        <span class="sort-indicator">
+                          <i class="bi bi-caret-up-fill"></i>
+                          <i class="bi bi-caret-down-fill"></i>
+                        </span>
+                      </th>
+                      <th>
+                        Driver Name (English)
+                        <span class="sort-indicator">
+                          <i class="bi bi-caret-up-fill"></i>
+                          <i class="bi bi-caret-down-fill"></i>
+                        </span>
+                      </th>
+                      <th>
+                        Operational Status
+                        <span class="sort-indicator">
+                          <i class="bi bi-caret-up-fill"></i>
+                          <i class="bi bi-caret-down-fill"></i>
+                        </span>
+                      </th>
+                      <th>
+                        Status
+                        <span class="sort-indicator">
+                          <i class="bi bi-caret-up-fill"></i>
+                          <i class="bi bi-caret-down-fill"></i>
+                        </span>
+                      </th>
+                      <th>ACTIONS</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr data-driver-hub-row>
+                      <td>
+                        <div class="fi-drv-meta">
+                          <span class="eal-entity-id">DRV-1001</span>
+                          <!-- <div class="eal-pi-number">Jeddah</div> -->
+                        </div>
+                      </td>
+                      <td>
+                        <span class="fi-drv-legal-name">1088224401</span>
+                      </td>
+                      <td>
+                        <span class="fi-drv-legal-name">Ahmed Mansour</span>
+                      </td>
+                      <td>
+                        <span class="eal-pi-number">On active trip</span>
+                      </td>
+                      <td>
+                        <span class="status-badge expired">Loaded</span>
+                      </td>
+                      <td>
+                        <div class="eal-actions-cell">
+                          <button type="button" class="eal-row-btn" title="View">
+                            <i class="bi bi-eye"></i>
+                          </button>
+                          <button
+                            type="button"
+                            class="eal-row-btn"
+                            title="Location"
+                          >
+                            <i class="bi bi-geo-alt"></i>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                    <tr data-driver-hub-row>
+                      <td>
+                        <div class="fi-drv-meta">
+                          <span class="eal-entity-id">DRV-1002</span>
+                          <!-- <div class="eal-pi-number">Dammam</div> -->
+                        </div>
+                      </td>
+                      <td>
+                        <span class="fi-drv-legal-name">1077112290</span>
+                      </td>
+                      <td>
+                        <span class="fi-drv-legal-name">Sami Al-Otaibi</span>
+                      </td>
+                      <td>
+                        <span class="eal-pi-number">Ready for assignment</span>
+                      </td>
+                      <td>
+                        <span class="status-badge success">Available</span>
+                      </td>
+                      <td>
+                        <div class="eal-actions-cell">
+                          <button type="button" class="eal-row-btn" title="View">
+                            <i class="bi bi-eye"></i>
+                          </button>
+                          <button
+                            type="button"
+                            class="eal-row-btn"
+                            title="Location"
+                          >
+                            <i class="bi bi-geo-alt"></i>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                    <tr data-driver-hub-row>
+                      <td>
+                        <div class="fi-drv-meta">
+                          <span class="eal-entity-id">DRV-1003</span>
+                          <!-- <div class="eal-pi-number">Yanbu</div> -->
+                        </div>
+                      </td>
+                      <td>
+                        <span class="fi-drv-legal-name">1055883311</span>
+                      </td>
+                      <td>
+                        <span class="fi-drv-legal-name">Omar Muhammad</span>
+                      </td>
+                      <td>
+                        <span class="eal-pi-number">Compliance hold</span>
+                      </td>
+                      <td>
+                        <span class="status-badge inactive">Suspended</span>
+                      </td>
+                      <td>
+                        <div class="eal-actions-cell">
+                          <button type="button" class="eal-row-btn" title="View">
+                            <i class="bi bi-eye"></i>
+                          </button>
+                          <button
+                            type="button"
+                            class="eal-row-btn"
+                            title="Location"
+                          >
+                            <i class="bi bi-geo-alt"></i>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                    <tr data-driver-hub-row>
+                      <td>
+                        <div class="fi-drv-meta">
+                          <span class="eal-entity-id">DRV-1004</span>
+                          <!-- <div class="eal-pi-number">Riyadh</div> -->
+                        </div>
+                      </td>
+                      <td>
+                        <span class="fi-drv-legal-name">1022990088</span>
+                      </td>
+                      <td>
+                        <span class="fi-drv-legal-name">Fahad Al-Anzi</span>
+                      </td>
+                      <td>
+                        <span class="eal-pi-number">On active trip</span>
+                      </td>
+                      <td>
+                        <span class="status-badge expired">Loaded</span>
+                      </td>
+                      <td>
+                        <div class="eal-actions-cell">
+                          <button type="button" class="eal-row-btn" title="View">
+                            <i class="bi bi-eye"></i>
+                          </button>
+                          <button
+                            type="button"
+                            class="eal-row-btn"
+                            title="Location"
+                          >
+                            <i class="bi bi-geo-alt"></i>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                    <tr data-driver-hub-row>
+                      <td>
+                        <div class="fi-drv-meta">
+                          <span class="eal-entity-id">DRV-1005</span>
+                          <!-- <div class="eal-pi-number">Abha</div> -->
+                        </div>
+                      </td>
+                      <td>
+                        <span class="fi-drv-legal-name">1044332211</span>
+                      </td>
+                      <td>
+                        <span class="fi-drv-legal-name">Yousef Sharif</span>
+                      </td>
+                      <td>
+                        <span class="eal-pi-number">Ready for assignment</span>
+                      </td>
+                      <td>
+                        <span class="status-badge success">Available</span>
+                      </td>
+                      <td>
+                        <div class="eal-actions-cell">
+                          <button type="button" class="eal-row-btn" title="View">
+                            <i class="bi bi-eye"></i>
+                          </button>
+                          <button
+                            type="button"
+                            class="eal-row-btn"
+                            title="Location"
+                          >
+                            <i class="bi bi-geo-alt"></i>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+      
+      </div>
+
+      <!-- ═══ 1. KPI CARDS ═══ -->
+      <div class="kpi-grid" data-section="operations,finance">
+        <div class="kpi-card db-fade" data-status="info">
+          <div class="kpi-top">
+            <div class="kpi-icon primary"><i class="bi bi-boxes"></i></div>
+            <canvas
+              class="kpi-sparkline"
+              data-values="[18,22,19,25,28,32,30,35]"
+              data-color="#5051f9"
+            ></canvas>
+          </div>
+          <div class="kpi-title">Total Shipments</div>
+          <div class="kpi-bottom">
+            <span class="kpi-value count-up" data-target="1,284">0</span>
+            <span class="kpi-change positive"
+              ><i class="bi bi-arrow-up-short"></i> 12.5%</span
+            >
+          </div>
+        </div>
+
+        <div class="kpi-card db-fade" data-status="good">
+          <div class="kpi-top">
+            <div class="kpi-icon green"><i class="bi bi-truck"></i></div>
+            <canvas
+              class="kpi-sparkline"
+              data-values="[30,28,34,32,38,36,40,42]"
+              data-color="#10b981"
+            ></canvas>
+          </div>
+          <div class="kpi-title">Active Shipments</div>
+          <div class="kpi-bottom">
+            <span class="kpi-value count-up" data-target="342">0</span>
+            <span class="kpi-change positive"
+              ><i class="bi bi-arrow-up-short"></i> 8.1%</span
+            >
+          </div>
+        </div>
+
+        <div class="kpi-card db-fade" data-status="good">
+          <div class="kpi-top">
+            <div class="kpi-icon green"><i class="bi bi-check-circle"></i></div>
+            <canvas
+              class="kpi-sparkline"
+              data-values="[60,65,58,72,68,75,80,85]"
+              data-color="#10b981"
+            ></canvas>
+          </div>
+          <div class="kpi-title">Completed Deliveries</div>
+          <div class="kpi-bottom">
+            <span class="kpi-value count-up" data-target="856">0</span>
+            <span class="kpi-change positive"
+              ><i class="bi bi-arrow-up-short"></i> 8.3%</span
+            >
+          </div>
+        </div>
+
+        <div class="kpi-card db-fade" data-status="warning">
+          <div class="kpi-top">
+            <div class="kpi-icon orange">
+              <i class="bi bi-clipboard-data"></i>
+            </div>
+            <canvas
+              class="kpi-sparkline"
+              data-values="[12,15,10,14,11,9,8,6]"
+              data-color="#f59e0b"
+            ></canvas>
+          </div>
+          <div class="kpi-title">Pending POD</div>
+          <div class="kpi-bottom">
+            <span class="kpi-value count-up" data-target="86">0</span>
+            <span class="kpi-change negative"
+              ><i class="bi bi-arrow-down-short"></i> 5.2%</span
+            >
+          </div>
+        </div>
+
+        <div class="kpi-card db-fade" data-status="good">
+          <div class="kpi-top">
+            <div class="kpi-icon purple"><i class="bi bi-cash-coin"></i></div>
+            <canvas
+              class="kpi-sparkline"
+              data-values="[3.2,3.5,3.8,4.1,3.9,4.3,4.5,4.8]"
+              data-color="#8b5cf6"
+            ></canvas>
+          </div>
+          <div class="kpi-title">Total Revenue</div>
+          <div class="kpi-bottom">
+            <span class="kpi-value count-up" data-target="SAR 24.5M">0</span>
+            <span class="kpi-change positive"
+              ><i class="bi bi-arrow-up-short"></i> 15.7%</span
+            >
+          </div>
+        </div>
+
+        <div class="kpi-card db-fade" data-status="warning">
+          <div class="kpi-top">
+            <div class="kpi-icon orange">
+              <i class="bi bi-file-earmark-text"></i>
+            </div>
+            <canvas
+              class="kpi-sparkline"
+              data-values="[6,7,6.5,7.2,7.8,8,8.1,8.2]"
+              data-color="#f59e0b"
+            ></canvas>
+          </div>
+          <div class="kpi-title">Outstanding Receivables</div>
+          <div class="kpi-bottom">
+            <span class="kpi-value count-up" data-target="SAR 8.2M">0</span>
+            <span class="kpi-change negative"
+              ><i class="bi bi-arrow-up-short"></i> 4.8%</span
+            >
+          </div>
+        </div>
+
+        <div class="kpi-card db-fade" data-status="critical">
+          <div class="kpi-top">
+            <div class="kpi-icon red"><i class="bi bi-cash-stack"></i></div>
+            <canvas
+              class="kpi-sparkline"
+              data-values="[4,4.5,5,4.8,5.2,5.1,5.3,5.4]"
+              data-color="#ef4444"
+            ></canvas>
+          </div>
+          <div class="kpi-title">Pending Vendor Payments</div>
+          <div class="kpi-bottom">
+            <span class="kpi-value count-up" data-target="SAR 5.4M">0</span>
+            <span class="kpi-change negative"
+              ><i class="bi bi-arrow-up-short"></i> 3.1%</span
+            >
+          </div>
+        </div>
+
+        <div class="kpi-card db-fade" data-status="good">
+          <div class="kpi-top">
+            <div class="kpi-icon cyan"><i class="bi bi-speedometer2"></i></div>
+            <canvas
+              class="kpi-sparkline"
+              data-values="[68,72,70,74,76,75,77,78]"
+              data-color="#06b6d4"
+            ></canvas>
+          </div>
+          <div class="kpi-title">Fleet Utilization</div>
+          <div class="kpi-bottom">
+            <span class="kpi-value count-up" data-target="78%">0</span>
+            <span class="kpi-change positive"
+              ><i class="bi bi-arrow-up-short"></i> 6.2%</span
+            >
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ 2. OPERATIONS ANALYTICS ═══ -->
+      <div class="db-grid-2" data-section="operations">
+        <div class="db-card db-fade">
+          <div class="db-card-header">
+            <div>
+              <div class="db-card-title">Shipment Flow</div>
+              <div class="db-card-subtitle">
+                Bookings vs Shipments vs Deliveries
+              </div>
+            </div>
+            <div class="db-card-actions">
+              <button class="db-action-btn">Today</button>
+              <button class="db-action-btn active">Week</button>
+              <button class="db-action-btn">Month</button>
+            </div>
+          </div>
+          <div class="chart-wrap" style="height: 260px">
+            <canvas id="shipmentFlowChart"></canvas>
+          </div>
+        </div>
+
+        <div class="db-card db-fade">
+          <div class="db-card-header">
+            <div>
+              <div class="db-card-title">Shipment Status</div>
+              <div class="db-card-subtitle">Current distribution</div>
+            </div>
+            <div class="db-card-actions">
+              <button class="db-action-btn active">Week</button>
+              <button class="db-action-btn">Month</button>
+            </div>
+          </div>
+          <div class="donut-section">
+            <div class="donut-chart-wrap">
+              <canvas id="statusDonutChart" width="190" height="190"></canvas>
+              <div class="donut-center-label">
+                <span class="donut-center-value">1,344</span>
+                <span class="donut-center-text">Total</span>
+              </div>
+            </div>
+            <div class="donut-stats">
+              <div class="donut-stat-card" style="--stat-color: #5051f9">
+                <div class="donut-stat-left">
+                  <span class="donut-stat-dot"></span>
+                  <div class="donut-stat-info">
+                    <span class="donut-stat-label">In Transit</span>
+                    <span class="donut-stat-pct">25.4%</span>
+                  </div>
+                </div>
+                <span class="donut-stat-value">342</span>
+              </div>
+              <div class="donut-stat-card" style="--stat-color: #10b981">
+                <div class="donut-stat-left">
+                  <span class="donut-stat-dot"></span>
+                  <div class="donut-stat-info">
+                    <span class="donut-stat-label">Delivered</span>
+                    <span class="donut-stat-pct">63.7%</span>
+                  </div>
+                </div>
+                <span class="donut-stat-value">856</span>
+              </div>
+              <div class="donut-stat-card" style="--stat-color: #f59e0b">
+                <div class="donut-stat-left">
+                  <span class="donut-stat-dot"></span>
+                  <div class="donut-stat-info">
+                    <span class="donut-stat-label">Pending</span>
+                    <span class="donut-stat-pct">9.5%</span>
+                  </div>
+                </div>
+                <span class="donut-stat-value">128</span>
+              </div>
+              <div class="donut-stat-card" style="--stat-color: #ef4444">
+                <div class="donut-stat-left">
+                  <span class="donut-stat-dot"></span>
+                  <div class="donut-stat-info">
+                    <span class="donut-stat-label">Cancelled</span>
+                    <span class="donut-stat-pct">1.3%</span>
+                  </div>
+                </div>
+                <span class="donut-stat-value">18</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ 3. QUICK ACTIONS + PERFORMANCE METRICS ═══ -->
+      <div
+        class="db-grid-2 db-grid-qa-metrics"
+        data-section="operations,finance"
+      >
+        <div class="db-card db-fade">
+          <div class="db-card-header">
+            <div>
+              <div class="db-card-title">Quick Actions</div>
+              <div class="db-card-subtitle">Common operations</div>
+            </div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 8px">
+            <button class="quick-action-btn">
+              <i class="bi bi-bookmark-plus" style="color: #5051f9"></i> Create
+              Booking
+            </button>
+            <button class="quick-action-btn">
+              <i class="bi bi-truck" style="color: #6366f1"></i> Create Empty
+              Movement
+            </button>
+            <button class="quick-action-btn">
+              <i class="bi bi-file-earmark-pdf" style="color: #ef4444"></i>
+              Convert Media to Official Doc
+            </button>
+            <button class="quick-action-btn">
+              <i class="bi bi-wallet2" style="color: #10b981"></i> Receive COD
+              Amount
+            </button>
+            <button class="quick-action-btn">
+              <i class="bi bi-patch-check" style="color: #06b6d4"></i> Verify
+              Digital PODs
+            </button>
+            <button class="quick-action-btn">
+              <i class="bi bi-file-earmark-ruled" style="color: #8b5cf6"></i>
+              Receive Hard POD
+            </button>
+            <button class="quick-action-btn">
+              <i class="bi bi-clipboard-check" style="color: #f59e0b"></i> POD
+              Management
+            </button>
+            <button class="quick-action-btn">
+              <i
+                class="bi bi-file-earmark-bar-graph"
+                style="color: #64748b"
+              ></i>
+              View Report
+            </button>
+          </div>
+        </div>
+
+        <div class="db-card db-fade">
+          <div class="db-card-header">
+            <div>
+              <div class="db-card-title">Performance Metrics</div>
+              <div class="db-card-subtitle">Key delivery indicators</div>
+            </div>
+          </div>
+          <div class="chart-wrap" style="height: 240px; margin-bottom: 12px">
+            <canvas id="performanceMetricsChart"></canvas>
+          </div>
+          <div class="perf-grid">
+            <div class="perf-card">
+              <div class="perf-card-lbl">On-Time Delivery</div>
+              <div class="perf-card-val" style="color: #10b981">94.2%</div>
+            </div>
+            <div class="perf-card">
+              <div class="perf-card-lbl">Avg Delivery Time</div>
+              <div class="perf-card-val">18.5h</div>
+            </div>
+            <div class="perf-card">
+              <div class="perf-card-lbl">Cost per Shipment</div>
+              <div class="perf-card-val">SAR 4,250</div>
+            </div>
+            <div class="perf-card">
+              <div class="perf-card-lbl">Fleet Efficiency</div>
+              <div class="perf-card-val" style="color: #8b5cf6">86.7%</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ 4. FLEET & DRIVER INSIGHTS ═══ -->
+      <div class="db-grid-2 equal" data-section="operations">
+        <div class="db-card db-fade">
+          <div class="db-card-header">
+            <div>
+              <div class="db-card-title">Fleet Utilization</div>
+              <div class="db-card-subtitle">Vehicle status overview</div>
+            </div>
+          </div>
+          <div class="radial-wrap">
+            <canvas id="fleetRadialChart" width="160" height="100"></canvas>
+          </div>
+          <div class="radial-center">
+            <span class="radial-val">78%</span>
+            <span class="radial-lbl">Utilization Rate</span>
+          </div>
+          <div class="fleet-metrics">
+            <div class="fleet-metric">
+              <div class="fleet-metric-val" style="color: #5051f9">64</div>
+              <div class="fleet-metric-lbl">Total Trucks</div>
+            </div>
+            <div class="fleet-metric">
+              <div class="fleet-metric-val" style="color: #10b981">50</div>
+              <div class="fleet-metric-lbl">Active</div>
+            </div>
+            <div class="fleet-metric">
+              <div class="fleet-metric-val" style="color: #f59e0b">14</div>
+              <div class="fleet-metric-lbl">Idle</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="db-card db-fade">
+          <div class="db-card-header">
+            <div>
+              <div class="db-card-title">Driver Activity</div>
+              <div class="db-card-subtitle">Real-time driver status</div>
+            </div>
+            <button class="db-action-btn">View All</button>
+          </div>
+          <div class="driver-stats">
+            <div class="driver-stat">
+              <div class="driver-stat-val" style="color: #5051f9">72</div>
+              <div class="driver-stat-lbl">Active Drivers</div>
+            </div>
+            <div class="driver-stat">
+              <div class="driver-stat-val" style="color: #10b981">58</div>
+              <div class="driver-stat-lbl">On Duty</div>
+            </div>
+            <div class="driver-stat">
+              <div class="driver-stat-val" style="color: #94a3b8">14</div>
+              <div class="driver-stat-lbl">Offline</div>
+            </div>
+          </div>
+          <div class="driver-list">
+            <div class="driver-item">
+              <div
+                class="driver-avatar"
+                style="background: linear-gradient(135deg, #5051f9, #7c7dfa)"
+              >
+                KR
+              </div>
+              <div class="driver-info">
+                <div class="driver-name">Khalid Al-Rashidi</div>
+                <div class="driver-route">Riyadh → Jeddah · RYD 1234</div>
+              </div>
+              <span class="driver-badge in-transit">In Transit</span>
+            </div>
+            <div class="driver-item">
+              <div
+                class="driver-avatar"
+                style="background: linear-gradient(135deg, #10b981, #34d399)"
+              >
+                FO
+              </div>
+              <div class="driver-info">
+                <div class="driver-name">Fahad Al-Otaibi</div>
+                <div class="driver-route">Dammam → Al Khobar · DMM 5678</div>
+              </div>
+              <span class="driver-badge on-duty">On Duty</span>
+            </div>
+            <div class="driver-item">
+              <div
+                class="driver-avatar"
+                style="background: linear-gradient(135deg, #f59e0b, #fbbf24)"
+              >
+                SQ
+              </div>
+              <div class="driver-info">
+                <div class="driver-name">Sultan Al-Qahtani</div>
+                <div class="driver-route">Makkah → Madinah · MKH 9012</div>
+              </div>
+              <span class="driver-badge in-transit">In Transit</span>
+            </div>
+            <div class="driver-item">
+              <div
+                class="driver-avatar"
+                style="background: linear-gradient(135deg, #8b5cf6, #a78bfa)"
+              >
+                AD
+              </div>
+              <div class="driver-info">
+                <div class="driver-name">Abdulaziz Al-Dosari</div>
+                <div class="driver-route">Tabuk → Ha'il · TBK 3456</div>
+              </div>
+              <span class="driver-badge on-duty">On Duty</span>
+            </div>
+            <div class="driver-item">
+              <div
+                class="driver-avatar"
+                style="background: linear-gradient(135deg, #94a3b8, #cbd5e1)"
+              >
+                OH
+              </div>
+              <div class="driver-info">
+                <div class="driver-name">Omar Al-Harbi</div>
+                <div class="driver-route">Last trip: Abha → Khamis Mushait</div>
+              </div>
+              <span class="driver-badge offline">Offline</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ 4.5 LIVE FLEET TRACKING MAP & DETAILS ═══ -->
+      <div
+        class="db-card db-fade"
+        style="
+          grid-column: 1 / -1;
+          margin-bottom: 24px;
+          padding: 24px;
+          box-sizing: border-box;
+        "
+        data-section="operations"
+      >
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+          "
+        >
+          <div
+            class="db-card-title"
+            style="font-size: 18px; font-weight: 700; color: #1e293b; margin: 0"
+          >
+            Delivery Tracking
+          </div>
+          <button
+            style="
+              width: 32px;
+              height: 32px;
+              border-radius: 8px;
+              border: none;
+              background: #f1f5f9;
+              color: #64748b;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              cursor: pointer;
+            "
+          >
+            <i class="bi bi-three-dots"></i>
+          </button>
+        </div>
+
+        <div style="display: flex; flex-wrap: wrap; gap: 40px">
+          <!-- LEFT SIDE: MAP -->
+          <div
+            style="
+              flex: 1 1 450px;
+              position: relative;
+              border-radius: 12px;
+              overflow: hidden;
+              border: 1px solid #e2e8f0;
+              min-height: 500px;
+            "
+          >
+            <div
+              style="
+                position: absolute;
+                top: 16px;
+                left: 50%;
+                transform: translateX(-50%);
+                z-index: 1000;
+                width: 90%;
+                max-width: 400px;
+                background: white;
+                border-radius: 8px;
+                padding: 12px 16px;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                box-shadow:
+                  0 4px 6px -1px rgba(0, 0, 0, 0.1),
+                  0 2px 4px -1px rgba(0, 0, 0, 0.06);
+                border: 1px solid #f1f5f9;
+              "
+            >
+              <span style="color: #64748b; font-size: 14px; font-weight: 500"
+                >SHP-2026-1284</span
+              >
+              <i
+                class="bi bi-search"
+                style="color: #94a3b8; font-size: 14px; font-weight: bold"
+              ></i>
+            </div>
+            <div
+              id="fleetMap"
+              style="height: 100%; width: 100%; min-height: 500px"
+            ></div>
+          </div>
+
+          <!-- RIGHT SIDE: CONTENT -->
+          <div
+            style="
+              flex: 1 1 350px;
+              max-width: 500px;
+              display: flex;
+              flex-direction: column;
+              gap: 28px;
+            "
+          >
+            <!-- Tracking ID & Status -->
+            <div
+              style="
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+              "
+            >
+              <div>
+                <div
+                  style="font-size: 13px; color: #64748b; margin-bottom: 6px"
+                >
+                  Tracking ID
+                </div>
+                <div style="font-size: 20px; font-weight: 700; color: #1e293b">
+                  #SHP-2026-1284
+                </div>
+              </div>
+              <span
+                style="
+                  background: rgba(80, 81, 249, 0.1);
+                  color: #5051f9;
+                  padding: 8px 16px;
+                  border-radius: 20px;
+                  font-weight: 600;
+                  font-size: 14px;
+                "
+                >In Transit</span
+              >
+            </div>
+
+            <!-- Departure & Destination -->
+            <div
+              style="
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+              "
+            >
+              <div>
+                <div
+                  style="font-size: 12px; color: #64748b; margin-bottom: 4px"
+                >
+                  Departure
+                </div>
+                <div
+                  style="
+                    font-weight: 600;
+                    color: #1e293b;
+                    font-size: 15px;
+                    margin-bottom: 2px;
+                  "
+                >
+                  Riyadh, SA
+                </div>
+                <div style="font-size: 12px; color: #94a3b8">
+                  14/03/2026 - 3:20 PM
+                </div>
+              </div>
+              <i
+                class="bi bi-arrow-right"
+                style="font-size: 20px; color: #64748b"
+              ></i>
+              <div style="text-align: right">
+                <div
+                  style="font-size: 12px; color: #64748b; margin-bottom: 4px"
+                >
+                  Destination
+                </div>
+                <div
+                  style="
+                    font-weight: 600;
+                    color: #1e293b;
+                    font-size: 15px;
+                    margin-bottom: 2px;
+                  "
+                >
+                  Jeddah, SA
+                </div>
+                <div style="font-size: 12px; color: #94a3b8">
+                  16/03/2026 - 5:30 PM<br />(estimated)
+                </div>
+              </div>
+            </div>
+
+            <!-- Courier Info -->
+            <div
+              style="
+                background: #f8fafc;
+                border-radius: 12px;
+                padding: 16px;
+                border: 1px solid #f1f5f9;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+              "
+            >
+              <div style="display: flex; align-items: center; gap: 14px">
+                <div
+                  style="
+                    width: 48px;
+                    height: 48px;
+                    border-radius: 50%;
+                    background: linear-gradient(135deg, #1e293b, #334155);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: white;
+                    font-weight: 700;
+                    font-size: 16px;
+                    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                  "
+                >
+                  KR
+                </div>
+                <div>
+                  <div
+                    style="font-size: 13px; color: #64748b; margin-bottom: 2px"
+                  >
+                    Courier
+                  </div>
+                  <div
+                    style="font-weight: 600; font-size: 15px; color: #1e293b"
+                  >
+                    Khalid Al-Rashidi
+                  </div>
+                </div>
+              </div>
+              <div style="display: flex; gap: 8px">
+                <button
+                  style="
+                    width: 40px;
+                    height: 40px;
+                    border-radius: 8px;
+                    border: 1px solid #e2e8f0;
+                    background: white;
+                    color: #475569;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    cursor: pointer;
+                    transition: 0.2s;
+                  "
+                >
+                  <i class="bi bi-chat-dots" style="font-size: 16px"></i>
+                </button>
+                <button
+                  style="
+                    width: 40px;
+                    height: 40px;
+                    border-radius: 8px;
+                    border: 1px solid #e2e8f0;
+                    background: white;
+                    color: #475569;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    cursor: pointer;
+                    transition: 0.2s;
+                  "
+                >
+                  <i class="bi bi-telephone" style="font-size: 16px"></i>
+                </button>
+              </div>
+            </div>
+
+            <hr style="border-top: 1px solid #f1f5f9; margin: 0" />
+
+            <!-- Shipment History Timeline -->
+            <div>
+              <div
+                style="
+                  font-size: 16px;
+                  font-weight: 700;
+                  color: #1e293b;
+                  margin-bottom: 24px;
+                "
+              >
+                Shipment History
+              </div>
+              <div
+                style="
+                  display: flex;
+                  flex-direction: column;
+                  gap: 0;
+                  position: relative;
+                "
+              >
+                <!-- Timeline Item 1 (Active/Latest) -->
+                <div
+                  style="
+                    display: flex;
+                    gap: 20px;
+                    position: relative;
+                    padding-bottom: 32px;
+                  "
+                >
+                  <div
+                    style="
+                      position: absolute;
+                      left: 81px;
+                      top: 32px;
+                      bottom: 0;
+                      width: 1px;
+                      background: #e2e8f0;
+                    "
+                  ></div>
+                  <div
+                    style="
+                      width: 65px;
+                      text-align: right;
+                      flex-shrink: 0;
+                      padding-top: 2px;
+                    "
+                  >
+                    <div
+                      style="font-size: 13px; font-weight: 600; color: #1e293b"
+                    >
+                      11:55 PM
+                    </div>
+                    <div
+                      style="font-size: 11px; color: #64748b; margin-top: 2px"
+                    >
+                      Mar 15
+                    </div>
+                  </div>
+                  <div
+                    style="
+                      width: 32px;
+                      height: 32px;
+                      border-radius: 50%;
+                      background: #5051f9;
+                      color: white;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                      z-index: 1;
+                      flex-shrink: 0;
+                      box-shadow: 0 0 0 6px white;
+                    "
+                  >
+                    <i class="bi bi-flag-fill" style="font-size: 14px"></i>
+                  </div>
+                  <div style="padding-top: 4px">
+                    <div
+                      style="
+                        font-size: 15px;
+                        font-weight: 600;
+                        color: #1e293b;
+                        margin-bottom: 4px;
+                      "
+                    >
+                      In Transit
+                    </div>
+                    <div style="font-size: 13px; color: #64748b">
+                      Riyadh, SA
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Timeline Item 2 -->
+                <div
+                  style="
+                    display: flex;
+                    gap: 20px;
+                    position: relative;
+                    padding-bottom: 32px;
+                  "
+                >
+                  <div
+                    style="
+                      position: absolute;
+                      left: 81px;
+                      top: 32px;
+                      bottom: 0;
+                      width: 1px;
+                      background: #e2e8f0;
+                    "
+                  ></div>
+                  <div
+                    style="
+                      width: 65px;
+                      text-align: right;
+                      flex-shrink: 0;
+                      padding-top: 2px;
+                    "
+                  >
+                    <div
+                      style="font-size: 13px; font-weight: 500; color: #475569"
+                    >
+                      08:45 AM
+                    </div>
+                    <div
+                      style="font-size: 11px; color: #94a3b8; margin-top: 2px"
+                    >
+                      Mar 15
+                    </div>
+                  </div>
+                  <div
+                    style="
+                      width: 32px;
+                      height: 32px;
+                      border-radius: 50%;
+                      background: white;
+                      border: 2px solid #5051f9;
+                      color: #5051f9;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                      z-index: 1;
+                      flex-shrink: 0;
+                    "
+                  >
+                    <i class="bi bi-truck" style="font-size: 14px"></i>
+                  </div>
+                  <div style="padding-top: 6px">
+                    <div
+                      style="
+                        font-size: 14px;
+                        font-weight: 500;
+                        color: #1e293b;
+                        margin-bottom: 4px;
+                      "
+                    >
+                      Departure Origin Facility
+                    </div>
+                    <div style="font-size: 13px; color: #64748b">
+                      Riyadh, SA
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Timeline Item 3 -->
+                <div
+                  style="
+                    display: flex;
+                    gap: 20px;
+                    position: relative;
+                    padding-bottom: 32px;
+                  "
+                >
+                  <div
+                    style="
+                      position: absolute;
+                      left: 81px;
+                      top: 32px;
+                      bottom: 0;
+                      width: 1px;
+                      background: #e2e8f0;
+                    "
+                  ></div>
+                  <div
+                    style="
+                      width: 65px;
+                      text-align: right;
+                      flex-shrink: 0;
+                      padding-top: 2px;
+                    "
+                  >
+                    <div
+                      style="font-size: 13px; font-weight: 500; color: #475569"
+                    >
+                      07:00 AM
+                    </div>
+                    <div
+                      style="font-size: 11px; color: #94a3b8; margin-top: 2px"
+                    >
+                      Mar 15
+                    </div>
+                  </div>
+                  <div
+                    style="
+                      width: 32px;
+                      height: 32px;
+                      border-radius: 50%;
+                      background: white;
+                      border: 2px solid #5051f9;
+                      color: #5051f9;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                      z-index: 1;
+                      flex-shrink: 0;
+                    "
+                  >
+                    <i class="bi bi-box-seam" style="font-size: 14px"></i>
+                  </div>
+                  <div style="padding-top: 6px">
+                    <div
+                      style="
+                        font-size: 14px;
+                        font-weight: 500;
+                        color: #1e293b;
+                        margin-bottom: 4px;
+                      "
+                    >
+                      Package Received at Origin Facility
+                    </div>
+                    <div style="font-size: 13px; color: #64748b">
+                      Riyadh, SA
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Timeline Item 4 -->
+                <div style="display: flex; gap: 20px; position: relative">
+                  <div
+                    style="
+                      width: 65px;
+                      text-align: right;
+                      flex-shrink: 0;
+                      padding-top: 2px;
+                    "
+                  >
+                    <div
+                      style="font-size: 13px; font-weight: 500; color: #475569"
+                    >
+                      03:20 PM
+                    </div>
+                    <div
+                      style="font-size: 11px; color: #94a3b8; margin-top: 2px"
+                    >
+                      Mar 14
+                    </div>
+                  </div>
+                  <div
+                    style="
+                      width: 32px;
+                      height: 32px;
+                      border-radius: 50%;
+                      background: white;
+                      border: 2px solid #5051f9;
+                      color: #5051f9;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                      z-index: 1;
+                      flex-shrink: 0;
+                    "
+                  >
+                    <i class="bi bi-upc-scan" style="font-size: 14px"></i>
+                  </div>
+                  <div style="padding-top: 6px">
+                    <div
+                      style="
+                        font-size: 14px;
+                        font-weight: 500;
+                        color: #1e293b;
+                        margin-bottom: 4px;
+                      "
+                    >
+                      Label Created
+                    </div>
+                    <div style="font-size: 13px; color: #64748b">
+                      Riyadh, SA
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ 5. FINANCIAL OVERVIEW ═══ -->
+      <div class="db-grid-2" data-section="finance">
+        <div class="db-card db-fade">
+          <div class="db-card-header">
+            <div>
+              <div class="db-card-title">Revenue vs Expenses</div>
+              <div class="db-card-subtitle">
+                Monthly comparison (SAR in Millions)
+              </div>
+            </div>
+            <div class="db-card-actions">
+              <button class="db-action-btn active">Monthly</button>
+              <button class="db-action-btn">Quarterly</button>
+            </div>
+          </div>
+          <div class="chart-wrap" style="height: 260px">
+            <canvas id="revenueChart"></canvas>
+          </div>
+        </div>
+
+        <div class="db-card db-fade">
+          <div class="db-card-header">
+            <div>
+              <div class="db-card-title">Financial Summary</div>
+              <div class="db-card-subtitle">AR &amp; AP Overview</div>
+            </div>
+          </div>
+          <div class="finance-grid">
+            <div class="finance-card">
+              <div class="finance-card-lbl">Total Invoices Generated</div>
+              <div class="finance-card-val">SAR 32.8M</div>
+              <div class="finance-card-sub">
+                <span class="up">↑ 18.2%</span> vs last month
+              </div>
+            </div>
+            <div class="finance-card">
+              <div class="finance-card-lbl">Paid Invoices</div>
+              <div class="finance-card-val">SAR 24.6M</div>
+              <div class="finance-card-sub">
+                <span class="up">75%</span> collection rate
+              </div>
+            </div>
+            <div class="finance-card">
+              <div class="finance-card-lbl">Accounts Receivable (AR)</div>
+              <div class="finance-card-val" style="color: #f59e0b">
+                SAR 8.2M
+              </div>
+              <div class="finance-card-sub">
+                <span class="down">↑ 4.8%</span> overdue
+              </div>
+            </div>
+            <div class="finance-card">
+              <div class="finance-card-lbl">Accounts Payable (AP)</div>
+              <div class="finance-card-val" style="color: #ef4444">
+                SAR 5.4M
+              </div>
+              <div class="finance-card-sub">12 vendors pending</div>
+            </div>
+          </div>
+          <div class="cashflow-bar">
+            <i class="bi bi-arrow-up-right"></i>
+            <div class="cashflow-bar-lbl">Net Cash Flow</div>
+            <div class="cashflow-bar-val">+SAR 2.8M</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ 6. RECENT OPERATIONS TABLE ═══ -->
+      <div
+        class="db-card db-fade"
+        style="margin-bottom: 24px"
+        data-section="operations"
+      >
+        <div class="db-card-header">
+          <div>
+            <div class="db-card-title">Recent Operations</div>
+            <div class="db-card-subtitle">Latest shipment activity</div>
+          </div>
+          <button class="db-action-btn">
+            View All <i class="bi bi-arrow-right" style="font-size: 10px"></i>
+          </button>
+        </div>
+
+        <div class="db-table-toolbar">
+          <div class="db-table-search">
+            <i class="bi bi-search"></i>
+            <input
+              type="text"
+              id="dbTableSearch"
+              placeholder="Search shipments…"
+            />
+          </div>
+          <div class="db-table-filters">
+            <button class="filter-chip active" data-filter="all">All</button>
+            <button class="filter-chip" data-filter="in-transit">
+              <i
+                class="bi bi-circle-fill"
+                style="font-size: 6px; color: #5051f9"
+              ></i>
+              In Transit
+            </button>
+            <button class="filter-chip" data-filter="delivered">
+              <i
+                class="bi bi-circle-fill"
+                style="font-size: 6px; color: #10b981"
+              ></i>
+              Delivered
+            </button>
+            <button class="filter-chip" data-filter="pending">
+              <i
+                class="bi bi-circle-fill"
+                style="font-size: 6px; color: #f59e0b"
+              ></i>
+              Pending
+            </button>
+          </div>
+        </div>
+
+        <div class="db-table-wrap">
+          <table class="db-table">
+            <thead>
+              <tr>
+                <th>Shipment ID</th>
+                <th>Client</th>
+                <th>Route</th>
+                <th>Truck</th>
+                <th>Driver</th>
+                <th>Status</th>
+                <th>POD</th>
+                <th>Delivery Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr data-status="in-transit">
+                <td><span class="shp-id">SHP-2026-1284</span></td>
+                <td>Saudi Aramco Logistics</td>
+                <td>Riyadh → Jeddah</td>
+                <td>RYD 1234</td>
+                <td>Khalid Al-Rashidi</td>
+                <td>
+                  <span class="status-badge in-transit"
+                    ><i class="bi bi-circle-fill"></i> In Transit</span
+                  >
+                </td>
+                <td><span class="pod-st pod-pending">Pending</span></td>
+                <td>Mar 18, 2026</td>
+              </tr>
+              <tr data-status="delivered">
+                <td><span class="shp-id">SHP-2026-1283</span></td>
+                <td>SABIC Logistics</td>
+                <td>Dammam → Al Khobar</td>
+                <td>DMM 5678</td>
+                <td>Fahad Al-Otaibi</td>
+                <td>
+                  <span class="status-badge delivered"
+                    ><i class="bi bi-circle-fill"></i> Delivered</span
+                  >
+                </td>
+                <td><span class="pod-st received">Received</span></td>
+                <td>Mar 16, 2026</td>
+              </tr>
+              <tr data-status="in-transit">
+                <td><span class="shp-id">SHP-2026-1282</span></td>
+                <td>Al-Marai Distribution</td>
+                <td>Makkah → Madinah</td>
+                <td>MKH 9012</td>
+                <td>Sultan Al-Qahtani</td>
+                <td>
+                  <span class="status-badge in-transit"
+                    ><i class="bi bi-circle-fill"></i> In Transit</span
+                  >
+                </td>
+                <td><span class="pod-st pod-pending">Pending</span></td>
+                <td>Mar 18, 2026</td>
+              </tr>
+              <tr data-status="delivered">
+                <td><span class="shp-id">SHP-2026-1281</span></td>
+                <td>Saudi Post (SPL)</td>
+                <td>Tabuk → Ha'il</td>
+                <td>TBK 3456</td>
+                <td>Abdulaziz Al-Dosari</td>
+                <td>
+                  <span class="status-badge delivered"
+                    ><i class="bi bi-circle-fill"></i> Delivered</span
+                  >
+                </td>
+                <td><span class="pod-st received">Received</span></td>
+                <td>Mar 15, 2026</td>
+              </tr>
+              <tr data-status="pending">
+                <td><span class="shp-id">SHP-2026-1280</span></td>
+                <td>Naqel Express</td>
+                <td>Abha → Khamis Mushait</td>
+                <td>ABH 7890</td>
+                <td>Omar Al-Harbi</td>
+                <td>
+                  <span class="status-badge pending"
+                    ><i class="bi bi-circle-fill"></i> Pending</span
+                  >
+                </td>
+                <td><span class="pod-st missing">Missing</span></td>
+                <td>Mar 19, 2026</td>
+              </tr>
+              <tr data-status="delivered">
+                <td><span class="shp-id">SHP-2026-1279</span></td>
+                <td>Jarir Marketing</td>
+                <td>Jizan → Najran</td>
+                <td>JIZ 2345</td>
+                <td>Turki Al-Mutairi</td>
+                <td>
+                  <span class="status-badge delivered"
+                    ><i class="bi bi-circle-fill"></i> Delivered</span
+                  >
+                </td>
+                <td><span class="pod-st received">Received</span></td>
+                <td>Mar 14, 2026</td>
+              </tr>
+              <tr data-status="in-transit">
+                <td><span class="shp-id">SHP-2026-1278</span></td>
+                <td>Noon.com</td>
+                <td>Buraydah → Unaizah</td>
+                <td>BRD 6789</td>
+                <td>Nawaf Al-Shammari</td>
+                <td>
+                  <span class="status-badge in-transit"
+                    ><i class="bi bi-circle-fill"></i> In Transit</span
+                  >
+                </td>
+                <td><span class="pod-st pod-pending">Pending</span></td>
+                <td>Mar 19, 2026</td>
+              </tr>
+              <tr data-status="pending">
+                <td><span class="shp-id">SHP-2026-1277</span></td>
+                <td>SMSA Express</td>
+                <td>Al Jubail → Dhahran</td>
+                <td>JBL 1234</td>
+                <td>Saad Al-Ghamdi</td>
+                <td>
+                  <span class="status-badge pending"
+                    ><i class="bi bi-circle-fill"></i> Pending</span
+                  >
+                </td>
+                <td><span class="pod-st pod-pending">Pending</span></td>
+                <td>Mar 20, 2026</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ═══ 7. OPERATIONAL & ADMIN INSIGHTS ═══ -->
+      <div class="db-grid-2" data-section="operations">
+        <div class="db-card db-fade">
+          <div class="db-card-header">
+            <div>
+              <div class="db-card-title">
+                <i
+                  class="bi bi-speedometer2"
+                  style="color: #5051f9; margin-right: 6px"
+                ></i>
+                Operational Insights
+              </div>
+              <div class="db-card-subtitle">
+                SLA performance & POD → billing pipeline
+              </div>
+            </div>
+            <button class="db-action-btn">
+              View Details
+              <i class="bi bi-arrow-right" style="font-size: 10px"></i>
+            </button>
+          </div>
+
+          <div class="insights-grid">
+            <!-- Route SLA Performance -->
+            <div class="insight-block">
+              <div class="insight-title">Route SLA Performance</div>
+              <div class="insight-list">
+                <div class="insight-row">
+                  <div class="insight-row-left">
+                    <div class="insight-route">Riyadh → Jeddah</div>
+                    <div class="insight-meta">
+                      Avg. transit: 14.2h · 42 loads
+                    </div>
+                  </div>
+                  <div class="insight-row-right">
+                    <div class="insight-kpi">93%</div>
+                    <div class="insight-bar">
+                      <div class="insight-fill good" style="width: 93%"></div>
+                    </div>
+                  </div>
+                </div>
+                <div class="insight-row">
+                  <div class="insight-row-left">
+                    <div class="insight-route">Dammam → Al Khobar</div>
+                    <div class="insight-meta">
+                      Avg. transit: 3.1h · 28 loads
+                    </div>
+                  </div>
+                  <div class="insight-row-right">
+                    <div class="insight-kpi">97%</div>
+                    <div class="insight-bar">
+                      <div class="insight-fill good" style="width: 97%"></div>
+                    </div>
+                  </div>
+                </div>
+                <div class="insight-row">
+                  <div class="insight-row-left">
+                    <div class="insight-route">Makkah → Madinah</div>
+                    <div class="insight-meta">
+                      Avg. transit: 5.6h · 19 loads
+                    </div>
+                  </div>
+                  <div class="insight-row-right">
+                    <div class="insight-kpi">88%</div>
+                    <div class="insight-bar">
+                      <div class="insight-fill warn" style="width: 88%"></div>
+                    </div>
+                  </div>
+                </div>
+                <div class="insight-row">
+                  <div class="insight-row-left">
+                    <div class="insight-route">Abha → Khamis Mushait</div>
+                    <div class="insight-meta">
+                      Avg. transit: 2.4h · 12 loads
+                    </div>
+                  </div>
+                  <div class="insight-row-right">
+                    <div class="insight-kpi">81%</div>
+                    <div class="insight-bar">
+                      <div class="insight-fill warn" style="width: 81%"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- POD → Billing Pipeline -->
+            <div class="insight-block">
+              <div class="insight-title">POD → Billing Pipeline</div>
+              <div class="pipeline">
+                <div class="pipe-step">
+                  <div
+                    class="pipe-ic"
+                    style="background: rgba(80, 81, 249, 0.08); color: #5051f9"
+                  >
+                    <i class="bi bi-truck"></i>
+                  </div>
+                  <div class="pipe-txt">
+                    <div class="pipe-name">Delivered</div>
+                    <div class="pipe-sub">Today</div>
+                  </div>
+                  <div class="pipe-val">86</div>
+                </div>
+                <div class="pipe-step">
+                  <div
+                    class="pipe-ic"
+                    style="background: rgba(245, 158, 11, 0.1); color: #f59e0b"
+                  >
+                    <i class="bi bi-file-earmark-text"></i>
+                  </div>
+                  <div class="pipe-txt">
+                    <div class="pipe-name">POD Pending</div>
+                    <div class="pipe-sub">48h window</div>
+                  </div>
+                  <div class="pipe-val" style="color: #f59e0b">12</div>
+                </div>
+                <div class="pipe-step">
+                  <div
+                    class="pipe-ic"
+                    style="background: rgba(16, 185, 129, 0.08); color: #10b981"
+                  >
+                    <i class="bi bi-receipt"></i>
+                  </div>
+                  <div class="pipe-txt">
+                    <div class="pipe-name">Ready to Invoice</div>
+                    <div class="pipe-sub">Verified POD</div>
+                  </div>
+                  <div class="pipe-val">58</div>
+                </div>
+                <div class="pipe-step">
+                  <div
+                    class="pipe-ic"
+                    style="background: rgba(139, 92, 246, 0.08); color: #8b5cf6"
+                  >
+                    <i class="bi bi-cash-coin"></i>
+                  </div>
+                  <div class="pipe-txt">
+                    <div class="pipe-name">Invoiced</div>
+                    <div class="pipe-sub">SAR this week</div>
+                  </div>
+                  <div class="pipe-val">SAR 2.8M</div>
+                </div>
+              </div>
+
+              <div class="insight-note">
+                <span class="insight-note-dot"></span>
+                Updated just now · Saudi operations dataset
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="db-card db-fade">
+          <div class="db-card-header">
+            <div>
+              <div class="db-card-title">Admin Insights</div>
+              <div class="db-card-subtitle">System &amp; user overview</div>
+            </div>
+          </div>
+          <div class="admin-grid">
+            <div class="admin-stat">
+              <div class="admin-stat-val">48</div>
+              <div class="admin-stat-lbl">Total Users</div>
+            </div>
+            <div class="admin-stat">
+              <div class="admin-stat-val" style="color: #10b981">23</div>
+              <div class="admin-stat-lbl">Active Sessions</div>
+            </div>
+            <div class="admin-stat">
+              <div class="admin-stat-val" style="color: #5051f9">5</div>
+              <div class="admin-stat-lbl">Admin Roles</div>
+            </div>
+            <div class="admin-stat">
+              <div class="admin-stat-val" style="color: #8b5cf6">12</div>
+              <div class="admin-stat-lbl">Operator Roles</div>
+            </div>
+          </div>
+          <div class="audit-list">
+            <div class="audit-row">
+              <span class="audit-dot"></span>
+              <span class="audit-text">Mark updated fleet settings</span>
+              <span class="audit-time">10m ago</span>
+            </div>
+            <div class="audit-row">
+              <span class="audit-dot" style="background: #10b981"></span>
+              <span class="audit-text">New user Noura Al-Dossari added</span>
+              <span class="audit-time">1h ago</span>
+            </div>
+            <div class="audit-row">
+              <span class="audit-dot" style="background: #f59e0b"></span>
+              <span class="audit-text">Invoice #INV-4521 approved</span>
+              <span class="audit-time">3h ago</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+
+{% endblock %}

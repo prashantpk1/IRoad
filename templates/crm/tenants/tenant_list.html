@@ -228,7 +228,7 @@
             <td>{{ t.country.name_en|default:'-' }}</td>
             <td>
               {% if t.current_plan %}
-                <span class="badge" style="background: rgba(80, 81, 249, 0.1); color: var(--primary-color);">{{ t.current_plan.plan_name_en }}</span>
+                <span class="value-badge">{{ t.current_plan.plan_name_en }}</span>
               {% else %}
                 -
               {% endif %}
@@ -243,22 +243,14 @@
             <td class="text-nowrap small text-muted">{{ t.updated_at|date:'d M Y, H:i' }}</td>
             <td>
               {% if t.account_status == 'Active' %}
-                <div class="eal-status" style="gap: 8px">
-                    <i class="bi bi-circle-fill text-success" style="font-size: 8px"></i>
-                    <span>{% translate "Active" %}</span>
-                </div>
+                <span class="status-badge active">{% translate "Active" %}</span>
               {% elif t.account_status == 'Suspended_Billing' or t.account_status == 'Suspended_Violation' %}
-                <div class="eal-status" style="gap: 8px">
-                    <i class="bi bi-circle-fill text-warning" style="font-size: 8px"></i>
-                    <span>{{ t.account_status }}</span>
-                </div>
+                <span class="status-badge warning">{{ t.account_status }}</span>
               {% else %}
-                <div class="eal-status" style="gap: 8px">
-                    <i class="bi bi-circle-fill text-secondary" style="font-size: 8px"></i>
-                    <span>{% translate "Churned" %}</span>
-                </div>
+                <span class="status-badge neutral">{% translate "Churned" %}</span>
               {% endif %}
             </td>
+
             <td><span class="fw-semibold text-primary">{{ t.wallet_balance|floatformat:2 }}</span></td>
             <td class="text-nowrap">
               <div class="eal-actions-cell">
@@ -270,6 +262,12 @@
                     title="{% translate 'Kill Switch' %}"
                   ><i class="bi bi-shield-x"></i></a>
                   <a href="{% url 'tenant_edit' t.tenant_id %}" class="eal-row-btn" title="{% translate 'Edit' %}"><i class="bi bi-pencil"></i></a>
+                  {% if t.account_status != 'Active' %}
+                    <form method="post" action="{% url 'tenant_delete' t.tenant_id %}" style="display:inline" onsubmit="return confirm('Remove this tenant from UI? Database record will stay.');">
+                      {% csrf_token %}
+                      <button type="submit" class="eal-row-btn" title="{% translate 'Delete (Soft)' %}"><i class="bi bi-trash"></i></button>
+                    </form>
+                  {% endif %}
                 {% endif %}
               </div>
             </td>

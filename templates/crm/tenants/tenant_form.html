@@ -39,58 +39,59 @@
 </div>
 {% endif %}
 
-<div class="form-card">
-  <div class="form-card-header">
-    <div class="form-card-icon blue">
-      <i class="bi bi-person-badge"></i>
-    </div>
-    <div class="form-card-header-text">
-      <h3 class="form-card-title">{% translate "Profile & Identity" %}</h3>
-      <p class="form-card-desc">{% translate "Subscriber core identity and contact details." %}</p>
-    </div>
-  </div>
-  <div class="form-card-body">
-    {% if is_edit %}
-      <div class="alert alert-info py-2 small mb-4" style="background: rgba(80, 81, 249, 0.05); border: 1px solid rgba(80, 81, 249, 0.1); color: var(--primary-color);">
-        <i class="bi bi-info-circle me-1"></i> {% translate "Synced fields are read only in Control Panel (synced from the tenant system via webhook)." %}
+<form method="post" novalidate>
+  {% csrf_token %}
+  {% if form.non_field_errors %}<div class="alert alert-danger mb-4">{{ form.non_field_errors }}</div>{% endif %}
+
+  {% if is_edit %}
+    <!-- Card 1: Read-only Synced Info -->
+    <div class="form-card mb-4">
+      <div class="form-card-header">
+        <div class="form-card-icon blue">
+          <i class="bi bi-person-badge"></i>
+        </div>
+        <div class="form-card-header-text">
+          <h3 class="form-card-title">{% translate "Profile & Identity" %}</h3>
+          <p class="form-card-desc">{% translate "Subscriber core identity (Synced from Tenant system - read only)." %}</p>
+        </div>
       </div>
-      
-      <div class="field-group">
+      <div class="form-card-body">
+        <div class="alert alert-info py-2 small mb-4" style="background: rgba(80, 81, 249, 0.05); border: 1px solid rgba(80, 81, 249, 0.1); color: var(--primary-color);">
+          <i class="bi bi-info-circle me-1"></i> {% translate "Synced fields are read only in Control Panel." %}
+        </div>
+        
         <div class="row g-3">
           <div class="col-12 col-md-6">
-            <label class="form-label"><i class="bi bi-lock me-1"></i> {% translate "Company name" %}</label>
+            <label class="form-label">{% translate "Company name" %}</label>
             <input type="text" class="form-control" value="{{ tenant.company_name }}" disabled style="background: #f8fafc;">
-            <div class="field-hint">{% translate "Synced from Tenant system - read only" %}</div>
           </div>
           <div class="col-12 col-md-6">
-            <label class="form-label"><i class="bi bi-lock me-1"></i> {% translate "Registration number" %}</label>
+            <label class="form-label">{% translate "Registration number" %}</label>
             <input type="text" class="form-control" value="{{ tenant.registration_number }}" disabled style="background: #f8fafc;">
-            <div class="field-hint">{% translate "Synced from Tenant system - read only" %}</div>
           </div>
           <div class="col-12 col-md-6">
-            <label class="form-label"><i class="bi bi-lock me-1"></i> {% translate "Tax number" %}</label>
+            <label class="form-label">{% translate "Tax number" %}</label>
             <input type="text" class="form-control" value="{{ tenant.tax_number|default:'' }}" disabled style="background: #f8fafc;">
-            <div class="field-hint">{% translate "Synced from Tenant system - read only" %}</div>
           </div>
           <div class="col-12 col-md-6">
-            <label class="form-label"><i class="bi bi-lock me-1"></i> {% translate "Primary email" %}</label>
+            <label class="form-label">{% translate "Primary email" %}</label>
             <input type="email" class="form-control" value="{{ tenant.primary_email }}" disabled style="background: #f8fafc;">
-            <div class="field-hint">{% translate "Synced from Tenant system - read only" %}</div>
           </div>
           <div class="col-12 col-md-6">
-            <label class="form-label"><i class="bi bi-lock me-1"></i> {% translate "Primary phone" %}</label>
+            <label class="form-label">{% translate "Primary phone" %}</label>
             <input type="text" class="form-control" value="{{ tenant.primary_phone }}" disabled style="background: #f8fafc;">
-            <div class="field-hint">{% translate "Synced from Tenant system - read only" %}</div>
           </div>
           <div class="col-12 col-md-6">
-            <label class="form-label"><i class="bi bi-lock me-1"></i> {% translate "Country" %}</label>
+            <label class="form-label">{% translate "Country" %}</label>
             <input type="text" class="form-control" value="{{ tenant.country.name_en|default:'-' }}" disabled style="background: #f8fafc;">
-            <div class="field-hint">{% translate "Synced from Tenant system - read only" %}</div>
           </div>
         </div>
       </div>
+    </div>
 
-      <div class="form-card-header mt-5" style="border-top: 1px solid var(--border-light); padding-top: 24px;">
+    <!-- Card 2: Editable Settings -->
+    <div class="form-card mb-4">
+      <div class="form-card-header">
         <div class="form-card-icon" style="background: rgba(245, 158, 11, 0.1); color: var(--warning-color);">
           <i class="bi bi-gear-wide-connected"></i>
         </div>
@@ -99,45 +100,25 @@
           <p class="form-card-desc">{% translate "Control administrative status and account management." %}</p>
         </div>
       </div>
-      
-      <form method="post" novalidate>
-        {% csrf_token %}
-        {% if form.non_field_errors %}<div class="alert alert-danger mb-4">{{ form.non_field_errors }}</div>{% endif %}
-        
-        <div class="field-group">
-          <div class="row g-3 mt-2">
-            <div class="col-12 col-md-6">
-              <label class="form-label" for="{{ form.account_status.id_for_label }}">{{ form.account_status.label }}</label>
-              {{ form.account_status }}
-              {% if form.account_status.errors %}<div class="field-error">{{ form.account_status.errors.0 }}</div>{% endif %}
-              <div class="field-hint" style="color: var(--warning-color);">
-                <i class="bi bi-exclamation-triangle"></i> {% translate "Suspension will trigger the Kill Switch for all tenant users." %}
-              </div>
+      <div class="form-card-body">
+        <div class="row g-3">
+          <div class="col-12 col-md-6">
+            <label class="form-label" for="{{ form.account_status.id_for_label }}">{{ form.account_status.label }}</label>
+            {{ form.account_status }}
+            {% if form.account_status.errors %}<div class="field-error">{{ form.account_status.errors.0 }}</div>{% endif %}
+            <div class="field-hint" style="color: var(--warning-color);">
+              <i class="bi bi-exclamation-triangle"></i> {% translate "Suspension will trigger the Kill Switch for all tenant users." %}
             </div>
-            <div class="col-12 col-md-6">
-              <label class="form-label" for="{{ form.assigned_sales_rep.id_for_label }}">{{ form.assigned_sales_rep.label }}</label>
-              {{ form.assigned_sales_rep }}
-              {% if form.assigned_sales_rep.errors %}<div class="field-error">{{ form.assigned_sales_rep.errors.0 }}</div>{% endif %}
-            </div>
-            {% if form.rotate_bridge_api_key %}
-            <div class="col-12">
-              <div class="form-check mt-2">
-                {{ form.rotate_bridge_api_key }}
-                <label class="form-check-label" for="{{ form.rotate_bridge_api_key.id_for_label }}">{{ form.rotate_bridge_api_key.label }}</label>
-              </div>
-              {% if form.rotate_bridge_api_key.help_text %}<div class="field-hint small text-muted">{{ form.rotate_bridge_api_key.help_text }}</div>{% endif %}
-              {% if form.rotate_bridge_api_key.errors %}<div class="field-error">{{ form.rotate_bridge_api_key.errors.0 }}</div>{% endif %}
-            </div>
-            {% endif %}
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label" for="{{ form.assigned_sales_rep.id_for_label }}">{{ form.assigned_sales_rep.label }}</label>
+            {{ form.assigned_sales_rep }}
+            {% if form.assigned_sales_rep.errors %}<div class="field-error">{{ form.assigned_sales_rep.errors.0 }}</div>{% endif %}
           </div>
         </div>
-
-
+      </div>
     </div>
 
-    </div>
-
-    <!-- Fixed Action Bar at the bottom of the viewport -->
     <div class="form-actions-bar">
       <div class="form-actions-left">
         <a href="{% url 'tenant_detail' tenant.tenant_id %}" class="eal-btn eal-btn-outline">
@@ -152,32 +133,33 @@
         </button>
       </div>
     </div>
-  </div>
-</form>
-    {% else %}
-      <form method="post" novalidate>
-        {% csrf_token %}
-        {% if form.non_field_errors %}<div class="alert alert-danger mb-4">{{ form.non_field_errors }}</div>{% endif %}
-        
-        <div class="field-group">
-          <div class="row g-3">
-            {% for field in form %}
-              <div class="col-12 col-md-6">
-                <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
-                {{ field }}
-                {% if field.help_text %}<div class="field-hint">{{ field.help_text }}</div>{% endif %}
-                {% if field.errors %}<div class="field-error">{{ field.errors.0 }}</div>{% endif %}
-              </div>
-            {% endfor %}
-          </div>
+
+  {% else %}
+    <!-- Create View Card -->
+    <div class="form-card mb-4">
+      <div class="form-card-header">
+        <div class="form-card-icon blue">
+          <i class="bi bi-person-plus"></i>
         </div>
-
-
+        <div class="form-card-header-text">
+          <h3 class="form-card-title">{% translate "New Subscriber Details" %}</h3>
+          <p class="form-card-desc">{% translate "Enter primary details to register a new subscriber." %}</p>
+        </div>
+      </div>
+      <div class="form-card-body">
+        <div class="row g-3">
+          {% for field in form %}
+            <div class="col-12 col-md-6">
+              <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+              {{ field }}
+              {% if field.help_text %}<div class="field-hint small text-muted">{{ field.help_text }}</div>{% endif %}
+              {% if field.errors %}<div class="field-error">{{ field.errors.0 }}</div>{% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      </div>
     </div>
 
-    </div>
-
-    <!-- Fixed Action Bar -->
     <div class="form-actions-bar">
       <div class="form-actions-left">
         <a href="{% url 'tenant_list' %}" class="eal-btn eal-btn-outline">
@@ -192,9 +174,6 @@
         </button>
       </div>
     </div>
-  </div>
+  {% endif %}
 </form>
-    {% endif %}
-  </div>
-</div>
 {% endblock %}

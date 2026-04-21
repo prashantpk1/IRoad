@@ -13,11 +13,14 @@
   <div class="page-header-row">
     <div class="page-header-left">
       <h1 class="page-title">{% if is_edit %}{% translate "Edit Banner" %}{% else %}{% translate "Add Banner" %}{% endif %}</h1>
-      <p class="page-subtitle">{% translate "Manage your records here" %}</p>
+      <p class="page-subtitle">{% translate "Create and schedule system banners with severity and visibility settings." %}</p>
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
-        <!-- Actions here -->
+        <a href="{% url 'banner_list' %}" class="eal-btn eal-btn-outline">
+          <i class="bi bi-arrow-left"></i>
+          <span>{% translate "Back to list" %}</span>
+        </a>
       </div>
     </div>
   </div>
@@ -27,40 +30,110 @@
 {% if form.instance.pk and form.instance.updated_at %}
 <div class="edit-info-bar">
   <i class="bi bi-clock-history"></i>
-  Last updated
+  {% translate "Last updated" %}
   {% if form.instance.updated_by %}
-    by <strong>{{ form.instance.updated_by.first_name }} {{ form.instance.updated_by.last_name }}</strong>
+    {% translate "by" %} <strong>{{ form.instance.updated_by.first_name }} {{ form.instance.updated_by.last_name }}</strong>
   {% endif %}
-  at <strong>{{ form.instance.updated_at|date:"d M Y, H:i" }}</strong>
+  {% translate "at" %} <strong>{{ form.instance.updated_at|date:"d M Y, H:i" }}</strong>
 </div>
 {% endif %}
-<div class="form-card mb-3">
-  <div class="form-card-body">
-    <form method="post">
-      {% csrf_token %}
-      {{ form.non_field_errors }}
-      <div class="fields-grid cols-2">
-        <div class="field">{{ form.title_en.label_tag }}{{ form.title_en }}{{ form.title_en.errors }}</div>
-        <div class="field" dir="rtl">{{ form.title_ar.label_tag }}{{ form.title_ar }}{{ form.title_ar.errors }}</div>
-        <div class="field">{{ form.message_en.label_tag }}{{ form.message_en }}{{ form.message_en.errors }}</div>
-        <div class="field" dir="rtl">{{ form.message_ar.label_tag }}{{ form.message_ar }}{{ form.message_ar.errors }}</div>
-        <div class="field">{{ form.severity.label_tag }}{{ form.severity }}{{ form.severity.errors }}</div>
-        <div class="field">{{ form.is_dismissible.label_tag }}{{ form.is_dismissible }}{{ form.is_dismissible.errors }}</div>
-        <div class="field">{{ form.is_active.label_tag }}{{ form.is_active }}{{ form.is_active.errors }}</div>
-        <div class="field">{{ form.valid_from.label_tag }}{{ form.valid_from }}{{ form.valid_from.errors }}</div>
-        <div class="field">{{ form.valid_until.label_tag }}{{ form.valid_until }}{{ form.valid_until.errors }}</div>
-      </div>
-      <div class="form-actions-bar">
-  <div class="eal-header-actions">
+<form method="post" autocomplete="off">
+  {% csrf_token %}
 
-        <div class="footer-left"><a href="{% url 'banner_list' %}" class="eal-btn eal-btn-outline">Cancel</a>
-  </div>
-</div>
-        <div class="footer-right"><button type="submit" class="eal-btn eal-btn-primary">Save</button></div>
+  {% if form.non_field_errors %}
+    <div class="alert alert-danger mb-3" role="alert">
+      {{ form.non_field_errors }}
+    </div>
+  {% endif %}
+
+  <div class="form-card mb-3">
+    <div class="form-card-header">
+      <div class="form-card-icon blue">
+        <i class="bi bi-megaphone"></i>
       </div>
-    </form>
+      <div class="form-card-header-text">
+        <h3 class="form-card-title">{% translate "Banner Details" %}</h3>
+        <p class="form-card-desc">{% translate "Set banner text, severity, and active visibility window." %}</p>
+      </div>
+    </div>
+    <div class="form-card-body">
+      <div class="field-group">
+        <div class="row g-3">
+          <div class="col-12 col-md-6">
+            <label class="form-label" for="{{ form.title_en.id_for_label }}">{{ form.title_en.label }}</label>
+            {{ form.title_en }}
+            {% for error in form.title_en.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+          </div>
+          <div class="col-12 col-md-6" dir="rtl">
+            <label class="form-label" for="{{ form.title_ar.id_for_label }}">{{ form.title_ar.label }}</label>
+            {{ form.title_ar }}
+            {% for error in form.title_ar.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label" for="{{ form.message_en.id_for_label }}">{{ form.message_en.label }}</label>
+            {{ form.message_en }}
+            {% for error in form.message_en.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+          </div>
+          <div class="col-12 col-md-6" dir="rtl">
+            <label class="form-label" for="{{ form.message_ar.id_for_label }}">{{ form.message_ar.label }}</label>
+            {{ form.message_ar }}
+            {% for error in form.message_ar.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label" for="{{ form.severity.id_for_label }}">{{ form.severity.label }}</label>
+            {{ form.severity }}
+            {% for error in form.severity.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label" for="{{ form.valid_from.id_for_label }}">{{ form.valid_from.label }}</label>
+            {{ form.valid_from }}
+            {% for error in form.valid_from.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label" for="{{ form.valid_until.id_for_label }}">{{ form.valid_until.label }}</label>
+            {{ form.valid_until }}
+            {% for error in form.valid_until.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+          </div>
+          <div class="col-12 col-md-3">
+            <div class="form-label d-block mb-0">{{ form.is_dismissible.label }}</div>
+            <div class="form-check form-switch mt-2">
+              {{ form.is_dismissible }}
+              <label class="form-check-label ms-1" for="{{ form.is_dismissible.id_for_label }}">
+                <span class="fw-medium">{% translate "Dismissible" %}</span>
+              </label>
+            </div>
+            {% for error in form.is_dismissible.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+          </div>
+          <div class="col-12 col-md-3">
+            <div class="form-label d-block mb-0">{{ form.is_active.label }}</div>
+            <div class="form-check form-switch mt-2">
+              {{ form.is_active }}
+              <label class="form-check-label ms-1" for="{{ form.is_active.id_for_label }}">
+                <span class="fw-medium">{% translate "Active Status" %}</span>
+              </label>
+            </div>
+            {% for error in form.is_active.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
-</div>
+
+  <div class="form-actions-bar">
+    <div class="form-actions-left">
+      <a href="{% url 'banner_list' %}" class="eal-btn eal-btn-outline">
+        <i class="bi bi-x-lg"></i>
+        <span>{% translate "Cancel" %}</span>
+      </a>
+    </div>
+    <div class="form-actions-right">
+      <button type="submit" class="eal-btn eal-btn-primary">
+        <i class="bi bi-send"></i>
+        <span>{% if is_edit %}{% translate "Update Banner" %}{% else %}{% translate "Save Banner" %}{% endif %}</span>
+      </button>
+    </div>
+  </div>
+</form>
 
 <div class="form-card">
   <div class="form-card-body">

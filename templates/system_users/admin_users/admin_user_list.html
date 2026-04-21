@@ -256,6 +256,12 @@
                         </button>
                       {% endif %}
                     </form>
+                    <form method="post" action="{% url 'admin_user_delete' u.pk %}" onsubmit="return confirm('Remove this admin user from UI? Database record will stay.');">
+                      {% csrf_token %}
+                      <button type="submit" class="eal-row-btn" title="Delete (Soft)">
+                        <i class="bi bi-trash"></i>
+                      </button>
+                    </form>
                   {% endif %}
                 </div>
               </td>

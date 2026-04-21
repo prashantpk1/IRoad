@@ -247,6 +247,12 @@
                         <i class="bi bi-arrow-repeat"></i>
                       </button>
                     </form>
+                    <form method="post" action="{% url 'promo_code_delete' p.promo_code_id %}" style="display:inline" onsubmit="return confirm('Remove this promo code from UI? Database record will stay.');">
+                      {% csrf_token %}
+                      <button type="submit" class="eal-row-btn" title="Delete (Soft)">
+                        <i class="bi bi-trash"></i>
+                      </button>
+                    </form>
                   {% endif %}
                 </div>
               </td>

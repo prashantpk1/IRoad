@@ -213,9 +213,10 @@
           <tr>
             <td>{{ row.default_rank }}</td>
             <td>{{ row.recipient }}</td>
-            <td>{% if row.channel_type == 'Email' %}<span class="status-badge inactive">Email</span>{% elif row.channel_type == 'SMS' %}<span class="status-badge active">SMS</span>{% else %}<span class="status-badge warning">Push</span>{% endif %}</td>
+            <td>{% if row.channel_type == 'Email' %}<span class="value-badge">Email</span>{% elif row.channel_type == 'SMS' %}<span class="value-badge">SMS</span>{% else %}<span class="value-badge">Push</span>{% endif %}</td>
             <td>{{ row.trigger_source }}</td>
-            <td>{% if row.delivery_status == 'Sent' %}<span class="status-badge active">Sent</span>{% elif row.delivery_status == 'Failed' %}<span class="status-badge inactive">Failed</span>{% else %}<span class="status-badge inactive">{{ row.delivery_status }}</span>{% endif %}</td>
+            <td>{% if row.delivery_status == 'Sent' %}<span class="status-badge success">Sent</span>{% elif row.delivery_status == 'Failed' %}<span class="status-badge inactive">Failed</span>{% else %}<span class="status-badge inactive">{{ row.delivery_status }}</span>{% endif %}</td>
+
             <td>{{ row.error_details|default:'-'|truncatechars:70 }}</td>
             <td>{{ row.dispatched_at|date:'Y-m-d H:i:s' }}</td>
           </tr>

@@ -3,7 +3,7 @@ from django.template import Context, Template
 from django.http import HttpResponse, JsonResponse
 from django.contrib.sessions.models import Session
 from django.contrib.auth import login, logout
-from django.contrib.auth.hashers import check_password
+from django.contrib.auth.hashers import check_password, make_password
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.conf import settings
 from django.db import transaction as db_transaction
@@ -34,6 +34,7 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 import json
 import logging
+import os
 import secrets
 import uuid
 import smtplib
@@ -41,6 +42,18 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 logger = logging.getLogger(__name__)
+
+
+def _write_txn_approve_debug(message):
+    """Append transaction-approve debug output to a local txt file."""
+    debug_file = os.path.join(settings.BASE_DIR, 'transaction_approve_debug.txt')
+    stamp = timezone.now().strftime('%Y-%m-%d %H:%M:%S')
+    try:
+        with open(debug_file, 'a', encoding='utf-8') as fh:
+            fh.write(f'[{stamp}] {message}\n')
+    except Exception:
+        logger.exception('Failed writing transaction approve debug log')
+
 
 from .billing_helpers import (
     calculate_addon_prorata,
@@ -164,6 +177,7 @@ from .models import (
     SupportTicket,
     TicketReply,
 )
+from iroad_tenants.models import TenantAuthToken
 
 
 def _client_ip(request):
@@ -346,7 +360,7 @@ class LoginView(View):
                 request,
                 'Tenant authenticated successfully. Access token generated in backend.',
             )
-            return render(request, self.template_name, {'form': LoginForm()})
+            return redirect('iroad_tenants:tenant_dashboard')
 
         # STEP 3: Check status
         if user.status == 'Suspended':
@@ -687,6 +701,35 @@ class ForgotPasswordView(View):
                 "password_reset",
                 {"admin_user": user, "reset_url": reset_url},
             )
+        else:
+            tenant = TenantProfile.objects.filter(primary_email__iexact=email).first()
+            if tenant and tenant.account_status == 'Active':
+                TenantAuthToken.objects.filter(
+                    tenant_profile=tenant,
+                    token_type=TenantAuthToken.TokenType.INVITE,
+                    is_used=False,
+                ).update(is_used=True)
+                tenant_token = TenantAuthToken.objects.create(
+                    tenant_profile=tenant,
+                    token=secrets.token_urlsafe(32),
+                    token_type=TenantAuthToken.TokenType.INVITE,
+                    expires_at=timezone.now() + timedelta(hours=1),
+                )
+                reset_url = request.build_absolute_uri(
+                    reverse('set_password', args=[tenant_token.token])
+                )
+                send_named_notification_email(
+                    'AUTH_PASSWORD_RESET',
+                    recipient_email=tenant.primary_email,
+                    context_dict={
+                        'admin_user': {'first_name': tenant.company_name},
+                        'reset_url': reset_url,
+                    },
+                    language='en',
+                    default_subject='Reset Your iRoad Password',
+                    trigger_source='TemplateName: AUTH_PASSWORD_RESET',
+                    force_django_smtp=True,
+                )
 
         # Always show the same success_message text to avoid information leaks
         return render(
@@ -1914,7 +1957,7 @@ class AdminUserListView(LoginRequiredMixin, View):
         sort_by = request.GET.get('sort', 'name')
         sort_dir = request.GET.get('dir', 'asc')
 
-        users_qs = AdminUser.objects.all().select_related('role', 'created_by', 'updated_by')
+        users_qs = AdminUser.objects.filter(is_deleted=False).select_related('role', 'created_by', 'updated_by')
 
         # Sortable fields whitelist and mapping
         sort_mapping = {
@@ -2104,7 +2147,7 @@ class MyAccountView(LoginRequiredMixin, View):
 
 
 class SetPasswordView(View):
-    """Public: activate invited admin via token."""
+    """Public: activate invited admin/tenant via token."""
 
     template_form = 'auth/set_password.html'
     template_error = 'auth/token_error.html'
@@ -2125,74 +2168,90 @@ class SetPasswordView(View):
         except AdminAuthToken.DoesNotExist:
             return None
 
+    def _get_tenant_invite_token(self, raw_token):
+        try:
+            return TenantAuthToken.objects.select_related('tenant_profile').get(
+                token=raw_token,
+                token_type=TenantAuthToken.TokenType.INVITE,
+            )
+        except TenantAuthToken.DoesNotExist:
+            return None
+
     def get(self, request, token):
         invite = self._get_invite_token(token)
-        if invite is None:
+        tenant_invite = self._get_tenant_invite_token(token) if invite is None else None
+        active_invite = invite or tenant_invite
+        if active_invite is None:
             return self._render_error(request, 'Invalid invite link.')
-        if invite.is_used:
-            return self._render_error(
-                request,
-                'This invite link has already been used.',
-            )
-        if invite.is_expired:
-            return self._render_error(
-                request,
-                'This invite link has expired.',
-            )
+        if active_invite.is_used:
+            return self._render_error(request, 'This invite link has already been used.')
+        if active_invite.is_expired:
+            return self._render_error(request, 'This invite link has expired.')
+        invite_email = (
+            invite.admin_user.email if invite is not None else tenant_invite.tenant_profile.primary_email
+        )
         return render(
             request,
             self.template_form,
             {
                 'form': SetPasswordForm(),
-                'invite_email': invite.admin_user.email,
+                'invite_email': invite_email,
             },
         )
 
     def post(self, request, token):
         invite = self._get_invite_token(token)
-        if invite is None:
+        tenant_invite = self._get_tenant_invite_token(token) if invite is None else None
+        active_invite = invite or tenant_invite
+        if active_invite is None:
             return self._render_error(request, 'Invalid invite link.')
-        if invite.is_used:
-            return self._render_error(
-                request,
-                'This invite link has already been used.',
-            )
-        if invite.is_expired:
-            return self._render_error(
-                request,
-                'This invite link has expired.',
-            )
+        if active_invite.is_used:
+            return self._render_error(request, 'This invite link has already been used.')
+        if active_invite.is_expired:
+            return self._render_error(request, 'This invite link has expired.')
 
         form = SetPasswordForm(request.POST)
         if not form.is_valid():
+            invite_email = (
+                invite.admin_user.email if invite is not None else tenant_invite.tenant_profile.primary_email
+            )
             return render(
                 request,
                 self.template_form,
                 {
                     'form': form,
-                    'invite_email': invite.admin_user.email,
+                    'invite_email': invite_email,
                 },
             )
 
-        user = invite.admin_user
         password = form.cleaned_data['password']
-        user.set_password(password)
-        user.status = 'Active'
-        user.two_factor_enabled = True
-        user.save(update_fields=['password', 'status', 'two_factor_enabled'])
-
-        invite.is_used = True
-        invite.save(update_fields=['is_used'])
-
         ip = _client_ip(request)
-        log_access('Login', 'Success', user.email, ip)
+        if invite is not None:
+            user = invite.admin_user
+            user.set_password(password)
+            user.status = 'Active'
+            user.two_factor_enabled = True
+            user.save(update_fields=['password', 'status', 'two_factor_enabled'])
+            invite.is_used = True
+            invite.save(update_fields=['is_used'])
+            log_access('Login', 'Success', user.email, ip)
+        else:
+            tenant = tenant_invite.tenant_profile
+            tenant.portal_bootstrap_password_hash = make_password(password)
+            tenant.save(update_fields=['portal_bootstrap_password_hash'])
+            tenant_invite.is_used = True
+            tenant_invite.save(update_fields=['is_used'])
+            reset_failed_attempts(tenant.primary_email)
+            log_access('Login', 'Success', tenant.primary_email, ip)
 
         messages.success(
             request,
             'Password set successfully. Please login.',
         )
 
-        return redirect(reverse('login'))
+        if invite is not None:
+            return redirect(reverse('login'))
+        return redirect(reverse('iroad_tenants:tenant_dashboard'))
 
 
 class AdminUserResendInviteView(LoginRequiredMixin, View):
@@ -2346,6 +2405,38 @@ class AdminUserToggleStatusView(LoginRequiredMixin, View):
             messages.success(request, 'Admin user activated successfully.')
 
         return redirect(reverse('admin_user_list'))
+
+
+class AdminUserDeleteView(LoginRequiredMixin, View):
+    def post(self, request, pk):
+        if not getattr(request.user, 'is_root', False):
+            messages.error(request, 'Access denied: root admin only.')
+            return redirect(reverse('admin_user_list'))
+
+        target_user = get_object_or_404(AdminUser, pk=pk)
+        if target_user.is_root:
+            messages.error(request, 'Root admin cannot be deleted')
+            return redirect(reverse('admin_user_list'))
+        if target_user.pk == request.user.pk:
+            messages.error(request, 'You cannot delete your own account')
+            return redirect(reverse('admin_user_list'))
+
+        if not target_user.is_deleted:
+            target_user.is_deleted = True
+            target_user.updated_by = request.user
+            target_user.save(update_fields=['is_deleted', 'updated_by'])
+            from superadmin.redis_helpers import revoke_all_sessions_for_admin
+
+            revoke_all_sessions_for_admin(target_user.id)
+            _revoke_user_sessions(target_user)
+            messages.success(request, 'Admin user removed from UI successfully.')
+        else:
+            messages.info(request, 'Admin user is already removed from UI.')
+
+        return redirect(reverse('admin_user_list'))
+
+    def get(self, request, pk):
+        return self.post(request, pk)
 
 
 class SystemUsersAnalyticsView(LoginRequiredMixin, View):
@@ -3500,7 +3591,7 @@ class TaxCodeListView(LoginRequiredMixin, View):
         sort = request.GET.get('sort', 'rank')
         direction = request.GET.get('dir', 'asc')
 
-        tax_codes_qs = TaxCode.objects.select_related(
+        tax_codes_qs = TaxCode.objects.filter(is_deleted=False).select_related(
             'applicable_country_code'
         ).annotate(
             default_rank=Window(
@@ -3696,12 +3787,21 @@ class TaxCodeToggleStatusView(LoginRequiredMixin, View):
 
 class TaxCodeDeleteView(LoginRequiredMixin, View):
     def post(self, request, pk):
-        messages.error(request, 'Tax codes cannot be deleted. Deactivate instead.')
+        if not getattr(request.user, 'is_root', False):
+            messages.error(request, 'Access denied: root admin only.')
+            return redirect(reverse('tax_code_list'))
+        tax_code = get_object_or_404(TaxCode, pk=pk)
+        if tax_code.is_deleted:
+            messages.info(request, 'Tax code is already removed from UI.')
+            return redirect(reverse('tax_code_list'))
+        tax_code.is_deleted = True
+        tax_code.updated_by = request.user
+        tax_code.save(update_fields=['is_deleted', 'updated_by'])
+        messages.success(request, 'Tax code removed from UI successfully.')
         return redirect(reverse('tax_code_list'))
 
     def get(self, request, pk):
-        messages.error(request, 'Tax codes cannot be deleted. Deactivate instead.')
-        return redirect(reverse('tax_code_list'))
+        return self.post(request, pk)
 
 
 class PlanListView(LoginRequiredMixin, View):
@@ -3713,7 +3813,7 @@ class PlanListView(LoginRequiredMixin, View):
         sort_by = request.GET.get('sort', 'name_en')
         sort_dir = request.GET.get('dir', 'asc')
 
-        plans_qs = SubscriptionPlan.objects.annotate(
+        plans_qs = SubscriptionPlan.objects.filter(is_deleted=False).annotate(
             pricing_rows_count=Count('pricing_cycles')
         )
 
@@ -4122,12 +4222,20 @@ class PlanToggleStatusView(LoginRequiredMixin, View):
 
 class PlanDeleteView(LoginRequiredMixin, View):
     def post(self, request, pk):
-        messages.error(request, 'Plans cannot be deleted. Deactivate instead.')
+        if not getattr(request.user, 'is_root', False):
+            messages.error(request, 'Access denied: root admin only.')
+            return redirect(reverse('plan_list'))
+        plan = get_object_or_404(SubscriptionPlan, pk=pk)
+        if plan.is_deleted:
+            messages.info(request, 'Plan is already removed from UI.')
+            return redirect(reverse('plan_list'))
+        plan.is_deleted = True
+        plan.save(update_fields=['is_deleted'])
+        messages.success(request, 'Plan removed from UI successfully.')
         return redirect(reverse('plan_list'))
 
     def get(self, request, pk):
-        messages.error(request, 'Plans cannot be deleted. Deactivate instead.')
-        return redirect(reverse('plan_list'))
+        return self.post(request, pk)
 
 
 class AddOnsPolicyListView(LoginRequiredMixin, View):
@@ -4139,7 +4247,7 @@ class AddOnsPolicyListView(LoginRequiredMixin, View):
         sort_by = request.GET.get('sort', 'policy_name')
         sort_dir = request.GET.get('dir', 'asc')
 
-        policies_qs = AddOnsPricingPolicy.objects.all()
+        policies_qs = AddOnsPricingPolicy.objects.filter(is_deleted=False)
 
         # Sortable fields whitelist and mapping
         sort_mapping = {
@@ -4282,11 +4390,16 @@ class AddOnsPolicyUpdateView(LoginRequiredMixin, View):
 
 class AddOnsPolicyDeleteView(LoginRequiredMixin, View):
     def post(self, request, pk):
-        policy = get_object_or_404(AddOnsPricingPolicy, pk=pk)
-        if policy.is_active:
-            messages.error(request, 'Active policy cannot be deleted. Deactivate first.')
+        if not getattr(request.user, 'is_root', False):
+            messages.error(request, 'Access denied: root admin only.')
             return redirect(reverse('addons_policy_list'))
-        messages.error(request, 'Policies cannot be deleted. Deactivate instead.')
+        policy = get_object_or_404(AddOnsPricingPolicy, pk=pk)
+        if policy.is_deleted:
+            messages.info(request, 'Policy is already removed from UI.')
+            return redirect(reverse('addons_policy_list'))
+        policy.is_deleted = True
+        policy.save(update_fields=['is_deleted'])
+        messages.success(request, 'Policy removed from UI successfully.')
         return redirect(reverse('addons_policy_list'))
 
     def get(self, request, pk):
@@ -4302,7 +4415,7 @@ class PromoCodeListView(LoginRequiredMixin, View):
         sort_by = request.GET.get('sort', 'code')
         sort_dir = request.GET.get('dir', 'asc')
 
-        qs = PromoCode.objects.prefetch_related('applicable_plans')
+        qs = PromoCode.objects.filter(is_deleted=False).prefetch_related('applicable_plans')
 
         # Sortable fields whitelist and mapping
         sort_mapping = {
@@ -4475,12 +4588,20 @@ class PromoCodeToggleStatusView(LoginRequiredMixin, View):
 
 class PromoCodeDeleteView(LoginRequiredMixin, View):
     def post(self, request, pk):
-        messages.error(request, 'Promo codes cannot be deleted. Deactivate instead.')
+        if not getattr(request.user, 'is_root', False):
+            messages.error(request, 'Access denied: root admin only.')
+            return redirect(reverse('promo_code_list'))
+        promo = get_object_or_404(PromoCode, pk=pk)
+        if promo.is_deleted:
+            messages.info(request, 'Promo code is already removed from UI.')
+            return redirect(reverse('promo_code_list'))
+        promo.is_deleted = True
+        promo.save(update_fields=['is_deleted'])
+        messages.success(request, 'Promo code removed from UI successfully.')
         return redirect(reverse('promo_code_list'))
 
     def get(self, request, pk):
-        messages.error(request, 'Promo codes cannot be deleted. Deactivate instead.')
-        return redirect(reverse('promo_code_list'))
+        return self.post(request, pk)
 
 
 class BankAccountListView(LoginRequiredMixin, View):
@@ -4654,7 +4775,7 @@ class PaymentGatewayListView(LoginRequiredMixin, View):
         sort = request.GET.get('sort', 'rank')
         direction = request.GET.get('dir', 'asc')
 
-        qs = PaymentGateway.objects.annotate(
+        qs = PaymentGateway.objects.filter(is_deleted=False).annotate(
             default_rank=Window(
                 expression=RowNumber(),
                 order_by=F('gateway_name').asc(),
@@ -4802,12 +4923,20 @@ class PaymentGatewayToggleStatusView(LoginRequiredMixin, View):
 
 class PaymentGatewayDeleteView(LoginRequiredMixin, View):
     def post(self, request, pk):
-        messages.error(request, 'Gateways cannot be deleted. Deactivate instead.')
+        if not getattr(request.user, 'is_root', False):
+            messages.error(request, 'Access denied: root admin only.')
+            return redirect(reverse('gateway_list'))
+        gateway = get_object_or_404(PaymentGateway, pk=pk)
+        if gateway.is_deleted:
+            messages.info(request, 'Gateway is already removed from UI.')
+            return redirect(reverse('gateway_list'))
+        gateway.is_deleted = True
+        gateway.save(update_fields=['is_deleted'])
+        messages.success(request, 'Gateway removed from UI successfully.')
         return redirect(reverse('gateway_list'))
 
     def get(self, request, pk):
-        messages.error(request, 'Gateways cannot be deleted. Deactivate instead.')
-        return redirect(reverse('gateway_list'))
+        return self.post(request, pk)
 
 
 class PaymentMethodListView(LoginRequiredMixin, View):
@@ -4978,7 +5107,7 @@ class CommGatewayListView(LoginRequiredMixin, View):
     template_name = 'comm/gateways/gateway_list.html'
 
     def get(self, request):
-        qs = CommGateway.objects.all()
+        qs = CommGateway.objects.filter(is_deleted=False)
 
         q = request.GET.get('q', '').strip()
         if q:
@@ -5029,10 +5158,10 @@ class CommGatewayListView(LoginRequiredMixin, View):
                 'current_sort': sort,
                 'current_dir': direction,
                 'active_email_id': CommGateway.objects.filter(
-                    gateway_type='Email', is_active=True
+                    is_deleted=False, gateway_type='Email', is_active=True
                 ).values_list('gateway_id', flat=True).first(),
                 'active_sms_id': CommGateway.objects.filter(
-                    gateway_type='SMS', is_active=True
+                    is_deleted=False, gateway_type='SMS', is_active=True
                 ).values_list('gateway_id', flat=True).first(),
             },
         )
@@ -5114,11 +5243,17 @@ class CommGatewayToggleStatusView(LoginRequiredMixin, View):
 
 class CommGatewayDeleteView(LoginRequiredMixin, View):
     def post(self, request, pk):
-        gateway = get_object_or_404(CommGateway, pk=pk)
-        if gateway.is_active:
-            messages.error(request, 'Active gateway cannot be deleted. Deactivate first.')
+        if not getattr(request.user, 'is_root', False):
+            messages.error(request, 'Access denied: root admin only.')
             return redirect(reverse('comm_gateway_list'))
-        messages.error(request, 'Gateways cannot be deleted. Deactivate instead.')
+        gateway = get_object_or_404(CommGateway, pk=pk)
+        if gateway.is_deleted:
+            messages.info(request, 'Gateway is already removed from UI.')
+            return redirect(reverse('comm_gateway_list'))
+        gateway.is_deleted = True
+        gateway.updated_by = request.user
+        gateway.save(update_fields=['is_deleted', 'updated_by'])
+        messages.success(request, 'Gateway removed from UI successfully.')
         return redirect(reverse('comm_gateway_list'))
 
     def get(self, request, pk):
@@ -5281,7 +5416,7 @@ class NotificationTemplateListView(LoginRequiredMixin, View):
         category_filter = request.GET.get('category', 'All')
         status_filter = request.GET.get('status', 'All')
 
-        qs = NotificationTemplate.objects.all()
+        qs = NotificationTemplate.objects.filter(is_deleted=False)
         if search_query:
             qs = qs.filter(template_name__icontains=search_query)
         if channel_filter in ['Email', 'SMS']:
@@ -5418,12 +5553,20 @@ class NotificationTemplateToggleStatusView(LoginRequiredMixin, View):
 
 class NotificationTemplateDeleteView(LoginRequiredMixin, View):
     def post(self, request, pk):
-        messages.error(request, 'Templates cannot be deleted. Deactivate instead.')
+        if not getattr(request.user, 'is_root', False):
+            messages.error(request, 'Access denied: root admin only.')
+            return redirect(reverse('notif_template_list'))
+        template_obj = get_object_or_404(NotificationTemplate, pk=pk)
+        if template_obj.is_deleted:
+            messages.info(request, 'Template is already removed from UI.')
+            return redirect(reverse('notif_template_list'))
+        template_obj.is_deleted = True
+        template_obj.save(update_fields=['is_deleted'])
+        messages.success(request, 'Template removed from UI successfully.')
         return redirect(reverse('notif_template_list'))
 
     def get(self, request, pk):
-        messages.error(request, 'Templates cannot be deleted. Deactivate instead.')
-        return redirect(reverse('notif_template_list'))
+        return self.post(request, pk)
 
 
 def get_mock_preview_context():
@@ -5466,9 +5609,10 @@ class NotificationTemplatePreviewView(LoginRequiredMixin, View):
         subject = template_obj.subject_ar if lang == 'ar' else template_obj.subject_en
         body_html = template_obj.body_ar if lang == 'ar' else template_obj.body_en
 
-        # Render with mock data
+        # Render with mock data + dynamic branding context
         try:
-            mock_ctx = get_mock_preview_context()
+            from superadmin.communication_helpers import _merge_template_context
+            mock_ctx = _merge_template_context(get_mock_preview_context())
             body_html = Template(body_html or "").render(Context(mock_ctx))
             subject = Template(subject or "").render(Context(mock_ctx))
 
@@ -6225,7 +6369,7 @@ class TenantListView(LoginRequiredMixin, View):
 
     def get(self, request):
         # Annotate with a stable rank based on registration date
-        qs = TenantProfile.objects.annotate(
+        qs = TenantProfile.objects.filter(is_deleted=False).annotate(
             default_rank=Window(
                 expression=RowNumber(),
                 order_by=F('registered_at').desc()
@@ -6288,10 +6432,10 @@ class TenantListView(LoginRequiredMixin, View):
         paginator = Paginator(qs, 10)
         tenants = paginator.get_page(request.GET.get('page', 1))
         
-        sales_reps = AdminUser.objects.filter(status='Active').order_by(
+        sales_reps = AdminUser.objects.filter(status='Active', is_deleted=False).order_by(
             'first_name', 'last_name'
         )
-        plans = SubscriptionPlan.objects.filter(is_active=True).order_by(
+        plans = SubscriptionPlan.objects.filter(is_active=True, is_deleted=False).order_by(
             'plan_name_en'
         )
         
@@ -6365,7 +6509,26 @@ class TenantCreateView(LoginRequiredMixin, View):
             try:
                 from superadmin.communication_helpers import send_tenant_welcome_email
 
-                send_tenant_welcome_email(tenant, plain_key, plain_portal)
+                TenantAuthToken.objects.filter(
+                    tenant_profile=tenant,
+                    token_type=TenantAuthToken.TokenType.INVITE,
+                    is_used=False,
+                ).update(is_used=True)
+                tenant_token = TenantAuthToken.objects.create(
+                    tenant_profile=tenant,
+                    token=secrets.token_urlsafe(32),
+                    token_type=TenantAuthToken.TokenType.INVITE,
+                    expires_at=timezone.now() + timedelta(hours=24),
+                )
+                invite_url = request.build_absolute_uri(
+                    reverse('set_password', args=[tenant_token.token])
+                )
+                send_tenant_welcome_email(
+                    tenant,
+                    plain_key,
+                    plain_portal,
+                    invite_url=invite_url,
+                )
             except Exception:
                 logger.exception(
                     'Welcome email failed for tenant %s',
@@ -6373,11 +6536,8 @@ class TenantCreateView(LoginRequiredMixin, View):
                 )
             messages.success(
                 request,
-                'Subscriber profile created. The API bridge key was sent to '
-                f'{tenant.primary_email} when SMTP (settings.py) is configured; '
-                'it is never shown in the Control Panel. Fix EMAIL_* / '
-                'DEFAULT_FROM_EMAIL and use "Generate new API bridge key" on '
-                'edit if delivery failed.',
+                f'Subscriber profile created for {tenant.primary_email}. '
+                'A welcome email has been sent with portal access instructions.'
             )
             return redirect(reverse('tenant_detail', kwargs={'pk': tenant.pk}))
         return render(
@@ -6424,16 +6584,7 @@ class TenantUpdateView(LoginRequiredMixin, View):
                 },
             )
         new_status = form.cleaned_data['account_status']
-        inst = form.save(commit=False)
-        plain_bridge_key = None
-        if form.cleaned_data.get('rotate_bridge_api_key'):
-            import secrets
-            from django.contrib.auth.hashers import make_password
-
-            plain_bridge_key = secrets.token_urlsafe(32)
-            inst.api_bridge_secret_hash = make_password(plain_bridge_key)
-        inst.save()
-        inst.refresh_from_db()
+        inst = form.save()
         if old_status != new_status:
             log_audit_action(
                 request,
@@ -6443,29 +6594,10 @@ class TenantUpdateView(LoginRequiredMixin, View):
                 old_instance=old_obj,
                 new_instance=inst,
             )
-        if plain_bridge_key:
-            try:
-                from superadmin.communication_helpers import (
-                    send_tenant_bridge_rotated_email,
-                )
-
-                send_tenant_bridge_rotated_email(inst, plain_bridge_key)
-            except Exception:
-                logger.exception(
-                    'Bridge rotation email failed for tenant %s',
-                    inst.tenant_id,
-                )
-            messages.success(
-                request,
-                'Subscriber profile updated. A new API bridge key was emailed to '
-                f'{inst.primary_email} when mail is configured; it is never '
-                'shown in the Control Panel.',
-            )
-        else:
-            messages.success(
-                request,
-                'Subscriber profile updated successfully.',
-            )
+        messages.success(
+            request,
+            'Subscriber profile updated successfully.',
+        )
         return redirect(reverse('tenant_detail', kwargs={'pk': tenant.pk}))
 
 
@@ -6594,6 +6726,24 @@ class TenantImpersonationView(RootRequiredMixin, View):
                 'expires_minutes': 15,
             },
         )
+
+
+class TenantDeleteView(LoginRequiredMixin, View):
+    def post(self, request, pk):
+        if not getattr(request.user, 'is_root', False):
+            messages.error(request, 'You do not have permission to perform this action.')
+            return redirect(reverse('tenant_list'))
+        tenant = get_object_or_404(TenantProfile, pk=pk)
+        if tenant.is_deleted:
+            messages.info(request, 'Tenant is already removed from UI.')
+            return redirect(reverse('tenant_list'))
+        tenant.is_deleted = True
+        tenant.save(update_fields=['is_deleted'])
+        messages.success(request, 'Tenant removed from UI successfully.')
+        return redirect(reverse('tenant_list'))
+
+    def get(self, request, pk):
+        return self.post(request, pk)
 
 
 _PLAN_CLASSIFICATIONS = {
@@ -7354,6 +7504,12 @@ class TransactionListView(LoginRequiredMixin, View):
             order__isnull=False,
             order__order_status='Paid',
         ).update(status='Completed', updated_at=timezone.now())
+        Transaction.objects.filter(
+            transaction_type='Order_Payment',
+            status='Pending',
+            order__isnull=False,
+            order__invoices__isnull=False,
+        ).update(status='Completed', updated_at=timezone.now())
 
         qs = Transaction.objects.annotate(
             default_rank=Window(
@@ -7532,16 +7688,24 @@ class TransactionDetailView(LoginRequiredMixin, View):
 
 class TransactionApproveView(RootRequiredMixin, View):
     def post(self, request, pk):
-        with db_transaction.atomic():
+        _write_txn_approve_debug(f'Approve requested for txn={pk} user={request.user.pk}')
+        try:
             txn = get_object_or_404(
-                Transaction.objects.select_for_update(),
+                Transaction.objects.select_related('payment_method'),
                 transaction_id=pk,
             )
+            _write_txn_approve_debug(
+                f'Loaded txn={txn.transaction_id} status={txn.status} order_id={txn.order_id}'
+            )
             if txn.status != 'Pending':
+                _write_txn_approve_debug('Blocked: transaction is not pending')
                 messages.error(request, 'Only pending transactions can be approved.')
                 return redirect('transaction_detail', pk=pk)
             pm = txn.payment_method
             if not pm or pm.method_type != 'Offline_Bank':
+                _write_txn_approve_debug(
+                    f'Blocked: invalid payment method {getattr(pm, "method_type", None)}'
+                )
                 messages.error(
                     request,
                     'Only offline bank transfers use manual approval.',
@@ -7551,42 +7715,47 @@ class TransactionApproveView(RootRequiredMixin, View):
             if uploaded_attachment:
                 txn.attachment = uploaded_attachment
                 txn.save(update_fields=['attachment', 'updated_at'])
+                _write_txn_approve_debug('Attachment uploaded and saved')
             if not txn.attachment:
+                _write_txn_approve_debug('Blocked: no attachment present')
                 messages.error(
                     request,
                     'Offline bank transfers require an attachment/receipt before approval.',
                 )
                 return redirect('transaction_detail', pk=pk)
+
             order = None
             if txn.order_id:
-                order = SubscriptionOrder.objects.select_for_update().filter(
-                    pk=txn.order_id
-                ).first()
-            if not order or order.order_status != 'Pending_Payment':
+                order = SubscriptionOrder.objects.filter(pk=txn.order_id).first()
+            if not order or order.order_status not in ('Pending_Payment', 'Paid'):
+                _write_txn_approve_debug(
+                    f'Blocked: order invalid or wrong status={getattr(order, "order_status", None)}'
+                )
                 messages.error(request, 'Order is not awaiting payment.')
                 return redirect('transaction_detail', pk=pk)
 
-            updated = Transaction.objects.filter(
-                pk=txn.pk,
-                status='Pending',
-            ).update(
-                status='Completed',
-                reviewed_by=request.user,
-                review_notes=None,
-                updated_at=timezone.now(),
-            )
-            if updated != 1:
-                messages.error(
-                    request,
-                    'Transaction status changed by another process. Please refresh.',
-                )
-                return redirect('transaction_detail', pk=pk)
-            txn.refresh_from_db()
+            # Persist status first (autocommit) so later failures do not revert approval.
+            txn.status = 'Completed'
+            txn.reviewed_by = request.user
+            txn.review_notes = None
+            txn.save(update_fields=[
+                'status', 'reviewed_by', 'review_notes', 'updated_at',
+            ])
+            _write_txn_approve_debug('Transaction status updated to Completed')
 
-            order.order_status = 'Paid'
-            order.save(update_fields=['order_status', 'updated_at'])
+            if order.order_status != 'Paid':
+                order.order_status = 'Paid'
+                order.save(update_fields=['order_status', 'updated_at'])
+                _write_txn_approve_debug('Order marked Paid')
+                try:
+                    fulfill_paid_order(order, request.user, txn.amount)
+                    _write_txn_approve_debug('Fulfillment completed')
+                except Exception as exc:
+                    _write_txn_approve_debug(f'Fulfillment ERROR: {exc!r}')
+                    logger.exception('Fulfillment failed for txn %s', txn.transaction_id)
+            else:
+                _write_txn_approve_debug('Order already Paid; skipped fulfill')
 
-            fulfill_paid_order(order, request.user, txn.amount)
             log_audit_action(
                 request,
                 'Status_Change',
@@ -7594,9 +7763,41 @@ class TransactionApproveView(RootRequiredMixin, View):
                 str(txn.transaction_id),
                 new_instance=txn,
             )
+            _write_txn_approve_debug('Audit log written')
 
-        messages.success(request, 'Payment approved and order fulfilled.')
-        return redirect('transaction_detail', pk=pk)
+            post_commit_txn = Transaction.objects.get(pk=txn.pk)
+            post_commit_order = SubscriptionOrder.objects.get(pk=order.pk)
+            _write_txn_approve_debug(
+                'Post-save check: '
+                f'txn_status={post_commit_txn.status}, '
+                f'order_status={post_commit_order.order_status}'
+            )
+            if post_commit_txn.status != 'Completed':
+                messages.error(
+                    request,
+                    'Approval failed to persist transaction status. Check debug log.',
+                )
+                return redirect('transaction_detail', pk=pk)
+
+            messages.success(request, 'Payment approved and order fulfilled.')
+            invoice = (
+                StandardInvoice.objects.filter(order_id=txn.order_id)
+                .order_by('-updated_at', '-issue_date')
+                .first()
+            )
+            if invoice:
+                _write_txn_approve_debug(f'Redirecting to invoice_detail {invoice.pk}')
+                return redirect('invoice_detail', pk=invoice.pk)
+            _write_txn_approve_debug('Redirecting to invoice_list (no invoice found)')
+            return redirect('invoice_list')
+        except Exception as exc:
+            _write_txn_approve_debug(f'ERROR for txn={pk}: {exc!r}')
+            logger.exception('Transaction approve failed for %s', pk)
+            messages.error(
+                request,
+                'Approval failed due to an internal error. Please check debug log.',
+            )
+            return redirect('transaction_detail', pk=pk)
 
 
 class TransactionUploadAttachmentView(RootRequiredMixin, View):

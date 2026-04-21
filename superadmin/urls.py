@@ -87,6 +87,7 @@ from .views import (
     SupportCategoryToggleStatusView,
     SupportCategoryUpdateView,
     AdminUserCreateView,
+    AdminUserDeleteView,
     AdminUserDetailView,
     AdminUserListView,
     AdminUserResendInviteView,
@@ -141,6 +142,7 @@ from .views import (
     TicketListView,
     TicketPriorityOverrideView,
     TenantCreateView,
+    TenantDeleteView,
     TenantDetailView,
     TenantImpersonationView,
     TenantListView,
@@ -218,6 +220,11 @@ urlpatterns = [
         name='admin_user_toggle_status',
     ),
     path(
+        'admin-users/<uuid:pk>/delete/',
+        AdminUserDeleteView.as_view(),
+        name='admin_user_delete',
+    ),
+    path(
         "admin-users/<uuid:pk>/resend-invite/",
         AdminUserResendInviteView.as_view(),
         name="admin_user_resend_invite",
@@ -273,14 +280,14 @@ urlpatterns = [
         name='country_list',
     ),
     path(
-        'master-data/countries/<str:pk>/',
-        CountryDetailView.as_view(),
-        name='country_detail',
-    ),
-    path(
         'master-data/countries/create/',
         CountryCreateView.as_view(),
         name='country_create',
+    ),
+    path(
+        'master-data/countries/<str:pk>/',
+        CountryDetailView.as_view(),
+        name='country_detail',
     ),
     path(
         'master-data/countries/<str:pk>/edit/',
@@ -303,14 +310,14 @@ urlpatterns = [
         name='currency_list',
     ),
     path(
-        'master-data/currencies/<str:pk>/',
-        CurrencyDetailView.as_view(),
-        name='currency_detail',
-    ),
-    path(
         'master-data/currencies/create/',
         CurrencyCreateView.as_view(),
         name='currency_create',
+    ),
+    path(
+        'master-data/currencies/<str:pk>/',
+        CurrencyDetailView.as_view(),
+        name='currency_detail',
     ),
     path(
         'master-data/currencies/<str:pk>/edit/',
@@ -865,6 +872,11 @@ urlpatterns = [
         'crm/tenants/<uuid:pk>/impersonate/',
         TenantImpersonationView.as_view(),
         name='tenant_impersonate',
+    ),
+    path(
+        'crm/tenants/<uuid:pk>/delete/',
+        TenantDeleteView.as_view(),
+        name='tenant_delete',
     ),
     path(
         'crm/tenants/<uuid:pk>/add-note/',

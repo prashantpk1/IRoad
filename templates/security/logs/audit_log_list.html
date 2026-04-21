@@ -182,13 +182,13 @@
                 {% endif %}
               </a>
             </th>
-            <th style="width: 100px">{% translate "Actions" %}</th>
+            <!-- <th style="width: 100px">{% translate "Actions" %}</th> -->
           </tr>
         </thead>
         <tbody>
           {% for log in audit_logs %}
           <tr>
-            <td><span class="text-muted small">#{{ forloop.counter0|add:audit_logs.start_index }}</span></td>
+            <td><span class="text-muted small">{{ forloop.counter0|add:audit_logs.start_index }}</span></td>
             <td>
               <div class="d-flex flex-column">
                 <span class="fw-bold text-dark">{{ log.admin.get_full_name|default:log.admin.email|default:'N/A' }}</span>
@@ -197,24 +197,25 @@
             </td>
             <td>
               {% if log.action_type == 'Create' %}
-                <span class="status-badge active">{% translate "Create" %}</span>
+                <span class="status-badge success">{% translate "Create" %}</span>
               {% elif log.action_type == 'Update' %}
-                <span class="status-badge success" style="background: #eef2ff; color: #4338ca;">{% translate "Update" %}</span>
+                <span class="status-badge update">{% translate "Update" %}</span>
               {% elif log.action_type == 'Delete' %}
                 <span class="status-badge inactive">{% translate "Delete" %}</span>
               {% else %}
                 <span class="status-badge warning">{% translate "Status Change" %}</span>
               {% endif %}
             </td>
-            <td><span class="eal-type-badge ind">{{ log.module_name }}</span></td>
+            <td><span class="value-badge">{{ log.module_name }}</span></td>
             <td><span class="eal-entity-id" style="font-size: 11px">{{ log.record_id|truncatechars:12 }}</span></td>
+
             <td><code>{{ log.ip_address|default:'-' }}</code></td>
             <td><span class="eal-date"><i class="bi bi-calendar-event"></i> {{ log.timestamp|date:'d M Y, H:i' }}</span></td>
-            <td>
+            <!-- <td>
               <div class="eal-actions-cell">
                 <a href="{% url 'audit_log_detail' log.audit_id %}" class="eal-row-btn" title="{% translate 'View Details' %}"><i class="bi bi-eye"></i></a>
               </div>
-            </td>
+            </td> -->
           </tr>
           {% empty %}
           <tr class="eal-table-empty">

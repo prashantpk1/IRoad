@@ -210,22 +210,23 @@
             <td><span class="text-muted small">{{ forloop.counter0|add:access_logs.start_index }}</span></td>
             <td>
                {% if log.attempt_type == 'Login' %}
-                 <span class="eal-type-badge ind">{% translate "Login" %}</span>
+                 <span class="value-badge">{% translate "Login" %}</span>
                {% elif log.attempt_type == 'Logout' %}
-                 <span class="eal-type-badge org">{% translate "Logout" %}</span>
+                 <span class="value-badge">{% translate "Logout" %}</span>
                {% else %}
-                 <span class="eal-type-badge gov">{% translate "Refresh" %}</span>
+                 <span class="value-badge">{% translate "Refresh" %}</span>
                {% endif %}
             </td>
             <td>
               {% if log.status == 'Success' %}
-                <span class="status-badge active">{% translate "Success" %}</span>
+                <span class="status-badge success">{% translate "Success" %}</span>
               {% elif log.status == 'Failed' %}
                 <span class="status-badge inactive">{% translate "Failed" %}</span>
               {% else %}
                 <span class="status-badge warning">{% translate "Blocked" %}</span>
               {% endif %}
             </td>
+
             <td>
               <span class="fw-medium text-dark">
                 {% if log.user_domain == 'Admin' %}

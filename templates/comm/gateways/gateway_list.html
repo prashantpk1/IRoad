@@ -243,6 +243,12 @@
 <i class="bi bi-arrow-repeat"></i>
 </button>
                       </form>
+                      <form method="post" action="{% url 'comm_gateway_delete' gateway.gateway_id %}" style="display: inline" onsubmit="return confirm('Remove this gateway from UI? Database record will stay.');">
+                        {% csrf_token %}
+                        <button type="submit" class="eal-row-btn icon-only-btn" title="Delete (Soft)">
+<i class="bi bi-trash"></i>
+</button>
+                      </form>
                     </div>
                   {% endif %}
                 </td>

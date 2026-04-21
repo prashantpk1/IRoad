@@ -110,8 +110,9 @@
         <input class="form-control" value="{{ tenant.subscription_expiry_date|default:'-' }}" readonly>
       </div>
     </div>
+
     {% if tenant.scheduled_downgrade_plan %}
-    <div class="row g-3 mt-2">
+    <div class="row g-3 mt-1">
       <div class="col-12">
         {% with plan_name=tenant.scheduled_downgrade_plan.plan_name_en eff_date=tenant.scheduled_downgrade_effective_date|date:"d M Y" %}
         <div class="alert alert-info mb-0 py-2" role="status">
@@ -124,10 +125,11 @@
       </div>
     </div>
     {% endif %}
-    <div class="row g-3 mt-1">
-      <div class="col-12">
-        <label class="form-label fw-semibold">{% translate "Active limits" %}</label>
-      </div>
+
+    <h6 class="mb-2 mt-3">
+      <i class="bi bi-speedometer2 me-2"></i>{% translate "Active limits" %}
+    </h6>
+    <div class="row g-3">
       <div class="col-6 col-md-3">
         <label class="form-label">{% translate "Users" %}</label>
         <input class="form-control" value="{{ tenant.active_max_users }}" readonly>
@@ -145,6 +147,7 @@
         <input class="form-control" value="{{ tenant.active_max_drivers }}" readonly>
       </div>
     </div>
+
     <div class="row g-3 mt-1">
       <div class="col-12 col-md-6">
         <label class="form-label">{% translate "Wallet balance" %}</label>
@@ -179,13 +182,7 @@
         <i class="bi bi-pencil"></i>
         <span>{% translate "Edit Status" %}</span>
       </a>
-      <form method="post" action="{% url 'tenant_impersonate' tenant.tenant_id %}" class="d-inline">
-        {% csrf_token %}
-        <button type="submit" class="eal-btn eal-btn-outline" title="{% translate 'Issue a short-lived workspace token (root only)' %}">
-          <i class="bi bi-box-arrow-in-right"></i>
-          <span>{% translate "Login As" %}</span>
-        </button>
-      </form>
+      
     {% endif %}
   </div>
 </div>
@@ -204,7 +201,7 @@
   <div class="form-card-body">
     <form method="post" action="{% url 'crm_note_create' tenant.tenant_id %}" class="mb-4">
       {% csrf_token %}
-      <div class="row g-3 align-items-end">
+      <div class="row g-3 align-items-start">
         <div class="col-12 col-md-3">
           <label class="form-label">{% translate "Type" %}</label>
           <select name="note_type" class="form-select">
@@ -227,13 +224,21 @@
     </form>
 
     {% for note in notes %}
-      <div class="border-bottom py-3 {% if forloop.last %}border-bottom-0{% endif %}">
-        <span class="status-badge pending">{{ note.get_note_type_display }}</span>
-        <span class="text-muted small ms-2">
-          {% if note.admin %}{{ note.admin.first_name }} {{ note.admin.last_name }}{% else %}—{% endif %}
-          · {{ note.created_at|date:'d M Y, H:i' }}
-        </span>
-        <p class="mb-0 mt-2">{{ note.note_content|linebreaksbr }}</p>
+      <div class="border-bottom py-3 d-flex align-items-start gap-3 {% if forloop.last %}border-bottom-0{% endif %}">
+        <div style="width: 120px; flex-shrink: 0; padding-top: 2px;">
+          <span class="status-badge {% if note.note_type == 'Sales_Call' %}update{% elif note.note_type == 'Billing_Issue' %}warning{% elif note.note_type == 'Complaint' %}danger{% else %}neutral{% endif %} w-100 justify-content-center">
+            {{ note.get_note_type_display }}
+          </span>
+        </div>
+        <div class="flex-grow-1">
+          <div class="mb-1">
+            <span class="fw-semibold text-dark small">
+              {% if note.admin %}{{ note.admin.first_name }} {{ note.admin.last_name }}{% else %}—{% endif %}
+            </span>
+            <span class="text-muted small ms-2">· {{ note.created_at|date:'d M Y, H:i' }}</span>
+          </div>
+          <div class="text-secondary" style="line-height: 1.5;">{{ note.note_content|linebreaksbr }}</div>
+        </div>
       </div>
     {% empty %}
       <p class="text-muted mb-0">{% translate "No notes yet." %}</p>

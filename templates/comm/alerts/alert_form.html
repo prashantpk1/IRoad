@@ -13,11 +13,14 @@
   <div class="page-header-row">
     <div class="page-header-left">
       <h1 class="page-title">{% if is_edit %}{% translate "Edit Alert Route" %}{% else %}{% translate "Add Alert Route" %}{% endif %}</h1>
-      <p class="page-subtitle">{% translate "Manage your records here" %}</p>
+      <p class="page-subtitle">{% translate "Configure who receives internal alerts for specific trigger events." %}</p>
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
-        <!-- Actions here -->
+        <a href="{% url 'alert_route_list' %}" class="eal-btn eal-btn-outline">
+          <i class="bi bi-arrow-left"></i>
+          <span>{% translate "Back to list" %}</span>
+        </a>
       </div>
     </div>
   </div>
@@ -27,41 +30,80 @@
 {% if form.instance.pk and form.instance.updated_at %}
 <div class="edit-info-bar">
   <i class="bi bi-clock-history"></i>
-  Last updated
+  {% translate "Last updated" %}
   {% if form.instance.updated_by %}
-    by <strong>{{ form.instance.updated_by.first_name }} {{ form.instance.updated_by.last_name }}</strong>
+    {% translate "by" %} <strong>{{ form.instance.updated_by.first_name }} {{ form.instance.updated_by.last_name }}</strong>
   {% endif %}
-  at <strong>{{ form.instance.updated_at|date:"d M Y, H:i" }}</strong>
+  {% translate "at" %} <strong>{{ form.instance.updated_at|date:"d M Y, H:i" }}</strong>
 </div>
 {% endif %}
-<div class="form-card">
-  <div class="form-card-body">
-    <p class="text-muted">At least one of Role or Custom Email required.</p>
-    <form method="post">
-      {% csrf_token %}
+
+<form method="post" autocomplete="off">
+  {% csrf_token %}
+
+  {% if form.non_field_errors %}
+    <div class="alert alert-danger mb-3" role="alert">
       {{ form.non_field_errors }}
-      <div class="fields-grid cols-2">
-        <div class="field">{{ form.trigger_event.label_tag }}{{ form.trigger_event }}{{ form.trigger_event.errors }}</div>
-        <div class="field">{{ form.is_active.label_tag }}{{ form.is_active }}{{ form.is_active.errors }}</div>
-        <div class="field">{{ form.notify_role.label_tag }}{{ form.notify_role }}{{ form.notify_role.errors }}</div>
-        <div class="field">{{ form.notify_custom_email.label_tag }}{{ form.notify_custom_email }}{{ form.notify_custom_email.errors }}</div>
+    </div>
+  {% endif %}
+
+  <div class="form-card">
+    <div class="form-card-header">
+      <div class="form-card-icon blue">
+        <i class="bi bi-bell"></i>
       </div>
-      <div class="form-actions-bar">
-        <div class="form-actions-left">
-          <a href="{% url 'alert_route_list' %}" class="eal-btn eal-btn-outline">
-            <i class="bi bi-x-lg"></i>
-            <span>{% translate "Cancel" %}</span>
-          </a>
-        </div>
-        <div class="form-actions-right">
-          <button type="submit" class="eal-btn eal-btn-primary">
-            <i class="bi bi-send"></i>
-            <span>{% if is_edit %}{% translate "Update Route" %}{% else %}{% translate "Add Route" %}{% endif %}</span>
-          </button>
+      <div class="form-card-header-text">
+        <h3 class="form-card-title">{% translate "Route Details" %}</h3>
+        <p class="form-card-desc">{% translate "At least one of Role or Custom Email is required." %}</p>
+      </div>
+    </div>
+    <div class="form-card-body">
+      <div class="field-group">
+        <div class="row g-3">
+          <div class="col-12 col-md-6">
+            <label class="form-label" for="{{ form.trigger_event.id_for_label }}">{{ form.trigger_event.label }}</label>
+            {{ form.trigger_event }}
+            {% for error in form.trigger_event.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label" for="{{ form.notify_role.id_for_label }}">{{ form.notify_role.label }}</label>
+            {{ form.notify_role }}
+            {% for error in form.notify_role.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label" for="{{ form.notify_custom_email.id_for_label }}">{{ form.notify_custom_email.label }}</label>
+            {{ form.notify_custom_email }}
+            {% for error in form.notify_custom_email.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+          </div>
+          <div class="col-12 col-md-6">
+            <div class="form-label d-block mb-0">{{ form.is_active.label }}</div>
+            <div class="form-check form-switch mt-2">
+              {{ form.is_active }}
+              <label class="form-check-label ms-1" for="{{ form.is_active.id_for_label }}">
+                <span class="fw-medium">{% translate "Active Status" %}</span>
+              </label>
+            </div>
+            {% for error in form.is_active.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+          </div>
         </div>
       </div>
-    </form>
+    </div>
   </div>
-</div>
+
+  <div class="form-actions-bar">
+    <div class="form-actions-left">
+      <a href="{% url 'alert_route_list' %}" class="eal-btn eal-btn-outline">
+        <i class="bi bi-x-lg"></i>
+        <span>{% translate "Cancel" %}</span>
+      </a>
+    </div>
+    <div class="form-actions-right">
+      <button type="submit" class="eal-btn eal-btn-primary">
+        <i class="bi bi-send"></i>
+        <span>{% if is_edit %}{% translate "Update Route" %}{% else %}{% translate "Add Route" %}{% endif %}</span>
+      </button>
+    </div>
+  </div>
+</form>
 {% endblock %}
 

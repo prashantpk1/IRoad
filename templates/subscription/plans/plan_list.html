@@ -181,10 +181,10 @@
             <td><span class="fw-bold">{{ plan.plan_name_en }}</span></td>
             <td>{{ plan.plan_name_ar }}</td>
             <td>{{ plan.base_cycle_days }}</td>
-            <td><span class="badge" style="background: rgba(80, 81, 249, 0.1); color: var(--primary-color);">{{ plan.pricing_rows_count }}</span></td>
+            <td><span class="value-badge">{{ plan.pricing_rows_count }}</span></td>
             <td>
               {% if plan.has_driver_app %}
-                <span class="status-badge active"><i class="bi bi-check-circle-fill" style="font-size: 10px; margin-right: 4px;"></i>{% translate "Yes" %}</span>
+                <span class="status-badge success">{% translate "Yes" %}</span>
               {% else %}
                 <span class="status-badge inactive">{% translate "No" %}</span>
               {% endif %}
@@ -197,6 +197,7 @@
                 <span class="status-badge inactive">{% translate "Inactive" %}</span>
               {% endif %}
             </td>
+
             <td>
               <div class="eal-actions-cell">
                 <a href="{% url 'plan_detail' plan.plan_id %}" class="eal-row-btn" title="{% translate 'View' %}"><i class="bi bi-eye"></i></a>
@@ -205,6 +206,10 @@
                   <form method="post" action="{% url 'plan_toggle' plan.plan_id %}" style="display:inline" class="js-confirm-submit">
                     {% csrf_token %}
                     <button type="submit" class="eal-row-btn" title="{% translate 'Toggle Status' %}"><i class="bi bi-arrow-repeat"></i></button>
+                  </form>
+                  <form method="post" action="{% url 'plan_delete' plan.plan_id %}" style="display:inline" onsubmit="return confirm('Remove this plan from UI? Database record will stay.');">
+                    {% csrf_token %}
+                    <button type="submit" class="eal-row-btn" title="{% translate 'Delete (Soft)' %}"><i class="bi bi-trash"></i></button>
                   </form>
                 {% endif %}
               </div>

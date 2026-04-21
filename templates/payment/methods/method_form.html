@@ -3,6 +3,29 @@
 
 {% block page_title %}{% if is_edit %}{% translate "Edit Payment Method" %}{% else %}{% translate "Add Payment Method" %}{% endif %}{% endblock %}
 
+{% block extra_css %}
+<style>
+  .config-section-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 2px 0 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px dashed #cbd5e1;
+  }
+  .config-section-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(79, 70, 229, 0.12);
+    color: #4f46e5;
+  }
+</style>
+{% endblock %}
+
 
 {% block breadcrumb_items %}
 <li class="breadcrumb-item active" aria-current="page">{% if is_edit %}{% translate "Edit Payment Method" %}{% else %}{% translate "Add Payment Method" %}{% endif %}</li>
@@ -13,167 +36,158 @@
   <div class="page-header-row">
     <div class="page-header-left">
       <h1 class="page-title">{% if is_edit %}{% translate "Edit Payment Method" %}{% else %}{% translate "Add Payment Method" %}{% endif %}</h1>
-      <p class="page-subtitle">{% translate "Manage your records here" %}</p>
+      <p class="page-subtitle">{% translate "Configure how tenants can pay orders and invoices." %}</p>
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
-        <!-- Actions here -->
+        <a href="{% url 'payment_method_list' %}" class="eal-btn eal-btn-outline">
+          <i class="bi bi-arrow-left"></i>
+          <span>{% translate "Back to list" %}</span>
+        </a>
       </div>
     </div>
   </div>
 </div>
 
-  
-
-  <div class="list-page-actions">
-    <a href="{% url 'payment_method_list' %}" class="eal-btn">
-          <i class="bi bi-arrow-left"></i>
-          <span>Cancel</span>
-        </a>
-  </div>
+{% if is_edit and method and method.updated_at %}
+<div class="edit-info-bar">
+  <i class="bi bi-clock-history"></i>
+  {% translate "Last updated" %}
+  {% if method.updated_by %}
+    {% translate "by" %} <strong>{{ method.updated_by.first_name }} {{ method.updated_by.last_name }}</strong>
+  {% endif %}
+  {% translate "at" %} <strong>{{ method.updated_at|date:"d M Y, H:i" }}</strong>
 </div>
+{% endif %}
 
-  {% if is_edit and method and method.updated_at %}
-  <div class="edit-info-bar">
-    <i class="bi bi-clock-history"></i>
-    Last updated
-    {% if method.updated_by %}
-      by <strong>{{ method.updated_by.first_name }} {{ method.updated_by.last_name }}</strong>
-    {% endif %}
-    at <strong>{{ method.updated_at|date:"d M Y, H:i" }}</strong>
-  </div>
+<form method="post" action="" enctype="multipart/form-data" autocomplete="off">
+  {% csrf_token %}
+
+  {% if form.non_field_errors %}
+    <div class="alert alert-danger mb-3" role="alert">
+      {{ form.non_field_errors }}
+    </div>
   {% endif %}
 
   <div class="form-card">
+    <div class="form-card-header">
+      <div class="form-card-icon blue">
+        <i class="bi bi-credit-card-2-front"></i>
+      </div>
+      <div class="form-card-header-text">
+        <h3 class="form-card-title">{% translate "Method Details" %}</h3>
+        <p class="form-card-desc">{% translate "Define payment method type, gateway/bank mapping, and supported currencies." %}</p>
+      </div>
+    </div>
     <div class="form-card-body">
-      {% if form.non_field_errors %}
-        <div style="margin-bottom: 16px; color: #b91c1c; font-weight: 600">
-          {{ form.non_field_errors }}
-        </div>
-      {% endif %}
-
-      <h3 style="margin: 0 0 12px 0">Method Details</h3>
-
-      <form method="post" action="" enctype="multipart/form-data">
-        {% csrf_token %}
-
-        <div style="margin-bottom: 16px">
-          <label class="form-label">Method Name (EN)</label>
-          {{ form.method_name_en }}
-          {% for error in form.method_name_en.errors %}
-            <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-          {% endfor %}
-        </div>
-
-        <div style="margin-bottom: 16px">
-          <label class="form-label">Method Name (AR)</label>
-          {{ form.method_name_ar }}
-          {% for error in form.method_name_ar.errors %}
-            <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-          {% endfor %}
-        </div>
-
-        <div style="margin-bottom: 16px">
-          <label class="form-label">Method Type</label>
-          {{ form.method_type }}
-          {% for error in form.method_type.errors %}
-            <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-          {% endfor %}
-        </div>
-
-        <h3 style="margin: 18px 0 12px 0">Configuration</h3>
-
-        <div id="gateway-wrapper" style="margin-bottom: 16px">
-          <label class="form-label">Gateway</label>
-          {{ form.gateway }}
-          {% for error in form.gateway.errors %}
-            <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-          {% endfor %}
-        </div>
-
-        <div id="bank-wrapper" style="margin-bottom: 16px">
-          <label class="form-label">Dedicated Bank Account</label>
-          {{ form.dedicated_bank_account }}
-          {% for error in form.dedicated_bank_account.errors %}
-            <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-          {% endfor %}
-        </div>
-
-        <div style="margin-bottom: 16px">
-          <label class="form-label">Supported Currencies</label>
-          <div class="vstack gap-2">
-            <div class="d-flex gap-2">
-              <input type="text" id="currency-code-input" class="form-control" placeholder="Type currency code (e.g. SAR)">
-              <button type="button" id="add-currency-btn" class="eal-btn eal-btn-outline">
-                <i class="bi bi-plus-lg"></i>
-                <span>Add</span>
-              </button>
-            </div>
-            <div id="currency-chip-list" class="d-flex flex-wrap gap-2"></div>
-            <div style="display:none;">
-              {{ form.supported_currencies }}
-            </div>
+      <div class="field-group">
+        <div class="row g-3">
+          <div class="col-12 col-md-6">
+            <label class="form-label" for="{{ form.method_name_en.id_for_label }}">{% translate "Method Name (EN)" %}</label>
+            {{ form.method_name_en }}
+            {% for error in form.method_name_en.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
           </div>
-          <div style="margin-top: 6px; color: #6b7280; font-size: 13px">
-            Add one or more currency codes. JSON is generated automatically.
+          <div class="col-12 col-md-6">
+            <label class="form-label" for="{{ form.method_name_ar.id_for_label }}">{% translate "Method Name (AR)" %}</label>
+            {{ form.method_name_ar }}
+            {% for error in form.method_name_ar.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
           </div>
-          {% for error in form.supported_currencies.errors %}
-            <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-          {% endfor %}
+          <div class="col-12 col-md-6">
+            <label class="form-label" for="{{ form.method_type.id_for_label }}">{% translate "Method Type" %}</label>
+            {{ form.method_type }}
+            {% for error in form.method_type.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+          </div>
         </div>
+      </div>
 
-        <div style="margin-bottom: 16px">
-          <label class="form-label">Logo</label>
-          {{ form.logo }}
-          {% for error in form.logo.errors %}
-            <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-          {% endfor %}
+      <div class="field-group mt-4">
+        <div class="config-section-head">
+          <span class="config-section-icon"><i class="bi bi-sliders"></i></span>
+          <div>
+            <h4 class="form-card-title mb-0">{% translate "Configuration" %}</h4>
+            <p class="form-card-desc mb-0">{% translate "Set gateway/bank mapping and currency support." %}</p>
+          </div>
         </div>
+        <div class="row g-3">
+          <div class="col-12 col-md-6" id="gateway-wrapper">
+            <label class="form-label" for="{{ form.gateway.id_for_label }}">{% translate "Gateway" %}</label>
+            {{ form.gateway }}
+            {% for error in form.gateway.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+          </div>
+          <div class="col-12 col-md-6" id="bank-wrapper">
+            <label class="form-label" for="{{ form.dedicated_bank_account.id_for_label }}">{% translate "Dedicated Bank Account" %}</label>
+            {{ form.dedicated_bank_account }}
+            {% for error in form.dedicated_bank_account.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+          </div>
 
-        {% if is_edit and method and method.logo %}
-          <div style="margin-bottom: 16px">
-            <label class="form-label">Current Logo</label>
-            <div>
-              <img src="{{ method.logo.url }}" alt="Current Logo" style="height: 70px; width: 70px; object-fit: cover; border-radius: 8px; border: 1px solid #e5e7eb" />
+          <div class="col-12">
+            <label class="form-label">{% translate "Supported Currencies" %}</label>
+            <div class="vstack gap-2">
+              <div class="d-flex gap-2">
+                <input type="text" id="currency-code-input" class="form-control" placeholder="{% translate 'Type currency code (e.g. SAR)' %}">
+                <button type="button" id="add-currency-btn" class="eal-btn eal-btn-outline">
+                  <i class="bi bi-plus-lg"></i>
+                  <span>{% translate "Add" %}</span>
+                </button>
+              </div>
+              <div id="currency-chip-list" class="d-flex flex-wrap gap-2"></div>
+              <div style="display:none;">{{ form.supported_currencies }}</div>
+            </div>
+            <span class="field-hint">{% translate "Add one or more currency codes. JSON is generated automatically." %}</span>
+            {% for error in form.supported_currencies.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+          </div>
+
+          <div class="col-12 col-md-6">
+            <label class="form-label" for="{{ form.logo.id_for_label }}">{% translate "Logo" %}</label>
+            {{ form.logo }}
+            {% for error in form.logo.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+          </div>
+
+          {% if is_edit and method and method.logo %}
+          <div class="col-12 col-md-6">
+            <label class="form-label">{% translate "Current Logo" %}</label>
+            <div class="d-flex align-items-center p-2 bg-light rounded-3 border" style="min-height: 56px;">
+              <img src="{{ method.logo.url }}" alt="Current Logo" style="height: 56px; width: 56px; object-fit: cover; border-radius: 8px; border: 1px solid #e5e7eb;" />
             </div>
           </div>
-        {% endif %}
+          {% endif %}
 
-        <div style="margin-bottom: 16px">
-          <label class="form-label">Display Order</label>
-          {{ form.display_order }}
-          {% for error in form.display_order.errors %}
-            <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-          {% endfor %}
-        </div>
-
-        <div style="margin-bottom: 16px">
-          <label class="form-label">Status</label>
-          <div style="display: flex; align-items: center; gap: 10px">
-            {{ form.is_active }}
+          <div class="col-12 col-md-6">
+            <label class="form-label" for="{{ form.display_order.id_for_label }}">{% translate "Display Order" %}</label>
+            {{ form.display_order }}
+            {% for error in form.display_order.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
           </div>
-          {% for error in form.is_active.errors %}
-            <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
-          {% endfor %}
-        </div>
 
-        <div class="form-actions-bar">
-          <div class="form-actions-left">
-            <a href="{% url 'payment_method_list' %}" class="eal-btn eal-btn-outline">
-              <i class="bi bi-x-lg"></i>
-              <span>{% translate "Cancel" %}</span>
-            </a>
-          </div>
-          <div class="form-actions-right">
-            <button type="submit" class="eal-btn eal-btn-primary">
-              <i class="bi bi-send"></i>
-              <span>{% if is_edit %}{% translate "Update Method" %}{% else %}{% translate "Add Method" %}{% endif %}</span>
-            </button>
+          <div class="col-12 col-md-6">
+            <div class="form-label d-block mb-0">{% translate "Status" %}</div>
+            <div class="form-check form-switch mt-2">
+              {{ form.is_active }}
+              <label class="form-check-label ms-1" for="id_is_active">
+                <span class="fw-medium">{% translate "Active Status" %}</span>
+              </label>
+            </div>
+            {% for error in form.is_active.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
           </div>
         </div>
-      </form>
+      </div>
     </div>
   </div>
+
+  <div class="form-actions-bar">
+    <div class="form-actions-left">
+      <a href="{% url 'payment_method_list' %}" class="eal-btn eal-btn-outline">
+        <i class="bi bi-x-lg"></i>
+        <span>{% translate "Cancel" %}</span>
+      </a>
+    </div>
+    <div class="form-actions-right">
+      <button type="submit" class="eal-btn eal-btn-primary">
+        <i class="bi bi-send"></i>
+        <span>{% if is_edit %}{% translate "Update Method" %}{% else %}{% translate "Add Method" %}{% endif %}</span>
+      </button>
+    </div>
+  </div>
+</form>
 
   <script>
     (function () {

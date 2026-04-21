@@ -1,0 +1,2180 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="iRoad Admin Dashboard - Driver Details" />
+    <title>Driver Details | iRoad Admin</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Bootstrap 5 CSS -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+
+    <!-- Bootstrap Icons -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css"
+      rel="stylesheet"
+    />
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="Style/style.css" />
+    <link rel="stylesheet" href="Style/responsive.css" />
+    <style>
+      .ch-header-card {
+        background: #fff;
+        border-radius: 12px;
+        padding: 24px;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        gap: 20px;
+        flex-wrap: wrap;
+      }
+      .ch-left {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      .ch-title-row {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+      }
+      .ch-logo {
+        width: 48px;
+        height: 48px;
+        background: #ebecfa;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #5051f9;
+        font-size: 1.25rem;
+      }
+      .ch-title {
+        font-size: 1.4rem;
+        font-weight: 700;
+        margin: 0;
+        color: #1a1a1a;
+      }
+      .ch-badges {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .ch-badge {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 14px;
+        border-radius: 20px;
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        font-size: 0.85rem;
+        font-weight: 500;
+        color: #4a4a4a;
+        background: #fff;
+      }
+      .ch-badge i {
+        color: #6b6b6b;
+      }
+
+      .ch-right {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        min-width: 250px;
+      }
+      .ch-contact-item {
+        display: flex;
+        align-items: stretch;
+        background: #f4f5f9;
+        border-radius: 6px;
+        overflow: hidden;
+        font-size: 0.85rem;
+        border: 1px solid rgba(0, 0, 0, 0.04);
+      }
+      .ch-contact-icon {
+        padding: 8px 12px;
+        background: #e4e6fb;
+        color: #5051f9;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .ch-contact-text {
+        padding: 8px 16px;
+        flex: 1;
+        display: flex;
+        align-items: center;
+        color: #1a1a1a;
+        font-weight: 500;
+      }
+      .ch-contact-copy {
+        padding: 8px 12px;
+        background: #ced3fa;
+        color: #5051f9;
+        border: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+      .ch-contact-copy:hover {
+        background: #b2baff;
+      }
+
+      .ch-actions {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin: 20px 0;
+        flex-wrap: wrap;
+      }
+      .ch-action-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 16px;
+        border: 1px solid #c2c4fa;
+        border-radius: 8px;
+        background: #fff;
+        color: #5051f9;
+        font-size: 0.9rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+        text-decoration: none;
+      }
+      .ch-action-btn:hover {
+        background: #f4f5fc;
+        color: #5051f9;
+      }
+
+      .cd-main-card {
+        background: #fff;
+        border-radius: 12px;
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        padding: 20px;
+      }
+      .cd-tabs-container {
+        background: #f4f5fc;
+        border-radius: 8px;
+        padding: 6px;
+        margin-bottom: 24px;
+      }
+      .cd-tabs-list {
+        display: flex;
+        gap: 6px;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        padding: 0;
+        margin: 0;
+        list-style: none;
+      }
+      .cd-tabs-list::-webkit-scrollbar {
+        display: none;
+      }
+      .cd-tab {
+        border: none;
+        background: transparent;
+        padding: 8px 20px;
+        font-size: 0.85rem;
+        color: #6b6b6b;
+        cursor: pointer;
+        border-radius: 6px;
+        font-weight: 500;
+        white-space: nowrap;
+        transition: all 0.2s;
+      }
+      .cd-tab.active {
+        background: #5051f9;
+        color: #fff;
+        box-shadow: 0 2px 4px rgba(80, 81, 249, 0.2);
+      }
+      .cd-tab:hover:not(.active) {
+        color: #1a1a1a;
+      }
+
+      .cd-details-section {
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .cd-details-header {
+        background: #f4f5fc;
+        padding: 16px 20px;
+        font-weight: 600;
+        font-size: 0.9rem;
+        color: #1a1a1a;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+      }
+      .cd-details-body {
+        background: #fff;
+        padding: 20px;
+      }
+      .cd-grid-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+        padding-bottom: 20px;
+        margin-bottom: 20px;
+        border-bottom: 1px dashed rgba(0, 0, 0, 0.1);
+      }
+      .cd-grid-row:last-child {
+        padding-bottom: 0;
+        margin-bottom: 0;
+        border-bottom: none;
+      }
+      .cd-field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .cd-field-label {
+        font-size: 0.8rem;
+        color: #6b6b6b;
+      }
+      .cd-field-value {
+        font-size: 1rem;
+        font-weight: 700;
+        color: #1a1a1a;
+      }
+
+      @media (max-width: 768px) {
+        .ch-header-card {
+          flex-direction: column;
+        }
+        .cd-grid-row {
+          grid-template-columns: 1fr;
+        }
+      }
+      .cd-empty {
+        border: 1px dashed rgba(0, 0, 0, 0.2);
+        border-radius: 14px;
+        padding: 18px;
+        background: rgba(0, 0, 0, 0.02);
+      }
+    </style>
+    <style>
+      .cd-details-section .cd-details-header[data-bs-toggle="collapse"] {
+        cursor: pointer;
+        user-select: none;
+        transition:
+          background-color 0.2s ease,
+          border-color 0.2s ease;
+      }
+      .cd-details-section .cd-details-header[data-bs-toggle="collapse"]:hover {
+        background-color: #f8fafc;
+      }
+      .cd-details-section .collapse-icon {
+        transition: transform 0.3s ease;
+      }
+      .cd-details-section .cd-details-header.collapsed .collapse-icon {
+        transform: rotate(-90deg);
+      }
+    </style>
+  </head>
+
+  <body>
+    <!-- Mobile Menu Toggle -->
+    <button class="mobile-menu-toggle" aria-label="Toggle menu">
+      <i class="bi bi-list"></i>
+    </button>
+
+    <!-- Sidebar Overlay -->
+    <div class="sidebar-overlay"></div>
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="appSidebar">
+      <!-- Sidebar Header -->
+      <div class="sidebar-header">
+        <a href="index.html" class="sidebar-logo">
+          <span class="logo-icon">i</span>
+          <span class="logo-label">Road</span>
+        </a>
+      </div>
+
+      <!-- Navigation -->
+      <nav class="sidebar-nav">
+        <ul class="nav-menu">
+          <!-- Dashboard -->
+          <li class="nav-item">
+            <a href="index.html" class="nav-link" data-tooltip="Dashboard">
+              <i class="bi bi-speedometer2"></i>
+              <span class="nav-text">Dashboard</span>
+            </a>
+          </li>
+
+          <!-- --- ADMINISTRATION --- -->
+          <li class="nav-section-title">
+            <span>Administration</span>
+          </li>
+
+          <!-- Account Management -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="Account Management">
+              <i class="bi bi-building"></i>
+              <span class="nav-text">Account Management</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Organization-profile.html" class="submenu-link">
+                  <i class="bi bi-card-heading"></i>
+                  <span>Organization Profile</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- User Management -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="User Management">
+              <i class="bi bi-people"></i>
+              <span class="nav-text">User Management</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Users-administration.html" class="submenu-link">
+                  <i class="bi bi-person-gear"></i>
+                  <span>Users Administration</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Roles--permissions.html" class="submenu-link">
+                  <i class="bi bi-person-lock"></i>
+                  <span>Roles & Permissions</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- Subscriptions Management -->
+          <li class="nav-item has-submenu open">
+            <a
+              href="#"
+              class="nav-link"
+              data-tooltip="Subscriptions Management"
+            >
+              <i class="bi bi-credit-card-2-front"></i>
+              <span class="nav-text">Subscriptions Management</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Subscription-plan.html" class="submenu-link">
+                  <i class="bi bi-card-checklist"></i>
+                  <span>Subscription Plan</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Subscription-billing.html" class="submenu-link">
+                  <i class="bi bi-receipt"></i>
+                  <span>Subscription Billing</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- Audit & Security Logs -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="Audit & Security Logs">
+              <i class="bi bi-shield-lock"></i>
+              <span class="nav-text">Audit & Security Logs</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Login--session-events.html" class="submenu-link">
+                  <i class="bi bi-shield-lock"></i>
+                  <span>Login / Session Events</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Role--permission-changes.html" class="submenu-link">
+                  <i class="bi bi-person-lock"></i>
+                  <span>Role / Permission Changes</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Critical-account-changes.html" class="submenu-link">
+                  <i class="bi bi-person-vcard"></i>
+                  <span>Critical Account Changes</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- Support Management -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="Support Management">
+              <i class="bi bi-headset"></i>
+              <span class="nav-text">Support Management</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Support-ticket-master.html" class="submenu-link">
+                  <i class="bi bi-ticket-detailed"></i>
+                  <span>Support Ticket Master</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- --- CRM --- -->
+          <li class="nav-section-title">
+            <span>CRM</span>
+          </li>
+
+          <!-- Clients Management -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="Clients Management">
+              <i class="bi bi-person-badge"></i>
+              <span class="nav-text">Clients Management</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Client-account.html" class="submenu-link">
+                  <i class="bi bi-person-vcard"></i>
+                  <span>Client Account</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Client-account-setting.html" class="submenu-link">
+                  <i class="bi bi-gear"></i>
+                  <span>Client Account Settings</span>
+                </a>
+              </li>
+
+              <li class="submenu-item">
+                <a href="Client-attachments.html" class="submenu-link">
+                  <i class="bi bi-paperclip"></i>
+                  <span>Client Attachments</span>
+                </a>
+              </li>
+
+              <li class="submenu-item">
+                <a href="Client-contacts.html" class="submenu-link">
+                  <i class="bi bi-person-rolodex"></i>
+                  <span>Client Contacts</span>
+                </a>
+              </li>
+
+              <li class="submenu-item">
+                <a href="Client-contract.html" class="submenu-link">
+                  <i class="bi bi-file-earmark-text"></i>
+                  <span>Client Contracts</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Client-contract-settings.html" class="submenu-link">
+                  <i class="bi bi-gear"></i>
+                  <span>Client Contract Settings</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- --- MASTER DATA --- -->
+          <li class="nav-section-title">
+            <span>Master Data</span>
+          </li>
+
+          <!-- Address Management -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="Address Management">
+              <i class="bi bi-map"></i>
+              <span class="nav-text">Address Management</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="addresses.html" class="submenu-link">
+                  <i class="bi bi-card-heading"></i>
+                  <span>Address Master</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- Cargo Management -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="Cargo Management">
+              <i class="bi bi-box-seam"></i>
+              <span class="nav-text">Cargo Management</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Cargo-master.html" class="submenu-link">
+                  <i class="bi bi-boxes"></i>
+                  <span>Cargo Master</span>
+                </a>
+              </li>
+
+              <li class="submenu-item">
+                <a href="Cargo-category-config.html" class="submenu-link">
+                  <i class="bi bi-boxes"></i>
+                  <span>Cargo Category Config</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- Route Management -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="Route Management">
+              <i class="bi bi-signpost-split"></i>
+              <span class="nav-text">Route Management</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Location-master.html" class="submenu-link">
+                  <i class="bi bi-pin-map"></i>
+                  <span>Location Master</span>
+                </a>
+              </li>
+
+              <li class="submenu-item">
+                <a href="Route-master.html" class="submenu-link">
+                  <i class="bi bi-signpost"></i>
+                  <span>Route Master</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- Services Management -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="Services Management">
+              <i class="bi bi-gear"></i>
+              <span class="nav-text">Services Management</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Service-item-master.html" class="submenu-link">
+                  <i class="bi bi-tools"></i>
+                  <span>Service Item Master</span>
+                </a>
+              </li>
+
+              <li class="submenu-item">
+                <a href="Price-list.html" class="submenu-link">
+                  <i class="bi bi-tags"></i>
+                  <span>Price List Master</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- --- OPERATIONS --- -->
+          <li class="nav-section-title">
+            <span>Operations</span>
+          </li>
+
+          <!-- Operations Management -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="Operations Management">
+              <i class="bi bi-activity"></i>
+              <span class="nav-text">Operations Management</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Booking.html" class="submenu-link">
+                  <i class="bi bi-calendar-check"></i>
+                  <span>Booking</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Shipment.html" class="submenu-link">
+                  <i class="bi bi-box-seam"></i>
+                  <span>Shipment</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Shipment-documents.html" class="submenu-link">
+                  <i class="bi bi-paperclip"></i>
+                  <span>Shipment Documents</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Surcharge-sales-transaction.html" class="submenu-link">
+                  <i class="bi bi-receipt"></i>
+
+                  <span>Surcharge Sales Transaction</span>
+                </a>
+              </li>
+
+              <li class="submenu-item">
+                <a href="Digital-pod-transaction.html" class="submenu-link">
+                  <i class="bi bi-file-earmark-check"></i>
+                  <span>Shipment POD Analysis</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Document-handover.html" class="submenu-link">
+                  <i class="bi bi-file-earmark-check"></i>
+                  <span>Document Handover</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Truck-movement-log.html" class="submenu-link">
+                  <i class="bi bi-truck"></i>
+                  <span>Truck Movement Log</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Operation-actions.html" class="submenu-link">
+                  <i class="bi bi-record-circle"></i>
+                  <span>Operation Actions</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- Fleet Management -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="Fleet Management">
+              <i class="bi bi-truck-front"></i>
+              <span class="nav-text">Fleet Management</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Truck-master.html" class="submenu-link">
+                  <i class="bi bi-truck"></i>
+                  <span>Truck Master</span>
+                </a>
+              </li>
+
+              <li class="submenu-item">
+                <a href="Truck-type-master.html" class="submenu-link">
+                  <i class="bi bi-truck-flatbed"></i>
+                  <span>Truck Type Master</span>
+                </a>
+              </li>
+
+              <li class="submenu-item">
+                <a href="Truck-attachments.html" class="submenu-link">
+                  <i class="bi bi-truck"></i>
+                  <span>Truck Attachments</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Truck-settings.html" class="submenu-link">
+                  <i class="bi bi-truck"></i>
+                  <span>Truck Settings</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- Drivers Management -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="Drivers Management">
+              <i class="bi bi-person-vcard"></i>
+              <span class="nav-text">Drivers Management</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Driver-master.html" class="submenu-link">
+                  <i class="bi bi-person-badge"></i>
+                  <span>Driver Master</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Driver-attachments.html" class="submenu-link">
+                  <i class="bi bi-person-badge"></i>
+                  <span>Driver Attachments</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Driver-settings.html" class="submenu-link">
+                  <i class="bi bi-person-badge"></i>
+                  <span>Driver Settings</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- --- FINANCE --- -->
+          <li class="nav-section-title">
+            <span>Finance</span>
+          </li>
+
+          <!-- Sales Invoicing -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="Sales Invoicing">
+              <i class="bi bi-receipt"></i>
+              <span class="nav-text">Sales Invoicing</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Sales-invoice-create.html" class="submenu-link">
+                  <i class="bi bi-receipt"></i>
+                  <span>Sales Invoice Reports</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- Treasury Management -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="Treasury Management">
+              <i class="bi bi-cash-coin"></i>
+              <span class="nav-text">Treasury Management</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Treasury-master.html" class="submenu-link">
+                  <i class="bi bi-card-heading"></i>
+                  <span>Treasury Master</span>
+                </a>
+              </li>
+
+              <li class="submenu-item">
+                <a href="Treasury-transaction-log.html" class="submenu-link">
+                  <i class="bi bi-clock-history"></i>
+                  <span>Treasury Transaction Log</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- --- SYSTEM --- -->
+          <li class="nav-section-title">
+            <span>System</span>
+          </li>
+
+          <!-- Configurations -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="Configurations">
+              <i class="bi bi-gear-wide-connected"></i>
+              <span class="nav-text">Configurations</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Auto-number-configuration.html" class="submenu-link">
+                  <i class="bi bi-gear"></i>
+                  <span>Auto Number Configuration</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+        </ul>
+      </nav>
+    </aside>
+
+    <!-- Notification Panel -->
+    <div class="notification-panel" id="notificationPanel">
+      <!-- Panel Header -->
+      <div class="notification-header">
+        <h3 class="notification-title">Notifications</h3>
+        <button
+          class="notification-close"
+          id="notificationClose"
+          aria-label="Close"
+        >
+          <i class="bi bi-x-lg"></i>
+        </button>
+      </div>
+
+      <!-- Panel Content -->
+      <div class="notification-content">
+        <!-- Settings Button -->
+        <div class="notification-settings">
+          <button
+            class="settings-btn"
+            id="notificationSettingsBtn"
+            aria-label="Settings"
+          >
+            <i class="bi bi-gear"></i>
+          </button>
+        </div>
+
+        <!-- Preferences Popup -->
+        <div class="preferences-popup" id="preferencesPopup">
+          <h4 class="preferences-title">Preferences</h4>
+          <div class="ce-item">
+            <div class="preference-label">
+              <span>Allow Notifications</span>
+              <i
+                class="bi bi-info-circle"
+                title="Enable or disable all notifications"
+              ></i>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="allowNotifications" checked />
+              <span class="toggle-slider">
+                <span class="toggle-text-on">Enable</span>
+                <span class="toggle-text-off">Disable</span>
+              </span>
+            </label>
+          </div>
+          <div class="preference-item">
+            <label class="preference-checkbox">
+              <input type="checkbox" checked />
+              <span class="checkmark"></span>
+              <span>Record Comments</span>
+            </label>
+          </div>
+          <div class="preference-item">
+            <label class="preference-checkbox">
+              <input type="checkbox" checked />
+              <span class="checkmark"></span>
+              <span>Blueprint Transitions</span>
+            </label>
+          </div>
+          <button class="btn btn-primary preferences-done" id="preferencesDone">
+            Done
+          </button>
+        </div>
+
+        <!-- Empty State -->
+        <div class="notification-empty">
+          <div class="empty-icon">
+            <i class="bi bi-bell"></i>
+            <span class="sparkle sparkle-1">&#10022;</span>
+            <span class="sparkle sparkle-2">&#10023;</span>
+            <span class="sparkle sparkle-3">&deg;</span>
+          </div>
+          <h4 class="empty-title">No notifications</h4>
+          <p class="empty-text">You are yet to receive notifications</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notification Panel Overlay -->
+    <div class="notification-overlay" id="notificationOverlay"></div>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- Top Header -->
+      <header class="top-header">
+        <div class="header-left">
+          <button
+            class="header-toggle-btn"
+            id="sidebarCollapseBtn"
+            title="Toggle Sidebar"
+          >
+            <i class="bi bi-list"></i>
+          </button>
+          <div class="header-search">
+            <i class="bi bi-search"></i>
+            <input type="text" placeholder="Search trucks, fleet..." />
+          </div>
+        </div>
+        <div class="header-datetime">
+          <span class="header-date" id="headerDate"
+            >Tuesday, 28 January 2026</span
+          >
+          <span class="header-time" id="headerTime">3:52 PM</span>
+        </div>
+        <div class="header-right">
+          <button class="header-icon-btn" title="Switch Language">
+            <i class="bi bi-translate"></i>
+          </button>
+          <button class="header-icon-btn" title="Notifications">
+            <i class="bi bi-bell"></i>
+            <span class="badge">3</span>
+          </button>
+          <div class="header-divider"></div>
+          <div class="header-user-wrapper">
+            <div class="header-user" id="headerUserToggle">
+              <div class="header-user-avatar">
+                <img
+                  src="https://ui-avatars.com/api/?name=Mark&background=5051f9&color=fff&size=40"
+                  alt="User"
+                />
+              </div>
+              <div class="header-user-info">
+                <span class="header-user-name">Mark</span>
+                <span class="header-user-role">Administrator</span>
+              </div>
+              <i class="bi bi-chevron-down header-user-chevron"></i>
+            </div>
+            <!-- Header User Dropdown -->
+            <div class="header-user-dropdown" id="headerUserDropdown">
+              <div class="header-dropdown-profile">
+                <div class="header-dropdown-avatar">
+                  <img
+                    src="https://ui-avatars.com/api/?name=Mark&background=e8e8e8&color=888&size=80"
+                    alt="User"
+                  />
+                </div>
+                <div class="header-dropdown-name">mark</div>
+                <div class="header-dropdown-email">mark@redsparkinfo.com</div>
+              </div>
+              <div class="header-dropdown-divider"></div>
+              <ul class="header-dropdown-menu">
+                <li>
+                  <a href="#" class="header-dropdown-item">
+                    <i class="bi bi-person"></i>
+                    <span>My Account</span>
+                  </a>
+                </li>
+                <li>
+                  <a href="#" class="header-dropdown-item">
+                    <i class="bi bi-box-arrow-right"></i>
+                    <span>Sign out</span>
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- Page Header -->
+      <div class="page-header">
+        <nav aria-label="breadcrumb">
+          <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+              <a href="index.html">Dashboard</a>
+            </li>
+            <li class="breadcrumb-item">Operations</li>
+            <li class="breadcrumb-item">Fleet Management</li>
+            <li class="breadcrumb-item">
+              <a href="Driver-master-list.html">Driver Master List</a>
+            </li>
+            <li class="breadcrumb-item active" aria-current="page">
+              Driver Details
+            </li>
+          </ol>
+        </nav>
+
+        <div class="page-header-row">
+          <div class="page-header-left">
+            <h1 class="page-title">Driver Details</h1>
+            <p class="page-subtitle">
+              View comprehensive profile, trip history, and documentation for
+              the driver.
+            </p>
+          </div>
+          <div class="page-header-right">
+            <div class="eal-header-actions">
+              <a href="Driver-master-list.html" class="eal-btn eal-btn-outline">
+                <i class="bi bi-arrow-left"></i>
+                <span>Back to list</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="container-fluid pb-4">
+        <!-- Top Profile Card -->
+        <div class="ch-header-card">
+          <div class="ch-left">
+            <div class="ch-title-row">
+              <div class="ch-logo">
+                <i class="bi bi-person-badge"></i>
+              </div>
+              <h2 class="ch-title">Mohammad Hassan</h2>
+            </div>
+            <!-- Subtitle span kept hidden to avoid JS error but unused -->
+            <span id="vdSubtitle" class="d-none"></span>
+            <div class="ch-badges">
+              <div class="ch-badge">
+                <i class="bi bi-truck-flatbed"></i>
+                <span>Heavy License</span>
+              </div>
+              <div class="ch-badge">
+                <i class="bi bi-building"></i>
+                <span>Al Safa Transport Co.</span>
+              </div>
+              <div class="ch-badge">
+                <i class="bi bi-person-check"></i>
+                <span>Direct Hire</span>
+              </div>
+              <div class="ch-badge">
+                <i class="bi bi-check2-circle"></i>
+                <span>Active</span>
+              </div>
+            </div>
+          </div>
+          <div class="ch-right">
+            <div class="ch-contact-item">
+              <div class="ch-contact-icon">
+                <i class="bi bi-telephone"></i>
+              </div>
+              <div class="ch-contact-text">+966 50 123 4567</div>
+            </div>
+            <div class="ch-contact-item">
+              <div class="ch-contact-icon">
+                <i class="bi bi-truck"></i>
+              </div>
+              <div class="ch-contact-text">Assigned: TRK-1001</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Action Buttons Row -->
+        <div class="ch-actions">
+          <button class="ch-action-btn">
+            <i class="bi bi-pencil-square"></i> Edit
+          </button>
+          <button class="ch-action-btn">
+            <i class="bi bi-card-checklist"></i> Update Licenses
+          </button>
+          <button class="ch-action-btn">
+            <i class="bi bi-wallet"></i> Add Wallet Transaction
+          </button>
+          <button class="ch-action-btn">
+            <i class="bi bi-person-x"></i> Suspend Driver
+          </button>
+          <button class="ch-action-btn">
+            <i class="bi bi-person-check"></i> Activate Driver
+          </button>
+          <button class="ch-action-btn">
+            <i class="bi bi-phone-vibrate"></i> Suspend App Access
+          </button>
+
+          <button class="ch-action-btn">
+            <i class="bi bi-key"></i> Reset Password
+          </button>
+        </div>
+
+        <!-- Main Content Card with Tabs -->
+        <div class="cd-main-card">
+          <!-- Tabs Header -->
+          <div class="cd-tabs-container">
+            <ul class="nav cd-tabs-list" role="tablist">
+              <li class="nav-item" role="presentation">
+                <button
+                  class="cd-tab active"
+                  data-bs-toggle="tab"
+                  data-bs-target="#pane-overview"
+                  type="button"
+                  role="tab"
+                >
+                  Overview
+                </button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button
+                  class="cd-tab"
+                  data-bs-toggle="tab"
+                  data-bs-target="#pane-licenses-docs"
+                  type="button"
+                  role="tab"
+                >
+                  Licenses &amp; Documents
+                </button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button
+                  class="cd-tab"
+                  data-bs-toggle="tab"
+                  data-bs-target="#pane-assigned-trucks"
+                  type="button"
+                  role="tab"
+                >
+                  Assigned Trucks
+                </button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button
+                  class="cd-tab"
+                  data-bs-toggle="tab"
+                  data-bs-target="#pane-shipments"
+                  type="button"
+                  role="tab"
+                >
+                  Shipments
+                </button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button
+                  class="cd-tab"
+                  data-bs-toggle="tab"
+                  data-bs-target="#pane-movements-log"
+                  type="button"
+                  role="tab"
+                >
+                  Movements Log
+                </button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button
+                  class="cd-tab"
+                  data-bs-toggle="tab"
+                  data-bs-target="#pane-wallet"
+                  type="button"
+                  role="tab"
+                >
+                  Wallet Statement
+                </button>
+              </li>
+            </ul>
+          </div>
+
+          <div class="tab-content">
+            <!-- ----------- 1. OVERVIEW PANE ----------- -->
+            <div
+              class="tab-pane fade show active"
+              id="pane-overview"
+              role="tabpanel"
+            >
+              <!-- Core Driver Information -->
+              <div class="cd-details-section mb-4">
+                <div class="cd-details-header">Core Driver Information</div>
+                <div class="cd-details-body">
+                  <div class="cd-grid-row">
+                    <div class="cd-field">
+                      <span class="cd-field-label">Driver Code</span
+                      ><span class="cd-field-value" style="font-weight: 600"
+                        >DRV-1001</span
+                      >
+                    </div>
+                    <div class="cd-field">
+                      <span class="cd-field-label">Status</span
+                      ><span class="cd-field-value"
+                        ><span
+                          class="status-badge active border border-success border-opacity-25"
+                          style="background: #e6f8ef; color: #0d894f"
+                          >Active</span
+                        ></span
+                      >
+                    </div>
+                  </div>
+                  <div class="cd-grid-row">
+                    <div class="cd-field">
+                      <span class="cd-field-label">Driver Name (English)</span
+                      ><span class="cd-field-value">Mohammad Hassan</span>
+                    </div>
+                    <div class="cd-field">
+                      <span class="cd-field-label">Driver Name (Arabic)</span
+                      ><span class="cd-field-value">???? ???</span>
+                    </div>
+                  </div>
+                  <div class="cd-grid-row">
+                    <div class="cd-field">
+                      <span class="cd-field-label">Date of Birth</span
+                      ><span class="cd-field-value">12 May 1985</span>
+                    </div>
+                    <div class="cd-field">
+                      <span class="cd-field-label">Nationality</span
+                      ><span class="cd-field-value">Saudi Arabia</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <!-- Contact Details -->
+              <div class="cd-details-section mb-4">
+                <div class="cd-details-header">Contact Details</div>
+                <div class="cd-details-body">
+                  <div class="cd-grid-row">
+                    <div class="cd-field">
+                      <span class="cd-field-label">Mobile Number</span
+                      ><span class="cd-field-value">+966 50 123 4567</span>
+                    </div>
+                    <div class="cd-field">
+                      <span class="cd-field-label">Secondary Mobile</span
+                      ><span class="cd-field-value">+966 55 987 6543</span>
+                    </div>
+                  </div>
+                  <div class="cd-grid-row">
+                    <div class="cd-field">
+                      <span class="cd-field-label">Email Address</span
+                      ><span class="cd-field-value text-primary"
+                        >m.hassan@example.com</span
+                      >
+                    </div>
+                    <div class="cd-field">
+                      <span class="cd-field-label">Emergency Contact</span
+                      ><span class="cd-field-value">+966 50 111 2222</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <!-- Employment Details -->
+              <div class="cd-details-section mb-4">
+                <div class="cd-details-header">Employment Details</div>
+                <div class="cd-details-body">
+                  <div class="cd-grid-row">
+                    <div class="cd-field">
+                      <span class="cd-field-label">Vendor / Company</span
+                      ><span class="cd-field-value">Al Safa Transport Co.</span>
+                    </div>
+                    <div class="cd-field">
+                      <span class="cd-field-label">Employment Type</span
+                      ><span class="cd-field-value">Direct Hire</span>
+                    </div>
+                  </div>
+                  <div class="cd-grid-row">
+                    <div class="cd-field">
+                      <span class="cd-field-label">Joining Date</span
+                      ><span class="cd-field-value">15 Jan 2022</span>
+                    </div>
+                    <div class="cd-field">
+                      <span class="cd-field-label">License Type</span
+                      ><span class="cd-field-value">Heavy Vehicle License</span>
+                    </div>
+                  </div>
+                  <div class="cd-grid-row">
+                    <div class="cd-field">
+                      <span class="cd-field-label">App Access</span
+                      ><span class="cd-field-value"
+                        ><span
+                          class="status-badge"
+                          style="background: #e6f8ef; color: #0d894f"
+                          >Enabled</span
+                        ></span
+                      >
+                    </div>
+                    <div class="cd-field">
+                      <span class="cd-field-label">Created By</span
+                      ><span class="cd-field-value">Admin (Mark)</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- ----------- 2. LICENSES & DOCUMENTS PANE ----------- -->
+            <div class="tab-pane fade" id="pane-licenses-docs" role="tabpanel">
+              <!-- License Information -->
+              <div class="cd-details-section mb-4">
+                <div class="cd-details-header">License Information</div>
+                <div class="cd-details-body">
+                  <div class="cd-grid-row">
+                    <div class="cd-field">
+                      <span class="cd-field-label"
+                        >National ID / Iqama Number</span
+                      ><span
+                        class="cd-field-value"
+                        style="font-weight: 600; font-size: 1.05rem"
+                        >2459812745</span
+                      >
+                    </div>
+                    <div class="cd-field">
+                      <span class="cd-field-label">License Number</span
+                      ><span class="cd-field-value">SA983421A</span>
+                    </div>
+                  </div>
+                  <div class="cd-grid-row">
+                    <div class="cd-field">
+                      <span class="cd-field-label">License Expiry Date</span
+                      ><span class="cd-field-value text-success"
+                        >20 Nov 2028</span
+                      >
+                    </div>
+                    <div class="cd-field">
+                      <span class="cd-field-label">License Type</span
+                      ><span class="cd-field-value">Heavy Vehicle</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <!-- Documents Table -->
+              <div class="cd-details-section mb-4">
+                <div
+                  class="cd-details-header d-flex justify-content-between align-items-center"
+                >
+                  <span>Uploaded Documents</span>
+                  <button
+                    class="btn btn-primary btn-sm"
+                    onclick="event.stopPropagation()"
+                  >
+                    <i class="bi bi-upload"></i> Upload File
+                  </button>
+                </div>
+                <div class="cd-details-body p-0">
+                  <div
+                    class="eal-table-wrap"
+                    style="box-shadow: none; border-radius: 0"
+                  >
+                    <table class="eal-table mb-0">
+                      <thead>
+                        <tr>
+                          <th>#</th>
+                          <th>Document Name</th>
+                          <th>Type</th>
+                          <th>Expiry Applicable</th>
+                          <th>Expiry Date</th>
+                          <th>Status</th>
+                          <th>Attached On</th>
+                          <th class="text-end">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td>1</td>
+                          <td>
+                            <i
+                              class="bi bi-file-earmark-pdf text-danger me-1"
+                            ></i>
+                            Driver_License_Copy.pdf
+                          </td>
+                          <td>License</td>
+                          <td>Yes</td>
+                          <td class="text-success fw-600">20 Nov 2028</td>
+                          <td>
+                            <span class="status-badge active">Active</span>
+                          </td>
+                          <td>12 Jan 2025</td>
+                          <td class="text-end">
+                            <div
+                              class="eal-actions-cell justify-content-end pt-0 pb-0 w-100"
+                            >
+                              <button class="eal-row-btn" title="Download">
+                                <i class="bi bi-download"></i></button
+                              ><button
+                                class="eal-row-btn"
+                                title="Delete"
+                                style="
+                                  color: #ef4444;
+                                  border-color: #fca5a5;
+                                  background: #fef2f2;
+                                "
+                              >
+                                <i class="bi bi-trash"></i>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td>2</td>
+                          <td>
+                            <i
+                              class="bi bi-file-earmark-image text-info me-1"
+                            ></i>
+                            Iqama_Scanned.jpeg
+                          </td>
+                          <td>ID Document</td>
+                          <td>Yes</td>
+                          <td class="text-warning fw-600">10 Feb 2026</td>
+                          <td>
+                            <span class="status-badge active">Active</span>
+                          </td>
+                          <td>15 Jan 2025</td>
+                          <td class="text-end">
+                            <div
+                              class="eal-actions-cell justify-content-end pt-0 pb-0 w-100"
+                            >
+                              <button class="eal-row-btn" title="Download">
+                                <i class="bi bi-download"></i></button
+                              ><button
+                                class="eal-row-btn"
+                                title="Delete"
+                                style="
+                                  color: #ef4444;
+                                  border-color: #fca5a5;
+                                  background: #fef2f2;
+                                "
+                              >
+                                <i class="bi bi-trash"></i>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td>3</td>
+                          <td>
+                            <i
+                              class="bi bi-file-earmark-pdf text-danger me-1"
+                            ></i>
+                            Medical_Certificate.pdf
+                          </td>
+                          <td>Medical</td>
+                          <td>Yes</td>
+                          <td class="text-success fw-600">30 Sep 2027</td>
+                          <td>
+                            <span class="status-badge active">Active</span>
+                          </td>
+                          <td>20 Feb 2025</td>
+                          <td class="text-end">
+                            <div
+                              class="eal-actions-cell justify-content-end pt-0 pb-0 w-100"
+                            >
+                              <button class="eal-row-btn" title="Download">
+                                <i class="bi bi-download"></i></button
+                              ><button
+                                class="eal-row-btn"
+                                title="Delete"
+                                style="
+                                  color: #ef4444;
+                                  border-color: #fca5a5;
+                                  background: #fef2f2;
+                                "
+                              >
+                                <i class="bi bi-trash"></i>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- ----------- 3. ASSIGNED TRUCKS PANE ----------- -->
+            <div
+              class="tab-pane fade"
+              id="pane-assigned-trucks"
+              role="tabpanel"
+            >
+              <div class="cd-details-section mb-4">
+                <div class="cd-details-header">Truck Assignment History</div>
+                <div class="cd-details-body p-0">
+                  <div
+                    class="eal-table-wrap"
+                    style="box-shadow: none; border-radius: 0"
+                  >
+                    <table class="eal-table mb-0">
+                      <thead>
+                        <tr>
+                          <th>#</th>
+                          <th>Truck Code</th>
+                          <th>Truck Model</th>
+                          <th>Plate Number</th>
+                          <th>Assigned From</th>
+                          <th>Assigned To</th>
+                          <th>Status</th>
+                          <th class="text-end">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td>1</td>
+                          <td><span class="eal-entity-id">TRK-1001</span></td>
+                          <td>Volvo FH16</td>
+                          <td>ABC 1234</td>
+                          <td>01 Feb 2024</td>
+                          <td>�</td>
+                          <td>
+                            <span
+                              class="status-badge"
+                              style="
+                                background: #e6f8ef;
+                                color: #0d894f;
+                                border: 1px solid #bbf7d0;
+                              "
+                              >Current</span
+                            >
+                          </td>
+                          <td class="text-end">
+                            <div
+                              class="eal-actions-cell justify-content-end pt-0 pb-0 w-100"
+                            >
+                              <a
+                                href="Truck-details.html"
+                                class="eal-row-btn"
+                                title="View Truck"
+                                ><i class="bi bi-eye"></i
+                              ></a>
+                            </div>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td>2</td>
+                          <td><span class="eal-entity-id">TRK-0887</span></td>
+                          <td>Mercedes Actros</td>
+                          <td>XYZ 5678</td>
+                          <td>10 Mar 2022</td>
+                          <td>31 Jan 2024</td>
+                          <td>
+                            <span
+                              class="status-badge"
+                              style="
+                                background: #f1f5f9;
+                                color: #64748b;
+                                border: 1px solid #e2e8f0;
+                              "
+                              >Ended</span
+                            >
+                          </td>
+                          <td class="text-end">
+                            <div
+                              class="eal-actions-cell justify-content-end pt-0 pb-0 w-100"
+                            >
+                              <a
+                                href="Truck-details.html"
+                                class="eal-row-btn"
+                                title="View Truck"
+                                ><i class="bi bi-eye"></i
+                              ></a>
+                            </div>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td>3</td>
+                          <td><span class="eal-entity-id">TRK-0512</span></td>
+                          <td>Scania R-series</td>
+                          <td>DEF 9012</td>
+                          <td>15 Jan 2022</td>
+                          <td>08 Mar 2022</td>
+                          <td>
+                            <span
+                              class="status-badge"
+                              style="
+                                background: #f1f5f9;
+                                color: #64748b;
+                                border: 1px solid #e2e8f0;
+                              "
+                              >Ended</span
+                            >
+                          </td>
+                          <td class="text-end">
+                            <div
+                              class="eal-actions-cell justify-content-end pt-0 pb-0 w-100"
+                            >
+                              <a
+                                href="Truck-details.html"
+                                class="eal-row-btn"
+                                title="View Truck"
+                                ><i class="bi bi-eye"></i
+                              ></a>
+                            </div>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- ----------- 4. SHIPMENTS PANE ----------- -->
+            <div class="tab-pane fade" id="pane-shipments" role="tabpanel">
+              <div class="cd-details-section mb-4">
+                <div class="cd-details-header">Shipment History</div>
+                <div class="cd-details-body p-0">
+                  <div
+                    class="eal-table-wrap"
+                    style="box-shadow: none; border-radius: 0"
+                  >
+                    <table class="eal-table mb-0">
+                      <thead>
+                        <tr>
+                          <th>Shipment ID</th>
+                          <th>Date</th>
+                          <th>Route</th>
+                          <th>Client</th>
+                          <th>Truck</th>
+                          <th>Cargo Type</th>
+                          <th>Status</th>
+                          <th class="text-end">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td><span class="eal-entity-id">SHP-9021</span></td>
+                          <td>28 Jan 2026</td>
+                          <td>Dubai ? Riyadh</td>
+                          <td>Saudi Cement Co.</td>
+                          <td>TRK-1001</td>
+                          <td>Bulk Cement</td>
+                          <td>
+                            <span
+                              class="status-badge"
+                              style="
+                                background: #eef2ff;
+                                color: #4f46e5;
+                                border: 1px solid #c7d2fe;
+                              "
+                              >In Transit</span
+                            >
+                          </td>
+                          <td class="text-end">
+                            <div
+                              class="eal-actions-cell justify-content-end pt-0 pb-0 w-100"
+                            >
+                              <button class="eal-row-btn" title="View">
+                                <i class="bi bi-eye"></i>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td><span class="eal-entity-id">SHP-8990</span></td>
+                          <td>25 Jan 2026</td>
+                          <td>Jeddah ? Dammam</td>
+                          <td>Al Rajhi Steel</td>
+                          <td>TRK-1001</td>
+                          <td>Steel Bars</td>
+                          <td>
+                            <span
+                              class="status-badge"
+                              style="
+                                background: #f0fdf4;
+                                color: #166534;
+                                border: 1px solid #bbf7d0;
+                              "
+                              >Delivered</span
+                            >
+                          </td>
+                          <td class="text-end">
+                            <div
+                              class="eal-actions-cell justify-content-end pt-0 pb-0 w-100"
+                            >
+                              <button class="eal-row-btn" title="View">
+                                <i class="bi bi-eye"></i>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td><span class="eal-entity-id">SHP-8842</span></td>
+                          <td>18 Jan 2026</td>
+                          <td>Riyadh ? Tabuk</td>
+                          <td>National Foods Ltd.</td>
+                          <td>TRK-1001</td>
+                          <td>Perishable Goods</td>
+                          <td>
+                            <span
+                              class="status-badge"
+                              style="
+                                background: #f0fdf4;
+                                color: #166534;
+                                border: 1px solid #bbf7d0;
+                              "
+                              >Delivered</span
+                            >
+                          </td>
+                          <td class="text-end">
+                            <div
+                              class="eal-actions-cell justify-content-end pt-0 pb-0 w-100"
+                            >
+                              <button class="eal-row-btn" title="View">
+                                <i class="bi bi-eye"></i>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td><span class="eal-entity-id">SHP-8701</span></td>
+                          <td>10 Jan 2026</td>
+                          <td>Dammam ? Riyadh</td>
+                          <td>Gulf Petrochemicals</td>
+                          <td>TRK-1001</td>
+                          <td>Chemical Drums</td>
+                          <td>
+                            <span
+                              class="status-badge"
+                              style="
+                                background: #f0fdf4;
+                                color: #166534;
+                                border: 1px solid #bbf7d0;
+                              "
+                              >Delivered</span
+                            >
+                          </td>
+                          <td class="text-end">
+                            <div
+                              class="eal-actions-cell justify-content-end pt-0 pb-0 w-100"
+                            >
+                              <button class="eal-row-btn" title="View">
+                                <i class="bi bi-eye"></i>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td><span class="eal-entity-id">SHP-8555</span></td>
+                          <td>02 Jan 2026</td>
+                          <td>Riyadh ? Jeddah</td>
+                          <td>Maaden Mining Co.</td>
+                          <td>TRK-1001</td>
+                          <td>Mining Equipment</td>
+                          <td>
+                            <span
+                              class="status-badge"
+                              style="
+                                background: #fef2f2;
+                                color: #ef4444;
+                                border: 1px solid #fca5a5;
+                              "
+                              >Cancelled</span
+                            >
+                          </td>
+                          <td class="text-end">
+                            <div
+                              class="eal-actions-cell justify-content-end pt-0 pb-0 w-100"
+                            >
+                              <button class="eal-row-btn" title="View">
+                                <i class="bi bi-eye"></i>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- ----------- 5. MOVEMENTS LOG PANE ----------- -->
+            <div class="tab-pane fade" id="pane-movements-log" role="tabpanel">
+              <div class="cd-details-section mb-4">
+                <div class="cd-details-header">Truck Movements Log</div>
+                <div class="cd-details-body p-0">
+                  <div
+                    class="eal-table-wrap"
+                    style="box-shadow: none; border-radius: 0"
+                  >
+                    <table class="eal-table mb-0">
+                      <thead>
+                        <tr>
+                          <th>Movement ID</th>
+                          <th>Date &amp; Time</th>
+                          <th>Truck</th>
+                          <th>From Location</th>
+                          <th>To Location</th>
+                          <th>KM Covered</th>
+                          <th>Movement Type</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td><span class="eal-entity-id">MOV-6521</span></td>
+                          <td>28 Jan 2026, 08:15 AM</td>
+                          <td>TRK-1001</td>
+                          <td>Dubai Warehouse</td>
+                          <td>Riyadh Central Hub</td>
+                          <td style="font-weight: 600">1,067 km</td>
+                          <td>
+                            <span
+                              class="status-badge"
+                              style="background: #eef2ff; color: #4f46e5"
+                              >Loaded Trip</span
+                            >
+                          </td>
+                          <td>
+                            <span
+                              class="status-badge"
+                              style="
+                                background: #fffbeb;
+                                color: #b45309;
+                                border: 1px solid #fde68a;
+                              "
+                              >In Progress</span
+                            >
+                          </td>
+                        </tr>
+                        <tr>
+                          <td><span class="eal-entity-id">MOV-6490</span></td>
+                          <td>27 Jan 2026, 06:30 PM</td>
+                          <td>TRK-1001</td>
+                          <td>Jeddah Port</td>
+                          <td>Dubai Warehouse</td>
+                          <td style="font-weight: 600">1,540 km</td>
+                          <td>
+                            <span
+                              class="status-badge"
+                              style="background: #f1f5f9; color: #475569"
+                              >Empty Return</span
+                            >
+                          </td>
+                          <td>
+                            <span
+                              class="status-badge"
+                              style="
+                                background: #f0fdf4;
+                                color: #166534;
+                                border: 1px solid #bbf7d0;
+                              "
+                              >Completed</span
+                            >
+                          </td>
+                        </tr>
+                        <tr>
+                          <td><span class="eal-entity-id">MOV-6445</span></td>
+                          <td>25 Jan 2026, 05:00 AM</td>
+                          <td>TRK-1001</td>
+                          <td>Jeddah Depot</td>
+                          <td>Dammam Port</td>
+                          <td style="font-weight: 600">1,420 km</td>
+                          <td>
+                            <span
+                              class="status-badge"
+                              style="background: #eef2ff; color: #4f46e5"
+                              >Loaded Trip</span
+                            >
+                          </td>
+                          <td>
+                            <span
+                              class="status-badge"
+                              style="
+                                background: #f0fdf4;
+                                color: #166534;
+                                border: 1px solid #bbf7d0;
+                              "
+                              >Completed</span
+                            >
+                          </td>
+                        </tr>
+                        <tr>
+                          <td><span class="eal-entity-id">MOV-6390</span></td>
+                          <td>20 Jan 2026, 09:00 AM</td>
+                          <td>TRK-1001</td>
+                          <td>Riyadh Yard</td>
+                          <td>Jeddah Depot</td>
+                          <td style="font-weight: 600">950 km</td>
+                          <td>
+                            <span
+                              class="status-badge"
+                              style="background: #eef2ff; color: #4f46e5"
+                              >Loaded Trip</span
+                            >
+                          </td>
+                          <td>
+                            <span
+                              class="status-badge"
+                              style="
+                                background: #f0fdf4;
+                                color: #166534;
+                                border: 1px solid #bbf7d0;
+                              "
+                              >Completed</span
+                            >
+                          </td>
+                        </tr>
+                        <tr>
+                          <td><span class="eal-entity-id">MOV-6310</span></td>
+                          <td>15 Jan 2026, 07:45 AM</td>
+                          <td>TRK-1001</td>
+                          <td>Dammam Port</td>
+                          <td>Riyadh Yard</td>
+                          <td style="font-weight: 600">410 km</td>
+                          <td>
+                            <span
+                              class="status-badge"
+                              style="background: #f1f5f9; color: #475569"
+                              >Empty Return</span
+                            >
+                          </td>
+                          <td>
+                            <span
+                              class="status-badge"
+                              style="
+                                background: #f0fdf4;
+                                color: #166534;
+                                border: 1px solid #bbf7d0;
+                              "
+                              >Completed</span
+                            >
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- ----------- 6. WALLET STATEMENT PANE ----------- -->
+            <div class="tab-pane fade" id="pane-wallet" role="tabpanel">
+              <!-- Balance Overview Cards -->
+              <div class="cd-details-section mb-4">
+                <div class="cd-details-header">Wallet Balance Overview</div>
+                <div class="cd-details-body p-4 d-flex gap-4 flex-wrap">
+                  <div
+                    class="flex-grow-1"
+                    style="
+                      background: #f8f9fa;
+                      border-radius: 8px;
+                      padding: 1.5rem;
+                      text-align: center;
+                      border: 1px solid #e2e8f0;
+                      min-width: 200px;
+                    "
+                  >
+                    <div
+                      style="
+                        font-size: 0.9rem;
+                        color: #64748b;
+                        font-weight: 500;
+                        margin-bottom: 0.5rem;
+                      "
+                    >
+                      Current Wallet Balance
+                    </div>
+                    <div
+                      style="
+                        font-size: 1.8rem;
+                        font-weight: 700;
+                        color: #0d894f;
+                      "
+                    >
+                      SAR 1,250.00
+                    </div>
+                  </div>
+                  <div
+                    class="flex-grow-1"
+                    style="
+                      background: #f8f9fa;
+                      border-radius: 8px;
+                      padding: 1.5rem;
+                      text-align: center;
+                      border: 1px solid #e2e8f0;
+                      min-width: 200px;
+                    "
+                  >
+                    <div
+                      style="
+                        font-size: 0.9rem;
+                        color: #64748b;
+                        font-weight: 500;
+                        margin-bottom: 0.5rem;
+                      "
+                    >
+                      Total Advances (YTD)
+                    </div>
+                    <div
+                      style="
+                        font-size: 1.8rem;
+                        font-weight: 700;
+                        color: #1e293b;
+                      "
+                    >
+                      SAR 4,500.00
+                    </div>
+                  </div>
+                  <div
+                    class="flex-grow-1"
+                    style="
+                      background: #fef2f2;
+                      border-radius: 8px;
+                      padding: 1.5rem;
+                      text-align: center;
+                      border: 1px solid #fca5a5;
+                      min-width: 200px;
+                    "
+                  >
+                    <div
+                      style="
+                        font-size: 0.9rem;
+                        color: #ef4444;
+                        font-weight: 500;
+                        margin-bottom: 0.5rem;
+                      "
+                    >
+                      Pending Deductions
+                    </div>
+                    <div
+                      style="
+                        font-size: 1.8rem;
+                        font-weight: 700;
+                        color: #b91c1c;
+                      "
+                    >
+                      SAR 450.00
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <!-- Wallet Transactions Table -->
+              <div class="cd-details-section mb-4">
+                <div class="cd-details-header">Wallet Transactions</div>
+                <div class="cd-details-body p-0">
+                  <div
+                    class="eal-table-wrap"
+                    style="box-shadow: none; border-radius: 0"
+                  >
+                    <table class="eal-table mb-0">
+                      <thead>
+                        <tr>
+                          <th>Date</th>
+                          <th>Reference</th>
+                          <th>Type</th>
+                          <th>Description</th>
+                          <th class="text-end">Debit (SAR)</th>
+                          <th class="text-end">Credit (SAR)</th>
+                          <th class="text-end">Balance (SAR)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td>01 Feb 2026</td>
+                          <td><span class="eal-entity-id">TRN-4421</span></td>
+                          <td>
+                            <span
+                              class="status-badge"
+                              style="background: #eef2ff; color: #4f46e5"
+                              >Trip Advance</span
+                            >
+                          </td>
+                          <td>Cash issued for Dammam trip fuel & tolls</td>
+                          <td class="text-end">�</td>
+                          <td
+                            class="text-end"
+                            style="color: #0d894f; font-weight: 600"
+                          >
+                            +500.00
+                          </td>
+                          <td class="text-end" style="font-weight: 700">
+                            1,250.00
+                          </td>
+                        </tr>
+                        <tr>
+                          <td>28 Jan 2026</td>
+                          <td><span class="eal-entity-id">TRN-4309</span></td>
+                          <td>
+                            <span
+                              class="status-badge"
+                              style="background: #fffbeb; color: #b45309"
+                              >Settlement</span
+                            >
+                          </td>
+                          <td>Receipts submitted for previous trip</td>
+                          <td
+                            class="text-end"
+                            style="color: #b91c1c; font-weight: 600"
+                          >
+                            -320.00
+                          </td>
+                          <td class="text-end">�</td>
+                          <td class="text-end" style="font-weight: 700">
+                            750.00
+                          </td>
+                        </tr>
+                        <tr>
+                          <td>20 Jan 2026</td>
+                          <td><span class="eal-entity-id">TRN-4250</span></td>
+                          <td>
+                            <span
+                              class="status-badge"
+                              style="background: #eef2ff; color: #4f46e5"
+                              >Trip Advance</span
+                            >
+                          </td>
+                          <td>Advance for Riyadh�Tabuk shipment</td>
+                          <td class="text-end">�</td>
+                          <td
+                            class="text-end"
+                            style="color: #0d894f; font-weight: 600"
+                          >
+                            +800.00
+                          </td>
+                          <td class="text-end" style="font-weight: 700">
+                            1,070.00
+                          </td>
+                        </tr>
+                        <tr>
+                          <td>15 Jan 2026</td>
+                          <td><span class="eal-entity-id">TRN-4211</span></td>
+                          <td>
+                            <span
+                              class="status-badge"
+                              style="background: #fef2f2; color: #ef4444"
+                              >Penalty</span
+                            >
+                          </td>
+                          <td>Speeding violation deduction (TRP-8990)</td>
+                          <td
+                            class="text-end"
+                            style="color: #b91c1c; font-weight: 600"
+                          >
+                            -150.00
+                          </td>
+                          <td class="text-end">�</td>
+                          <td class="text-end" style="font-weight: 700">
+                            270.00
+                          </td>
+                        </tr>
+                        <tr>
+                          <td>10 Jan 2026</td>
+                          <td><span class="eal-entity-id">TRN-4180</span></td>
+                          <td>
+                            <span
+                              class="status-badge"
+                              style="background: #fffbeb; color: #b45309"
+                              >Settlement</span
+                            >
+                          </td>
+                          <td>Fuel receipts reconciliation (Dammam�Riyadh)</td>
+                          <td
+                            class="text-end"
+                            style="color: #b91c1c; font-weight: 600"
+                          >
+                            -580.00
+                          </td>
+                          <td class="text-end">�</td>
+                          <td class="text-end" style="font-weight: 700">
+                            420.00
+                          </td>
+                        </tr>
+                        <tr>
+                          <td>05 Jan 2026</td>
+                          <td><span class="eal-entity-id">TRN-4102</span></td>
+                          <td>
+                            <span
+                              class="status-badge"
+                              style="background: #eef2ff; color: #4f46e5"
+                              >Trip Advance</span
+                            >
+                          </td>
+                          <td>Cash advance for new year operations</td>
+                          <td class="text-end">�</td>
+                          <td
+                            class="text-end"
+                            style="color: #0d894f; font-weight: 600"
+                          >
+                            +1,000.00
+                          </td>
+                          <td class="text-end" style="font-weight: 700">
+                            1,000.00
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Custom JS -->
+    <script src="Javascript/main.js"></script>
+
+    <script>
+      // Copy to clipboard functionally for top card
+      document.querySelectorAll(".ch-contact-copy").forEach((btn) => {
+        btn.addEventListener("click", function () {
+          const textToCopy = this.previousElementSibling.innerText;
+          navigator.clipboard.writeText(textToCopy).then(() => {
+            let originalHtml = this.innerHTML;
+            this.innerHTML = '<i class="bi bi-check2"></i>';
+            setTimeout(() => {
+              this.innerHTML = originalHtml;
+            }, 1500);
+          });
+        });
+      });
+    </script>
+  </body>
+</html>

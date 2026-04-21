@@ -1,0 +1,1569 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="iRoad Admin Dashboard - Booking" />
+    <title>Booking | iRoad Admin</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Bootstrap 5 CSS -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+
+    <!-- Bootstrap Icons -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css"
+      rel="stylesheet"
+    />
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="Style/style.css" />
+    <link rel="stylesheet" href="Style/responsive.css" />
+  </head>
+
+  <body>
+    <!-- Mobile Menu Toggle -->
+    <button class="mobile-menu-toggle" aria-label="Toggle menu">
+      <i class="bi bi-list"></i>
+    </button>
+
+    <!-- Sidebar Overlay -->
+    <div class="sidebar-overlay"></div>
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="appSidebar">
+      <!-- Sidebar Header -->
+      <div class="sidebar-header">
+        <a href="index.html" class="sidebar-logo">
+          <span class="logo-icon">i</span>
+          <span class="logo-label">Road</span>
+        </a>
+      </div>
+
+      <!-- Navigation -->
+      <nav class="sidebar-nav">
+        <ul class="nav-menu">
+          <!-- Dashboard -->
+          <li class="nav-item">
+            <a href="index.html" class="nav-link" data-tooltip="Dashboard">
+              <i class="bi bi-speedometer2"></i>
+              <span class="nav-text">Dashboard</span>
+            </a>
+          </li>
+
+          <!-- --- ADMINISTRATION --- -->
+          <li class="nav-section-title">
+            <span>Administration</span>
+          </li>
+
+          <!-- Account Management -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="Account Management">
+              <i class="bi bi-building"></i>
+              <span class="nav-text">Account Management</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Organization-profile.html" class="submenu-link">
+                  <i class="bi bi-card-heading"></i>
+                  <span>Organization Profile</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- User Management -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="User Management">
+              <i class="bi bi-people"></i>
+              <span class="nav-text">User Management</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Users-administration.html" class="submenu-link">
+                  <i class="bi bi-person-gear"></i>
+                  <span>Users Administration</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Roles--permissions.html" class="submenu-link">
+                  <i class="bi bi-person-lock"></i>
+                  <span>Roles & Permissions</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- Subscriptions Management -->
+          <li class="nav-item has-submenu open">
+            <a
+              href="#"
+              class="nav-link"
+              data-tooltip="Subscriptions Management"
+            >
+              <i class="bi bi-credit-card-2-front"></i>
+              <span class="nav-text">Subscriptions Management</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Subscription-plan.html" class="submenu-link">
+                  <i class="bi bi-card-checklist"></i>
+                  <span>Subscription Plan</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Subscription-billing.html" class="submenu-link">
+                  <i class="bi bi-receipt"></i>
+                  <span>Subscription Billing</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- Audit & Security Logs -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="Audit & Security Logs">
+              <i class="bi bi-shield-lock"></i>
+              <span class="nav-text">Audit & Security Logs</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Login--session-events.html" class="submenu-link">
+                  <i class="bi bi-shield-lock"></i>
+                  <span>Login / Session Events</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Role--permission-changes.html" class="submenu-link">
+                  <i class="bi bi-person-lock"></i>
+                  <span>Role / Permission Changes</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Critical-account-changes.html" class="submenu-link">
+                  <i class="bi bi-person-vcard"></i>
+                  <span>Critical Account Changes</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- Support Management -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="Support Management">
+              <i class="bi bi-headset"></i>
+              <span class="nav-text">Support Management</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Support-ticket-master.html" class="submenu-link">
+                  <i class="bi bi-ticket-detailed"></i>
+                  <span>Support Ticket Master</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- --- CRM --- -->
+          <li class="nav-section-title">
+            <span>CRM</span>
+          </li>
+
+          <!-- Clients Management -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="Clients Management">
+              <i class="bi bi-person-badge"></i>
+              <span class="nav-text">Clients Management</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Client-account.html" class="submenu-link">
+                  <i class="bi bi-person-vcard"></i>
+                  <span>Client Account</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Client-account-setting.html" class="submenu-link">
+                  <i class="bi bi-gear"></i>
+                  <span>Client Account Settings</span>
+                </a>
+              </li>
+
+              <li class="submenu-item">
+                <a href="Client-attachments.html" class="submenu-link">
+                  <i class="bi bi-paperclip"></i>
+                  <span>Client Attachments</span>
+                </a>
+              </li>
+
+              <li class="submenu-item">
+                <a href="Client-contacts.html" class="submenu-link">
+                  <i class="bi bi-person-rolodex"></i>
+                  <span>Client Contacts</span>
+                </a>
+              </li>
+
+              <li class="submenu-item">
+                <a href="Client-contract.html" class="submenu-link">
+                  <i class="bi bi-file-earmark-text"></i>
+                  <span>Client Contracts</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Client-contract-settings.html" class="submenu-link">
+                  <i class="bi bi-gear"></i>
+                  <span>Client Contract Settings</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- --- MASTER DATA --- -->
+          <li class="nav-section-title">
+            <span>Master Data</span>
+          </li>
+
+          <!-- Address Management -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="Address Management">
+              <i class="bi bi-map"></i>
+              <span class="nav-text">Address Management</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="addresses.html" class="submenu-link">
+                  <i class="bi bi-card-heading"></i>
+                  <span>Address Master</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- Cargo Management -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="Cargo Management">
+              <i class="bi bi-box-seam"></i>
+              <span class="nav-text">Cargo Management</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Cargo-master.html" class="submenu-link">
+                  <i class="bi bi-boxes"></i>
+                  <span>Cargo Master</span>
+                </a>
+              </li>
+
+              <li class="submenu-item">
+                <a href="Cargo-category-config.html" class="submenu-link">
+                  <i class="bi bi-boxes"></i>
+                  <span>Cargo Category Config</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- Route Management -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="Route Management">
+              <i class="bi bi-signpost-split"></i>
+              <span class="nav-text">Route Management</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Location-master.html" class="submenu-link">
+                  <i class="bi bi-pin-map"></i>
+                  <span>Location Master</span>
+                </a>
+              </li>
+
+              <li class="submenu-item">
+                <a href="Route-master.html" class="submenu-link">
+                  <i class="bi bi-signpost"></i>
+                  <span>Route Master</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- Services Management -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="Services Management">
+              <i class="bi bi-gear"></i>
+              <span class="nav-text">Services Management</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Service-item-master.html" class="submenu-link">
+                  <i class="bi bi-tools"></i>
+                  <span>Service Item Master</span>
+                </a>
+              </li>
+
+              <li class="submenu-item">
+                <a href="Price-list.html" class="submenu-link">
+                  <i class="bi bi-tags"></i>
+                  <span>Price List Master</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- --- OPERATIONS --- -->
+          <li class="nav-section-title">
+            <span>Operations</span>
+          </li>
+
+          <!-- Operations Management -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="Operations Management">
+              <i class="bi bi-activity"></i>
+              <span class="nav-text">Operations Management</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Booking.html" class="submenu-link">
+                  <i class="bi bi-calendar-check"></i>
+                  <span>Booking</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Shipment.html" class="submenu-link">
+                  <i class="bi bi-box-seam"></i>
+                  <span>Shipment</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Shipment-documents.html" class="submenu-link">
+                  <i class="bi bi-paperclip"></i>
+                  <span>Shipment Documents</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Surcharge-sales-transaction.html" class="submenu-link">
+                  <i class="bi bi-receipt"></i>
+
+                  <span>Surcharge Sales Transaction</span>
+                </a>
+              </li>
+
+              <li class="submenu-item">
+                <a href="Digital-pod-transaction.html" class="submenu-link">
+                  <i class="bi bi-file-earmark-check"></i>
+                  <span>Shipment POD Analysis</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Document-handover.html" class="submenu-link">
+                  <i class="bi bi-file-earmark-check"></i>
+                  <span>Document Handover</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Truck-movement-log.html" class="submenu-link">
+                  <i class="bi bi-truck"></i>
+                  <span>Truck Movement Log</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Operation-actions.html" class="submenu-link">
+                  <i class="bi bi-record-circle"></i>
+                  <span>Operation Actions</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- Fleet Management -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="Fleet Management">
+              <i class="bi bi-truck-front"></i>
+              <span class="nav-text">Fleet Management</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Truck-master.html" class="submenu-link">
+                  <i class="bi bi-truck"></i>
+                  <span>Truck Master</span>
+                </a>
+              </li>
+
+              <li class="submenu-item">
+                <a href="Truck-type-master.html" class="submenu-link">
+                  <i class="bi bi-truck-flatbed"></i>
+                  <span>Truck Type Master</span>
+                </a>
+              </li>
+
+              <li class="submenu-item">
+                <a href="Truck-attachments.html" class="submenu-link">
+                  <i class="bi bi-truck"></i>
+                  <span>Truck Attachments</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Truck-settings.html" class="submenu-link">
+                  <i class="bi bi-truck"></i>
+                  <span>Truck Settings</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- Drivers Management -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="Drivers Management">
+              <i class="bi bi-person-vcard"></i>
+              <span class="nav-text">Drivers Management</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Driver-master.html" class="submenu-link">
+                  <i class="bi bi-person-badge"></i>
+                  <span>Driver Master</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Driver-attachments.html" class="submenu-link">
+                  <i class="bi bi-person-badge"></i>
+                  <span>Driver Attachments</span>
+                </a>
+              </li>
+              <li class="submenu-item">
+                <a href="Driver-settings.html" class="submenu-link">
+                  <i class="bi bi-person-badge"></i>
+                  <span>Driver Settings</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- --- FINANCE --- -->
+          <li class="nav-section-title">
+            <span>Finance</span>
+          </li>
+
+          <!-- Sales Invoicing -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="Sales Invoicing">
+              <i class="bi bi-receipt"></i>
+              <span class="nav-text">Sales Invoicing</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Sales-invoice-create.html" class="submenu-link">
+                  <i class="bi bi-receipt"></i>
+                  <span>Sales Invoice Reports</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- Treasury Management -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="Treasury Management">
+              <i class="bi bi-cash-coin"></i>
+              <span class="nav-text">Treasury Management</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Treasury-master.html" class="submenu-link">
+                  <i class="bi bi-card-heading"></i>
+                  <span>Treasury Master</span>
+                </a>
+              </li>
+
+              <li class="submenu-item">
+                <a href="Treasury-transaction-log.html" class="submenu-link">
+                  <i class="bi bi-clock-history"></i>
+                  <span>Treasury Transaction Log</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
+          <!-- --- SYSTEM --- -->
+          <li class="nav-section-title">
+            <span>System</span>
+          </li>
+
+          <!-- Configurations -->
+          <li class="nav-item has-submenu open">
+            <a href="#" class="nav-link" data-tooltip="Configurations">
+              <i class="bi bi-gear-wide-connected"></i>
+              <span class="nav-text">Configurations</span>
+              <i class="bi bi-chevron-right arrow"></i>
+            </a>
+            <ul class="submenu">
+              <li class="submenu-item">
+                <a href="Auto-number-configuration.html" class="submenu-link">
+                  <i class="bi bi-gear"></i>
+                  <span>Auto Number Configuration</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+        </ul>
+      </nav>
+    </aside>
+
+    <!-- Notification Panel -->
+    <div class="notification-panel" id="notificationPanel">
+      <!-- Panel Header -->
+      <div class="notification-header">
+        <h3 class="notification-title">Notifications</h3>
+        <button
+          class="notification-close"
+          id="notificationClose"
+          aria-label="Close"
+        >
+          <i class="bi bi-x-lg"></i>
+        </button>
+      </div>
+
+      <!-- Panel Content -->
+      <div class="notification-content">
+        <!-- Settings Button -->
+        <div class="notification-settings">
+          <button
+            class="settings-btn"
+            id="notificationSettingsBtn"
+            aria-label="Settings"
+          >
+            <i class="bi bi-gear"></i>
+          </button>
+        </div>
+
+        <!-- Preferences Popup -->
+        <div class="preferences-popup" id="preferencesPopup">
+          <h4 class="preferences-title">Preferences</h4>
+          <div class="ce-item">
+            <div class="preference-label">
+              <span>Allow Notifications</span>
+              <i
+                class="bi bi-info-circle"
+                title="Enable or disable all notifications"
+              ></i>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="allowNotifications" checked />
+              <span class="toggle-slider">
+                <span class="toggle-text-on">Enable</span>
+                <span class="toggle-text-off">Disable</span>
+              </span>
+            </label>
+          </div>
+          <div class="preference-item">
+            <label class="preference-checkbox">
+              <input type="checkbox" checked />
+              <span class="checkmark"></span>
+              <span>Record Comments</span>
+            </label>
+          </div>
+          <div class="preference-item">
+            <label class="preference-checkbox">
+              <input type="checkbox" checked />
+              <span class="checkmark"></span>
+              <span>Blueprint Transitions</span>
+            </label>
+          </div>
+          <button class="btn btn-primary preferences-done" id="preferencesDone">
+            Done
+          </button>
+        </div>
+
+        <!-- Empty State -->
+        <div class="notification-empty">
+          <div class="empty-icon">
+            <i class="bi bi-bell"></i>
+            <span class="sparkle sparkle-1">&#10022;</span>
+            <span class="sparkle sparkle-2">&#10023;</span>
+            <span class="sparkle sparkle-3">&#176;</span>
+          </div>
+          <h4 class="empty-title">No notifications</h4>
+          <p class="empty-text">You are yet to receive notifications</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notification Panel Overlay -->
+    <div class="notification-overlay" id="notificationOverlay"></div>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- Top Header -->
+      <header class="top-header">
+        <div class="header-left">
+          <button
+            class="header-toggle-btn"
+            id="sidebarCollapseBtn"
+            title="Toggle Sidebar"
+          >
+            <i class="bi bi-list"></i>
+          </button>
+          <div class="header-search">
+            <i class="bi bi-search"></i>
+            <input
+              type="text"
+              placeholder="Search shipments, clients, addresses..."
+            />
+          </div>
+        </div>
+        <div class="header-datetime">
+          <span class="header-date" id="headerDate"
+            >Tuesday, 28 January 2026</span
+          >
+          <span class="header-time" id="headerTime">3:52 PM</span>
+        </div>
+        <div class="header-right">
+          <button class="header-icon-btn" title="Switch Language">
+            <i class="bi bi-translate"></i>
+          </button>
+          <button class="header-icon-btn" title="Notifications">
+            <i class="bi bi-bell"></i>
+            <span class="badge">3</span>
+          </button>
+          <div class="header-divider"></div>
+          <div class="header-user-wrapper">
+            <div class="header-user" id="headerUserToggle">
+              <div class="header-user-avatar">
+                <img
+                  src="https://ui-avatars.com/api/?name=Mark&background=5051f9&color=fff&size=40"
+                  alt="User"
+                />
+              </div>
+              <div class="header-user-info">
+                <span class="header-user-name">Mark</span>
+                <span class="header-user-role">Administrator</span>
+              </div>
+              <i class="bi bi-chevron-down header-user-chevron"></i>
+            </div>
+
+            <!-- Header User Dropdown -->
+            <div class="header-user-dropdown" id="headerUserDropdown">
+              <div class="header-dropdown-profile">
+                <div class="header-dropdown-avatar">
+                  <img
+                    src="https://ui-avatars.com/api/?name=Mark&background=e8e8e8&color=888&size=80"
+                    alt="User"
+                  />
+                </div>
+                <div class="header-dropdown-name">mark</div>
+                <div class="header-dropdown-email">mark@redsparkinfo.com</div>
+              </div>
+              <div class="header-dropdown-divider"></div>
+              <ul class="header-dropdown-menu">
+                <li>
+                  <a href="#" class="header-dropdown-item">
+                    <i class="bi bi-person"></i>
+                    <span>My Account</span>
+                  </a>
+                </li>
+                <li>
+                  <a href="#" class="header-dropdown-item">
+                    <i class="bi bi-box-arrow-right"></i>
+                    <span>Sign out</span>
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- Page Header -->
+      <div class="page-header">
+        <nav aria-label="breadcrumb">
+          <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+              <a href="index.html">Dashboard</a>
+            </li>
+            <li class="breadcrumb-item">Operations</li>
+            <li class="breadcrumb-item">Operations Management</li>
+            <li class="breadcrumb-item active" aria-current="page">Booking</li>
+          </ol>
+        </nav>
+
+        <div class="page-header-row">
+          <div class="page-header-left">
+            <h1 class="page-title">Booking</h1>
+            <p class="page-subtitle">
+              Create or edit a booking. Link to Sales Order and optionally
+              Purchase Order (External sourcing).
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Booking Form -->
+      <form id="bookingForm">
+        <!-- Section 1: Booking Information (Header) -->
+        <div class="form-card" data-section="1">
+          <div class="form-card-header">
+            <div class="form-card-icon blue">
+              <i class="bi bi-info-circle"></i>
+            </div>
+            <div class="form-card-header-text">
+              <h2 class="form-card-title">Booking Information</h2>
+            </div>
+          </div>
+          <div class="form-card-body">
+            <div class="field-group">
+              <div class="fields-grid cols-3">
+                <div class="field">
+                  <label for="bookingNo" class="form-label"
+                    >Booking No.
+                    <span class="required">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="bookingNo"
+                    name="booking_no"
+                    placeholder="Auto"
+                    readonly
+                  />
+                  <span class="field-hint">Auto-generated, unique</span>
+                </div>
+                <div class="field">
+                  <label for="creationDate" class="form-label"
+                    >Creation Date</label
+                  >
+                  <input
+                    type="date"
+                    class="form-control"
+                    id="creationDate"
+                    name="creation_date"
+                    readonly
+                  />
+                  <span class="field-hint">System date (read-only)</span>
+                </div>
+                <div class="field">
+                  <label for="bookingDate" class="form-label"
+                    >Booking Date
+                    <span class="required">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    class="form-control"
+                    id="bookingDate"
+                    name="booking_date"
+                    required
+                  />
+                </div>
+              </div>
+              <div class="fields-grid cols-3">
+                <div class="field">
+                  <label class="form-label d-block">Is it a scheduled?</label>
+                  <label class="setting-toggle">
+                    <input type="checkbox" id="isScheduled" checked />
+                    <span class="toggle-track"></span>
+                    <span class="toggle-label">Scheduled</span>
+                  </label>
+                </div>
+                <div class="field">
+                  <label for="executionDate" class="form-label"
+                    >Execution Date
+                    <span class="required">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    class="form-control"
+                    id="executionDate"
+                    name="execution_date"
+                    required
+                  />
+                  <span class="field-hint"
+                    >Planned execution date; required before Confirm</span
+                  >
+                </div>
+                <div class="field">
+                  <label for="bookingStatus" class="form-label"
+                    >Booking Status
+                    <span class="required">*</span>
+                  </label>
+                  <select
+                    class="form-select"
+                    id="bookingStatus"
+                    name="booking_status"
+                    required
+                  >
+                    <option value="Draft" selected>Draft</option>
+                    <option value="Confirmed">Confirmed</option>
+                    <option value="Cancelled">Cancelled</option>
+                  </select>
+                </div>
+              </div>
+              <div class="fields-grid cols-2">
+                <div class="field">
+                  <label for="salesReportLookup" class="form-label"
+                    >Sales Report
+                    <span class="required">*</span>
+                  </label>
+                  <select
+                    class="form-select"
+                    id="salesReportLookup"
+                    name="sales_report_lookup"
+                  >
+                    <option value="" selected disabled>
+                      -Select sales report-
+                    </option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="salesReportStatus" class="form-label"
+                    >Sales Report Status
+                    <span class="required">*</span>
+                  </label>
+                  <select
+                    class="form-select"
+                    id="salesReportStatus"
+                    name="sales_report_status"
+                  >
+                    <option value="" selected disabled>
+                      -Select sales report status-
+                    </option>
+                    <option value="pending">Pending</option>
+                    <option value="submitted">Submitted</option>
+                    <option value="approved">Approved</option>
+                  </select>
+                </div>
+              </div>
+              <div class="fields-grid cols-2">
+                <div class="field">
+                  <label for="podType" class="form-label">POD Type</label>
+                  <select class="form-select" id="podType" name="pod_type">
+                    <option value="" selected disabled>
+                      -Select POD type-
+                    </option>
+                    <option value="signature">Signature</option>
+                    <option value="photo">Photo</option>
+                    <option value="digital">Digital</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="podStatus" class="form-label">POD Status</label>
+                  <select class="form-select" id="podStatus" name="pod_status">
+                    <option value="" selected disabled>
+                      -Select POD status-
+                    </option>
+                    <option value="pending">Pending</option>
+                    <option value="received">Received</option>
+                    <option value="verified">Verified</option>
+                  </select>
+                </div>
+              </div>
+              <div style="display: none">
+                <label for="sourcingMode" class="form-label"
+                  >Sourcing Mode</label
+                >
+                <select
+                  class="form-select"
+                  id="sourcingMode"
+                  name="sourcing_mode"
+                  required
+                >
+                  <option value="Internal" selected>Internal</option>
+                  <option value="External">External</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 2: Sales Order Information -->
+        <div class="form-card" data-section="2">
+          <div class="form-card-header">
+            <div class="form-card-icon amber">
+              <i class="bi bi-cart-check"></i>
+            </div>
+            <div class="form-card-header-text">
+              <h2 class="form-card-title">Service Details</h2>
+            </div>
+          </div>
+          <div class="form-card-body">
+            <div class="field-group">
+              <div class="fields-grid cols-3">
+                <div class="field">
+                  <label for="clientAccount" class="form-label"
+                    >Client Account
+                    <span class="required">*</span>
+                  </label>
+                  <select
+                    class="form-select"
+                    id="clientAccount"
+                    name="client_account"
+                    required
+                  >
+                    <option value="" selected disabled>
+                      -Select client account-
+                    </option>
+                    <option value="1">Client Account 1</option>
+                    <option value="2">Client Account 2</option>
+                  </select>
+                  <span class="field-hint"
+                    >Used for filtering Sales Orders</span
+                  >
+                </div>
+                <div class="field">
+                  <label for="salesOrderNo" class="form-label"
+                    >Price List
+                    <span class="required">*</span>
+                  </label>
+                  <select
+                    class="form-select"
+                    id="salesOrderNo"
+                    name="sales_order_no"
+                    required
+                  >
+                    <option value="" selected disabled>
+                      -Select price list-
+                    </option>
+                  </select>
+                  <span class="field-hint">Lookup by client account</span>
+                </div>
+                <div class="field">
+                  <label for="salesOrderLine" class="form-label"
+                    >Service
+                    <span class="required">*</span>
+                  </label>
+                  <select
+                    class="form-select"
+                    id="salesOrderLine"
+                    name="service_lookup"
+                    required
+                  >
+                    <option value="" selected disabled>-Select service-</option>
+                  </select>
+                  <span class="field-hint"
+                    >Lookup from selected price list</span
+                  >
+                </div>
+              </div>
+              <div class="fields-grid cols-3">
+                <div class="field">
+                  <label for="routeDisplay" class="form-label"
+                    >Route
+                    <span class="required">*</span>
+                  </label>
+                  <select
+                    class="form-select"
+                    id="routeDisplay"
+                    name="route_lookup"
+                    required
+                  >
+                    <option value="" selected disabled>-Select route-</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="orderType" class="form-label"
+                    >Order Type
+                    <span class="required">*</span>
+                  </label>
+                  <select
+                    class="form-select"
+                    id="orderType"
+                    name="order_type"
+                    required
+                  >
+                    <option value="" selected disabled>
+                      -Select order type-
+                    </option>
+                    <option value="Credit">Credit</option>
+                    <option value="COD">COD</option>
+                  </select>
+                  <span class="field-hint">List values: COD, Credit</span>
+                </div>
+                <div class="field">
+                  <label for="tripTypeDisplay" class="form-label"
+                    >Trip Type <span class="required">*</span></label
+                  >
+                  <select
+                    class="form-select"
+                    id="tripTypeDisplay"
+                    name="trip_type"
+                    required
+                  >
+                    <option value="" selected disabled>
+                      -Select trip type-
+                    </option>
+                    <option value="Outbound">Outbound</option>
+                    <option value="Inbound">Inbound</option>
+                    <option value="Round">Round</option>
+                  </select>
+                </div>
+              </div>
+              <div class="fields-grid cols-3">
+                <div class="field">
+                  <label for="sellUnitPrice" class="form-label"
+                    >Sell Price
+                    <span class="required">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="sellUnitPrice"
+                    name="sell_price"
+                    readonly
+                    placeholder="Enter or derive sell price"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 5: Address -->
+        <div class="form-card" data-section="5">
+          <div class="form-card-header">
+            <div class="form-card-icon amber">
+              <i class="bi bi-geo-alt"></i>
+            </div>
+            <div class="form-card-header-text">
+              <h2 class="form-card-title">Address</h2>
+            </div>
+          </div>
+          <div class="form-card-body">
+            <div class="field-group">
+              <h3 class="field-group-title">
+                <i class="bi bi-box-arrow-in-down"></i>
+                Loading Address
+              </h3>
+              <div class="eal-table-card">
+                <div class="eal-table-wrap">
+                  <table class="eal-table" id="loadingAddressTable">
+                    <thead>
+                      <tr>
+                        <th>SN</th>
+                        <th>Booking Item</th>
+                        <th>Loading Address</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>1</td>
+                        <td>
+                          <select
+                            class="form-select"
+                            name="loading_booking_item_1"
+                          >
+                            <option value="Outbound" selected>Outbound</option>
+                            <option value="Inbound">Inbound</option>
+                          </select>
+                        </td>
+                        <td>
+                          <select class="form-select" name="loading_address_1">
+                            <option value="" selected disabled>
+                              -Select loading address-
+                            </option>
+                            <option value="LOAD-001">
+                              Warehouse A - Jeddah
+                            </option>
+                            <option value="LOAD-002">
+                              Warehouse B - Riyadh
+                            </option>
+                          </select>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <div class="field-group">
+              <h3 class="field-group-title">
+                <i class="bi bi-box-arrow-up-right"></i>
+                Delivery Address
+              </h3>
+              <div class="eal-table-card">
+                <div class="eal-table-wrap">
+                  <table class="eal-table" id="deliveryAddressTable">
+                    <thead>
+                      <tr>
+                        <th>SN</th>
+                        <th>Booking Item</th>
+                        <th>Delivery Address</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>1</td>
+                        <td>
+                          <select
+                            class="form-select"
+                            name="delivery_booking_item_1"
+                          >
+                            <option value="Outbound" selected>Outbound</option>
+                            <option value="Inbound">Inbound</option>
+                          </select>
+                        </td>
+                        <td>
+                          <select class="form-select" name="delivery_address_1">
+                            <option value="" selected disabled>
+                              -Select delivery address-
+                            </option>
+                            <option value="DEL-001">
+                              Client Site - Dammam
+                            </option>
+                            <option value="DEL-002">Retail Site - Yanbu</option>
+                          </select>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 6: Booking Lines -->
+        <div class="form-card" data-section="6">
+          <div class="form-card-header">
+            <div class="form-card-icon blue">
+              <i class="bi bi-list-ul"></i>
+            </div>
+            <div class="form-card-header-text">
+              <h2 class="form-card-title">Booking Lines</h2>
+            </div>
+          </div>
+          <div class="form-card-body">
+            <div class="eal-table-card">
+              <div class="eal-table-wrap">
+                <table
+                  class="eal-table"
+                  id="bookingLinesTable"
+                  data-static-view="true"
+                >
+                  <thead>
+                    <tr>
+                      <th>SN</th>
+                      <th>Code</th>
+                      <th>Type</th>
+                      <th>Status</th>
+                      <th>Route</th>
+                      <th>Truck</th>
+                      <th>Driver</th>
+                      <th class="cod-col">COD Amount</th>
+                      <th>POD Doc Count</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>1</td>
+                      <td>BOOKING-1</td>
+                      <td>Outbound</td>
+                      <td>
+                        <span class="status-badge status-active">Planned</span>
+                      </td>
+                      <td>
+                        <select class="form-select form-select-sm">
+                          <option value="A-B" selected>A-B</option>
+                          <option value="B-A">B-A</option>
+                        </select>
+                      </td>
+                      <td>
+                        <select class="form-select form-select-sm">
+                          <option value="" selected disabled>
+                            -Select truck-
+                          </option>
+                          <option selected>Truck 1</option>
+                          <option>Truck 2</option>
+                        </select>
+                      </td>
+                      <td>
+                        <select class="form-select form-select-sm">
+                          <option value="" selected disabled>
+                            -Select driver-
+                          </option>
+                          <option selected>Driver 1</option>
+                          <option>Driver 2</option>
+                        </select>
+                      </td>
+                      <td class="cod-col">
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          class="form-control form-control-sm booking-line-cod-input"
+                          value="2500"
+                        />
+                      </td>
+                      <td>
+                        <input
+                          type="number"
+                          min="0"
+                          class="form-control form-control-sm"
+                          value="2"
+                        />
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>2</td>
+                      <td>BOOKING-2</td>
+                      <td>Inbound</td>
+                      <td>
+                        <span class="status-badge status-active">Planned</span>
+                      </td>
+                      <td>
+                        <select class="form-select form-select-sm">
+                          <option value="A-B">A-B</option>
+                          <option value="B-A" selected>B-A</option>
+                        </select>
+                      </td>
+                      <td>
+                        <select class="form-select form-select-sm">
+                          <option value="" selected disabled>
+                            -Select truck-
+                          </option>
+                          <option>Truck 1</option>
+                          <option selected>Truck 2</option>
+                        </select>
+                      </td>
+                      <td>
+                        <select class="form-select form-select-sm">
+                          <option value="" selected disabled>
+                            -Select driver-
+                          </option>
+                          <option>Driver 1</option>
+                          <option selected>Driver 2</option>
+                        </select>
+                      </td>
+                      <td class="cod-col">
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          class="form-control form-control-sm booking-line-cod-input"
+                          value="1800"
+                        />
+                      </td>
+                      <td>
+                        <input
+                          type="number"
+                          min="0"
+                          class="form-control form-control-sm"
+                          value="1"
+                        />
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div
+              id="codValidationMsg"
+              class="alert alert-warning mt-3 py-2 px-3 d-none"
+              role="alert"
+            ></div>
+          </div>
+        </div>
+
+        <!-- Section 9: Cargo -->
+        <div class="form-card" data-section="9">
+          <div class="form-card-header">
+            <div class="form-card-icon red">
+              <i class="bi bi-box-seam"></i>
+            </div>
+            <div class="form-card-header-text">
+              <h2 class="form-card-title">Cargo</h2>
+            </div>
+          </div>
+          <div class="form-card-body">
+            <div class="eal-table-card">
+              <div class="eal-table-wrap">
+                <table class="eal-table" id="cargoTable">
+                  <thead>
+                    <tr>
+                      <th>SN</th>
+                      <th>Booking Item</th>
+                      <th>Cargo</th>
+                      <th>Weight (Ton)</th>
+                      <th>Unit</th>
+                      <th>QTY</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>1</td>
+                      <td>
+                        <select class="form-select">
+                          <option value="Outbound" selected>Outbound</option>
+                          <option value="Inbound">Inbound</option>
+                        </select>
+                      </td>
+                      <td>
+                        <select class="form-select">
+                          <option value="" selected disabled>
+                            -Select cargo-
+                          </option>
+                          <option value="CARGO-001">
+                            CARGO-001 - Steel Coil
+                          </option>
+                          <option value="CARGO-002">
+                            CARGO-002 - Cement Bag
+                          </option>
+                        </select>
+                      </td>
+                      <td>
+                        <input
+                          type="number"
+                          class="form-control cargo-weight-input"
+                          min="0"
+                          step="0.01"
+                          value="0"
+                        />
+                      </td>
+                      <td>
+                        <input type="text" class="form-control" value="PCS" />
+                      </td>
+                      <td>
+                        <input
+                          type="number"
+                          class="form-control cargo-qty-input"
+                          min="0"
+                          value="0"
+                        />
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div class="fields-grid cols-2 mt-3">
+              <div class="field">
+                <label for="totalCargoQty" class="form-label"
+                  >Total Cargo Unit QTY</label
+                >
+                <input
+                  type="number"
+                  id="totalCargoQty"
+                  class="form-control"
+                  value="0"
+                  readonly
+                />
+              </div>
+              <div class="field">
+                <label for="totalCargoWeight" class="form-label"
+                  >Total Cargo Weight</label
+                >
+                <input
+                  type="number"
+                  id="totalCargoWeight"
+                  class="form-control"
+                  value="0"
+                  readonly
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 10: Additional Information -->
+        <div class="form-card" data-section="10">
+          <div class="form-card-header">
+            <div class="form-card-icon amber">
+              <i class="bi bi-journal-text"></i>
+            </div>
+            <div class="form-card-header-text">
+              <h2 class="form-card-title">Additional Information</h2>
+            </div>
+          </div>
+          <div class="form-card-body">
+            <div class="field-group">
+              <div class="fields-grid cols-2">
+                <div class="field">
+                  <label for="containerNo" class="form-label"
+                    >Container No</label
+                  >
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="containerNo"
+                    name="container_no"
+                    placeholder="Enter container number"
+                  />
+                </div>
+                <div class="field">
+                  <label for="bookingAttachment" class="form-label"
+                    >Attachment</label
+                  >
+                  <input
+                    type="file"
+                    class="form-control"
+                    id="bookingAttachment"
+                    name="booking_attachment"
+                  />
+                </div>
+              </div>
+              <div class="fields-grid cols-1">
+                <div class="field">
+                  <label for="bookingInstructions" class="form-label"
+                    >Booking Instructions</label
+                  >
+                  <textarea
+                    id="bookingInstructions"
+                    class="form-control"
+                    name="booking_instructions"
+                    rows="4"
+                    placeholder="Add special instructions for operations team..."
+                  ></textarea>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Form Actions -->
+        <div class="form-actions-bar">
+          <div class="form-actions-left">
+            <button type="reset" class="btn btn-outline-secondary">
+              <i class="bi bi-arrow-counterclockwise"></i>
+              Reset Form
+            </button>
+          </div>
+          <div class="form-actions-right">
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-check-circle"></i>
+              Save Booking
+            </button>
+          </div>
+        </div>
+      </form>
+    </main>
+
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Custom JS -->
+    <script src="Javascript/main.js"></script>
+    <script>
+      (function () {
+        var section = document.getElementById("purchaseOrderSection");
+        var sourcing = document.getElementById("sourcingMode");
+        var vendorAccount = document.getElementById("vendorAccount");
+        var purchaseOrderNo = document.getElementById("purchaseOrderNo");
+        var purchaseOrderLine = document.getElementById("purchaseOrderLine");
+        var requiredExternalFields = [
+          vendorAccount,
+          purchaseOrderNo,
+          purchaseOrderLine,
+        ];
+        if (section) {
+          section.setAttribute("aria-hidden", "false");
+        }
+        requiredExternalFields.forEach(function (field) {
+          if (!field) return;
+          field.setAttribute("required", "required");
+        });
+
+        var bookingDate = document.getElementById("bookingDate");
+        if (bookingDate && !bookingDate.value) {
+          bookingDate.value = new Date().toISOString().slice(0, 10);
+        }
+        var creationDate = document.getElementById("creationDate");
+        if (creationDate && !creationDate.value) {
+          creationDate.value = new Date().toISOString().slice(0, 10);
+        }
+
+        var codValidationMsg = document.getElementById("codValidationMsg");
+        if (codValidationMsg) {
+          codValidationMsg.classList.add("d-none");
+          codValidationMsg.textContent = "";
+        }
+
+        function setupStopTable(modeId, tableId, addButtonId) {
+          var modeField = document.getElementById(modeId);
+          var tableBody = document.querySelector("#" + tableId + " tbody");
+          var addButton = document.getElementById(addButtonId);
+          if (!tableBody || !addButton) return;
+
+          function getNextSequence() {
+            var lastSequenceInput = tableBody.querySelector(
+              "tr:last-child input[type='number']",
+            );
+            var current = lastSequenceInput
+              ? Number(lastSequenceInput.value)
+              : 0;
+            return current + 1;
+          }
+
+          addButton.addEventListener("click", function () {
+            var row = document.createElement("tr");
+            row.innerHTML =
+              "<td>1</td>" +
+              "<td><input type='number' class='form-control' min='1' value='" +
+              getNextSequence() +
+              "' /></td>" +
+              "<td><input type='text' class='form-control' placeholder='Enter address' /></td>" +
+              "<td><button type='button' class='btn btn-outline-danger btn-sm'><i class='bi bi-trash'></i></button></td>";
+            tableBody.appendChild(row);
+          });
+
+          tableBody.addEventListener("click", function (event) {
+            var removeBtn = event.target.closest("button");
+            if (!removeBtn) return;
+            if (tableBody.querySelectorAll("tr").length === 1) return;
+            removeBtn.closest("tr").remove();
+          });
+        }
+
+        setupStopTable("pickupMode", "pickupTable", "addPickupRow");
+        setupStopTable("deliveryMode", "deliveryTable", "addDeliveryRow");
+
+        var cargoTableBody = document.querySelector("#cargoTable tbody");
+        var totalCargoQty = document.getElementById("totalCargoQty");
+        var totalCargoWeight = document.getElementById("totalCargoWeight");
+
+        function updateCargoTotals() {
+          if (!cargoTableBody || !totalCargoQty || !totalCargoWeight) return;
+          var rows = cargoTableBody.querySelectorAll("tr");
+          var grandQty = 0;
+          var grandWeight = 0;
+
+          rows.forEach(function (row) {
+            var qtyInput = row.querySelector(".cargo-qty-input");
+            var wtInput = row.querySelector(".cargo-weight-input");
+            var qty = qtyInput ? Number(qtyInput.value || "0") : 0;
+            var wt = wtInput ? Number(wtInput.value || "0") : 0;
+            grandQty += qty;
+            grandWeight += wt;
+          });
+
+          totalCargoQty.value = grandQty;
+          totalCargoWeight.value = grandWeight.toFixed(2);
+        }
+
+        if (cargoTableBody) {
+          cargoTableBody.addEventListener("input", updateCargoTotals);
+          updateCargoTotals();
+        }
+      })();
+    </script>
+  </body>
+</html>
