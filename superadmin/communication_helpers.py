@@ -8,6 +8,7 @@ not the CP Communication → Gateway row, so ops use one production SMTP config.
 import logging
 import smtplib
 import json
+from decouple import config
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from pathlib import Path
@@ -25,10 +26,33 @@ from django.utils.html import strip_tags
 logger = logging.getLogger(__name__)
 
 
+def _get_base_url():
+    """
+    Attempt to resolve the base URL of the site.
+    Prefer 'SITE_URL' setting, then 'TENANT_PORTAL_LOGIN_URL' (stripped),
+    with a final fallback to localhost.
+    """
+    site_url = getattr(settings, 'SITE_URL', config('SITE_URL', default='')).strip()
+    if site_url:
+        return site_url.rstrip('/')
+
+    # Check for another common setting
+    portal_url = getattr(settings, 'TENANT_PORTAL_LOGIN_URL', '').strip()
+    if portal_url:
+        # If it's a full URL, use its origin
+        if '://' in portal_url:
+            from urllib.parse import urlparse
+            p = urlparse(portal_url)
+            return f"{p.scheme}://{p.netloc}"
+
+    return 'http://127.0.0.1:8000'
+
+
 def _build_branding_context():
     """
     Resolve branding values from Legal Identity for email wrappers.
     Falls back to default IR/iRoad when no logo/name configured.
+    Ensures brand_logo_url is absolute for external email clients.
     """
     brand_name = 'iRoad'
     brand_logo_url = ''
@@ -51,6 +75,10 @@ def _build_branding_context():
         # Keep email delivery resilient even if branding lookup fails.
         brand_name = 'iRoad'
         brand_logo_url = ''
+
+    # Make logo URL absolute if it is relative
+    if brand_logo_url and not brand_logo_url.startswith('http'):
+        brand_logo_url = f"{_get_base_url()}{brand_logo_url}"
 
     letters = ''.join(ch for ch in brand_name if ch.isalnum()).upper()
     brand_initials = (letters[:2] if letters else 'IR')
