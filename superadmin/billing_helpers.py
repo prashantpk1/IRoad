@@ -888,17 +888,32 @@ def send_invoice_paid_notification(invoice, use_async_tasks=False):
     if not recipient:
         return False
 
+    amount_display = f'{invoice.grand_total} {invoice.currency_id}'.strip()
     context = {
         'invoice_number': invoice.invoice_number,
         'invoice_amount': str(invoice.grand_total),
+        'invoice_amount_display': amount_display,
         'currency_code': invoice.currency_id,
         'company_name': invoice.customer_name,
         'tenant_name': invoice.customer_name,
         'issue_date': invoice.issue_date.strftime('%Y-%m-%d') if invoice.issue_date else '',
+        'due_date': invoice.due_date.strftime('%Y-%m-%d') if invoice.due_date else '',
+        'invoice_status': invoice.status or 'Issued',
+        'invoice_sub_total': str(invoice.sub_total),
+        'invoice_discount_amount': str(invoice.discount_amount),
+        'invoice_tax_amount': str(invoice.tax_amount),
+        'invoice_grand_total': str(invoice.grand_total),
+        'invoice_taxable_amount': str(invoice.taxable_amount),
+        'customer_tax_number': invoice.customer_tax_number or '',
+        'customer_address': invoice.customer_address or '',
     }
 
     try:
-        from .communication_helpers import dispatch_event_notification
+        from .communication_helpers import (
+            dispatch_event_notification,
+            ensure_default_notification_templates,
+            send_named_notification_email,
+        )
         from .models import LegalIdentity
         legal = LegalIdentity.objects.filter(
             identity_id='GLOBAL-LEGAL-IDENTITY',
@@ -936,6 +951,31 @@ def send_invoice_paid_notification(invoice, use_async_tasks=False):
             'style="max-height:60px;width:auto;">'
             if absolute_logo else ''
         )
+        context['line_items'] = list(
+            invoice.line_items.values(
+                'item_description',
+                'quantity',
+                'unit_price',
+                'tax_rate',
+                'tax_amount',
+                'line_total',
+            )
+        )
+        # Ensure default invoice template exists before direct named dispatch.
+        ensure_default_notification_templates()
+
+        # Prefer dedicated invoice template with stable design and variables.
+        sent = send_named_notification_email(
+            'INVOICE_PAID',
+            recipient_email=recipient,
+            context_dict=context,
+            language='en',
+            default_subject=f'Invoice {invoice.invoice_number} issued',
+            trigger_source='TemplateName: INVOICE_PAID',
+        )
+        if sent:
+            return True
+
         sent = dispatch_event_notification(
             'Invoice_Paid',
             recipient_email=recipient,

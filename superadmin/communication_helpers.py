@@ -697,6 +697,71 @@ DEFAULT_NOTIFICATION_EMAIL_TEMPLATES = [
         ),
     },
     {
+        'template_name': 'INVOICE_PAID',
+        'category': 'Transactional',
+        'subject_en': 'Invoice {{ invoice_number }} issued',
+        'subject_ar': 'تم إصدار الفاتورة {{ invoice_number }}',
+        'body_en': _wrap_email_body(
+            '<h2>Invoice Issued Successfully 🧾</h2>'
+            '<p>Hello {{ tenant_name|default:company_name|default:"Customer" }},</p>'
+            '<p>Your invoice has been generated and is now available in your account.</p>'
+            '<div style="background:linear-gradient(135deg,#f8fafc,#f1f5f9);'
+            'padding:20px 22px;border-radius:12px;border:1px solid #e2e8f0;margin:20px 0;">'
+            '<table style="width:100%;border-collapse:collapse;font-size:14px;color:#334155;">'
+            '<tr><td style="padding:8px 0;font-weight:700;color:#6366f1;width:160px;">Invoice No:</td>'
+            '<td style="padding:8px 0;">{{ invoice_number }}</td></tr>'
+            '<tr><td style="padding:8px 0;border-top:1px solid #e2e8f0;font-weight:700;color:#6366f1;">'
+            'Issue Date:</td><td style="padding:8px 0;border-top:1px solid #e2e8f0;">{{ issue_date }}</td></tr>'
+            '<tr><td style="padding:8px 0;border-top:1px solid #e2e8f0;font-weight:700;color:#6366f1;">'
+            'Due Date:</td><td style="padding:8px 0;border-top:1px solid #e2e8f0;">{{ due_date }}</td></tr>'
+            '<tr><td style="padding:8px 0;border-top:1px solid #e2e8f0;font-weight:700;color:#6366f1;">'
+            'Currency:</td><td style="padding:8px 0;border-top:1px solid #e2e8f0;">{{ currency_code }}</td></tr>'
+            '<tr><td style="padding:8px 0;border-top:1px solid #e2e8f0;font-weight:700;color:#6366f1;">'
+            'Status:</td><td style="padding:8px 0;border-top:1px solid #e2e8f0;">{{ invoice_status|default:"Issued" }}</td></tr>'
+            '</table>'
+            '</div>'
+            '<div style="background:#eef2ff;border:1px solid #c7d2fe;border-radius:12px;padding:16px 18px;margin:0 0 20px;">'
+            '<p style="margin:0;font-size:14px;color:#4338ca;"><strong>Total Amount:</strong> '
+            '{{ invoice_amount_display|default:invoice_amount }}'
+            '</p>'
+            '</div>'
+            '<p style="font-size:13px;color:#64748b;">'
+            'For detailed line items, open the invoice in your iRoad portal.'
+            '</p>'
+        ),
+        'body_ar': _wrap_email_body(
+            '<div dir="rtl" style="text-align:right;">'
+            '<h2>تم إصدار الفاتورة بنجاح 🧾</h2>'
+            '<p>مرحباً {{ tenant_name|default:company_name|default:"العميل" }}،</p>'
+            '<p>تم إنشاء فاتورتك وهي الآن متاحة في حسابك.</p>'
+            '<div style="background:linear-gradient(135deg,#f8fafc,#f1f5f9);'
+            'padding:20px 22px;border-radius:12px;border:1px solid #e2e8f0;margin:20px 0;">'
+            '<table style="width:100%;border-collapse:collapse;font-size:14px;color:#334155;">'
+            '<tr><td style="padding:8px 0;font-weight:700;color:#6366f1;width:160px;">رقم الفاتورة:</td>'
+            '<td style="padding:8px 0;">{{ invoice_number }}</td></tr>'
+            '<tr><td style="padding:8px 0;border-top:1px solid #e2e8f0;font-weight:700;color:#6366f1;">'
+            'تاريخ الإصدار:</td><td style="padding:8px 0;border-top:1px solid #e2e8f0;">{{ issue_date }}</td></tr>'
+            '<tr><td style="padding:8px 0;border-top:1px solid #e2e8f0;font-weight:700;color:#6366f1;">'
+            'تاريخ الاستحقاق:</td><td style="padding:8px 0;border-top:1px solid #e2e8f0;">{{ due_date }}</td></tr>'
+            '<tr><td style="padding:8px 0;border-top:1px solid #e2e8f0;font-weight:700;color:#6366f1;">'
+            'العملة:</td><td style="padding:8px 0;border-top:1px solid #e2e8f0;">{{ currency_code }}</td></tr>'
+            '<tr><td style="padding:8px 0;border-top:1px solid #e2e8f0;font-weight:700;color:#6366f1;">'
+            'الحالة:</td><td style="padding:8px 0;border-top:1px solid #e2e8f0;">{{ invoice_status|default:"Issued" }}</td></tr>'
+            '</table>'
+            '</div>'
+            '<div style="background:#eef2ff;border:1px solid #c7d2fe;border-radius:12px;padding:16px 18px;margin:0 0 20px;">'
+            '<p style="margin:0;font-size:14px;color:#4338ca;"><strong>إجمالي المبلغ:</strong> '
+            '{{ invoice_amount_display|default:invoice_amount }}'
+            '</p>'
+            '</div>'
+            '<p style="font-size:13px;color:#64748b;">'
+            'للاطلاع على تفاصيل البنود، افتح الفاتورة من بوابة iRoad.'
+            '</p>'
+            '</div>',
+            use_rtl=True
+        ),
+    },
+    {
         'template_name': 'TESTING_EMAIL',
         'category': 'Transactional',
         'subject_en': 'iRoad — Test Email Notification',

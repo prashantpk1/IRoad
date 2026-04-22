@@ -232,7 +232,7 @@
 </button>
                         {% endif %}
                       </form>
-                      <form method="post" action="{% url 'gateway_delete' gateway.gateway_id %}" style="display: inline" onsubmit="return confirm('Remove this gateway from UI? Database record will stay.');">
+                      <form method="post" action="{% url 'gateway_delete' gateway.gateway_id %}" style="display: inline" onsubmit="return confirm('Remove this gateway?');">
                         {% csrf_token %}
                         <button type="submit" class="eal-row-btn icon-only-btn" title="Delete (Soft)">
 <i class="bi bi-trash"></i>

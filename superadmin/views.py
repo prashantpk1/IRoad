@@ -2429,9 +2429,9 @@ class AdminUserDeleteView(LoginRequiredMixin, View):
 
             revoke_all_sessions_for_admin(target_user.id)
             _revoke_user_sessions(target_user)
-            messages.success(request, 'Admin user removed from UI successfully.')
+            messages.success(request, 'Admin user removed successfully.')
         else:
-            messages.info(request, 'Admin user is already removed from UI.')
+            messages.info(request, 'Admin user is already removed.')
 
         return redirect(reverse('admin_user_list'))
 
@@ -3792,12 +3792,12 @@ class TaxCodeDeleteView(LoginRequiredMixin, View):
             return redirect(reverse('tax_code_list'))
         tax_code = get_object_or_404(TaxCode, pk=pk)
         if tax_code.is_deleted:
-            messages.info(request, 'Tax code is already removed from UI.')
+            messages.info(request, 'Tax code is already removed.')
             return redirect(reverse('tax_code_list'))
         tax_code.is_deleted = True
         tax_code.updated_by = request.user
         tax_code.save(update_fields=['is_deleted', 'updated_by'])
-        messages.success(request, 'Tax code removed from UI successfully.')
+        messages.success(request, 'Tax code removed successfully.')
         return redirect(reverse('tax_code_list'))
 
     def get(self, request, pk):
@@ -4227,11 +4227,11 @@ class PlanDeleteView(LoginRequiredMixin, View):
             return redirect(reverse('plan_list'))
         plan = get_object_or_404(SubscriptionPlan, pk=pk)
         if plan.is_deleted:
-            messages.info(request, 'Plan is already removed from UI.')
+            messages.info(request, 'Plan is already removed.')
             return redirect(reverse('plan_list'))
         plan.is_deleted = True
         plan.save(update_fields=['is_deleted'])
-        messages.success(request, 'Plan removed from UI successfully.')
+        messages.success(request, 'Plan removed successfully.')
         return redirect(reverse('plan_list'))
 
     def get(self, request, pk):
@@ -4395,11 +4395,11 @@ class AddOnsPolicyDeleteView(LoginRequiredMixin, View):
             return redirect(reverse('addons_policy_list'))
         policy = get_object_or_404(AddOnsPricingPolicy, pk=pk)
         if policy.is_deleted:
-            messages.info(request, 'Policy is already removed from UI.')
+            messages.info(request, 'Policy is already removed.')
             return redirect(reverse('addons_policy_list'))
         policy.is_deleted = True
         policy.save(update_fields=['is_deleted'])
-        messages.success(request, 'Policy removed from UI successfully.')
+        messages.success(request, 'Policy removed successfully.')
         return redirect(reverse('addons_policy_list'))
 
     def get(self, request, pk):
@@ -4593,11 +4593,11 @@ class PromoCodeDeleteView(LoginRequiredMixin, View):
             return redirect(reverse('promo_code_list'))
         promo = get_object_or_404(PromoCode, pk=pk)
         if promo.is_deleted:
-            messages.info(request, 'Promo code is already removed from UI.')
+            messages.info(request, 'Promo code is already removed.')
             return redirect(reverse('promo_code_list'))
         promo.is_deleted = True
         promo.save(update_fields=['is_deleted'])
-        messages.success(request, 'Promo code removed from UI successfully.')
+        messages.success(request, 'Promo code removed successfully.')
         return redirect(reverse('promo_code_list'))
 
     def get(self, request, pk):
@@ -4928,11 +4928,11 @@ class PaymentGatewayDeleteView(LoginRequiredMixin, View):
             return redirect(reverse('gateway_list'))
         gateway = get_object_or_404(PaymentGateway, pk=pk)
         if gateway.is_deleted:
-            messages.info(request, 'Gateway is already removed from UI.')
+            messages.info(request, 'Gateway is already removed.')
             return redirect(reverse('gateway_list'))
         gateway.is_deleted = True
         gateway.save(update_fields=['is_deleted'])
-        messages.success(request, 'Gateway removed from UI successfully.')
+        messages.success(request, 'Gateway removed successfully.')
         return redirect(reverse('gateway_list'))
 
     def get(self, request, pk):
@@ -5248,12 +5248,12 @@ class CommGatewayDeleteView(LoginRequiredMixin, View):
             return redirect(reverse('comm_gateway_list'))
         gateway = get_object_or_404(CommGateway, pk=pk)
         if gateway.is_deleted:
-            messages.info(request, 'Gateway is already removed from UI.')
+            messages.info(request, 'Gateway is already removed.')
             return redirect(reverse('comm_gateway_list'))
         gateway.is_deleted = True
         gateway.updated_by = request.user
         gateway.save(update_fields=['is_deleted', 'updated_by'])
-        messages.success(request, 'Gateway removed from UI successfully.')
+        messages.success(request, 'Gateway removed successfully.')
         return redirect(reverse('comm_gateway_list'))
 
     def get(self, request, pk):
@@ -5558,11 +5558,11 @@ class NotificationTemplateDeleteView(LoginRequiredMixin, View):
             return redirect(reverse('notif_template_list'))
         template_obj = get_object_or_404(NotificationTemplate, pk=pk)
         if template_obj.is_deleted:
-            messages.info(request, 'Template is already removed from UI.')
+            messages.info(request, 'Template is already removed.')
             return redirect(reverse('notif_template_list'))
         template_obj.is_deleted = True
         template_obj.save(update_fields=['is_deleted'])
-        messages.success(request, 'Template removed from UI successfully.')
+        messages.success(request, 'Template removed from successfully.')
         return redirect(reverse('notif_template_list'))
 
     def get(self, request, pk):
@@ -6735,11 +6735,11 @@ class TenantDeleteView(LoginRequiredMixin, View):
             return redirect(reverse('tenant_list'))
         tenant = get_object_or_404(TenantProfile, pk=pk)
         if tenant.is_deleted:
-            messages.info(request, 'Tenant is already removed from UI.')
+            messages.info(request, 'Tenant is already removed.')
             return redirect(reverse('tenant_list'))
         tenant.is_deleted = True
         tenant.save(update_fields=['is_deleted'])
-        messages.success(request, 'Tenant removed from UI successfully.')
+        messages.success(request, 'Tenant removed successfully.')
         return redirect(reverse('tenant_list'))
 
     def get(self, request, pk):

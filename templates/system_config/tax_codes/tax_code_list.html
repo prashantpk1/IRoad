@@ -249,7 +249,7 @@
                         <i class="bi bi-arrow-repeat"></i>
                       </button>
                     </form>
-                    <form method="post" action="{% url 'tax_code_delete' tax.tax_code %}" style="display:inline" onsubmit="return confirm('Remove this tax code from UI? Database record will stay.');">
+                    <form method="post" action="{% url 'tax_code_delete' tax.tax_code %}" style="display:inline" onsubmit="return confirm('Remove this tax code?');">
                       {% csrf_token %}
                       <button type="submit" class="eal-row-btn" title="Delete (Soft)">
                         <i class="bi bi-trash"></i>

@@ -242,7 +242,7 @@
                     <a href="{% url 'addons_policy_edit' p.policy_id %}" class="eal-row-btn" title="{% if p.is_active %}Deactivate{% else %}Activate{% endif %}">
                       <i class="bi bi-arrow-repeat"></i>
                     </a>
-                    <form method="post" action="{% url 'addons_policy_delete' p.policy_id %}" style="display:inline" onsubmit="return confirm('Remove this policy from UI? Database record will stay.');">
+                    <form method="post" action="{% url 'addons_policy_delete' p.policy_id %}" style="display:inline" onsubmit="return confirm('Remove this policy?');">
                       {% csrf_token %}
                       <button type="submit" class="eal-row-btn" title="Delete (Soft)">
                         <i class="bi bi-trash"></i>
