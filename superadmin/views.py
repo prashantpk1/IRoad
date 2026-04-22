@@ -35,6 +35,7 @@ from decimal import Decimal
 import json
 import logging
 import os
+import re
 import secrets
 import uuid
 import smtplib
@@ -187,9 +188,34 @@ def _client_ip(request):
     return request.META.get('REMOTE_ADDR')
 
 
+def _resolve_tenant_by_email(raw_email):
+    """Resolve tenant login target from email with duplicate-safety."""
+    email = (raw_email or '').strip()
+    if not email:
+        return None, 'not_found'
+
+    qs = TenantProfile.objects.filter(primary_email__iexact=email)
+    if not qs.exists():
+        return None, 'not_found'
+
+    active_qs = qs.filter(account_status='Active')
+    active_count = active_qs.count()
+    if active_count == 1:
+        return active_qs.first(), None
+    if active_count > 1:
+        return None, 'ambiguous_active'
+
+    if qs.count() == 1:
+        return qs.first(), None
+    return None, 'ambiguous_inactive'
+
+
 ADMIN_LOGIN_OTP_SESSION_KEY = 'admin_login_otp'
 ADMIN_LOGIN_OTP_TTL_SECONDS = 300
 ADMIN_LOGIN_OTP_MAX_ATTEMPTS = 5
+TENANT_LOGIN_OTP_SESSION_KEY = 'tenant_login_otp'
+TENANT_LOGIN_OTP_TTL_SECONDS = 300
+TENANT_LOGIN_OTP_MAX_ATTEMPTS = 5
 
 
 def _issue_admin_login_otp(request, user):
@@ -246,6 +272,62 @@ def _issue_admin_login_otp(request, user):
     return True
 
 
+def _issue_tenant_login_otp(request, tenant):
+    ensure_default_notification_templates(created_by=None)
+    otp_code = f'{secrets.randbelow(1000000):06d}'
+    expires_at = timezone.now() + timezone.timedelta(seconds=TENANT_LOGIN_OTP_TTL_SECONDS)
+    request.session[TENANT_LOGIN_OTP_SESSION_KEY] = {
+        'tenant_id': str(tenant.tenant_id),
+        'email': (tenant.primary_email or '').strip().lower(),
+        'otp_code': otp_code,
+        'expires_at': expires_at.isoformat(),
+        'attempts': 0,
+    }
+    request.session.modified = True
+
+    tenant_name = (
+        f"{(tenant.first_name or '').strip()} {(tenant.last_name or '').strip()}".strip()
+        or (tenant.company_name or tenant.primary_email or 'Tenant User')
+    )
+    ctx = {
+        'otp_code': otp_code,
+        'otp': otp_code,
+        'user_name': tenant_name,
+        'company_name': (tenant.company_name or tenant_name),
+    }
+    sent = send_named_notification_email(
+        'AUTH_LOGIN_OTP',
+        recipient_email=tenant.primary_email,
+        context_dict=ctx,
+        default_subject='Your iRoad Login Verification Code',
+        trigger_source='TemplateName: AUTH_LOGIN_OTP',
+        force_django_smtp=False,
+    )
+    if sent:
+        return True
+
+    sent = dispatch_event_notification(
+        'OTP_Requested',
+        recipient_email=tenant.primary_email,
+        context_dict=ctx,
+        use_async_tasks=False,
+    )
+    if sent:
+        return True
+
+    send_transactional_email(
+        tenant.primary_email,
+        'Your iRoad OTP verification code',
+        f'Your verification code is {otp_code}. It expires in 5 minutes.',
+        (
+            f'<p>Your verification code is <strong>{otp_code}</strong>.</p>'
+            '<p>This code expires in 5 minutes.</p>'
+        ),
+        trigger_source='Direct: Tenant Login OTP',
+    )
+    return True
+
+
 @method_decorator(ensure_csrf_cookie, name='dispatch')
 class LoginView(View):
     template_name = 'auth/login.html'
@@ -293,8 +375,21 @@ class LoginView(View):
                 email=form.cleaned_data['email'].lower().strip()
             )
         except AdminUser.DoesNotExist:
-            tenant = TenantProfile.objects.filter(primary_email__iexact=email).first()
+            tenant, tenant_resolution = _resolve_tenant_by_email(email)
             if not tenant:
+                if tenant_resolution in ('ambiguous_active', 'ambiguous_inactive'):
+                    log_access('Login', 'Failed', email, ip)
+                    return render(
+                        request,
+                        self.template_name,
+                        {
+                            'form': form,
+                            'error': (
+                                'This email is linked to multiple tenant accounts. '
+                                'Please contact administrator support.'
+                            ),
+                        },
+                    )
                 record_failed_attempt(email)
                 log_access('Login', 'Failed', email, ip)
                 return render(
@@ -341,26 +436,30 @@ class LoginView(View):
                     },
                 )
 
-            from .tenant_jwt import sign_tenant_access_jwt
-
-            ttl = max(60, int(getattr(settings, 'TENANT_BOOTSTRAP_JWT_TTL_SECONDS', 3600)))
-            token_str, jti = sign_tenant_access_jwt(
-                tenant_id=tenant.tenant_id,
-                subject=tenant.primary_email,
-                token_type='tenant_bootstrap',
-                ttl_seconds=ttl,
-            )
-            request.session['tenant_bootstrap_token'] = token_str
-            request.session['tenant_bootstrap_tenant_id'] = str(tenant.tenant_id)
-            request.session['tenant_bootstrap_jti'] = jti
-            request.session['tenant_bootstrap_expires_in'] = ttl
-            reset_failed_attempts(email)
-            log_access('Login', 'Success', email, ip)
+            request.session['pending_tenant_id'] = str(tenant.tenant_id)
+            request.session['pending_tenant_email'] = (tenant.primary_email or '').strip().lower()
+            request.session['pending_tenant_ip'] = ip
+            request.session.modified = True
+            try:
+                _issue_tenant_login_otp(request, tenant)
+            except Exception:
+                logger.exception('Failed to dispatch tenant login OTP for %s', tenant.primary_email)
+                return render(
+                    request,
+                    self.template_name,
+                    {
+                        'form': form,
+                        'error': (
+                            'Could not send verification code right now. '
+                            'Please try again.'
+                        ),
+                    },
+                )
             messages.success(
                 request,
-                'Tenant authenticated successfully. Access token generated in backend.',
+                'A verification code has been sent to your email. Enter it to continue.',
             )
-            return redirect('iroad_tenants:tenant_dashboard')
+            return redirect('otp_verify')
 
         # STEP 3: Check status
         if user.status == 'Suspended':
@@ -472,12 +571,55 @@ class OTPVerificationView(View):
     template_name = 'auth/otp_verify.html'
 
     @staticmethod
+    def _otp_page_context(domain):
+        is_tenant = domain == 'tenant'
+        return {
+            'otp_page_title': 'Tenant OTP Verification' if is_tenant else 'OTP Verification',
+            'otp_meta_description': (
+                'iRoad Tenant Portal - OTP Verification'
+                if is_tenant
+                else 'iRoad Admin Dashboard - OTP Verification'
+            ),
+            'otp_portal_label': 'Tenant Portal' if is_tenant else 'Admin Portal',
+        }
+
+    @staticmethod
+    def _clear_admin_pending(request):
+        request.session.pop(ADMIN_LOGIN_OTP_SESSION_KEY, None)
+        request.session.pop('pending_admin_id', None)
+        request.session.pop('pending_admin_email', None)
+        request.session.pop('pending_admin_ip', None)
+
+    @staticmethod
+    def _clear_tenant_pending(request):
+        request.session.pop(TENANT_LOGIN_OTP_SESSION_KEY, None)
+        request.session.pop('pending_tenant_id', None)
+        request.session.pop('pending_tenant_email', None)
+        request.session.pop('pending_tenant_ip', None)
+
+    @staticmethod
     def _pending_state(request):
-        otp_payload = request.session.get(ADMIN_LOGIN_OTP_SESSION_KEY) or {}
+        admin_otp_payload = request.session.get(ADMIN_LOGIN_OTP_SESSION_KEY) or {}
         admin_id = request.session.get('pending_admin_id')
-        email = (request.session.get('pending_admin_email') or '').strip().lower()
-        if not otp_payload or not admin_id or not email:
-            return None
+        admin_email = (request.session.get('pending_admin_email') or '').strip().lower()
+        if admin_otp_payload and admin_id and admin_email:
+            otp_payload = admin_otp_payload
+            domain = 'admin'
+            identity_id = admin_id
+            email = admin_email
+            max_attempts = ADMIN_LOGIN_OTP_MAX_ATTEMPTS
+        else:
+            tenant_otp_payload = request.session.get(TENANT_LOGIN_OTP_SESSION_KEY) or {}
+            tenant_id = request.session.get('pending_tenant_id')
+            tenant_email = (request.session.get('pending_tenant_email') or '').strip().lower()
+            if not tenant_otp_payload or not tenant_id or not tenant_email:
+                return None
+            otp_payload = tenant_otp_payload
+            domain = 'tenant'
+            identity_id = tenant_id
+            email = tenant_email
+            max_attempts = TENANT_LOGIN_OTP_MAX_ATTEMPTS
+
         expires_raw = otp_payload.get('expires_at')
         try:
             expires_at = datetime.fromisoformat(expires_raw)
@@ -486,18 +628,32 @@ class OTPVerificationView(View):
         if timezone.is_naive(expires_at):
             expires_at = timezone.make_aware(expires_at, timezone.get_current_timezone())
         remaining = max(0, int((expires_at - timezone.now()).total_seconds()))
-        return otp_payload, admin_id, email, remaining
+        return {
+            'otp_payload': otp_payload,
+            'identity_id': identity_id,
+            'email': email,
+            'remaining': remaining,
+            'domain': domain,
+            'max_attempts': max_attempts,
+        }
 
     def get(self, request):
         if request.user.is_authenticated:
             return redirect('dashboard')
+        if request.session.get('tenant_bootstrap_tenant_id'):
+            return redirect('iroad_tenants:tenant_dashboard')
         pending = self._pending_state(request)
         if not pending:
             messages.error(request, 'Your verification session has expired. Please sign in again.')
             return redirect('login')
-        otp_payload, _, email, remaining = pending
+        otp_payload = pending['otp_payload']
+        email = pending['email']
+        remaining = pending['remaining']
         if remaining <= 0:
-            request.session.pop(ADMIN_LOGIN_OTP_SESSION_KEY, None)
+            if pending['domain'] == 'admin':
+                self._clear_admin_pending(request)
+            else:
+                self._clear_tenant_pending(request)
             messages.error(request, 'OTP expired. Please sign in again to get a new code.')
             return redirect('login')
         return render(
@@ -507,41 +663,65 @@ class OTPVerificationView(View):
                 'form': OTPVerificationForm(),
                 'masked_email': email,
                 'remaining_seconds': remaining,
-                'attempts_left': max(0, ADMIN_LOGIN_OTP_MAX_ATTEMPTS - int(otp_payload.get('attempts', 0))),
+                'attempts_left': max(0, pending['max_attempts'] - int(otp_payload.get('attempts', 0))),
+                **self._otp_page_context(pending['domain']),
             },
         )
 
     def post(self, request):
         if request.user.is_authenticated:
             return redirect('dashboard')
+        if request.session.get('tenant_bootstrap_tenant_id'):
+            return redirect('iroad_tenants:tenant_dashboard')
         action = request.POST.get('action')
         pending = self._pending_state(request)
         if not pending:
             messages.error(request, 'Your verification session has expired. Please sign in again.')
             return redirect('login')
-        otp_payload, admin_id, email, remaining = pending
+        otp_payload = pending['otp_payload']
+        identity_id = pending['identity_id']
+        email = pending['email']
+        remaining = pending['remaining']
         if remaining <= 0:
-            request.session.pop(ADMIN_LOGIN_OTP_SESSION_KEY, None)
+            if pending['domain'] == 'admin':
+                self._clear_admin_pending(request)
+            else:
+                self._clear_tenant_pending(request)
             messages.error(request, 'OTP expired. Please sign in again to get a new code.')
             return redirect('login')
 
-        user = AdminUser.objects.filter(pk=admin_id, email__iexact=email).first()
-        if not user or user.status != 'Active':
-            request.session.pop(ADMIN_LOGIN_OTP_SESSION_KEY, None)
-            request.session.pop('pending_admin_id', None)
-            request.session.pop('pending_admin_email', None)
-            request.session.pop('pending_admin_ip', None)
-            messages.error(request, 'Account no longer eligible for login. Please contact administrator.')
-            return redirect('login')
+        if pending['domain'] == 'admin':
+            user = AdminUser.objects.filter(pk=identity_id, email__iexact=email).first()
+            if not user or user.status != 'Active':
+                self._clear_admin_pending(request)
+                messages.error(request, 'Account no longer eligible for login. Please contact administrator.')
+                return redirect('login')
+            tenant = None
+        else:
+            tenant = TenantProfile.objects.filter(pk=identity_id, primary_email__iexact=email).first()
+            if not tenant or tenant.account_status != 'Active':
+                self._clear_tenant_pending(request)
+                messages.error(request, 'Account no longer eligible for login. Please contact administrator.')
+                return redirect('login')
+            user = None
 
         if action == 'resend':
-            try:
-                _issue_admin_login_otp(request, user)
-            except Exception:
-                logger.exception('Failed to resend login OTP for %s', user.email)
-                messages.error(request, 'Failed to resend OTP right now. Please try again shortly.')
+            if pending['domain'] == 'admin':
+                try:
+                    _issue_admin_login_otp(request, user)
+                except Exception:
+                    logger.exception('Failed to resend login OTP for %s', user.email)
+                    messages.error(request, 'Failed to resend OTP right now. Please try again shortly.')
+                else:
+                    messages.success(request, 'A new OTP has been sent to your email.')
             else:
-                messages.success(request, 'A new OTP has been sent to your email.')
+                try:
+                    _issue_tenant_login_otp(request, tenant)
+                except Exception:
+                    logger.exception('Failed to resend tenant login OTP for %s', tenant.primary_email)
+                    messages.error(request, 'Failed to resend OTP right now. Please try again shortly.')
+                else:
+                    messages.success(request, 'A new OTP has been sent to your email.')
             return redirect('otp_verify')
 
         form = OTPVerificationForm(request.POST)
@@ -553,21 +733,27 @@ class OTPVerificationView(View):
                     'form': form,
                     'masked_email': email,
                     'remaining_seconds': remaining,
-                    'attempts_left': max(0, ADMIN_LOGIN_OTP_MAX_ATTEMPTS - int(otp_payload.get('attempts', 0))),
+                    'attempts_left': max(0, pending['max_attempts'] - int(otp_payload.get('attempts', 0))),
+                    **self._otp_page_context(pending['domain']),
                 },
             )
 
         if form.cleaned_data['otp'] != str(otp_payload.get('otp_code') or ''):
             attempts = int(otp_payload.get('attempts', 0)) + 1
             otp_payload['attempts'] = attempts
-            request.session[ADMIN_LOGIN_OTP_SESSION_KEY] = otp_payload
+            session_key = (
+                ADMIN_LOGIN_OTP_SESSION_KEY
+                if pending['domain'] == 'admin'
+                else TENANT_LOGIN_OTP_SESSION_KEY
+            )
+            request.session[session_key] = otp_payload
             request.session.modified = True
-            attempts_left = max(0, ADMIN_LOGIN_OTP_MAX_ATTEMPTS - attempts)
-            if attempts >= ADMIN_LOGIN_OTP_MAX_ATTEMPTS:
-                request.session.pop(ADMIN_LOGIN_OTP_SESSION_KEY, None)
-                request.session.pop('pending_admin_id', None)
-                request.session.pop('pending_admin_email', None)
-                request.session.pop('pending_admin_ip', None)
+            attempts_left = max(0, pending['max_attempts'] - attempts)
+            if attempts >= pending['max_attempts']:
+                if pending['domain'] == 'admin':
+                    self._clear_admin_pending(request)
+                else:
+                    self._clear_tenant_pending(request)
                 messages.error(request, 'Too many invalid OTP attempts. Please sign in again.')
                 return redirect('login')
             return render(
@@ -579,43 +765,62 @@ class OTPVerificationView(View):
                     'masked_email': email,
                     'remaining_seconds': remaining,
                     'attempts_left': attempts_left,
+                    **self._otp_page_context(pending['domain']),
                 },
             )
 
-        # OTP verified successfully -> complete admin login + session creation.
+        if pending['domain'] == 'admin':
+            # OTP verified successfully -> complete admin login + session creation.
+            reset_failed_attempts(email)
+            user.last_login_at = timezone.now()
+            user.two_factor_enabled = True
+            user.save(update_fields=['last_login_at', 'two_factor_enabled'])
+            login(request, user)
+
+            settings_obj = get_security_settings()
+            user_agent = request.META.get('HTTP_USER_AGENT', '')
+            ip = request.session.get('pending_admin_ip') or _client_ip(request)
+            jti = create_admin_session(
+                admin_user=user,
+                ip_address=ip,
+                user_agent=user_agent,
+                timeout_minutes=settings_obj.session_timeout_minutes,
+            )
+            request.session['jti'] = jti
+            create_session(request, user, user_domain='Admin', redis_jti=jti)
+            log_audit_action(
+                request=request,
+                action_type='Create',
+                module_name='Auth - Login',
+                record_id=str(getattr(user, 'admin_id', user.id)),
+                new_instance=None,
+            )
+            log_access('Login', 'Success', email, ip)
+
+            self._clear_admin_pending(request)
+            request.session['notify_auth_tabs'] = True
+            messages.success(request, 'OTP verified successfully.')
+            return redirect('dashboard')
+
+        from .tenant_jwt import sign_tenant_access_jwt
+
+        ttl = max(60, int(getattr(settings, 'TENANT_BOOTSTRAP_JWT_TTL_SECONDS', 3600)))
+        token_str, jti = sign_tenant_access_jwt(
+            tenant_id=tenant.tenant_id,
+            subject=tenant.primary_email,
+            token_type='tenant_bootstrap',
+            ttl_seconds=ttl,
+        )
+        request.session['tenant_bootstrap_token'] = token_str
+        request.session['tenant_bootstrap_tenant_id'] = str(tenant.tenant_id)
+        request.session['tenant_bootstrap_jti'] = jti
+        request.session['tenant_bootstrap_expires_in'] = ttl
         reset_failed_attempts(email)
-        user.last_login_at = timezone.now()
-        user.two_factor_enabled = True
-        user.save(update_fields=['last_login_at', 'two_factor_enabled'])
-        login(request, user)
-
-        settings_obj = get_security_settings()
-        user_agent = request.META.get('HTTP_USER_AGENT', '')
-        ip = request.session.get('pending_admin_ip') or _client_ip(request)
-        jti = create_admin_session(
-            admin_user=user,
-            ip_address=ip,
-            user_agent=user_agent,
-            timeout_minutes=settings_obj.session_timeout_minutes,
-        )
-        request.session['jti'] = jti
-        create_session(request, user, user_domain='Admin', redis_jti=jti)
-        log_audit_action(
-            request=request,
-            action_type='Create',
-            module_name='Auth - Login',
-            record_id=str(getattr(user, 'admin_id', user.id)),
-            new_instance=None,
-        )
+        ip = request.session.get('pending_tenant_ip') or _client_ip(request)
         log_access('Login', 'Success', email, ip)
-
-        request.session.pop(ADMIN_LOGIN_OTP_SESSION_KEY, None)
-        request.session.pop('pending_admin_id', None)
-        request.session.pop('pending_admin_email', None)
-        request.session.pop('pending_admin_ip', None)
-        request.session['notify_auth_tabs'] = True
+        self._clear_tenant_pending(request)
         messages.success(request, 'OTP verified successfully.')
-        return redirect('dashboard')
+        return redirect('iroad_tenants:tenant_dashboard')
 
 
 class LogoutView(View):
@@ -702,7 +907,7 @@ class ForgotPasswordView(View):
                 {"admin_user": user, "reset_url": reset_url},
             )
         else:
-            tenant = TenantProfile.objects.filter(primary_email__iexact=email).first()
+            tenant, tenant_resolution = _resolve_tenant_by_email(email)
             if tenant and tenant.account_status == 'Active':
                 TenantAuthToken.objects.filter(
                     tenant_profile=tenant,
@@ -729,6 +934,11 @@ class ForgotPasswordView(View):
                     default_subject='Reset Your iRoad Password',
                     trigger_source='TemplateName: AUTH_PASSWORD_RESET',
                     force_django_smtp=True,
+                )
+            elif tenant_resolution in ('ambiguous_active', 'ambiguous_inactive'):
+                logger.warning(
+                    'Password reset skipped for duplicated tenant email: %s',
+                    email,
                 )
 
         # Always show the same success_message text to avoid information leaks
@@ -2249,9 +2459,7 @@ class SetPasswordView(View):
             'Password set successfully. Please login.',
         )
 
-        if invite is not None:
-            return redirect(reverse('login'))
-        return redirect(reverse('iroad_tenants:tenant_dashboard'))
+        return redirect(reverse('login'))
 
 
 class AdminUserResendInviteView(LoginRequiredMixin, View):
@@ -5610,11 +5818,32 @@ class NotificationTemplatePreviewView(LoginRequiredMixin, View):
         body_html = template_obj.body_ar if lang == 'ar' else template_obj.body_en
 
         # Render with mock data + dynamic branding context
+        def _render_preview_html(raw_html, context):
+            """Best-effort renderer: render Django template syntax, and if it fails,
+            degrade gracefully by stripping template tags so raw braces are not shown.
+            """
+            source = raw_html or ""
+            try:
+                return Template(source).render(Context(context))
+            except Exception as err:
+                logger.warning(f"Preview template render fallback triggered: {err}")
+
+                without_blocks = re.sub(r"\{%\s*.*?%\}", "", source, flags=re.DOTALL)
+
+                def _replace_var(match):
+                    expr = (match.group(1) or "").strip()
+                    key = expr.split("|", 1)[0].strip()
+                    value = context.get(key, "")
+                    return "" if value is None else str(value)
+
+                return re.sub(r"\{\{\s*(.*?)\s*\}\}", _replace_var, without_blocks, flags=re.DOTALL)
+
+        mock_ctx = get_mock_preview_context()
         try:
             from superadmin.communication_helpers import _merge_template_context
             mock_ctx = _merge_template_context(get_mock_preview_context())
-            body_html = Template(body_html or "").render(Context(mock_ctx))
-            subject = Template(subject or "").render(Context(mock_ctx))
+            body_html = _render_preview_html(body_html, mock_ctx)
+            subject = _render_preview_html(subject, mock_ctx)
 
             # Dynamic fix for legacy broken logo URL in hardcoded template bodies
             old_logo = "https://iroad-assets.s3.amazonaws.com/logo.png"
@@ -5651,8 +5880,9 @@ class NotificationTemplatePreviewView(LoginRequiredMixin, View):
                     wrapped_content = wrapped_content.replace('<html lang="en">', '<html lang="ar" dir="rtl">')
 
             # Resolve wrapper branding placeholders (company logo/name initials).
-            wrapped_content = Template(wrapped_content).render(
-                Context(_merge_template_context(mock_ctx)),
+            wrapped_content = _render_preview_html(
+                wrapped_content,
+                _merge_template_context(mock_ctx),
             )
 
             return HttpResponse(wrapped_content)

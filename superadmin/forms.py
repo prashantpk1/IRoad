@@ -1403,15 +1403,37 @@ class TenantProfileCreateForm(forms.ModelForm):
         )
         self.fields['assigned_sales_rep'].required = False
 
+    def clean_primary_email(self):
+        value = (self.cleaned_data.get('primary_email') or '').strip().lower()
+        if not value:
+            raise ValidationError('Primary email is required.')
+        if TenantProfile.objects.filter(primary_email__iexact=value).exists():
+            raise ValidationError('Primary email must be unique across tenants.')
+        return value
+
 
 class TenantProfileUpdateForm(forms.ModelForm):
     class Meta:
         model = TenantProfile
-        fields = ['account_status', 'assigned_sales_rep']
+        fields = [
+            'company_name',
+            'registration_number',
+            'tax_number',
+            'primary_email',
+            'primary_phone',
+            'country',
+            'account_status',
+            'assigned_sales_rep',
+        ]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         apply_premium_styling(self)
+        self.fields['country'].queryset = (
+            Country.objects.filter(is_active=True).order_by('name_en')
+        )
+        self.fields['country'].required = False
+        self.fields['tax_number'].required = False
         active_reps = AdminUser.objects.filter(status='Active').order_by(
             'first_name', 'last_name'
         )
@@ -1422,6 +1444,17 @@ class TenantProfileUpdateForm(forms.ModelForm):
         self.fields['assigned_sales_rep'].required = False
         if self.instance.pk:
             pass
+
+    def clean_primary_email(self):
+        value = (self.cleaned_data.get('primary_email') or '').strip().lower()
+        if not value:
+            raise ValidationError('Primary email is required.')
+        qs = TenantProfile.objects.filter(primary_email__iexact=value)
+        if self.instance.pk:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise ValidationError('Primary email must be unique across tenants.')
+        return value
 
 
 class SupportCategoryForm(forms.ModelForm):

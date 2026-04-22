@@ -5,8 +5,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="iRoad Admin Dashboard - OTP Verification" />
-    <title>OTP Verification | iRoad Admin</title>
+    <meta name="description" content="{{ otp_meta_description|default:'iRoad Admin Dashboard - OTP Verification' }}" />
+    <title>{{ otp_page_title|default:'OTP Verification' }} | iRoad</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -127,8 +127,10 @@
             <div class="auth-brand">
               <span class="auth-logo">i<span>Road</span></span>
             </div>
-            <h1 class="auth-title">OTP Verification</h1>
-            <p class="auth-subtitle">Enter the code sent to {{ masked_email }}</p>
+            <h1 class="auth-title">{{ otp_page_title|default:'OTP Verification' }}</h1>
+            <p class="auth-subtitle">
+              {{ otp_portal_label|default:'Admin Portal' }} - Enter the code sent to {{ masked_email }}
+            </p>
           </div>
 
           <form class="auth-form" method="post" action="{% url 'otp_verify' %}">

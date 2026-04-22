@@ -913,43 +913,18 @@ def send_invoice_paid_notification(invoice, use_async_tasks=False):
             dispatch_event_notification,
             ensure_default_notification_templates,
             send_named_notification_email,
+            _build_branding_context,
         )
-        from .models import LegalIdentity
-        legal = LegalIdentity.objects.filter(
-            identity_id='GLOBAL-LEGAL-IDENTITY',
-        ).first()
-        company_logo = ''
-        if legal and legal.company_logo:
-            try:
-                company_logo = legal.company_logo.url
-            except Exception:
-                company_logo = ''
-
-        # Email clients require absolute URLs for reliable image rendering.
-        absolute_logo = company_logo
-        if company_logo and not company_logo.startswith(('http://', 'https://')):
-            public_base = (
-                (getattr(settings, 'PUBLIC_BASE_URL', '') or '').strip()
-                or (getattr(settings, 'TENANT_PORTAL_LOGIN_URL', '') or '').strip()
-            )
-            origin = ''
-            if public_base:
-                parsed = urlsplit(public_base)
-                if parsed.scheme and parsed.netloc:
-                    origin = f'{parsed.scheme}://{parsed.netloc}'
-                else:
-                    origin = public_base.rstrip('/')
-            if origin:
-                if company_logo.startswith('/'):
-                    absolute_logo = f'{origin}{company_logo}'
-                else:
-                    absolute_logo = f'{origin}/{company_logo.lstrip("/")}'
-
-        context['company_logo'] = absolute_logo
+        
+        # Inject centralized branding (logo, company name, initials)
+        context.update(_build_branding_context())
+        
+        # Backward compatibility if any legacy templates still use 'company_logo'
+        context['company_logo'] = context.get('brand_logo_url', '')
         context['company_logo_img'] = (
-            f'<img src="{absolute_logo}" alt="Company Logo" '
+            f'<img src="{context["company_logo"]}" alt="Company Logo" '
             'style="max-height:60px;width:auto;">'
-            if absolute_logo else ''
+            if context['company_logo'] else ''
         )
         context['line_items'] = list(
             invoice.line_items.values(

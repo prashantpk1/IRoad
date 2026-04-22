@@ -2,39 +2,141 @@
 
 {% block title %}My Account | iRoad{% endblock %}
 
+{% block extra_css %}
+<style>
+  .form-control[readonly], 
+  .form-control:read-only {
+    background-color: #e3e3e3 !important;
+    border-color: #cbd5e1 !important;
+    color: #1e293b !important;
+    cursor: default;
+    opacity: 1 !important;
+  }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="dashboard-toolbar">
-  <div class="toolbar-left">
-    <div class="page-title">My Account</div>
-    <div class="toolbar-subtitle">Tenant profile summary</div>
+<div class="page-header">
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">My Account</h1>
+      <p class="page-subtitle">Tenant profile summary</p>
+    </div>
   </div>
 </div>
 
 <div class="overview-shell" data-section="overview">
-  <div class="db-card db-fade">
-    <div class="db-card-header">
-      <div class="db-card-title">Account Details</div>
-    </div>
-    <div class="db-card-body" style="padding: 20px;">
-      <div class="row g-3">
-        <div class="col-md-6">
-          <label class="form-label">Company Name</label>
-          <input type="text" class="form-control" value="{{ tenant.company_name }}" disabled />
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show" role="alert" style="border-radius: var(--radius-md); margin-bottom: 24px;">
+        <i class="bi {% if message.tags == 'error' %}bi-exclamation-octagon{% else %}bi-check-circle{% endif %} me-2"></i>
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+
+  <form method="post">
+    {% csrf_token %}
+    
+    <!-- Personal Profile Card -->
+    <div class="form-card">
+      <div class="form-card-header">
+        <div class="form-card-icon blue">
+          <i class="bi bi-person-badge"></i>
         </div>
-        <div class="col-md-6">
-          <label class="form-label">Primary Email</label>
-          <input type="text" class="form-control" value="{{ tenant.primary_email }}" disabled />
+        <div class="form-card-header-text">
+          <h3 class="form-card-title">Personal Profile</h3>
+          <p class="form-card-desc">Manage your personal contact details and security.</p>
         </div>
-        <div class="col-md-6">
-          <label class="form-label">Primary Phone</label>
-          <input type="text" class="form-control" value="{{ tenant.primary_phone }}" disabled />
+      </div>
+      <div class="form-card-body">
+        <div class="field-group">
+          <div class="row g-4">
+            <div class="col-md-6">
+              <label class="form-label">First Name</label>
+              <input type="text" name="first_name" class="form-control" value="{{ tenant.first_name|default:'' }}" placeholder="Enter first name" />
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Last Name</label>
+              <input type="text" name="last_name" class="form-control" value="{{ tenant.last_name|default:'' }}" placeholder="Enter last name" />
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Primary Email</label>
+              <input type="email" name="primary_email" class="form-control" value="{{ tenant.primary_email }}" readonly />
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Primary Phone</label>
+              <input type="text" name="primary_phone" class="form-control" value="{{ tenant.primary_phone }}" readonly />
+            </div>
+          </div>
         </div>
-        <div class="col-md-6">
-          <label class="form-label">Account Status</label>
-          <input type="text" class="form-control" value="{{ tenant.account_status }}" disabled />
+
+        <!-- Security Section -->
+        <div class="field-group mt-4 pt-4 border-top">
+          <div class="row g-4">
+            <div class="col-md-6">
+              <label class="form-label">Change Password</label>
+              <input type="password" name="password" class="form-control" placeholder="Type here to set a new password" autocomplete="new-password" />
+              <div class="form-text small text-muted mt-1">Leave blank to keep current password</div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
-  </div>
+
+    <!-- Company Details Card -->
+    <div class="form-card mt-4">
+      <div class="form-card-header">
+        <div class="form-card-icon slate">
+          <i class="bi bi-building"></i>
+        </div>
+        <div class="form-card-header-text">
+          <h3 class="form-card-title">Company Details</h3>
+          <p class="form-card-desc">Official registration and tax information (Read-only).</p>
+        </div>
+      </div>
+      <div class="form-card-body">
+        <div class="field-group">
+          <div class="row g-4">
+            <div class="col-md-6">
+              <label class="form-label">Company Name</label>
+              <input type="text" name="company_name" class="form-control" value="{{ tenant.company_name }}" readonly />
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Registration Number</label>
+              <input type="text" name="registration_number" class="form-control" value="{{ tenant.registration_number|default:'' }}" readonly />
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Tax Number</label>
+              <input type="text" name="tax_number" class="form-control" value="{{ tenant.tax_number|default:'' }}" readonly />
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Account Status</label>
+              <input type="text" class="form-control" value="{{ tenant.account_status }}" readonly />
+              <div class="form-text small text-muted mt-1">Managed by administration</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-actions-bar">
+      <div class="form-actions-left">
+        {% if tenant.updated_at %}
+          <div class="small text-muted">
+            <i class="bi bi-clock-history me-1"></i>
+            Last updated at {{ tenant.updated_at|date:"d M Y, H:i" }}
+          </div>
+        {% endif %}
+      </div>
+      <div class="form-actions-right">
+        <button type="submit" class="eal-btn eal-btn-primary">
+          <i class="bi bi-check2-circle"></i>
+          <span>Save Changes</span>
+        </button>
+      </div>
+    </div>
+  </form>
 </div>
 {% endblock %}

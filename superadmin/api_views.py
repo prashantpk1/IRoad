@@ -439,11 +439,19 @@ def tenant_profile_sync(request):
         tenant.registration_number = reg
 
     if 'primary_email' in updates:
-        email = (updates['primary_email'] or '').strip()
+        email = (updates['primary_email'] or '').strip().lower()
         if not email:
             return JsonResponse({'error': 'primary_email cannot be empty'}, status=400)
         if len(email) > 100:
             return JsonResponse({'error': 'primary_email too long'}, status=400)
+        duplicate_exists = TenantProfile.objects.filter(
+            primary_email__iexact=email
+        ).exclude(pk=tenant.pk).exists()
+        if duplicate_exists:
+            return JsonResponse(
+                {'error': 'primary_email already used by another tenant'},
+                status=400,
+            )
         tenant.primary_email = email
 
     if 'primary_phone' in updates:

@@ -1506,6 +1506,8 @@ class TenantProfile(models.Model):
     ]
 
     tenant_id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    first_name = models.CharField(max_length=50, blank=True, default='')
+    last_name = models.CharField(max_length=50, blank=True, default='')
     company_name = models.CharField(max_length=100)
     registration_number = models.CharField(max_length=50)
     tax_number = models.CharField(max_length=50, null=True, blank=True)

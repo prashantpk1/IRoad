@@ -44,7 +44,7 @@
   {% if form.non_field_errors %}<div class="alert alert-danger mb-4">{{ form.non_field_errors }}</div>{% endif %}
 
   {% if is_edit %}
-    <!-- Card 1: Read-only Synced Info -->
+    <!-- Card 1: Editable Profile & Identity -->
     <div class="form-card mb-4">
       <div class="form-card-header">
         <div class="form-card-icon blue">
@@ -52,38 +52,40 @@
         </div>
         <div class="form-card-header-text">
           <h3 class="form-card-title">{% translate "Profile & Identity" %}</h3>
-          <p class="form-card-desc">{% translate "Subscriber core identity (Synced from Tenant system - read only)." %}</p>
+          <p class="form-card-desc">{% translate "Update subscriber core identity details." %}</p>
         </div>
       </div>
       <div class="form-card-body">
-        <div class="alert alert-info py-2 small mb-4" style="background: rgba(80, 81, 249, 0.05); border: 1px solid rgba(80, 81, 249, 0.1); color: var(--primary-color);">
-          <i class="bi bi-info-circle me-1"></i> {% translate "Synced fields are read only in Control Panel." %}
-        </div>
-        
         <div class="row g-3">
           <div class="col-12 col-md-6">
-            <label class="form-label">{% translate "Company name" %}</label>
-            <input type="text" class="form-control" value="{{ tenant.company_name }}" disabled style="background: #f8fafc;">
+            <label class="form-label" for="{{ form.company_name.id_for_label }}">{{ form.company_name.label }}</label>
+            {{ form.company_name }}
+            {% if form.company_name.errors %}<div class="field-error">{{ form.company_name.errors.0 }}</div>{% endif %}
           </div>
           <div class="col-12 col-md-6">
-            <label class="form-label">{% translate "Registration number" %}</label>
-            <input type="text" class="form-control" value="{{ tenant.registration_number }}" disabled style="background: #f8fafc;">
+            <label class="form-label" for="{{ form.registration_number.id_for_label }}">{{ form.registration_number.label }}</label>
+            {{ form.registration_number }}
+            {% if form.registration_number.errors %}<div class="field-error">{{ form.registration_number.errors.0 }}</div>{% endif %}
           </div>
           <div class="col-12 col-md-6">
-            <label class="form-label">{% translate "Tax number" %}</label>
-            <input type="text" class="form-control" value="{{ tenant.tax_number|default:'' }}" disabled style="background: #f8fafc;">
+            <label class="form-label" for="{{ form.tax_number.id_for_label }}">{{ form.tax_number.label }}</label>
+            {{ form.tax_number }}
+            {% if form.tax_number.errors %}<div class="field-error">{{ form.tax_number.errors.0 }}</div>{% endif %}
           </div>
           <div class="col-12 col-md-6">
-            <label class="form-label">{% translate "Primary email" %}</label>
-            <input type="email" class="form-control" value="{{ tenant.primary_email }}" disabled style="background: #f8fafc;">
+            <label class="form-label" for="{{ form.primary_email.id_for_label }}">{{ form.primary_email.label }}</label>
+            {{ form.primary_email }}
+            {% if form.primary_email.errors %}<div class="field-error">{{ form.primary_email.errors.0 }}</div>{% endif %}
           </div>
           <div class="col-12 col-md-6">
-            <label class="form-label">{% translate "Primary phone" %}</label>
-            <input type="text" class="form-control" value="{{ tenant.primary_phone }}" disabled style="background: #f8fafc;">
+            <label class="form-label" for="{{ form.primary_phone.id_for_label }}">{{ form.primary_phone.label }}</label>
+            {{ form.primary_phone }}
+            {% if form.primary_phone.errors %}<div class="field-error">{{ form.primary_phone.errors.0 }}</div>{% endif %}
           </div>
           <div class="col-12 col-md-6">
-            <label class="form-label">{% translate "Country" %}</label>
-            <input type="text" class="form-control" value="{{ tenant.country.name_en|default:'-' }}" disabled style="background: #f8fafc;">
+            <label class="form-label" for="{{ form.country.id_for_label }}">{{ form.country.label }}</label>
+            {{ form.country }}
+            {% if form.country.errors %}<div class="field-error">{{ form.country.errors.0 }}</div>{% endif %}
           </div>
         </div>
       </div>

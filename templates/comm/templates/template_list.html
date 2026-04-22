@@ -387,12 +387,39 @@
       iframe.style.opacity = '0.3';
       
       const url = `{% url 'notif_template_preview' '00000000-0000-0000-0000-000000000000' %}`.replace('00000000-0000-0000-0000-000000000000', templateId);
-      iframe.src = `${url}?lang=${lang}`;
-      
-      iframe.onload = function() {
-        loader.classList.add('d-none');
-        iframe.style.opacity = '1';
-      };
+      fetch(`${url}?lang=${lang}`, {
+        method: 'GET',
+        credentials: 'same-origin'
+      })
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`Preview request failed with status ${response.status}`);
+          }
+          return response.text();
+        })
+        .then(html => {
+          iframe.removeAttribute('src');
+          iframe.srcdoc = html;
+        })
+        .catch(() => {
+          iframe.removeAttribute('src');
+          iframe.srcdoc = `
+            <html>
+              <body style="font-family: Inter, Arial, sans-serif; margin:0; background:#f8fafc; color:#0f172a;">
+                <div style="max-width:560px; margin:72px auto; padding:24px; background:#fff; border:1px solid #e2e8f0; border-radius:12px;">
+                  <h3 style="margin:0 0 8px; font-size:18px;">Preview unavailable</h3>
+                  <p style="margin:0; color:#475569; line-height:1.6;">
+                    We could not load this template preview right now. Please try again or open Edit Template to review content.
+                  </p>
+                </div>
+              </body>
+            </html>
+          `;
+        })
+        .finally(() => {
+          loader.classList.add('d-none');
+          iframe.style.opacity = '1';
+        });
     }
 
     document.querySelectorAll('.preview-template-btn').forEach(btn => {

@@ -5,6 +5,7 @@ Tenant API bridge secrets (welcome / rotation) always use Django SMTP settings
 from ``config/settings.py`` (EMAIL_HOST, EMAIL_PORT, DEFAULT_FROM_EMAIL, etc.),
 not the CP Communication → Gateway row, so ops use one production SMTP config.
 """
+import os
 import logging
 import smtplib
 import json
@@ -55,7 +56,9 @@ def _build_branding_context():
     Ensures brand_logo_url is absolute for external email clients.
     """
     brand_name = 'iRoad'
-    brand_logo_url = ''
+    # Default fallback image
+    brand_logo_url = '/media/legal/Link.png'
+    brand_initials = 'IR'
 
     try:
         from superadmin.models import LegalIdentity
@@ -66,22 +69,38 @@ def _build_branding_context():
         if legal:
             if (legal.company_name_en or '').strip():
                 brand_name = legal.company_name_en.strip()
+            
+            # Check if a custom logo is uploaded and physically exists on the disk.
+            # This prevents broken links if a file was deleted or the path is invalid.
             if getattr(legal, 'company_logo', None):
                 try:
-                    brand_logo_url = legal.company_logo.url or ''
+                    # In Django, truthy ImageField has a 'path' attribute if it's on local storage.
+                    if legal.company_logo and os.path.exists(legal.company_logo.path):
+                        brand_logo_url = legal.company_logo.url or brand_logo_url
                 except Exception:
-                    brand_logo_url = ''
+                    # If path resolution fails (e.g. S3), fallback to the URL anyway
+                    # but we prefer the safety of the disk check for local dev.
+                    try:
+                        brand_logo_url = legal.company_logo.url
+                    except Exception:
+                        pass
+            
+            # Generate initials from company name
+            letters = ''.join(ch for ch in brand_name if ch.isalnum()).upper()
+            if letters:
+                brand_initials = letters[:2]
     except Exception:
         # Keep email delivery resilient even if branding lookup fails.
-        brand_name = 'iRoad'
-        brand_logo_url = ''
+        pass
 
-    # Make logo URL absolute if it is relative
-    if brand_logo_url and not brand_logo_url.startswith('http'):
-        brand_logo_url = f"{_get_base_url()}{brand_logo_url}"
-
-    letters = ''.join(ch for ch in brand_name if ch.isalnum()).upper()
-    brand_initials = (letters[:2] if letters else 'IR')
+    # Standardize logo URL resolution (ensure absolute URL)
+    if brand_logo_url:
+        # Avoid double-slashes and ensure absolute URL if not already
+        if not (brand_logo_url.startswith('http') or brand_logo_url.startswith('//')):
+            base = _get_base_url()
+            if not brand_logo_url.startswith('/'):
+                brand_logo_url = f"/{brand_logo_url}"
+            brand_logo_url = f"{base}{brand_logo_url}"
 
     return {
         'brand_company_name': brand_name,
@@ -373,14 +392,20 @@ DEFAULT_NOTIFICATION_EMAIL_TEMPLATES = [
             'style="background:#f1f5f9;padding:24px 12px;"><tr><td align="center">'
             '<table role="presentation" width="640" cellspacing="0" cellpadding="0" border="0" '
             'style="width:640px;max-width:640px;background:#ffffff;border-radius:16px;overflow:hidden;">'
-            '<tr><td style="background:#5b5ce2;padding:28px 24px;text-align:center;">'
-            '<div style="width:52px;height:52px;line-height:52px;margin:0 auto 12px;border-radius:50%;'
-            'background:#4b4cd6;color:#ffffff;font-size:30px;font-weight:700;font-family:Arial,sans-serif;">'
-            '{{ brand_initials|default:"IR" }}</div>'
-            '<div style="color:#ffffff;font-size:28px;line-height:1.1;font-weight:700;font-family:Arial,sans-serif;">'
+            '<tr><td style="background:linear-gradient(135deg,#4f46e5 0%,#6366f1 50%,#818cf8 100%);padding:28px 24px;text-align:center;">'
+            '<div style="width:52px;height:52px;line-height:52px;margin:0 auto 12px;border-radius:14px;'
+            'background:rgba(255,255,255,0.2);color:#ffffff;font-size:20px;font-weight:800;'
+            'overflow:hidden;border:2px solid rgba(255,255,255,0.3);">'
+            '{% if brand_logo_url %}'
+            '<img src="{{ brand_logo_url }}" style="width:100%;height:100%;object-fit:cover;" alt="{{ brand_company_name }}">'
+            '{% else %}'
+            '{{ brand_initials|default:"IR" }}'
+            '{% endif %}'
+            '</div>'
+            '<div style="color:#ffffff;font-size:26px;line-height:1.2;font-weight:800;letter-spacing:-0.02em;font-family:Arial,sans-serif;">'
             '{{ brand_company_name|default:"iRoad" }}</div>'
-            '<div style="color:#e6e8ff;font-size:14px;line-height:1.5;font-weight:600;'
-            'font-family:Arial,sans-serif;margin-top:6px;">Logistics Management Platform</div>'
+            '<div style="color:rgba(255,255,255,0.7);font-size:13px;line-height:1.5;font-weight:500;'
+            'font-family:Arial,sans-serif;margin-top:4px;">Logistics Management Platform</div>'
             '</td></tr>'
             '<tr><td style="padding:34px 34px 28px;font-family:Arial,sans-serif;color:#1f2d3d;">'
             '<h2 style="margin:0 0 16px;font-size:34px;line-height:1.2;font-weight:700;color:#102a56;">'
@@ -424,12 +449,20 @@ DEFAULT_NOTIFICATION_EMAIL_TEMPLATES = [
             'style="background:#f1f5f9;padding:24px 12px;"><tr><td align="center">'
             '<table role="presentation" width="640" cellspacing="0" cellpadding="0" border="0" '
             'style="width:640px;max-width:640px;background:#ffffff;border-radius:16px;overflow:hidden;">'
-            '<tr><td style="background:#5b5ce2;padding:28px 24px;text-align:center;">'
-            '<div style="width:52px;height:52px;line-height:52px;margin:0 auto 12px;border-radius:50%;'
-            'background:#4b4cd6;color:#ffffff;font-size:30px;font-weight:700;font-family:Arial,sans-serif;">IR</div>'
-            '<div style="color:#ffffff;font-size:28px;line-height:1.1;font-weight:700;font-family:Arial,sans-serif;">iRoad</div>'
-            '<div style="color:#e6e8ff;font-size:14px;line-height:1.5;font-weight:600;'
-            'font-family:Arial,sans-serif;margin-top:6px;">منصة إدارة الخدمات اللوجستية</div>'
+            '<tr><td style="background:linear-gradient(135deg,#4f46e5 0%,#6366f1 50%,#818cf8 100%);padding:28px 24px;text-align:center;">'
+            '<div style="width:52px;height:52px;line-height:52px;margin:0 auto 12px;border-radius:14px;'
+            'background:rgba(255,255,255,0.2);color:#ffffff;font-size:20px;font-weight:800;'
+            'overflow:hidden;border:2px solid rgba(255,255,255,0.3);">'
+            '{% if brand_logo_url %}'
+            '<img src="{{ brand_logo_url }}" style="width:100%;height:100%;object-fit:cover;" alt="{{ brand_company_name }}">'
+            '{% else %}'
+            '{{ brand_initials|default:"IR" }}'
+            '{% endif %}'
+            '</div>'
+            '<div style="color:#ffffff;font-size:26px;line-height:1.2;font-weight:800;letter-spacing:-0.02em;font-family:Arial,sans-serif;">'
+            '{{ brand_company_name|default:"iRoad" }}</div>'
+            '<div style="color:rgba(255,255,255,0.7);font-size:13px;line-height:1.5;font-weight:500;'
+            'font-family:Arial,sans-serif;margin-top:4px;">منصة إدارة الخدمات اللوجستية</div>'
             '</td></tr>'
             '<tr><td style="padding:34px 34px 28px;font-family:Arial,sans-serif;color:#1f2d3d;" dir="rtl">'
             '<h2 style="margin:0 0 16px;font-size:34px;line-height:1.2;font-weight:700;color:#102a56;">'
