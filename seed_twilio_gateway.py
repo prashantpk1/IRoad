@@ -1,5 +1,6 @@
 import os
 import django
+from decouple import config
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 django.setup()
@@ -12,10 +13,10 @@ def seed_twilio_mock():
         provider_name='Twilio',
         gateway_type='SMS',
         defaults={
-            'host_url': 'http://localhost:8000/api/v1/mock/twilio/',
-            'username_key': 'AC_MOCK_SID_12345',
-            'password_secret': 'MOCK_TOKEN_67890',
-            'sender_id': '+15551234567',
+            'host_url': config('TWILIO_HOST_URL', default='https://api.twilio.com/2010-04-01/Accounts'),
+            'username_key': config('TWILIO_ACCOUNT_SID', default=''),
+            'password_secret': config('TWILIO_AUTH_TOKEN', default=''),
+            'sender_id': config('TWILIO_SENDER_ID', default=''),
             'is_active': True,
         }
     )
