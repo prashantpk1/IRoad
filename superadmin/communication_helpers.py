@@ -1416,7 +1416,11 @@ def dispatch_event_notification(
 
 
 def dispatch_internal_alerts(event_code, context_dict=None):
-    from superadmin.models import AdminUser, InternalAlertRoute
+    from superadmin.models import (
+        AdminUser,
+        InternalAlertNotification,
+        InternalAlertRoute,
+    )
     from superadmin.tasks import send_email_task
 
     routes = InternalAlertRoute.objects.filter(trigger_event=event_code, is_active=True)
@@ -1430,22 +1434,58 @@ def dispatch_internal_alerts(event_code, context_dict=None):
         f'Context:\n{json.dumps(ctx, default=str, ensure_ascii=True)}'
     )
     sent_to = set()
+    notified_admin_ids = set()
+    title = f'Internal Alert - {event_code.replace("_", " ")}'
+    message = ctx.get('message') or body[:1000]
     for route in routes.iterator():
         if route.notify_custom_email:
             email = route.notify_custom_email.strip().lower()
             if email and email not in sent_to:
                 send_email_task.delay(email, subject, body, None)
                 sent_to.add(email)
+            if email:
+                admin = AdminUser.objects.filter(
+                    email__iexact=email,
+                    status='Active',
+                    is_deleted=False,
+                ).first()
+                if admin and admin.pk not in notified_admin_ids:
+                    InternalAlertNotification.objects.create(
+                        admin_user=admin,
+                        route=route,
+                        trigger_event=event_code,
+                        title=title,
+                        message=message,
+                        context_payload=ctx,
+                    )
+                    notified_admin_ids.add(admin.pk)
         if route.notify_role_id:
-            admin_emails = AdminUser.objects.filter(
+            admins = AdminUser.objects.filter(
                 role_id=route.notify_role_id,
                 status='Active',
+                is_deleted=False,
             ).values_list('email', flat=True)
-            for email in admin_emails:
+            for email in admins:
                 norm = (email or '').strip().lower()
                 if norm and norm not in sent_to:
                     send_email_task.delay(norm, subject, body, None)
                     sent_to.add(norm)
+            for admin in AdminUser.objects.filter(
+                role_id=route.notify_role_id,
+                status='Active',
+                is_deleted=False,
+            ).only('id'):
+                if admin.pk in notified_admin_ids:
+                    continue
+                InternalAlertNotification.objects.create(
+                    admin_user=admin,
+                    route=route,
+                    trigger_event=event_code,
+                    title=title,
+                    message=message,
+                    context_payload=ctx,
+                )
+                notified_admin_ids.add(admin.pk)
     return len(sent_to)
 
 

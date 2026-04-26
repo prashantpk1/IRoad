@@ -23,10 +23,12 @@
     <span class="status-text">{% if active_lang == 'ar' %}AR{% else %}EN{% endif %}</span>
   </div>
   {% endwith %}
-  <!-- <button type="button" class="header-icon-btn" title="{% translate 'Notifications' %}">
+  <button type="button" class="header-icon-btn" title="{% translate 'Notifications' %}">
     <i class="bi bi-bell"></i>
-    <span class="badge">3</span>
-  </button> -->
+    {% if internal_alert_unread_count > 0 %}
+    <span class="badge">{{ internal_alert_unread_count }}</span>
+    {% endif %}
+  </button>
   <div class="header-divider"></div>
   <div class="header-user-wrapper">
     <div class="header-user" id="headerUserToggle">

@@ -51,6 +51,15 @@
     <div class="notification-panel" id="notificationPanel">
       <div class="notification-header">
         <h3 class="notification-title">Notifications</h3>
+        <div class="notification-header-actions">
+          {% if internal_alert_unread_count > 0 %}
+          <form method="post" action="{% url 'internal_alert_notifications_read_all' %}" class="d-inline">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <button type="submit" class="mark-all-btn">Mark all read</button>
+          </form>
+          {% endif %}
+        </div>
         <button
           class="notification-close"
           id="notificationClose"
@@ -105,16 +114,40 @@
             Done
           </button>
         </div>
-        <div class="notification-empty">
-          <div class="empty-icon">
-            <i class="bi bi-bell"></i>
-            <span class="sparkle sparkle-1">&#10022;</span>
-            <span class="sparkle sparkle-2">&#10023;</span>
-            <span class="sparkle sparkle-3">&#176;</span>
+        {% if internal_alert_items %}
+        <div class="notification-list">
+          {% for item in internal_alert_items %}
+          <div class="notification-item {% if not item.is_read %}unread{% endif %}">
+            <div class="notification-item-main">
+              <div class="notification-item-title">{{ item.title }}</div>
+              <div class="notification-item-body">{{ item.message|truncatechars:160 }}</div>
+              <div class="notification-item-meta">
+                <span>{{ item.get_trigger_event_display }}</span>
+                <span>{{ item.created_at|date:"d M Y, H:i" }}</span>
+              </div>
+            </div>
+            {% if not item.is_read %}
+            <form method="post" action="{% url 'internal_alert_notification_read' item.notification_id %}">
+              {% csrf_token %}
+              <input type="hidden" name="next" value="{{ request.get_full_path }}">
+              <button type="submit" class="notification-read-btn">Mark read</button>
+            </form>
+            {% endif %}
           </div>
-          <h4 class="empty-title">No notifications</h4>
-          <p class="empty-text">You are yet to receive notifications</p>
+          {% endfor %}
         </div>
+        {% else %}
+          <div class="notification-empty">
+            <div class="empty-icon">
+              <i class="bi bi-bell"></i>
+              <span class="sparkle sparkle-1">&#10022;</span>
+              <span class="sparkle sparkle-2">&#10023;</span>
+              <span class="sparkle sparkle-3">&#176;</span>
+            </div>
+            <h4 class="empty-title">No notifications</h4>
+            <p class="empty-text">You are yet to receive notifications</p>
+          </div>
+        {% endif %}
       </div>
     </div>
 

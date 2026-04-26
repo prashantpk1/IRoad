@@ -89,6 +89,7 @@ from .audit_helpers import (
 )
 from .redis_helpers import create_admin_session
 from .communication_helpers import (
+    dispatch_internal_alerts,
     dispatch_event_notification,
     ensure_default_notification_templates,
     send_named_notification_email,
@@ -150,6 +151,7 @@ from .models import (
     CRMNote,
     Currency,
     EventMapping,
+    InternalAlertNotification,
     InternalAlertRoute,
     GeneralTaxSettings,
     GlobalSystemRules,
@@ -6510,6 +6512,36 @@ class InternalAlertRouteToggleStatusView(LoginRequiredMixin, View):
         return redirect(reverse('alert_route_list'))
 
 
+class InternalAlertNotificationReadView(LoginRequiredMixin, View):
+    def post(self, request, pk):
+        notif = get_object_or_404(
+            InternalAlertNotification,
+            notification_id=pk,
+            admin_user=request.user,
+        )
+        if not notif.is_read:
+            notif.is_read = True
+            notif.read_at = timezone.now()
+            notif.save(update_fields=['is_read', 'read_at'])
+        next_url = (request.POST.get('next') or '').strip()
+        if next_url:
+            return redirect(next_url)
+        return redirect('dashboard')
+
+
+class InternalAlertNotificationReadAllView(LoginRequiredMixin, View):
+    def post(self, request):
+        now = timezone.now()
+        InternalAlertNotification.objects.filter(
+            admin_user=request.user,
+            is_read=False,
+        ).update(is_read=True, read_at=now)
+        next_url = (request.POST.get('next') or '').strip()
+        if next_url:
+            return redirect(next_url)
+        return redirect('dashboard')
+
+
 class CommLogListView(LoginRequiredMixin, View):
     template_name = 'comm/logs/comm_log_list.html'
 
@@ -6764,6 +6796,21 @@ class TenantCreateView(LoginRequiredMixin, View):
                     'Welcome email failed for tenant %s',
                     tenant.tenant_id,
                 )
+            try:
+                dispatch_internal_alerts(
+                    'New_Tenant_Registered',
+                    context_dict={
+                        'tenant_id': str(tenant.tenant_id),
+                        'company_name': tenant.company_name,
+                        'primary_email': tenant.primary_email,
+                        'message': (
+                            f'New tenant "{tenant.company_name}" registered '
+                            f'({tenant.primary_email}).'
+                        ),
+                    },
+                )
+            except Exception:
+                logger.exception('Internal alert dispatch failed for tenant %s', tenant.tenant_id)
             messages.success(
                 request,
                 f'Subscriber profile created for {tenant.primary_email}. '
@@ -8724,6 +8771,23 @@ class TicketCreateView(LoginRequiredMixin, View):
             getattr(request.user, 'admin_id', getattr(request.user, 'id', ''))
         )
         ticket.save()
+        if ticket.priority in ['High', 'Critical']:
+            try:
+                dispatch_internal_alerts(
+                    'High_Priority_Ticket',
+                    context_dict={
+                        'ticket_id': str(ticket.ticket_id),
+                        'ticket_no': ticket.ticket_no,
+                        'priority': ticket.priority,
+                        'tenant': ticket.tenant.company_name,
+                        'message': (
+                            f'High priority ticket "{ticket.ticket_no}" '
+                            f'raised for {ticket.tenant.company_name}.'
+                        ),
+                    },
+                )
+            except Exception:
+                logger.exception('Internal alert dispatch failed for ticket %s', ticket.ticket_id)
 
         TicketReply.objects.create(
             ticket=ticket,
@@ -8849,6 +8913,26 @@ class TicketPriorityOverrideView(LoginRequiredMixin, View):
             return redirect('ticket_detail', pk=ticket.pk)
 
         ticket = form.save()
+        if ticket.priority in ['High', 'Critical']:
+            try:
+                dispatch_internal_alerts(
+                    'High_Priority_Ticket',
+                    context_dict={
+                        'ticket_id': str(ticket.ticket_id),
+                        'ticket_no': ticket.ticket_no,
+                        'priority': ticket.priority,
+                        'tenant': ticket.tenant.company_name,
+                        'message': (
+                            f'Ticket "{ticket.ticket_no}" priority changed '
+                            f'to {ticket.priority}.'
+                        ),
+                    },
+                )
+            except Exception:
+                logger.exception(
+                    'Internal alert dispatch failed on ticket priority update %s',
+                    ticket.ticket_id,
+                )
         TicketReply.objects.create(
             ticket=ticket,
             sender_type='System_Bot',

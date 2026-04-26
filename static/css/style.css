@@ -1029,6 +1029,19 @@ a {
   margin: 0;
 }
 
+.notification-header-actions {
+  margin-left: auto;
+  margin-right: 8px;
+}
+
+.mark-all-btn {
+  border: none;
+  background: transparent;
+  color: var(--primary-color);
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .notification-close {
   width: 36px;
   height: 36px;
@@ -1060,6 +1073,64 @@ a {
   display: flex;
   justify-content: flex-end;
   margin-bottom: 16px;
+}
+
+.notification-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.notification-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  background: var(--bg-white);
+}
+
+.notification-item.unread {
+  border-color: rgba(80, 81, 249, 0.35);
+  background: rgba(80, 81, 249, 0.05);
+}
+
+.notification-item-main {
+  min-width: 0;
+}
+
+.notification-item-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dark);
+}
+
+.notification-item-body {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.notification-item-meta {
+  display: flex;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 6px;
+}
+
+.notification-read-btn {
+  border: 1px solid var(--border-light);
+  background: #fff;
+  border-radius: 6px;
+  color: var(--text-dark);
+  padding: 4px 8px;
+  font-size: 11px;
+  white-space: nowrap;
 }
 
 .settings-btn {

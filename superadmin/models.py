@@ -1447,6 +1447,39 @@ class InternalAlertRoute(models.Model):
         ordering = ['trigger_event']
 
 
+class InternalAlertNotification(models.Model):
+    notification_id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    admin_user = models.ForeignKey(
+        'AdminUser',
+        on_delete=models.CASCADE,
+        related_name='internal_alert_notifications',
+    )
+    route = models.ForeignKey(
+        InternalAlertRoute,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='notifications',
+    )
+    trigger_event = models.CharField(
+        max_length=50,
+        choices=InternalAlertRoute.TRIGGER_EVENT_CHOICES,
+    )
+    title = models.CharField(max_length=255)
+    message = models.TextField()
+    context_payload = models.JSONField(default=dict, blank=True)
+    is_read = models.BooleanField(default=False, db_index=True)
+    read_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        db_table = 'comm_internal_alert_notifications'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.admin_user.email} :: {self.trigger_event}'
+
+
 class CommLog(models.Model):
     CHANNEL_CHOICES = [
         ('Email', 'Email'),
@@ -1520,6 +1553,11 @@ class TenantProfile(models.Model):
         blank=True,
         related_name='tenant_profiles',
     )
+    registered_address = models.TextField(
+        blank=True,
+        default='',
+        help_text='Registered address for tenant profile.',
+    )
     account_status = models.CharField(
         max_length=30,
         choices=STATUS_CHOICES,
@@ -1557,6 +1595,17 @@ class TenantProfile(models.Model):
         default='',
         db_index=True,
         help_text='PostgreSQL schema name for isolated tenant workspace (CP 4.3.2).',
+    )
+    provisioning_error = models.TextField(
+        blank=True,
+        default='',
+        help_text='Last provisioning failure message (empty when no error).',
+    )
+    provisioning_status = models.CharField(
+        max_length=30,
+        blank=True,
+        default='',
+        help_text='Workspace provisioning status (empty when not started).',
     )
   
     registered_at = models.DateTimeField(auto_now_add=True)

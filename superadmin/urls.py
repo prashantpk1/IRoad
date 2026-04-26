@@ -66,6 +66,8 @@ from .views import (
     OTPVerificationView,
     InternalAlertRouteCreateView,
     InternalAlertRouteListView,
+    InternalAlertNotificationReadAllView,
+    InternalAlertNotificationReadView,
     InternalAlertRouteToggleStatusView,
     InternalAlertRouteUpdateView,
     NotificationTemplateCreateView,
@@ -693,6 +695,16 @@ urlpatterns = [
         'comm/alert-routes/<uuid:pk>/toggle/',
         InternalAlertRouteToggleStatusView.as_view(),
         name='alert_route_toggle',
+    ),
+    path(
+        'comm/alerts/notifications/<uuid:pk>/read/',
+        InternalAlertNotificationReadView.as_view(),
+        name='internal_alert_notification_read',
+    ),
+    path(
+        'comm/alerts/notifications/read-all/',
+        InternalAlertNotificationReadAllView.as_view(),
+        name='internal_alert_notifications_read_all',
     ),
     path(
         'comm/logs/',
