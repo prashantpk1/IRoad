@@ -8,29 +8,104 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
+msgid "2FA Adoption Rate"
+msgstr "معدل اعتماد التحقق الثنائي"
+
+msgid "Access Log"
+msgstr "سجل الوصول"
+
+msgid "Accounts inactive for 30+ days (Active only)"
+msgstr "الحسابات غير النشطة لأكثر من 30 يوماً (النشطة فقط)"
+
+msgid "Action"
+msgstr "الإجراء"
+
 msgid "Actions"
 msgstr "الإجراءات"
 
 msgid "Active"
 msgstr "نشط"
 
+msgid "Active Sessions Monitor"
+msgstr "مراقبة الجلسات النشطة"
+
 msgid "Active Subscribers"
 msgstr "المشتركين النشطين"
+
+msgid "Active users per role"
+msgstr "المستخدمون النشطون حسب الدور"
 
 msgid "Add"
 msgstr "إضافة"
 
+msgid "Add-ons Pricing"
+msgstr "أسعار الإضافات"
+
+msgid "Admin"
+msgstr "المسؤول"
+
+msgid "Admin Security"
+msgstr "أمن المسؤولين"
+
+msgid "Admin Users"
+msgstr "مستخدمين النظام"
+
+msgid "Administration"
+msgstr "الإدارة"
+
+msgid "Adoption"
+msgstr "الاعتماد"
+
+msgid "All accounts are active recently"
+msgstr "جميع الحسابات كانت نشطة مؤخراً"
+
+msgid "All clear"
+msgstr "الكل نشط"
+
+msgid "Amount"
+msgstr "المبلغ"
+
 msgid "Analytics"
 msgstr "التحليلات"
+
+msgid "Attention Center Shortcuts"
+msgstr "اختصارات مركز الاهتمام"
+
+msgid "Audit Log"
+msgstr "سجل التدقيق"
+
+msgid "Awaiting Payment"
+msgstr "في انتظار الدفع"
 
 msgid "Back"
 msgstr "رجوع"
 
+msgid "Bank Accounts"
+msgstr "الحسابات البنكية"
+
+msgid "Base Currency"
+msgstr "العملة الأساسية"
+
 msgid "Cancel"
 msgstr "إلغاء"
 
+msgid "Canned Responses"
+msgstr "الردود الجاهزة"
+
+msgid "Category"
+msgstr "الفئة"
+
+msgid "Churned"
+msgstr "منتهي"
+
 msgid "Close"
 msgstr "إغلاق"
+
+msgid "Comm Logs"
+msgstr "سجلات الاتصال"
+
+msgid "Communication & Alerts"
+msgstr "الاتصالات والتنبيهات"
 
 msgid "Companies"
 msgstr "الشركات"
@@ -41,8 +116,26 @@ msgstr "قائمة الشركات"
 msgid "Configuration"
 msgstr "الإعدادات"
 
+msgid "Countries Master"
+msgstr "سجل الدول"
+
+msgid "Create"
+msgstr "إنشاء"
+
+msgid "Created At"
+msgstr "تاريخ الإنشاء"
+
+msgid "Currencies Master"
+msgstr "سجل العملات"
+
+msgid "Currency"
+msgstr "العملة"
+
 msgid "Dashboard"
 msgstr "لوحة القيادة"
+
+msgid "Days Since Login"
+msgstr "الأيام منذ آخر دخول"
 
 msgid "Delete"
 msgstr "حذف"
@@ -68,14 +161,89 @@ msgstr "إعدادات البريد"
 msgid "Email Templates"
 msgstr "قوالب البريد"
 
+msgid "Events Mapping"
+msgstr "ربط الأحداث"
+
+msgid "Exchange Rates"
+msgstr "أسعار الصرف"
+
+msgid "FX Change Log"
+msgstr "سجل تغيير أسعار الصرف"
+
+msgid "Failed"
+msgstr "فاشل"
+
+msgid "Failed / Rejected Transactions"
+msgstr "المعاملات الفاشلة / المرفوضة"
+
+msgid "Fri"
+msgstr "جمعة"
+
+msgid "Gateway Settings"
+msgstr "إعدادات البوابات"
+
+msgid "General Tax Settings"
+msgstr "إعدادات الضرائب العامة"
+
+msgid "Global Master Data"
+msgstr "البيانات الأساسية العالمية"
+
+msgid "Global System Rules"
+msgstr "قواعد النظام العالمية"
+
+msgid "Grand Total"
+msgstr "الإجمالي الكلي"
+
 msgid "Here's what's happening with your system today"
 msgstr "نظرة عامة على نشاط نظامك اليوم"
+
+msgid "Hours Old"
+msgstr "ساعات مضت"
+
+msgid "IP Address"
+msgstr "عنوان IP"
 
 msgid "Inactive"
 msgstr "غير نشط"
 
+msgid "Internal Alerts"
+msgstr "التنبيهات الداخلية"
+
+msgid "LIVE DATA"
+msgstr "بيانات مباشرة"
+
 msgid "Languages"
 msgstr "اللغات"
+
+msgid "Last Login"
+msgstr "آخر تسجيل دخول"
+
+msgid "Legal Identity"
+msgstr "الهوية القانونية"
+
+msgid "Less"
+msgstr "أقل"
+
+msgid "Live Sessions"
+msgstr "الجلسات المباشرة"
+
+msgid "Locked"
+msgstr "مغلق"
+
+msgid "Login Activity Heatmap"
+msgstr "خريطة نشاط تسجيل الدخول"
+
+msgid "MRR — This Month"
+msgstr "الإيرادات الشهرية المتكررة - هذا الشهر"
+
+msgid "Module"
+msgstr "الوحدة"
+
+msgid "Mon"
+msgstr "إثنين"
+
+msgid "More"
+msgstr "أكثر"
 
 msgid "My Account"
 msgstr "حسابي"
@@ -83,23 +251,74 @@ msgstr "حسابي"
 msgid "Name"
 msgstr "الاسم"
 
+msgid "Needs Approval"
+msgstr "بحاجة لموافقة"
+
 msgid "Next"
 msgstr "التالي"
+
+msgid "No audit entries yet."
+msgstr "لا توجد قيود تدقيق بعد."
 
 msgid "No data available"
 msgstr "لا توجد بيانات"
 
+msgid "No failed transactions."
+msgstr "لا توجد معاملات فاشلة."
+
 msgid "No notifications"
 msgstr "لا توجد إشعارات"
+
+msgid "No overdue tickets."
+msgstr "لا توجد تذاكر متأخرة."
+
+msgid "No pending orders. All clear!"
+msgstr "لا توجد طلبات معلقة. الكل نشط!"
 
 msgid "No records found"
 msgstr "لم يتم العثور على سجلات"
 
+msgid "No suspended tenants."
+msgstr "لا يوجد مستأجرين موقوفين."
+
+msgid "Notification Templates"
+msgstr "قوالب الإشعارات"
+
 msgid "Notifications"
 msgstr "الإشعارات"
 
+msgid "Open"
+msgstr "مفتوح"
+
+msgid "Over 48 Hours"
+msgstr "أكثر من 48 ساعة"
+
+msgid "Overdue"
+msgstr "متأخر"
+
+msgid "Overdue Support Tickets"
+msgstr "تذاكر الدعم المتأخرة"
+
+msgid "Payment Gateways"
+msgstr "بوابات الدفع"
+
+msgid "Payment Infrastructure"
+msgstr "البنية التحتية للمدفوعات"
+
+msgid "Payment Methods"
+msgstr "طرق الدفع"
+
+msgid "Pending"
+msgstr "قيد التفعيل"
+
+msgid "Pending Activation"
+msgstr "في انتظار التفعيل"
+
 msgid "Pending Approvals"
 msgstr "الموافقات المعلقة"
+
+msgid "Pending Bank Transfer Orders"
+msgstr "طلبات الدفع البنكي المعلقة"
 
 msgid "Pending Liquidity"
 msgstr "السيولة المعلقة"
@@ -107,11 +326,50 @@ msgstr "السيولة المعلقة"
 msgid "Previous"
 msgstr "السابق"
 
+msgid "Promo Codes"
+msgstr "أكواد الخصم"
+
+msgid "Queue"
+msgstr "قائمة الانتظار"
+
+msgid "Recent Admin Actions"
+msgstr "إجراءات المسؤولين الأخيرة"
+
+msgid "Recently Added Users"
+msgstr "المستخدمون المضافون حديثاً"
+
+msgid "Recently Suspended Tenants"
+msgstr "المستأجرون الموقوفون حديثاً"
+
+msgid "Record ID"
+msgstr "معرف السجل"
+
+msgid "Rejected"
+msgstr "مرفوض"
+
 msgid "Reports"
 msgstr "التقارير"
 
 msgid "Revenue Forecast & Trend"
 msgstr "توقعات الإيرادات والاتجاه"
+
+msgid "Role"
+msgstr "الدور"
+
+msgid "Role Distribution"
+msgstr "توزيع الأدوار"
+
+msgid "Role Name"
+msgstr "اسم الدور"
+
+msgid "Roles Master"
+msgstr "سجل الأدوار"
+
+msgid "Root Admin"
+msgstr "مدير النظام"
+
+msgid "Sat"
+msgstr "سبت"
 
 msgid "Save"
 msgstr "حفظ"
@@ -122,11 +380,26 @@ msgstr "ابحث عن الشحنات والعملاء والعناوين..."
 msgid "Search..."
 msgstr "بحث..."
 
+msgid "Security & Audit"
+msgstr "الأمن والتدقيق"
+
 msgid "Settings"
 msgstr "الإعدادات"
 
 msgid "Sign out"
 msgstr "تسجيل الخروج"
+
+msgid "Staff Analytics — Role Distribution"
+msgstr "تحليلات الموظفين - توزيع الأدوار"
+
+msgid "Staff overview and activity insights"
+msgstr "نظرة عامة على الموظفين ورؤى النشاط"
+
+msgid "Stale Accounts"
+msgstr "الحسابات غير النشطة"
+
+msgid "Standard Invoices"
+msgstr "الفواتير القياسية"
 
 msgid "Status"
 msgstr "الحالة"
@@ -134,8 +407,26 @@ msgstr "الحالة"
 msgid "Subadmin"
 msgstr "مسؤول فرعي"
 
+msgid "Subject"
+msgstr "الموضوع"
+
+msgid "Subscribers CRM & Billing"
+msgstr "إدارة المشتركين والفوترة"
+
+msgid "Subscribers List"
+msgstr "قائمة المشتركين"
+
+msgid "Subscription Orders"
+msgstr "طلبات الاشتراك"
+
 msgid "Subscription Packages"
 msgstr "باقات الاشتراك"
+
+msgid "Subscription Plans"
+msgstr "باقات الاشتراك"
+
+msgid "Subscription Plans Management"
+msgstr "إدارة باقات الاشتراك"
 
 msgid "Subscription Report"
 msgstr "تقرير الاشتراكات"
@@ -143,23 +434,125 @@ msgstr "تقرير الاشتراكات"
 msgid "Subscriptions"
 msgstr "الاشتراكات"
 
+msgid "Sun"
+msgstr "أحد"
+
 msgid "Super Admin"
 msgstr "المشرف العام"
 
 msgid "Super Admin Dashboard"
 msgstr "لوحة تحكم المشرف العام"
 
+msgid "Super Administrator"
+msgstr "المسؤول العام"
+
+msgid "Support Categories"
+msgstr "فئات الدعم"
+
+msgid "Support Inbox"
+msgstr "صندوق الوارد للدعم"
+
+msgid "Support Management"
+msgstr "إدارة الدعم الفني"
+
+msgid "Support Tickets"
+msgstr "تذاكر الدعم"
+
+msgid "Suspended"
+msgstr "موقوف"
+
+msgid "Suspended Accounts"
+msgstr "الحسابات الموقوفة"
+
+msgid "Suspended Billing"
+msgstr "فوترة موقوفة"
+
+msgid "Suspended Violation"
+msgstr "موقوف لمخالفة"
+
 msgid "Switch Language"
 msgstr "تبديل اللغة"
+
+msgid "System"
+msgstr "النظام"
+
+msgid "System Banners"
+msgstr "لافتات النظام"
+
+msgid "System Configurations & Tax"
+msgstr "إعدادات النظام والضرائب"
+
+msgid "System Users Analytics"
+msgstr "تحليلات مستخدمي النظام"
+
+msgid "System Users Management"
+msgstr "إدارة مستخدمي النظام"
+
+msgid "System event list is hardcoded; Super Admin cannot create new event types from UI."
+msgstr "قائمة أحداث النظام ثابتة؛ لا يمكن للمشرف العام إنشاء أنواع أحداث جديدة من الواجهة."
+
+msgid "System overview — real-time platform insights"
+msgstr "نظرة عامة على النظام — رؤى المنصة في الوقت الفعلي"
+
+msgid "Tax Codes"
+msgstr "الأكواد الضريبية"
+
+msgid "Tenant Name"
+msgstr "اسم المستأجر"
+
+msgid "Thu"
+msgstr "خميس"
 
 msgid "Ticket Health"
 msgstr "صحة التذاكر"
 
+msgid "Ticket No"
+msgstr "رقم التذكرة"
+
+msgid "Timestamp"
+msgstr "الطابع الزمني"
+
+msgid "Total"
+msgstr "الإجمالي"
+
+msgid "Total Active Staff"
+msgstr "إجمالي الموظفين النشطين"
+
 msgid "Total Revenue This Month"
 msgstr "إجمالي الإيرادات هذا الشهر"
 
+msgid "Transactions Ledger"
+msgstr "سجل المعاملات"
+
+msgid "Tue"
+msgstr "ثلاثاء"
+
+msgid "Unassigned"
+msgstr "غير معين"
+
+msgid "Update"
+msgstr "تحديث"
+
+msgid "User Count"
+msgstr "عدد المستخدمين"
+
 msgid "User Management"
 msgstr "إدارة المستخدمين"
+
+msgid "Users Analytics"
+msgstr "تحليلات المستخدمين"
+
+msgid "View"
+msgstr "عرض"
+
+msgid "View Detail"
+msgstr "عرض التفاصيل"
+
+msgid "View Full Audit Log"
+msgstr "عرض سجل التدقيق الكامل"
+
+msgid "Wed"
+msgstr "أربعاء"
 
 msgid "Welcome back"
 msgstr "مرحباً بعودتك"

@@ -1,3 +1,4 @@
+from django.utils.translation import gettext as _
 from django.contrib import messages
 from django.template import Context, Template
 from django.http import HttpResponse, JsonResponse
@@ -1376,7 +1377,7 @@ class DashboardView(LoginRequiredMixin, View):
             # Audit
             'recent_audit': recent_audit,
             # Meta
-            'page_title': 'Super Admin Dashboard',
+            'page_title': _('Super Admin Dashboard'),
             'auth_tab_sync_bump': auth_tab_sync_bump,
         }
 
@@ -2800,7 +2801,11 @@ class SystemUsersAnalyticsView(LoginRequiredMixin, View):
     template_name = 'system_users/analytics/users_analytics.html'
 
     def get(self, request):
+        from django.utils.translation import gettext as _
+        from django.utils import translation
         from datetime import timedelta
+
+        is_ar = translation.get_language() == 'ar'
 
         total_staff = AdminUser.objects.exclude(status='Suspended').count()
         suspended_count = AdminUser.objects.filter(status='Suspended').count()
@@ -2824,11 +2829,15 @@ class SystemUsersAnalyticsView(LoginRequiredMixin, View):
         now = timezone.now()
         for u in stale_accounts_qs:
             days_since = (now.date() - u.last_login_at.date()).days if u.last_login_at else None
+            role_display = None
+            if u.role:
+                role_display = u.role.role_name_ar if is_ar else u.role.role_name_en
+            
             stale_accounts.append(
                 {
                     'name': f'{u.first_name} {u.last_name}',
                     'email': u.email,
-                    'role': u.role.role_name_en if u.role else None,
+                    'role': role_display,
                     'last_login_at': u.last_login_at,
                     'days_since_login': days_since,
                 }
@@ -2844,18 +2853,24 @@ class SystemUsersAnalyticsView(LoginRequiredMixin, View):
 
         counts_by_role_id = {row['role']: row['count'] for row in active_users_by_role}
         for role in Role.objects.all().order_by('role_name_en'):
+            role_name = role.role_name_ar if is_ar else role.role_name_en
             role_distribution.append(
                 {
-                    'role_name': role.role_name_en,
+                    'role_name': role_name,
                     'count': counts_by_role_id.get(role.pk, 0),
                 }
             )
         if None in counts_by_role_id:
-            role_distribution.append({'role_name': 'Unassigned', 'count': counts_by_role_id.get(None, 0)})
+            role_distribution.append({'role_name': _('Unassigned'), 'count': counts_by_role_id.get(None, 0)})
 
-        recently_created = list(
-            AdminUser.objects.select_related('role').order_by('-created_at')[:5]
-        )
+        recently_created = []
+        for u in AdminUser.objects.select_related('role').order_by('-created_at')[:5]:
+            # Add a dynamic attribute for the role name to be used in template
+            if u.role:
+                u.display_role = u.role.role_name_ar if is_ar else u.role.role_name_en
+            else:
+                u.display_role = '-'
+            recently_created.append(u)
 
         context = {
             'total_staff': total_staff,
@@ -2866,7 +2881,7 @@ class SystemUsersAnalyticsView(LoginRequiredMixin, View):
             'stale_accounts': stale_accounts,
             'role_distribution': role_distribution,
             'recently_created': recently_created,
-            'page_title': 'System Users Analytics',
+            'page_title': _('System Users Analytics'),
         }
         return render(request, self.template_name, context)
 

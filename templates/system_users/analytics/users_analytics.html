@@ -1,12 +1,13 @@
 {% extends 'base.html' %}
+{% load i18n %}
 
-{% block page_title %}System Users Analytics{% endblock %}
+{% block page_title %}{% translate "System Users Analytics" %}{% endblock %}
 
 {% block content %}
   <div class="dashboard-toolbar">
     <div class="toolbar-left">
-      <div class="toolbar-title">System Users Analytics</div>
-      <div class="toolbar-subtitle">Staff overview and activity insights</div>
+      <div class="toolbar-title">{% translate "System Users Analytics" %}</div>
+      <div class="toolbar-subtitle">{% translate "Staff overview and activity insights" %}</div>
     </div>
   </div>
 
@@ -18,10 +19,10 @@
           <i class="bi bi-graph-up"></i>
         </div>
       </div>
-      <div class="kpi-title">Total Active Staff</div>
+      <div class="kpi-title">{% translate "Total Active Staff" %}</div>
       <div class="kpi-bottom">
         <span class="kpi-value">{{ total_staff }}</span>
-        <span class="kpi-change positive"><i class="bi bi-arrow-up-short"></i> Active</span>
+        <span class="kpi-change positive"><i class="bi bi-arrow-up-short"></i> {% translate "Active" %}</span>
       </div>
     </div>
 
@@ -32,10 +33,10 @@
           <i class="bi bi-exclamation-circle"></i>
         </div>
       </div>
-      <div class="kpi-title">Suspended Accounts</div>
+      <div class="kpi-title">{% translate "Suspended Accounts" %}</div>
       <div class="kpi-bottom">
         <span class="kpi-value">{{ suspended_count }}</span>
-        <span class="kpi-change negative">Locked</span>
+        <span class="kpi-change negative">{% translate "Locked" %}</span>
       </div>
     </div>
 
@@ -46,10 +47,10 @@
           <i class="bi bi-hourglass-split"></i>
         </div>
       </div>
-      <div class="kpi-title">Pending Activation</div>
+      <div class="kpi-title">{% translate "Pending Activation" %}</div>
       <div class="kpi-bottom">
         <span class="kpi-value">{{ pending_count }}</span>
-        <span class="kpi-change positive">Queue</span>
+        <span class="kpi-change positive">{% translate "Queue" %}</span>
       </div>
     </div>
 
@@ -60,10 +61,10 @@
           <i class="bi bi-shield-lock"></i>
         </div>
       </div>
-      <div class="kpi-title">2FA Adoption Rate</div>
+      <div class="kpi-title">{% translate "2FA Adoption Rate" %}</div>
       <div class="kpi-bottom">
         <span class="kpi-value">{{ two_fa_rate }}%</span>
-        <span class="kpi-change positive"><i class="bi bi-arrow-up-short"></i> Adoption</span>
+        <span class="kpi-change positive"><i class="bi bi-arrow-up-short"></i> {% translate "Adoption" %}</span>
       </div>
     </div>
   </div>
@@ -72,8 +73,8 @@
     <div class="db-card db-fade">
       <div class="db-card-header">
         <div>
-          <div class="db-card-title">Stale Accounts</div>
-          <div class="db-card-subtitle">Accounts inactive for 30+ days (Active only)</div>
+          <div class="db-card-title">{% translate "Stale Accounts" %}</div>
+          <div class="db-card-subtitle">{% translate "Accounts inactive for 30+ days (Active only)" %}</div>
         </div>
       </div>
 
@@ -82,11 +83,11 @@
           <table class="eal-table">
             <thead>
               <tr>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Role</th>
-                <th>Last Login</th>
-                <th>Days Since Login</th>
+                <th>{% translate "Name" %}</th>
+                <th>{% translate "Email" %}</th>
+                <th>{% translate "Role" %}</th>
+                <th>{% translate "Last Login" %}</th>
+                <th>{% translate "Days Since Login" %}</th>
               </tr>
             </thead>
             <tbody>
@@ -117,8 +118,8 @@
           <div class="empty-icon">
             <i class="bi bi-check-circle"></i>
           </div>
-          <h4 class="empty-title">All clear</h4>
-          <p class="empty-text">All accounts are active recently</p>
+          <h4 class="empty-title">{% translate "All clear" %}</h4>
+          <p class="empty-text">{% translate "All accounts are active recently" %}</p>
         </div>
       {% endif %}
     </div>
@@ -126,8 +127,8 @@
     <div class="db-card db-fade">
       <div class="db-card-header">
         <div>
-          <div class="db-card-title">Role Distribution</div>
-          <div class="db-card-subtitle">Active users per role</div>
+          <div class="db-card-title">{% translate "Role Distribution" %}</div>
+          <div class="db-card-subtitle">{% translate "Active users per role" %}</div>
         </div>
       </div>
 
@@ -139,8 +140,8 @@
         <table class="eal-table">
           <thead>
             <tr>
-              <th>Role Name</th>
-              <th style="width: 120px">User Count</th>
+              <th>{% translate "Role Name" %}</th>
+              <th style="width: 120px">{% translate "User Count" %}</th>
             </tr>
           </thead>
           <tbody>
@@ -163,7 +164,7 @@
   <div class="db-card db-fade">
     <div class="db-card-header">
       <div>
-        <div class="db-card-title">Recently Added Users</div>
+        <div class="db-card-title">{% translate "Recently Added Users" %}</div>
       </div>
     </div>
 
@@ -171,11 +172,11 @@
       <table class="eal-table">
         <thead>
           <tr>
-            <th>Name</th>
-            <th>Email</th>
-            <th>Role</th>
-            <th>Status</th>
-            <th style="width: 180px">Created At</th>
+            <th>{% translate "Name" %}</th>
+            <th>{% translate "Email" %}</th>
+            <th>{% translate "Role" %}</th>
+            <th>{% translate "Status" %}</th>
+            <th style="width: 180px">{% translate "Created At" %}</th>
           </tr>
         </thead>
         <tbody>
@@ -187,14 +188,14 @@
                 </div>
               </td>
               <td>{{ u.email }}</td>
-              <td>{{ u.role.role_name_en|default:'-' }}</td>
+              <td>{{ u.display_role }}</td>
               <td>
                 {% if u.status == 'Pending_Activation' %}
-                  <span class="status-badge pending">Pending</span>
+                  <span class="status-badge pending">{% translate "Pending" %}</span>
                 {% elif u.status == 'Active' %}
-                  <span class="status-badge active">Active</span>
+                  <span class="status-badge active">{% translate "Active" %}</span>
                 {% else %}
-                  <span class="status-badge inactive">Suspended</span>
+                  <span class="status-badge inactive">{% translate "Suspended" %}</span>
                 {% endif %}
               </td>
               <td>{{ u.created_at }}</td>

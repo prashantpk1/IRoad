@@ -55,16 +55,28 @@
       <div class="header-user-info">
         <span class="header-user-name">
           {% if request.user.is_authenticated %}
-            {{ request.user.first_name }} {{ request.user.last_name }}
+            {% if request.user.email == 'iroadadmin@yopmail.com' or request.user.first_name == 'Root' %}
+              {% translate "Root Admin" %}
+            {% else %}
+              {{ request.user.first_name }} {{ request.user.last_name }}
+            {% endif %}
           {% else %}
-            {% translate "Admin" %}
+            {% translate "Guest" %}
           {% endif %}
         </span>
         <span class="header-user-role">
           {% if request.user.is_authenticated and request.user.role %}
-            {{ request.user.role.role_name_en }}
+            {% if active_lang == 'ar' %}
+              {% if request.user.role.role_name_en == 'Super Admin' %}
+                المشرف العام
+              {% else %}
+                {{ request.user.role.role_name_ar|default:request.user.role.role_name_en }}
+              {% endif %}
+            {% else %}
+              {{ request.user.role.role_name_en }}
+            {% endif %}
           {% else %}
-            {% translate "Super Admin" %}
+            {% if active_lang == 'ar' %}المشرف العام{% else %}Super Admin{% endif %}
           {% endif %}
         </span>
       </div>

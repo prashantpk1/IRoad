@@ -10,9 +10,29 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AddField(
-            model_name='tenantprofile',
-            name='registered_address',
-            field=models.TextField(blank=True, default='', help_text='Registered address for tenant profile.'),
+        migrations.SeparateDatabaseAndState(
+            database_operations=[
+                migrations.RunSQL(
+                    sql="""
+                        ALTER TABLE crm_tenant_profiles
+                        ADD COLUMN IF NOT EXISTS registered_address text DEFAULT '' NOT NULL;
+                    """,
+                    reverse_sql="""
+                        ALTER TABLE crm_tenant_profiles
+                        DROP COLUMN IF EXISTS registered_address;
+                    """,
+                ),
+            ],
+            state_operations=[
+                migrations.AddField(
+                    model_name='tenantprofile',
+                    name='registered_address',
+                    field=models.TextField(
+                        blank=True,
+                        default='',
+                        help_text='Registered address for tenant profile.',
+                    ),
+                ),
+            ],
         ),
     ]

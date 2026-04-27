@@ -1,19 +1,20 @@
 {% extends 'base.html' %}
 {% load static %}
-{% block title %}Super Admin Dashboard{% endblock %}
-{% block page_title %}Super Admin Dashboard{% endblock %}
+{% load i18n %}
+{% block title %}{% translate "Super Admin Dashboard" %}{% endblock %}
+{% block page_title %}{% translate "Super Admin Dashboard" %}{% endblock %}
 {% block content %}
 <div class="dashboard-toolbar">
   <div class="toolbar-left">
-    <h2 class="mb-1">Super Admin Dashboard</h2>
+    <h2 class="mb-1">{% translate "Super Admin Dashboard" %}</h2>
     <div class="toolbar-subtitle">
-      System overview — real-time platform insights
+      {% translate "System overview — real-time platform insights" %}
     </div>
   </div>
   <div class="toolbar-right d-flex align-items-center gap-3">
     <div class="status-badge-premium status-badge-success">
         <span class="heartbeat-dot success"></span>
-        <span class="status-text">LIVE DATA</span>
+        <span class="status-text">{% translate "LIVE DATA" %}</span>
     </div>
     <div class="text-end border-start ps-3">
       <div id="dashDate" class="fw-semibold" style="font-size: 13px;"></div>
@@ -28,7 +29,7 @@
       <div class="kpi-top">
         <div class="kpi-icon green"><i class="bi bi-currency-dollar"></i></div>
       </div>
-      <div class="kpi-title">MRR — This Month</div>
+      <div class="kpi-title">{% translate "MRR — This Month" %}</div>
       <div class="kpi-bottom"><span class="kpi-value">{{ mrr|floatformat:2 }} SAR</span></div>
     </div>
   </a>
@@ -38,7 +39,7 @@
       <div class="kpi-top">
         <div class="kpi-icon primary"><i class="bi bi-buildings"></i></div>
       </div>
-      <div class="kpi-title">Active Subscribers</div>
+      <div class="kpi-title">{% translate "Active Subscribers" %}</div>
       <div class="kpi-bottom"><span class="kpi-value">{{ active_tenants }}</span></div>
     </div>
   </a>
@@ -48,7 +49,7 @@
       <div class="kpi-top">
         <div class="kpi-icon"><i class="bi bi-hourglass-split" style="color:#f59e0b;"></i></div>
       </div>
-      <div class="kpi-title">Awaiting Payment</div>
+      <div class="kpi-title">{% translate "Awaiting Payment" %}</div>
       <div class="kpi-bottom"><span class="kpi-value">{{ pending_orders }}</span></div>
     </div>
   </a>
@@ -58,7 +59,7 @@
       <div class="kpi-top">
         <div class="kpi-icon"><i class="bi bi-bank" style="color:#f97316;"></i></div>
       </div>
-      <div class="kpi-title">Needs Approval</div>
+      <div class="kpi-title">{% translate "Needs Approval" %}</div>
       <div class="kpi-bottom"><span class="kpi-value">{{ pending_bank_txns }}</span></div>
     </div>
   </a>
@@ -68,7 +69,7 @@
       <div class="kpi-top">
         <div class="kpi-icon purple"><i class="bi bi-headset"></i></div>
       </div>
-      <div class="kpi-title">Support Inbox</div>
+      <div class="kpi-title">{% translate "Support Inbox" %}</div>
       <div class="kpi-bottom"><span class="kpi-value">{{ open_tickets }}</span></div>
     </div>
   </a>
@@ -78,7 +79,7 @@
       <div class="kpi-top">
         <div class="kpi-icon red"><i class="bi bi-alarm"></i></div>
       </div>
-      <div class="kpi-title">Over 48 Hours</div>
+      <div class="kpi-title">{% translate "Over 48 Hours" %}</div>
       <div class="kpi-bottom"><span class="kpi-value">{{ overdue_tickets }}</span></div>
     </div>
   </a>
@@ -88,7 +89,7 @@
       <div class="kpi-top">
         <div class="kpi-icon"><i class="bi bi-shield-check" style="color:#14b8a6;"></i></div>
       </div>
-      <div class="kpi-title">Live Sessions</div>
+      <div class="kpi-title">{% translate "Live Sessions" %}</div>
       <div class="kpi-bottom"><span class="kpi-value">{{ active_admin_sessions }}</span></div>
     </div>
   </a>
@@ -98,7 +99,7 @@
   <div class="col-lg-6">
     <div class="db-card db-fade h-100">
       <div class="db-card-header">
-        <div class="db-card-title">Revenue Forecast & Trend</div>
+        <div class="db-card-title">{% translate "Revenue Forecast & Trend" %}</div>
       </div>
       <div class="db-card-body">
         <div style="height: 300px;">
@@ -112,15 +113,15 @@
   <div class="col-lg-3">
     <div class="db-card db-fade h-100">
       <div class="db-card-header">
-        <div class="db-card-title">Ticket Health</div>
+        <div class="db-card-title">{% translate "Ticket Health" %}</div>
       </div>
       <div class="db-card-body d-flex flex-column align-items-center justify-content-center">
         <div style="height: 220px; width: 100%;">
           <canvas id="ticketHealthChart"></canvas>
         </div>
         <div class="mt-3 text-center small text-muted">
-          <span class="me-2"><i class="bi bi-circle-fill" style="color: #6366f1;"></i> Open</span>
-          <span><i class="bi bi-circle-fill" style="color: #f43f5e;"></i> Overdue</span>
+          <span class="me-2"><i class="bi bi-circle-fill" style="color: #6366f1;"></i> {% translate "Open" %}</span>
+          <span><i class="bi bi-circle-fill" style="color: #f43f5e;"></i> {% translate "Overdue" %}</span>
         </div>
       </div>
     </div>
@@ -130,15 +131,15 @@
   <div class="col-lg-3">
     <div class="db-card db-fade h-100">
       <div class="db-card-header">
-        <div class="db-card-title">Pending Liquidity</div>
+        <div class="db-card-title">{% translate "Pending Liquidity" %}</div>
       </div>
       <div class="db-card-body d-flex flex-column align-items-center justify-content-center">
         <div style="height: 220px; width: 100%;">
           <canvas id="financeHubChart"></canvas>
         </div>
         <div class="mt-3 text-center small text-muted">
-          <span class="me-2"><i class="bi bi-circle-fill" style="color: #10b981;"></i> Orders</span>
-          <span><i class="bi bi-circle-fill" style="color: #f59e0b;"></i> Transfers</span>
+          <span class="me-2"><i class="bi bi-circle-fill" style="color: #10b981;"></i> {% translate "Orders" %}</span>
+          <span><i class="bi bi-circle-fill" style="color: #f59e0b;"></i> {% translate "Transfers" %}</span>
         </div>
       </div>
     </div>
@@ -150,12 +151,12 @@
   <div class="db-card db-fade">
     <div class="db-card-header">
       <div>
-        <div class="db-card-title">Pending Bank Transfer Orders</div>
+        <div class="db-card-title">{% translate "Pending Bank Transfer Orders" %}</div>
       </div>
     </div>
     <div class="table-responsive">
       <table class="table align-middle">
-        <thead><tr><th>Tenant Name</th><th>Grand Total</th><th>Currency</th><th>Created At</th><th>Actions</th></tr></thead>
+        <thead><tr><th>{% translate "Tenant Name" %}</th><th>{% translate "Grand Total" %}</th><th>{% translate "Currency" %}</th><th>{% translate "Created At" %}</th><th>{% translate "Actions" %}</th></tr></thead>
         <tbody>
           {% for order in pending_orders_list %}
           <tr>
@@ -165,12 +166,12 @@
             <td>{{ order.created_at }}</td>
             <td>
               <div class="eal-actions-cell">
-                <a href="{% url 'order_detail' pk=order.order_id %}" class="eal-row-btn" title="View Detail"><i class="bi bi-eye"></i></a>
+                <a href="{% url 'order_detail' pk=order.order_id %}" class="eal-row-btn" title="{% translate 'View Detail' %}"><i class="bi bi-eye"></i></a>
               </div>
             </td>
           </tr>
           {% empty %}
-          <tr><td colspan="5" class="text-center text-muted">No pending orders. All clear!</td></tr>
+          <tr><td colspan="5" class="text-center text-muted">{% translate "No pending orders. All clear!" %}</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -180,12 +181,12 @@
   <div class="db-card db-fade">
     <div class="db-card-header">
       <div>
-        <div class="db-card-title">Overdue Support Tickets</div>
+        <div class="db-card-title">{% translate "Overdue Support Tickets" %}</div>
       </div>
     </div>
     <div class="table-responsive">
       <table class="table align-middle">
-        <thead><tr><th>Ticket No</th><th>Tenant</th><th>Subject</th><th>Category</th><th>Hours Old</th><th>Actions</th></tr></thead>
+        <thead><tr><th>{% translate "Ticket No" %}</th><th>{% translate "Tenant" %}</th><th>{% translate "Subject" %}</th><th>{% translate "Category" %}</th><th>{% translate "Hours Old" %}</th><th>{% translate "Actions" %}</th></tr></thead>
         <tbody>
           {% for ticket in overdue_tickets_list %}
           <tr>
@@ -196,12 +197,12 @@
             <td><span class="ticket-hours-old" data-created="{{ ticket.created_at|date:'c' }}">-</span></td>
             <td>
               <div class="eal-actions-cell">
-                <a href="{% url 'ticket_detail' pk=ticket.ticket_id %}" class="eal-row-btn" title="View Detail"><i class="bi bi-eye"></i></a>
+                <a href="{% url 'ticket_detail' pk=ticket.ticket_id %}" class="eal-row-btn" title="{% translate 'View Detail' %}"><i class="bi bi-eye"></i></a>
               </div>
             </td>
           </tr>
           {% empty %}
-          <tr><td colspan="6" class="text-center text-muted">No overdue tickets.</td></tr>
+          <tr><td colspan="6" class="text-center text-muted">{% translate "No overdue tickets." %}</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -211,36 +212,36 @@
 
 <div class="db-card db-fade mt-3">
   <div class="db-card-header">
-    <div class="db-card-title">Attention Center Shortcuts</div>
+    <div class="db-card-title">{% translate "Attention Center Shortcuts" %}</div>
   </div>
   <div class="d-flex flex-wrap gap-3">
     <a class="btn btn-soft-primary d-inline-flex align-items-center gap-2 px-3" href="{% url 'order_list' %}">
-      <i class="bi bi-cart-check"></i> Pending Orders
+      <i class="bi bi-cart-check"></i> {% translate "Pending Orders" %}
     </a>
     <a class="btn btn-soft-warning d-inline-flex align-items-center gap-2 px-3" href="{% url 'transaction_list' %}">
-      <i class="bi bi-bank"></i> Bank Transfers
+      <i class="bi bi-bank"></i> {% translate "Bank Transfers" %}
     </a>
     <a class="btn btn-soft-danger d-inline-flex align-items-center gap-2 px-3" href="{% url 'ticket_list' %}">
-      <i class="bi bi-exclamation-triangle"></i> Overdue Tickets
+      <i class="bi bi-exclamation-triangle"></i> {% translate "Overdue Tickets" %}
     </a>
     <a class="btn btn-soft-secondary d-inline-flex align-items-center gap-2 px-3" href="{% url 'transaction_list' %}">
-      <i class="bi bi-x-circle"></i> Failed TXNs
+      <i class="bi bi-x-circle"></i> {% translate "Failed TXNs" %}
     </a>
     <a class="btn btn-soft-dark d-inline-flex align-items-center gap-2 px-3" href="{% url 'tenant_list' %}">
-      <i class="bi bi-person-slash"></i> Suspended Tenants
+      <i class="bi bi-person-slash"></i> {% translate "Suspended Tenants" %}
     </a>
     <a class="btn btn-soft-info d-inline-flex align-items-center gap-2 px-3" href="{% url 'audit_log_list' %}">
-      <i class="bi bi-journal-text"></i> Audit Logs
+      <i class="bi bi-journal-text"></i> {% translate "Audit Logs" %}
     </a>
   </div>
 </div>
 
 <div class="db-grid-2 mt-3">
   <div class="db-card db-fade">
-    <div class="db-card-header"><div class="db-card-title">Failed / Rejected Transactions</div></div>
+    <div class="db-card-header"><div class="db-card-title">{% translate "Failed / Rejected Transactions" %}</div></div>
     <div class="table-responsive">
       <table class="table align-middle">
-        <thead><tr><th>Tenant</th><th>Amount</th><th>Currency</th><th>Status</th><th>Date</th><th>View</th></tr></thead>
+        <thead><tr><th>{% translate "Tenant" %}</th><th>{% translate "Amount" %}</th><th>{% translate "Currency" %}</th><th>{% translate "Status" %}</th><th>{% translate "Date" %}</th><th>{% translate "View" %}</th></tr></thead>
         <tbody>
           {% for txn in failed_transactions %}
           <tr>
@@ -249,20 +250,20 @@
             <td>{{ txn.currency_id }}</td>
             <td>
               {% if txn.status == 'Failed' %}
-                <span class="status-badge suspended">Failed</span>
+                <span class="status-badge suspended">{% translate "Failed" %}</span>
               {% else %}
-                <span class="status-badge warning">Rejected</span>
+                <span class="status-badge warning">{% translate "Rejected" %}</span>
               {% endif %}
             </td>
             <td>{{ txn.created_at }}</td>
             <td>
               <div class="eal-actions-cell">
-                <a href="{% url 'transaction_detail' pk=txn.transaction_id %}" class="eal-row-btn" title="View Detail"><i class="bi bi-eye"></i></a>
+                <a href="{% url 'transaction_detail' pk=txn.transaction_id %}" class="eal-row-btn" title="{% translate 'View Detail' %}"><i class="bi bi-eye"></i></a>
               </div>
             </td>
           </tr>
           {% empty %}
-          <tr><td colspan="6" class="text-center text-muted">No failed transactions.</td></tr>
+          <tr><td colspan="6" class="text-center text-muted">{% translate "No failed transactions." %}</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -270,23 +271,23 @@
   </div>
 
   <div class="db-card db-fade">
-    <div class="db-card-header"><div class="db-card-title">Recently Suspended Tenants</div></div>
+    <div class="db-card-header"><div class="db-card-title">{% translate "Recently Suspended Tenants" %}</div></div>
     <div class="table-responsive">
       <table class="table align-middle">
-        <thead><tr><th>Company Name</th><th>Status</th><th>Updated At</th><th>View</th></tr></thead>
+        <thead><tr><th>{% translate "Company Name" %}</th><th>{% translate "Status" %}</th><th>{% translate "Updated At" %}</th><th>{% translate "View" %}</th></tr></thead>
         <tbody>
           {% for tenant in suspended_tenants %}
           <tr>
             <td>{{ tenant.company_name }}</td>
             <td>
               {% if tenant.account_status == 'Suspended_Billing' %}
-                <span class="status-badge warning">Suspended Billing</span>
+                <span class="status-badge warning">{% translate "Suspended Billing" %}</span>
               {% elif tenant.account_status == 'Suspended_Violation' %}
-                <span class="status-badge suspended">Suspended Violation</span>
+                <span class="status-badge suspended">{% translate "Suspended Violation" %}</span>
               {% elif tenant.account_status == 'Churned' %}
-                <span class="status-badge inactive">Churned</span>
+                <span class="status-badge inactive">{% translate "Churned" %}</span>
               {% elif tenant.account_status == 'Active' %}
-                 <span class="status-badge active">Active</span>
+                 <span class="status-badge active">{% translate "Active" %}</span>
               {% else %}
                 <span class="status-badge inactive">{{ tenant.account_status }}</span>
               {% endif %}
@@ -294,12 +295,12 @@
             <td>{{ tenant.updated_at }}</td>
             <td>
               <div class="eal-actions-cell">
-                <a href="{% url 'tenant_detail' pk=tenant.tenant_id %}" class="eal-row-btn" title="View Detail"><i class="bi bi-eye"></i></a>
+                <a href="{% url 'tenant_detail' pk=tenant.tenant_id %}" class="eal-row-btn" title="{% translate 'View Detail' %}"><i class="bi bi-eye"></i></a>
               </div>
             </td>
           </tr>
           {% empty %}
-          <tr><td colspan="4" class="text-center text-muted">No suspended tenants.</td></tr>
+          <tr><td colspan="4" class="text-center text-muted">{% translate "No suspended tenants." %}</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -314,7 +315,7 @@
   <div class="col-lg-6">
     <div class="db-card db-fade h-100">
       <div class="db-card-header">
-        <div class="db-card-title">Login Activity Heatmap</div>
+        <div class="db-card-title">{% translate "Login Activity Heatmap" %}</div>
       </div>
       <div class="db-card-body">
         <style>
@@ -334,7 +335,7 @@
         </style>
         <div class="heatmap-container">
           <div class="heatmap-y-axis">
-            <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+            <span>{% translate "Mon" %}</span><span>{% translate "Tue" %}</span><span>{% translate "Wed" %}</span><span>{% translate "Thu" %}</span><span>{% translate "Fri" %}</span><span>{% translate "Sat" %}</span><span>{% translate "Sun" %}</span>
           </div>
           <div class="heatmap-scrollable">
             {{ heatmap_data|json_script:"heatmap-data" }}
@@ -345,13 +346,13 @@
           </div>
         </div>
         <div class="heatmap-legend">
-          <span class="legend-label">Less</span>
+          <span class="legend-label">{% translate "Less" %}</span>
           <div class="legend-color" style="background: #f1f5f9"></div>
           <div class="legend-color" style="background: #cbd5e1"></div>
           <div class="legend-color" style="background: #818cf8"></div>
           <div class="legend-color" style="background: #6366f1"></div>
           <div class="legend-color" style="background: #4338ca"></div>
-          <span class="legend-label">More</span>
+          <span class="legend-label">{% translate "More" %}</span>
         </div>
       </div>
     </div>
@@ -361,7 +362,7 @@
   <div class="col-lg-6">
     <div class="db-card db-fade h-100">
       <div class="db-card-header">
-        <div class="db-card-title">Staff Analytics — Role Distribution</div>
+        <div class="db-card-title">{% translate "Staff Analytics — Role Distribution" %}</div>
       </div>
       <div class="db-card-body">
         <div class="row align-items-center">
@@ -370,7 +371,7 @@
               <canvas id="roleDistributionChart"></canvas>
               <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; pointer-events: none;">
                 <div style="font-size: 24px; font-weight: 700; color: #1e293b;">{{ total_staff }}</div>
-                <div style="font-size: 10px; color: #64748b; font-weight: 600; text-transform: uppercase;">Total</div>
+                <div style="font-size: 10px; color: #64748b; font-weight: 600; text-transform: uppercase;">{% translate "Total" %}</div>
               </div>
             </div>
           </div>
@@ -380,7 +381,9 @@
               <div class="d-flex align-items-center justify-content-between p-2 rounded" style="background: #f8fafc; border: 1px solid #e2e8f0;">
                 <div class="d-flex align-items-center gap-2">
                   <span class="role-legend-dot" data-index="{{ forloop.counter0 }}" style="width: 8px; height: 8px; border-radius: 50%;"></span>
-                  <span style="font-size: 12px; font-weight: 500; color: #1e293b;">{{ role.role_name_en }}</span>
+                  <span style="font-size: 12px; font-weight: 500; color: #1e293b;">
+                    {% if request.LANGUAGE_CODE|slice:':2' == 'ar' %}{{ role.role_name_ar }}{% else %}{{ role.role_name_en }}{% endif %}
+                  </span>
                 </div>
                 <div class="text-end">
                    <div style="font-size: 13px; font-weight: 700; color: #1e293b;">{{ role.staff_count }}</div>
@@ -393,15 +396,15 @@
         </div>
         <div class="row text-center mt-3 pt-3 border-top">
           <div class="col-4">
-            <div class="small text-muted mb-1">Active</div>
+            <div class="small text-muted mb-1">{% translate "Active" %}</div>
             <div class="fw-bold">{{ total_staff }}</div>
           </div>
           <div class="col-4">
-            <div class="small text-muted mb-1">Suspended</div>
+            <div class="small text-muted mb-1">{% translate "Suspended" %}</div>
             <div class="fw-bold text-danger">{{ suspended_admins }}</div>
           </div>
           <div class="col-4">
-            <div class="small text-muted mb-1">Stale</div>
+            <div class="small text-muted mb-1">{% translate "Stale" %}</div>
             <div class="fw-bold text-warning">{{ stale_accounts }}</div>
           </div>
         </div>
@@ -412,19 +415,19 @@
 
 <div class="db-card db-fade mt-3">
   <div class="db-card-header">
-    <div class="db-card-title">Recent Admin Actions</div>
+    <div class="db-card-title">{% translate "Recent Admin Actions" %}</div>
   </div>
   <div class="eal-table-wrap">
     <table class="eal-table">
       <thead>
         <tr>
           <th style="width: 50px">#</th>
-          <th>Admin</th>
-          <th>Action</th>
-          <th>Module</th>
-          <th>Record ID</th>
-          <th>IP Address</th>
-          <th class="text-end">Timestamp</th>
+          <th>{% translate "Admin" %}</th>
+          <th>{% translate "Action" %}</th>
+          <th>{% translate "Module" %}</th>
+          <th>{% translate "Record ID" %}</th>
+          <th>{% translate "IP Address" %}</th>
+          <th class="text-end">{% translate "Timestamp" %}</th>
         </tr>
       </thead>
       <tbody>
@@ -434,16 +437,16 @@
           <td>
             <div class="d-flex align-items-center gap-2">
               
-                <span class="fw-bold">{% if item.admin %}{{ item.admin.first_name }} {{ item.admin.last_name }}{% else %}System{% endif %}</span>
+                <span class="fw-bold">{% if item.admin %}{{ item.admin.first_name }} {{ item.admin.last_name }}{% else %}{% translate "System" %}{% endif %}</span>
             </div>
           </td>
           <td>
             {% if item.action_type == 'Create' %}
-                <span class="status-badge active">Create</span>
+                <span class="status-badge active">{% translate "Create" %}</span>
             {% elif item.action_type == 'Update' %}
-                <span class="status-badge primary">Update</span>
+                <span class="status-badge primary">{% translate "Update" %}</span>
             {% elif item.action_type == 'Delete' %}
-                <span class="status-badge suspended">Delete</span>
+                <span class="status-badge suspended">{% translate "Delete" %}</span>
             {% else %}
                 <span class="status-badge warning">{{ item.action_type }}</span>
             {% endif %}
@@ -454,14 +457,14 @@
           <td class="text-end text-muted small">{{ item.timestamp|date:'d M, H:i' }}</td>
         </tr>
         {% empty %}
-        <tr><td colspan="7" class="text-center text-muted py-4">No audit entries yet.</td></tr>
+        <tr><td colspan="7" class="text-center text-muted py-4">{% translate "No audit entries yet." %}</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
   <div class="mt-3 text-center">
     <a href="{% url 'audit_log_list' %}" class="eal-btn eal-btn-outline" style="font-size: 11px; padding: 4px 16px;">
-      <span>View Full Audit Log</span>
+      <span>{% translate "View Full Audit Log" %}</span>
       <i class="bi bi-arrow-right"></i>
     </a>
   </div>
@@ -496,7 +499,7 @@ function initEnhancedCharts() {
         data: {
             labels: {{ revenue_labels|safe|default:"[]" }},
             datasets: [{
-                label: 'Revenue (SAR)',
+                label: isArabic ? 'الإيرادات (ريال)' : 'Revenue (SAR)',
                 data: {{ revenue_data|safe|default:"[]" }},
                 borderColor: '#5051f9',
                 backgroundColor: revGradient,
@@ -530,7 +533,7 @@ function initEnhancedCharts() {
     new Chart(ticketCtx, {
         type: 'doughnut',
         data: {
-            labels: ['Open', 'Overdue'],
+            labels: [isArabic ? 'مفتوح' : 'Open', isArabic ? 'متأخر' : 'Overdue'],
             datasets: [{
                 data: [{{ open_tickets|default:0 }}, {{ overdue_tickets|default:0 }}],
                 backgroundColor: ['#6366f1', '#f43f5e'],
@@ -551,7 +554,7 @@ function initEnhancedCharts() {
     new Chart(financeCtx, {
         type: 'doughnut',
         data: {
-            labels: ['Orders', 'Transfers'],
+            labels: [isArabic ? 'طلبات' : 'Orders', isArabic ? 'تحويلات' : 'Transfers'],
             datasets: [{
                 data: [{{ pending_orders|default:0 }}, {{ pending_bank_txns|default:0 }}],
                 backgroundColor: ['#10b981', '#f59e0b'],
@@ -578,7 +581,7 @@ function initEnhancedCharts() {
     new Chart(roleCtx, {
         type: 'doughnut',
         data: {
-            labels: [{% for r in role_distribution %}'{{ r.role_name_en }}',{% endfor %}],
+            labels: [{% for r in role_distribution %}isArabic ? '{{ r.role_name_ar }}' : '{{ r.role_name_en }}',{% endfor %}],
             datasets: [{
                 data: [{% for r in role_distribution %}{{ r.staff_count }},{% endfor %}],
                 backgroundColor: roleColors,
@@ -624,15 +627,39 @@ function initEnhancedCharts() {
 
 }
 
+
 function updateDateTime() {
     const now = new Date();
     const dateEl = document.getElementById('dashDate');
     const timeEl = document.getElementById('dashTime');
+    
+    // Detect RTL/Arabic from body or html
+    const isArabic = document.documentElement.lang.startsWith('ar') || document.body.dir === 'rtl';
+    const locale = isArabic ? 'ar-SA' : 'en-US';
+    
     if (dateEl) {
-        dateEl.textContent = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        try {
+            dateEl.textContent = now.toLocaleDateString(locale, { 
+                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
+            });
+        } catch(e) {
+            dateEl.textContent = now.toDateString();
+        }
     }
     if (timeEl) {
-        timeEl.textContent = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        try {
+            timeEl.textContent = now.toLocaleTimeString(locale, { 
+                hour: '2-digit', minute: '2-digit', second: '2-digit' 
+            });
+        } catch(e) {
+            timeEl.textContent = now.toTimeString().split(' ')[0];
+        }
+    }
+}
+);
+    }
+    if (timeEl) {
+        timeEl.textContent = now.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     }
 }
 updateDateTime();
