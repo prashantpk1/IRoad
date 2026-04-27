@@ -36,7 +36,7 @@
       <div class="field-group">
         <div class="row g-4">
           <div class="col-12 col-md-6">
-            <label class="form-label">{% translate "Company Logo" %}</label>
+            <label class="form-label">{% translate "Company Logo" %} <span class="text-danger">*</span></label>
             <div class="logo-preview-container" style="margin-bottom: 16px;">
               {% if obj.company_logo %}
                 <div class="d-flex align-items-center gap-3 p-3 bg-light rounded-3 border">
@@ -54,17 +54,17 @@
             <div class="field-error">{{ form.company_logo.errors }}</div>
           </div>
           <div class="col-12 col-md-6">
-            <label class="form-label">{% translate "Company Name (EN)" %}</label>
+            <label class="form-label">{% translate "Company Name (EN)" %} <span class="text-danger">*</span></label>
             {{ form.company_name_en }}
             <div class="field-error">{{ form.company_name_en.errors }}</div>
           </div>
           <div class="col-12 col-md-6">
-            <label class="form-label">{% translate "Company Name (AR)" %}</label>
+            <label class="form-label">{% translate "Company Name (AR)" %} <span class="text-danger">*</span></label>
             {{ form.company_name_ar }}
             <div class="field-error">{{ form.company_name_ar.errors }}</div>
           </div>
           <div class="col-12 col-md-6">
-            <label class="form-label">{% translate "Company Country" %}</label>
+            <label class="form-label">{% translate "Company Country" %} <span class="text-danger">*</span></label>
             {{ form.company_country_code }}
             <div class="field-error">{{ form.company_country_code.errors }}</div>
           </div>

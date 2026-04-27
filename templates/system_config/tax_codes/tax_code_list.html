@@ -212,7 +212,7 @@
         <tbody>
           {% for tax in tax_codes.object_list %}
             <tr>
-              <td>{{ tax.default_rank }}</td>
+              <td>{{ tax.list_rank }}</td>
               <td><span class="eal-entity-id">{{ tax.tax_code }}</span></td>
               <td>{{ tax.rate_percent }}</td>
               <td>{{ tax.applicable_country_code.name_en|default:"-" }}</td>

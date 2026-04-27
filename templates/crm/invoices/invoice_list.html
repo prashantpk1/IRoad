@@ -204,7 +204,7 @@
       <tbody>
         {% for inv in invoices %}
           <tr>
-            <td>{{ inv.default_rank }}</td>
+            <td>{{ inv.list_rank }}</td>
             <td><span class="eal-entity-id">{{ inv.invoice_number }}</span></td>
             <td><span class="fw-bold">{{ inv.tenant.company_name }}</span></td>
             <td>{{ inv.grand_total|floatformat:2 }}</td>

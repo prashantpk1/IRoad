@@ -222,7 +222,7 @@
       <tbody>
         {% for t in tenants %}
           <tr>
-            <td>{{ t.default_rank }}</td>
+            <td>{{ t.list_rank }}</td>
             <td><span class="fw-bold">{{ t.company_name }}</span></td>
             <td>{{ t.primary_email }}</td>
             <td>{{ t.country.name_en|default:'-' }}</td>

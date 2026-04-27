@@ -54,7 +54,7 @@
         {% if request.user.is_root %}
           <a href="{% url 'addons_policy_create' %}" class="eal-btn eal-btn-primary">
             <i class="bi bi-plus-lg"></i>
-            <span>Add Policy</span>
+            <span>Add New Add-ons</span>
           </a>
         {% endif %}
       </div>
@@ -218,7 +218,7 @@
         <tbody>
           {% for p in policies %}
             <tr style="{% if p.is_active %}border-left: 4px solid #22c55e;{% endif %}">
-              <td>{{ p.default_rank }}</td>
+              <td>{{ p.list_rank }}</td>
               <td><span class="fw-bold">{{ p.policy_name }}</span></td>
               <td>{{ p.extra_internal_user_price }}</td>
               <td>{{ p.extra_internal_truck_price }}</td>
@@ -273,7 +273,7 @@
         {% if request.user.is_root %}
           <a href="{% url 'addons_policy_create' %}" class="eal-btn eal-btn-primary" style="margin-top: 1rem;">
             <i class="bi bi-plus-lg"></i>
-            {% translate "Add Policy" %}
+            {% translate "Add New Add-ons" %}
           </a>
         {% endif %}
       {% endif %}

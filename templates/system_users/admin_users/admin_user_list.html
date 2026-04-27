@@ -192,7 +192,7 @@
         <tbody>
           {% for u in admin_users.object_list %}
             <tr>
-              <td>{{ u.default_rank }}</td>
+              <td>{{ u.list_rank }}</td>
               <td>
                 <div class="eal-name-cell">
                   <span class="eal-name-text">
@@ -256,6 +256,8 @@
                         </button>
                       {% endif %}
                     </form>
+                  {% endif %}
+                  {% if u.status != 'Active' %}
                     <form method="post" action="{% url 'admin_user_delete' u.pk %}" onsubmit="return confirm('Remove this admin user?');">
                       {% csrf_token %}
                       <button type="submit" class="eal-row-btn" title="Delete (Soft)">

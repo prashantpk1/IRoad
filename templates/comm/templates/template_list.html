@@ -88,7 +88,7 @@
             <tr>
               <th class="sortable" style="width: 120px">
                 <a href="?q={{ search_query }}&channel={{ channel_filter }}&category={{ category_filter }}&status={{ status_filter }}&sort=rank&dir={% if current_sort == 'rank' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                  <span>Template ID</span>
+                  <span>#</span>
                   {% if current_sort == 'rank' %}
                     <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
                   {% else %}
@@ -154,7 +154,7 @@
           <tbody>
             {% for t in templates_page.object_list %}
               <tr>
-                <td><span class="eal-entity-id">TPL-{{ t.template_id|slice:":8" }}</span></td>
+                <td>{{ t.list_rank }}</td>
                 <td><span class="fw-semibold text-dark">{{ t.template_name }}</span></td>
                 <td>
                   {% if t.channel_type == 'Email' %}

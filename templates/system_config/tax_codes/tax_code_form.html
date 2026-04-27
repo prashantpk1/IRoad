@@ -125,19 +125,15 @@
           <div class="col-12 col-md-6">
             <label class="form-label">{% translate "Defaults & Status" %}</label>
             <div class="field-container d-flex flex-column gap-3 mt-2">
-              <div class="form-check d-flex align-items-center m-0">
-                {{ form.is_default_for_country }}
-                <label class="form-check-label fw-medium ms-2" for="{{ form.is_default_for_country.id_for_label }}">
-                  {% translate "Set as Country Default" %}
-                </label>
-              </div>
-              <div class="form-check d-flex align-items-center m-0">
-                {{ form.is_international_default }}
-                <label class="form-check-label fw-medium ms-2" for="{{ form.is_international_default.id_for_label }}">
-                  {% translate "Set as International Default" %}
-                </label>
-              </div>
-              <div class="form-check form-switch d-flex align-items-center m-0">
+              {% for radio in form.default_type %}
+                <div class="form-check d-flex align-items-center m-0">
+                  {{ radio.tag }}
+                  <label class="form-check-label fw-medium ms-2" for="{{ radio.id_for_label }}">
+                    {{ radio.choice_label }}
+                  </label>
+                </div>
+              {% endfor %}
+              <div class="form-check form-switch d-flex align-items-center m-0 pt-2 border-top">
                 {{ form.is_active }}
                 <label class="form-check-label fw-medium ms-2" for="id_taxcode_is_active">
                   {% translate "Active Status" %}
@@ -148,9 +144,9 @@
           </div>
         </div>
       </div>
-
     </div>
-
+    </div>
+    </div>
     <!-- Fixed Action Bar at the bottom of the viewport -->
     <div class="form-actions-bar">
       <div class="form-actions-left">

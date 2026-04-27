@@ -129,9 +129,10 @@ class AdminSecuritySettings(models.Model):
         max_length=50,
         default='ADMIN-SEC-CONF',
     )
-    session_timeout_minutes = models.IntegerField(default=240)
+    session_timeout_minutes = models.IntegerField(default=1440)
     max_failed_logins = models.IntegerField(default=3)
     lockout_duration_minutes = models.IntegerField(default=30)
+    otp_timeout_seconds = models.IntegerField(default=240)
     updated_by = models.ForeignKey(
         'AdminUser',
         on_delete=models.SET_NULL,
@@ -1447,6 +1448,7 @@ class InternalAlertRoute(models.Model):
         ordering = ['trigger_event']
 
 
+
 class InternalAlertNotification(models.Model):
     notification_id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     admin_user = models.ForeignKey(
@@ -1595,17 +1597,6 @@ class TenantProfile(models.Model):
         default='',
         db_index=True,
         help_text='PostgreSQL schema name for isolated tenant workspace (CP 4.3.2).',
-    )
-    provisioning_error = models.TextField(
-        blank=True,
-        default='',
-        help_text='Last provisioning failure message (empty when no error).',
-    )
-    provisioning_status = models.CharField(
-        max_length=30,
-        blank=True,
-        default='',
-        help_text='Workspace provisioning status (empty when not started).',
     )
   
     registered_at = models.DateTimeField(auto_now_add=True)
@@ -2077,7 +2068,13 @@ class StandardInvoice(models.Model):
 
     # Snapshot fields (hard-copied at generation)
     supplier_name = models.CharField(max_length=100)
+    supplier_name_ar = models.CharField(max_length=100, null=True, blank=True)
     supplier_tax_number = models.CharField(max_length=50)
+    supplier_address = models.TextField(null=True, blank=True)
+    supplier_support_email = models.EmailField(max_length=100, null=True, blank=True)
+    supplier_support_phone = models.CharField(max_length=20, null=True, blank=True)
+    supplier_commercial_register = models.CharField(max_length=50, null=True, blank=True)
+    
     customer_name = models.CharField(max_length=100)
     customer_tax_number = models.CharField(
         max_length=50,

@@ -8,6 +8,11 @@
     body { font-family: Arial, sans-serif; margin: 24px; color: #111; }
     .row { display: flex; justify-content: space-between; gap: 24px; margin-bottom: 16px; }
     .col { flex: 1; }
+    /* Use table-based two-column layout for reliable PDF/print rendering. */
+    .party-table { width: 100%; border-collapse: collapse; table-layout: fixed; margin-top: 20px; }
+    .party-table td { vertical-align: top; padding: 0; border: none; }
+    .party-col { width: calc((100% - 32px) / 2); }
+    .party-gap { width: 32px; }
     .muted { color: #666; font-size: 12px; }
     h1 { margin: 0 0 8px 0; font-size: 28px; }
     h2 { margin: 0 0 8px 0; font-size: 18px; }
@@ -17,9 +22,7 @@
     .text-end { text-align: right; }
     .totals { margin-top: 20px; width: 360px; margin-left: auto; }
     .totals td { border: none; border-bottom: 1px solid #ddd; }
-    .actions { margin-top: 20px; display: flex; gap: 10px; }
     @media print {
-      .actions { display: none; }
       body { margin: 12px; }
     }
   </style>
@@ -33,19 +36,52 @@
   <h1>{{ invoice.invoice_number }}</h1>
   <div class="muted">Issue Date: {{ invoice.issue_date|date:'d M Y' }}</div>
 
-  <div class="row" style="margin-top: 20px;">
-    <div class="col">
-      <h2>Supplier</h2>
-      <div>{{ invoice.supplier_name }}</div>
-      <div class="muted">Tax: {{ invoice.supplier_tax_number|default:'—' }}</div>
-    </div>
-    <div class="col">
-      <h2>Bill To</h2>
-      <div>{{ invoice.customer_name }}</div>
-      <div class="muted">Tax: {{ invoice.customer_tax_number|default:'—' }}</div>
-      <div class="muted">Address: {{ invoice.customer_address|default:'—' }}</div>
-    </div>
-  </div>
+  <table class="party-table">
+    <tr>
+      <td class="party-col">
+        <h2>Supplier</h2>
+        <div><strong>{{ legal_identity.company_name_en|default:invoice.supplier_name }}</strong></div>
+        <div class="muted">
+          {% if legal_identity and legal_identity.registered_address %}
+            <div>{{ legal_identity.registered_address }}</div>
+          {% elif not legal_identity and invoice.supplier_address %}
+            <div>{{ invoice.supplier_address }}</div>
+          {% endif %}
+          {% if legal_identity and legal_identity.tax_number %}
+            <div>Tax: {{ legal_identity.tax_number }}</div>
+          {% elif not legal_identity and invoice.supplier_tax_number %}
+            <div>Tax: {{ invoice.supplier_tax_number }}</div>
+          {% endif %}
+          {% if legal_identity and legal_identity.commercial_register %}
+            <div>CR: {{ legal_identity.commercial_register }}</div>
+          {% elif not legal_identity and invoice.supplier_commercial_register %}
+            <div>CR: {{ invoice.supplier_commercial_register }}</div>
+          {% endif %}
+          {% if legal_identity and legal_identity.support_email %}
+            <div>Email: {{ legal_identity.support_email }}</div>
+          {% elif not legal_identity and invoice.supplier_support_email %}
+            <div>Email: {{ invoice.supplier_support_email }}</div>
+          {% endif %}
+          {% if legal_identity and legal_identity.support_phone %}
+            <div>Phone: {{ legal_identity.support_phone }}</div>
+          {% elif not legal_identity and invoice.supplier_support_phone %}
+            <div>Phone: {{ invoice.supplier_support_phone }}</div>
+          {% endif %}
+        </div>
+      </td>
+      <td class="party-gap"></td>
+      <td class="party-col">
+        <h2>Bill To</h2>
+        <div><strong>{{ invoice.customer_name }}</strong></div>
+        {% if invoice.customer_tax_number %}
+          <div class="muted">Tax: {{ invoice.customer_tax_number }}</div>
+        {% endif %}
+        {% if invoice.customer_address %}
+          <div class="muted">Address: {{ invoice.customer_address }}</div>
+        {% endif %}
+      </td>
+    </tr>
+  </table>
 
   <table>
     <thead>
@@ -78,10 +114,5 @@
     <tr><td>Tax amount</td><td class="text-end">{{ invoice.tax_amount|floatformat:2 }}</td></tr>
     <tr><td><strong>Grand total</strong></td><td class="text-end"><strong>{{ invoice.grand_total|floatformat:2 }} {{ invoice.currency_id }}</strong></td></tr>
   </table>
-
-  <div class="actions">
-    <button onclick="window.print()">Print / Save PDF</button>
-    <button onclick="window.close()">Close</button>
-  </div>
 </body>
 </html>

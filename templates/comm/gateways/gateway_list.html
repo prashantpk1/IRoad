@@ -211,7 +211,7 @@
           <tbody>
             {% for gateway in gateways.object_list %}
               <tr{% if gateway.gateway_type == 'Email' and gateway.gateway_id == active_email_id %} style="background:#f0fdf4"{% elif gateway.gateway_type == 'SMS' and gateway.gateway_id == active_sms_id %} style="background:#f0fdf4"{% endif %}>
-                <td>{{ forloop.counter0|add:gateways.start_index }}</td>
+                <td>{{ gateway.list_rank }}</td>
                 <td>
                   {% if gateway.gateway_type == 'Email' %}
                     <span class="status-badge inactive">Email</span>

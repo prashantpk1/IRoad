@@ -93,7 +93,7 @@
     <tbody>
       {% for session in sessions %}
         <tr {% if session.jti == current_jti %}class="table-info"{% endif %}>
-          <td>{{ sessions.start_index|add:forloop.counter0 }}</td>
+          <td>{{ session.list_rank }}</td>
           <td>
             <div class="eal-name-cell">
               <span class="eal-name-text">
@@ -115,11 +115,16 @@
           <td>{{ session.started_at }}</td>
           <td>{{ session.last_activity }}</td>
           <td>
-            {% if session.ttl_seconds and session.ttl_seconds > 0 %}
-              {{ session.ttl_seconds }}s
-            {% else %}
-              &lt; 1 min
-            {% endif %}
+            <span
+              class="js-ttl-countdown"
+              data-ttl-seconds="{% if session.ttl_seconds and session.ttl_seconds > 0 %}{{ session.ttl_seconds }}{% else %}0{% endif %}"
+            >
+              {% if session.ttl_seconds and session.ttl_seconds > 0 %}
+                {{ session.ttl_seconds }}s
+              {% else %}
+                Expired
+              {% endif %}
+            </span>
           </td>
           <td>
             {% if session.jti != current_jti %}

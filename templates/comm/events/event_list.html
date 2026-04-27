@@ -189,7 +189,7 @@
           {% for row in page_rows %}
             {% if row.row_type == 'mapped' %}
               <tr>
-                <td>{{ row.row_id }}</td>
+                <td>{{ row.list_rank }}</td>
                 <td>{{ row.mapping.get_system_event_display }}</td>
                 <td>{{ row.mapping.primary_channel }}</td>
                 <td>{{ row.mapping.primary_template.template_name|default:'-' }}</td>
@@ -208,7 +208,7 @@
               </tr>
             {% else %}
               <tr class="table-warning">
-                <td>{{ row.row_id }}</td>
+                <td>{{ row.list_rank }}</td>
                 <td>{{ row.event.label }}</td>
                 <td colspan="5">
                   <span class="text-warning fw-semibold">⚠ Not Configured</span>

@@ -26,6 +26,23 @@ document.addEventListener("DOMContentLoaded", function () {
 });
 
 /* ============================================
+   Shared Body Scroll Lock
+   ============================================ */
+const bodyScrollLocks = new Set();
+
+function setBodyScrollLock(source, shouldLock) {
+  if (!source) {
+    return;
+  }
+  if (shouldLock) {
+    bodyScrollLocks.add(source);
+  } else {
+    bodyScrollLocks.delete(source);
+  }
+  document.body.style.overflow = bodyScrollLocks.size > 0 ? "hidden" : "";
+}
+
+/* ============================================
    Ensure Unified Sidebar (load from index.html)
    ============================================ */
 function ensureUnifiedSidebar() {
@@ -58,9 +75,7 @@ function initSidebarCollapse() {
       // Mobile: toggle sidebar overlay (slide in/out)
       sidebar.classList.toggle("active");
       if (overlay) overlay.classList.toggle("active");
-      document.body.style.overflow = sidebar.classList.contains("active")
-        ? "hidden"
-        : "";
+      setBodyScrollLock("sidebar", sidebar.classList.contains("active"));
     } else {
       // Desktop: toggle collapsed state
       sidebar.classList.toggle("collapsed");
@@ -221,9 +236,7 @@ function initSidebar() {
     mobileToggle.addEventListener("click", function () {
       sidebar.classList.toggle("active");
       overlay.classList.toggle("active");
-      document.body.style.overflow = sidebar.classList.contains("active")
-        ? "hidden"
-        : "";
+      setBodyScrollLock("sidebar", sidebar.classList.contains("active"));
     });
   }
 
@@ -232,7 +245,7 @@ function initSidebar() {
     overlay.addEventListener("click", function () {
       sidebar.classList.remove("active");
       overlay.classList.remove("active");
-      document.body.style.overflow = "";
+      setBodyScrollLock("sidebar", false);
     });
   }
 
@@ -300,7 +313,7 @@ function initSidebar() {
     if (window.innerWidth > 992) {
       sidebar.classList.remove("active");
       overlay.classList.remove("active");
-      document.body.style.overflow = "";
+      setBodyScrollLock("sidebar", false);
     }
   });
 
@@ -636,7 +649,7 @@ function initNotificationPanel() {
     e.stopPropagation();
     notificationPanel.classList.add("active");
     notificationOverlay.classList.add("active");
-    document.body.style.overflow = "hidden";
+    setBodyScrollLock("notifications", true);
   }
 
   if (notificationPanel) {
@@ -654,12 +667,18 @@ function initNotificationPanel() {
     function closeNotificationPanel() {
       notificationPanel.classList.remove("active");
       notificationOverlay.classList.remove("active");
-      preferencesPopup.classList.remove("active");
-      document.body.style.overflow = "";
+      if (preferencesPopup) {
+        preferencesPopup.classList.remove("active");
+      }
+      setBodyScrollLock("notifications", false);
     }
 
-    notificationClose.addEventListener("click", closeNotificationPanel);
-    notificationOverlay.addEventListener("click", closeNotificationPanel);
+    if (notificationClose) {
+      notificationClose.addEventListener("click", closeNotificationPanel);
+    }
+    if (notificationOverlay) {
+      notificationOverlay.addEventListener("click", closeNotificationPanel);
+    }
 
     // Close on Escape key
     document.addEventListener("keydown", function (e) {
@@ -679,9 +698,11 @@ function initNotificationPanel() {
       });
 
       // Close preferences when clicking Done
-      preferencesDone.addEventListener("click", function () {
-        preferencesPopup.classList.remove("active");
-      });
+      if (preferencesDone) {
+        preferencesDone.addEventListener("click", function () {
+          preferencesPopup.classList.remove("active");
+        });
+      }
 
       // Close preferences when clicking outside
       notificationPanel.addEventListener("click", function (e) {

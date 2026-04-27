@@ -1,18 +1,18 @@
 {% extends 'base.html' %}
 {% load i18n %}
 
-{% block page_title %}{% if is_edit %}{% translate "Edit Policy" %}{% else %}{% translate "Add Policy" %}{% endif %}{% endblock %}
+{% block page_title %}{% if is_edit %}{% translate "Edit Add-ons Policy" %}{% else %}{% translate "Add Add-ons Policy" %}{% endif %}{% endblock %}
 
 
 {% block breadcrumb_items %}
-<li class="breadcrumb-item active" aria-current="page">{% if is_edit %}{% translate "Edit Policy" %}{% else %}{% translate "Add Policy" %}{% endif %}</li>
+<li class="breadcrumb-item active" aria-current="page">{% if is_edit %}{% translate "Edit Add-ons Policy" %}{% else %}{% translate "Add Add-ons Policy" %}{% endif %}</li>
 {% endblock %}
 
 {% block content %}
 <div class="page-header">
   <div class="page-header-row">
     <div class="page-header-left">
-      <h1 class="page-title">{% if is_edit %}{% translate "Edit Policy" %}{% else %}{% translate "Add Policy" %}{% endif %}</h1>
+      <h1 class="page-title">{% if is_edit %}{% translate "Edit Add-ons Policy" %}{% else %}{% translate "Add Add-ons Policy" %}{% endif %}</h1>
       <p class="page-subtitle">{% translate "Manage your records here" %}</p>
     </div>
    
@@ -107,7 +107,7 @@
           <div class="form-actions-right">
             <button type="submit" class="eal-btn eal-btn-primary">
               <i class="bi bi-send"></i>
-              <span>{% if is_edit %}{% translate "Update Policy" %}{% else %}{% translate "Add Policy" %}{% endif %}</span>
+              <span>{% if is_edit %}{% translate "Update Add-ons Policy" %}{% else %}{% translate "Add Add-ons Policy" %}{% endif %}</span>
             </button>
           </div>
         </div>

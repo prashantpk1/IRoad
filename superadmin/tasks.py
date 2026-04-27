@@ -197,6 +197,7 @@ def check_subscription_expiry_task(self):
 
         from superadmin.models import TenantProfile
         from superadmin.billing_helpers import get_subscription_grace_days
+        from superadmin.communication_helpers import dispatch_internal_alerts
         from superadmin.redis_helpers import revoke_all_tenant_sessions
 
         grace = get_subscription_grace_days()
@@ -212,6 +213,24 @@ def check_subscription_expiry_task(self):
             tenant.save(update_fields=['account_status', 'updated_at'])
             revoke_all_tenant_sessions(str(tenant.tenant_id))
             revoke_tenant_sessions_task.delay(str(tenant.tenant_id))
+            dispatch_internal_alerts(
+                'Subscription_Expired',
+                context_dict={
+                    'tenant_id': str(tenant.tenant_id),
+                    'company_name': tenant.company_name,
+                    'primary_email': tenant.primary_email,
+                    'subscription_expiry_date': (
+                        tenant.subscription_expiry_date.isoformat()
+                        if tenant.subscription_expiry_date
+                        else ''
+                    ),
+                    'grace_days': grace,
+                    'message': (
+                        f'Subscription expired for "{tenant.company_name}". '
+                        'Tenant has been suspended for billing.'
+                    ),
+                },
+            )
             suspended += 1
         logger.info(
             'Subscription expiry check: cutoff=%s suspended=%s',
@@ -220,6 +239,24 @@ def check_subscription_expiry_task(self):
         )
         return {'status': 'completed', 'cutoff': str(cutoff), 'suspended': suspended}
     except Exception as exc:
+        try:
+            from superadmin.communication_helpers import dispatch_internal_alerts
+
+            dispatch_internal_alerts(
+                'System_Error',
+                context_dict={
+                    'source': 'check_subscription_expiry_task',
+                    'error': str(exc),
+                    'message': (
+                        'Subscription expiry checker failed with a system error. '
+                        'Review worker logs.'
+                    ),
+                },
+            )
+        except Exception:
+            logger.exception(
+                'Failed to dispatch System_Error internal alert for subscription expiry task failure.',
+            )
         logger.error(f'check_subscription_expiry_task failed: {exc}')
         raise self.retry(exc=exc, countdown=3600)
 

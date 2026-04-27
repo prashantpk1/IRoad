@@ -66,6 +66,7 @@ from .views import (
     OTPVerificationView,
     InternalAlertRouteCreateView,
     InternalAlertRouteListView,
+    InternalAlertNotificationClearAllView,
     InternalAlertNotificationReadAllView,
     InternalAlertNotificationReadView,
     InternalAlertRouteToggleStatusView,
@@ -146,6 +147,7 @@ from .views import (
     TenantCreateView,
     TenantDeleteView,
     TenantDetailView,
+    TenantHistoryPartialView,
     TenantImpersonationView,
     TenantListView,
     TenantSecuritySettingsView,
@@ -362,14 +364,14 @@ urlpatterns = [
         name='tax_code_list',
     ),
     path(
-        'system-config/tax-codes/<str:pk>/',
-        TaxCodeDetailView.as_view(),
-        name='tax_code_detail',
-    ),
-    path(
         'system-config/tax-codes/create/',
         TaxCodeCreateView.as_view(),
         name='tax_code_create',
+    ),
+    path(
+        'system-config/tax-codes/<str:pk>/',
+        TaxCodeDetailView.as_view(),
+        name='tax_code_detail',
     ),
     path(
         'system-config/tax-codes/<str:pk>/edit/',
@@ -462,14 +464,14 @@ urlpatterns = [
         name='promo_code_list',
     ),
     path(
-        'subscription/promo-codes/<uuid:pk>/',
-        PromoCodeDetailView.as_view(),
-        name='promo_code_detail',
-    ),
-    path(
         'subscription/promo-codes/create/',
         PromoCodeCreateView.as_view(),
         name='promo_code_create',
+    ),
+    path(
+        'subscription/promo-codes/<uuid:pk>/',
+        PromoCodeDetailView.as_view(),
+        name='promo_code_detail',
     ),
     path(
         'subscription/promo-codes/<uuid:pk>/edit/',
@@ -707,6 +709,11 @@ urlpatterns = [
         name='internal_alert_notifications_read_all',
     ),
     path(
+        'comm/alerts/notifications/clear-all/',
+        InternalAlertNotificationClearAllView.as_view(),
+        name='internal_alert_notifications_clear_all',
+    ),
+    path(
         'comm/logs/',
         CommLogListView.as_view(),
         name='comm_log_list',
@@ -889,6 +896,11 @@ urlpatterns = [
         'crm/tenants/<uuid:pk>/delete/',
         TenantDeleteView.as_view(),
         name='tenant_delete',
+    ),
+    path(
+        'crm/tenants/<uuid:pk>/history/',
+        TenantHistoryPartialView.as_view(),
+        name='tenant_history_partial',
     ),
     path(
         'crm/tenants/<uuid:pk>/add-note/',

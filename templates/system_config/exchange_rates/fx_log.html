@@ -181,7 +181,7 @@
         <tbody>
           {% for log in fx_logs.object_list %}
             <tr>
-              <td>{{ fx_logs.start_index|add:forloop.counter0 }}</td>
+              <td>{{ log.list_rank }}</td>
               <td><span class="eal-entity-id">{{ log.currency.currency_code }}</span></td>
               <td>{{ log.old_rate|floatformat:6 }}</td>
               <td>{{ log.new_rate|floatformat:6 }}</td>

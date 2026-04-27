@@ -197,7 +197,7 @@
           <tbody>
             {% for gateway in gateways.object_list %}
               <tr>
-                <td>{{ gateway.default_rank }}</td>
+                <td>{{ gateway.list_rank }}</td>
                 <td>{{ gateway.gateway_name }}</td>
                 <td>
                   {% if gateway.environment == 'Live' %}

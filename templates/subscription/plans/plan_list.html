@@ -177,7 +177,7 @@
       <tbody>
         {% for plan in plans %}
           <tr {% if not plan.is_active %}class="row-inactive"{% endif %}>
-            <td>{{ plan.default_rank }}</td>
+            <td>{{ plan.list_rank }}</td>
             <td><span class="fw-bold">{{ plan.plan_name_en }}</span></td>
             <td>{{ plan.plan_name_ar }}</td>
             <td>{{ plan.base_cycle_days }}</td>

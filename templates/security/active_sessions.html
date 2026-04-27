@@ -57,7 +57,7 @@
     <div class="toolbar-left">
       <div class="toolbar-title">Active Sessions Monitor</div>
       <div class="toolbar-subtitle">
-        Live view of all active admin sessions. This page auto-refreshes every 30 seconds.
+        Live view of all active Admin, Tenant, and Driver sessions. This page auto-refreshes every 30 seconds.
       </div>
     </div>
   </div>
@@ -204,7 +204,7 @@
           <tbody>
             {% for session in sessions %}
                 <tr {% if session.jti == current_jti %}class="table-info"{% endif %}>
-                  <td>{{ sessions.start_index|add:forloop.counter0 }}</td>
+                  <td>{{ session.list_rank }}</td>
                   <td>
                     <div class="eal-name-cell">
                       <span class="eal-name-text">
@@ -226,11 +226,16 @@
                   <td>{{ session.started_at }}</td>
                   <td>{{ session.last_activity }}</td>
                   <td>
-                    {% if session.ttl_seconds and session.ttl_seconds > 0 %}
-                      {{ session.ttl_seconds }}s
-                    {% else %}
-                      &lt; 1 min
-                    {% endif %}
+                    <span
+                      class="js-ttl-countdown"
+                      data-ttl-seconds="{% if session.ttl_seconds and session.ttl_seconds > 0 %}{{ session.ttl_seconds }}{% else %}0{% endif %}"
+                    >
+                      {% if session.ttl_seconds and session.ttl_seconds > 0 %}
+                        {{ session.ttl_seconds }}s
+                      {% else %}
+                        Expired
+                      {% endif %}
+                    </span>
                   </td>
                   <td>
                     {% if session.jti != current_jti %}
@@ -270,7 +275,7 @@
         </div>
         <h4 class="empty-title">No active sessions found</h4>
         <p class="empty-text">
-          There are currently no active admin sessions in the system.
+          There are currently no active sessions in the system.
         </p>
       </div>
     </div>
@@ -282,6 +287,34 @@
       const kpiElId = "active-sessions-kpi";
       const tableElId = "active-sessions-table";
       const paginationElId = "active-sessions-pagination";
+      const ttlSelector = ".js-ttl-countdown";
+
+      function formatTtl(totalSeconds) {
+        const s = Math.max(0, Number.parseInt(totalSeconds || 0, 10));
+        const hh = Math.floor(s / 3600);
+        const mm = Math.floor((s % 3600) / 60);
+        const ss = s % 60;
+        if (hh > 0) return `${hh}h ${String(mm).padStart(2, "0")}m ${String(ss).padStart(2, "0")}s`;
+        if (mm > 0) return `${mm}m ${String(ss).padStart(2, "0")}s`;
+        if (ss > 0) return `${ss}s`;
+        return "Expired";
+      }
+
+      function paintTtlNodes() {
+        document.querySelectorAll(ttlSelector).forEach((node) => {
+          const ttl = Number.parseInt(node.dataset.ttlSeconds || "0", 10);
+          node.textContent = formatTtl(ttl);
+        });
+      }
+
+      function tickTtlNodes() {
+        document.querySelectorAll(ttlSelector).forEach((node) => {
+          const ttl = Number.parseInt(node.dataset.ttlSeconds || "0", 10);
+          const next = Math.max(0, ttl - 1);
+          node.dataset.ttlSeconds = String(next);
+          node.textContent = formatTtl(next);
+        });
+      }
 
       function shouldSkipRefresh() {
         if (document.hidden) return true;
@@ -320,8 +353,11 @@
         if (curKpi && nextKpi) curKpi.textContent = nextKpi.textContent;
         if (curTable && nextTable) curTable.outerHTML = nextTable.outerHTML;
         if (curPagination && nextPagination) curPagination.outerHTML = nextPagination.outerHTML;
+        paintTtlNodes();
       }
 
+      paintTtlNodes();
+      setInterval(tickTtlNodes, 1000);
       setInterval(refreshFragments, POLL_MS);
     })();
   </script>

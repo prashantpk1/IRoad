@@ -207,7 +207,7 @@
         <tbody>
           {% for log in access_logs %}
           <tr>
-            <td><span class="text-muted small">{{ forloop.counter0|add:access_logs.start_index }}</span></td>
+            <td><span class="text-muted small">{{ log.list_rank }}</span></td>
             <td>
                {% if log.attempt_type == 'Login' %}
                  <span class="value-badge">{% translate "Login" %}</span>

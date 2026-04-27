@@ -24,6 +24,88 @@
     <!-- Custom CSS -->
     <link rel="stylesheet" href="{% static 'css/style.css' %}" />
     <link rel="stylesheet" href="{% static 'css/responsive.css' %}" />
+    <style>
+      /* Premium Security UI Styling */
+      .security-status-card {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 24px;
+        transition: all 0.3s ease;
+      }
+      .security-status-card.locked {
+        background: #fff1f2;
+        border-color: #fecaca;
+      }
+      .otp-info-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+        font-size: 13px;
+        color: #64748b;
+        font-weight: 600;
+      }
+      .otp-timer-text i {
+        margin-right: 8px;
+        color: #6366f1;
+        font-size: 16px;
+      }
+      .otp-timer-value {
+        font-weight: 700;
+        color: #1e293b;
+        font-family: 'Inter', monospace;
+      }
+      .otp-timer-bar-bg {
+        height: 6px;
+        background: #e2e8f0;
+        border-radius: 10px;
+        overflow: hidden;
+        position: relative;
+      }
+      .otp-timer-bar-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #6366f1 0%, #8b5cf6 100%);
+        width: 100%;
+        border-radius: 10px;
+        transition: width 1s linear, background-color 0.3s ease;
+      }
+      .otp-timer-bar-fill.danger {
+        background: linear-gradient(90deg, #ef4444 0%, #f43f5e 100%);
+      }
+      .otp-attempts-text {
+        font-size: 12px;
+        letter-spacing: 0.025em;
+      }
+      .otp-attempts-text .val {
+        color: #1e293b;
+        font-weight: 700;
+      }
+      .auth-input-wrapper i {
+        color: #94a3b8;
+      }
+      .auth-btn-primary {
+        box-shadow: 0 4px 6px -1px rgba(99, 102, 241, 0.2), 0 2px 4px -2px rgba(99, 102, 241, 0.1);
+      }
+      .auth-alert {
+        border-radius: 10px;
+        padding: 12px 16px;
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        font-size: 14px;
+        line-height: 1.5;
+        border: 1px solid transparent;
+      }
+      .auth-alert-error {
+        background: #fef2f2;
+        border-color: #fee2e2;
+        color: #991b1b;
+      }
+      .auth-alert-error i { color: #ef4444; font-size: 18px; }
+
+    </style>
   </head>
 
   <body class="auth-body">
@@ -69,9 +151,10 @@
             </div>
             {% endif %}
 
-            {% if form.errors or error %}
+            {% if form.errors or error or is_locked or attempts_remaining %}
             <div class="auth-field">
-              <div class="auth-alert auth-alert-error">
+              {% if error or form.errors %}
+              <div class="auth-alert auth-alert-error" style="margin-bottom: 15px;">
                 <i class="bi bi-exclamation-circle"></i>
                 <div class="auth-alert-content">
                   {% if error %}
@@ -91,6 +174,34 @@
               </div>
             </div>
             {% endif %}
+            {% endif %}
+
+            <!-- Security Context Section -->
+            <div class="auth-field">
+              <div class="security-status-card {% if is_locked %}locked{% endif %}">
+                <div class="otp-info-row">
+                  <span class="otp-timer-text">
+                    <i class="bi bi-shield-lock{% if not is_locked %}-fill{% endif %}"></i> 
+                    {% if is_locked %}
+                      Lockout Expires: <span class="otp-timer-value" id="lockout-timer">00:00</span>
+                    {% else %}
+                      Expires in <span class="otp-timer-value" id="security-session-timer">00:00</span>
+                    {% endif %}
+                  </span>
+                  <span id="attempts-container" class="otp-attempts-text" style="{% if is_locked %}color: #ef4444;{% endif %}">
+                    {% if is_locked %}
+                      <i class="bi bi-x-circle-fill"></i> Access Blocked
+                    {% else %}
+                      <span class="val" id="attempts-val">{{ attempts_remaining|default:max_failed_logins }}</span> attempts remaining
+                    {% endif %}
+                  </span>
+                </div>
+                <div class="otp-timer-bar-bg">
+                  <div id="lockout-bar" class="otp-timer-bar-fill {% if is_locked %}danger{% endif %}" style="width: 100%;"></div>
+                </div>
+              </div>
+            </div>
+
 
             <!-- Email Field -->
             <div class="auth-field">
@@ -167,7 +278,130 @@
           toggleIcon.classList.add("bi-eye");
         }
       }
-      (function () {
+
+      document.addEventListener('DOMContentLoaded', function() {
+        // SECURITY ATTRIBUTES
+        const isLocked = {% if is_locked %}true{% else %}false{% endif %};
+        const remainingSeconds = {{ remaining_seconds|default:0 }};
+        const totalLockoutTime = {{ lockout_duration_total|default:1800 }};
+        const attemptsRemaining = {{ attempts_remaining|default:3 }};
+        const maxAttempts = {{ max_failed_logins|default:3 }};
+        const lockedEmail = "{{ locked_email|default:'' }}".toLowerCase().trim();
+
+        const timerText = document.getElementById('lockout-timer');
+        const timerBar = document.getElementById('lockout-bar');
+        const submitBtn = document.querySelector('.auth-btn-primary');
+
+        if (isLocked) {
+          let secondsLeft = remainingSeconds;
+          const totalTime = totalLockoutTime > 0 ? totalLockoutTime : 1800;
+          
+          if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.classList.add('disabled');
+            submitBtn.style.opacity = '0.7';
+            submitBtn.style.cursor = 'not-allowed';
+            submitBtn.innerHTML = '<i class="bi bi-shield-lock"></i> Account Locked';
+          }
+
+          // PER-EMAIL FLEXIBILITY: Re-enable if email changes to something else
+          const emailInput = document.getElementById('email');
+          if (emailInput) {
+             emailInput.addEventListener('input', function() {
+                const currentEmail = this.value.toLowerCase().trim();
+                if (currentEmail !== lockedEmail && currentEmail !== "") {
+                   submitBtn.disabled = false;
+                   submitBtn.classList.remove('disabled');
+                   submitBtn.style.opacity = '1';
+                   submitBtn.style.cursor = 'pointer';
+                   submitBtn.innerHTML = '<i class="bi bi-box-arrow-in-right"></i> Sign In';
+                } else {
+                   submitBtn.disabled = true;
+                   submitBtn.classList.add('disabled');
+                   submitBtn.style.opacity = '0.7';
+                   submitBtn.style.cursor = 'not-allowed';
+                   submitBtn.innerHTML = '<i class="bi bi-shield-lock"></i> Account Locked';
+                }
+             });
+          }
+
+          const formatTime = (s) => {
+            const m = Math.floor(s / 60);
+            const ss = s % 60;
+            return `${m.toString().padStart(2, '0')}:${ss.toString().padStart(2, '0')}`;
+          };
+
+          const updateLockout = () => {
+            if (secondsLeft <= 0) {
+              if (timerText) timerText.innerText = "00:00";
+              if (timerBar) timerBar.style.width = "0%";
+              if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.classList.remove('disabled');
+                submitBtn.style.opacity = '1';
+                submitBtn.innerHTML = '<i class="bi bi-box-arrow-in-right"></i> Sign In';
+              }
+              location.reload(); // Refresh to clear locked state in backend/context
+              clearInterval(lockInterval);
+              return;
+            }
+
+            if (timerText) timerText.innerText = formatTime(secondsLeft);
+            const percent = (secondsLeft / totalTime) * 100;
+            if (timerBar) {
+               timerBar.style.width = `${percent}%`;
+               timerBar.classList.add('danger');
+            }
+            
+            secondsLeft--;
+          };
+
+          const lockInterval = setInterval(updateLockout, 1000);
+          updateLockout();
+        } else {
+          // Security Session Countdown
+          const securityTimeout = {{ security_timeout|default:240 }};
+          let timeLeft = securityTimeout;
+          const sessionTimerText = document.getElementById('security-session-timer');
+          
+          const formatTime = (s) => {
+            const m = Math.floor(s / 60);
+            const ss = s % 60;
+            return `${m.toString().padStart(2, '0')}:${ss.toString().padStart(2, '0')}`;
+          };
+
+          const updateSessionTimer = () => {
+             if (timeLeft <= 0) {
+               if (sessionTimerText) sessionTimerText.innerText = "00:00";
+               clearInterval(sessionInterval);
+               window.location.reload(); 
+               return;
+             }
+             if (sessionTimerText) sessionTimerText.innerText = formatTime(timeLeft);
+             
+             // Bar Logic: If no fails, show session life. If fails exist, show attempts.
+             if (attemptsRemaining >= maxAttempts) {
+                const percent = (timeLeft / securityTimeout) * 100;
+                if (timerBar) {
+                  timerBar.style.width = `${percent}%`;
+                  if (timeLeft < 30) timerBar.classList.add('danger');
+                }
+             } else {
+                // Show attempts remaining specifically
+                const percent = (attemptsRemaining / maxAttempts) * 100;
+                if (timerBar) {
+                   timerBar.style.width = `${percent}%`;
+                   if (attemptsRemaining === 1) timerBar.classList.add('danger');
+                }
+             }
+             
+             timeLeft--;
+          };
+
+          const sessionInterval = setInterval(updateSessionTimer, 1000);
+          updateSessionTimer();
+        }
+
         /* Other tab logged in -> CSRF was rotated; reload to get a fresh token or redirect. */
         window.addEventListener("storage", function (ev) {
           if (ev.key === "iroad_auth_bump" && ev.newValue) {
@@ -177,7 +411,7 @@
             window.location.reload();
           }
         });
-      })();
+      });
     </script>
   </body>
 </html>

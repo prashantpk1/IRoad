@@ -230,7 +230,7 @@
           <tbody>
             {% for account in accounts.object_list %}
               <tr>
-                <td>{{ account.default_rank }}</td>
+                <td>{{ account.list_rank }}</td>
                 <td>{{ account.bank_name }}</td>
                 <td>{{ account.account_holder_name }}</td>
                 <td style="font-family: monospace">****{{ account.iban_number|slice:"-4:" }}</td>

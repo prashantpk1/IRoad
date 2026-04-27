@@ -29,9 +29,9 @@
     />
 
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="{% static 'css/style.css' %}" />
-    <link rel="stylesheet" href="{% static 'css/dashboard.css' %}" />
-    <link rel="stylesheet" href="{% static 'css/responsive.css' %}" />
+    <link rel="stylesheet" href="{% static 'css_up/style.css' %}" />
+    <link rel="stylesheet" href="{% static 'css_up/dashboard.css' %}" />
+    <link rel="stylesheet" href="{% static 'css_up/responsive.css' %}" />
 
     {% block extra_css %}{% endblock %}
   </head>
@@ -52,11 +52,24 @@
       <div class="notification-header">
         <h3 class="notification-title">Notifications</h3>
         <div class="notification-header-actions">
+          {% if internal_alert_items %}
+          <form method="post" action="{% url 'internal_alert_notifications_clear_all' %}" class="d-inline">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <button type="submit" class="clear-all-btn">
+              <i class="bi bi-trash3"></i>
+              <span>Clear all</span>
+            </button>
+          </form>
+          {% endif %}
           {% if internal_alert_unread_count > 0 %}
           <form method="post" action="{% url 'internal_alert_notifications_read_all' %}" class="d-inline">
             {% csrf_token %}
             <input type="hidden" name="next" value="{{ request.get_full_path }}">
-            <button type="submit" class="mark-all-btn">Mark all read</button>
+            <button type="submit" class="mark-all-btn">
+              <i class="bi bi-check2-all"></i>
+              <span>Mark all read</span>
+            </button>
           </form>
           {% endif %}
         </div>
@@ -69,51 +82,7 @@
         </button>
       </div>
       <div class="notification-content">
-        <div class="notification-settings">
-          <button
-            class="settings-btn"
-            id="notificationSettingsBtn"
-            aria-label="Settings"
-          >
-            <i class="bi bi-gear"></i>
-          </button>
-        </div>
-        <div class="preferences-popup" id="preferencesPopup">
-          <h4 class="preferences-title">Preferences</h4>
-          <div class="ce-item">
-            <div class="preference-label">
-              <span>Allow Notifications</span>
-              <i
-                class="bi bi-info-circle"
-                title="Enable or disable all notifications"
-              ></i>
-            </div>
-            <label class="toggle-switch">
-              <input type="checkbox" id="allowNotifications" checked />
-              <span class="toggle-slider">
-                <span class="toggle-text-on">Enable</span>
-                <span class="toggle-text-off">Disable</span>
-              </span>
-            </label>
-          </div>
-          <div class="preference-item">
-            <label class="preference-checkbox">
-              <input type="checkbox" checked />
-              <span class="checkmark"></span>
-              <span>Record Comments</span>
-            </label>
-          </div>
-          <div class="preference-item">
-            <label class="preference-checkbox">
-              <input type="checkbox" checked />
-              <span class="checkmark"></span>
-              <span>Blueprint Transitions</span>
-            </label>
-          </div>
-          <button class="btn btn-primary preferences-done" id="preferencesDone">
-            Done
-          </button>
-        </div>
+  
         {% if internal_alert_items %}
         <div class="notification-list">
           {% for item in internal_alert_items %}

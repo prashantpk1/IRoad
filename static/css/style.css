@@ -1016,7 +1016,8 @@ a {
 .notification-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
+  gap: 10px;
   padding: 20px 24px;
   background: var(--bg-white);
   border-bottom: 1px solid var(--border-light);
@@ -1027,19 +1028,64 @@ a {
   font-weight: 600;
   color: var(--text-dark);
   margin: 0;
+  flex-shrink: 0;
 }
 
 .notification-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin-left: auto;
-  margin-right: 8px;
+  margin-right: 6px;
+  flex-wrap: nowrap;
+}
+
+.notification-header-actions form {
+  display: inline-flex;
+}
+
+.mark-all-btn,
+.clear-all-btn {
+  border: 1px solid var(--border-light);
+  background: #fff;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 6px 10px;
+  transition: var(--transition-fast);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.clear-all-btn {
+  color: var(--danger);
+  border-color: rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.clear-all-btn:hover {
+  background: rgba(239, 68, 68, 0.14);
+  border-color: rgba(239, 68, 68, 0.5);
 }
 
 .mark-all-btn {
-  border: none;
-  background: transparent;
   color: var(--primary-color);
-  font-size: 12px;
-  font-weight: 600;
+  border-color: rgba(80, 81, 249, 0.35);
+  background: rgba(80, 81, 249, 0.08);
+}
+
+.mark-all-btn:hover {
+  background: rgba(80, 81, 249, 0.14);
+  border-color: rgba(80, 81, 249, 0.5);
+}
+
+.mark-all-btn i,
+.clear-all-btn i {
+  font-size: 11px;
 }
 
 .notification-close {
@@ -1067,20 +1113,26 @@ a {
   position: relative;
   display: flex;
   flex-direction: column;
+  overflow-y: auto;
 }
 
 .notification-settings {
   display: flex;
   justify-content: flex-end;
   margin-bottom: 16px;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg-light);
+  padding-bottom: 8px;
 }
 
 .notification-list {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  overflow-y: auto;
-  padding-right: 4px;
+  overflow: visible;
+  padding-right: 0;
 }
 
 .notification-item {

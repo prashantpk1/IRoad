@@ -206,7 +206,7 @@
       <tbody>
         {% for ticket in tickets %}
           <tr>
-            <td>{{ tickets.start_index|add:forloop.counter0 }}</td>
+            <td>{{ ticket.list_rank }}</td>
             <td class="fw-bold text-primary">{{ ticket.ticket_no }}</td>
             <td>
               <div class="d-flex flex-column">

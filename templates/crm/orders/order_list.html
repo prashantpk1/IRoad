@@ -204,7 +204,7 @@
       <tbody>
       {% for o in orders %}
         <tr>
-          <td>{{ o.default_rank }}</td>
+          <td>{{ o.list_rank }}</td>
           <td><span class="fw-bold">{{ o.tenant.company_name }}</span></td>
           <td>
             <span class="value-badge">{{ o.get_order_classification_display }}</span>

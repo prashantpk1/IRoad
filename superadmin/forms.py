@@ -431,6 +431,18 @@ class CurrencyForm(forms.ModelForm):
 
 
 class TaxCodeForm(forms.ModelForm):
+    DEFAULT_CHOICES = [
+        ('country', 'Set as Country Default'),
+        ('international', 'Set as International Default'),
+    ]
+
+    default_type = forms.ChoiceField(
+        choices=DEFAULT_CHOICES,
+        widget=forms.RadioSelect(attrs={'class': 'form-check-input'}),
+        required=False,
+        label='Default Type'
+    )
+
     class Meta:
         model = TaxCode
         fields = [
@@ -450,6 +462,14 @@ class TaxCodeForm(forms.ModelForm):
         apply_premium_styling(self)
         if is_edit:
             self.fields['tax_code'].disabled = True
+            
+            if self.instance.is_default_for_country:
+                self.initial['default_type'] = 'country'
+            elif self.instance.is_international_default:
+                self.initial['default_type'] = 'international'
+            else:
+                self.initial['default_type'] = 'none'
+
         self.fields['applicable_country_code'].queryset = (
             Country.objects.filter(is_active=True).order_by('name_en')
         )
@@ -464,8 +484,16 @@ class TaxCodeForm(forms.ModelForm):
     def clean(self):
         cleaned = super().clean()
         applicable_country = cleaned.get('applicable_country_code')
-        is_default_for_country = cleaned.get('is_default_for_country')
-        is_international_default = cleaned.get('is_international_default')
+        default_type = cleaned.get('default_type')
+        
+        # Set individual boolean fields based on radio selection
+        is_default_for_country = (default_type == 'country')
+        is_international_default = (default_type == 'international')
+
+        cleaned['is_default_for_country'] = is_default_for_country
+        cleaned['is_international_default'] = is_international_default
+        self.instance.is_default_for_country = is_default_for_country
+        self.instance.is_international_default = is_international_default
 
         if is_default_for_country and is_international_default:
             raise forms.ValidationError(
@@ -540,6 +568,15 @@ class LegalIdentityForm(forms.ModelForm):
         self.fields['company_country_code'].queryset = (
             Country.objects.filter(is_active=True).order_by('name_en')
         )
+        # Required identity fields for legal profile completeness.
+        required_fields = {
+            'company_logo',
+            'company_name_en',
+            'company_name_ar',
+            'company_country_code',
+        }
+        for field_name, field in self.fields.items():
+            field.required = field_name in required_fields
 
 
 class GlobalSystemRulesForm(forms.ModelForm):
@@ -1466,11 +1503,9 @@ class SupportCategoryForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         apply_premium_styling(self)
         self.fields['name_en'].widget.attrs.update({
-            'placeholder': 'e.g., Billing & Invoices',
             'maxlength': '100',
         })
         self.fields['name_ar'].widget.attrs.update({
-            'placeholder': 'e.g., الفوترة والفواتير',
             'dir': 'rtl',
             'maxlength': '100',
         })
@@ -1523,11 +1558,9 @@ class CannedResponseForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         apply_premium_styling(self)
         self.fields['title'].widget.attrs.update({
-            'placeholder': 'e.g., Requesting Screenshot',
             'maxlength': '100',
         })
         self.fields['message_body'].widget.attrs.update({
-            'placeholder': 'Write the standardized reply content here...',
             'rows': 8,
         })
         if 'is_active' in self.fields:
@@ -1703,6 +1736,21 @@ class AdminSecuritySettingsForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         apply_premium_styling(self)
+        if 'session_timeout_minutes' in self.fields:
+            self.fields['session_timeout_minutes'].widget.attrs.update({
+                'placeholder': 'e.g. 60 to 240',
+                'min': 1,
+            })
+        if 'max_failed_logins' in self.fields:
+            self.fields['max_failed_logins'].widget.attrs.update({
+                'placeholder': 'e.g. 3',
+                'min': 1,
+            })
+        if 'lockout_duration_minutes' in self.fields:
+            self.fields['lockout_duration_minutes'].widget.attrs.update({
+                'placeholder': 'e.g. 15 or 30',
+                'min': 1,
+            })
 
     def clean_session_timeout_minutes(self):
         value = self.cleaned_data.get('session_timeout_minutes')

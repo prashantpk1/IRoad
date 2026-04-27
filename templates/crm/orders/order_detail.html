@@ -203,19 +203,19 @@
       </div>
       <div class="col-12 col-md-4">
         <label class="form-label">{% translate "Max users" %}</label>
-        <input class="form-control" value="{{ order.projected_max_users|default:'—' }}" readonly>
+        <input class="form-control" value="{% if order.projected_max_users == 0 or order.projected_max_users == -1 %}Unlimited{% elif order.projected_max_users is None %}—{% else %}{{ order.projected_max_users }}{% endif %}" readonly>
       </div>
       <div class="col-12 col-md-4">
         <label class="form-label">{% translate "Max int. trucks" %}</label>
-        <input class="form-control" value="{{ order.projected_max_internal_trucks|default:'—' }}" readonly>
+        <input class="form-control" value="{% if order.projected_max_internal_trucks == 0 or order.projected_max_internal_trucks == -1 %}Unlimited{% elif order.projected_max_internal_trucks is None %}—{% else %}{{ order.projected_max_internal_trucks }}{% endif %}" readonly>
       </div>
       <div class="col-12 col-md-4">
         <label class="form-label">{% translate "Max ext. trucks" %}</label>
-        <input class="form-control" value="{{ order.projected_max_external_trucks|default:'—' }}" readonly>
+        <input class="form-control" value="{% if order.projected_max_external_trucks == 0 or order.projected_max_external_trucks == -1 %}Unlimited{% elif order.projected_max_external_trucks is None %}—{% else %}{{ order.projected_max_external_trucks }}{% endif %}" readonly>
       </div>
       <div class="col-12 col-md-4">
         <label class="form-label">{% translate "Max drivers" %}</label>
-        <input class="form-control" value="{{ order.projected_max_drivers|default:'—' }}" readonly>
+        <input class="form-control" value="{% if order.projected_max_drivers == 0 or order.projected_max_drivers == -1 %}Unlimited{% elif order.projected_max_drivers is None %}—{% else %}{{ order.projected_max_drivers }}{% endif %}" readonly>
       </div>
     </div>
   </div>
@@ -244,7 +244,16 @@
     </div>
   {% elif order.order_status == 'Pending_Payment' %}
     <div class="form-actions-bar mb-4">
-      <div class="form-actions-left"></div>
+      <div class="form-actions-left">
+        <form method="post" action="{% url 'order_status_update' order.order_id %}" data-confirm="{{ confirm_cancel_order|escape }}">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="cancel">
+          <button type="submit" class="eal-btn eal-btn-outline" style="color: var(--danger-color); border-color: var(--danger-color);">
+            <i class="bi bi-x-circle"></i>
+            <span>{% translate "Cancel Order" %}</span>
+          </button>
+        </form>
+      </div>
       <div class="form-actions-right">
         {% if payment_txn %}
           <a href="{% url 'transaction_detail' payment_txn.transaction_id %}" class="eal-btn eal-btn-primary">

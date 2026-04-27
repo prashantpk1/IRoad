@@ -180,7 +180,7 @@
         <tbody>
           {% for row in banners %}
             <tr>
-              <td>{{ row.default_rank }}</td>
+              <td>{{ row.list_rank }}</td>
               <td>{{ row.title_en }}</td>
               <td>
                 {% if row.severity == 'Info' %}<span class="status-badge active">Info</span>{% elif row.severity == 'Warning' %}<span class="status-badge warning">Warning</span>{% else %}<span class="status-badge inactive">Critical</span>{% endif %}

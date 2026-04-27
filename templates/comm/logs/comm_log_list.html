@@ -211,7 +211,7 @@
       <tbody>
         {% for row in logs %}
           <tr>
-            <td>{{ row.default_rank }}</td>
+            <td>{{ row.list_rank }}</td>
             <td>{{ row.recipient }}</td>
             <td>{% if row.channel_type == 'Email' %}<span class="value-badge">Email</span>{% elif row.channel_type == 'SMS' %}<span class="value-badge">SMS</span>{% else %}<span class="value-badge">Push</span>{% endif %}</td>
             <td>{{ row.trigger_source }}</td>

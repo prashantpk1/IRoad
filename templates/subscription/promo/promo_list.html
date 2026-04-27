@@ -199,7 +199,7 @@
         <tbody>
           {% for p in promo_codes.object_list %}
             <tr>
-              <td>{{ p.default_rank }}</td>
+              <td>{{ p.list_rank }}</td>
               <td><span class="fw-bold" style="font-family: monospace; color: #4338ca;">{{ p.code }}</span></td>
               <td>
                 <span class="status-badge" style="background: #f1f5f9; color: #475569; border: none;">
@@ -222,7 +222,7 @@
                 </div>
               </td>
               <td>
-                {% if p.valid_until and p.valid_until < now %}
+                {% if p.valid_until and p.valid_until < now or p.max_uses and p.current_uses >= p.max_uses %}
                   <span class="status-badge expired">Expired</span>
                 {% elif p.valid_from > now %}
                   <span class="status-badge warning" style="background: #fef3c7; color: #92400e;">Scheduled</span>

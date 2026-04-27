@@ -143,7 +143,7 @@
             <tr>
               <th class="sortable" style="width: 120px">
                 <a href="?q={{ search_query }}&method_type={{ type_filter }}&status={{ status_filter }}&sort=rank&dir={% if current_sort == 'rank' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                  <span>Method ID</span>
+                  <span>#</span>
                   {% if current_sort == 'rank' %}
                     <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
                   {% else %}
@@ -208,7 +208,7 @@
           <tbody>
             {% for method in methods.object_list %}
               <tr>
-                <td><span class="eal-entity-id">PM-{{ method.method_id|slice:":8" }}</span></td>
+                <td>{{ method.list_rank }}</td>
                 <td>{{ method.display_order }}</td>
                 <td>{{ method.method_name_en }}</td>
                 <td>

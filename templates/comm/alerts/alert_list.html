@@ -163,7 +163,7 @@
       <tbody>
         {% for row in routes %}
           <tr>
-            <td>{{ row.default_rank }}</td>
+            <td>{{ row.list_rank }}</td>
             <td>{{ row.get_trigger_event_display }}</td>
             <td>{{ row.notify_role.role_name_en|default:'-' }}</td>
             <td>{{ row.notify_custom_email|default:'-' }}</td>

@@ -127,16 +127,6 @@
               {% endif %}
             </a>
           </th>
-          <th class="sortable" style="width: 220px">
-            <a href="?q={{ search_query|urlencode }}&is_active={{ status_filter }}&sort=category_id&dir={% if current_sort == 'category_id' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
-              <span>{% translate "Category ID" %}</span>
-              {% if current_sort == 'category_id' %}
-                <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
-              {% else %}
-                <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
-              {% endif %}
-            </a>
-          </th>
           <th class="sortable">
             <a href="?q={{ search_query|urlencode }}&is_active={{ status_filter }}&sort=name_en&dir={% if current_sort == 'name_en' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
               <span>{% translate "English Name" %}</span>
@@ -173,10 +163,7 @@
       <tbody>
         {% for c in categories %}
           <tr>
-            <td>{{ forloop.counter0|add:categories.start_index }}</td>
-            <td>
-              <span class="eal-entity-id" title="{{ c.category_id }}">{{ c.category_id }}</span>
-            </td>
+            <td>{{ c.list_rank }}</td>
             <td class="fw-semibold">{{ c.name_en }}</td>
             <td dir="rtl">{{ c.name_ar }}</td>
             <td>

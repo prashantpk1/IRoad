@@ -50,39 +50,62 @@
          border-color: var(--primary-color);
          color: var(--primary-color);
       }
+      .security-status-card {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 24px;
+        transition: all 0.3s ease;
+      }
       .otp-info-row {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-top: 10px;
+        margin-bottom: 10px;
         font-size: 13px;
-        color: var(--text-muted);
-        font-weight: 500;
-        margin-bottom: 4px;
+        color: #64748b;
+        font-weight: 600;
       }
       .otp-timer-text i {
-        margin-right: 4px;
-        color: var(--primary-color);
+        margin-right: 8px;
+        color: #6366f1;
+        font-size: 16px;
       }
       .otp-timer-value {
         font-weight: 700;
-        color: var(--text-dark);
-        font-variant-numeric: tabular-nums;
+        color: #1e293b;
+        font-family: 'Inter', monospace;
       }
       .otp-timer-bar-bg {
         height: 6px;
-        background: var(--bg-gray);
+        background: #e2e8f0;
         border-radius: 10px;
-        margin-bottom: 24px;
         overflow: hidden;
+        position: relative;
       }
       .otp-timer-bar-fill {
         height: 100%;
-        background: var(--primary-gradient);
+        background: linear-gradient(90deg, #6366f1 0%, #8b5cf6 100%);
         width: 100%;
         border-radius: 10px;
-        transition: width 1s linear;
+        transition: width 1s linear, background-color 0.3s ease;
       }
+      .otp-timer-bar-fill.warning {
+        background: linear-gradient(90deg, #f59e0b 0%, #fbbf24 100%);
+      }
+      .otp-timer-bar-fill.danger {
+        background: linear-gradient(90deg, #ef4444 0%, #f43f5e 100%);
+      }
+      .otp-attempts-text {
+        font-size: 12px;
+        letter-spacing: 0.025em;
+      }
+      .otp-attempts-text .val {
+        color: #1e293b;
+        font-weight: 700;
+      }
+
       @media (max-width: 480px) {
         .otp-digit-input {
           width: 42px;
@@ -194,13 +217,22 @@
               <input type="hidden" id="otp" name="otp" value="{{ form.otp.value|default:'' }}">
             </div>
 
-            <div class="otp-info-row">
-              <span class="otp-timer-text"><i class="bi bi-clock-history"></i> Expires in <span class="otp-timer-value" id="otp-timer">05:00</span></span>
-              <span class="otp-attempts-text">{{ attempts_left }} attempts remaining</span>
+            <div class="auth-field">
+              <div class="security-status-card">
+                <div class="otp-info-row">
+                  <span class="otp-timer-text">
+                    <i class="bi bi-clock-history"></i> Expires in <span class="otp-timer-value" id="otp-timer">00:00</span>
+                  </span>
+                  <span class="otp-attempts-text">
+                    <span class="val">{{ attempts_left }}</span> attempts remaining
+                  </span>
+                </div>
+                <div class="otp-timer-bar-bg">
+                  <div id="otp-timer-bar" class="otp-timer-bar-fill"></div>
+                </div>
+              </div>
             </div>
-            <div class="otp-timer-bar-bg">
-              <div class="otp-timer-bar-fill" id="otp-timer-bar"></div>
-            </div>
+
 
             <button type="submit" class="auth-btn auth-btn-primary">
               <i class="bi bi-shield-check"></i>
@@ -318,7 +350,7 @@
 
         // TIMER LOGIC
         const initialSeconds = {{ remaining_seconds|default:0 }};
-        const totalTTL = 300; // Match ADMIN_LOGIN_OTP_TTL_SECONDS in views.py
+        const totalTTL = {{ total_ttl|default:300 }};
         let secondsRemaining = initialSeconds;
 
         const timerText = document.getElementById('otp-timer');

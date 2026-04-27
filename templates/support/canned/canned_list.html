@@ -127,16 +127,6 @@
               {% endif %}
             </a>
           </th>
-          <th class="sortable" style="width: 160px">
-            <a href="?q={{ search_query|urlencode }}&is_active={{ status_filter }}&sort=template_id&dir={% if current_sort == 'template_id' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
-              <span>{% translate "Template ID" %}</span>
-              {% if current_sort == 'template_id' %}
-                <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
-              {% else %}
-                <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
-              {% endif %}
-            </a>
-          </th>
           <th class="sortable" style="width: 200px">
             <a href="?q={{ search_query|urlencode }}&is_active={{ status_filter }}&sort=title&dir={% if current_sort == 'title' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
               <span>{% translate "Title" %}</span>
@@ -173,8 +163,7 @@
       <tbody>
         {% for c in canned_responses %}
           <tr>
-            <td>{{ forloop.counter0|add:canned_responses.start_index }}</td>
-            <td><code>{{ c.template_id|truncatechars:13 }}</code></td>
+            <td>{{ c.list_rank }}</td>
             <td class="fw-semibold">{{ c.title }}</td>
             <td>
               <div class="text-muted small" title="{{ c.message_body }}">

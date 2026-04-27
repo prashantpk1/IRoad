@@ -241,3 +241,50 @@ def revoke_tenant_session_key(tenant_id, jti):
     client = get_redis_client()
     client.delete(f'tenant:{tenant_id}:session:{jti}')
 
+
+def revoke_tenant_session_by_jti(jti):
+    """
+    Delete a tenant/driver session by JTI without prior tenant_id.
+    Returns number of deleted keys.
+    """
+    if not jti:
+        return 0
+    client = get_redis_client()
+    pattern = f'tenant:*:session:{jti}'
+    deleted = 0
+    cursor = 0
+    while True:
+        cursor, keys = client.scan(cursor, match=pattern, count=100)
+        for key in keys:
+            deleted += client.delete(key)
+        if cursor == 0:
+            break
+    return deleted
+
+
+def get_all_active_tenant_sessions():
+    """
+    Return list of all active tenant web/driver sessions from Redis.
+    Keys: tenant:{tenant_id}:session:{jti}
+    """
+    client = get_redis_client()
+    pattern = 'tenant:*:session:*'
+    sessions = []
+
+    cursor = 0
+    while True:
+        cursor, keys = client.scan(cursor, match=pattern, count=200)
+        for key in keys:
+            data = client.get(key)
+            if not data:
+                continue
+            session = json.loads(data)
+            ttl = client.ttl(key)
+            session['ttl_seconds'] = ttl
+            sessions.append(session)
+        if cursor == 0:
+            break
+
+    sessions.sort(key=lambda x: x.get('started_at', ''), reverse=True)
+    return sessions
+

@@ -12,6 +12,6 @@ def internal_alert_notifications(request):
         admin_user=request.user
     ).order_by('-created_at')
     return {
-        'internal_alert_items': list(qs[:10]),
+        'internal_alert_items': list(qs[:100]),
         'internal_alert_unread_count': qs.filter(is_read=False).count(),
     }

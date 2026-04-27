@@ -188,7 +188,7 @@
         <tbody>
           {% for log in audit_logs %}
           <tr>
-            <td><span class="text-muted small">{{ forloop.counter0|add:audit_logs.start_index }}</span></td>
+            <td><span class="text-muted small">{{ log.list_rank }}</span></td>
             <td>
               <div class="d-flex flex-column">
                 <span class="fw-bold text-dark">{{ log.admin.get_full_name|default:log.admin.email|default:'N/A' }}</span>

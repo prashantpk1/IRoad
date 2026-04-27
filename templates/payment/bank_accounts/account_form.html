@@ -3,7 +3,6 @@
 
 {% block page_title %}{% if is_edit %}{% translate "Edit Bank Account" %}{% else %}{% translate "Add Bank Account" %}{% endif %}{% endblock %}
 
-
 {% block breadcrumb_items %}
 <li class="breadcrumb-item active" aria-current="page">{% if is_edit %}{% translate "Edit Bank Account" %}{% else %}{% translate "Add Bank Account" %}{% endif %}</li>
 {% endblock %}
@@ -33,12 +32,12 @@
     at <strong>{{ account.updated_at|date:"d M Y, H:i" }}</strong>
   </div>
   {% endif %}
+  <div class="alert alert-info mb-3">
+    <p class="mb-0 fw-semibold">IBAN stored uppercase, spaces removed.</p>
+  </div>
 
   <div class="form-card">
     <div class="form-card-body">
-      <div class="alert alert-info mb-3">
-        <p class="mb-0 fw-semibold">IBAN stored uppercase, spaces removed.</p>
-      </div>
 
       {% if form.non_field_errors %}
         <div class="alert alert-danger mb-3">
@@ -109,14 +108,19 @@
           </div>
 
           <div class="field">
-            <label class="form-label">Status</label>
-            <div class="form-check form-switch ps-0">
+            <div class="form-label d-block mb-0">Status</div>
+            <div class="form-check form-switch mt-2">
               {{ form.is_active }}
+              <label class="form-check-label ms-1" for="{{ form.is_active.id_for_label }}">
+                <span class="fw-medium">Active account</span>
+              </label>
             </div>
             {% for error in form.is_active.errors %}
               <div class="text-danger mt-1 fw-semibold">{{ error }}</div>
             {% endfor %}
           </div>
+        </div>
+        </div>
         </div>
 
         <div class="form-actions-bar">
@@ -136,5 +140,13 @@
       </form>
     </div>
   </div>
+  <script>
+    (function () {
+      const isActive = document.getElementById("{{ form.is_active.id_for_label }}");
+      if (isActive) {
+        isActive.classList.add("form-check-input");
+      }
+    })();
+  </script>
 {% endblock %}
 

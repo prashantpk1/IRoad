@@ -2,8 +2,10 @@ from decimal import Decimal
 from datetime import date, timedelta
 import ipaddress
 import logging
+import subprocess
 from pathlib import Path
 from urllib.parse import urlsplit
+from django.template.loader import render_to_string
 
 from django.conf import settings
 
@@ -791,14 +793,26 @@ def generate_invoice_from_order(order, admin_user):
     )
 
     # Get IRoad legal identity for supplier snapshot
+    supplier_name = "IRoad Technology"
+    supplier_name_ar = "آيرود للخدمات اللوجستية"
+    supplier_tax = ""
+    supplier_address = ""
+    supplier_email = ""
+    supplier_phone = ""
+    supplier_cr = ""
+
     try:
         legal = LegalIdentity.objects.get(
             identity_id='GLOBAL-LEGAL-IDENTITY')
         supplier_name = legal.company_name_en
+        supplier_name_ar = legal.company_name_ar
         supplier_tax = legal.tax_number
+        supplier_address = legal.registered_address
+        supplier_email = legal.support_email
+        supplier_phone = legal.support_phone
+        supplier_cr = legal.commercial_register
     except LegalIdentity.DoesNotExist:
-        supplier_name = "IRoad Technology"
-        supplier_tax = ""
+        pass
 
     tenant = order.tenant
     customer_address_snapshot = ''
@@ -821,7 +835,12 @@ def generate_invoice_from_order(order, admin_user):
         status='Issued',
         # Supplier snapshot
         supplier_name=supplier_name,
+        supplier_name_ar=supplier_name_ar,
         supplier_tax_number=supplier_tax,
+        supplier_address=supplier_address,
+        supplier_support_email=supplier_email,
+        supplier_support_phone=supplier_phone,
+        supplier_commercial_register=supplier_cr,
         # Customer snapshot
         customer_name=tenant.company_name,
         customer_tax_number=tenant.tax_number or '',
@@ -877,10 +896,55 @@ def generate_invoice_from_order(order, admin_user):
     return invoice
 
 
+def generate_invoice_pdf_bytes(invoice):
+    """
+    Generate PDF bytes for a StandardInvoice using the print template.
+    """
+    from .models import LegalIdentity
+    legal_identity = LegalIdentity.objects.filter(
+        identity_id='GLOBAL-LEGAL-IDENTITY',
+    ).first()
+
+    html_content = render_to_string(
+        'crm/invoices/invoice_print.html',
+        {
+            'invoice': invoice,
+            'legal_identity': legal_identity,
+        },
+    )
+
+    # Convert relative media URLs to absolute file paths for wkhtmltopdf
+    if settings.MEDIA_URL in html_content:
+        media_root_path = str(settings.MEDIA_ROOT).replace('\\', '/')
+        if not media_root_path.endswith('/'):
+            media_root_path += '/'
+        html_content = html_content.replace(
+            settings.MEDIA_URL,
+            media_root_path
+        )
+
+    try:
+        process = subprocess.Popen(
+            ['wkhtmltopdf', '--quiet', '--enable-local-file-access', '-', '-'],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+        pdf_content, error = process.communicate(input=html_content.encode('utf-8'))
+        if process.returncode != 0:
+            logger.error(f"wkhtmltopdf error in background: {error.decode('utf-8')}")
+            return None
+        return pdf_content
+    except Exception:
+        logger.exception("Background PDF generation failed")
+        return None
+
+
 def send_invoice_paid_notification(invoice, use_async_tasks=False):
     """
     Dispatch Invoice_Paid notification to tenant billing email.
     Uses Event Mapping engine when configured, with direct email fallback.
+    Now includes the invoice PDF as an attachment.
     """
     if not invoice or not getattr(invoice, 'tenant', None):
         return False
@@ -916,7 +980,8 @@ def send_invoice_paid_notification(invoice, use_async_tasks=False):
             _build_branding_context,
         )
         
-        # Inject centralized branding (logo, company name, initials)
+        # Inject centralized branding (logo, company name, initials) 
+        # (Note: _build_branding_context might be currently returning static defaults)
         context.update(_build_branding_context())
         
         # Backward compatibility if any legacy templates still use 'company_logo'
@@ -936,6 +1001,17 @@ def send_invoice_paid_notification(invoice, use_async_tasks=False):
                 'line_total',
             )
         )
+
+        # Generate Attachment
+        attachments = []
+        pdf_bytes = generate_invoice_pdf_bytes(invoice)
+        if pdf_bytes:
+            attachments.append((
+                f'Invoice-{invoice.invoice_number}.pdf',
+                pdf_bytes,
+                'application/pdf'
+            ))
+
         # Ensure default invoice template exists before direct named dispatch.
         ensure_default_notification_templates()
 
@@ -946,7 +1022,8 @@ def send_invoice_paid_notification(invoice, use_async_tasks=False):
             context_dict=context,
             language='en',
             default_subject=f'Invoice {invoice.invoice_number} issued',
-            trigger_source='TemplateName: INVOICE_PAID',
+            trigger_source=f'TemplateName: INVOICE_PAID for {invoice.invoice_number}',
+            attachments=attachments,
         )
         if sent:
             return True
@@ -956,6 +1033,7 @@ def send_invoice_paid_notification(invoice, use_async_tasks=False):
             recipient_email=recipient,
             context_dict=context,
             use_async_tasks=use_async_tasks,
+            attachments=attachments,
         )
         if sent:
             return True
@@ -1156,40 +1234,42 @@ def fulfill_paid_order(order, admin_user, ltv_amount):
     Call inside transaction.atomic(); order.order_status should already
     be Saved as Paid. ltv_amount is normally the payment transaction amount.
     """
+    from django.db import transaction as db_transaction
     from .models import PromoCode, StandardInvoice, TenantProfile
 
-    # Ref: CP-PCS-P1 §5.3 - Transactional Immutability (Snapshots)
-    for pl in order.plan_lines.all():
-        if not pl.plan_name_en_snapshot:
-            pl.plan_name_en_snapshot = pl.plan.plan_name_en
-            pl.plan_name_ar_snapshot = pl.plan.plan_name_ar or ''
-            pl.save(update_fields=['plan_name_en_snapshot', 'plan_name_ar_snapshot'])
+    with db_transaction.atomic():
+        # Ref: CP-PCS-P1 §5.3 - Transactional Immutability (Snapshots)
+        for pl in order.plan_lines.all():
+            if not pl.plan_name_en_snapshot:
+                pl.plan_name_en_snapshot = pl.plan.plan_name_en
+                pl.plan_name_ar_snapshot = pl.plan.plan_name_ar or ''
+                pl.save(update_fields=['plan_name_en_snapshot', 'plan_name_ar_snapshot'])
 
-    for al in order.addon_lines.all():
-        if not al.add_on_type_label_snapshot:
-            al.add_on_type_label_snapshot = al.get_add_on_type_display()
-            al.save(update_fields=['add_on_type_label_snapshot'])
+        for al in order.addon_lines.all():
+            if not al.add_on_type_label_snapshot:
+                al.add_on_type_label_snapshot = al.get_add_on_type_display()
+                al.save(update_fields=['add_on_type_label_snapshot'])
 
-    created_invoice = None
-    if not StandardInvoice.objects.filter(order=order).exists():
-        created_invoice = generate_invoice_from_order(order, admin_user)
+        created_invoice = None
+        if not StandardInvoice.objects.filter(order=order).exists():
+            created_invoice = generate_invoice_from_order(order, admin_user)
 
-    provision_tenant_from_order(order)
+        provision_tenant_from_order(order)
 
-    if order.promo_code_id:
-        pc = PromoCode.objects.select_for_update().get(pk=order.promo_code_id)
-        pc.current_uses = (pc.current_uses or 0) + 1
-        update_fields = ['current_uses']
-        if pc.max_uses is not None and pc.current_uses >= pc.max_uses:
-            pc.is_active = False
-            update_fields.append('is_active')
-        pc.save(update_fields=update_fields)
+        if order.promo_code_id:
+            pc = PromoCode.objects.select_for_update().get(pk=order.promo_code_id)
+            pc.current_uses = (pc.current_uses or 0) + 1
+            update_fields = ['current_uses']
+            if pc.max_uses is not None and pc.current_uses >= pc.max_uses:
+                pc.is_active = False
+                update_fields.append('is_active')
+            pc.save(update_fields=update_fields)
 
-    ten = TenantProfile.objects.select_for_update().get(pk=order.tenant_id)
-    ten.total_ltv = (
-        ten.total_ltv + ltv_amount
-    ).quantize(Decimal('0.01'))
-    ten.save(update_fields=['total_ltv', 'updated_at'])
+        ten = TenantProfile.objects.select_for_update().get(pk=order.tenant_id)
+        ten.total_ltv = (
+            ten.total_ltv + ltv_amount
+        ).quantize(Decimal('0.01'))
+        ten.save(update_fields=['total_ltv', 'updated_at'])
 
     if created_invoice is not None:
         send_invoice_paid_notification(created_invoice, use_async_tasks=False)

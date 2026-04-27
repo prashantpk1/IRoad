@@ -112,7 +112,9 @@
           </div>
           <div class="col-12 col-md-3">
             <label class="form-label">{% translate "Cycles" %}</label>
-            <input type="number" name="number_of_cycles" class="form-control" id="id_cycles" value="1" min="1">
+            <select name="number_of_cycles" class="form-select" id="id_cycles">
+              <option value="1">1</option>
+            </select>
           </div>
           <div class="col-12 col-md-3">
             <label class="form-label">{% translate "Plan price" %}</label>
@@ -204,7 +206,7 @@
   <div class="form-actions-right">
     <button type="submit" class="eal-btn eal-btn-primary">
       <i class="bi bi-save"></i>
-      <span>{% translate "Save as draft" %}</span>
+      <span>{% translate "Submit" %}</span>
     </button>
   </div>
 </div>
@@ -338,6 +340,35 @@
     }
   }
 
+  function buildCycleOptions() {
+    const pid = String(planEl.value || '');
+    const cur = String(currencyEl.value || '');
+    const pidN = normUuid(pid);
+    if (!pidN) {
+      return [1];
+    }
+    const unique = {};
+    pricing.forEach(function (r) {
+      if (normUuid(r.plan_id) !== pidN || String(r.currency) !== cur) return;
+      const c = cycleCount(r);
+      unique[c] = true;
+    });
+    const opts = Object.keys(unique).map(function (x) { return parseInt(x, 10); }).filter(function (x) { return x >= 1; });
+    opts.sort(function (a, b) { return a - b; });
+    return opts.length ? opts : [1];
+  }
+
+  function syncCycleOptions() {
+    if (!cyclesEl) return;
+    const prev = parseInt(String(cyclesEl.value || '1'), 10) || 1;
+    const options = buildCycleOptions();
+    const keep = options.includes(prev) ? prev : options[0];
+    cyclesEl.innerHTML = options.map(function (c) {
+      const selected = c === keep ? ' selected' : '';
+      return '<option value="' + c + '"' + selected + '>' + c + '</option>';
+    }).join('');
+  }
+
   function findPricingRow() {
     const pid = String(planEl.value || '');
     const cur = String(currencyEl.value || '');
@@ -361,10 +392,6 @@
     }
     const best = pickBestPricingRow(rows, cy);
     if (planPriceHintEl) planPriceHintEl.textContent = '';
-    var bestC = cycleCount(best);
-    if (bestC !== cy) {
-      cyclesEl.value = String(bestC);
-    }
     return best;
   }
 
@@ -540,12 +567,18 @@
     var pIt = document.getElementById('pv_projected_it');
     var pEt = document.getElementById('pv_projected_et');
     var pDr = document.getElementById('pv_projected_drivers');
+    function formatProjectedLimit(v) {
+      if (v == null || v === '') return '';
+      var n = parseInt(String(v), 10);
+      if (!Number.isNaN(n) && (n === 0 || n === -1)) return 'Unlimited';
+      return String(v);
+    }
     if (pPlan) pPlan.value = projected.plan_name || '';
     if (pExp) pExp.value = projected.expiry_date || '';
-    if (pUsers) pUsers.value = projected.max_users != null ? String(projected.max_users) : '';
-    if (pIt) pIt.value = projected.max_internal_trucks != null ? String(projected.max_internal_trucks) : '';
-    if (pEt) pEt.value = projected.max_external_trucks != null ? String(projected.max_external_trucks) : '';
-    if (pDr) pDr.value = projected.max_drivers != null ? String(projected.max_drivers) : '';
+    if (pUsers) pUsers.value = formatProjectedLimit(projected.max_users);
+    if (pIt) pIt.value = formatProjectedLimit(projected.max_internal_trucks);
+    if (pEt) pEt.value = formatProjectedLimit(projected.max_external_trucks);
+    if (pDr) pDr.value = formatProjectedLimit(projected.max_drivers);
   }
 
   function setProjectedHint(message, isError) {
@@ -647,9 +680,9 @@
   }
 
   clsEl.addEventListener('change', onClassificationOrSectionsChange);
-  currencyEl.addEventListener('change', function () { refreshPlanPreview(); refreshTotalsPreviewServer(); });
-  planEl.addEventListener('change', function () { refreshPlanPreview(); refreshTotalsPreviewServer(); });
-  planEl.addEventListener('input', function () { refreshPlanPreview(); refreshTotalsPreviewServer(); });
+  currencyEl.addEventListener('change', function () { syncCycleOptions(); refreshPlanPreview(); refreshTotalsPreviewServer(); });
+  planEl.addEventListener('change', function () { syncCycleOptions(); refreshPlanPreview(); refreshTotalsPreviewServer(); });
+  planEl.addEventListener('input', function () { syncCycleOptions(); refreshPlanPreview(); refreshTotalsPreviewServer(); });
   cyclesEl.addEventListener('input', function () { refreshPlanPreview(); refreshTotalsPreviewServer(); });
   cyclesEl.addEventListener('change', function () { refreshPlanPreview(); refreshTotalsPreviewServer(); });
   document.getElementById('btn-add-addon-row').addEventListener('click', addAddonRow);
@@ -671,6 +704,7 @@
   }
 
   showSections();
+  syncCycleOptions();
   refreshPlanPreview();
   refreshTotalsPreviewServer();
 })();

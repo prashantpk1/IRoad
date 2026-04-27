@@ -84,6 +84,35 @@
   </div>
 </div>
 
+{# Quick Actions Card #}
+<div class="form-card mb-3">
+  <div class="form-card-header">
+    <div class="form-card-icon" style="background: rgba(245, 158, 11, 0.1); color: var(--warning-color);">
+      <i class="bi bi-lightning-charge"></i>
+    </div>
+    <div class="form-card-header-text">
+      <h3 class="form-card-title">{% translate "Quick Actions" %}</h3>
+      <p class="form-card-desc">{% translate "Common actions for this subscriber." %}</p>
+    </div>
+  </div>
+  <div class="form-card-body d-flex flex-wrap gap-2">
+    <a href="{% url 'order_create' %}?tenant={{ tenant.tenant_id }}" class="eal-btn eal-btn-primary">
+      <i class="bi bi-cart-plus"></i>
+      <span>{% translate "Add Subsciption/Add-ons" %}</span>
+    </a>
+    {% if request.user.is_root %}
+      <a href="{% url 'tenant_edit' tenant.tenant_id %}" class="eal-btn eal-btn-outline">
+        <i class="bi bi-pencil"></i>
+        <span>{% translate "Edit Status" %}</span>
+      </a>
+      <button type="button" class="eal-btn eal-btn-outline" data-bs-toggle="modal" data-bs-target="#historyModal">
+        <i class="bi bi-clock-history"></i>
+        <span>{% translate "History" %}</span>
+      </button>
+    {% endif %}
+  </div>
+</div>
+
 {# Subscription State Card #}
 <div class="form-card mb-3">
   <div class="form-card-header">
@@ -160,7 +189,7 @@
     </div>
   </div>
 </div>
-
+<!-- 
 {# Quick Actions Card #}
 <div class="form-card mb-3">
   <div class="form-card-header">
@@ -182,10 +211,13 @@
         <i class="bi bi-pencil"></i>
         <span>{% translate "Edit Status" %}</span>
       </a>
-      
+      <button type="button" class="eal-btn eal-btn-outline" data-bs-toggle="modal" data-bs-target="#historyModal">
+        <i class="bi bi-clock-history"></i>
+        <span>{% translate "History" %}</span>
+      </button>
     {% endif %}
   </div>
-</div>
+</div> -->
 
 {# CRM Notes Card #}
 <div class="form-card mb-3">
@@ -246,4 +278,54 @@
   </div>
 </div>
 
+{# History Modal #}
+<div class="modal fade" id="historyModal" tabindex="-1" aria-labelledby="historyModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
+      <div class="modal-header border-bottom-0 pt-4 px-4">
+        <div>
+          <h5 class="modal-title fw-bold" id="historyModalLabel">
+            <i class="bi bi-clock-history me-2 text-primary"></i>
+            {% translate "Order & Billing History" %}
+          </h5>
+          <p class="text-muted small mb-0">{{ tenant.company_name }}</p>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-4" id="historyModalBody">
+        <div class="text-center py-5">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+          <p class="mt-2 text-muted small">{% translate "Fetching history..." %}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.getElementById('historyModal').addEventListener('show.bs.modal', function () {
+    const body = document.getElementById('historyModalBody');
+    // For simplicity, we only load once per session. Remove if fresh data always needed.
+    if (body.dataset.loaded === 'true') return;
+
+    fetch('{% url "tenant_history_partial" tenant.tenant_id %}')
+      .then(response => response.text())
+      .then(html => {
+        body.innerHTML = html;
+        body.dataset.loaded = 'true';
+      })
+      .catch(err => {
+        body.innerHTML = `
+          <div class="alert alert-danger">
+            <i class="bi bi-exclamation-triangle me-2"></i>
+            {% translate "Failed to load history. Please try again." %}
+          </div>`;
+      });
+  });
+</script>
 {% endblock %}

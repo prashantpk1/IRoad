@@ -56,46 +56,58 @@ def _build_branding_context():
     Ensures brand_logo_url is absolute for external email clients.
     """
     brand_name = 'iRoad'
+    brand_name_ar = 'iRoad'
     # Default fallback image
     brand_logo_url = '/media/legal/Link.png'
     brand_initials = 'IR'
+    
+    # Commented out for now as requested
+    # support_email = ''
+    # support_phone = ''
+    # registered_address = ''
+    # tax_number = ''
+    
+    brand_company_name_ar = brand_name_ar # Keep this for now
 
-    try:
-        from superadmin.models import LegalIdentity
-
-        legal = LegalIdentity.objects.filter(
-            identity_id='GLOBAL-LEGAL-IDENTITY',
-        ).first()
-        if legal:
-            if (legal.company_name_en or '').strip():
-                brand_name = legal.company_name_en.strip()
-            
-            # Check if a custom logo is uploaded and physically exists on the disk.
-            # This prevents broken links if a file was deleted or the path is invalid.
-            if getattr(legal, 'company_logo', None):
-                try:
-                    # In Django, truthy ImageField has a 'path' attribute if it's on local storage.
-                    if legal.company_logo and os.path.exists(legal.company_logo.path):
-                        brand_logo_url = legal.company_logo.url or brand_logo_url
-                except Exception:
-                    # If path resolution fails (e.g. S3), fallback to the URL anyway
-                    # but we prefer the safety of the disk check for local dev.
-                    try:
-                        brand_logo_url = legal.company_logo.url
-                    except Exception:
-                        pass
-            
-            # Generate initials from company name
-            letters = ''.join(ch for ch in brand_name if ch.isalnum()).upper()
-            if letters:
-                brand_initials = letters[:2]
-    except Exception:
-        # Keep email delivery resilient even if branding lookup fails.
-        pass
+    # try:
+    #     from superadmin.models import LegalIdentity
+    # 
+    #     legal = LegalIdentity.objects.filter(
+    #         identity_id='GLOBAL-LEGAL-IDENTITY',
+    #     ).first()
+    #     if legal:
+    #         if (legal.company_name_en or '').strip():
+    #             brand_name = legal.company_name_en.strip()
+    #         
+    #         if (legal.company_name_ar or '').strip():
+    #             brand_name_ar = legal.company_name_ar.strip()
+    #         
+    #         # Contact details - Commented out for now
+    #         # support_email = getattr(legal, 'support_email', '')
+    #         # support_phone = getattr(legal, 'support_phone', '')
+    #         # registered_address = getattr(legal, 'registered_address', '')
+    #         # tax_number = getattr(legal, 'tax_number', '')
+    # 
+    #         # Check if a custom logo is uploaded and physically exists on the disk.
+    #         if getattr(legal, 'company_logo', None):
+    #             try:
+    #                 if legal.company_logo and os.path.exists(legal.company_logo.path):
+    #                     brand_logo_url = legal.company_logo.url or brand_logo_url
+    #             except Exception:
+    #                 try:
+    #                     brand_logo_url = legal.company_logo.url
+    #                 except Exception:
+    #                     pass
+    #         
+    #         # Generate initials from company name
+    #         letters = ''.join(ch for ch in brand_name if ch.isalnum()).upper()
+    #         if letters:
+    #             brand_initials = letters[:2]
+    # except Exception:
+    #     pass
 
     # Standardize logo URL resolution (ensure absolute URL)
     if brand_logo_url:
-        # Avoid double-slashes and ensure absolute URL if not already
         if not (brand_logo_url.startswith('http') or brand_logo_url.startswith('//')):
             base = _get_base_url()
             if not brand_logo_url.startswith('/'):
@@ -104,8 +116,13 @@ def _build_branding_context():
 
     return {
         'brand_company_name': brand_name,
+        'brand_company_name_ar': brand_name_ar,
         'brand_logo_url': brand_logo_url,
         'brand_initials': brand_initials,
+        'brand_support_email': '',
+        'brand_support_phone': '',
+        'brand_registered_address': '',
+        'brand_tax_number': '',
     }
 
 
@@ -906,6 +923,7 @@ def send_email_smtp_gateway(
     *,
     trigger_source='Direct: Email',
     client_id=None,
+    attachments=None,
 ):
     msg = MIMEMultipart('alternative')
     msg['Subject'] = subject
@@ -914,6 +932,13 @@ def send_email_smtp_gateway(
     msg.attach(MIMEText(text_body, 'plain', 'utf-8'))
     if html_body:
         msg.attach(MIMEText(html_body, 'html', 'utf-8'))
+
+    if attachments:
+        from email.mime.application import MIMEApplication
+        for filename, content, mimetype in attachments:
+            part = MIMEApplication(content)
+            part.add_header('Content-Disposition', 'attachment', filename=filename)
+            msg.attach(part)
 
     port = gateway.port
     enc = gateway.encryption_type or 'TLS'
@@ -1000,6 +1025,7 @@ def send_email_via_django_smtp(
     *,
     trigger_source='Direct: Email',
     client_id=None,
+    attachments=None,
 ):
     """
     Send using ``EMAIL_BACKEND`` and ``EMAIL_*`` / ``DEFAULT_FROM_EMAIL`` from
@@ -1026,6 +1052,10 @@ def send_email_via_django_smtp(
     )
     if html_body:
         msg.attach_alternative(html_body, 'text/html')
+    
+    if attachments:
+        for filename, content, mimetype in attachments:
+            msg.attach(filename, content, mimetype)
     try:
         msg.send(fail_silently=False)
     except smtplib.SMTPException:
@@ -1067,6 +1097,7 @@ def send_transactional_email(
     *,
     trigger_source='Direct: Email',
     client_id=None,
+    attachments=None,
 ):
     """
     Send one email: active CommGateway (Email) if configured, else Django SMTP settings.
@@ -1081,6 +1112,7 @@ def send_transactional_email(
             html_body,
             trigger_source=trigger_source,
             client_id=client_id,
+            attachments=attachments,
         )
         return True
     return send_email_via_django_smtp(
@@ -1090,6 +1122,7 @@ def send_transactional_email(
         html_body,
         trigger_source=trigger_source,
         client_id=client_id,
+        attachments=attachments,
     )
 
 
@@ -1239,6 +1272,22 @@ def ensure_default_notification_templates(created_by=None):
                 'updated_by': created_by,
             },
         )
+
+    # Ensure New_Tenant_Registered event is mapped to the default Welcome template.
+    welcome_template = NotificationTemplate.objects.filter(
+        template_name='TENANT_WELCOME_EMAIL',
+        channel_type='Email',
+    ).first()
+    if welcome_template:
+        EventMapping.objects.update_or_create(
+            system_event='New_Tenant_Registered',
+            defaults={
+                'primary_channel': 'Email',
+                'primary_template': welcome_template,
+                'is_active': True,
+                'updated_by': created_by,
+            },
+        )
     return created
 
 
@@ -1272,6 +1321,7 @@ def send_named_notification_email(
     default_subject='Notification',
     trigger_source=None,
     force_django_smtp=False,
+    attachments=None,
 ):
     """
     Send an Email NotificationTemplate selected by ``template_name``.
@@ -1307,6 +1357,7 @@ def send_named_notification_email(
             text_body,
             body,
             trigger_source=source,
+            attachments=attachments,
         )
     return send_transactional_email(
         recipient_email,
@@ -1314,6 +1365,7 @@ def send_named_notification_email(
         text_body,
         body,
         trigger_source=source,
+        attachments=attachments,
     )
 
 
@@ -1326,6 +1378,7 @@ def dispatch_event_notification(
     language='en',
     force_django_smtp=False,
     use_async_tasks=True,
+    attachments=None,
 ):
     """
     Generic dispatcher:
@@ -1370,12 +1423,14 @@ def dispatch_event_notification(
                     subject or 'Notification',
                     strip_tags(body),
                     body,
+                    attachments=attachments,
                 )
             return send_transactional_email(
                 recipient_email,
                 subject or 'Notification',
                 strip_tags(body),
                 body,
+                attachments=attachments,
                 trigger_source=f'Event: {event_code}',
             )
         if channel == 'SMS':
@@ -1422,43 +1477,74 @@ def dispatch_internal_alerts(event_code, context_dict=None):
         InternalAlertRoute,
     )
     from superadmin.tasks import send_email_task
+    def _send_internal_alert_email(recipient_email):
+        """Prefer async queue; fallback to direct SMTP if queue is unavailable."""
+        try:
+            send_email_task.delay(recipient_email, subject, body, None)
+            return True
+        except Exception:
+            logger.exception(
+                'Internal alert queue dispatch failed for %s; falling back to direct SMTP.',
+                recipient_email,
+            )
+            try:
+                send_email_via_django_smtp(
+                    recipient_email,
+                    subject,
+                    body,
+                    None,
+                    trigger_source=f'InternalAlert: {event_code}',
+                )
+                return True
+            except Exception:
+                logger.exception(
+                    'Internal alert direct SMTP failed for %s',
+                    recipient_email,
+                )
+                return False
+
 
     routes = InternalAlertRoute.objects.filter(trigger_event=event_code, is_active=True)
     if not routes.exists():
         return 0
 
     ctx = context_dict or {}
+    # InternalAlertNotification.context_payload is JSONField, so sanitize any
+    # non-JSON values (e.g., model instances) before persisting notifications.
+    safe_ctx = json.loads(json.dumps(ctx, default=str, ensure_ascii=True))
     subject = f'Internal Alert: {event_code}'
     body = (
         f'Event "{event_code}" triggered.\n\n'
-        f'Context:\n{json.dumps(ctx, default=str, ensure_ascii=True)}'
+        f'Context:\n{json.dumps(safe_ctx, default=str, ensure_ascii=True)}'
     )
     sent_to = set()
     notified_admin_ids = set()
     title = f'Internal Alert - {event_code.replace("_", " ")}'
-    message = ctx.get('message') or body[:1000]
+    message = safe_ctx.get('message') or body[:1000]
     for route in routes.iterator():
+        email = ''
         if route.notify_custom_email:
             email = route.notify_custom_email.strip().lower()
             if email and email not in sent_to:
-                send_email_task.delay(email, subject, body, None)
-                sent_to.add(email)
-            if email:
-                admin = AdminUser.objects.filter(
-                    email__iexact=email,
-                    status='Active',
-                    is_deleted=False,
-                ).first()
-                if admin and admin.pk not in notified_admin_ids:
-                    InternalAlertNotification.objects.create(
-                        admin_user=admin,
-                        route=route,
-                        trigger_event=event_code,
-                        title=title,
-                        message=message,
-                        context_payload=ctx,
-                    )
-                    notified_admin_ids.add(admin.pk)
+                if _send_internal_alert_email(email):
+                    sent_to.add(email)
+
+        if email:
+            admin = AdminUser.objects.filter(
+                email__iexact=email,
+                status='Active',
+                is_deleted=False,
+            ).first()
+            if admin and admin.pk not in notified_admin_ids:
+                InternalAlertNotification.objects.create(
+                    admin_user=admin,
+                    route=route,
+                    trigger_event=event_code,
+                    title=title,
+                    message=message,
+                    context_payload=safe_ctx,
+                )
+                notified_admin_ids.add(admin.pk)
         if route.notify_role_id:
             admins = AdminUser.objects.filter(
                 role_id=route.notify_role_id,
@@ -1468,8 +1554,8 @@ def dispatch_internal_alerts(event_code, context_dict=None):
             for email in admins:
                 norm = (email or '').strip().lower()
                 if norm and norm not in sent_to:
-                    send_email_task.delay(norm, subject, body, None)
-                    sent_to.add(norm)
+                    if _send_internal_alert_email(norm):
+                        sent_to.add(norm)
             for admin in AdminUser.objects.filter(
                 role_id=route.notify_role_id,
                 status='Active',
@@ -1483,7 +1569,7 @@ def dispatch_internal_alerts(event_code, context_dict=None):
                     trigger_event=event_code,
                     title=title,
                     message=message,
-                    context_payload=ctx,
+                    context_payload=safe_ctx,
                 )
                 notified_admin_ids.add(admin.pk)
     return len(sent_to)
@@ -1533,52 +1619,33 @@ def send_tenant_welcome_email(
 ):
     """
     Welcome email after subscriber provisioning (CP-PCS-P1 §4 handover).
-
-    Delivers bridge key and optional initial portal password via email only
-    (never shown in Control Panel). SMTP from ``config/settings.py``.
+    Now uses the centralized dispatch_event_notification engine.
     """
     set_password_url = (invite_url or '').strip() or 'http://127.0.0.1:8000/set-password/'
     ctx = {
         'tenant': tenant,
+        'tenant_id': str(tenant.tenant_id),
         'company_name': tenant.company_name,
+        'primary_email': tenant.primary_email,
         'invite_url': set_password_url,
         'portal_login_url': set_password_url,
+        'api_bridge_key': api_bridge_key_plain or '',
+        'portal_bootstrap_password': portal_bootstrap_password_plain or '',
+        'message': f'New tenant "{tenant.company_name}" registered ({tenant.primary_email}).',
     }
-    ctx = _merge_template_context(ctx)
-    # Preferred path: explicit named template from Notification Templates screen.
-    # This lets ops edit content without code changes.
-    if send_named_notification_email(
-        'TENANT_WELCOME_EMAIL',
+    
+    # We use the dispatch_event_notification engine so that:
+    # 1. The Welcome Email is sent to the tenant (primary_template).
+    # 2. Internal alerts are routed to admins (dispatch_internal_alerts).
+    # We force synchronous dispatch for registration so we can verify delivery immediately.
+    return dispatch_event_notification(
+        'New_Tenant_Registered',
         recipient_email=tenant.primary_email,
         context_dict=ctx,
         language='en',
-        default_subject=f'Welcome to iRoad — {tenant.company_name}',
-        trigger_source='TemplateName: TENANT_WELCOME_EMAIL',
         force_django_smtp=True,
-    ):
-        return True
-
-    try:
-        sent = dispatch_event_notification(
-            'Welcome_Email',
-            recipient_email=tenant.primary_email,
-            context_dict=ctx,
-            language='en',
-            # Keep subscriber credential emails on Django SMTP only.
-            force_django_smtp=True,
-        )
-        if sent:
-            return True
-    except Exception:
-        logger.exception(
-            'Mapped Welcome_Email dispatch failed; falling back to static template for tenant %s',
-            tenant.tenant_id,
-        )
-
-    html = render_to_string('tenant/emails/welcome_subscriber.html', ctx)
-    text = strip_tags(html)
-    subject = f'Welcome to iRoad — {tenant.company_name}'
-    return send_email_via_django_smtp(tenant.primary_email, subject, text, html)
+        use_async_tasks=False,
+    )
 
 
 def send_tenant_bridge_rotated_email(tenant, api_bridge_key_plain):

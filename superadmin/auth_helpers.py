@@ -17,7 +17,7 @@ def get_security_settings():
     except AdminSecuritySettings.DoesNotExist:
 
         class Defaults:
-            session_timeout_minutes = 240
+            session_timeout_minutes = 1440
             max_failed_logins = 3
             lockout_duration_minutes = 30
 
@@ -51,12 +51,14 @@ def check_brute_force(email):
             minutes=settings.lockout_duration_minutes
         )
         if timezone.now() < lockout_end:
-            remaining = (
+            remaining_minutes = (
                 int((lockout_end - timezone.now()).total_seconds() / 60) + 1
             )
+            remaining_seconds = int((lockout_end - timezone.now()).total_seconds())
             return {
                 "is_locked": True,
-                "remaining_minutes": remaining,
+                "remaining_minutes": remaining_minutes,
+                "remaining_seconds": max(0, remaining_seconds),
                 "failed_count": attempt.failed_count,
             }
         else:

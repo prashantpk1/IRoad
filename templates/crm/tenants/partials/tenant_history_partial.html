@@ -1,0 +1,63 @@
+{% load i18n %}
+
+<div class="eal-table-wrap">
+    <table class="eal-table">
+        <thead>
+            <tr>
+                <th>{% translate "Order ID" %}</th>
+                <th>{% translate "Classification" %}</th>
+                <th>{% translate "Amount" %}</th>
+                <th>{% translate "Status" %}</th>
+                <th>{% translate "Invoices" %}</th>
+                <th>{% translate "Date" %}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for order in orders %}
+            <tr>
+                <td>
+                    <a href="{% url 'order_detail' order.order_id %}" class="fw-bold text-primary">#{{ order.order_id|stringformat:".8s" }}</a>
+                </td>
+                <td><span class="value-badge">{{ order.get_order_classification_display }}</span></td>
+                <td><span class="fw-semibold">{{ order.grand_total|floatformat:2 }} {{ order.currency_id }}</span></td>
+                <td>
+                    {% if order.order_status == 'Paid' %}
+                        <span class="status-badge active">{% translate "Paid" %}</span>
+                    {% elif order.order_status == 'Pending_Payment' %}
+                        <span class="status-badge warning">{% translate "Pending" %}</span>
+                    {% else %}
+                        <span class="status-badge neutral">{{ order.get_order_status_display }}</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% with primary_invoice=order.invoices.all.0 %}
+                        {% if primary_invoice %}
+                            <a href="{% url 'invoice_print' primary_invoice.invoice_id %}" class="eal-row-btn" title="{% translate 'Download PDF Invoice' %}">
+                                <i class="bi bi-file-earmark-pdf text-danger"></i>
+                            </a>
+                        {% else %}
+                            <span class="text-muted small">-</span>
+                        {% endif %}
+                    {% endwith %}
+                </td>
+                <td class="small text-muted">{{ order.created_at|date:'d M Y' }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="6" class="text-center py-4 text-muted">
+                    {% translate "No order history found for this tenant." %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if orders.exists %}
+<div class="mt-3 text-center">
+    <a href="{% url 'order_list' %}?tenant={{ tenant.tenant_id }}" class="eal-btn eal-btn-outline eal-btn-sm">
+        <span>{% translate "View Full Order History" %}</span>
+        <i class="bi bi-arrow-right"></i>
+    </a>
+</div>
+{% endif %}

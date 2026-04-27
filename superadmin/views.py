@@ -37,6 +37,7 @@ import logging
 import os
 import re
 import secrets
+import subprocess
 import uuid
 import smtplib
 from email.mime.multipart import MIMEMultipart
@@ -88,8 +89,18 @@ from .audit_helpers import (
     log_audit_action,
 )
 from .redis_helpers import create_admin_session
+from .tenant_portal_auth import (
+    get_tenant_portal_cookie_payload,
+    set_tenant_portal_cookie,
+)
 from .communication_helpers import (
     dispatch_internal_alerts,
+    dispatch_event_notification,
+    ensure_default_notification_templates,
+    send_named_notification_email,
+    send_transactional_email,
+)
+from .communication_helpers import (
     dispatch_event_notification,
     ensure_default_notification_templates,
     send_named_notification_email,
@@ -225,7 +236,13 @@ def _issue_admin_login_otp(request, user):
         created_by=user if getattr(user, 'is_authenticated', False) else None
     )
     otp_code = f'{secrets.randbelow(1000000):06d}'
-    expires_at = timezone.now() + timezone.timedelta(seconds=ADMIN_LOGIN_OTP_TTL_SECONDS)
+    
+    # PCS FRM-CP-11-01 — fetch dynamic OTP TTL from settings row.
+    from .auth_helpers import get_security_settings
+    settings_obj = get_security_settings()
+    ttl_seconds = getattr(settings_obj, 'otp_timeout_seconds', ADMIN_LOGIN_OTP_TTL_SECONDS)
+
+    expires_at = timezone.now() + timezone.timedelta(seconds=ttl_seconds)
     request.session[ADMIN_LOGIN_OTP_SESSION_KEY] = {
         'admin_id': str(getattr(user, 'admin_id', user.id)),
         'email': (user.email or '').strip().lower(),
@@ -335,9 +352,30 @@ class LoginView(View):
     template_name = 'auth/login.html'
 
     def get(self, request):
-        if request.user.is_authenticated:
-            return redirect('dashboard')
-        return render(request, self.template_name, {'form': LoginForm()})
+        email = request.GET.get('email', '').strip().lower()
+        settings_obj = get_security_settings()
+        context = {
+            'form': LoginForm(initial={'email': email}),
+            'max_failed_logins': settings_obj.max_failed_logins,
+            'attempts_remaining': settings_obj.max_failed_logins,
+            'security_timeout': settings_obj.otp_timeout_seconds,
+        }
+
+        if email:
+            brute = check_brute_force(email)
+            if brute['is_locked']:
+                context.update({
+                    'is_locked': True,
+                    'remaining_seconds': brute.get('remaining_seconds', 0),
+                    'lockout_duration_total': settings_obj.lockout_duration_minutes * 60,
+                    'attempts_remaining': 0,
+                    'locked_email': email,
+                    'error': 'Account locked due to too many failed attempts.',
+                })
+            else:
+                context['attempts_remaining'] = max(0, settings_obj.max_failed_logins - brute['failed_count'])
+
+        return render(request, self.template_name, context)
 
     def post(self, request):
         form = LoginForm(request.POST)
@@ -346,30 +384,43 @@ class LoginView(View):
 
         # STEP 1: Check brute force FIRST
         brute = check_brute_force(email)
+        settings_obj = get_security_settings()
+        
+        # Calculate initial remaining attempts based on pre-post state
+        current_remaining = max(0, settings_obj.max_failed_logins - brute['failed_count'])
+
+        base_context = {
+            'max_failed_logins': settings_obj.max_failed_logins,
+            'attempts_remaining': current_remaining,
+            'security_timeout': settings_obj.otp_timeout_seconds,
+            'is_locked': brute['is_locked'],
+        }
+
+        def render_login(extra_context=None):
+            context = {'form': form, **base_context}
+            if extra_context:
+                context.update(extra_context)
+            return render(request, self.template_name, context)
+
         if brute['is_locked']:
             log_access('Login', 'Blocked', email, ip)
-            return render(
-                request,
-                self.template_name,
-                {
-                    'form': form,
-                    'error': (
-                        f'Account locked. Try again in '
-                        f"{brute['remaining_minutes']} minute(s)."
-                    ),
-                    'is_locked': True,
-                },
-            )
+            return render_login({
+                'error': 'Account locked due to too many failed attempts.',
+                'is_locked': True,
+                'remaining_seconds': brute.get('remaining_seconds', 0),
+                'lockout_duration_total': settings_obj.lockout_duration_minutes * 60,
+                'attempts_remaining': 0,
+                'locked_email': email,
+            })
 
         if not form.is_valid():
-            return render(
-                request,
-                self.template_name,
-                {
-                    'form': form,
-                    'error': 'Please enter valid email and password.',
-                },
-            )
+            if form.errors.get('email'):
+                error_msg = 'Please enter a valid email address.'
+            elif form.errors.get('password'):
+                error_msg = 'Please enter your password.'
+            else:
+                error_msg = 'Please enter valid email and password.'
+            return render_login({'error': error_msg})
 
         # STEP 2: Check user exists
         try:
@@ -381,62 +432,62 @@ class LoginView(View):
             if not tenant:
                 if tenant_resolution in ('ambiguous_active', 'ambiguous_inactive'):
                     log_access('Login', 'Failed', email, ip)
-                    return render(
-                        request,
-                        self.template_name,
-                        {
-                            'form': form,
-                            'error': (
-                                'This email is linked to multiple tenant accounts. '
-                                'Please contact administrator support.'
-                            ),
-                        },
-                    )
+                    return render_login({
+                        'error': (
+                            'This email is linked to multiple tenant accounts. '
+                            'Please contact administrator support.'
+                        ),
+                    })
                 record_failed_attempt(email)
                 log_access('Login', 'Failed', email, ip)
-                return render(
-                    request,
-                    self.template_name,
-                    {
-                        'form': form,
-                        'error': 'Invalid email or password.',
-                        'failed_count': check_brute_force(email)['failed_count'],
-                    },
-                )
+                brute_after = check_brute_force(email)
+                
+                if brute_after['is_locked']:
+                    return render_login({
+                        'error': 'Account locked due to too many failed attempts.',
+                        'is_locked': True,
+                        'remaining_seconds': brute_after.get('remaining_seconds', 0),
+                        'lockout_duration_total': settings_obj.lockout_duration_minutes * 60,
+                        'attempts_remaining': 0,
+                        'locked_email': email,
+                    })
+
+                remaining_attempts = max(0, settings_obj.max_failed_logins - brute_after['failed_count'])
+                return render_login({
+                    'error': f"Invalid email or password. {remaining_attempts} attempts remaining before lockout.",
+                    'failed_count': brute_after['failed_count'],
+                    'attempts_remaining': remaining_attempts,
+                })
             if tenant.account_status != 'Active':
                 log_access('Login', 'Failed', email, ip)
-                return render(
-                    request,
-                    self.template_name,
-                    {
-                        'form': form,
-                        'error': 'Tenant account is not active.',
-                    },
-                )
+                return render_login({'error': 'Tenant account is not active.'})
             if not (tenant.portal_bootstrap_password_hash or '').strip():
                 log_access('Login', 'Failed', email, ip)
-                return render(
-                    request,
-                    self.template_name,
-                    {
-                        'form': form,
-                        'error': 'Tenant password is not provisioned yet.',
-                    },
-                )
+                return render_login({'error': 'Tenant password is not provisioned yet.'})
             if not check_password(
                 form.cleaned_data['password'],
                 tenant.portal_bootstrap_password_hash,
             ):
                 record_failed_attempt(email)
                 log_access('Login', 'Failed', email, ip)
-                return render(
-                    request,
-                    self.template_name,
-                    {
-                        'form': form,
-                        'error': 'Invalid email or password.',
-                    },
-                )
+                brute_after = check_brute_force(email)
+                
+                if brute_after['is_locked']:
+                    return render_login({
+                        'error': 'Account locked due to too many failed attempts.',
+                        'is_locked': True,
+                        'remaining_seconds': brute_after.get('remaining_seconds', 0),
+                        'lockout_duration_total': settings_obj.lockout_duration_minutes * 60,
+                        'attempts_remaining': 0,
+                        'locked_email': email,
+                    })
+
+                remaining_attempts = max(0, settings_obj.max_failed_logins - brute_after['failed_count'])
+                return render_login({
+                    'error': f"Invalid email or password. {remaining_attempts} attempts remaining before lockout.",
+                    'failed_count': brute_after['failed_count'],
+                    'attempts_remaining': remaining_attempts,
+                })
 
             request.session['pending_tenant_id'] = str(tenant.tenant_id)
             request.session['pending_tenant_email'] = (tenant.primary_email or '').strip().lower()
@@ -446,17 +497,12 @@ class LoginView(View):
                 _issue_tenant_login_otp(request, tenant)
             except Exception:
                 logger.exception('Failed to dispatch tenant login OTP for %s', tenant.primary_email)
-                return render(
-                    request,
-                    self.template_name,
-                    {
-                        'form': form,
-                        'error': (
-                            'Could not send verification code right now. '
-                            'Please try again.'
-                        ),
-                    },
-                )
+                return render_login({
+                    'error': (
+                        'Could not send verification code right now. '
+                        'Please try again.'
+                    ),
+                })
             messages.success(
                 request,
                 'A verification code has been sent to your email. Enter it to continue.',
@@ -466,31 +512,21 @@ class LoginView(View):
         # STEP 3: Check status
         if user.status == 'Suspended':
             log_access('Login', 'Failed', email, ip)
-            return render(
-                request,
-                self.template_name,
-                {
-                    'form': form,
-                    'error': (
-                        'Your account has been suspended. '
-                        'Contact your administrator.'
-                    ),
-                },
-            )
+            return render_login({
+                'error': (
+                    'Your account has been suspended. '
+                    'Contact your administrator.'
+                ),
+            })
 
         if user.status == 'Pending_Activation':
             log_access('Login', 'Failed', email, ip)
-            return render(
-                request,
-                self.template_name,
-                {
-                    'form': form,
-                    'error': (
-                        'Your account is not yet activated. '
-                        'Please use the invite link sent to you.'
-                    ),
-                },
-            )
+            return render_login({
+                'error': (
+                    'Your account is not yet activated. '
+                    'Please use the invite link sent to you.'
+                ),
+            })
 
         # STEP 4: Check password (never log plaintext password)
         password_ok = user.check_password(form.cleaned_data['password'])
@@ -510,36 +546,24 @@ class LoginView(View):
             # Re-check AFTER recording — may have just hit the limit
             brute_after = check_brute_force(email)
             if brute_after['is_locked']:
-                return render(
-                    request,
-                    'auth/login.html',
-                    {
-                        'form': form,
-                        'error': (
-                            'Account locked due to too many failed '
-                            'attempts. Try again in '
-                            f"{brute_after['remaining_minutes']} "
-                            'minute(s).'
-                        ),
-                        'is_locked': True,
-                    },
-                )
+                return render_login({
+                    'error': 'Account locked due to too many failed attempts.',
+                    'is_locked': True,
+                    'remaining_seconds': brute_after.get('remaining_seconds', 0),
+                    'lockout_duration_total': settings_obj.lockout_duration_minutes * 60,
+                    'attempts_remaining': 0,
+                    'locked_email': email,
+                })
 
             settings_obj = get_security_settings()
             remaining_attempts = (
                 settings_obj.max_failed_logins - brute_after['failed_count']
             )
-            return render(
-                request,
-                'auth/login.html',
-                {
-                    'form': form,
-                    'error': (
-                        'Invalid email or password. '
-                        f'{remaining_attempts} attempt(s) remaining.'
-                    ),
-                },
-            )
+            return render_login({
+                'error': f"Invalid email or password. {remaining_attempts} attempts remaining before lockout.",
+                'failed_count': brute_after['failed_count'],
+                'attempts_remaining': remaining_attempts,
+            })
 
         # STEP 5: Password verified — continue with OTP verification
         request.session['pending_admin_id'] = str(getattr(user, 'admin_id', user.id))
@@ -550,17 +574,12 @@ class LoginView(View):
             _issue_admin_login_otp(request, user)
         except Exception:
             logger.exception('Failed to dispatch login OTP for %s', user.email)
-            return render(
-                request,
-                self.template_name,
-                {
-                    'form': form,
-                    'error': (
-                        'Could not send verification code right now. '
-                        'Please try again.'
-                    ),
-                },
-            )
+            return render_login({
+                'error': (
+                    'Could not send verification code right now. '
+                    'Please try again.'
+                ),
+            })
         messages.success(
             request,
             'A verification code has been sent to your email. Enter it to continue.',
@@ -630,27 +649,35 @@ class OTPVerificationView(View):
         if timezone.is_naive(expires_at):
             expires_at = timezone.make_aware(expires_at, timezone.get_current_timezone())
         remaining = max(0, int((expires_at - timezone.now()).total_seconds()))
+
+        from .auth_helpers import get_security_settings
+        settings_obj = get_security_settings()
+        total_ttl = getattr(settings_obj, 'otp_timeout_seconds', 300)
+
         return {
             'otp_payload': otp_payload,
             'identity_id': identity_id,
             'email': email,
             'remaining': remaining,
+            'total_ttl': total_ttl,
             'domain': domain,
             'max_attempts': max_attempts,
         }
 
     def get(self, request):
-        if request.user.is_authenticated:
-            return redirect('dashboard')
-        if request.session.get('tenant_bootstrap_tenant_id'):
-            return redirect('iroad_tenants:tenant_dashboard')
         pending = self._pending_state(request)
         if not pending:
+            if request.user.is_authenticated:
+                return redirect('dashboard')
+            if get_tenant_portal_cookie_payload(request):
+                return redirect('iroad_tenants:tenant_dashboard')
             messages.error(request, 'Your verification session has expired. Please sign in again.')
             return redirect('login')
         otp_payload = pending['otp_payload']
         email = pending['email']
         remaining = pending['remaining']
+        total_ttl = pending.get('total_ttl', 300)
+
         if remaining <= 0:
             if pending['domain'] == 'admin':
                 self._clear_admin_pending(request)
@@ -658,6 +685,7 @@ class OTPVerificationView(View):
                 self._clear_tenant_pending(request)
             messages.error(request, 'OTP expired. Please sign in again to get a new code.')
             return redirect('login')
+
         return render(
             request,
             self.template_name,
@@ -665,19 +693,20 @@ class OTPVerificationView(View):
                 'form': OTPVerificationForm(),
                 'masked_email': email,
                 'remaining_seconds': remaining,
+                'total_ttl': total_ttl,
                 'attempts_left': max(0, pending['max_attempts'] - int(otp_payload.get('attempts', 0))),
                 **self._otp_page_context(pending['domain']),
             },
         )
 
     def post(self, request):
-        if request.user.is_authenticated:
-            return redirect('dashboard')
-        if request.session.get('tenant_bootstrap_tenant_id'):
-            return redirect('iroad_tenants:tenant_dashboard')
         action = request.POST.get('action')
         pending = self._pending_state(request)
         if not pending:
+            if request.user.is_authenticated:
+                return redirect('dashboard')
+            if get_tenant_portal_cookie_payload(request):
+                return redirect('iroad_tenants:tenant_dashboard')
             messages.error(request, 'Your verification session has expired. Please sign in again.')
             return redirect('login')
         otp_payload = pending['otp_payload']
@@ -805,6 +834,8 @@ class OTPVerificationView(View):
             return redirect('dashboard')
 
         from .tenant_jwt import sign_tenant_access_jwt
+        from .redis_helpers import create_tenant_session, revoke_tenant_session_key
+        from .models import TenantSecuritySettings
 
         ttl = max(60, int(getattr(settings, 'TENANT_BOOTSTRAP_JWT_TTL_SECONDS', 3600)))
         token_str, jti = sign_tenant_access_jwt(
@@ -813,16 +844,39 @@ class OTPVerificationView(View):
             token_type='tenant_bootstrap',
             ttl_seconds=ttl,
         )
-        request.session['tenant_bootstrap_token'] = token_str
-        request.session['tenant_bootstrap_tenant_id'] = str(tenant.tenant_id)
-        request.session['tenant_bootstrap_jti'] = jti
-        request.session['tenant_bootstrap_expires_in'] = ttl
+        existing_tenant_auth = get_tenant_portal_cookie_payload(request) or {}
+        old_tenant_id = existing_tenant_auth.get('tenant_id')
+        old_jti = existing_tenant_auth.get('jti')
+        if old_tenant_id and old_jti:
+            revoke_tenant_session_key(str(old_tenant_id), str(old_jti))
+
+        sec = TenantSecuritySettings.objects.first()
+        tenant_timeout_min = max(
+            60,
+            int(getattr(sec, 'tenant_web_timeout_hours', 12)) * 60,
+        )
+        create_tenant_session(
+            tenant_id=str(tenant.tenant_id),
+            user_domain='Tenant_User',
+            reference_id=str(tenant.tenant_id),
+            reference_name=(tenant.company_name or tenant.primary_email or '').strip(),
+            ip_address=request.session.get('pending_tenant_ip') or _client_ip(request),
+            user_agent=request.META.get('HTTP_USER_AGENT', ''),
+            timeout_minutes=tenant_timeout_min,
+            jti=jti,
+        )
+
+        # Backward-compat cleanup for older session-based tenant bootstrap.
+        for key in ('tenant_bootstrap_token', 'tenant_bootstrap_tenant_id', 'tenant_bootstrap_jti', 'tenant_bootstrap_expires_in'):
+            request.session.pop(key, None)
         reset_failed_attempts(email)
         ip = request.session.get('pending_tenant_ip') or _client_ip(request)
         log_access('Login', 'Success', email, ip)
         self._clear_tenant_pending(request)
         messages.success(request, 'OTP verified successfully.')
-        return redirect('iroad_tenants:tenant_dashboard')
+        response = redirect('iroad_tenants:tenant_dashboard')
+        set_tenant_portal_cookie(response, tenant.tenant_id, jti)
+        return response
 
 
 class LogoutView(View):
@@ -1347,9 +1401,9 @@ class AccessLogListView(LoginRequiredMixin, View):
             return redirect_resp
 
         sort_by = request.GET.get('sort', 'rank').strip()
-        sort_dir = request.GET.get('dir', 'asc').strip().lower()
+        sort_dir = request.GET.get('dir', 'desc').strip().lower()
         if sort_dir not in ('asc', 'desc'):
-            sort_dir = 'asc'
+            sort_dir = 'desc'
 
         qs = AccessLog.objects.annotate(
             default_rank=Window(
@@ -1413,6 +1467,9 @@ class AccessLogListView(LoginRequiredMixin, View):
         paginator = Paginator(qs, 10)
         page_number = request.GET.get('page', 1)
         page_obj = paginator.get_page(page_number)
+        start_index = page_obj.start_index()
+        for offset, log in enumerate(page_obj.object_list):
+            log.list_rank = total_count - (start_index + offset) + 1
 
         query_params = request.GET.copy()
         if 'page' in query_params:
@@ -1449,6 +1506,11 @@ class AuditLogListView(LoginRequiredMixin, View):
         if redirect_resp:
             return redirect_resp
 
+        sort_by = request.GET.get('sort', 'rank').strip()
+        sort_dir = request.GET.get('dir', 'desc').strip().lower()
+        if sort_dir not in ('asc', 'desc'):
+            sort_dir = 'desc'
+
         qs = AuditLog.objects.select_related('admin').all()
 
         action_filter = request.GET.get('action_type', 'All')
@@ -1479,10 +1541,29 @@ class AuditLogListView(LoginRequiredMixin, View):
                 | Q(record_id__icontains=search_query)
             )
 
-        qs = qs.order_by('-timestamp')
+        sort_mapping = {
+            'rank': ['timestamp'],
+            'admin': ['admin__first_name', 'admin__last_name', 'admin__email'],
+            'action_type': ['action_type'],
+            'module_name': ['module_name'],
+            'ip': ['ip_address'],
+            'timestamp': ['timestamp'],
+        }
+        active_sort_fields = sort_mapping.get(sort_by, ['timestamp'])
+        ordering = []
+        for field_name in active_sort_fields:
+            ordering.append(
+                field_name if sort_dir == 'asc' else f'-{field_name}'
+            )
+        qs = qs.order_by(*ordering)
+        total_count = qs.count()
+
         paginator = Paginator(qs, 10)
         page_number = request.GET.get('page', 1)
         page_obj = paginator.get_page(page_number)
+        start_index = page_obj.start_index()
+        for offset, log in enumerate(page_obj.object_list):
+            log.list_rank = total_count - (start_index + offset) + 1
 
         query_params = request.GET.copy()
         if 'page' in query_params:
@@ -1496,6 +1577,8 @@ class AuditLogListView(LoginRequiredMixin, View):
             'from_date': from_date,
             'to_date': to_date,
             'search_query': search_query,
+            'current_sort': sort_by,
+            'current_dir': sort_dir,
             'admins': AdminUser.objects.order_by('first_name', 'last_name'),
             'modules': AuditLog.objects.values_list(
                 'module_name', flat=True
@@ -1553,9 +1636,10 @@ class AdminSecuritySettingsView(LoginRequiredMixin, View):
         obj, _created = AdminSecuritySettings.objects.get_or_create(
             setting_id='ADMIN-SEC-CONF',
             defaults={
-                'session_timeout_minutes': 240,
+                'session_timeout_minutes': 1440,
                 'max_failed_logins': 3,
                 'lockout_duration_minutes': 30,
+                'otp_timeout_seconds': 300,
             },
         )
         form = AdminSecuritySettingsForm(instance=obj)
@@ -1568,14 +1652,19 @@ class AdminSecuritySettingsView(LoginRequiredMixin, View):
         obj, _created = AdminSecuritySettings.objects.get_or_create(
             setting_id='ADMIN-SEC-CONF',
             defaults={
-                'session_timeout_minutes': 240,
+                'session_timeout_minutes': 1440,
                 'max_failed_logins': 3,
                 'lockout_duration_minutes': 30,
+                'otp_timeout_seconds': 300,
             },
         )
         old_obj = AdminSecuritySettings.objects.get(setting_id=obj.setting_id)
         form = AdminSecuritySettingsForm(request.POST, instance=obj)
         if not form.is_valid():
+            messages.error(
+                request,
+                'Could not save admin security settings. Please correct the highlighted fields.',
+            )
             return render(request, self.template_name, {'form': form, 'obj': obj})
         form.instance.updated_by = request.user
         form.save()
@@ -1713,6 +1802,8 @@ class ActiveSessionListView(LoginRequiredMixin, View):
 from superadmin.redis_helpers import (
     get_all_active_admin_sessions,
     revoke_admin_session,
+    get_all_active_tenant_sessions,
+    revoke_tenant_session_by_jti,
 )
 
 
@@ -1722,16 +1813,39 @@ class ActiveSessionsView(LoginRequiredMixin, View):
             messages.error(request, 'Access denied.')
             return redirect('dashboard')
 
-        sessions = get_all_active_admin_sessions()
+        admin_sessions = get_all_active_admin_sessions()
+        tenant_sessions = get_all_active_tenant_sessions()
+        sessions = list(admin_sessions)
+        for t in tenant_sessions:
+            display_name = (t.get('reference_name') or '').strip()
+            name_parts = [p for p in display_name.split(' ') if p]
+            first_name = name_parts[0] if name_parts else (t.get('user_domain') or 'Tenant')
+            last_name = ' '.join(name_parts[1:]) if len(name_parts) > 1 else ''
+            user_domain = (t.get('user_domain') or 'Tenant_User').strip()
+            role_label = 'Tenant Admin' if user_domain == 'Tenant_User' else user_domain.replace('_', ' ')
+            sessions.append({
+                'jti': t.get('jti'),
+                'admin_id': '',
+                'email': '',
+                'first_name': first_name,
+                'last_name': last_name,
+                'role': role_label,
+                'ip_address': t.get('ip_address', ''),
+                'user_agent': t.get('user_agent', ''),
+                'user_domain': user_domain,
+                'started_at': t.get('started_at', ''),
+                'last_activity': t.get('last_activity', ''),
+                'ttl_seconds': t.get('ttl_seconds', 0),
+            })
         current_jti = request.session.get('jti')
 
         search_query = request.GET.get('q', '').strip()
         role_filter = request.GET.get('role', 'All').strip()
         scope_filter = request.GET.get('scope', 'All').strip()
         sort_by = request.GET.get('sort', 'rank').strip()
-        sort_dir = request.GET.get('dir', 'asc').strip().lower()
+        sort_dir = request.GET.get('dir', 'desc').strip().lower()
         if sort_dir not in ('asc', 'desc'):
-            sort_dir = 'asc'
+            sort_dir = 'desc'
 
         if search_query:
             q = search_query.lower()
@@ -1741,6 +1855,7 @@ class ActiveSessionsView(LoginRequiredMixin, View):
                 or q in (s.get('first_name', '') or '').lower()
                 or q in (s.get('last_name', '') or '').lower()
                 or q in (s.get('ip_address', '') or '').lower()
+                or q in (s.get('user_domain', '') or '').lower()
             ]
 
         all_roles = sorted(
@@ -1767,7 +1882,10 @@ class ActiveSessionsView(LoginRequiredMixin, View):
                 return datetime.min
 
         sort_mapping = {
-            'rank': lambda s: _dt(s.get('started_at')),
+            'rank': lambda s: (
+                s.get('jti') == current_jti,
+                _dt(s.get('started_at')),
+            ),
             'user': lambda s: (
                 f"{s.get('first_name', '')} {s.get('last_name', '')}".strip().lower(),
                 str(s.get('email', '')).lower(),
@@ -1786,11 +1904,15 @@ class ActiveSessionsView(LoginRequiredMixin, View):
         paginator = Paginator(sessions, 10)
         page_number = request.GET.get('page', 1)
         sessions_page = paginator.get_page(page_number)
+        total_count = len(sessions)
+        start_index = sessions_page.start_index()
+        for offset, session in enumerate(sessions_page.object_list):
+            session['list_rank'] = total_count - (start_index + offset) + 1
 
         context = {
             'sessions': sessions_page,
             'current_jti': current_jti,
-            'total_count': len(sessions),
+            'total_count': total_count,
             'search_query': search_query,
             'role_filter': role_filter,
             'scope_filter': scope_filter,
@@ -1821,6 +1943,7 @@ class RevokeSessionView(LoginRequiredMixin, View):
             return redirect('active_sessions')
 
         revoke_admin_session(jti)
+        revoke_tenant_session_by_jti(jti)
 
         from superadmin.auth_helpers import log_access
 
@@ -2166,8 +2289,8 @@ class AdminUserListView(LoginRequiredMixin, View):
         search_query = request.GET.get('q', '').strip()
         status_filter = request.GET.get('status', 'All')
         role_filter = request.GET.get('role', 'All')
-        sort_by = request.GET.get('sort', 'name')
-        sort_dir = request.GET.get('dir', 'asc')
+        sort_by = request.GET.get('sort', 'updated_at')
+        sort_dir = request.GET.get('dir', 'desc')
 
         users_qs = AdminUser.objects.filter(is_deleted=False).select_related('role', 'created_by', 'updated_by')
 
@@ -2179,6 +2302,7 @@ class AdminUserListView(LoginRequiredMixin, View):
             'role': ['role__role_name_en'],
             'status': ['status'],
             'last_login_at': ['last_login_at'],
+            'created_at': ['created_at'],
         }
 
         active_sort_fields = sort_mapping.get(sort_by, ['first_name', 'last_name'])
@@ -2213,6 +2337,10 @@ class AdminUserListView(LoginRequiredMixin, View):
         paginator = Paginator(users_qs, 10)
         page_number = request.GET.get('page', 1)
         users_page = paginator.get_page(page_number)
+        start_index = users_page.start_index()
+        for offset, user in enumerate(users_page.object_list):
+            # Keep displayed rank aligned with newest-first ordering.
+            user.list_rank = total_count - (start_index + offset) + 1
 
         context = {
             'admin_users': users_page,
@@ -2231,6 +2359,11 @@ class AdminUserListView(LoginRequiredMixin, View):
 
 class AdminUserCreateView(LoginRequiredMixin, View):
     template_name = 'system_users/admin_users/admin_user_form.html'
+
+    @staticmethod
+    def _is_root_role(role):
+        role_name = (getattr(role, 'role_name_en', '') or '').strip().lower()
+        return role_name == 'super admin'
 
     def _require_root(self, request):
         if not getattr(request.user, 'is_root', False):
@@ -2257,6 +2390,7 @@ class AdminUserCreateView(LoginRequiredMixin, View):
         user = form.save(commit=False)
         # Phase 1/2 rule: invite flow (no password yet)
         user.status = 'Pending_Activation'
+        user.is_root = self._is_root_role(user.role)
         user.created_by = request.user
         user.updated_by = request.user
         user.save()
@@ -2443,7 +2577,10 @@ class SetPasswordView(View):
             user.set_password(password)
             user.status = 'Active'
             user.two_factor_enabled = True
-            user.save(update_fields=['password', 'status', 'two_factor_enabled'])
+            # Keep root marker aligned to current role during activation.
+            role_name = (getattr(user.role, 'role_name_en', '') or '').strip().lower()
+            user.is_root = role_name == 'super admin'
+            user.save(update_fields=['password', 'status', 'two_factor_enabled', 'is_root'])
             invite.is_used = True
             invite.save(update_fields=['is_used'])
             log_access('Login', 'Success', user.email, ip)
@@ -2540,6 +2677,7 @@ class AdminUserUpdateView(LoginRequiredMixin, View):
             pk=pk,
         )
         original_role = target_user.role
+        original_status = target_user.status
 
         form = AdminUserForm(request.POST, instance=target_user)
         if not form.is_valid():
@@ -2560,7 +2698,16 @@ class AdminUserUpdateView(LoginRequiredMixin, View):
 
         user = form.save(commit=False)
         user.updated_by = request.user
+        
+        status_changed = (user.status == 'Suspended' and original_status != 'Suspended')
         user.save()
+
+        if status_changed:
+            from superadmin.redis_helpers import revoke_all_sessions_for_admin
+            revoke_all_sessions_for_admin(user.id)
+            _revoke_user_sessions(user)
+            messages.info(request, f'Admin sessions for {user.email} have been revoked due to account suspension.')
+
         messages.success(request, 'Admin user updated successfully.')
         return redirect(reverse('admin_user_list'))
 
@@ -2731,7 +2878,7 @@ class CountryListView(LoginRequiredMixin, View):
         search_query = request.GET.get('q', '').strip()
         status_filter = request.GET.get('status', 'All')
         sort = request.GET.get('sort', 'rank')
-        direction = request.GET.get('dir', 'asc')
+        direction = request.GET.get('dir', 'desc')
 
         countries_qs = Country.objects.annotate(
             default_rank=Window(
@@ -2969,7 +3116,7 @@ class CurrencyListView(LoginRequiredMixin, View):
         search_query = request.GET.get('q', '').strip()
         status_filter = request.GET.get('status', 'All')
         sort = request.GET.get('sort', 'rank')
-        direction = request.GET.get('dir', 'asc')
+        direction = request.GET.get('dir', 'desc')
 
         currencies_qs = Currency.objects.annotate(
             default_rank=Window(
@@ -3020,6 +3167,10 @@ class CurrencyListView(LoginRequiredMixin, View):
         paginator = Paginator(currencies_qs, 10)
         page_number = request.GET.get('page', 1)
         currencies_page = paginator.get_page(page_number)
+        start_index = currencies_page.start_index()
+        for offset, currency in enumerate(currencies_page.object_list):
+            # Show descending list ID so top rows have higher numbers.
+            currency.list_rank = total_count - (start_index + offset) + 1
 
         context = {
             'currencies': currencies_page,
@@ -3489,7 +3640,7 @@ class ExchangeRateListView(LoginRequiredMixin, View):
         search_query = request.GET.get('q', '').strip()
         status_filter = request.GET.get('status', 'All')
         sort = request.GET.get('sort', 'rank')
-        direction = request.GET.get('dir', 'asc')
+        direction = request.GET.get('dir', 'desc')
 
         base_code = _get_base_currency_code()
         base_config = BaseCurrencyConfig.objects.get_or_create(
@@ -3729,7 +3880,7 @@ class FXRateChangeLogView(LoginRequiredMixin, View):
         search_query = request.GET.get('q', '').strip()
         currency_code = request.GET.get('currency', '').strip()
         sort = request.GET.get('sort', 'rank')
-        direction = request.GET.get('dir', 'asc')
+        direction = request.GET.get('dir', 'desc')
 
         qs = (
             FXRateChangeLog.objects.select_related('currency', 'changed_by')
@@ -3778,6 +3929,11 @@ class FXRateChangeLogView(LoginRequiredMixin, View):
         paginator = Paginator(qs, 10)
         page_number = request.GET.get('page', 1)
         log_page = paginator.get_page(page_number)
+        total_count = qs.count()
+        start_index = log_page.start_index()
+        for offset, fx_log in enumerate(log_page.object_list):
+            # Show descending list ID so top rows have higher numbers.
+            fx_log.list_rank = total_count - (start_index + offset) + 1
 
         currencies = Currency.objects.all().order_by('name_en')
 
@@ -3862,6 +4018,10 @@ class TaxCodeListView(LoginRequiredMixin, View):
         paginator = Paginator(tax_codes_qs, 10)
         page_number = request.GET.get('page', 1)
         tax_codes_page = paginator.get_page(page_number)
+        start_index = tax_codes_page.start_index()
+        for offset, tax_code in enumerate(tax_codes_page.object_list):
+            # Show descending list ID so top rows have higher numbers.
+            tax_code.list_rank = total_count - (start_index + offset) + 1
 
         context = {
             'tax_codes': tax_codes_page,
@@ -4020,8 +4180,8 @@ class PlanListView(LoginRequiredMixin, View):
     def get(self, request):
         search_query = request.GET.get('q', '').strip()
         status_filter = request.GET.get('status', 'All')
-        sort_by = request.GET.get('sort', 'name_en')
-        sort_dir = request.GET.get('dir', 'asc')
+        sort_by = request.GET.get('sort', 'updated_at')
+        sort_dir = request.GET.get('dir', 'desc')
 
         plans_qs = SubscriptionPlan.objects.filter(is_deleted=False).annotate(
             pricing_rows_count=Count('pricing_cycles')
@@ -4035,9 +4195,10 @@ class PlanListView(LoginRequiredMixin, View):
             'cycle': ['base_cycle_days'],
             'pricing': ['pricing_rows_count'],
             'status': ['is_active'],
+            'updated_at': ['updated_at'],
         }
 
-        active_sort_fields = sort_mapping.get(sort_by, ['plan_name_en'])
+        active_sort_fields = sort_mapping.get(sort_by, ['updated_at'])
         ordering = []
         for f in active_sort_fields:
             ordering.append(f if sort_dir == 'asc' else '-' + f)
@@ -4053,11 +4214,11 @@ class PlanListView(LoginRequiredMixin, View):
         elif status_filter == 'Inactive':
             plans_qs = plans_qs.filter(is_active=False)
 
-        # Annotate with stable rank based on default order (plan_name_en)
+        # Annotate with stable rank based on default order (newest first).
         plans_qs = plans_qs.annotate(
             default_rank=Window(
                 expression=RowNumber(),
-                order_by=F('plan_name_en').asc()
+                order_by=F('created_at').desc()
             )
         )
 
@@ -4067,6 +4228,10 @@ class PlanListView(LoginRequiredMixin, View):
         paginator = Paginator(plans_qs, 10)
         page_number = request.GET.get('page', 1)
         plans_page = paginator.get_page(page_number)
+        start_index = plans_page.start_index()
+        for offset, plan in enumerate(plans_page.object_list):
+            # Show descending list ID so newest appears with highest number.
+            plan.list_rank = total_count - (start_index + offset) + 1
 
         return render(
             request,
@@ -4454,8 +4619,8 @@ class AddOnsPolicyListView(LoginRequiredMixin, View):
     def get(self, request):
         search_query = request.GET.get('q', '').strip()
         status_filter = request.GET.get('status', 'All')
-        sort_by = request.GET.get('sort', 'policy_name')
-        sort_dir = request.GET.get('dir', 'asc')
+        sort_by = request.GET.get('sort', 'created_at')
+        sort_dir = request.GET.get('dir', 'desc')
 
         policies_qs = AddOnsPricingPolicy.objects.filter(is_deleted=False)
 
@@ -4470,9 +4635,10 @@ class AddOnsPolicyListView(LoginRequiredMixin, View):
             'shipment_price': ['extra_shipment_price'],
             'storage_price': ['extra_storage_gb_price'],
             'status': ['is_active'],
+            'updated_at': ['updated_at'],
         }
 
-        active_sort_fields = sort_mapping.get(sort_by, ['policy_name'])
+        active_sort_fields = sort_mapping.get(sort_by, ['updated_at'])
         ordering = []
         for f in active_sort_fields:
             ordering.append(f if sort_dir == 'asc' else '-' + f)
@@ -4487,11 +4653,11 @@ class AddOnsPolicyListView(LoginRequiredMixin, View):
         elif status_filter == 'Inactive':
             policies_qs = policies_qs.filter(is_active=False)
 
-        # Annotate with stable rank based on default order (policy_name)
+        # Annotate with stable rank based on default order (newest first).
         policies_qs = policies_qs.annotate(
             default_rank=Window(
                 expression=RowNumber(),
-                order_by=F('policy_name').asc()
+                order_by=F('updated_at').desc()
             )
         )
 
@@ -4501,6 +4667,10 @@ class AddOnsPolicyListView(LoginRequiredMixin, View):
         paginator = Paginator(policies_qs, 10)
         page_number = request.GET.get('page', 1)
         policies_page = paginator.get_page(page_number)
+        start_index = policies_page.start_index()
+        for offset, policy in enumerate(policies_page.object_list):
+            # Show descending list ID so newest appears with highest number.
+            policy.list_rank = total_count - (start_index + offset) + 1
 
         return render(
             request,
@@ -4622,8 +4792,8 @@ class PromoCodeListView(LoginRequiredMixin, View):
     def get(self, request):
         search_query = request.GET.get('q', '').strip()
         status_filter = request.GET.get('status', 'All')
-        sort_by = request.GET.get('sort', 'code')
-        sort_dir = request.GET.get('dir', 'asc')
+        sort_by = request.GET.get('sort', 'created_at')
+        sort_dir = request.GET.get('dir', 'desc')
 
         qs = PromoCode.objects.filter(is_deleted=False).prefetch_related('applicable_plans')
 
@@ -4638,9 +4808,10 @@ class PromoCodeListView(LoginRequiredMixin, View):
             'valid_until': ['valid_until'],
             'uses': ['current_uses'],
             'status': ['is_active'],
+            'created_at': ['created_at'],
         }
 
-        active_sort_fields = sort_mapping.get(sort_by, ['code'])
+        active_sort_fields = sort_mapping.get(sort_by, ['created_at'])
         ordering = []
         for f in active_sort_fields:
             ordering.append(f if sort_dir == 'asc' else '-' + f)
@@ -4667,6 +4838,10 @@ class PromoCodeListView(LoginRequiredMixin, View):
         paginator = Paginator(qs, 10)
         page_number = request.GET.get('page', 1)
         promo_page = paginator.get_page(page_number)
+        start_index = promo_page.start_index()
+        for offset, promo in enumerate(promo_page.object_list):
+            # Show descending list ID so newest appears with highest number.
+            promo.list_rank = total_count - (start_index + offset) + 1
 
         now = timezone.now()
         return render(
@@ -4777,8 +4952,12 @@ class PromoCodeUpdateView(LoginRequiredMixin, View):
             )
         promo_obj = form.save(commit=False)
         promo_obj.code = promo.code
-        promo_obj.current_uses = promo.current_uses
-        promo_obj.save()
+        # Save only the fields that were actually in the form to avoid overwriting current_uses
+        save_fields = [
+            'discount_type', 'discount_value', 'discount_duration',
+            'valid_from', 'valid_until', 'max_uses', 'is_active',
+        ]
+        promo_obj.save(update_fields=save_fields)
         form.save_m2m()
         messages.success(request, 'Promo code updated successfully.')
         return redirect(reverse('promo_code_list'))
@@ -4821,8 +5000,8 @@ class BankAccountListView(LoginRequiredMixin, View):
         search_query = request.GET.get('q', '').strip()
         currency_filter = request.GET.get('currency', '').strip()
         status_filter = request.GET.get('status', 'All')
-        sort = request.GET.get('sort', 'display_order')
-        direction = request.GET.get('dir', 'asc')
+        sort = request.GET.get('sort', 'rank')
+        direction = request.GET.get('dir', 'desc')
 
         qs = BankAccount.objects.select_related('currency').annotate(
             default_rank=Window(
@@ -4862,6 +5041,11 @@ class BankAccountListView(LoginRequiredMixin, View):
 
         paginator = Paginator(qs, 10)
         accounts = paginator.get_page(request.GET.get('page', 1))
+        total_count = qs.count()
+        start_index = accounts.start_index()
+        for offset, account in enumerate(accounts.object_list):
+            # Show descending list ID so top rows have higher numbers.
+            account.list_rank = total_count - (start_index + offset) + 1
 
         return render(
             request,
@@ -4982,13 +5166,13 @@ class PaymentGatewayListView(LoginRequiredMixin, View):
         search_query = request.GET.get('q', '').strip()
         environment_filter = request.GET.get('environment', 'All')
         status_filter = request.GET.get('status', 'All')
-        sort = request.GET.get('sort', 'rank')
-        direction = request.GET.get('dir', 'asc')
+        sort = request.GET.get('sort', 'created_at')
+        direction = request.GET.get('dir', 'desc')
 
         qs = PaymentGateway.objects.filter(is_deleted=False).annotate(
             default_rank=Window(
                 expression=RowNumber(),
-                order_by=F('gateway_name').asc(),
+                order_by=F('created_at').desc(),
             ),
         )
         if search_query:
@@ -5007,7 +5191,7 @@ class PaymentGatewayListView(LoginRequiredMixin, View):
             'status': 'is_active',
             'created_at': 'created_at',
         }
-        order_by_field = sort_mapping.get(sort, 'default_rank')
+        order_by_field = sort_mapping.get(sort, 'created_at')
         if direction == 'desc':
             qs = qs.order_by(F(order_by_field).desc(nulls_last=True), '-default_rank')
         else:
@@ -5015,6 +5199,11 @@ class PaymentGatewayListView(LoginRequiredMixin, View):
 
         paginator = Paginator(qs, 10)
         gateways = paginator.get_page(request.GET.get('page', 1))
+        total_count = qs.count()
+        start_index = gateways.start_index()
+        for offset, gateway in enumerate(gateways.object_list):
+            # Show descending list ID so top rows have higher numbers.
+            gateway.list_rank = total_count - (start_index + offset) + 1
 
         return render(
             request,
@@ -5156,15 +5345,15 @@ class PaymentMethodListView(LoginRequiredMixin, View):
         search_query = request.GET.get('q', '').strip()
         type_filter = request.GET.get('method_type', 'All')
         status_filter = request.GET.get('status', 'All')
-        sort = request.GET.get('sort', 'rank')
-        direction = request.GET.get('dir', 'asc')
+        sort = request.GET.get('sort', 'created_at')
+        direction = request.GET.get('dir', 'desc')
         qs = PaymentMethod.objects.select_related(
             'gateway',
             'dedicated_bank_account',
         ).annotate(
             default_rank=Window(
                 expression=RowNumber(),
-                order_by=F('display_order').asc(),
+                order_by=F('created_at').desc(),
             ),
             source_name=Case(
                 When(method_type='Online_Gateway', then=F('gateway__gateway_name')),
@@ -5191,14 +5380,15 @@ class PaymentMethodListView(LoginRequiredMixin, View):
             qs = qs.filter(is_active=False)
 
         sort_mapping = {
-            'rank': 'method_id',
+            'rank': 'default_rank',
             'display_order': 'display_order',
             'name': 'method_name_en',
             'type': 'method_type',
             'source': 'source_name',
             'status': 'status_sort',
+            'created_at': 'created_at',
         }
-        order_by_field = sort_mapping.get(sort, 'display_order')
+        order_by_field = sort_mapping.get(sort, 'created_at')
         if direction == 'desc':
             qs = qs.order_by(F(order_by_field).desc(nulls_last=True), '-method_id')
         else:
@@ -5206,6 +5396,11 @@ class PaymentMethodListView(LoginRequiredMixin, View):
 
         paginator = Paginator(qs, 10)
         methods = paginator.get_page(request.GET.get('page', 1))
+        total_count = qs.count()
+        start_index = methods.start_index()
+        for offset, method in enumerate(methods.object_list):
+            # Show descending list ID so top rows have higher numbers.
+            method.list_rank = total_count - (start_index + offset) + 1
 
         return render(
             request,
@@ -5337,10 +5532,10 @@ class CommGatewayListView(LoginRequiredMixin, View):
         elif status_filter == 'Inactive':
             qs = qs.filter(is_active=False)
 
-        sort = request.GET.get('sort', 'rank')
-        direction = request.GET.get('dir', 'asc')
+        sort = request.GET.get('sort', 'updated')
+        direction = request.GET.get('dir', 'desc')
         sort_mapping = {
-            'rank': 'gateway_type',
+            'rank': 'default_rank',
             'type': 'gateway_type',
             'provider': 'provider_name',
             'host': 'host_url',
@@ -5348,8 +5543,15 @@ class CommGatewayListView(LoginRequiredMixin, View):
             'sender': 'sender_id',
             'encryption': 'encryption_type',
             'status': 'is_active',
+            'updated': 'updated_at',
         }
-        order_by_field = sort_mapping.get(sort, 'gateway_type')
+        qs = qs.annotate(
+            default_rank=Window(
+                expression=RowNumber(),
+                order_by=F('updated_at').desc(),
+            )
+        )
+        order_by_field = sort_mapping.get(sort, 'updated_at')
         if direction == 'desc':
             qs = qs.order_by(F(order_by_field).desc(nulls_last=True), 'provider_name')
         else:
@@ -5357,6 +5559,11 @@ class CommGatewayListView(LoginRequiredMixin, View):
 
         paginator = Paginator(qs, 10)
         gateways = paginator.get_page(request.GET.get('page', 1))
+        total_count = qs.count()
+        start_index = gateways.start_index()
+        for offset, gateway in enumerate(gateways.object_list):
+            # Show descending list ID so newest appears with highest number.
+            gateway.list_rank = total_count - (start_index + offset) + 1
         return render(
             request,
             self.template_name,
@@ -5641,12 +5848,12 @@ class NotificationTemplateListView(LoginRequiredMixin, View):
         qs = qs.annotate(
             default_rank=Window(
                 expression=RowNumber(),
-                order_by=F('template_name').asc(),
+                order_by=F('created_at').desc(),
             )
         )
 
-        sort = request.GET.get('sort', 'name')
-        direction = request.GET.get('dir', 'asc')
+        sort = request.GET.get('sort', 'created_at')
+        direction = request.GET.get('dir', 'desc')
         sort_mapping = {
             'rank': 'default_rank',
             'name': 'template_name',
@@ -5654,8 +5861,9 @@ class NotificationTemplateListView(LoginRequiredMixin, View):
             'category': 'category',
             'subject': 'subject_en',
             'status': 'is_active',
+            'created_at': 'created_at',
         }
-        order_by_field = sort_mapping.get(sort, 'template_name')
+        order_by_field = sort_mapping.get(sort, 'created_at')
         if direction == 'desc':
             qs = qs.order_by(F(order_by_field).desc(nulls_last=True), '-template_name')
         else:
@@ -5663,6 +5871,11 @@ class NotificationTemplateListView(LoginRequiredMixin, View):
 
         paginator = Paginator(qs, 10)
         templates = paginator.get_page(request.GET.get('page', 1))
+        total_count = qs.count()
+        start_index = templates.start_index()
+        for offset, template_obj in enumerate(templates.object_list):
+            # Show descending list ID so newest appears with highest number.
+            template_obj.list_rank = total_count - (start_index + offset) + 1
         return render(
             request,
             self.template_name,
@@ -5908,8 +6121,8 @@ class EventMappingListView(LoginRequiredMixin, View):
         search_query = request.GET.get('q', '').strip()
         status_filter = request.GET.get('status', 'All').strip() or 'All'
         channel_filter = request.GET.get('channel', 'All').strip() or 'All'
-        sort = request.GET.get('sort', 'event')
-        direction = request.GET.get('dir', 'asc')
+        sort = request.GET.get('sort', 'rank')
+        direction = request.GET.get('dir', 'desc')
 
         qs = EventMapping.objects.select_related(
             'primary_template', 'fallback_template'
@@ -5991,6 +6204,11 @@ class EventMappingListView(LoginRequiredMixin, View):
         paginator = Paginator(all_rows, 10)
         page_number = request.GET.get('page', 1)
         page_rows = paginator.get_page(page_number)
+        total_count = len(all_rows)
+        start_index = page_rows.start_index()
+        for offset, row in enumerate(page_rows.object_list):
+            # Show descending list ID so newest/highest rows appear first.
+            row['list_rank'] = total_count - (start_index + offset) + 1
 
         return render(
             request,
@@ -6269,8 +6487,8 @@ class SystemBannerListView(LoginRequiredMixin, View):
         search_query = request.GET.get('q', '').strip()
         severity_filter = request.GET.get('severity', 'All')
         status_filter = request.GET.get('status', 'All')
-        sort = request.GET.get('sort', 'rank')
-        direction = request.GET.get('dir', 'asc')
+        sort = request.GET.get('sort', 'valid_from')
+        direction = request.GET.get('dir', 'desc')
 
         qs = SystemBanner.objects.annotate(
             default_rank=Window(
@@ -6308,6 +6526,11 @@ class SystemBannerListView(LoginRequiredMixin, View):
 
         paginator = Paginator(qs, 10)
         banners = paginator.get_page(request.GET.get('page', 1))
+        total_count = qs.count()
+        start_index = banners.start_index()
+        for offset, banner in enumerate(banners.object_list):
+            # Show descending list ID so newest appears with highest number.
+            banner.list_rank = total_count - (start_index + offset) + 1
         return render(
             request,
             self.template_name,
@@ -6436,6 +6659,11 @@ class InternalAlertRouteListView(LoginRequiredMixin, View):
 
         paginator = Paginator(qs, 10)
         routes = paginator.get_page(request.GET.get('page', 1))
+        total_count = qs.count()
+        start_index = routes.start_index()
+        for offset, route in enumerate(routes.object_list):
+            # Show descending list ID so top rows have higher numbers.
+            route.list_rank = total_count - (start_index + offset) + 1
         return render(
             request,
             self.template_name,
@@ -6511,7 +6739,6 @@ class InternalAlertRouteToggleStatusView(LoginRequiredMixin, View):
         messages.success(request, 'Alert route status updated successfully.')
         return redirect(reverse('alert_route_list'))
 
-
 class InternalAlertNotificationReadView(LoginRequiredMixin, View):
     def post(self, request, pk):
         notif = get_object_or_404(
@@ -6542,6 +6769,17 @@ class InternalAlertNotificationReadAllView(LoginRequiredMixin, View):
         return redirect('dashboard')
 
 
+class InternalAlertNotificationClearAllView(LoginRequiredMixin, View):
+    def post(self, request):
+        InternalAlertNotification.objects.filter(
+            admin_user=request.user,
+        ).delete()
+        next_url = (request.POST.get('next') or '').strip()
+        if next_url:
+            return redirect(next_url)
+        return redirect('dashboard')
+
+
 class CommLogListView(LoginRequiredMixin, View):
     template_name = 'comm/logs/comm_log_list.html'
 
@@ -6552,7 +6790,7 @@ class CommLogListView(LoginRequiredMixin, View):
         date_from = request.GET.get('date_from', '').strip()
         date_to = request.GET.get('date_to', '').strip()
         sort = request.GET.get('sort', 'rank')
-        direction = request.GET.get('dir', 'asc')
+        direction = request.GET.get('dir', 'desc')
 
         qs = CommLog.objects.annotate(
             default_rank=Window(
@@ -6604,6 +6842,11 @@ class CommLogListView(LoginRequiredMixin, View):
 
         paginator = Paginator(qs, 10)
         logs = paginator.get_page(request.GET.get('page', 1))
+        total_count = qs.count()
+        start_index = logs.start_index()
+        for offset, log in enumerate(logs.object_list):
+            # Show descending list ID so top rows have higher numbers.
+            log.list_rank = total_count - (start_index + offset) + 1
         return render(
             request,
             self.template_name,
@@ -6669,8 +6912,8 @@ class TenantListView(LoginRequiredMixin, View):
                 pass
 
         # Advanced Sorting Logic
-        sort = request.GET.get('sort', 'company')
-        direction = request.GET.get('dir', 'asc')
+        sort = request.GET.get('sort', 'updated')
+        direction = request.GET.get('dir', 'desc')
         
         sort_mapping = {
             'rank': 'default_rank',
@@ -6684,7 +6927,7 @@ class TenantListView(LoginRequiredMixin, View):
             'wallet': 'wallet_balance',
         }
         
-        order_by_field = sort_mapping.get(sort, 'company_name')
+        order_by_field = sort_mapping.get(sort, 'updated_at')
         if direction == 'desc':
             qs = qs.order_by(F(order_by_field).desc())
         else:
@@ -6693,6 +6936,11 @@ class TenantListView(LoginRequiredMixin, View):
         # Pagination density: 10 per page
         paginator = Paginator(qs, 10)
         tenants = paginator.get_page(request.GET.get('page', 1))
+        total_count = qs.count()
+        start_index = tenants.start_index()
+        for offset, tenant in enumerate(tenants.object_list):
+            # Show descending list ID so newest appears with highest number.
+            tenant.list_rank = total_count - (start_index + offset) + 1
         
         sales_reps = AdminUser.objects.filter(status='Active', is_deleted=False).order_by(
             'first_name', 'last_name'
@@ -6768,6 +7016,7 @@ class TenantCreateView(LoginRequiredMixin, View):
                 ],
             )
             schedule_tenant_workspace_provisioning(tenant)
+            welcome_email_sent = False
             try:
                 from superadmin.communication_helpers import send_tenant_welcome_email
 
@@ -6785,37 +7034,29 @@ class TenantCreateView(LoginRequiredMixin, View):
                 invite_url = request.build_absolute_uri(
                     reverse('set_password', args=[tenant_token.token])
                 )
-                send_tenant_welcome_email(
+                welcome_email_sent = bool(send_tenant_welcome_email(
                     tenant,
                     plain_key,
                     plain_portal,
                     invite_url=invite_url,
-                )
+                ))
             except Exception:
                 logger.exception(
                     'Welcome email failed for tenant %s',
                     tenant.tenant_id,
                 )
-            try:
-                dispatch_internal_alerts(
-                    'New_Tenant_Registered',
-                    context_dict={
-                        'tenant_id': str(tenant.tenant_id),
-                        'company_name': tenant.company_name,
-                        'primary_email': tenant.primary_email,
-                        'message': (
-                            f'New tenant "{tenant.company_name}" registered '
-                            f'({tenant.primary_email}).'
-                        ),
-                    },
+            if welcome_email_sent:
+                messages.success(
+                    request,
+                    f'Subscriber profile created for {tenant.primary_email}. '
+                    
                 )
-            except Exception:
-                logger.exception('Internal alert dispatch failed for tenant %s', tenant.tenant_id)
-            messages.success(
-                request,
-                f'Subscriber profile created for {tenant.primary_email}. '
-                'A welcome email has been sent with portal access instructions.'
-            )
+            else:
+                messages.warning(
+                    request,
+                    f'Subscriber profile created for {tenant.primary_email}, '
+                    'but welcome email was not sent. Please verify Notification Template is Active and SMTP settings are valid.'
+                )
             return redirect(reverse('tenant_detail', kwargs={'pk': tenant.pk}))
         return render(
             request,
@@ -6876,6 +7117,26 @@ class TenantUpdateView(LoginRequiredMixin, View):
             'Subscriber profile updated successfully.',
         )
         return redirect(reverse('tenant_detail', kwargs={'pk': tenant.pk}))
+
+
+class TenantHistoryPartialView(LoginRequiredMixin, View):
+    template_name = 'crm/tenants/partials/tenant_history_partial.html'
+
+    def get(self, request, pk):
+        tenant = get_object_or_404(TenantProfile, tenant_id=pk)
+        # Fetch last 15 orders with their primary invoice pre-fetched
+        orders = SubscriptionOrder.objects.filter(
+            tenant=tenant
+        ).select_related(
+            'currency', 'created_by'
+        ).prefetch_related(
+            'invoices'
+        ).order_by('-created_at')[:15]
+        
+        return render(request, self.template_name, {
+            'tenant': tenant,
+            'orders': orders,
+        })
 
 
 class TenantDetailView(LoginRequiredMixin, View):
@@ -7054,11 +7315,18 @@ class OrderListView(LoginRequiredMixin, View):
             )
         ).select_related(
             'tenant', 'currency', 'created_by',
+        ).prefetch_related(
+            'invoices'
         )
 
         q = request.GET.get('q', '').strip()
         if q:
             qs = qs.filter(tenant__company_name__icontains=q)
+        
+        tenant_id = request.GET.get('tenant', '').strip()
+        if tenant_id:
+            qs = qs.filter(tenant_id=tenant_id)
+
         oc = request.GET.get('order_classification', '').strip()
         if oc:
             qs = qs.filter(order_classification=oc)
@@ -7090,10 +7358,16 @@ class OrderListView(LoginRequiredMixin, View):
         # Increased pagination: 10 per page
         paginator = Paginator(qs, 10)
         page = paginator.get_page(request.GET.get('page'))
+        total_count = qs.count()
+        start_index = page.start_index()
+        for offset, order in enumerate(page.object_list):
+            # Show descending list ID so newest appears with highest number.
+            order.list_rank = total_count - (start_index + offset) + 1
         
         return render(request, self.template_name, {
             'orders': page,
             'search_query': q,
+            'tenant_filter': tenant_id,
             'classification_filter': oc,
             'status_filter': st,
             'classification_choices': SubscriptionOrder.CLASSIFICATION_CHOICES,
@@ -7220,6 +7494,7 @@ class OrderCreateView(RootRequiredMixin, View):
         sub_total = Decimal('0.00')
         plan_line_data = None
 
+        payment_txn = None
         with db_transaction.atomic():
             order = SubscriptionOrder.objects.create(
                 tenant=tenant,
@@ -7235,7 +7510,8 @@ class OrderCreateView(RootRequiredMixin, View):
                 grand_total=Decimal('0.00'),
                 exchange_rate_snapshot=fx,
                 base_currency_equivalent=Decimal('0.00'),
-                order_status='Draft',
+                # Skip a separate draft step and move directly to payment flow.
+                order_status='Pending_Payment',
             )
 
             if classification in _PLAN_CLASSIFICATIONS:
@@ -7394,8 +7670,49 @@ class OrderCreateView(RootRequiredMixin, View):
                 'projected_max_users', 'projected_max_internal_trucks',
                 'projected_max_external_trucks', 'projected_max_drivers',
             ])
+            payment_txn = sync_or_create_order_payment_transaction(order)
 
-        messages.success(request, 'Order saved as draft.')
+        pm = order.payment_method
+        if pm and pm.method_type == 'Online_Gateway':
+            if complete_order_payment_as_system(order, request.user):
+                messages.success(
+                    request,
+                    'Online payment captured. Order fulfilled.',
+                )
+            else:
+                messages.warning(
+                    request,
+                    'Order submitted; online capture did not complete '
+                    '(check amount or retry from order detail).',
+                )
+            payment_txn = Transaction.objects.filter(
+                order=order,
+                transaction_type='Order_Payment',
+            ).order_by('-created_at').first()
+        else:
+            if pm and pm.method_type == 'Offline_Bank':
+                try:
+                    dispatch_internal_alerts(
+                        'Bank_Transfer_Pending',
+                        context_dict={
+                            'order_id': str(order.order_id),
+                            'tenant_id': str(order.tenant_id),
+                            'company_name': order.tenant.company_name,
+                            'amount': str(order.grand_total),
+                            'currency': order.currency_id,
+                            'message': (
+                                f'Bank transfer pending for '
+                                f'"{order.tenant.company_name}".'
+                            ),
+                        },
+                    )
+                except Exception:
+                    logger.exception(
+                        'Internal alert dispatch failed for pending bank transfer order %s',
+                        order.order_id,
+                    )
+            messages.success(request, 'Order marked as pending payment.')
+
         return redirect('order_detail', pk=order.pk)
 
 
@@ -7685,6 +8002,27 @@ class OrderStatusUpdateView(RootRequiredMixin, View):
                             '(check amount or retry from order detail).',
                         )
                 else:
+                    if pm and pm.method_type == 'Offline_Bank':
+                        try:
+                            dispatch_internal_alerts(
+                                'Bank_Transfer_Pending',
+                                context_dict={
+                                    'order_id': str(order.order_id),
+                                    'tenant_id': str(order.tenant_id),
+                                    'company_name': order.tenant.company_name,
+                                    'amount': str(order.grand_total),
+                                    'currency': order.currency_id,
+                                    'message': (
+                                        f'Bank transfer pending for '
+                                        f'"{order.tenant.company_name}".'
+                                    ),
+                                },
+                            )
+                        except Exception:
+                            logger.exception(
+                                'Internal alert dispatch failed for pending bank transfer order %s',
+                                order.order_id,
+                            )
                     messages.success(
                         request,
                         'Order marked as pending payment.',
@@ -7837,6 +8175,11 @@ class TransactionListView(LoginRequiredMixin, View):
 
         paginator = Paginator(qs, 10)
         page = paginator.get_page(request.GET.get('page'))
+        total_count = qs.count()
+        start_index = page.start_index()
+        for offset, txn in enumerate(page.object_list):
+            # Show descending list ID so newest appears with highest number.
+            txn.list_rank = total_count - (start_index + offset) + 1
         
         return render(request, self.template_name, {
             'transactions': page,
@@ -8104,6 +8447,7 @@ class TransactionRejectView(RootRequiredMixin, View):
             messages.error(request, 'Review notes are required to reject.')
             return redirect('transaction_detail', pk=pk)
 
+        linked_order_cancelled = False
         with db_transaction.atomic():
             txn = get_object_or_404(
                 Transaction.objects.select_for_update(),
@@ -8118,8 +8462,46 @@ class TransactionRejectView(RootRequiredMixin, View):
             txn.save(update_fields=[
                 'status', 'reviewed_by', 'review_notes', 'updated_at',
             ])
+            pm = txn.payment_method
+            should_cancel_linked_order = bool(pm and pm.method_type != 'Offline_Bank')
+            if should_cancel_linked_order and txn.order_id:
+                order = (
+                    SubscriptionOrder.objects.select_for_update()
+                    .filter(pk=txn.order_id)
+                    .first()
+                )
+                if order and order.order_status == 'Pending_Payment':
+                    order.order_status = 'Cancelled'
+                    order.save(update_fields=['order_status', 'updated_at'])
+                    linked_order_cancelled = True
 
-        messages.success(request, 'Transaction rejected.')
+        try:
+            dispatch_internal_alerts(
+                'Payment_Failed',
+                context_dict={
+                    'transaction_id': str(txn.transaction_id),
+                    'order_id': str(txn.order_id) if txn.order_id else '',
+                    'tenant_id': str(txn.tenant_id),
+                    'company_name': txn.tenant.company_name,
+                    'amount': str(txn.amount),
+                    'currency': txn.currency_id,
+                    'review_notes': txn.review_notes or '',
+                    'message': (
+                        f'Payment failed/rejected for transaction '
+                        f'"{txn.tenant.company_name}".'
+                    ),
+                },
+            )
+        except Exception:
+            logger.exception(
+                'Internal alert dispatch failed for rejected transaction %s',
+                txn.transaction_id,
+            )
+
+        if linked_order_cancelled:
+            messages.success(request, 'Transaction rejected and linked order cancelled.')
+        else:
+            messages.success(request, 'Transaction rejected.')
         return redirect('transaction_detail', pk=pk)
 
 
@@ -8219,6 +8601,11 @@ class InvoiceListView(LoginRequiredMixin, View):
         # 4. Pagination
         paginator = Paginator(qs, 10) # Increased to 10 for better list view
         page = paginator.get_page(request.GET.get('page'))
+        total_count = qs.count()
+        start_index = page.start_index()
+        for offset, invoice in enumerate(page.object_list):
+            # Show descending list ID so newest appears with highest number.
+            invoice.list_rank = total_count - (start_index + offset) + 1
 
         return render(request, self.template_name, {
             'invoices': page,
@@ -8277,18 +8664,53 @@ class InvoicePrintView(LoginRequiredMixin, View):
         legal_identity = LegalIdentity.objects.filter(
             identity_id='GLOBAL-LEGAL-IDENTITY',
         ).first()
-        response = render(
-            request,
+        
+        # Render HTML to string
+        html_content = render_to_string(
             self.template_name,
             {
                 'invoice': invoice,
                 'legal_identity': legal_identity,
             },
         )
-        response['Content-Disposition'] = (
-            f'inline; filename="{invoice.invoice_number}.html"'
-        )
-        return response
+        
+        # Convert relative media URLs to absolute file paths for wkhtmltopdf
+        if settings.MEDIA_URL in html_content:
+            media_root_path = str(settings.MEDIA_ROOT).replace('\\', '/')
+            if not media_root_path.endswith('/'):
+                media_root_path += '/'
+            html_content = html_content.replace(
+                settings.MEDIA_URL,
+                media_root_path
+            )
+        
+        # Generate PDF using wkhtmltopdf
+        try:
+            # We use '-' for stdin and stdout
+            # --enable-local-file-access is added to allow wkhtmltopdf to access local images/css if paths are used
+            process = subprocess.Popen(
+                ['wkhtmltopdf', '--quiet', '--enable-local-file-access', '-', '-'],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
+            pdf_content, error = process.communicate(input=html_content.encode('utf-8'))
+            
+            if process.returncode != 0:
+                logger.error(f"wkhtmltopdf error: {error.decode('utf-8')}")
+                # Fallback to HTML if PDF fails
+                response = HttpResponse(html_content)
+                response['Content-Disposition'] = f'attachment; filename="{invoice.invoice_number}.html"'
+                return response
+                
+            response = HttpResponse(pdf_content, content_type='application/pdf')
+            response['Content-Disposition'] = f'attachment; filename="{invoice.invoice_number}.pdf"'
+            return response
+        except Exception as e:
+            logger.exception("PDF generation failed, falling back to HTML")
+            response = HttpResponse(html_content)
+            response['Content-Disposition'] = f'attachment; filename="{invoice.invoice_number}.html"'
+            return response
 
 
 class InvoiceSendEmailView(LoginRequiredMixin, View):
@@ -8336,9 +8758,9 @@ class SupportCategoryListView(LoginRequiredMixin, View):
 
     def get(self, request):
         sort_by = request.GET.get('sort', 'rank').strip()
-        sort_dir = request.GET.get('dir', 'asc').strip().lower()
+        sort_dir = request.GET.get('dir', 'desc').strip().lower()
         if sort_dir not in ('asc', 'desc'):
-            sort_dir = 'asc'
+            sort_dir = 'desc'
 
         qs = SupportCategory.objects.annotate(
             default_rank=Window(
@@ -8371,8 +8793,13 @@ class SupportCategoryListView(LoginRequiredMixin, View):
             ordering.append(f if sort_dir == 'asc' else f'-{f}')
         qs = qs.order_by(*ordering)
 
+        total_count = qs.count()
         paginator = Paginator(qs, 10)
         categories = paginator.get_page(request.GET.get('page'))
+        start_index = categories.start_index()
+        for offset, category in enumerate(categories.object_list):
+            # Show descending list ID so top rows have higher numbers.
+            category.list_rank = total_count - (start_index + offset) + 1
         return render(
             request,
             self.template_name,
@@ -8506,9 +8933,9 @@ class CannedResponseListView(LoginRequiredMixin, View):
 
     def get(self, request):
         sort_by = request.GET.get('sort', 'rank').strip()
-        sort_dir = request.GET.get('dir', 'asc').strip().lower()
+        sort_dir = request.GET.get('dir', 'desc').strip().lower()
         if sort_dir not in ('asc', 'desc'):
-            sort_dir = 'asc'
+            sort_dir = 'desc'
 
         qs = CannedResponse.objects.annotate(
             default_rank=Window(
@@ -8541,8 +8968,13 @@ class CannedResponseListView(LoginRequiredMixin, View):
             ordering.append(f if sort_dir == 'asc' else f'-{f}')
         qs = qs.order_by(*ordering)
 
+        total_count = qs.count()
         paginator = Paginator(qs, 10)
         canned_responses = paginator.get_page(request.GET.get('page'))
+        start_index = canned_responses.start_index()
+        for offset, canned in enumerate(canned_responses.object_list):
+            # Show descending list ID so top rows have higher numbers.
+            canned.list_rank = total_count - (start_index + offset) + 1
         return render(
             request,
             self.template_name,
@@ -8666,9 +9098,9 @@ class TicketListView(LoginRequiredMixin, View):
 
     def get(self, request):
         sort_by = request.GET.get('sort', 'rank').strip()
-        sort_dir = request.GET.get('dir', 'asc').strip().lower()
+        sort_dir = request.GET.get('dir', 'desc').strip().lower()
         if sort_dir not in ('asc', 'desc'):
-            sort_dir = 'asc'
+            sort_dir = 'desc'
 
         tickets_qs = SupportTicket.objects.select_related(
             'tenant',
@@ -8720,8 +9152,13 @@ class TicketListView(LoginRequiredMixin, View):
             ordering.append(f if sort_dir == 'asc' else f'-{f}')
         tickets_qs = tickets_qs.order_by(*ordering)
 
+        total_count = tickets_qs.count()
         paginator = Paginator(tickets_qs, 10)
         tickets = paginator.get_page(request.GET.get('page'))
+        start_index = tickets.start_index()
+        for offset, ticket in enumerate(tickets.object_list):
+            # Show descending list ID so top rows have higher numbers.
+            ticket.list_rank = total_count - (start_index + offset) + 1
 
         context = {
             'tickets': tickets,
@@ -8771,23 +9208,6 @@ class TicketCreateView(LoginRequiredMixin, View):
             getattr(request.user, 'admin_id', getattr(request.user, 'id', ''))
         )
         ticket.save()
-        if ticket.priority in ['High', 'Critical']:
-            try:
-                dispatch_internal_alerts(
-                    'High_Priority_Ticket',
-                    context_dict={
-                        'ticket_id': str(ticket.ticket_id),
-                        'ticket_no': ticket.ticket_no,
-                        'priority': ticket.priority,
-                        'tenant': ticket.tenant.company_name,
-                        'message': (
-                            f'High priority ticket "{ticket.ticket_no}" '
-                            f'raised for {ticket.tenant.company_name}.'
-                        ),
-                    },
-                )
-            except Exception:
-                logger.exception('Internal alert dispatch failed for ticket %s', ticket.ticket_id)
 
         TicketReply.objects.create(
             ticket=ticket,
@@ -8898,6 +9318,7 @@ class TicketAssignView(LoginRequiredMixin, View):
 
     def get(self, request, pk):
         return redirect('ticket_detail', pk=pk)
+
 
 
 class TicketPriorityOverrideView(LoginRequiredMixin, View):
