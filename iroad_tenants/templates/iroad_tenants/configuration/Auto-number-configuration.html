@@ -126,13 +126,13 @@
       </li>
 
       <li class="form-list-section">Administration</li>
-      <li class="form-list-item" data-form="users-administration">
+      <li class="form-list-item {% if auto_number_form_code == 'users-administration' %}active{% endif %}" data-form="users-administration">
         Users Administration
       </li>
       <li class="form-list-item" data-form="roles-permissions">
         Roles &amp; Permissions
       </li>
-      <li class="form-list-item active" data-form="organization-profile">
+      <li class="form-list-item {% if auto_number_form_code == 'organization-profile' %}active{% endif %}" data-form="organization-profile">
         Organization Profile
       </li>
 
@@ -152,11 +152,10 @@
         </div>
         <div class="form-card-header-text">
           <h2 class="form-card-title" id="autoNumberFormTitle">
-            Organization Profile Auto Numbering
+            {{ auto_number_form_label|default:'Organization Profile' }} Auto Numbering
           </h2>
           <p class="form-card-desc" id="autoNumberFormDesc">
-            Manage auto numbering settings and formats (currently enabled for
-            Organization Profile).
+            Manage auto numbering settings and formats.
           </p>
         </div>
       </div>
@@ -176,7 +175,7 @@
           <input
             type="hidden"
             id="baseNextNumber"
-            value="1"
+            value="{{ base_next_number|default:1 }}"
           />
 
           <div class="field-group">
@@ -308,7 +307,7 @@
     const sequenceFormatEl = document.getElementById("sequenceFormat");
     const nextNumberEl = document.getElementById("nextNumber");
     const baseNextNumberEl = document.getElementById("baseNextNumber");
-    const ORGANIZATION_FORM_CODE = "organization-profile";
+    const ENABLED_FORM_CODES = new Set(["organization-profile", "users-administration"]);
 
     function toAlpha(num) {
       let n = Math.max(1, num);
@@ -343,28 +342,28 @@
 
     formItems.forEach(function (item) {
       item.addEventListener("click", function () {
+        const selectedCode = item.dataset.form || "";
+        if (ENABLED_FORM_CODES.has(selectedCode)) {
+          const nextUrl = new URL(window.location.href);
+          nextUrl.searchParams.set("form_code", selectedCode);
+          window.location.href = nextUrl.toString();
+          return;
+        }
         formItems.forEach(function (i) {
           i.classList.remove("active");
         });
         item.classList.add("active");
         const name = item.textContent.trim();
-        selectedFormCodeEl.value = item.dataset.form || "";
+        selectedFormCodeEl.value = selectedCode;
         titleEl.textContent = name + " Auto Numbering";
-        if ((item.dataset.form || "") === ORGANIZATION_FORM_CODE) {
-          descEl.textContent = "Manage auto numbering settings and formats.";
-        } else {
-          descEl.textContent =
-            "Backend save is currently enabled only for Organization Profile.";
-        }
+        descEl.textContent = "Backend save is not enabled for this form yet.";
       });
     });
 
     formEl.addEventListener("submit", function (event) {
-      if (selectedFormCodeEl.value !== ORGANIZATION_FORM_CODE) {
+      if (!ENABLED_FORM_CODES.has(selectedFormCodeEl.value)) {
         event.preventDefault();
-        window.alert(
-          "Backend save is currently enabled only for Organization Profile."
-        );
+        window.alert("Backend save is not enabled for this form yet.");
       }
     });
 

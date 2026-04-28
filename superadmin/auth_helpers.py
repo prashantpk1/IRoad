@@ -6,7 +6,10 @@ from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 from django.conf import settings
 
-from superadmin.communication_helpers import send_named_notification_email
+from superadmin.communication_helpers import (
+    _normalize_from_email_header,
+    send_named_notification_email,
+)
 
 
 def get_security_settings():
@@ -170,10 +173,14 @@ def send_auth_email(user, email_type, context):
         html_content = render_to_string(template_name, context)
         text_content = strip_tags(html_content)
 
+        from_email = _normalize_from_email_header(
+            getattr(settings, 'DEFAULT_FROM_EMAIL', ''),
+            getattr(settings, 'EMAIL_HOST_USER', ''),
+        )
         msg = EmailMultiAlternatives(
             subject,
             text_content,
-            settings.DEFAULT_FROM_EMAIL,
+            from_email,
             [user.email]
         )
         msg.attach_alternative(html_content, "text/html")

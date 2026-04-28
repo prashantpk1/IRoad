@@ -2082,6 +2082,7 @@ class StandardInvoice(models.Model):
         blank=True,
     )
     customer_address = models.TextField(null=True, blank=True)
+    customer_logo_path = models.CharField(max_length=255, null=True, blank=True)
 
     # Financial fields
     sub_total = models.DecimalField(
@@ -2128,6 +2129,19 @@ class StandardInvoice(models.Model):
 
     def __str__(self):
         return self.invoice_number
+
+    @property
+    def customer_logo_url(self):
+        """Resolve a storage-safe URL for Bill To logo snapshot."""
+        if not self.customer_logo_path:
+            return ''
+        from django.conf import settings
+
+        media_url = settings.MEDIA_URL or '/media/'
+        if not media_url.endswith('/'):
+            media_url = f'{media_url}/'
+        path = str(self.customer_logo_path).lstrip('/')
+        return f'{media_url}{path}'
 
     def save(self, *args, **kwargs):
         if self.pk and StandardInvoice.objects.filter(

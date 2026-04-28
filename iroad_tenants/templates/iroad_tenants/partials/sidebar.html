@@ -50,7 +50,7 @@
           </li>
 
           <!-- User Management -->
-          <li class="nav-item has-submenu open">
+          <li class="nav-item has-submenu {% if 'tenant_users_administration' in request.resolver_match.url_name or 'tenant_roles_permissions' in request.resolver_match.url_name %}open{% endif %}">
             <a href="#" class="nav-link" data-tooltip="User Management">
               <i class="bi bi-people"></i>
               <span class="nav-text">User Management</span>
@@ -58,13 +58,14 @@
             </a>
             <ul class="submenu">
               <li class="submenu-item">
-                <a href="Users-administration.html" class="submenu-link">
+                <a href="{% url 'iroad_tenants:tenant_users_administration' %}" class="submenu-link {% if request.resolver_match.url_name == 'tenant_users_administration' %}active{% endif %}">
                   <i class="bi bi-person-gear"></i>
                   <span>Users Administration</span>
                 </a>
               </li>
+             
               <li class="submenu-item">
-                <a href="Roles--permissions.html" class="submenu-link">
+                <a href="{% url 'iroad_tenants:tenant_roles_permissions' %}" class="submenu-link {% if 'tenant_roles_permissions' in request.resolver_match.url_name %}active{% endif %}">
                   <i class="bi bi-person-lock"></i>
                   <span>Roles & Permissions</span>
                 </a>

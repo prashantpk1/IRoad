@@ -37,7 +37,7 @@
 </div>
 
 <!-- Account Master Form Card -->
-<form id="organizationProfileForm" method="post" enctype="multipart/form-data">
+<form id="organizationProfileForm" method="post" enctype="multipart/form-data" novalidate>
   {% csrf_token %}
   <!-- Section 1: Organization Identity -->
   <div class="form-card" data-section="1">
@@ -135,6 +135,16 @@
           </div>
           <div class="field">
             <label for="orgLogo" class="form-label">Logo</label>
+            {% if org.logo_file %}
+            <div style="margin-bottom: 8px;">
+              <img
+                src="{{ org.logo_file.url }}"
+                alt="Organization logo"
+                onerror="this.style.display='none';"
+                style="max-height: 48px; width: auto; border: 1px solid #ddd; border-radius: 6px; padding: 2px;"
+              />
+            </div>
+            {% endif %}
             <input
               type="file"
               class="form-control"
@@ -142,6 +152,31 @@
               name="logo_file"
               accept="image/*"
               title="Upload organization logo (e.g. organization-logo.png)"
+            />
+            {% if org.logo_file %}
+            <div style="margin-top: 8px;">
+              <label class="form-check-label" for="clearLogo">
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  id="clearLogo"
+                  name="clear_logo"
+                  value="1"
+                  style="margin-right: 6px;"
+                />
+                Remove current logo
+              </label>
+            </div>
+            {% endif %}
+          </div>
+          <div class="field">
+            <label for="accountStatus" class="form-label">Status</label>
+            <input
+              type="text"
+              class="form-control"
+              id="accountStatus"
+              value="{{ org_status_label }}"
+              readonly
             />
           </div>
         </div>
@@ -363,16 +398,11 @@
             <label for="secondaryCurrency" class="form-label"
               >Secondary Currency</label
             >
-            <select class="form-select" id="secondaryCurrency" disabled>
-              <option value="" selected disabled>
-                -Select secondary currency-
-              </option>
-              <option value="USD">USD – US Dollar</option>
-              <option value="SAR">SAR – Saudi Riyal</option>
-              <option value="AED" selected>AED – UAE Dirham</option>
-              <option value="INR">INR – Indian Rupee</option>
-              <option value="EUR">EUR – Euro</option>
-              <option value="GBP">GBP – British Pound</option>
+            <select class="form-select" id="secondaryCurrency" name="secondary_currency_code">
+              <option value="">-Select secondary currency-</option>
+              {% for currency in currencies %}
+              <option value="{{ currency.currency_code }}" {% if org.secondary_currency_code == currency.currency_code %}selected{% endif %}>{{ currency.currency_code }} – {{ currency.name_en }}</option>
+              {% endfor %}
             </select>
           </div>
           <div class="field">
@@ -389,7 +419,7 @@
             <label for="timezone" class="form-label">Timezone</label>
             <select class="form-select" id="timezone" name="timezone">
               {% for tz in timezone_choices %}
-              <option value="{{ tz }}" {% if org.timezone == tz %}selected{% endif %}>{{ tz }}</option>
+              <option value="{{ tz }}" {% if selected_timezone == tz %}selected{% endif %}>{{ tz }}</option>
               {% endfor %}
             </select>
           </div>
@@ -461,6 +491,8 @@
               type="email"
               class="form-control"
               id="supportEmail"
+              name="support_email"
+              value="{{ org.support_email }}"
               placeholder="support@iroad.com"
             />
           </div>
@@ -470,6 +502,8 @@
               type="tel"
               class="form-control"
               id="supportMobile1"
+              name="support_mobile_1"
+              value="{{ org.support_mobile_1 }}"
               placeholder="+966 50 000 0001"
             />
           </div>
@@ -479,6 +513,8 @@
               type="tel"
               class="form-control"
               id="supportMobile2"
+              name="support_mobile_2"
+              value="{{ org.support_mobile_2 }}"
               placeholder="+966 50 000 0002"
             />
           </div>
@@ -496,9 +532,10 @@
             <textarea
               class="form-control"
               id="driverInstructions"
+              name="driver_instructions"
               rows="4"
               placeholder="Enter detailed instructions for drivers..."
-            ></textarea>
+            >{{ org.driver_instructions }}</textarea>
           </div>
         </div>
       </div>

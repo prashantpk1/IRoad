@@ -248,15 +248,27 @@
       });
 
       document.querySelectorAll('.unlimited-toggle').forEach((chk) => {
+        const target = document.getElementById(chk.getAttribute('data-target'));
+        if (!target) return;
+
+        function syncToggleFromInput() {
+          chk.checked = String(target.value).trim() === '-1';
+        }
+
         chk.addEventListener('change', function () {
-          const target = document.getElementById(chk.getAttribute('data-target'));
-          if (!target) return;
           if (chk.checked) {
             target.value = -1;
           } else if (target.value === '-1') {
             target.value = '';
           }
         });
+
+        // If user types/changes number manually, keep Unlimited checkbox in sync.
+        target.addEventListener('input', syncToggleFromInput);
+        target.addEventListener('change', syncToggleFromInput);
+
+        // Ensure initial state is consistent on page load.
+        syncToggleFromInput();
       });
     })();
   </script>

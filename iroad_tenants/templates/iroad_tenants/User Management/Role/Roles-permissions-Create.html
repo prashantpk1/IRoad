@@ -1,0 +1,146 @@
+{% extends 'iroad_tenants/base.html' %}
+
+{% block title %}Create Role & Permissions | iRoad Admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{% url 'iroad_tenants:tenant_dashboard' %}">Dashboard</a></li>
+      <li class="breadcrumb-item">Administration</li>
+      <li class="breadcrumb-item"><a href="{% url 'iroad_tenants:tenant_roles_permissions' %}">User Management</a></li>
+      <li class="breadcrumb-item active" aria-current="page">{% if is_view_mode %}View Role{% elif is_edit_mode %}Edit Role{% else %}Create Role{% endif %}</li>
+    </ol>
+  </nav>
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">{% if is_view_mode %}View Role & Permissions{% elif is_edit_mode %}Edit Role & Permissions{% else %}Create Role & Permissions{% endif %}</h1>
+      <p class="page-subtitle">Configure role details and specific module permissions.</p>
+    </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <a href="{% url 'iroad_tenants:tenant_roles_permissions' %}" class="eal-btn eal-btn-outline">
+          <i class="bi bi-arrow-left"></i><span>Back</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<form id="createRoleForm" method="post" action="{% if is_edit_mode %}{% url 'iroad_tenants:tenant_roles_permissions_edit' editing_role.role_id %}{% else %}{% url 'iroad_tenants:tenant_roles_permissions_create' %}{% endif %}">
+  {% csrf_token %}
+  <div class="form-card" data-section="1">
+    <div class="form-card-header">
+      <div class="form-card-icon blue"><i class="bi bi-person-badge"></i></div>
+      <div class="form-card-header-text">
+        <h2 class="form-card-title">Role Details</h2>
+        <p class="form-card-desc">Core identity and status configuration for this role.</p>
+      </div>
+    </div>
+    <div class="form-card-body">
+      <div class="field-group">
+        <h3 class="field-group-title"><i class="bi bi-info-circle"></i>General Information</h3>
+        <div class="fields-grid cols-2">
+          <div class="field">
+            <label for="roleNameEn" class="form-label">Role Name (English) <span class="required">*</span></label>
+            <div class="input-icon-wrapper"><i class="bi bi-translate"></i><input type="text" name="role_name_en" class="form-control has-icon {% if form_errors.role_name_en %}is-invalid{% endif %}" id="roleNameEn" placeholder="e.g. Finance Manager" value="{{ form_data.role_name_en|default:'' }}" {% if is_view_mode %}disabled{% endif %} /></div>
+            {% if form_errors.role_name_en %}<div class="invalid-feedback d-block">{{ form_errors.role_name_en }}</div>{% endif %}
+          </div>
+          <div class="field">
+            <label for="roleNameAr" class="form-label">Role Name (Arabic) <span class="required">*</span></label>
+            <div class="input-icon-wrapper"><i class="bi bi-translate"></i><input type="text" name="role_name_ar" class="form-control has-icon {% if form_errors.role_name_ar %}is-invalid{% endif %}" id="roleNameAr" dir="rtl" placeholder="مدير مالي" value="{{ form_data.role_name_ar|default:'' }}" {% if is_view_mode %}disabled{% endif %} /></div>
+            {% if form_errors.role_name_ar %}<div class="invalid-feedback d-block">{{ form_errors.role_name_ar }}</div>{% endif %}
+          </div>
+        </div>
+        <div class="fields-grid cols-2">
+          <div class="field">
+            <label for="descriptionEn" class="form-label">Description (English)</label>
+            <div class="input-icon-wrapper"><i class="bi bi-text-paragraph"></i><input type="text" name="description_en" class="form-control has-icon" id="descriptionEn" placeholder="Brief description..." value="{{ form_data.description_en|default:'' }}" {% if is_view_mode %}disabled{% endif %} /></div>
+          </div>
+          <div class="field">
+            <label for="descriptionAr" class="form-label">Description (Arabic)</label>
+            <div class="input-icon-wrapper"><i class="bi bi-text-paragraph"></i><input type="text" name="description_ar" class="form-control has-icon" id="descriptionAr" dir="rtl" placeholder="وصف موجز..." value="{{ form_data.description_ar|default:'' }}" {% if is_view_mode %}disabled{% endif %} /></div>
+          </div>
+        </div>
+        <div class="fields-grid cols-2">
+          <div class="field">
+            <label for="createdBy" class="form-label">Created By</label>
+            <div class="input-icon-wrapper"><i class="bi bi-person"></i><input type="text" name="created_by_label" class="form-control has-icon" id="createdBy" value="{{ form_data.created_by_label|default:display_name }}" {% if is_view_mode %}disabled{% endif %} /></div>
+          </div>
+          <div class="field">
+            <label for="statusToggle" class="form-label">Status</label>
+            <div class="setting-toggle">
+              <label class="toggle-switch">
+                <input id="statusToggle" type="checkbox" name="status" {% if form_data.status|default:'Active' == 'Active' %}checked{% endif %} {% if is_view_mode %}disabled{% endif %}/>
+                <span class="toggle-slider"></span>
+              </label>
+              <span class="toggle-label">{% if form_data.status|default:'Active' == 'Active' %}Active{% else %}Inactive{% endif %}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-card" data-section="2">
+    <div class="form-card-header">
+      <div class="form-card-icon green"><i class="bi bi-shield-check"></i></div>
+      <div class="form-card-header-text">
+        <h2 class="form-card-title">Permissions Matrix</h2>
+        <p class="form-card-desc">Granular control over module access and specific form actions.</p>
+      </div>
+    </div>
+    <div class="form-card-body">
+      <div class="table-responsive eal-table-wrapper" style="border: 1px solid #e2e8f0; border-radius: 8px">
+        <table class="eal-table" style="margin-bottom: 0">
+          <thead>
+            <tr><th>Module</th><th>Form</th><th class="text-center">View</th><th class="text-center">Create</th><th class="text-center">Edit</th><th class="text-center">Delete</th><th class="text-center">Post</th><th class="text-center">Approve</th><th class="text-center">Export</th><th class="text-center">Print</th></tr>
+          </thead>
+          <tbody>
+            {% for permission_row in permission_matrix %}
+            <tr>
+              <td><strong>{{ permission_row.module_name }}</strong></td>
+              <td>{{ permission_row.form_name }}</td>
+              <td class="text-center"><input class="form-check-input" name="perm_{{ forloop.counter0 }}_view" type="checkbox" {% if permission_row.can_view %}checked{% endif %} {% if is_view_mode %}disabled{% endif %}/></td>
+              <td class="text-center"><input class="form-check-input" name="perm_{{ forloop.counter0 }}_create" type="checkbox" {% if permission_row.can_create %}checked{% endif %} {% if is_view_mode %}disabled{% endif %}/></td>
+              <td class="text-center"><input class="form-check-input" name="perm_{{ forloop.counter0 }}_edit" type="checkbox" {% if permission_row.can_edit %}checked{% endif %} {% if is_view_mode %}disabled{% endif %}/></td>
+              <td class="text-center"><input class="form-check-input" name="perm_{{ forloop.counter0 }}_delete" type="checkbox" {% if permission_row.can_delete %}checked{% endif %} {% if is_view_mode %}disabled{% endif %}/></td>
+              <td class="text-center"><input class="form-check-input" name="perm_{{ forloop.counter0 }}_post" type="checkbox" {% if permission_row.can_post %}checked{% endif %} {% if is_view_mode %}disabled{% endif %}/></td>
+              <td class="text-center"><input class="form-check-input" name="perm_{{ forloop.counter0 }}_approve" type="checkbox" {% if permission_row.can_approve %}checked{% endif %} {% if is_view_mode %}disabled{% endif %}/></td>
+              <td class="text-center"><input class="form-check-input" name="perm_{{ forloop.counter0 }}_export" type="checkbox" {% if permission_row.can_export %}checked{% endif %} {% if is_view_mode %}disabled{% endif %}/></td>
+              <td class="text-center"><input class="form-check-input" name="perm_{{ forloop.counter0 }}_print" type="checkbox" {% if permission_row.can_print %}checked{% endif %} {% if is_view_mode %}disabled{% endif %}/></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-actions-bar">
+    <div class="form-actions-left">
+      {% if not is_view_mode %}
+      <button type="reset" class="eal-btn eal-btn-outline text-danger border-danger"><i class="bi bi-trash"></i><span>Clear Form</span></button>
+      {% endif %}
+    </div>
+    <div class="form-actions-right">
+      <a href="{% url 'iroad_tenants:tenant_roles_permissions' %}" class="eal-btn eal-btn-outline">{% if is_view_mode %}Back{% else %}Cancel{% endif %}</a>
+      {% if not is_view_mode %}
+      <button type="submit" class="eal-btn eal-btn-primary"><i class="bi bi-check2-circle"></i><span>{% if is_edit_mode %}Update Role{% else %}Save Role{% endif %}</span></button>
+      {% endif %}
+    </div>
+  </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.querySelectorAll(".setting-toggle input").forEach((input) => {
+    const label = input.closest(".setting-toggle").querySelector(".toggle-label");
+    if (!label) return;
+    const updateLabel = () => (label.textContent = input.checked ? "Active" : "Inactive");
+    updateLabel();
+    input.addEventListener("change", updateLabel);
+  });
+</script>
+{% endblock %}

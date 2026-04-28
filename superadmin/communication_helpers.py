@@ -10,6 +10,7 @@ import logging
 import smtplib
 import json
 from decouple import config
+from email.utils import formataddr, parseaddr
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from pathlib import Path
@@ -61,50 +62,31 @@ def _build_branding_context():
     brand_logo_url = '/media/legal/Link.png'
     brand_initials = 'IR'
     
-    # Commented out for now as requested
-    # support_email = ''
-    # support_phone = ''
-    # registered_address = ''
-    # tax_number = ''
-    
-    brand_company_name_ar = brand_name_ar # Keep this for now
+    brand_company_name_ar = brand_name_ar
 
-    # try:
-    #     from superadmin.models import LegalIdentity
-    # 
-    #     legal = LegalIdentity.objects.filter(
-    #         identity_id='GLOBAL-LEGAL-IDENTITY',
-    #     ).first()
-    #     if legal:
-    #         if (legal.company_name_en or '').strip():
-    #             brand_name = legal.company_name_en.strip()
-    #         
-    #         if (legal.company_name_ar or '').strip():
-    #             brand_name_ar = legal.company_name_ar.strip()
-    #         
-    #         # Contact details - Commented out for now
-    #         # support_email = getattr(legal, 'support_email', '')
-    #         # support_phone = getattr(legal, 'support_phone', '')
-    #         # registered_address = getattr(legal, 'registered_address', '')
-    #         # tax_number = getattr(legal, 'tax_number', '')
-    # 
-    #         # Check if a custom logo is uploaded and physically exists on the disk.
-    #         if getattr(legal, 'company_logo', None):
-    #             try:
-    #                 if legal.company_logo and os.path.exists(legal.company_logo.path):
-    #                     brand_logo_url = legal.company_logo.url or brand_logo_url
-    #             except Exception:
-    #                 try:
-    #                     brand_logo_url = legal.company_logo.url
-    #                 except Exception:
-    #                     pass
-    #         
-    #         # Generate initials from company name
-    #         letters = ''.join(ch for ch in brand_name if ch.isalnum()).upper()
-    #         if letters:
-    #             brand_initials = letters[:2]
-    # except Exception:
-    #     pass
+    try:
+        from superadmin.models import LegalIdentity
+
+        legal = LegalIdentity.objects.filter(
+            identity_id='GLOBAL-LEGAL-IDENTITY',
+        ).first()
+        if legal:
+            if (legal.company_name_en or '').strip():
+                brand_name = legal.company_name_en.strip()
+            if (legal.company_name_ar or '').strip():
+                brand_name_ar = legal.company_name_ar.strip()
+
+            if getattr(legal, 'company_logo', None):
+                try:
+                    brand_logo_url = legal.company_logo.url or brand_logo_url
+                except Exception:
+                    pass
+
+            letters = ''.join(ch for ch in brand_name if ch.isalnum()).upper()
+            if letters:
+                brand_initials = letters[:2]
+    except Exception:
+        pass
 
     # Standardize logo URL resolution (ensure absolute URL)
     if brand_logo_url:
@@ -148,6 +130,36 @@ def _resolve_safe_from_email(preferred_from=''):
     return candidate
 
 
+def _normalize_from_email_header(raw_from='', fallback_email=''):
+    """
+    Return a stable RFC-2822 From header with a consistent display name.
+    """
+    fallback = (fallback_email or '').strip()
+    display_name = (
+        getattr(settings, 'EMAIL_FROM_DISPLAY_NAME', 'Iroad Platform')
+        or 'Iroad Platform'
+    ).strip()
+
+    name, addr = parseaddr((raw_from or '').strip())
+    if not addr:
+        addr = fallback
+    if not addr:
+        return ''
+    if name:
+        return formataddr((name, addr))
+    return formataddr((display_name, addr))
+
+
+def _extract_sender_address(raw_from='', fallback_email=''):
+    """
+    Extract SMTP envelope sender address from a header-like value.
+    """
+    _name, addr = parseaddr((raw_from or '').strip())
+    if addr:
+        return addr
+    return (fallback_email or '').strip()
+
+
 def _send_via_fallback_smtp(to_email, subject, text_body, html_body=None):
     fallback_user = (getattr(settings, 'FALLBACK_EMAIL_HOST_USER', '') or '').strip()
     fallback_pass = (getattr(settings, 'FALLBACK_EMAIL_HOST_PASSWORD', '') or '').strip()
@@ -158,9 +170,11 @@ def _send_via_fallback_smtp(to_email, subject, text_body, html_body=None):
     port = int(getattr(settings, 'FALLBACK_EMAIL_PORT', 587))
     use_ssl = bool(getattr(settings, 'FALLBACK_EMAIL_USE_SSL', False))
     use_tls = bool(getattr(settings, 'FALLBACK_EMAIL_USE_TLS', True))
-    sender = _resolve_safe_from_email(
+    sender_raw = _resolve_safe_from_email(
         getattr(settings, 'DEFAULT_FROM_EMAIL', '') or fallback_user,
     )
+    sender = _normalize_from_email_header(sender_raw, fallback_user)
+    envelope_from = _extract_sender_address(sender, fallback_user)
 
     msg = MIMEMultipart('alternative')
     msg['Subject'] = subject
@@ -178,7 +192,7 @@ def _send_via_fallback_smtp(to_email, subject, text_body, html_body=None):
             server.starttls()
     try:
         server.login(fallback_user, fallback_pass)
-        server.sendmail(sender, [to_email], msg.as_string())
+        server.sendmail(envelope_from, [to_email], msg.as_string())
     finally:
         try:
             server.quit()
@@ -925,9 +939,10 @@ def send_email_smtp_gateway(
     client_id=None,
     attachments=None,
 ):
+    header_from = _normalize_from_email_header(gateway.sender_id, gateway.username_key)
     msg = MIMEMultipart('alternative')
     msg['Subject'] = subject
-    msg['From'] = _resolve_safe_from_email(gateway.sender_id)
+    msg['From'] = header_from
     msg['To'] = to_email
     msg.attach(MIMEText(text_body, 'plain', 'utf-8'))
     if html_body:
@@ -947,6 +962,7 @@ def send_email_smtp_gateway(
         port = 465 if enc == 'SSL' else 587
 
     def _send_once(*, send_from, smtp_host, smtp_port, smtp_enc, smtp_user, smtp_pass):
+        envelope_from = _extract_sender_address(send_from, smtp_user)
         if smtp_enc == 'SSL':
             server = smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=60)
         else:
@@ -955,7 +971,7 @@ def send_email_smtp_gateway(
                 server.starttls()
         try:
             server.login(smtp_user, smtp_pass)
-            server.sendmail(send_from, [to_email], msg.as_string())
+            server.sendmail(envelope_from, [to_email], msg.as_string())
         finally:
             try:
                 server.quit()
@@ -965,7 +981,7 @@ def send_email_smtp_gateway(
     try:
         try:
             _send_once(
-                send_from=gateway.sender_id,
+                send_from=header_from,
                 smtp_host=host,
                 smtp_port=port,
                 smtp_enc=enc,
@@ -988,7 +1004,8 @@ def send_email_smtp_gateway(
                 if bool(getattr(settings, 'FALLBACK_EMAIL_USE_SSL', False))
                 else ('TLS' if bool(getattr(settings, 'FALLBACK_EMAIL_USE_TLS', True)) else '')
             )
-            fallback_from = _resolve_safe_from_email(fallback_user)
+            fallback_from = _normalize_from_email_header(fallback_user, fallback_user)
+            msg.replace_header('From', fallback_from)
             _send_once(
                 send_from=fallback_from,
                 smtp_host=fallback_host,
@@ -1038,6 +1055,10 @@ def send_email_via_django_smtp(
         '',
     )
     from_email = _resolve_safe_from_email(from_email)
+    from_email = _normalize_from_email_header(
+        from_email,
+        getattr(settings, 'EMAIL_HOST_USER', ''),
+    )
     if not from_email:
         logger.error(
             'Cannot send email: set DEFAULT_FROM_EMAIL or EMAIL_HOST_USER in settings',

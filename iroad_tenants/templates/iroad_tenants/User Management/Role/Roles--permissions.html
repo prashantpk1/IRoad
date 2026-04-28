@@ -1,0 +1,135 @@
+{% extends 'iroad_tenants/base.html' %}
+
+{% block title %}Roles & Permissions | iRoad Admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{% url 'iroad_tenants:tenant_dashboard' %}">Dashboard</a></li>
+      <li class="breadcrumb-item">Administration</li>
+      <li class="breadcrumb-item">User Management</li>
+      <li class="breadcrumb-item active" aria-current="page">Roles & Permissions</li>
+    </ol>
+  </nav>
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">Roles & Permissions</h1>
+      <p class="page-subtitle">Manage and view all system roles and their permissions.</p>
+    </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <a href="{% url 'iroad_tenants:tenant_roles_permissions_export' %}" class="eal-btn eal-btn-outline">
+          <i class="bi bi-download"></i><span>Export</span>
+        </a>
+        <a href="{% url 'iroad_tenants:tenant_roles_permissions_create' %}" class="eal-btn eal-btn-primary">
+          <i class="bi bi-plus-lg"></i><span>Add New Role</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="eal-stats-row">
+  <div class="eal-stat-card"><div class="eal-stat-icon purple"><i class="bi bi-shield-check"></i></div><div><div class="eal-stat-value">{{ roles_total_count|default:0 }}</div><div class="eal-stat-label">Total Roles</div></div></div>
+  <div class="eal-stat-card"><div class="eal-stat-icon green"><i class="bi bi-check-circle"></i></div><div><div class="eal-stat-value">{{ roles_active_count|default:0 }}</div><div class="eal-stat-label">Active Roles</div></div></div>
+  <div class="eal-stat-card"><div class="eal-stat-icon amber"><i class="bi bi-pause-circle"></i></div><div><div class="eal-stat-value">{{ roles_inactive_count|default:0 }}</div><div class="eal-stat-label">Inactive Roles</div></div></div>
+  <div class="eal-stat-card"><div class="eal-stat-icon blue"><i class="bi bi-file-earmark-text"></i></div><div><div class="eal-stat-value">{{ roles_draft_count|default:0 }}</div><div class="eal-stat-label">Draft Roles</div></div></div>
+</div>
+
+<div class="eal-table-card">
+  <div class="eal-toolbar">
+    <div class="eal-toolbar-left">
+      <div class="eal-search"><i class="bi bi-search"></i><input type="text" placeholder="Search roles..." /></div>
+    </div>
+  </div>
+
+  <div class="eal-table-wrap">
+    <table class="eal-table">
+      <thead>
+        <tr>
+          <th class="eal-col-check"><input type="checkbox" class="eal-custom-check" /></th>
+          <th>Role Name (English)</th>
+          <th>Role Name (Arabic)</th>
+          <th>Description</th>
+          <th>Created By</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for tenant_role in tenant_roles %}
+        <tr>
+          <td class="eal-col-check"><input type="checkbox" class="eal-custom-check" /></td>
+          <td>{{ tenant_role.role_name_en }}</td>
+          <td dir="rtl">{{ tenant_role.role_name_ar }}</td>
+          <td>{{ tenant_role.description_en|default:tenant_role.description_ar }}</td>
+          <td>{{ tenant_role.created_by_label|default:'N/A' }}</td>
+          <td>
+            <span class="status-badge {% if tenant_role.status == 'Active' %}active{% elif tenant_role.status == 'Inactive' %}inactive{% else %}draft{% endif %}">
+              {{ tenant_role.status }}
+            </span>
+          </td>
+          <td>
+            <div class="dropdown">
+              <button class="eal-row-btn" type="button" data-bs-toggle="dropdown" data-bs-boundary="viewport" aria-expanded="false">
+                <i class="bi bi-three-dots-vertical"></i>
+              </button>
+              <ul class="dropdown-menu dropdown-menu-end">
+                <li>
+                  <a class="dropdown-item" href="{% url 'iroad_tenants:tenant_roles_permissions_edit' tenant_role.role_id %}">
+                    <i class="bi bi-pencil me-2"></i>Edit
+                  </a>
+                </li>
+                <li>
+                  <a class="dropdown-item" href="{% url 'iroad_tenants:tenant_roles_permissions_edit' tenant_role.role_id %}?mode=view">
+                    <i class="bi bi-eye me-2"></i>View
+                  </a>
+                </li>
+                <li>
+                  <form method="post" action="{% url 'iroad_tenants:tenant_roles_permissions_toggle_status' tenant_role.role_id %}">
+                    {% csrf_token %}
+                    <button type="submit" class="dropdown-item">
+                      <i class="bi bi-arrow-repeat me-2"></i>{% if tenant_role.status == 'Active' %}Deactivate{% else %}Activate{% endif %}
+                    </button>
+                  </form>
+                </li>
+                <li><hr class="dropdown-divider"></li>
+                <li>
+                  <form method="post" action="{% url 'iroad_tenants:tenant_roles_permissions_delete' tenant_role.role_id %}" onsubmit="return confirm('Delete this role?');">
+                    {% csrf_token %}
+                    <button type="submit" class="dropdown-item text-danger">
+                      <i class="bi bi-trash3 me-2"></i>Delete
+                    </button>
+                  </form>
+                </li>
+              </ul>
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="7" class="text-center text-muted py-4">No roles found for this tenant yet.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="eal-pagination">
+    <div class="eal-pagination-info">Showing <strong>1-{{ tenant_roles|length }}</strong> of <strong>{{ tenant_roles|length }}</strong> roles</div>
+    <div class="eal-pagination-controls">
+      <button class="eal-page-btn" title="Previous"><i class="bi bi-chevron-left"></i></button>
+      <button class="eal-page-btn active">1</button>
+      <button class="eal-page-btn" title="Next"><i class="bi bi-chevron-right"></i></button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  .eal-table-wrap { overflow-x: auto !important; overflow-y: visible !important; }
+  .eal-table-wrap .dropdown { position: static; }
+</style>
+{% endblock %}

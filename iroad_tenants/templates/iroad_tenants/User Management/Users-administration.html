@@ -1,0 +1,175 @@
+{% extends 'iroad_tenants/base.html' %}
+
+{% block title %}Users Administration | iRoad Admin{% endblock %}
+
+{% block extra_css %}
+<style>
+  .eal-table-wrap {
+    overflow-x: auto !important;
+    overflow-y: visible !important;
+  }
+  .eal-table-wrap .dropdown {
+    position: static;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{% url 'iroad_tenants:tenant_dashboard' %}">Dashboard</a></li>
+      <li class="breadcrumb-item">Administration</li>
+      <li class="breadcrumb-item">User Management</li>
+      <li class="breadcrumb-item active" aria-current="page">Users Administration</li>
+    </ol>
+  </nav>
+</div>
+
+<div class="page-header">
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">Users Administration</h1>
+      <p class="page-subtitle">Manage and view all registered users.</p>
+    </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <a class="eal-btn eal-btn-outline" href="{% url 'iroad_tenants:tenant_users_administration_export' %}">
+          <i class="bi bi-download"></i>
+          <span>Export</span>
+        </a>
+        <a href="{% url 'iroad_tenants:tenant_users_administration_create' %}" class="eal-btn eal-btn-primary">
+          <i class="bi bi-plus-lg"></i>
+          <span>Add User Administration</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="eal-stats-row">
+  <div class="eal-stat-card">
+    <div class="eal-stat-icon purple"><i class="bi bi-people"></i></div>
+    <div><div class="eal-stat-value">{{ users_total_count|default:0 }}</div><div class="eal-stat-label">Total Users</div></div>
+  </div>
+  <div class="eal-stat-card">
+    <div class="eal-stat-icon green"><i class="bi bi-person-check"></i></div>
+    <div><div class="eal-stat-value">{{ users_active_count|default:0 }}</div><div class="eal-stat-label">Active Users</div></div>
+  </div>
+  <div class="eal-stat-card">
+    <div class="eal-stat-icon amber"><i class="bi bi-person-dash"></i></div>
+    <div><div class="eal-stat-value">{{ users_inactive_count|default:0 }}</div><div class="eal-stat-label">Inactive Users</div></div>
+  </div>
+  <div class="eal-stat-card">
+    <div class="eal-stat-icon blue"><i class="bi bi-person-lock"></i></div>
+    <div><div class="eal-stat-value">{{ users_locked_count|default:0 }}</div><div class="eal-stat-label">Locked Accounts</div></div>
+  </div>
+</div>
+
+<div class="eal-table-card">
+  <div class="eal-toolbar">
+    <div class="eal-toolbar-left">
+      <div class="eal-search">
+        <i class="bi bi-search"></i>
+        <input type="text" placeholder="Search users by name, email, or role&hellip;" />
+      </div>
+    </div>
+  </div>
+
+  <div class="eal-table-wrap">
+    <table class="eal-table">
+      <thead>
+        <tr>
+          <th class="eal-col-check"><input type="checkbox" class="eal-custom-check" id="ealSelectAll" /></th>
+          <th>User ID</th>
+          <th>Full Name</th>
+          <th>Email</th>
+          <th>Username</th>
+          <th>Role</th>
+          <th>Last Login</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for tenant_user in tenant_users %}
+        <tr>
+          <td class="eal-col-check"><input type="checkbox" class="eal-custom-check" /></td>
+          <td><span class="eal-entity-id">{{ tenant_user.tenant_ref_no|default:"USR-00001" }}</span></td>
+          <td>{{ tenant_user.full_name }}</td>
+          <td>{{ tenant_user.email }}</td>
+          <td>{{ tenant_user.username }}</td>
+          <td>{{ tenant_user.role_name }}</td>
+          <td>{% if tenant_user.last_login_at %}{{ tenant_user.last_login_at|date:"d M Y, h:i A" }}{% else %}Never{% endif %}</td>
+          <td>
+            <span class="status-badge {% if tenant_user.status == 'Active' %}active{% else %}inactive{% endif %}">
+              {{ tenant_user.status }}
+            </span>
+          </td>
+          <td>
+            <div class="dropdown eal-actions-cell">
+              <button
+                class="eal-row-btn"
+                type="button"
+                data-bs-toggle="dropdown"
+                data-bs-boundary="viewport"
+                aria-expanded="false"
+                title="Actions"
+              >
+                <i class="bi bi-three-dots-vertical"></i>
+              </button>
+              <ul
+                class="dropdown-menu dropdown-menu-end shadow-sm"
+                style="border-radius: 8px; border-color: #e2e8f0; min-width: 180px;"
+              >
+                <li>
+                  <a class="dropdown-item" href="{% url 'iroad_tenants:tenant_users_administration_edit' tenant_user.user_id %}">
+                    <i class="bi bi-pencil text-primary me-2"></i>Edit
+                  </a>
+                </li>
+                <li>
+                  <a class="dropdown-item" href="{% url 'iroad_tenants:tenant_users_administration_edit' tenant_user.user_id %}?mode=view">
+                    <i class="bi bi-eye text-info me-2"></i>View
+                  </a>
+                </li>
+                <li>
+                  <form method="post" action="{% url 'iroad_tenants:tenant_users_administration_toggle_status' tenant_user.user_id %}" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="dropdown-item">
+                      <i class="bi bi-person-slash text-secondary me-2"></i>
+                      {% if tenant_user.status == 'Active' %}Deactivate User{% else %}Activate User{% endif %}
+                    </button>
+                  </form>
+                </li>
+                <li><hr class="dropdown-divider" /></li>
+                <li>
+                  <form method="post" action="{% url 'iroad_tenants:tenant_users_administration_delete' tenant_user.user_id %}" class="d-inline" onsubmit="return confirm('Delete this user?');">
+                    {% csrf_token %}
+                    <button type="submit" class="dropdown-item text-danger">
+                      <i class="bi bi-trash3 me-2"></i>Delete
+                    </button>
+                  </form>
+                </li>
+              </ul>
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="9" class="text-center py-4 text-muted">No users found for this tenant yet.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="eal-pagination">
+    <div class="eal-pagination-info">Showing <strong>{% if tenant_users %}1-{{ tenant_users|length }}{% else %}0{% endif %}</strong> of <strong>{{ tenant_users|length }}</strong> users</div>
+    <div class="eal-pagination-controls">
+      <button class="eal-page-btn" title="Previous"><i class="bi bi-chevron-left"></i></button>
+      <button class="eal-page-btn active">1</button>
+      <button class="eal-page-btn" title="Next"><i class="bi bi-chevron-right"></i></button>
+    </div>
+  </div>
+</div>
+{% endblock %}

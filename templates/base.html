@@ -91,6 +91,16 @@
         <div class="notification-list">
           {% for item in internal_alert_items %}
           <div class="notification-item {% if not item.is_read %}unread{% endif %}">
+            {% if item.target_url %}
+            <a href="{{ item.target_url }}" class="notification-item-main">
+              <div class="notification-item-title">{{ item.title }}</div>
+              <div class="notification-item-body">{{ item.message|truncatechars:160 }}</div>
+              <div class="notification-item-meta">
+                <span>{{ item.get_trigger_event_display }}</span>
+                <span>{{ item.created_at|date:"d M Y, H:i" }}</span>
+              </div>
+            </a>
+            {% else %}
             <div class="notification-item-main">
               <div class="notification-item-title">{{ item.title }}</div>
               <div class="notification-item-body">{{ item.message|truncatechars:160 }}</div>
@@ -99,6 +109,7 @@
                 <span>{{ item.created_at|date:"d M Y, H:i" }}</span>
               </div>
             </div>
+            {% endif %}
             {% if not item.is_read %}
             <form method="post" action="{% url 'internal_alert_notification_read' item.notification_id %}">
               {% csrf_token %}
@@ -157,10 +168,12 @@
         {% if messages %}
           <div class="container-fluid px-0 mb-3">
             {% for message in messages %}
-              <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags|default:'info' }}{% endif %} alert-dismissible fade show" role="alert">
-                {{ message }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-              </div>
+              {% if 'tenant' not in message.tags %}
+                <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags|default:'info' }}{% endif %} alert-dismissible fade show" role="alert">
+                  {{ message }}
+                  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+              {% endif %}
             {% endfor %}
           </div>
         {% endif %}

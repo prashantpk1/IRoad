@@ -112,6 +112,11 @@ class OrganizationProfile(models.Model):
     primary_mobile = models.CharField(max_length=30, blank=True, default='')
     website = models.URLField(max_length=255, blank=True, default='')
     base_currency_code = models.CharField(max_length=10, blank=True, default='')
+    secondary_currency_code = models.CharField(max_length=10, blank=True, default='')
+    support_email = models.EmailField(max_length=150, blank=True, default='')
+    support_mobile_1 = models.CharField(max_length=30, blank=True, default='')
+    support_mobile_2 = models.CharField(max_length=30, blank=True, default='')
+    driver_instructions = models.TextField(blank=True, default='')
     system_language = models.CharField(
         max_length=5,
         choices=SYSTEM_LANGUAGE_CHOICES,
@@ -141,3 +146,88 @@ class OrganizationProfile(models.Model):
 
     def __str__(self):
         return self.name_en or self.tenant_ref_no
+
+
+class TenantUser(models.Model):
+    """Tenant-scoped internal users (stored per tenant schema)."""
+
+    class Status(models.TextChoices):
+        ACTIVE = 'Active', 'Active'
+        INACTIVE = 'Inactive', 'Inactive'
+
+    user_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant_ref_no = models.CharField(max_length=64, unique=True, blank=True, default='')
+    account_sequence = models.PositiveIntegerField(default=0)
+    username = models.CharField(max_length=150, unique=True)
+    full_name = models.CharField(max_length=200)
+    email = models.EmailField(max_length=254, unique=True)
+    mobile_country_code = models.CharField(max_length=8, blank=True, default='')
+    mobile_no = models.CharField(max_length=30, blank=True, default='')
+    password_hash = models.CharField(max_length=255)
+    role_name = models.CharField(max_length=100, default='Administrator')
+    status = models.CharField(max_length=12, choices=Status.choices, default=Status.ACTIVE)
+    last_login_at = models.DateTimeField(null=True, blank=True)
+    login_attempts = models.PositiveIntegerField(default=0)
+    created_by_label = models.CharField(max_length=200, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'tenant_users'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.full_name} ({self.username})'
+
+
+class TenantRole(models.Model):
+    """Tenant-scoped role master."""
+
+    class Status(models.TextChoices):
+        ACTIVE = 'Active', 'Active'
+        INACTIVE = 'Inactive', 'Inactive'
+        DRAFT = 'Draft', 'Draft'
+
+    role_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    role_name_en = models.CharField(max_length=150, unique=True)
+    role_name_ar = models.CharField(max_length=150, unique=True)
+    description_en = models.CharField(max_length=255, blank=True, default='')
+    description_ar = models.CharField(max_length=255, blank=True, default='')
+    status = models.CharField(max_length=12, choices=Status.choices, default=Status.ACTIVE)
+    created_by_label = models.CharField(max_length=200, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'tenant_roles'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return self.role_name_en
+
+
+class TenantRolePermission(models.Model):
+    """Tenant-scoped role permissions matrix by module/form."""
+
+    permission_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    role = models.ForeignKey(TenantRole, on_delete=models.CASCADE, related_name='permissions')
+    module_name = models.CharField(max_length=100)
+    form_name = models.CharField(max_length=120)
+    can_view = models.BooleanField(default=False)
+    can_create = models.BooleanField(default=False)
+    can_edit = models.BooleanField(default=False)
+    can_delete = models.BooleanField(default=False)
+    can_post = models.BooleanField(default=False)
+    can_approve = models.BooleanField(default=False)
+    can_export = models.BooleanField(default=False)
+    can_print = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'tenant_role_permissions'
+        unique_together = ('role', 'module_name', 'form_name')
+        ordering = ['module_name', 'form_name']
+
+    def __str__(self):
+        return f'{self.role.role_name_en} - {self.module_name}/{self.form_name}'

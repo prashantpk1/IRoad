@@ -149,7 +149,22 @@
           <div class="field">
             <label class="form-label">Logo</label>
             <div class="view-field-box">
-              <p class="view-value">{% if org.logo_file %}{{ org.logo_file.name }}{% else %}-{% endif %}</p>
+              {% if org.logo_file %}
+                <img
+                  src="{{ org.logo_file.url }}"
+                  alt="Organization logo"
+                  onerror="this.style.display='none';"
+                  style="max-height: 52px; width: auto; display: block; margin-bottom: 6px;"
+                />
+              {% else %}
+                <p class="view-value">-</p>
+              {% endif %}
+            </div>
+          </div>
+          <div class="field">
+            <label class="form-label">Status</label>
+            <div class="view-field-box">
+              <p class="view-value">{{ org_status_label }}</p>
             </div>
           </div>
         </div>
@@ -310,7 +325,7 @@
           <div class="field">
             <label class="form-label">Secondary Currency</label>
             <div class="view-field-box">
-              <p class="view-value">AED</p>
+              <p class="view-value">{{ org.secondary_currency_code|default:"-" }}</p>
             </div>
           </div>
           <div class="field">
@@ -380,19 +395,19 @@
           <div class="field">
             <label class="form-label">Support Email</label>
             <div class="view-field-box">
-              <p class="view-value">support@iroad.com</p>
+              <p class="view-value">{{ org.support_email|default:"-" }}</p>
             </div>
           </div>
           <div class="field">
             <label class="form-label">Support Mobile Number 1</label>
             <div class="view-field-box">
-              <p class="view-value">+966 50 000 0001</p>
+              <p class="view-value">{{ org.support_mobile_1|default:"-" }}</p>
             </div>
           </div>
           <div class="field">
             <label class="form-label">Support Mobile Number 2</label>
             <div class="view-field-box">
-              <p class="view-value">+966 50 000 0002</p>
+              <p class="view-value">{{ org.support_mobile_2|default:"-" }}</p>
             </div>
           </div>
         </div>
@@ -407,13 +422,7 @@
           <div class="field">
             <label class="form-label">Driver Instructions (Rich Text)</label>
             <div class="view-field-box" style="min-height: 120px;">
-              <p class="view-value">
-                Please ensure all hard copy PODs are collected at the time
-                of delivery. Any damages must be reported immediately via
-                the mobile app with supporting photos. Drivers should
-                maintain a log of all waiting times exceeding 30 minutes at
-                client locations.
-              </p>
+              <p class="view-value">{{ org.driver_instructions|default:"-" }}</p>
             </div>
           </div>
         </div>

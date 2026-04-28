@@ -8,6 +8,8 @@ from urllib.parse import urlsplit
 from django.template.loader import render_to_string
 
 from django.conf import settings
+from django.db import connection
+from django.core.files.storage import default_storage
 
 logger = logging.getLogger(__name__)
 
@@ -779,6 +781,109 @@ def calculate_addon_prorata(
     return cycles_fraction, line_total
 
 
+def _get_tenant_org_profile_snapshot(tenant):
+    """
+    Read tenant Organization Profile snapshot from isolated workspace schema.
+    Returns keys: customer_name, customer_tax_number, customer_cr_number,
+    customer_address, customer_logo_path.
+    """
+    from iroad_tenants.models import TenantRegistry
+    from tenant_workspace.models import OrganizationProfile
+
+    snapshot = {}
+    registry = (
+        TenantRegistry.objects.select_related('tenant_profile')
+        .filter(tenant_profile_id=tenant.pk)
+        .first()
+    )
+    if not registry:
+        return snapshot
+
+    try:
+        connection.set_schema_to_public()
+        connection.set_tenant(registry)
+        profile = (
+            OrganizationProfile.objects.order_by('-updated_at', '-created_at').first()
+        )
+        if not profile:
+            return snapshot
+
+        country_label = (profile.country_code or '').strip()
+        if country_label:
+            try:
+                from .models import Country
+
+                country = Country.objects.filter(country_code=country_label).first()
+                if country and country.name_en:
+                    country_label = country.name_en
+            except Exception:
+                pass
+
+        address_parts = [
+            (profile.address_line_1 or '').strip(),
+            (profile.address_line_2 or '').strip(),
+            (profile.city or '').strip(),
+            country_label,
+        ]
+        snapshot['customer_name'] = (profile.name_en or '').strip()
+        snapshot['customer_tax_number'] = (profile.tax_number or '').strip()
+        snapshot['customer_cr_number'] = (profile.cr_number or '').strip()
+        snapshot['customer_address'] = ', '.join(
+            part for part in address_parts if part
+        )
+        snapshot['customer_logo_path'] = (
+            (profile.logo_file.name or '').strip() if getattr(profile, 'logo_file', None) else ''
+        )
+    finally:
+        connection.set_schema_to_public()
+
+    return snapshot
+
+
+def get_live_bill_to_snapshot(invoice):
+    """
+    Resolve Bill To display values from current tenant Organization Profile.
+    Falls back to invoice snapshot values when tenant profile values are missing.
+    """
+    tenant = getattr(invoice, 'tenant', None)
+    live = _get_tenant_org_profile_snapshot(tenant) if tenant else {}
+
+    name = (live.get('customer_name') or getattr(invoice, 'customer_name', '') or '').strip()
+    tax_number = (
+        live.get('customer_tax_number') or getattr(invoice, 'customer_tax_number', '') or ''
+    ).strip()
+    cr_number = (
+        live.get('customer_cr_number')
+        or getattr(getattr(invoice, 'tenant', None), 'registration_number', '')
+        or ''
+    ).strip()
+    address = (
+        live.get('customer_address') or getattr(invoice, 'customer_address', '') or ''
+    ).strip()
+    logo_path = (
+        live.get('customer_logo_path') or getattr(invoice, 'customer_logo_path', '') or ''
+    ).strip()
+
+    logo_url = ''
+    if logo_path:
+        try:
+            if default_storage.exists(logo_path):
+                media_url = settings.MEDIA_URL or '/media/'
+                if not media_url.endswith('/'):
+                    media_url = f'{media_url}/'
+                logo_url = f"{media_url}{logo_path.lstrip('/')}"
+        except Exception:
+            logo_url = ''
+
+    return {
+        'name': name,
+        'tax_number': tax_number,
+        'cr_number': cr_number,
+        'address': address,
+        'logo_url': logo_url,
+    }
+
+
 def generate_invoice_from_order(order, admin_user):
     """
     Auto-generate StandardInvoice when order becomes Paid.
@@ -815,8 +920,16 @@ def generate_invoice_from_order(order, admin_user):
         pass
 
     tenant = order.tenant
-    customer_address_snapshot = ''
-    if getattr(tenant, 'country', None):
+    org_profile_snapshot = _get_tenant_org_profile_snapshot(tenant)
+    customer_name_snapshot = (
+        org_profile_snapshot.get('customer_name') or tenant.company_name
+    )
+    customer_tax_snapshot = (
+        org_profile_snapshot.get('customer_tax_number') or (tenant.tax_number or '')
+    )
+    customer_address_snapshot = org_profile_snapshot.get('customer_address', '')
+    customer_logo_snapshot = org_profile_snapshot.get('customer_logo_path', '')
+    if not customer_address_snapshot and getattr(tenant, 'country', None):
         customer_address_snapshot = tenant.country.name_en or ''
 
     # Calculate taxable amount
@@ -842,9 +955,10 @@ def generate_invoice_from_order(order, admin_user):
         supplier_support_phone=supplier_phone,
         supplier_commercial_register=supplier_cr,
         # Customer snapshot
-        customer_name=tenant.company_name,
-        customer_tax_number=tenant.tax_number or '',
+        customer_name=customer_name_snapshot,
+        customer_tax_number=customer_tax_snapshot,
         customer_address=customer_address_snapshot,
+        customer_logo_path=customer_logo_snapshot,
         # Financials
         sub_total=order.sub_total,
         discount_amount=order.discount_amount,
@@ -910,6 +1024,7 @@ def generate_invoice_pdf_bytes(invoice):
         {
             'invoice': invoice,
             'legal_identity': legal_identity,
+            'bill_to': get_live_bill_to_snapshot(invoice),
         },
     )
 

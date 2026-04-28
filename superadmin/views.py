@@ -47,6 +47,12 @@ from email.mime.text import MIMEText
 logger = logging.getLogger(__name__)
 
 
+def _rename_txn_attachment(uploaded_file, txn_id):
+    ext = os.path.splitext((uploaded_file.name or '').strip())[1].lower() or '.bin'
+    uploaded_file.name = f'txn_{txn_id}_{uuid.uuid4().hex[:10]}{ext}'
+    return uploaded_file
+
+
 def _write_txn_approve_debug(message):
     """Append transaction-approve debug output to a local txt file."""
     debug_file = os.path.join(settings.BASE_DIR, 'transaction_approve_debug.txt')
@@ -72,6 +78,7 @@ from .billing_helpers import (
     resolve_upgrade_credit_basis_price,
     send_invoice_paid_notification,
     sync_or_create_order_payment_transaction,
+    get_live_bill_to_snapshot,
     validate_downgrade_order,
 )
 from .auth_helpers import (
@@ -95,6 +102,8 @@ from .tenant_portal_auth import (
     set_tenant_portal_cookie,
 )
 from .communication_helpers import (
+    _extract_sender_address,
+    _normalize_from_email_header,
     dispatch_internal_alerts,
     dispatch_event_notification,
     ensure_default_notification_templates,
@@ -670,8 +679,11 @@ class OTPVerificationView(View):
         if not pending:
             if request.user.is_authenticated:
                 return redirect('dashboard')
-            if get_tenant_portal_cookie_payload(request):
-                return redirect('iroad_tenants:tenant_dashboard')
+            tenant_auth = get_tenant_portal_cookie_payload(request)
+            if tenant_auth:
+                return redirect(
+                    f"{reverse('iroad_tenants:tenant_dashboard')}?tid={tenant_auth.get('tenant_id')}"
+                )
             messages.error(request, 'Your verification session has expired. Please sign in again.')
             return redirect('login')
         otp_payload = pending['otp_payload']
@@ -706,8 +718,11 @@ class OTPVerificationView(View):
         if not pending:
             if request.user.is_authenticated:
                 return redirect('dashboard')
-            if get_tenant_portal_cookie_payload(request):
-                return redirect('iroad_tenants:tenant_dashboard')
+            tenant_auth = get_tenant_portal_cookie_payload(request)
+            if tenant_auth:
+                return redirect(
+                    f"{reverse('iroad_tenants:tenant_dashboard')}?tid={tenant_auth.get('tenant_id')}"
+                )
             messages.error(request, 'Your verification session has expired. Please sign in again.')
             return redirect('login')
         otp_payload = pending['otp_payload']
@@ -845,11 +860,8 @@ class OTPVerificationView(View):
             token_type='tenant_bootstrap',
             ttl_seconds=ttl,
         )
-        existing_tenant_auth = get_tenant_portal_cookie_payload(request) or {}
-        old_tenant_id = existing_tenant_auth.get('tenant_id')
-        old_jti = existing_tenant_auth.get('jti')
-        if old_tenant_id and old_jti:
-            revoke_tenant_session_key(str(old_tenant_id), str(old_jti))
+        # Keep existing tenant sessions for other tabs/profiles.
+        # We only add/refresh the current tenant session cookie entry below.
 
         sec = TenantSecuritySettings.objects.first()
         tenant_timeout_min = max(
@@ -875,8 +887,8 @@ class OTPVerificationView(View):
         log_access('Login', 'Success', email, ip)
         self._clear_tenant_pending(request)
         messages.success(request, 'OTP verified successfully.')
-        response = redirect('iroad_tenants:tenant_dashboard')
-        set_tenant_portal_cookie(response, tenant.tenant_id, jti)
+        response = redirect(f"{reverse('iroad_tenants:tenant_dashboard')}?tid={tenant.tenant_id}")
+        set_tenant_portal_cookie(response, tenant.tenant_id, jti, request=request)
         return response
 
 
@@ -3486,6 +3498,11 @@ class LegalIdentityView(LoginRequiredMixin, View):
                 {'form': form, 'obj': obj},
             )
 
+        company_logo = request.FILES.get('company_logo')
+        if company_logo:
+            ext = os.path.splitext(company_logo.name or '')[1].lower() or '.png'
+            company_logo.name = f'legal_{obj.identity_id}_{uuid.uuid4().hex[:10]}{ext}'
+
         form.instance.updated_by = request.user
         form.instance.save(update_fields=[
             'company_logo',
@@ -5739,7 +5756,11 @@ class CommGatewayTestConnectionView(LoginRequiredMixin, View):
                         'success': False,
                         'message': 'Connection check requires your admin account to have an email address for dummy test delivery.',
                     })
-                from_email = (sender or '').strip() or user.strip()
+                from_email = _normalize_from_email_header(
+                    (sender or '').strip() or user.strip(),
+                    user.strip(),
+                )
+                envelope_from = _extract_sender_address(from_email, user.strip())
                 try:
                     # Match runtime send path in communication_helpers / DatabaseEmailBackend
                     if enc == 'SSL':
@@ -5765,7 +5786,7 @@ class CommGatewayTestConnectionView(LoginRequiredMixin, View):
                     mime_msg['To'] = test_recipient
                     mime_msg.attach(MIMEText(text_body, 'plain', 'utf-8'))
                     mime_msg.attach(MIMEText(html_body, 'html', 'utf-8'))
-                    server.sendmail(from_email, [test_recipient], mime_msg.as_string())
+                    server.sendmail(envelope_from, [test_recipient], mime_msg.as_string())
                     try:
                         server.quit()
                     except Exception:
@@ -8084,7 +8105,10 @@ class OrderStatusUpdateView(RootRequiredMixin, View):
                     else:
                         pm = ord_row.payment_method
                         if uploaded_attachment:
-                            txn.attachment = uploaded_attachment
+                            txn.attachment = _rename_txn_attachment(
+                                uploaded_attachment,
+                                txn.transaction_id,
+                            )
                             txn.save(update_fields=['attachment', 'updated_at'])
                         if pm and pm.method_type == 'Offline_Bank' and not txn.attachment:
                             messages.error(
@@ -8348,7 +8372,10 @@ class TransactionApproveView(RootRequiredMixin, View):
                 return redirect('transaction_detail', pk=pk)
             uploaded_attachment = request.FILES.get('attachment')
             if uploaded_attachment:
-                txn.attachment = uploaded_attachment
+                txn.attachment = _rename_txn_attachment(
+                    uploaded_attachment,
+                    txn.transaction_id,
+                )
                 txn.save(update_fields=['attachment', 'updated_at'])
                 _write_txn_approve_debug('Attachment uploaded and saved')
             if not txn.attachment:
@@ -8449,7 +8476,7 @@ class TransactionUploadAttachmentView(RootRequiredMixin, View):
         if not uploaded:
             messages.error(request, 'Please choose a receipt file to upload.')
             return redirect('transaction_detail', pk=pk)
-        txn.attachment = uploaded
+        txn.attachment = _rename_txn_attachment(uploaded, txn.transaction_id)
         txn.save(update_fields=['attachment', 'updated_at'])
         messages.success(request, 'Receipt uploaded. You can now approve this transaction.')
         return redirect('transaction_detail', pk=pk)
@@ -8686,6 +8713,7 @@ class InvoicePrintView(LoginRequiredMixin, View):
             {
                 'invoice': invoice,
                 'legal_identity': legal_identity,
+                'bill_to': get_live_bill_to_snapshot(invoice),
             },
         )
         

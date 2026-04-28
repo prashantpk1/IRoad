@@ -161,19 +161,19 @@
     <div class="row g-3">
       <div class="col-6 col-md-3">
         <label class="form-label">{% translate "Users" %}</label>
-        <input class="form-control" value="{{ tenant.active_max_users }}" readonly>
+        <input class="form-control" value="{% if tenant.active_max_users == -1 or tenant.active_max_users == 0 %}Unlimited{% else %}{{ tenant.active_max_users|default:'-' }}{% endif %}" readonly>
       </div>
       <div class="col-6 col-md-3">
         <label class="form-label">{% translate "Internal trucks" %}</label>
-        <input class="form-control" value="{{ tenant.active_max_internal_trucks }}" readonly>
+        <input class="form-control" value="{% if tenant.active_max_internal_trucks == -1 or tenant.active_max_internal_trucks == 0 %}Unlimited{% else %}{{ tenant.active_max_internal_trucks|default:'-' }}{% endif %}" readonly>
       </div>
       <div class="col-6 col-md-3">
         <label class="form-label">{% translate "External trucks" %}</label>
-        <input class="form-control" value="{{ tenant.active_max_external_trucks }}" readonly>
+        <input class="form-control" value="{% if tenant.active_max_external_trucks == -1 or tenant.active_max_external_trucks == 0 %}Unlimited{% else %}{{ tenant.active_max_external_trucks|default:'-' }}{% endif %}" readonly>
       </div>
       <div class="col-6 col-md-3">
         <label class="form-label">{% translate "Drivers" %}</label>
-        <input class="form-control" value="{{ tenant.active_max_drivers }}" readonly>
+        <input class="form-control" value="{% if tenant.active_max_drivers == -1 or tenant.active_max_drivers == 0 %}Unlimited{% else %}{{ tenant.active_max_drivers|default:'-' }}{% endif %}" readonly>
       </div>
     </div>
 

@@ -3,10 +3,22 @@ from django.urls import path
 from .views import (
     TenantAutoNumberConfigurationView,
     TenantDashboardView,
+    TenantUsersAdministrationDeleteView,
+    TenantUsersAdministrationEditView,
+    TenantUsersAdministrationExportView,
+    TenantRolesPermissionsCreateView,
+    TenantRolesPermissionsDeleteView,
+    TenantRolesPermissionsEditView,
+    TenantRolesPermissionsExportView,
+    TenantRolesPermissionsToggleStatusView,
+    TenantRolesPermissionsView,
     TenantLogoutView,
     TenantMyAccountView,
     TenantOrganizationProfileEditView,
     TenantOrganizationProfileView,
+    TenantUsersAdministrationCreateView,
+    TenantUsersAdministrationToggleStatusView,
+    TenantUsersAdministrationView,
 )
 
 app_name = 'iroad_tenants'
@@ -28,6 +40,66 @@ urlpatterns = [
         'configuration/auto-number/',
         TenantAutoNumberConfigurationView.as_view(),
         name='tenant_auto_number_configuration',
+    ),
+    path(
+        'administration/users/',
+        TenantUsersAdministrationView.as_view(),
+        name='tenant_users_administration',
+    ),
+    path(
+        'administration/users/create/',
+        TenantUsersAdministrationCreateView.as_view(),
+        name='tenant_users_administration_create',
+    ),
+    path(
+        'administration/users/<uuid:user_id>/edit/',
+        TenantUsersAdministrationEditView.as_view(),
+        name='tenant_users_administration_edit',
+    ),
+    path(
+        'administration/users/<uuid:user_id>/toggle-status/',
+        TenantUsersAdministrationToggleStatusView.as_view(),
+        name='tenant_users_administration_toggle_status',
+    ),
+    path(
+        'administration/users/<uuid:user_id>/delete/',
+        TenantUsersAdministrationDeleteView.as_view(),
+        name='tenant_users_administration_delete',
+    ),
+    path(
+        'administration/users/export/',
+        TenantUsersAdministrationExportView.as_view(),
+        name='tenant_users_administration_export',
+    ),
+    path(
+        'administration/roles/',
+        TenantRolesPermissionsView.as_view(),
+        name='tenant_roles_permissions',
+    ),
+    path(
+        'administration/roles/create/',
+        TenantRolesPermissionsCreateView.as_view(),
+        name='tenant_roles_permissions_create',
+    ),
+    path(
+        'administration/roles/<uuid:role_id>/edit/',
+        TenantRolesPermissionsEditView.as_view(),
+        name='tenant_roles_permissions_edit',
+    ),
+    path(
+        'administration/roles/<uuid:role_id>/toggle-status/',
+        TenantRolesPermissionsToggleStatusView.as_view(),
+        name='tenant_roles_permissions_toggle_status',
+    ),
+    path(
+        'administration/roles/<uuid:role_id>/delete/',
+        TenantRolesPermissionsDeleteView.as_view(),
+        name='tenant_roles_permissions_delete',
+    ),
+    path(
+        'administration/roles/export/',
+        TenantRolesPermissionsExportView.as_view(),
+        name='tenant_roles_permissions_export',
     ),
     path('my-account/', TenantMyAccountView.as_view(), name='tenant_my_account'),
     path('logout/', TenantLogoutView.as_view(), name='tenant_logout'),

@@ -17,6 +17,22 @@
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
+        {% if request.user.is_root and order.order_status == 'Pending_Payment' %}
+          <form method="post" action="{% url 'order_status_update' order.order_id %}" data-confirm="{{ confirm_cancel_order|escape }}" class="d-inline">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="cancel">
+            <button type="submit" class="eal-btn eal-btn-outline">
+              <i class="bi bi-x-circle"></i>
+              <span>{% translate "Cancel Order" %}</span>
+            </button>
+          </form>
+          {% if payment_txn %}
+            <a href="{% url 'transaction_detail' payment_txn.transaction_id %}" class="eal-btn eal-btn-primary">
+              <i class="bi bi-eye"></i>
+              <span>{% translate "View/Approve Transaction" %}</span>
+            </a>
+          {% endif %}
+        {% endif %}
         <a href="{% url 'order_list' %}" class="eal-btn eal-btn-outline">
           <i class="bi bi-arrow-left"></i>
           <span>{% translate "Back to list" %}</span>
@@ -236,35 +252,18 @@
       <form method="post" action="{% url 'order_status_update' order.order_id %}" data-confirm="{{ confirm_cancel_order|escape }}">
         {% csrf_token %}
         <input type="hidden" name="action" value="cancel">
-        <button type="submit" class="eal-btn eal-btn-outline" style="color: var(--danger-color); border-color: var(--danger-color);">
+        <button type="submit" class="eal-btn eal-btn-outline">
           <i class="bi bi-x-circle"></i>
           <span>{% translate "Cancel Order" %}</span>
         </button>
       </form>
     </div>
   {% elif order.order_status == 'Pending_Payment' %}
-    <div class="form-actions-bar mb-4">
-      <div class="form-actions-left">
-        <form method="post" action="{% url 'order_status_update' order.order_id %}" data-confirm="{{ confirm_cancel_order|escape }}">
-          {% csrf_token %}
-          <input type="hidden" name="action" value="cancel">
-          <button type="submit" class="eal-btn eal-btn-outline" style="color: var(--danger-color); border-color: var(--danger-color);">
-            <i class="bi bi-x-circle"></i>
-            <span>{% translate "Cancel Order" %}</span>
-          </button>
-        </form>
+    {% if not payment_txn %}
+      <div class="mb-4">
+        <span class="text-muted">{% translate "No transaction linked yet." %}</span>
       </div>
-      <div class="form-actions-right">
-        {% if payment_txn %}
-          <a href="{% url 'transaction_detail' payment_txn.transaction_id %}" class="eal-btn eal-btn-primary">
-            <i class="bi bi-eye"></i>
-            <span>{% translate "View Transaction" %}</span>
-          </a>
-        {% else %}
-          <span class="text-muted">{% translate "No transaction linked yet." %}</span>
-        {% endif %}
-      </div>
-    </div>
+    {% endif %}
   {% elif order.order_status == 'Paid' %}
     <div class="mb-4">
       {% if invoice %}

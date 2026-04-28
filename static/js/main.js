@@ -635,8 +635,8 @@ function initUserProfile() {
    ============================================ */
 function initNotificationPanel() {
   const sidebarNotificationBtn = document.querySelector(".notification-btn");
-  const headerNotificationBtn = document.querySelector(
-    '.header-icon-btn[title="Notifications"]',
+  const headerNotificationBtn = document.getElementById(
+    "headerNotificationBtn",
   );
   const notificationPanel = document.getElementById("notificationPanel");
   const notificationClose = document.getElementById("notificationClose");

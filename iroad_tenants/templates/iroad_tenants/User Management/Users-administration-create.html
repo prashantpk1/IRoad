@@ -1,0 +1,394 @@
+{% extends 'iroad_tenants/base.html' %}
+
+{% block title %}{% if is_view_mode %}View User Administration{% elif is_edit_mode %}Edit User Administration{% else %}Create User Administration{% endif %} | iRoad Admin{% endblock %}
+
+{% block extra_css %}
+<style>
+  .password-input-wrapper {
+    position: relative;
+    width: 100%;
+  }
+  .password-lock-inside {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 2;
+    color: #94a3b8;
+    pointer-events: none;
+  }
+  .password-input-wrapper .password-toggle-inside {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    border: 0;
+    background: transparent;
+    color: #64748b;
+    padding: 0;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 3;
+  }
+  .password-input-wrapper input.form-control {
+    width: 100%;
+    padding-left: 2.25rem;
+    padding-right: 2.5rem;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{% url 'iroad_tenants:tenant_dashboard' %}">Dashboard</a></li>
+      <li class="breadcrumb-item">Administration</li>
+      <li class="breadcrumb-item">User Management</li>
+      <li class="breadcrumb-item active" aria-current="page">{% if is_view_mode %}View User Administration{% elif is_edit_mode %}Edit User Administration{% else %}Create User Administration{% endif %}</li>
+    </ol>
+  </nav>
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">{% if is_view_mode %}View User Administration{% elif is_edit_mode %}Edit User Administration{% else %}Create User Administration{% endif %}</h1>
+      <p class="page-subtitle">{% if is_view_mode %}Review user account details.{% elif is_edit_mode %}Update the details below to edit this user account.{% else %}Fill in the details below to create a new user account.{% endif %}</p>
+    </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <a href="{% url 'iroad_tenants:tenant_users_administration' %}" class="eal-btn eal-btn-outline">
+          <i class="bi bi-arrow-left"></i>
+          <span>Back</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<form id="userCreationForm" method="post" action="{% if is_edit_mode and editing_user %}{% url 'iroad_tenants:tenant_users_administration_edit' editing_user.user_id %}{% else %}{% url 'iroad_tenants:tenant_users_administration_create' %}{% endif %}" autocomplete="off">
+  {% csrf_token %}
+  <div class="form-card" data-section="1">
+                    <div class="form-card-header">
+                        <div class="form-card-icon blue">
+                            <i class="bi bi-person-badge"></i>
+                        </div>
+                        <div class="form-card-header-text">
+                            <h2 class="form-card-title">User Account Details</h2>
+                            <p class="form-card-desc">
+                                Core identity and contact information for the user.
+                            </p>
+                        </div>
+                    </div>
+                    <div class="form-card-body">
+                        <div class="field-group">
+                            <h3 class="field-group-title">
+                                <i class="bi bi-info-circle"></i>
+                                Basic Information
+                            </h3>
+                            <div class="fields-grid cols-2">
+                                <div class="field">
+                                    <label for="username" class="form-label">Username
+                                        <span class="required">*</span>
+                                    </label>
+                                    <div class="input-icon-wrapper">
+                                        <i class="bi bi-person"></i>
+                                        <input type="text" class="form-control has-icon {% if form_errors.username %}is-invalid{% endif %}" id="username" name="username" placeholder="e.g. jsmith" value="{{ form_data.username|default:'' }}" autocomplete="off" {% if is_view_mode %}disabled{% else %}required{% endif %}/>
+                                    </div>
+                                    {% if form_errors.username %}<div class="invalid-feedback d-block">{{ form_errors.username }}</div>{% endif %}
+                                    <span class="field-hint">No spaces allowed. Cannot be edited later.</span>
+                                </div>
+                                <div class="field">
+                                    <label for="fullName" class="form-label">Full Name
+                                        <span class="required">*</span>
+                                    </label>
+                                    <div class="input-icon-wrapper">
+                                        <i class="bi bi-card-text"></i>
+                                        <input type="text" class="form-control has-icon {% if form_errors.full_name %}is-invalid{% endif %}" id="fullName" name="full_name" placeholder="e.g. John Smith" value="{{ form_data.full_name|default:'' }}" autocomplete="off" {% if is_view_mode %}disabled{% else %}required{% endif %}/>
+                                    </div>
+                                    {% if form_errors.full_name %}<div class="invalid-feedback d-block">{{ form_errors.full_name }}</div>{% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="field-group mt-4">
+                            <h3 class="field-group-title">
+                                <i class="bi bi-telephone"></i>
+                                Contact Information
+                            </h3>
+                            <div class="fields-grid cols-2">
+                                <div class="field">
+                                    <label for="email" class="form-label">Email Address
+                                        <span class="required">*</span>
+                                    </label>
+                                    <div class="input-icon-wrapper">
+                                        <i class="bi bi-envelope"></i>
+                                        <input type="email" class="form-control has-icon {% if form_errors.email %}is-invalid{% endif %}" id="email" name="email" placeholder="Enter Email Address" value="{{ form_data.email|default:'' }}" autocomplete="off" {% if is_view_mode %}disabled{% else %}required{% endif %}/>
+                                    </div>
+                                    {% if form_errors.email %}<div class="invalid-feedback d-block">{{ form_errors.email }}</div>{% endif %}
+                                </div>
+                                <div class="field">
+                                    <label for="mobileNo" class="form-label">Mobile Number</label>
+                                    <div class="phone-input-group">
+                                        <select class="form-select country-code" id="mobileCountryCode" name="mobile_country_code" {% if is_view_mode %}disabled{% endif %}>
+                                            <option value="" {% if not form_data.mobile_country_code %}selected{% endif %}>Select code</option>
+                                            <option value="+966" {% if form_data.mobile_country_code == '+966' %}selected{% endif %}>+966</option>
+                                            <option value="+971" {% if form_data.mobile_country_code == '+971' %}selected{% endif %}>+971</option>
+                                            <option value="+965" {% if form_data.mobile_country_code == '+965' %}selected{% endif %}>+965</option>
+                                            <option value="+973" {% if form_data.mobile_country_code == '+973' %}selected{% endif %}>+973</option>
+                                            <option value="+974" {% if form_data.mobile_country_code == '+974' %}selected{% endif %}>+974</option>
+                                            <option value="+968" {% if form_data.mobile_country_code == '+968' %}selected{% endif %}>+968</option>
+                                            <option value="+91" {% if form_data.mobile_country_code == '+91' %}selected{% endif %}>+91</option>
+                                            <option value="+1" {% if form_data.mobile_country_code == '+1' %}selected{% endif %}>+1</option>
+                                        </select>
+                                        <input type="text" class="form-control phone-number" id="mobileNo" name="mobile_no" placeholder="Enter mobile number" value="{{ form_data.mobile_no|default:'' }}" autocomplete="off" oninput="formatPhoneNumber(this)" {% if is_view_mode %}disabled{% endif %}/>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+  <div class="form-card" data-section="2">
+                    <div class="form-card-header">
+                        <div class="form-card-icon green">
+                            <i class="bi bi-shield-lock"></i>
+                        </div>
+                        <div class="form-card-header-text">
+                            <h2 class="form-card-title">Security &amp; Access</h2>
+                            <p class="form-card-desc">
+                                Authentication and role-based permissions.
+                            </p>
+                        </div>
+                    </div>
+                    <div class="form-card-body">
+                        <div class="field-group">
+                            <h3 class="field-group-title">
+                                <i class="bi bi-key"></i>
+                                Authentication
+                            </h3>
+                            <div class="fields-grid cols-2">
+                                <div class="field">
+                                    <label for="password" class="form-label">Password
+                                        <span class="required">*</span>
+                                    </label>
+                                    <div class="d-flex align-items-stretch gap-2">
+                                        <div class="flex-grow-1 password-input-wrapper">
+                                            <i class="bi bi-lock password-lock-inside"></i>
+                                            <input type="password" class="form-control {% if form_errors.password %}is-invalid{% endif %}" id="password" name="password" placeholder="••••••••" autocomplete="new-password" {% if is_view_mode %}disabled{% elif not is_edit_mode %}required{% endif %}/>
+                                            <button
+                                              type="button"
+                                              class="password-toggle-inside"
+                                              id="togglePasswordBtn"
+                                              title="Show password"
+                                              aria-label="Show password"
+                                              {% if is_view_mode %}disabled{% endif %}
+                                            >
+                                              <i class="bi bi-eye"></i>
+                                            </button>
+                                        </div>
+                                        <button
+                                          type="button"
+                                          class="btn btn-outline-secondary"
+                                          id="generatePasswordBtn"
+                                          title="Generate random password"
+                                          {% if is_view_mode %}disabled{% endif %}
+                                        >
+                                          <i class="bi bi-shuffle me-1"></i>Generate
+                                        </button>
+                                    </div>
+                                    {% if form_errors.password %}<div class="invalid-feedback d-block">{{ form_errors.password }}</div>{% endif %}
+                                    <span class="field-hint">Min 8 chars, number &amp; special char</span>
+                                </div>
+                                <div class="field">
+                                    <label class="form-label d-block mb-2">Account Status</label>
+                                    <label class="setting-toggle">
+                                        <input type="checkbox" id="status" name="status" {% if form_data.status == 'Active' %}checked{% endif %} {% if is_view_mode %}disabled{% endif %}/>
+                                        <span class="toggle-track"></span>
+                                        <span class="toggle-label">Active</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="field-group mt-4">
+                            <h3 class="field-group-title">
+                                <i class="bi bi-person-gear"></i>
+                                Role Assignment
+                            </h3>
+                            <div class="fields-grid">
+                                <div class="field">
+                                    <label class="form-label">System Roles
+                                        <span class="required">*</span>
+                                    </label>
+                                    <div class="dropdown">
+                                        <button class="form-select text-start bg-white d-flex justify-content-between align-items-center w-100" type="button" id="roleOptionsDropdown" data-bs-toggle="dropdown" aria-expanded="false" data-bs-auto-close="outside" {% if is_view_mode %}disabled{% endif %}>
+                                            <span id="selectedRolesText" class="text-truncate {% if not form_data.roles %}text-muted{% endif %}">{% if form_data.roles %}{{ form_data.roles|join:", " }}{% else %}Select Roles{% endif %}</span>
+                                        </button>
+                                        <ul class="dropdown-menu w-100 p-2 shadow-sm" aria-labelledby="roleOptionsDropdown" style="max-height: 200px; overflow-y: auto">
+                                            {% for role_name in role_options %}
+                                            <li>
+                                              <div class="form-check mb-1">
+                                                <input class="form-check-input role-checkbox" type="checkbox" name="roles" value="{{ role_name }}" id="role_{{ forloop.counter }}" {% if role_name in form_data.roles %}checked{% endif %} {% if is_view_mode %}disabled{% endif %}/>
+                                                <label class="form-check-label w-100 cursor-pointer" for="role_{{ forloop.counter }}">{{ role_name }}</label>
+                                              </div>
+                                            </li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+                                    {% if form_errors.roles %}<div class="invalid-feedback d-block">{{ form_errors.roles }}</div>{% endif %}
+                                    <span class="field-hint">Select one or more roles from the dropdown</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+  <div class="form-card" data-section="3">
+                    <div class="form-card-header">
+                        <div class="form-card-icon amber">
+                            <i class="bi bi-clock-history"></i>
+                        </div>
+                        <div class="form-card-header-text">
+                            <h2 class="form-card-title">System &amp; Audit</h2>
+                            <p class="form-card-desc">System generated tracking and logs.</p>
+                        </div>
+                    </div>
+                    <div class="form-card-body">
+                        <div class="field-group">
+                            <h3 class="field-group-title">
+                                <i class="bi bi-journal-text"></i>
+                                Audit Details
+                            </h3>
+                            <div class="fields-grid cols-3">
+                                <div class="field">
+                                    <label class="form-label">Last Login</label>
+                                    <div class="input-icon-wrapper">
+                                        <i class="bi bi-box-arrow-in-right"></i>
+                                        <input type="text" class="form-control has-icon bg-light" value="{% if editing_user and editing_user.last_login_at %}{{ editing_user.last_login_at|date:'d M Y, h:i A' }}{% else %}N/A (New User){% endif %}" readonly/>
+                                    </div>
+                                </div>
+                                <div class="field">
+                                    <label class="form-label">Login Attempts</label>
+                                    <div class="input-icon-wrapper">
+                                        <i class="bi bi-123"></i>
+                                        <input type="text" class="form-control has-icon bg-light" value="{% if editing_user %}{{ editing_user.login_attempts }}{% else %}0{% endif %}" readonly/>
+                                    </div>
+                                    <span class="field-hint">Auto-resets on successful login</span>
+                                </div>
+                                <div class="field">
+                                    <label class="form-label">Created By</label>
+                                    <div class="input-icon-wrapper">
+                                        <i class="bi bi-person-badge"></i>
+                                        <input type="text" class="form-control has-icon bg-light" value="{% if editing_user and editing_user.created_by_label %}{{ editing_user.created_by_label }}{% else %}{{ display_name }} (Tenant Admin){% endif %}" readonly/>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+  <div class="form-actions-bar">
+                    {% if not is_view_mode %}
+                    <div class="form-actions-left">
+                        <button type="reset" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-counterclockwise"></i>
+                            Reset Form
+                        </button>
+                    </div>
+                    {% endif %}
+                    <div class="form-actions-right">
+                        {% if not is_view_mode %}
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-circle"></i>
+                            {% if is_edit_mode %}Update User{% else %}Create User{% endif %}
+                        </button>
+                        {% else %}
+                        <a href="{% url 'iroad_tenants:tenant_users_administration' %}" class="btn btn-outline-secondary">
+                          <i class="bi bi-arrow-left"></i> Back to List
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const toggleInputs = document.querySelectorAll(".setting-toggle input");
+    toggleInputs.forEach((input) => {
+      const label = input.closest(".setting-toggle").querySelector(".toggle-label");
+      if (!label) return;
+      const updateLabel = () => {
+        label.textContent = input.id === "status" ? (input.checked ? "Active" : "Inactive") : (input.checked ? "Enabled" : "Disabled");
+      };
+      updateLabel();
+      input.addEventListener("change", updateLabel);
+    });
+
+    const roleCheckboxes = document.querySelectorAll(".role-checkbox");
+    const selectedRolesText = document.getElementById("selectedRolesText");
+    const updateSelectedRoles = () => {
+      if (!selectedRolesText) return;
+      const selected = Array.from(roleCheckboxes)
+        .filter((cb) => cb.checked)
+        .map((cb) => cb.nextElementSibling.textContent.trim());
+      if (selected.length === 0) {
+        selectedRolesText.textContent = "Select Roles";
+        selectedRolesText.classList.add("text-muted");
+      } else if (selected.length <= 2) {
+        selectedRolesText.textContent = selected.join(", ");
+        selectedRolesText.classList.remove("text-muted");
+      } else {
+        selectedRolesText.textContent = selected.length + " Roles Selected";
+        selectedRolesText.classList.remove("text-muted");
+      }
+    };
+    roleCheckboxes.forEach((cb) => cb.addEventListener("change", updateSelectedRoles));
+    updateSelectedRoles();
+
+    const passwordInput = document.getElementById("password");
+    const generateBtn = document.getElementById("generatePasswordBtn");
+    const togglePasswordBtn = document.getElementById("togglePasswordBtn");
+    if (!passwordInput || !generateBtn || !togglePasswordBtn) return;
+
+    togglePasswordBtn.addEventListener("click", function () {
+      const isHidden = passwordInput.type === "password";
+      passwordInput.type = isHidden ? "text" : "password";
+      togglePasswordBtn.innerHTML = isHidden ? '<i class="bi bi-eye-slash"></i>' : '<i class="bi bi-eye"></i>';
+      togglePasswordBtn.setAttribute("title", isHidden ? "Hide password" : "Show password");
+      togglePasswordBtn.setAttribute("aria-label", isHidden ? "Hide password" : "Show password");
+    });
+
+    function generatePassword(length) {
+      const lower = "abcdefghijklmnopqrstuvwxyz";
+      const upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+      const nums = "0123456789";
+      const special = "!@#$%^&*()-_=+[]{};:,.?/";
+      const all = lower + upper + nums + special;
+      const pick = (chars) => chars.charAt(Math.floor(Math.random() * chars.length));
+      const out = [pick(lower), pick(upper), pick(nums), pick(special)];
+      for (let i = out.length; i < length; i++) out.push(pick(all));
+      for (let i = out.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [out[i], out[j]] = [out[j], out[i]];
+      }
+      return out.join("");
+    }
+
+    generateBtn.addEventListener("click", function () {
+      passwordInput.value = generatePassword(14);
+      const prevType = passwordInput.type;
+      passwordInput.type = "text";
+      setTimeout(() => {
+        passwordInput.type = prevType || "password";
+      }, 1500);
+      passwordInput.focus();
+      passwordInput.dispatchEvent(new Event("input", { bubbles: true }));
+      passwordInput.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+  });
+</script>
+{% endblock %}

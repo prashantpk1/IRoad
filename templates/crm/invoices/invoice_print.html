@@ -72,12 +72,20 @@
       <td class="party-gap"></td>
       <td class="party-col">
         <h2>Bill To</h2>
-        <div><strong>{{ invoice.customer_name }}</strong></div>
-        {% if invoice.customer_tax_number %}
-          <div class="muted">Tax: {{ invoice.customer_tax_number }}</div>
+        {% if bill_to.logo_url %}
+          <div style="margin-bottom: 8px;">
+            <img src="{{ bill_to.logo_url }}" alt="Customer Logo" style="max-height: 44px; width: auto;">
+          </div>
         {% endif %}
-        {% if invoice.customer_address %}
-          <div class="muted">Address: {{ invoice.customer_address }}</div>
+        <div><strong>{{ bill_to.name|default:invoice.customer_name }}</strong></div>
+        {% if bill_to.tax_number or invoice.customer_tax_number %}
+          <div class="muted">Tax: {{ bill_to.tax_number|default:invoice.customer_tax_number }}</div>
+        {% endif %}
+        {% if bill_to.cr_number %}
+          <div class="muted">CR: {{ bill_to.cr_number }}</div>
+        {% endif %}
+        {% if bill_to.address or invoice.customer_address %}
+          <div class="muted">Address: {{ bill_to.address|default:invoice.customer_address }}</div>
         {% endif %}
       </td>
     </tr>

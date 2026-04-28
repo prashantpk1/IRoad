@@ -12,9 +12,9 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet" />
-    <link rel="stylesheet" href="{% static 'tenantdesign/Style/style.css' %}" />
-    <link rel="stylesheet" href="{% static 'tenantdesign/Style/dashboard.css' %}" />
-    <link rel="stylesheet" href="{% static 'tenantdesign/Style/responsive.css' %}" />
+    <link rel="stylesheet" href="{% static 'tenantdesign/Style_up/style.css' %}" />
+    <link rel="stylesheet" href="{% static 'tenantdesign/Style_up/dashboard.css' %}" />
+    <link rel="stylesheet" href="{% static 'tenantdesign/Style_up/responsive.css' %}" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
     {% block extra_css %}{% endblock %}
   </head>
@@ -22,12 +22,74 @@
 {% include 'iroad_tenants/partials/sidebar.html' %}
     <main class="main-content">
 {% include 'iroad_tenants/partials/navbar.html' %}
+{% if messages %}
+<div class="page-content px-3 pt-2">
+  {% for message in messages %}
+    {% if 'tenant' in message.tags %}
+      <div class="alert alert-{% if 'error' in message.tags %}danger{% else %}success{% endif %} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    {% endif %}
+  {% endfor %}
+</div>
+{% endif %}
 {% block content %}{% endblock %}
     </main>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script src="{% static 'tenantdesign/Javascript/main.js' %}"></script>
     <script src="{% static 'tenantdesign/Javascript/dashboard.js' %}"></script>
+    <script>
+      (function () {
+        var params = new URLSearchParams(window.location.search || "");
+        var tid = params.get("tid") || sessionStorage.getItem("iroad_tenant_tid") || "";
+        if (tid) {
+          sessionStorage.setItem("iroad_tenant_tid", tid);
+          if (!params.get("tid")) {
+            params.set("tid", tid);
+            var q = params.toString();
+            var nextUrl = window.location.pathname + (q ? ("?" + q) : "") + window.location.hash;
+            window.history.replaceState({}, "", nextUrl);
+          }
+        }
+
+        function appendTidToUrl(href) {
+          try {
+            var url = new URL(href, window.location.origin);
+            if (!url.pathname.startsWith("/tenant/")) return href;
+            if (tid && !url.searchParams.get("tid")) {
+              url.searchParams.set("tid", tid);
+            }
+            return url.pathname + (url.search ? url.search : "") + (url.hash || "");
+          } catch (e) {
+            return href;
+          }
+        }
+
+        document.querySelectorAll("a[href]").forEach(function (a) {
+          var href = a.getAttribute("href") || "";
+          if (!href || href.startsWith("#") || href.startsWith("javascript:")) return;
+          if (href.startsWith("/tenant/")) {
+            a.setAttribute("href", appendTidToUrl(href));
+          }
+        });
+
+        document.querySelectorAll("form[action]").forEach(function (form) {
+          var action = form.getAttribute("action") || "";
+          if (action.startsWith("/tenant/")) {
+            var hidden = form.querySelector("input[name='tid']");
+            if (!hidden) {
+              hidden = document.createElement("input");
+              hidden.type = "hidden";
+              hidden.name = "tid";
+              form.appendChild(hidden);
+            }
+            hidden.value = tid;
+          }
+        });
+      })();
+    </script>
     {% block extra_js %}{% endblock %}
   </body>
 </html>
