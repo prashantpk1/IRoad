@@ -167,17 +167,23 @@ def revoke_all_tenant_sessions(tenant_id):
     """
     client = get_redis_client()
     pattern = f'tenant:{tenant_id}:session:*'
-    pipeline = client.pipeline()
+    deleted = 0
 
     cursor = 0
     while True:
+        pipeline = client.pipeline()
+        batch_has_keys = False
         cursor, keys = client.scan(cursor, match=pattern, count=100)
         for key in keys:
             pipeline.delete(key)
+            batch_has_keys = True
+        if batch_has_keys:
+            # Sum actual delete results (1 when key deleted, 0 otherwise).
+            deleted += sum(int(v or 0) for v in pipeline.execute())
         if cursor == 0:
             break
 
-    pipeline.execute()
+    return deleted
 
 
 def create_tenant_session(
@@ -287,4 +293,14 @@ def get_all_active_tenant_sessions():
 
     sessions.sort(key=lambda x: x.get('started_at', ''), reverse=True)
     return sessions
+
+
+def get_tenant_session(tenant_id, jti):
+    """Get one tenant session payload by tenant id + jti."""
+    if not tenant_id or not jti:
+        return None
+    client = get_redis_client()
+    key = f'tenant:{tenant_id}:session:{jti}'
+    data = client.get(key)
+    return json.loads(data) if data else None
 

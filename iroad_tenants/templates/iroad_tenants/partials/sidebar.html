@@ -33,6 +33,7 @@
           </li>
 
           <!-- Account Management -->
+          {% if is_tenant_admin %}
           <li class="nav-item has-submenu open">
             <a href="#" class="nav-link" data-tooltip="Account Management">
               <i class="bi bi-building"></i>
@@ -48,8 +49,10 @@
               </li>
             </ul>
           </li>
+          {% endif %}
 
           <!-- User Management -->
+          {% if is_tenant_admin %}
           <li class="nav-item has-submenu {% if 'tenant_users_administration' in request.resolver_match.url_name or 'tenant_roles_permissions' in request.resolver_match.url_name %}open{% endif %}">
             <a href="#" class="nav-link" data-tooltip="User Management">
               <i class="bi bi-people"></i>
@@ -72,8 +75,10 @@
               </li>
             </ul>
           </li>
+          {% endif %}
 
           <!-- Subscriptions Management -->
+          {% if is_tenant_admin %}
           <li class="nav-item has-submenu open">
             <a
               href="#"
@@ -86,21 +91,23 @@
             </a>
             <ul class="submenu">
               <li class="submenu-item">
-                <a href="Subscription-plan.html" class="submenu-link">
+                <a href="{% url 'iroad_tenants:tenant_subscription_plan' %}" class="submenu-link {% if request.resolver_match.url_name == 'tenant_subscription_plan' %}active{% endif %}">
                   <i class="bi bi-card-checklist"></i>
                   <span>Subscription Plan</span>
                 </a>
               </li>
               <li class="submenu-item">
-                <a href="Subscription-billing.html" class="submenu-link">
+                <a href="{% url 'iroad_tenants:tenant_subscription_billing' %}" class="submenu-link {% if request.resolver_match.url_name == 'tenant_subscription_billing' %}active{% endif %}">
                   <i class="bi bi-receipt"></i>
                   <span>Subscription Billing</span>
                 </a>
               </li>
             </ul>
           </li>
+          {% endif %}
 
           <!-- Audit & Security Logs -->
+          {% if is_tenant_admin %}
           <li class="nav-item has-submenu open">
             <a href="#" class="nav-link" data-tooltip="Audit & Security Logs">
               <i class="bi bi-shield-lock"></i>
@@ -109,27 +116,29 @@
             </a>
             <ul class="submenu">
               <li class="submenu-item">
-                <a href="Login--session-events.html" class="submenu-link">
+                <a href="{% url 'iroad_tenants:tenant_login_session_events' %}" class="submenu-link {% if request.resolver_match.url_name == 'tenant_login_session_events' %}active{% endif %}">
                   <i class="bi bi-shield-lock"></i>
                   <span>Login / Session Events</span>
                 </a>
               </li>
               <li class="submenu-item">
-                <a href="Role--permission-changes.html" class="submenu-link">
+                <a href="{% url 'iroad_tenants:tenant_role_permission_changes' %}" class="submenu-link {% if request.resolver_match.url_name == 'tenant_role_permission_changes' %}active{% endif %}">
                   <i class="bi bi-person-lock"></i>
                   <span>Role / Permission Changes</span>
                 </a>
               </li>
               <li class="submenu-item">
-                <a href="Critical-account-changes.html" class="submenu-link">
+                <a href="{% url 'iroad_tenants:tenant_critical_account_changes' %}" class="submenu-link {% if request.resolver_match.url_name == 'tenant_critical_account_changes' %}active{% endif %}">
                   <i class="bi bi-person-vcard"></i>
                   <span>Critical Account Changes</span>
                 </a>
               </li>
             </ul>
           </li>
+          {% endif %}
 
           <!-- Support Management -->
+          {% if is_tenant_admin %}
           <li class="nav-item has-submenu open">
             <a href="#" class="nav-link" data-tooltip="Support Management">
               <i class="bi bi-headset"></i>
@@ -145,6 +154,7 @@
               </li>
             </ul>
           </li>
+          {% endif %}
 
           <!-- --- CRM --- -->
           <li class="nav-section-title">
@@ -152,6 +162,7 @@
           </li>
 
           <!-- Clients Management -->
+          {% if is_tenant_admin %}
           <li class="nav-item has-submenu open">
             <a href="#" class="nav-link" data-tooltip="Clients Management">
               <i class="bi bi-person-badge"></i>
@@ -200,6 +211,7 @@
               </li>
             </ul>
           </li>
+          {% endif %}
 
           <!-- --- MASTER DATA --- -->
           <li class="nav-section-title">
@@ -207,6 +219,7 @@
           </li>
 
           <!-- Address Management -->
+          {% if is_tenant_admin %}
           <li class="nav-item has-submenu open">
             <a href="#" class="nav-link" data-tooltip="Address Management">
               <i class="bi bi-map"></i>
@@ -222,8 +235,10 @@
               </li>
             </ul>
           </li>
+          {% endif %}
 
           <!-- Cargo Management -->
+          {% if is_tenant_admin or can_view_cargo_master %}
           <li class="nav-item has-submenu open">
             <a href="#" class="nav-link" data-tooltip="Cargo Management">
               <i class="bi bi-box-seam"></i>
@@ -246,8 +261,10 @@
               </li>
             </ul>
           </li>
+          {% endif %}
 
           <!-- Route Management -->
+          {% if is_tenant_admin %}
           <li class="nav-item has-submenu open">
             <a href="#" class="nav-link" data-tooltip="Route Management">
               <i class="bi bi-signpost-split"></i>
@@ -270,8 +287,10 @@
               </li>
             </ul>
           </li>
+          {% endif %}
 
           <!-- Services Management -->
+          {% if is_tenant_admin %}
           <li class="nav-item has-submenu open">
             <a href="#" class="nav-link" data-tooltip="Services Management">
               <i class="bi bi-gear"></i>
@@ -294,6 +313,7 @@
               </li>
             </ul>
           </li>
+          {% endif %}
 
           <!-- --- OPERATIONS --- -->
           <li class="nav-section-title">
@@ -301,6 +321,7 @@
           </li>
 
           <!-- Operations Management -->
+          {% if is_tenant_admin or can_view_booking or can_view_shipment %}
           <li class="nav-item has-submenu open">
             <a href="#" class="nav-link" data-tooltip="Operations Management">
               <i class="bi bi-activity"></i>
@@ -308,18 +329,23 @@
               <i class="bi bi-chevron-right arrow"></i>
             </a>
             <ul class="submenu">
+              {% if is_tenant_admin or can_view_booking %}
               <li class="submenu-item">
                 <a href="Booking.html" class="submenu-link">
                   <i class="bi bi-calendar-check"></i>
                   <span>Booking</span>
                 </a>
               </li>
+              {% endif %}
+              {% if is_tenant_admin or can_view_shipment %}
               <li class="submenu-item">
                 <a href="Shipment.html" class="submenu-link">
                   <i class="bi bi-box-seam"></i>
                   <span>Shipment</span>
                 </a>
               </li>
+              {% endif %}
+              {% if is_tenant_admin %}
               <li class="submenu-item">
                 <a href="Shipment-documents.html" class="submenu-link">
                   <i class="bi bi-paperclip"></i>
@@ -358,10 +384,13 @@
                   <span>Operation Actions</span>
                 </a>
               </li>
+              {% endif %}
             </ul>
           </li>
+          {% endif %}
 
           <!-- Fleet Management -->
+          {% if is_tenant_admin %}
           <li class="nav-item has-submenu open">
             <a href="#" class="nav-link" data-tooltip="Fleet Management">
               <i class="bi bi-truck-front"></i>
@@ -397,8 +426,10 @@
               </li>
             </ul>
           </li>
+          {% endif %}
 
           <!-- Drivers Management -->
+          {% if is_tenant_admin %}
           <li class="nav-item has-submenu open">
             <a href="#" class="nav-link" data-tooltip="Drivers Management">
               <i class="bi bi-person-vcard"></i>
@@ -426,6 +457,7 @@
               </li>
             </ul>
           </li>
+          {% endif %}
 
           <!-- --- FINANCE --- -->
           <li class="nav-section-title">
@@ -433,6 +465,7 @@
           </li>
 
           <!-- Sales Invoicing -->
+          {% if is_tenant_admin or can_view_sales_invoicing %}
           <li class="nav-item has-submenu open">
             <a href="#" class="nav-link" data-tooltip="Sales Invoicing">
               <i class="bi bi-receipt"></i>
@@ -448,8 +481,10 @@
               </li>
             </ul>
           </li>
+          {% endif %}
 
           <!-- Treasury Management -->
+          {% if is_tenant_admin %}
           <li class="nav-item has-submenu open">
             <a href="#" class="nav-link" data-tooltip="Treasury Management">
               <i class="bi bi-cash-coin"></i>
@@ -472,6 +507,7 @@
               </li>
             </ul>
           </li>
+          {% endif %}
 
           <!-- --- SYSTEM --- -->
           <li class="nav-section-title">
@@ -479,6 +515,7 @@
           </li>
 
           <!-- Configurations -->
+          {% if is_tenant_admin %}
           <li class="nav-item has-submenu open">
             <a href="#" class="nav-link" data-tooltip="Configurations">
               <i class="bi bi-gear-wide-connected"></i>
@@ -494,6 +531,7 @@
               </li>
             </ul>
           </li>
+          {% endif %}
         </ul>
       </nav>
     </aside>

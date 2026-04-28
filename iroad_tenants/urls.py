@@ -2,6 +2,9 @@ from django.urls import path
 
 from .views import (
     TenantAutoNumberConfigurationView,
+    TenantCriticalAccountChangesView,
+    TenantSubscriptionBillingView,
+    TenantSubscriptionPlanView,
     TenantDashboardView,
     TenantUsersAdministrationDeleteView,
     TenantUsersAdministrationEditView,
@@ -12,6 +15,8 @@ from .views import (
     TenantRolesPermissionsExportView,
     TenantRolesPermissionsToggleStatusView,
     TenantRolesPermissionsView,
+    TenantRolePermissionChangesView,
+    TenantLoginSessionEventsView,
     TenantLogoutView,
     TenantMyAccountView,
     TenantOrganizationProfileEditView,
@@ -100,6 +105,31 @@ urlpatterns = [
         'administration/roles/export/',
         TenantRolesPermissionsExportView.as_view(),
         name='tenant_roles_permissions_export',
+    ),
+    path(
+        'administration/subscription-plan/',
+        TenantSubscriptionPlanView.as_view(),
+        name='tenant_subscription_plan',
+    ),
+    path(
+        'administration/subscription-billing/',
+        TenantSubscriptionBillingView.as_view(),
+        name='tenant_subscription_billing',
+    ),
+    path(
+        'administration/audit/login-session-events/',
+        TenantLoginSessionEventsView.as_view(),
+        name='tenant_login_session_events',
+    ),
+    path(
+        'administration/audit/role-permission-changes/',
+        TenantRolePermissionChangesView.as_view(),
+        name='tenant_role_permission_changes',
+    ),
+    path(
+        'administration/audit/critical-account-changes/',
+        TenantCriticalAccountChangesView.as_view(),
+        name='tenant_critical_account_changes',
     ),
     path('my-account/', TenantMyAccountView.as_view(), name='tenant_my_account'),
     path('logout/', TenantLogoutView.as_view(), name='tenant_logout'),

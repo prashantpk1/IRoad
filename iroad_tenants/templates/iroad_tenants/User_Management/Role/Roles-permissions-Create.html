@@ -65,7 +65,7 @@
         <div class="fields-grid cols-2">
           <div class="field">
             <label for="createdBy" class="form-label">Created By</label>
-            <div class="input-icon-wrapper"><i class="bi bi-person"></i><input type="text" name="created_by_label" class="form-control has-icon" id="createdBy" value="{{ form_data.created_by_label|default:display_name }}" {% if is_view_mode %}disabled{% endif %} /></div>
+            <div class="input-icon-wrapper"><i class="bi bi-person"></i><input type="text" name="created_by_label" class="form-control has-icon" id="createdBy" value="{{ form_data.created_by_label|default:display_name }}" readonly /></div>
           </div>
           <div class="field">
             <label for="statusToggle" class="form-label">Status</label>

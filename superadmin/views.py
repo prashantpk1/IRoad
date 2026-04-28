@@ -7,6 +7,7 @@ from django.contrib.auth import login, logout
 from django.contrib.auth.hashers import check_password, make_password
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.conf import settings
+from django.db import connection
 from django.db import transaction as db_transaction
 from django.db.models import (
     Sum, Count, F, Q, Window, Case, When, Value, IntegerField, DecimalField,
@@ -201,7 +202,7 @@ from .models import (
     SupportTicket,
     TicketReply,
 )
-from iroad_tenants.models import TenantAuthToken
+from iroad_tenants.models import TenantAuthToken, TenantRegistry
 
 
 def _client_ip(request):
@@ -231,6 +232,97 @@ def _resolve_tenant_by_email(raw_email):
     if qs.count() == 1:
         return qs.first(), None
     return None, 'ambiguous_inactive'
+
+
+def _resolve_tenant_user_by_tid_and_email(raw_tid, raw_email):
+    tenant_id = str(raw_tid or '').strip()
+    email = (raw_email or '').strip().lower()
+    if not email:
+        return None, None, 'missing_inputs'
+
+    from tenant_workspace.models import TenantRole, TenantUser
+
+    if not tenant_id:
+        registries = list(
+            TenantRegistry.objects.select_related('tenant_profile')
+            .filter(tenant_profile__account_status='Active')
+            .order_by('tenant_profile__company_name')
+        )
+        matches = []
+        inactive_matches = []
+        role_inactive_matches = []
+        connection.set_schema_to_public()
+        try:
+            for registry in registries:
+                tenant = registry.tenant_profile
+                connection.set_tenant(registry)
+                tenant_user = (
+                    TenantUser.objects.filter(email__iexact=email)
+                    .order_by('-updated_at')
+                    .first()
+                )
+                if not tenant_user:
+                    continue
+                if tenant_user.status != TenantUser.Status.ACTIVE:
+                    inactive_matches.append((tenant, tenant_user))
+                    continue
+                role = (
+                    TenantRole.objects.filter(
+                        role_name_en__iexact=(tenant_user.role_name or '').strip()
+                    ).first()
+                )
+                if role and role.status != TenantRole.Status.ACTIVE:
+                    role_inactive_matches.append((tenant, tenant_user))
+                    continue
+                matches.append((tenant, tenant_user))
+        finally:
+            connection.set_schema_to_public()
+
+        if len(matches) == 1:
+            return matches[0][0], matches[0][1], None
+        if len(matches) > 1:
+            return None, None, 'tenant_user_ambiguous'
+        if inactive_matches:
+            return inactive_matches[0][0], None, 'tenant_user_inactive'
+        if role_inactive_matches:
+            return role_inactive_matches[0][0], None, 'tenant_user_role_inactive'
+        return None, None, 'tenant_user_not_found'
+
+    tenant = TenantProfile.objects.filter(pk=tenant_id).first()
+    if not tenant:
+        return None, None, 'tenant_not_found'
+    if tenant.account_status != 'Active':
+        return tenant, None, 'tenant_inactive'
+
+    registry = (
+        TenantRegistry.objects.select_related('tenant_profile')
+        .filter(tenant_profile_id=tenant_id)
+        .first()
+    )
+    if not registry:
+        return tenant, None, 'tenant_registry_missing'
+
+    connection.set_schema_to_public()
+    try:
+        connection.set_tenant(registry)
+        tenant_user = (
+            TenantUser.objects.filter(email__iexact=email)
+            .order_by('-updated_at')
+            .first()
+        )
+        if not tenant_user:
+            return tenant, None, 'tenant_user_not_found'
+        if tenant_user.status != TenantUser.Status.ACTIVE:
+            return tenant, None, 'tenant_user_inactive'
+        role = (
+            TenantRole.objects.filter(role_name_en__iexact=(tenant_user.role_name or '').strip())
+            .first()
+        )
+        if role and role.status != TenantRole.Status.ACTIVE:
+            return tenant, None, 'tenant_user_role_inactive'
+        return tenant, tenant_user, None
+    finally:
+        connection.set_schema_to_public()
 
 
 ADMIN_LOGIN_OTP_SESSION_KEY = 'admin_login_otp'
@@ -301,20 +393,21 @@ def _issue_admin_login_otp(request, user):
     return True
 
 
-def _issue_tenant_login_otp(request, tenant):
+def _issue_tenant_login_otp(request, tenant, *, recipient_email=None, recipient_name=None):
     ensure_default_notification_templates(created_by=None)
     otp_code = f'{secrets.randbelow(1000000):06d}'
     expires_at = timezone.now() + timezone.timedelta(seconds=TENANT_LOGIN_OTP_TTL_SECONDS)
+    target_email = (recipient_email or tenant.primary_email or '').strip().lower()
     request.session[TENANT_LOGIN_OTP_SESSION_KEY] = {
         'tenant_id': str(tenant.tenant_id),
-        'email': (tenant.primary_email or '').strip().lower(),
+        'email': target_email,
         'otp_code': otp_code,
         'expires_at': expires_at.isoformat(),
         'attempts': 0,
     }
     request.session.modified = True
 
-    tenant_name = (
+    tenant_name = recipient_name or (
         f"{(tenant.first_name or '').strip()} {(tenant.last_name or '').strip()}".strip()
         or (tenant.company_name or tenant.primary_email or 'Tenant User')
     )
@@ -326,7 +419,7 @@ def _issue_tenant_login_otp(request, tenant):
     }
     sent = send_named_notification_email(
         'AUTH_LOGIN_OTP',
-        recipient_email=tenant.primary_email,
+        recipient_email=target_email,
         context_dict=ctx,
         default_subject='Your iRoad Login Verification Code',
         trigger_source='TemplateName: AUTH_LOGIN_OTP',
@@ -337,7 +430,7 @@ def _issue_tenant_login_otp(request, tenant):
 
     sent = dispatch_event_notification(
         'OTP_Requested',
-        recipient_email=tenant.primary_email,
+        recipient_email=target_email,
         context_dict=ctx,
         use_async_tasks=False,
     )
@@ -345,7 +438,7 @@ def _issue_tenant_login_otp(request, tenant):
         return True
 
     send_transactional_email(
-        tenant.primary_email,
+        target_email,
         'Your iRoad OTP verification code',
         f'Your verification code is {otp_code}. It expires in 5 minutes.',
         (
@@ -438,8 +531,62 @@ class LoginView(View):
                 email=form.cleaned_data['email'].lower().strip()
             )
         except AdminUser.DoesNotExist:
+            tid = (request.GET.get('tid') or request.POST.get('tid') or '').strip()
             tenant, tenant_resolution = _resolve_tenant_by_email(email)
             if not tenant:
+                tenant, tenant_user, tenant_user_resolution = _resolve_tenant_user_by_tid_and_email(
+                    tid,
+                    email,
+                )
+                if tenant and tenant_user:
+                    if not check_password(
+                        form.cleaned_data['password'],
+                        tenant_user.password_hash,
+                    ):
+                        record_failed_attempt(email)
+                        log_access('Login', 'Failed', email, ip)
+                        brute_after = check_brute_force(email)
+                        if brute_after['is_locked']:
+                            return render_login({
+                                'error': 'Account locked due to too many failed attempts.',
+                                'is_locked': True,
+                                'remaining_seconds': brute_after.get('remaining_seconds', 0),
+                                'lockout_duration_total': settings_obj.lockout_duration_minutes * 60,
+                                'attempts_remaining': 0,
+                                'locked_email': email,
+                            })
+                        remaining_attempts = max(0, settings_obj.max_failed_logins - brute_after['failed_count'])
+                        return render_login({
+                            'error': f"Invalid email or password. {remaining_attempts} attempts remaining before lockout.",
+                            'failed_count': brute_after['failed_count'],
+                            'attempts_remaining': remaining_attempts,
+                        })
+                    request.session['pending_tenant_id'] = str(tenant.tenant_id)
+                    request.session['pending_tenant_user_id'] = str(tenant_user.user_id)
+                    request.session['pending_tenant_email'] = (tenant_user.email or '').strip().lower()
+                    request.session['pending_tenant_ip'] = ip
+                    request.session.modified = True
+                    try:
+                        _issue_tenant_login_otp(
+                            request,
+                            tenant,
+                            recipient_email=tenant_user.email,
+                            recipient_name=tenant_user.full_name,
+                        )
+                    except Exception:
+                        logger.exception('Failed to dispatch tenant-user login OTP for %s', tenant_user.email)
+                        return render_login({
+                            'error': (
+                                'Could not send verification code right now. '
+                                'Please try again.'
+                            ),
+                        })
+                    messages.success(
+                        request,
+                        'A verification code has been sent to your email. Enter it to continue.',
+                    )
+                    return redirect('otp_verify')
+
                 if tenant_resolution in ('ambiguous_active', 'ambiguous_inactive'):
                     log_access('Login', 'Failed', email, ip)
                     return render_login({
@@ -448,6 +595,17 @@ class LoginView(View):
                             'Please contact administrator support.'
                         ),
                     })
+                if tenant_user_resolution == 'tenant_user_ambiguous':
+                    log_access('Login', 'Failed', email, ip)
+                    return render_login({
+                        'error': (
+                            'This email is linked to multiple tenant workspaces. '
+                            'Please use your tenant-specific login link.'
+                        ),
+                    })
+                if tenant_user_resolution in ('tenant_user_inactive', 'tenant_user_role_inactive'):
+                    log_access('Login', 'Failed', email, ip)
+                    return render_login({'error': 'User account is not active for login.'})
                 record_failed_attempt(email)
                 log_access('Login', 'Failed', email, ip)
                 brute_after = check_brute_force(email)
@@ -500,6 +658,7 @@ class LoginView(View):
                 })
 
             request.session['pending_tenant_id'] = str(tenant.tenant_id)
+            request.session.pop('pending_tenant_user_id', None)
             request.session['pending_tenant_email'] = (tenant.primary_email or '').strip().lower()
             request.session['pending_tenant_ip'] = ip
             request.session.modified = True
@@ -625,6 +784,7 @@ class OTPVerificationView(View):
     def _clear_tenant_pending(request):
         request.session.pop(TENANT_LOGIN_OTP_SESSION_KEY, None)
         request.session.pop('pending_tenant_id', None)
+        request.session.pop('pending_tenant_user_id', None)
         request.session.pop('pending_tenant_email', None)
         request.session.pop('pending_tenant_ip', None)
 
@@ -745,11 +905,44 @@ class OTPVerificationView(View):
                 return redirect('login')
             tenant = None
         else:
-            tenant = TenantProfile.objects.filter(pk=identity_id, primary_email__iexact=email).first()
+            tenant = TenantProfile.objects.filter(pk=identity_id).first()
             if not tenant or tenant.account_status != 'Active':
                 self._clear_tenant_pending(request)
                 messages.error(request, 'Account no longer eligible for login. Please contact administrator.')
                 return redirect('login')
+            tenant_user_id = str(request.session.get('pending_tenant_user_id') or '').strip()
+            tenant_user = None
+            if tenant_user_id:
+                registry = (
+                    TenantRegistry.objects.select_related('tenant_profile')
+                    .filter(tenant_profile_id=tenant.tenant_id)
+                    .first()
+                )
+                if not registry:
+                    self._clear_tenant_pending(request)
+                    messages.error(request, 'Tenant workspace is unavailable. Please contact administrator.')
+                    return redirect('login')
+                from tenant_workspace.models import TenantRole, TenantUser
+                connection.set_schema_to_public()
+                try:
+                    connection.set_tenant(registry)
+                    tenant_user = TenantUser.objects.filter(
+                        pk=tenant_user_id,
+                        email__iexact=email,
+                    ).first()
+                    if not tenant_user or tenant_user.status != TenantUser.Status.ACTIVE:
+                        self._clear_tenant_pending(request)
+                        messages.error(request, 'Account no longer eligible for login. Please contact administrator.')
+                        return redirect('login')
+                    role = TenantRole.objects.filter(
+                        role_name_en__iexact=(tenant_user.role_name or '').strip()
+                    ).first()
+                    if role and role.status != TenantRole.Status.ACTIVE:
+                        self._clear_tenant_pending(request)
+                        messages.error(request, 'Assigned role is inactive. Please contact administrator.')
+                        return redirect('login')
+                finally:
+                    connection.set_schema_to_public()
             user = None
 
         if action == 'resend':
@@ -871,13 +1064,35 @@ class OTPVerificationView(View):
         create_tenant_session(
             tenant_id=str(tenant.tenant_id),
             user_domain='Tenant_User',
-            reference_id=str(tenant.tenant_id),
-            reference_name=(tenant.company_name or tenant.primary_email or '').strip(),
+            reference_id=str(tenant_user.user_id) if tenant_user else str(tenant.tenant_id),
+            reference_name=(
+                (tenant_user.full_name or tenant_user.email or '').strip()
+                if tenant_user
+                else (tenant.company_name or tenant.primary_email or '').strip()
+            ),
             ip_address=request.session.get('pending_tenant_ip') or _client_ip(request),
             user_agent=request.META.get('HTTP_USER_AGENT', ''),
             timeout_minutes=tenant_timeout_min,
             jti=jti,
         )
+
+        if tenant_user:
+            registry = (
+                TenantRegistry.objects.select_related('tenant_profile')
+                .filter(tenant_profile_id=tenant.tenant_id)
+                .first()
+            )
+            if registry:
+                from tenant_workspace.models import TenantUser
+                connection.set_schema_to_public()
+                try:
+                    connection.set_tenant(registry)
+                    TenantUser.objects.filter(pk=tenant_user.user_id).update(
+                        last_login_at=timezone.now(),
+                        login_attempts=0,
+                    )
+                finally:
+                    connection.set_schema_to_public()
 
         # Backward-compat cleanup for older session-based tenant bootstrap.
         for key in ('tenant_bootstrap_token', 'tenant_bootstrap_tenant_id', 'tenant_bootstrap_jti', 'tenant_bootstrap_expires_in'):
@@ -2083,9 +2298,12 @@ class MassRevokeView(LoginRequiredMixin, View):
         )
         from superadmin.redis_helpers import revoke_all_tenant_sessions
 
-        revoke_all_tenant_sessions(str(tenant.tenant_id))
+        redis_revoked_count = revoke_all_tenant_sessions(str(tenant.tenant_id))
+        # Redis is the source of truth for active tenant JWT sessions.
+        # Fall back to DB-marked count only when Redis deleted nothing.
+        total_revoked_count = int(redis_revoked_count or 0) or int(revoked_count or 0)
         return JsonResponse(
-            {'message': 'Mass revoke executed.', 'revoked_count': revoked_count},
+            {'message': 'Mass revoke executed.', 'revoked_count': total_revoked_count},
             status=200,
         )
 

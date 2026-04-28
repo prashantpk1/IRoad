@@ -1,5 +1,7 @@
 import csv
 
+import logging
+from django.conf import settings
 from django.http import HttpResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
@@ -10,9 +12,11 @@ from django.db import connection
 from django.utils import timezone
 import os
 import uuid
+from urllib.parse import quote
 from superadmin.models import TenantProfile, TenantSecuritySettings
 from superadmin.models import AdminUser, Country, Currency
 from superadmin.redis_helpers import (
+    get_tenant_session,
     refresh_tenant_session,
     revoke_tenant_session_key,
 )
@@ -20,6 +24,7 @@ from superadmin.tenant_portal_auth import (
     clear_tenant_portal_cookie,
     get_tenant_portal_cookie_payload,
 )
+from superadmin.communication_helpers import send_named_notification_email
 from tenant_workspace.models import (
     AutoNumberConfiguration,
     AutoNumberSequence,
@@ -29,6 +34,32 @@ from tenant_workspace.models import (
     TenantUser,
 )
 from iroad_tenants.models import TenantRegistry
+
+logger = logging.getLogger(__name__)
+
+
+def _resolve_tenant_favicon_url(request, tenant):
+    """Return tenant favicon URL with a stable fallback."""
+    company_name = (getattr(tenant, 'company_name', '') or 'iRoad').strip() or 'iRoad'
+    default_icon = (
+        "https://ui-avatars.com/api/"
+        f"?name={quote(company_name)}&background=5051f9&color=fff&size=64&rounded=true&bold=true"
+    )
+    tenant_registry = _activate_tenant_workspace_schema(request)
+    if tenant_registry is None:
+        return default_icon
+    try:
+        profile = OrganizationProfile.objects.order_by('-updated_at', '-created_at').first()
+        if profile and getattr(profile, 'logo_file', None):
+            try:
+                return profile.logo_file.url or default_icon
+            except Exception:
+                return default_icon
+        return default_icon
+    except Exception:
+        return default_icon
+    finally:
+        connection.set_schema_to_public()
 
 
 def _tenant_context_from_session(request):
@@ -56,19 +87,56 @@ def _tenant_context_from_session(request):
         _clear_tenant_bootstrap_session(request)
         return None
     
-    # Use First Name + Last Name if available, otherwise Company Name
+    # Default to tenant owner profile.
     if tenant.first_name or tenant.last_name:
         display_name = f"{tenant.first_name} {tenant.last_name}".strip()
     else:
         display_name = (tenant.company_name or 'Tenant User').strip()
-        
     display_email = (tenant.primary_email or 'tenant@example.com').strip()
+    display_role = 'Tenant Admin'
+    permission_forms = set()
+    is_tenant_admin = True
+
+    # If this tenant session belongs to a tenant user, override display identity
+    # and collect role permissions for menu-level visibility.
+    session_data = get_tenant_session(str(tenant.tenant_id), str(tenant_jti)) or {}
+    reference_id = str(session_data.get('reference_id') or '').strip()
+    if reference_id and reference_id != str(tenant.tenant_id):
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        if tenant_registry is not None:
+            try:
+                tenant_user = TenantUser.objects.filter(pk=reference_id).first()
+                if tenant_user:
+                    display_name = (tenant_user.full_name or tenant_user.username or display_name).strip()
+                    display_email = (tenant_user.email or display_email).strip()
+                    display_role = (tenant_user.role_name or 'Tenant User').strip()
+                    is_tenant_admin = False
+                    role = TenantRole.objects.filter(
+                        role_name_en__iexact=(tenant_user.role_name or '').strip()
+                    ).first()
+                    if role:
+                        permission_forms = set(
+                            TenantRolePermission.objects.filter(
+                                role=role,
+                                can_view=True,
+                            ).values_list('form_name', flat=True)
+                        )
+            finally:
+                connection.set_schema_to_public()
+
     return {
         'tenant': tenant,
         'display_name': display_name,
         'display_email': display_email,
-        'display_role': 'Tenant Admin',
+        'display_role': display_role,
+        'tenant_favicon_url': _resolve_tenant_favicon_url(request, tenant),
         'avatar_name': display_name.replace(' ', '+'),
+        'is_tenant_admin': is_tenant_admin,
+        'perm_forms': permission_forms,
+        'can_view_cargo_master': 'Cargo Master' in permission_forms,
+        'can_view_booking': 'Booking' in permission_forms,
+        'can_view_shipment': 'Shipment' in permission_forms,
+        'can_view_sales_invoicing': 'Sales Invoicing' in permission_forms,
     }
 
 
@@ -120,6 +188,86 @@ class TenantDashboardView(View):
             clear_tenant_portal_cookie(response, request=request)
             return response
         return render(request, 'iroad_tenants/index.html', context)
+
+
+class TenantSubscriptionPlanView(View):
+    """Tenant subscription plan page (template-only for now)."""
+
+    def get(self, request):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        return render(
+            request,
+            'iroad_tenants/Subscription_Manage/Subscription-plan.html',
+            context,
+        )
+
+
+class TenantSubscriptionBillingView(View):
+    """Tenant subscription billing page (template-only for now)."""
+
+    def get(self, request):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        return render(
+            request,
+            'iroad_tenants/Subscription_Manage/Subscription-billing.html',
+            context,
+        )
+
+
+class TenantRolePermissionChangesView(View):
+    """Tenant audit page: role/permission changes (template-only for now)."""
+
+    def get(self, request):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        return render(
+            request,
+            'iroad_tenants/Audit_log/Role--permission-changes.html',
+            context,
+        )
+
+
+class TenantCriticalAccountChangesView(View):
+    """Tenant audit page: critical account changes (template-only for now)."""
+
+    def get(self, request):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        return render(
+            request,
+            'iroad_tenants/Audit_log/Critical-account-changes.html',
+            context,
+        )
+
+
+class TenantLoginSessionEventsView(View):
+    """Tenant audit page: login/session events (template-only for now)."""
+
+    def get(self, request):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        return render(
+            request,
+            'iroad_tenants/Audit_log/Login--session-events.html',
+            context,
+        )
 
 
 class TenantMyAccountView(View):
@@ -431,7 +579,7 @@ class TenantUsersAdministrationView(View):
             connection.set_schema_to_public()
         return render(
             request,
-            'iroad_tenants/User Management/Users-administration.html',
+            'iroad_tenants/User_Management/Users-administration.html',
             context,
         )
 
@@ -445,6 +593,61 @@ TENANT_PERMISSION_MATRIX = [
     {'module_name': 'Finance', 'form_name': 'Sales Invoicing'},
     {'module_name': 'Finance', 'form_name': 'Purchase Invoicing'},
 ]
+
+
+def _tenant_role_name_options():
+    role_names = list(
+        TenantRole.objects.order_by('role_name_en').values_list('role_name_en', flat=True)
+    )
+    if role_names:
+        return role_names
+    return TENANT_USER_ROLE_OPTIONS
+
+
+def _tenant_user_login_url(request):
+    configured_url = (getattr(settings, 'TENANT_PORTAL_LOGIN_URL', '') or '').strip()
+    auth_payload = get_tenant_portal_cookie_payload(request) or {}
+    tenant_id = str(auth_payload.get('tenant_id') or '').strip()
+    if configured_url:
+        if tenant_id and 'tid=' not in configured_url:
+            separator = '&' if '?' in configured_url else '?'
+            return f'{configured_url}{separator}tid={tenant_id}'
+        return configured_url
+    login_url = request.build_absolute_uri(reverse('login'))
+    if tenant_id:
+        login_url = f'{login_url}?tid={tenant_id}'
+    return login_url
+
+
+def _send_tenant_user_welcome_email(*, request, tenant_user, plaintext_password, role_name):
+    context_dict = {
+        'name': tenant_user.full_name,
+        'email': tenant_user.email,
+        'password': plaintext_password,
+        'role_name': role_name,
+        'login_url': _tenant_user_login_url(request),
+        'user_name': tenant_user.full_name,
+    }
+    sent = send_named_notification_email(
+        'TENANT_USER_WELCOME',
+        recipient_email=tenant_user.email,
+        context_dict=context_dict,
+        language='en',
+        default_subject='Welcome to iRoad - Tenant User Access',
+        trigger_source='TemplateName: TENANT_USER_WELCOME',
+        force_django_smtp=True,
+    )
+    if sent:
+        return True
+    return send_named_notification_email(
+        'SUBADMIN_WELCOME',
+        recipient_email=tenant_user.email,
+        context_dict=context_dict,
+        language='en',
+        default_subject='Welcome to iRoad - Your Login Credentials',
+        trigger_source='TemplateName: SUBADMIN_WELCOME',
+        force_django_smtp=True,
+    )
 
 
 def _tenant_user_form_data_from_post(request):
@@ -480,24 +683,33 @@ class TenantUsersAdministrationCreateView(View):
             response = redirect('login')
             clear_tenant_portal_cookie(response, request=request)
             return response
-        context.update(
-            {
-                'role_options': TENANT_USER_ROLE_OPTIONS,
-                'form_data': {
-                    'mobile_country_code': '',
-                    'status': '',
-                    'roles': [],
-                },
-                'form_errors': {},
-                'is_edit_mode': False,
-                'is_view_mode': False,
-            }
-        )
-        return render(
-            request,
-            'iroad_tenants/User Management/Users-administration-create.html',
-            context,
-        )
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        if tenant_registry is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        try:
+            context.update(
+                {
+                    'role_options': _tenant_role_name_options(),
+                    'form_data': {
+                        'mobile_country_code': '',
+                        'status': '',
+                        'roles': [],
+                    },
+                    'form_errors': {},
+                    'tenant_schema_name': tenant_registry.schema_name,
+                    'is_edit_mode': False,
+                    'is_view_mode': False,
+                }
+            )
+            return render(
+                request,
+                'iroad_tenants/User_Management/Users-administration-create.html',
+                context,
+            )
+        finally:
+            connection.set_schema_to_public()
 
     def post(self, request):
         context = _tenant_context_from_session(request)
@@ -516,6 +728,7 @@ class TenantUsersAdministrationCreateView(View):
         form_errors = {}
 
         try:
+            role_options = _tenant_role_name_options()
             if not form_data['username']:
                 form_errors['username'] = 'Username is required.'
             if not form_data['full_name']:
@@ -524,6 +737,10 @@ class TenantUsersAdministrationCreateView(View):
                 form_errors['email'] = 'Email is required.'
             if not form_data['roles']:
                 form_errors['roles'] = 'Select at least one role.'
+            else:
+                invalid_roles = [role for role in form_data['roles'] if role not in role_options]
+                if invalid_roles:
+                    form_errors['roles'] = 'Selected role is invalid. Please choose from Roles master.'
             if not password:
                 form_errors['password'] = 'Password is required.'
             elif len(password) < 8:
@@ -537,7 +754,7 @@ class TenantUsersAdministrationCreateView(View):
             if form_errors:
                 context.update(
                     {
-                        'role_options': TENANT_USER_ROLE_OPTIONS,
+                        'role_options': role_options,
                         'form_data': form_data,
                         'form_errors': form_errors,
                         'tenant_schema_name': tenant_registry.schema_name,
@@ -548,7 +765,7 @@ class TenantUsersAdministrationCreateView(View):
                 messages.error(request, 'Please fix the highlighted errors.', extra_tags='tenant')
                 return render(
                     request,
-                    'iroad_tenants/User Management/Users-administration-create.html',
+                    'iroad_tenants/User_Management/Users-administration-create.html',
                     context,
                 )
 
@@ -558,7 +775,8 @@ class TenantUsersAdministrationCreateView(View):
                 prefix='USR',
             )
 
-            TenantUser.objects.create(
+            selected_role = form_data['roles'][0] if form_data['roles'] else 'Administrator'
+            tenant_user = TenantUser.objects.create(
                 tenant_ref_no=user_ref_no,
                 account_sequence=account_sequence,
                 username=form_data['username'],
@@ -567,10 +785,39 @@ class TenantUsersAdministrationCreateView(View):
                 mobile_country_code=form_data['mobile_country_code'],
                 mobile_no=form_data['mobile_no'],
                 password_hash=make_password(password),
-                role_name=form_data['roles'][0] if form_data['roles'] else 'Administrator',
+                role_name=selected_role,
                 status=form_data['status'],
                 created_by_label=(context.get('display_name') or '').strip(),
             )
+            try:
+                email_sent = _send_tenant_user_welcome_email(
+                    request=request,
+                    tenant_user=tenant_user,
+                    plaintext_password=password,
+                    role_name=selected_role,
+                )
+                if email_sent:
+                    messages.success(
+                        request,
+                        'Login credentials email sent to the user.',
+                        extra_tags='tenant',
+                    )
+                else:
+                    messages.warning(
+                        request,
+                        'User created, but no active notification template found for login email.',
+                        extra_tags='tenant',
+                    )
+            except Exception:
+                logger.exception(
+                    'Tenant user welcome email failed for %s',
+                    tenant_user.email,
+                )
+                messages.warning(
+                    request,
+                    'User created, but login email could not be sent. Please verify email gateway/template settings.',
+                    extra_tags='tenant',
+                )
             messages.success(request, 'Tenant user created successfully.', extra_tags='tenant')
             return _tenant_redirect(request, 'iroad_tenants:tenant_users_administration')
         finally:
@@ -597,9 +844,12 @@ class TenantUsersAdministrationEditView(View):
                 messages.error(request, 'User not found.', extra_tags='tenant')
                 return _tenant_redirect(request, 'iroad_tenants:tenant_users_administration')
             is_view_mode = request.GET.get('mode') == 'view'
+            role_options = _tenant_role_name_options()
+            if tenant_user.role_name and tenant_user.role_name not in role_options:
+                role_options = [tenant_user.role_name, *role_options]
             context.update(
                 {
-                    'role_options': TENANT_USER_ROLE_OPTIONS,
+                    'role_options': role_options,
                     'form_data': _tenant_user_form_data_from_model(tenant_user),
                     'form_errors': {},
                     'tenant_schema_name': tenant_registry.schema_name,
@@ -610,7 +860,7 @@ class TenantUsersAdministrationEditView(View):
             )
             return render(
                 request,
-                'iroad_tenants/User Management/Users-administration-create.html',
+                'iroad_tenants/User_Management/Users-administration-create.html',
                 context,
             )
         finally:
@@ -636,6 +886,9 @@ class TenantUsersAdministrationEditView(View):
             form_data = _tenant_user_form_data_from_post(request)
             password = (request.POST.get('password') or '').strip()
             form_errors = {}
+            role_options = _tenant_role_name_options()
+            if tenant_user.role_name and tenant_user.role_name not in role_options:
+                role_options = [tenant_user.role_name, *role_options]
 
             if not form_data['username']:
                 form_errors['username'] = 'Username is required.'
@@ -645,6 +898,10 @@ class TenantUsersAdministrationEditView(View):
                 form_errors['email'] = 'Email is required.'
             if not form_data['roles']:
                 form_errors['roles'] = 'Select at least one role.'
+            else:
+                invalid_roles = [role for role in form_data['roles'] if role not in role_options]
+                if invalid_roles:
+                    form_errors['roles'] = 'Selected role is invalid. Please choose from Roles master.'
             if password and len(password) < 8:
                 form_errors['password'] = 'Password must be at least 8 characters.'
 
@@ -656,7 +913,7 @@ class TenantUsersAdministrationEditView(View):
             if form_errors:
                 context.update(
                     {
-                        'role_options': TENANT_USER_ROLE_OPTIONS,
+                        'role_options': role_options,
                         'form_data': form_data,
                         'form_errors': form_errors,
                         'tenant_schema_name': tenant_registry.schema_name,
@@ -668,7 +925,7 @@ class TenantUsersAdministrationEditView(View):
                 messages.error(request, 'Please fix the highlighted errors.', extra_tags='tenant')
                 return render(
                     request,
-                    'iroad_tenants/User Management/Users-administration-create.html',
+                    'iroad_tenants/User_Management/Users-administration-create.html',
                     context,
                 )
 
@@ -806,7 +1063,6 @@ def _tenant_role_form_data_from_post(request):
         'role_name_ar': (request.POST.get('role_name_ar') or '').strip(),
         'description_en': (request.POST.get('description_en') or '').strip(),
         'description_ar': (request.POST.get('description_ar') or '').strip(),
-        'created_by_label': (request.POST.get('created_by_label') or '').strip(),
         'status': 'Active' if request.POST.get('status') == 'on' else 'Inactive',
     }
 
@@ -915,7 +1171,7 @@ class TenantRolesPermissionsView(View):
             connection.set_schema_to_public()
         return render(
             request,
-            'iroad_tenants/User Management/Role/Roles--permissions.html',
+            'iroad_tenants/User_Management/Role/Roles--permissions.html',
             context,
         )
 
@@ -943,7 +1199,7 @@ class TenantRolesPermissionsCreateView(View):
         )
         return render(
             request,
-            'iroad_tenants/User Management/Role/Roles-permissions-Create.html',
+            'iroad_tenants/User_Management/Role/Roles-permissions-Create.html',
             context,
         )
 
@@ -959,6 +1215,7 @@ class TenantRolesPermissionsCreateView(View):
             clear_tenant_portal_cookie(response, request=request)
             return response
         form_data = _tenant_role_form_data_from_post(request)
+        form_data['created_by_label'] = (context.get('display_name') or '').strip()
         permissions_payload = _permissions_payload_from_post(request)
         form_errors = {}
         try:
@@ -989,7 +1246,7 @@ class TenantRolesPermissionsCreateView(View):
                 messages.error(request, 'Please fix the highlighted errors.', extra_tags='tenant')
                 return render(
                     request,
-                    'iroad_tenants/User Management/Role/Roles-permissions-Create.html',
+                    'iroad_tenants/User_Management/Role/Roles-permissions-Create.html',
                     context,
                 )
 
@@ -999,7 +1256,7 @@ class TenantRolesPermissionsCreateView(View):
                 description_en=form_data['description_en'],
                 description_ar=form_data['description_ar'],
                 status=form_data['status'],
-                created_by_label=form_data['created_by_label'] or (context.get('display_name') or '').strip(),
+                created_by_label=(context.get('display_name') or '').strip(),
             )
             TenantRolePermission.objects.bulk_create(
                 [
@@ -1047,7 +1304,10 @@ class TenantRolesPermissionsEditView(View):
             is_view_mode = request.GET.get('mode') == 'view'
             context.update(
                 {
-                    'form_data': _tenant_role_form_data_from_model(tenant_role),
+                    'form_data': {
+                        **_tenant_role_form_data_from_model(tenant_role),
+                        'created_by_label': (context.get('display_name') or '').strip(),
+                    },
                     'form_errors': {},
                     'permission_matrix': _permission_matrix_with_values(_permissions_by_key(tenant_role)),
                     'tenant_schema_name': tenant_registry.schema_name,
@@ -1058,7 +1318,7 @@ class TenantRolesPermissionsEditView(View):
             )
             return render(
                 request,
-                'iroad_tenants/User Management/Role/Roles-permissions-Create.html',
+                'iroad_tenants/User_Management/Role/Roles-permissions-Create.html',
                 context,
             )
         finally:
@@ -1076,6 +1336,7 @@ class TenantRolesPermissionsEditView(View):
             clear_tenant_portal_cookie(response, request=request)
             return response
         form_data = _tenant_role_form_data_from_post(request)
+        form_data['created_by_label'] = (context.get('display_name') or '').strip()
         permissions_payload = _permissions_payload_from_post(request)
         form_errors = {}
         try:
@@ -1112,7 +1373,7 @@ class TenantRolesPermissionsEditView(View):
                 messages.error(request, 'Please fix the highlighted errors.', extra_tags='tenant')
                 return render(
                     request,
-                    'iroad_tenants/User Management/Role/Roles-permissions-Create.html',
+                    'iroad_tenants/User_Management/Role/Roles-permissions-Create.html',
                     context,
                 )
 
@@ -1121,7 +1382,7 @@ class TenantRolesPermissionsEditView(View):
             tenant_role.description_en = form_data['description_en']
             tenant_role.description_ar = form_data['description_ar']
             tenant_role.status = form_data['status']
-            tenant_role.created_by_label = form_data['created_by_label'] or tenant_role.created_by_label
+            tenant_role.created_by_label = (context.get('display_name') or '').strip()
             tenant_role.save()
 
             TenantRolePermission.objects.filter(role=tenant_role).delete()

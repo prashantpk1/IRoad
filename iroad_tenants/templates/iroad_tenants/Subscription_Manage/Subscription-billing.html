@@ -1,0 +1,548 @@
+{% extends 'iroad_tenants/base.html' %}
+
+{% block title %}Subscription Billing | iRoad Admin{% endblock %}
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item">Administration</li>
+<li class="breadcrumb-item">Subscriptions Management</li>
+<li class="breadcrumb-item active" aria-current="page">Subscription Billing</li>
+{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+        <div class="page-header-row">
+          <div class="page-header-left">
+            <h1 class="page-title">Subscription Billing</h1>
+            <p class="sub-page-subtitle">
+              Manage your billing, invoices and payment methods
+            </p>
+          </div>
+          <div class="page-header-right">
+            <a href="{% url 'iroad_tenants:tenant_subscription_plan' %}" class="eal-btn eal-btn-outline">
+              <i class="bi bi-arrow-left-right"></i>
+              Change Plan
+            </a>
+          </div>
+        </div>
+      </div>
+
+<div class="bill-overview-grid">
+        <!-- Current Plan Card -->
+        <div class="bill-overview-card">
+          <div class="bill-overview-icon bill-overview-icon--plan">
+            <i class="bi bi-credit-card-2-front"></i>
+          </div>
+          <div class="bill-overview-info">
+            <span class="bill-overview-label">Current Plan</span>
+            <span class="bill-overview-value">Professional</span>
+            <span class="bill-overview-sub">Monthly Billing</span>
+          </div>
+          <span class="bill-status-badge bill-status-badge--active"
+            >Active</span
+          >
+        </div>
+
+        <!-- Next Payment Card -->
+        <div class="bill-overview-card">
+          <div class="bill-overview-icon bill-overview-icon--payment">
+            <i class="bi bi-calendar-event"></i>
+          </div>
+          <div class="bill-overview-info">
+            <span class="bill-overview-label">Next Payment</span>
+            <span class="bill-overview-value">$79.00</span>
+            <span class="bill-overview-sub">Due on Apr 1, 2026</span>
+          </div>
+        </div>
+
+        <!-- Payment Method Card -->
+        <div class="bill-overview-card">
+          <div class="bill-overview-icon bill-overview-icon--method">
+            <i class="bi bi-wallet2"></i>
+          </div>
+          <div class="bill-overview-info">
+            <span class="bill-overview-label">Payment Method</span>
+            <span class="bill-overview-value">•••• 4242</span>
+            <span class="bill-overview-sub">Visa — Expires 09/27</span>
+          </div>
+        </div>
+
+        <!-- Total Spent Card -->
+        <div class="bill-overview-card">
+          <div class="bill-overview-icon bill-overview-icon--spent">
+            <i class="bi bi-graph-up-arrow"></i>
+          </div>
+          <div class="bill-overview-info">
+            <span class="bill-overview-label">Total Spent (YTD)</span>
+            <span class="bill-overview-value">$237.00</span>
+            <span class="bill-overview-sub">3 invoices this year</span>
+          </div>
+        </div>
+      </div>
+
+<div class="bill-details-row">
+        <!-- Billing History -->
+        <div class="bill-section bill-section--history">
+          <div class="bill-section-header">
+            <div>
+              <h2 class="bill-section-title">Billing History</h2>
+              <p class="bill-section-desc">
+                View and download your past invoices
+              </p>
+            </div>
+            <button class="sub-help-btn sub-help-btn--outline" type="button">
+              <i class="bi bi-download"></i>
+              Export All
+            </button>
+          </div>
+          <div class="bill-table-wrapper">
+            <table class="bill-table">
+              <thead>
+                <tr>
+                  <th>Invoice</th>
+                  <th>Date</th>
+                  <th>Plan</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="bill-invoice-id">#INV-2026-003</td>
+                  <td>Mar 1, 2026</td>
+                  <td>Professional</td>
+                  <td class="bill-amount">$79.00</td>
+                  <td>
+                    <span class="bill-status bill-status--paid">Paid</span>
+                  </td>
+                  <td>
+                    <button
+                      class="bill-action-btn"
+                      title="Download Invoice"
+                      type="button"
+                    >
+                      <i class="bi bi-download"></i>
+                    </button>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="bill-invoice-id">#INV-2026-002</td>
+                  <td>Feb 1, 2026</td>
+                  <td>Professional</td>
+                  <td class="bill-amount">$79.00</td>
+                  <td>
+                    <span class="bill-status bill-status--paid">Paid</span>
+                  </td>
+                  <td>
+                    <button
+                      class="bill-action-btn"
+                      title="Download Invoice"
+                      type="button"
+                    >
+                      <i class="bi bi-download"></i>
+                    </button>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="bill-invoice-id">#INV-2026-001</td>
+                  <td>Jan 1, 2026</td>
+                  <td>Professional</td>
+                  <td class="bill-amount">$79.00</td>
+                  <td>
+                    <span class="bill-status bill-status--paid">Paid</span>
+                  </td>
+                  <td>
+                    <button
+                      class="bill-action-btn"
+                      title="Download Invoice"
+                      type="button"
+                    >
+                      <i class="bi bi-download"></i>
+                    </button>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="bill-invoice-id">#INV-2025-012</td>
+                  <td>Dec 1, 2025</td>
+                  <td>Professional</td>
+                  <td class="bill-amount">$79.00</td>
+                  <td>
+                    <span class="bill-status bill-status--paid">Paid</span>
+                  </td>
+                  <td>
+                    <button
+                      class="bill-action-btn"
+                      title="Download Invoice"
+                      type="button"
+                    >
+                      <i class="bi bi-download"></i>
+                    </button>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="bill-invoice-id">#INV-2025-011</td>
+                  <td>Nov 1, 2025</td>
+                  <td>Professional</td>
+                  <td class="bill-amount">$79.00</td>
+                  <td>
+                    <span class="bill-status bill-status--paid">Paid</span>
+                  </td>
+                  <td>
+                    <button
+                      class="bill-action-btn"
+                      title="Download Invoice"
+                      type="button"
+                    >
+                      <i class="bi bi-download"></i>
+                    </button>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="bill-invoice-id">#INV-2025-010</td>
+                  <td>Oct 1, 2025</td>
+                  <td>Starter</td>
+                  <td class="bill-amount">$29.00</td>
+                  <td>
+                    <span class="bill-status bill-status--paid">Paid</span>
+                  </td>
+                  <td>
+                    <button
+                      class="bill-action-btn"
+                      title="Download Invoice"
+                      type="button"
+                    >
+                      <i class="bi bi-download"></i>
+                    </button>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="bill-invoice-id">#INV-2025-009</td>
+                  <td>Sep 1, 2025</td>
+                  <td>Starter</td>
+                  <td class="bill-amount">$29.00</td>
+                  <td>
+                    <span class="bill-status bill-status--paid">Paid</span>
+                  </td>
+                  <td>
+                    <button
+                      class="bill-action-btn"
+                      title="Download Invoice"
+                      type="button"
+                    >
+                      <i class="bi bi-download"></i>
+                    </button>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="bill-invoice-id">#INV-2025-008</td>
+                  <td>Aug 1, 2025</td>
+                  <td>Starter</td>
+                  <td class="bill-amount">$29.00</td>
+                  <td>
+                    <span class="bill-status bill-status--refunded"
+                      >Refunded</span
+                    >
+                  </td>
+                  <td>
+                    <button
+                      class="bill-action-btn"
+                      title="Download Invoice"
+                      type="button"
+                    >
+                      <i class="bi bi-download"></i>
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Right Column -->
+        <div class="bill-sidebar-col">
+          <!-- Payment Method Details -->
+          <div class="bill-section">
+            <div class="bill-section-header">
+              <h2 class="bill-section-title">Payment Method</h2>
+            </div>
+            <div class="bill-payment-card">
+              <div class="bill-card-visual">
+                <div class="bill-card-chip"></div>
+                <div class="bill-card-number">•••• •••• •••• 4242</div>
+                <div class="bill-card-details">
+                  <div class="bill-card-holder">
+                    <span class="bill-card-label">Card Holder</span>
+                    <span class="bill-card-value">Mark Jones</span>
+                  </div>
+                  <div class="bill-card-expiry">
+                    <span class="bill-card-label">Expires</span>
+                    <span class="bill-card-value">09/27</span>
+                  </div>
+                </div>
+                <div class="bill-card-brand">VISA</div>
+              </div>
+              <div class="bill-payment-actions">
+                <button
+                  class="sub-help-btn sub-help-btn--primary"
+                  type="button"
+                >
+                  <i class="bi bi-pencil-square"></i>
+                  Update Card
+                </button>
+                <button
+                  class="sub-help-btn sub-help-btn--outline"
+                  type="button"
+                  data-bs-toggle="modal"
+                  data-bs-target="#addPaymentCardModal"
+                  aria-haspopup="dialog"
+                  aria-controls="addPaymentCardModal"
+                >
+                  <i class="bi bi-plus-lg"></i>
+                  Add New
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Billing Contact -->
+          <div class="bill-section">
+            <div class="bill-section-header">
+              <h2 class="bill-section-title">Billing Contact</h2>
+            </div>
+            <div class="bill-contact-list">
+              <div class="bill-contact-row">
+                <i class="bi bi-person"></i>
+                <div>
+                  <span class="bill-contact-label">Name</span>
+                  <span class="bill-contact-value">Mark Jones</span>
+                </div>
+              </div>
+              <div class="bill-contact-row">
+                <i class="bi bi-envelope"></i>
+                <div>
+                  <span class="bill-contact-label">Email</span>
+                  <span class="bill-contact-value">mark@redsparkinfo.com</span>
+                </div>
+              </div>
+              <div class="bill-contact-row">
+                <i class="bi bi-building"></i>
+                <div>
+                  <span class="bill-contact-label">Company</span>
+                  <span class="bill-contact-value">Redspark Technologies</span>
+                </div>
+              </div>
+              <div class="bill-contact-row">
+                <i class="bi bi-geo-alt"></i>
+                <div>
+                  <span class="bill-contact-label">Address</span>
+                  <span class="bill-contact-value"
+                    >Vadodara, Gujarat, India</span
+                  >
+                </div>
+              </div>
+            </div>
+           
+          </div>
+        </div>
+      </div>
+    </div>
+<div
+      class="modal fade bill-card-modal"
+      id="addPaymentCardModal"
+      tabindex="-1"
+      aria-labelledby="addPaymentCardModalLabel"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <div>
+              <h2 class="modal-title" id="addPaymentCardModalLabel">
+                Add payment card
+              </h2>
+              <p class="bill-card-modal-subtitle mb-0">
+                Enter your card details. This form matches the fields your
+                payment provider will need when you connect billing.
+              </p>
+            </div>
+            <button
+              type="button"
+              class="btn-close"
+              data-bs-dismiss="modal"
+              aria-label="Close"
+            ></button>
+          </div>
+          <form id="addPaymentCardForm" class="needs-validation" novalidate>
+            <div class="modal-body">
+              
+
+              <div class="row g-3">
+                <div class="col-12">
+                  <label class="form-label" for="addCardCardholderName">
+                    Account Holder Name <span class="text-danger">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="addCardCardholderName"
+                    name="cardholderName"
+                    autocomplete="cc-name"
+                    placeholder="As shown on the card"
+                    required
+                    maxlength="120"
+                  />
+                  <div class="invalid-feedback">
+                    Please enter the name as it appears on the card.
+                  </div>
+                </div>
+
+                <div class="col-12">
+                  <label class="form-label" for="addCardNumber">
+                    Card number <span class="text-danger">*</span>
+                  </label>
+                  <div class="input-group has-validation">
+                    <span class="input-group-text" aria-hidden="true">
+                      <i class="bi bi-credit-card"></i>
+                    </span>
+                    <input
+                      type="text"
+                      class="form-control"
+                      id="addCardNumber"
+                      name="cardNumber"
+                      inputmode="numeric"
+                      autocomplete="cc-number"
+                      placeholder="1234 5678 9012 3456"
+                      required
+                      maxlength="19"
+                      minlength="19"
+                      pattern="\d{4}\s\d{4}\s\d{4}\s\d{4}"
+                      title="Enter a 16-digit card number"
+                    />
+                    <div class="invalid-feedback">
+                      Enter a valid 16-digit card number.
+                    </div>
+                  </div>
+                </div>
+
+                <div class="col-md-6">
+                  <label class="form-label" for="addCardExpMonth">
+                    Expiry  <span class="text-danger">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="addCardCvc"
+                    name="cvc"
+                    inputmode="numeric"
+                    autocomplete="cc-csc"
+                    placeholder="mm/yy"
+                    required
+                    maxlength="4"
+                    minlength="3"
+                    pattern="\d{3,4}"
+                   
+                    spellcheck="false"
+                    autocorrect="off"
+                    autocapitalize="off"
+                  />
+                  <div class="invalid-feedback">Select a month.</div>
+                </div>
+
+                
+
+                <div class="col-md-6">
+                  <label class="form-label" for="addCardCvc">
+                    Security code (CVC) <span class="text-danger">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="addCardCvc"
+                    name="cvc"
+                    inputmode="numeric"
+                    autocomplete="cc-csc"
+                    placeholder="123"
+                    required
+                    maxlength="4"
+                    minlength="3"
+                    pattern="\d{3,4}"
+                    title="3 or 4 digits"
+                    spellcheck="false"
+                    autocorrect="off"
+                    autocapitalize="off"
+                  />
+                  <div class="invalid-feedback">
+                    Enter the 3 or 4 digit code from your card.
+                  </div>
+                </div>
+
+                
+
+                <div class="col-12">
+                  <div class="form-check">
+                    <input
+                      class="form-check-input"
+                      type="checkbox"
+                      id="addCardDefault"
+                      name="setAsDefault"
+                    />
+                    <label class="form-check-label" for="addCardDefault">
+                      Set as default payment method for this subscription
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button
+                type="button"
+                class="btn btn-outline-secondary"
+                data-bs-dismiss="modal"
+              >
+                Cancel
+              </button>
+              <button type="submit" class="btn btn-primary">
+                <i class="bi bi-check-lg me-1" aria-hidden="true"></i>
+                Save card
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    var modalEl = document.getElementById("addPaymentCardModal");
+    var form = document.getElementById("addPaymentCardForm");
+    var cardInput = document.getElementById("addCardNumber");
+    if (!modalEl || !form) return;
+
+    if (cardInput) {
+      cardInput.addEventListener("input", function (e) {
+        var digits = e.target.value.replace(/\D/g, "").slice(0, 16);
+        e.target.value = digits.replace(/(\d{4})(?=\d)/g, "$1 ").trim();
+      });
+    }
+
+    modalEl.addEventListener("hidden.bs.modal", function () {
+      form.reset();
+      form.classList.remove("was-validated");
+    });
+
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      if (!form.checkValidity()) {
+        form.classList.add("was-validated");
+        return;
+      }
+      form.classList.remove("was-validated");
+      var instance = bootstrap.Modal.getInstance(modalEl);
+      if (instance) instance.hide();
+    });
+  });
+</script>
+{% endblock %}

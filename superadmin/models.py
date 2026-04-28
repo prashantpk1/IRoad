@@ -1652,6 +1652,15 @@ class TenantProfile(models.Model):
         super().save(*args, **kwargs)
 
         if is_new_suspension:
+            # Enforce immediate lockout per CP-PCS-P1 kill-switch policy:
+            # revoke all tenant Redis sessions synchronously first, then
+            # queue async retry for resilience.
+            try:
+                from superadmin.redis_helpers import revoke_all_tenant_sessions
+
+                revoke_all_tenant_sessions(str(self.tenant_id))
+            except Exception:
+                pass
             from superadmin.tasks import revoke_tenant_sessions_task
             revoke_tenant_sessions_task.delay(str(self.tenant_id))
 

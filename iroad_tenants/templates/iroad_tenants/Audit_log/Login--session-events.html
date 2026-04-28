@@ -1,0 +1,391 @@
+{% extends 'iroad_tenants/base.html' %}
+
+{% block title %}Login Session Events | iRoad Admin{% endblock %}
+
+{% block content %}
+<div class="page-content">
+  <div class="page-header">
+        <nav aria-label="breadcrumb">
+          <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'iroad_tenants:tenant_dashboard' %}">Dashboard</a></li>
+            <li class="breadcrumb-item">Administration</li>
+            <li class="breadcrumb-item">Audit & Security Logs</li>
+            <li class="breadcrumb-item active" aria-current="page">Login / Session Events</li>
+          </ol>
+        </nav>
+        <div class="page-header-row">
+          <div class="page-header-left">
+            <h1 class="page-title">Login Session Events</h1>
+            <p class="page-subtitle">
+              Monitor and review all login attempts and active sessions.
+            </p>
+          </div>
+          <div class="page-header-right">
+            <div class="eal-header-actions">
+              <button
+                class="eal-btn eal-btn-outline"
+                type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#filterCollapse"
+                aria-expanded="false"
+                aria-controls="filterCollapse"
+              >
+                <i class="bi bi-funnel"></i>
+                <span>Filter</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Filter Panel -->
+        <div class="collapse mt-3" id="filterCollapse">
+          <div
+            class="p-3 border rounded shadow-sm"
+            style="background-color: #ffffff"
+          >
+            <div class="row g-3">
+              <div class="col-md-3">
+                <label
+                  class="form-label"
+                  style="
+                    font-size: 12px;
+                    font-weight: 500;
+                    color: #64748b;
+                    text-transform: uppercase;
+                    margin-bottom: 4px;
+                  "
+                  >From Date</label
+                >
+                <input type="date" class="form-control" />
+              </div>
+              <div class="col-md-3">
+                <label
+                  class="form-label"
+                  style="
+                    font-size: 12px;
+                    font-weight: 500;
+                    color: #64748b;
+                    text-transform: uppercase;
+                    margin-bottom: 4px;
+                  "
+                  >To Date</label
+                >
+                <input type="date" class="form-control" />
+              </div>
+              <div class="col-md-3">
+                <label
+                  class="form-label"
+                  style="
+                    font-size: 12px;
+                    font-weight: 500;
+                    color: #64748b;
+                    text-transform: uppercase;
+                    margin-bottom: 4px;
+                  "
+                  >Module</label
+                >
+                <select class="form-select">
+                  <option value="">All Modules</option>
+                  <option value="auth">Authentication</option>
+                  <option value="security">Security</option>
+                </select>
+              </div>
+              <div class="col-md-3">
+                <label
+                  class="form-label"
+                  style="
+                    font-size: 12px;
+                    font-weight: 500;
+                    color: #64748b;
+                    text-transform: uppercase;
+                    margin-bottom: 4px;
+                  "
+                  >Performed By</label
+                >
+                <input
+                  type="text"
+                  class="form-control"
+                  placeholder="Search user..."
+                />
+              </div>
+            </div>
+            <div class="d-flex justify-content-end gap-2 mt-3">
+              <button
+                type="button"
+                class="eal-btn eal-btn-outline"
+                data-bs-toggle="collapse"
+                data-bs-target="#filterCollapse"
+              >
+                Cancel
+              </button>
+              <button type="button" class="eal-btn eal-btn-primary">
+                Apply Filters
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stats Row -->
+      <div class="eal-stats-row">
+        <div class="eal-stat-card">
+          <div class="eal-stat-icon purple">
+            <i class="bi bi-file-earmark-text"></i>
+          </div>
+          <div>
+            <div class="eal-stat-value">48</div>
+            <div class="eal-stat-label">Total Events</div>
+          </div>
+        </div>
+        <div class="eal-stat-card">
+          <div class="eal-stat-icon green">
+            <i class="bi bi-check-circle"></i>
+          </div>
+          <div>
+            <div class="eal-stat-value">32</div>
+            <div class="eal-stat-label">Successful Logins</div>
+          </div>
+        </div>
+        <div class="eal-stat-card">
+          <div class="eal-stat-icon amber">
+            <i class="bi bi-hourglass-split"></i>
+          </div>
+          <div>
+            <div class="eal-stat-value">12</div>
+            <div class="eal-stat-label">Active Sessions</div>
+          </div>
+        </div>
+        <div class="eal-stat-card">
+          <div class="eal-stat-icon blue">
+            <i class="bi bi-x-octagon"></i>
+          </div>
+          <div>
+            <div class="eal-stat-value">4</div>
+            <div class="eal-stat-label">Failed Attempts</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Table Card -->
+      <div class="eal-table-card">
+        <!-- Toolbar -->
+        <div class="eal-toolbar">
+          <div class="eal-toolbar-left">
+            <div class="eal-search">
+              <i class="bi bi-search"></i>
+              <input type="text" placeholder="Search events&hellip;" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Table -->
+        <div class="eal-table-wrap">
+          <table class="eal-table">
+            <thead>
+              <tr>
+                <th class="eal-col-check">
+                  <input
+                    type="checkbox"
+                    class="eal-custom-check"
+                    id="ealSelectAll"
+                  />
+                </th>
+                <th>Sl No.</th>
+                <th>
+                  Timestamp
+                  <span class="sort-indicator">
+                    <i class="bi bi-caret-up-fill"></i>
+                    <i class="bi bi-caret-down-fill"></i>
+                  </span>
+                </th>
+                <th>
+                  Action
+                  <span class="sort-indicator">
+                    <i class="bi bi-caret-up-fill"></i>
+                    <i class="bi bi-caret-down-fill"></i>
+                  </span>
+                </th>
+                <th>
+                  Module
+                  <span class="sort-indicator">
+                    <i class="bi bi-caret-up-fill"></i>
+                    <i class="bi bi-caret-down-fill"></i>
+                  </span>
+                </th>
+                <th>
+                  Performed By
+                  <span class="sort-indicator">
+                    <i class="bi bi-caret-up-fill"></i>
+                    <i class="bi bi-caret-down-fill"></i>
+                  </span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="eal-col-check">
+                  <input type="checkbox" class="eal-custom-check" />
+                </td>
+                <td>1</td>
+                <td>28 Jan 2026, 09:30 AM</td>
+                <td>Login Successful</td>
+                <td>Authentication</td>
+                <td>
+                  <div class="eal-name-cell">
+                    <span class="eal-name-text">Mark Administrator</span>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td class="eal-col-check">
+                  <input type="checkbox" class="eal-custom-check" />
+                </td>
+                <td>2</td>
+                <td>28 Jan 2026, 11:15 AM</td>
+                <td>Failed Attempt</td>
+                <td>Security</td>
+                <td>
+                  <div class="eal-name-cell">
+                    <span class="eal-name-text">Unknown User</span>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td class="eal-col-check">
+                  <input type="checkbox" class="eal-custom-check" />
+                </td>
+                <td>3</td>
+                <td>27 Jan 2026, 04:45 PM</td>
+                <td>Logged Out</td>
+                <td>Authentication</td>
+                <td>
+                  <div class="eal-name-cell">
+                    <span class="eal-name-text">Sarah Manager</span>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td class="eal-col-check">
+                  <input type="checkbox" class="eal-custom-check" />
+                </td>
+                <td>4</td>
+                <td>26 Jan 2026, 02:20 PM</td>
+                <td>Session Renewed</td>
+                <td>Authentication</td>
+                <td>
+                  <div class="eal-name-cell">
+                    <span class="eal-name-text">John Doe</span>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td class="eal-col-check">
+                  <input type="checkbox" class="eal-custom-check" />
+                </td>
+                <td>5</td>
+                <td>26 Jan 2026, 08:00 AM</td>
+                <td>Login Successful</td>
+                <td>Authentication</td>
+                <td>
+                  <div class="eal-name-cell">
+                    <span class="eal-name-text">Mike Operations</span>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td class="eal-col-check">
+                  <input type="checkbox" class="eal-custom-check" />
+                </td>
+                <td>6</td>
+                <td>25 Jan 2026, 03:10 PM</td>
+                <td>Timeout Attempt</td>
+                <td>Security</td>
+                <td>
+                  <div class="eal-name-cell">
+                    <span class="eal-name-text">Emma Finance</span>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td class="eal-col-check">
+                  <input type="checkbox" class="eal-custom-check" />
+                </td>
+                <td>7</td>
+                <td>25 Jan 2026, 09:15 AM</td>
+                <td>Login Successful</td>
+                <td>Authentication</td>
+                <td>
+                  <div class="eal-name-cell">
+                    <span class="eal-name-text">David Support</span>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td class="eal-col-check">
+                  <input type="checkbox" class="eal-custom-check" />
+                </td>
+                <td>8</td>
+                <td>24 Jan 2026, 05:30 PM</td>
+                <td>Logged Out</td>
+                <td>Authentication</td>
+                <td>
+                  <div class="eal-name-cell">
+                    <span class="eal-name-text">Mark Administrator</span>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td class="eal-col-check">
+                  <input type="checkbox" class="eal-custom-check" />
+                </td>
+                <td>9</td>
+                <td>24 Jan 2026, 01:45 PM</td>
+                <td>Session Renewed</td>
+                <td>Authentication</td>
+                <td>
+                  <div class="eal-name-cell">
+                    <span class="eal-name-text">Lisa HR</span>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td class="eal-col-check">
+                  <input type="checkbox" class="eal-custom-check" />
+                </td>
+                <td>10</td>
+                <td>23 Jan 2026, 10:00 AM</td>
+                <td>Login Successful</td>
+                <td>Authentication</td>
+                <td>
+                  <div class="eal-name-cell">
+                    <span class="eal-name-text">System Admin</span>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Pagination -->
+        <div class="eal-pagination">
+          <div class="eal-pagination-info">
+            Showing
+            <strong>1&ndash;10</strong>
+            of
+            <strong>10</strong>
+            ticket replies
+          </div>
+          <div class="eal-pagination-controls">
+            <button class="eal-page-btn" title="Previous">
+              <i class="bi bi-chevron-left"></i>
+            </button>
+            <button class="eal-page-btn active">1</button>
+            <button class="eal-page-btn" title="Next">
+              <i class="bi bi-chevron-right"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+  </div>
+</div>
+{% endblock %}

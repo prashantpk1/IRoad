@@ -716,6 +716,55 @@ DEFAULT_NOTIFICATION_EMAIL_TEMPLATES = [
         ),
     },
     {
+        'template_name': 'TENANT_USER_WELCOME',
+        'category': 'Transactional',
+        'subject_en': 'Welcome to iRoad - Your Tenant User Access',
+        'subject_ar': 'مرحباً بك في iRoad - بيانات دخول مستخدم المؤسسة',
+        'body_en': _wrap_email_body(
+            '<h2>Welcome, {{ name }}! 👋</h2>'
+            '<p>Your tenant user account has been created successfully in iRoad.</p>'
+            '<div style="background:linear-gradient(135deg,#f8fafc,#f1f5f9);'
+            'padding:20px 22px;border-radius:12px;border:1px solid #e2e8f0;margin-bottom:20px;">'
+            '<p style="margin:0 0 8px;font-size:14px;color:#334155;"><strong>Login Email:</strong> {{ email }}</p>'
+            '<p style="margin:0 0 8px;font-size:14px;color:#334155;"><strong>Assigned Role:</strong> {{ role_name }}</p>'
+            '<p style="margin:0;font-size:14px;color:#334155;"><strong>Temporary Password:</strong></p>'
+            '<div style="background:#1e293b;color:#e2e8f0;padding:12px 16px;border-radius:8px;'
+            'font-family:monospace;font-size:14px;margin-top:8px;border:1px solid #334155;">{{ password }}</div>'
+            '</div>'
+            '<div style="text-align:center;margin:28px 0;">'
+            '<a href="{{ login_url }}" style="background:linear-gradient(135deg,#4f46e5,#6366f1);'
+            'color:#fff!important;padding:14px 32px;text-decoration:none;border-radius:10px;'
+            'font-weight:700;font-size:15px;display:inline-block;'
+            'box-shadow:0 4px 14px rgba(79,70,229,.3);">Login to Workspace &rarr;</a>'
+            '</div>'
+            '<p style="font-size:13px;color:#94a3b8;">'
+            'Please change your password after first login.</p>'
+        ),
+        'body_ar': _wrap_email_body(
+            '<div dir="rtl" style="text-align:right;">'
+            '<h2>مرحباً بك، {{ name }}! 👋</h2>'
+            '<p>تم إنشاء حساب مستخدم المؤسسة الخاص بك بنجاح في iRoad.</p>'
+            '<div style="background:linear-gradient(135deg,#f8fafc,#f1f5f9);'
+            'padding:20px 22px;border-radius:12px;border:1px solid #e2e8f0;margin-bottom:20px;">'
+            '<p style="margin:0 0 8px;font-size:14px;color:#334155;"><strong>البريد الإلكتروني:</strong> {{ email }}</p>'
+            '<p style="margin:0 0 8px;font-size:14px;color:#334155;"><strong>الدور المعيّن:</strong> {{ role_name }}</p>'
+            '<p style="margin:0;font-size:14px;color:#334155;"><strong>كلمة المرور المؤقتة:</strong></p>'
+            '<div style="background:#1e293b;color:#e2e8f0;padding:12px 16px;border-radius:8px;'
+            'font-family:monospace;font-size:14px;margin-top:8px;border:1px solid #334155;">{{ password }}</div>'
+            '</div>'
+            '<div style="text-align:center;margin:28px 0;">'
+            '<a href="{{ login_url }}" style="background:linear-gradient(135deg,#4f46e5,#6366f1);'
+            'color:#fff!important;padding:14px 32px;text-decoration:none;border-radius:10px;'
+            'font-weight:700;font-size:15px;display:inline-block;'
+            'box-shadow:0 4px 14px rgba(79,70,229,.3);">الدخول إلى مساحة العمل &larr;</a>'
+            '</div>'
+            '<p style="font-size:13px;color:#94a3b8;">'
+            'يرجى تغيير كلمة المرور بعد أول تسجيل دخول.</p>'
+            '</div>',
+            use_rtl=True
+        ),
+    },
+    {
         'template_name': 'TENANT_BRIDGE_ROTATED',
         'category': 'Transactional',
         'subject_en': 'iRoad — API bridge key rotated — {{ company_name }}',
