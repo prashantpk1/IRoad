@@ -17,6 +17,8 @@ from .views import (
     TenantRolesPermissionsView,
     TenantRolePermissionChangesView,
     TenantLoginSessionEventsView,
+    TenantInvoiceDownloadView,
+    TenantInvoiceExportAllView,
     TenantLogoutView,
     TenantMyAccountView,
     TenantOrganizationProfileEditView,
@@ -115,6 +117,16 @@ urlpatterns = [
         'administration/subscription-billing/',
         TenantSubscriptionBillingView.as_view(),
         name='tenant_subscription_billing',
+    ),
+    path(
+        'administration/subscription-billing/export-all/',
+        TenantInvoiceExportAllView.as_view(),
+        name='tenant_invoice_export_all',
+    ),
+    path(
+        'administration/subscription-billing/invoice/<uuid:invoice_id>/download/',
+        TenantInvoiceDownloadView.as_view(),
+        name='tenant_invoice_download',
     ),
     path(
         'administration/audit/login-session-events/',

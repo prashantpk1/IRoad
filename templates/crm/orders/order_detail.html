@@ -95,9 +95,8 @@
   </div>
 </div>
 
-{% if order.order_classification == 'Downgrade' and order.order_status == 'Paid' %}
-  {% if order.tenant.scheduled_downgrade_plan %}
-    {% with plan_name=order.tenant.scheduled_downgrade_plan.plan_name_en eff_date=order.tenant.scheduled_downgrade_effective_date|date:"d M Y" %}
+{% if downgrade_schedule %}
+    {% with plan_name=downgrade_schedule.plan_name eff_date=downgrade_schedule.effective_date|date:"d M Y" %}
     <div class="alert alert-info d-flex align-items-start gap-2 mb-3" role="status">
       <i class="bi bi-calendar-event flex-shrink-0 mt-1"></i>
       <div>
@@ -110,7 +109,6 @@
       </div>
     </div>
     {% endwith %}
-  {% endif %}
 {% endif %}
 
 {# Plan Lines Card #}

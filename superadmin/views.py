@@ -152,6 +152,7 @@ from .forms import (
     TenantSecuritySettingsForm,
     SupportCategoryForm,
     CannedResponseForm,
+    SubscriptionFAQForm,
     SupportTicketForm,
     TicketAssignForm,
     TicketPriorityForm,
@@ -199,6 +200,7 @@ from .models import (
     FXRateChangeLog,
     SupportCategory,
     CannedResponse,
+    SubscriptionFAQ,
     SupportTicket,
     TicketReply,
 )
@@ -532,6 +534,80 @@ class LoginView(View):
             )
         except AdminUser.DoesNotExist:
             tid = (request.GET.get('tid') or request.POST.get('tid') or '').strip()
+            if tid:
+                tenant_by_tid, tenant_user_by_tid, tenant_user_resolution = _resolve_tenant_user_by_tid_and_email(
+                    tid,
+                    email,
+                )
+                if tenant_by_tid and tenant_user_by_tid:
+                    if not check_password(
+                        form.cleaned_data['password'],
+                        tenant_user_by_tid.password_hash,
+                    ):
+                        record_failed_attempt(email)
+                        log_access('Login', 'Failed', email, ip)
+                        brute_after = check_brute_force(email)
+                        if brute_after['is_locked']:
+                            return render_login({
+                                'error': 'Account locked due to too many failed attempts.',
+                                'is_locked': True,
+                                'remaining_seconds': brute_after.get('remaining_seconds', 0),
+                                'lockout_duration_total': settings_obj.lockout_duration_minutes * 60,
+                                'attempts_remaining': 0,
+                                'locked_email': email,
+                            })
+                        remaining_attempts = max(0, settings_obj.max_failed_logins - brute_after['failed_count'])
+                        return render_login({
+                            'error': f"Invalid email or password. {remaining_attempts} attempts remaining before lockout.",
+                            'failed_count': brute_after['failed_count'],
+                            'attempts_remaining': remaining_attempts,
+                        })
+                    temp_expires_at = getattr(tenant_user_by_tid, 'temp_password_expires_at', None)
+                    if temp_expires_at and temp_expires_at <= timezone.now():
+                        log_access('Login', 'Failed', email, ip)
+                        return render_login({
+                            'error': (
+                                'Temporary password has expired after 24 hours. '
+                                'Please contact your tenant administrator for a new password.'
+                            ),
+                        })
+                    request.session['pending_tenant_id'] = str(tenant_by_tid.tenant_id)
+                    request.session['pending_tenant_user_id'] = str(tenant_user_by_tid.user_id)
+                    request.session['pending_tenant_email'] = (tenant_user_by_tid.email or '').strip().lower()
+                    request.session['pending_tenant_ip'] = ip
+                    request.session.modified = True
+                    try:
+                        _issue_tenant_login_otp(
+                            request,
+                            tenant_by_tid,
+                            recipient_email=tenant_user_by_tid.email,
+                            recipient_name=tenant_user_by_tid.full_name,
+                        )
+                    except Exception:
+                        logger.exception('Failed to dispatch tenant-user login OTP for %s', tenant_user_by_tid.email)
+                        return render_login({
+                            'error': (
+                                'Could not send verification code right now. '
+                                'Please try again.'
+                            ),
+                        })
+                    messages.success(
+                        request,
+                        'A verification code has been sent to your email. Enter it to continue.',
+                    )
+                    return redirect('otp_verify')
+                if tenant_user_resolution == 'tenant_user_ambiguous':
+                    log_access('Login', 'Failed', email, ip)
+                    return render_login({
+                        'error': (
+                            'This email is linked to multiple tenant workspaces. '
+                            'Please use your tenant-specific login link.'
+                        ),
+                    })
+                if tenant_user_resolution in ('tenant_user_inactive', 'tenant_user_role_inactive'):
+                    log_access('Login', 'Failed', email, ip)
+                    return render_login({'error': 'User account is not active for login.'})
+
             tenant, tenant_resolution = _resolve_tenant_by_email(email)
             if not tenant:
                 tenant, tenant_user, tenant_user_resolution = _resolve_tenant_user_by_tid_and_email(
@@ -560,6 +636,15 @@ class LoginView(View):
                             'error': f"Invalid email or password. {remaining_attempts} attempts remaining before lockout.",
                             'failed_count': brute_after['failed_count'],
                             'attempts_remaining': remaining_attempts,
+                        })
+                    temp_expires_at = getattr(tenant_user, 'temp_password_expires_at', None)
+                    if temp_expires_at and temp_expires_at <= timezone.now():
+                        log_access('Login', 'Failed', email, ip)
+                        return render_login({
+                            'error': (
+                                'Temporary password has expired after 24 hours. '
+                                'Please contact your tenant administrator for a new password.'
+                            ),
                         })
                     request.session['pending_tenant_id'] = str(tenant.tenant_id)
                     request.session['pending_tenant_user_id'] = str(tenant_user.user_id)
@@ -1090,6 +1175,7 @@ class OTPVerificationView(View):
                     TenantUser.objects.filter(pk=tenant_user.user_id).update(
                         last_login_at=timezone.now(),
                         login_attempts=0,
+                        temp_password_expires_at=None,
                     )
                 finally:
                     connection.set_schema_to_public()
@@ -8223,10 +8309,26 @@ class OrderDetailView(LoginRequiredMixin, View):
             transaction_type='Order_Payment',
         ).order_by('-created_at').first()
         invoice = order.invoices.order_by('-issue_date').first()
+        downgrade_schedule = None
+        if order.order_classification == 'Downgrade' and order.order_status == 'Paid':
+            plan_line = order.plan_lines.first() if order.plan_lines.exists() else None
+            plan_name = ''
+            if plan_line:
+                plan_name = (
+                    (plan_line.plan_name_en_snapshot or '').strip()
+                    or plan_line.plan.plan_name_en
+                )
+            eff_date = order.projected_expiry_date
+            if plan_name and eff_date:
+                downgrade_schedule = {
+                    'plan_name': plan_name,
+                    'effective_date': eff_date,
+                }
         return render(request, self.template_name, {
             'order': order,
             'payment_txn': payment_txn,
             'invoice': invoice,
+            'downgrade_schedule': downgrade_schedule,
         })
 
 
@@ -9352,6 +9454,158 @@ class CannedResponseDeleteView(LoginRequiredMixin, View):
 
     def get(self, request, pk):
         return self.post(request, pk)
+
+
+class SubscriptionFAQListView(LoginRequiredMixin, View):
+    template_name = 'support/faqs/faq_list.html'
+
+    def get(self, request):
+        sort_by = request.GET.get('sort', 'rank').strip()
+        sort_dir = request.GET.get('dir', 'desc').strip().lower()
+        if sort_dir not in ('asc', 'desc'):
+            sort_dir = 'desc'
+
+        qs = SubscriptionFAQ.objects.annotate(
+            default_rank=Window(
+                expression=RowNumber(),
+                order_by=F('display_order').asc(),
+            )
+        )
+        q = request.GET.get('q', '').strip()
+        status_filter = request.GET.get('is_active', 'All').strip()
+        if q:
+            qs = qs.filter(Q(question__icontains=q) | Q(answer__icontains=q))
+        if status_filter == 'Active':
+            qs = qs.filter(is_active=True)
+        elif status_filter == 'Inactive':
+            qs = qs.filter(is_active=False)
+
+        sort_mapping = {
+            'rank': ['default_rank'],
+            'question': ['question'],
+            'order': ['display_order'],
+            'status': ['is_active'],
+        }
+        active_sort_fields = sort_mapping.get(sort_by, ['default_rank'])
+        ordering = []
+        for f in active_sort_fields:
+            ordering.append(f if sort_dir == 'asc' else f'-{f}')
+        qs = qs.order_by(*ordering)
+
+        total_count = qs.count()
+        paginator = Paginator(qs, 10)
+        faqs = paginator.get_page(request.GET.get('page'))
+        start_index = faqs.start_index()
+        for offset, faq in enumerate(faqs.object_list):
+            faq.list_rank = total_count - (start_index + offset) + 1
+        return render(
+            request,
+            self.template_name,
+            {
+                'faqs': faqs,
+                'search_query': q,
+                'status_filter': status_filter,
+                'current_sort': sort_by,
+                'current_dir': sort_dir,
+            },
+        )
+
+
+class SubscriptionFAQCreateView(LoginRequiredMixin, View):
+    template_name = 'support/faqs/faq_form.html'
+
+    def get(self, request):
+        redirect_resp = _require_root_or_redirect(request)
+        if redirect_resp:
+            return redirect_resp
+        return render(
+            request,
+            self.template_name,
+            {
+                'form': SubscriptionFAQForm(),
+                'is_edit': False,
+                'faq': None,
+            },
+        )
+
+    def post(self, request):
+        redirect_resp = _require_root_or_redirect(request)
+        if redirect_resp:
+            return redirect_resp
+        form = SubscriptionFAQForm(request.POST)
+        if form.is_valid():
+            faq = form.save(commit=False)
+            faq.created_by = request.user
+            faq.updated_by = request.user
+            faq.save()
+            messages.success(request, 'FAQ created successfully.')
+            return redirect('subscription_faq_list')
+        return render(
+            request,
+            self.template_name,
+            {
+                'form': form,
+                'is_edit': False,
+                'faq': None,
+            },
+        )
+
+
+class SubscriptionFAQUpdateView(LoginRequiredMixin, View):
+    template_name = 'support/faqs/faq_form.html'
+
+    def get(self, request, pk):
+        redirect_resp = _require_root_or_redirect(request)
+        if redirect_resp:
+            return redirect_resp
+        faq = get_object_or_404(SubscriptionFAQ, pk=pk)
+        return render(
+            request,
+            self.template_name,
+            {
+                'form': SubscriptionFAQForm(instance=faq),
+                'is_edit': True,
+                'faq': faq,
+            },
+        )
+
+    def post(self, request, pk):
+        redirect_resp = _require_root_or_redirect(request)
+        if redirect_resp:
+            return redirect_resp
+        faq = get_object_or_404(SubscriptionFAQ, pk=pk)
+        form = SubscriptionFAQForm(request.POST, instance=faq)
+        if form.is_valid():
+            updated = form.save(commit=False)
+            updated.updated_by = request.user
+            updated.save()
+            messages.success(request, 'FAQ updated successfully.')
+            return redirect('subscription_faq_list')
+        return render(
+            request,
+            self.template_name,
+            {
+                'form': form,
+                'is_edit': True,
+                'faq': faq,
+            },
+        )
+
+
+class SubscriptionFAQToggleStatusView(LoginRequiredMixin, View):
+    def post(self, request, pk):
+        redirect_resp = _require_root_or_redirect(request)
+        if redirect_resp:
+            return redirect_resp
+        faq = get_object_or_404(SubscriptionFAQ, pk=pk)
+        faq.is_active = not faq.is_active
+        faq.updated_by = request.user
+        faq.save(update_fields=['is_active', 'updated_by', 'updated_at'])
+        messages.success(
+            request,
+            f"FAQ '{faq.question}' {'activated' if faq.is_active else 'deactivated'}.",
+        )
+        return redirect('subscription_faq_list')
 
 
 class TicketListView(LoginRequiredMixin, View):

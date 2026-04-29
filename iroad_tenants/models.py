@@ -67,3 +67,38 @@ class TenantAuthToken(models.Model):
 
     class Meta:
         db_table = 'iroad_tenants_auth_tokens'
+
+
+class TenantPaymentCard(models.Model):
+    """Tenant-managed card metadata for default subscription payments."""
+
+    card_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant_profile = models.ForeignKey(
+        'superadmin.TenantProfile',
+        on_delete=models.CASCADE,
+        related_name='payment_cards',
+    )
+    cardholder_name = models.CharField(max_length=120)
+    brand = models.CharField(max_length=30, blank=True, default='Card')
+    last4 = models.CharField(max_length=4)
+    expiry_month = models.PositiveSmallIntegerField()
+    expiry_year = models.PositiveSmallIntegerField()
+    is_default = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        if self.is_default:
+            TenantPaymentCard.objects.filter(
+                tenant_profile=self.tenant_profile,
+                is_active=True,
+            ).exclude(pk=self.pk).update(is_default=False)
+
+    def __str__(self):
+        return f'{self.tenant_profile.company_name} •••• {self.last4}'
+
+    class Meta:
+        db_table = 'iroad_tenants_payment_cards'
+        ordering = ['-is_default', '-updated_at']

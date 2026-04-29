@@ -727,7 +727,7 @@ DEFAULT_NOTIFICATION_EMAIL_TEMPLATES = [
             'padding:20px 22px;border-radius:12px;border:1px solid #e2e8f0;margin-bottom:20px;">'
             '<p style="margin:0 0 8px;font-size:14px;color:#334155;"><strong>Login Email:</strong> {{ email }}</p>'
             '<p style="margin:0 0 8px;font-size:14px;color:#334155;"><strong>Assigned Role:</strong> {{ role_name }}</p>'
-            '<p style="margin:0;font-size:14px;color:#334155;"><strong>Temporary Password:</strong></p>'
+            '<p style="margin:0;font-size:14px;color:#334155;"><strong>Password:</strong></p>'
             '<div style="background:#1e293b;color:#e2e8f0;padding:12px 16px;border-radius:8px;'
             'font-family:monospace;font-size:14px;margin-top:8px;border:1px solid #334155;">{{ password }}</div>'
             '</div>'

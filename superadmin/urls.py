@@ -89,6 +89,10 @@ from .views import (
     SupportCategoryListView,
     SupportCategoryToggleStatusView,
     SupportCategoryUpdateView,
+    SubscriptionFAQCreateView,
+    SubscriptionFAQListView,
+    SubscriptionFAQToggleStatusView,
+    SubscriptionFAQUpdateView,
     AdminUserCreateView,
     AdminUserDeleteView,
     AdminUserDetailView,
@@ -767,6 +771,26 @@ urlpatterns = [
         'support/canned/<uuid:pk>/delete/',
         CannedResponseDeleteView.as_view(),
         name='canned_response_delete',
+    ),
+    path(
+        'support/faqs/',
+        SubscriptionFAQListView.as_view(),
+        name='subscription_faq_list',
+    ),
+    path(
+        'support/faqs/create/',
+        SubscriptionFAQCreateView.as_view(),
+        name='subscription_faq_create',
+    ),
+    path(
+        'support/faqs/<uuid:pk>/edit/',
+        SubscriptionFAQUpdateView.as_view(),
+        name='subscription_faq_edit',
+    ),
+    path(
+        'support/faqs/<uuid:pk>/toggle/',
+        SubscriptionFAQToggleStatusView.as_view(),
+        name='subscription_faq_toggle',
     ),
     path(
         'support/tickets/',

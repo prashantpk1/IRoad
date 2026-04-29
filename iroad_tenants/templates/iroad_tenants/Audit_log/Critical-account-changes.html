@@ -134,7 +134,7 @@
             <i class="bi bi-file-earmark-text"></i>
           </div>
           <div>
-            <div class="eal-stat-value">15</div>
+            <div class="eal-stat-value">{{ critical_account_total_changes }}</div>
             <div class="eal-stat-label">Total Changes</div>
           </div>
         </div>
@@ -143,7 +143,7 @@
             <i class="bi bi-check-circle"></i>
           </div>
           <div>
-            <div class="eal-stat-value">5</div>
+            <div class="eal-stat-value">{{ critical_account_billing_updates }}</div>
             <div class="eal-stat-label">Billing Updates</div>
           </div>
         </div>
@@ -152,7 +152,7 @@
             <i class="bi bi-hourglass-split"></i>
           </div>
           <div>
-            <div class="eal-stat-value">7</div>
+            <div class="eal-stat-value">{{ critical_account_security_updates }}</div>
             <div class="eal-stat-label">Security Updates</div>
           </div>
         </div>
@@ -161,7 +161,7 @@
             <i class="bi bi-x-octagon"></i>
           </div>
           <div>
-            <div class="eal-stat-value">3</div>
+            <div class="eal-stat-value">{{ critical_account_critical_alerts }}</div>
             <div class="eal-stat-label">Critical Alerts</div>
           </div>
         </div>
@@ -223,146 +223,26 @@
               </tr>
             </thead>
             <tbody>
+              {% for row in critical_account_rows %}
               <tr>
                 <td class="eal-col-check">
                   <input type="checkbox" class="eal-custom-check" />
                 </td>
-                <td>1</td>
-                <td>28 Jan 2026, 03:20 PM</td>
-                <td>Password Reset Initiated</td>
-                <td>Security Settings</td>
+                <td>{{ row.sl_no }}</td>
+                <td>{{ row.timestamp|date:"d M Y, h:i A" }}</td>
+                <td>{{ row.action }}</td>
+                <td>{{ row.module }}</td>
                 <td>
                   <div class="eal-name-cell">
-                    <span class="eal-name-text">Mark Administrator</span>
+                    <span class="eal-name-text">{{ row.performed_by }}</span>
                   </div>
                 </td>
               </tr>
+              {% empty %}
               <tr>
-                <td class="eal-col-check">
-                  <input type="checkbox" class="eal-custom-check" />
-                </td>
-                <td>2</td>
-                <td>26 Jan 2026, 11:05 AM</td>
-                <td>Billing Plan Updated</td>
-                <td>Billing Settings</td>
-                <td>
-                  <div class="eal-name-cell">
-                    <span class="eal-name-text">Finance Manager</span>
-                  </div>
-                </td>
+                <td colspan="6" class="text-center text-muted py-4">No critical account changes found.</td>
               </tr>
-              <tr>
-                <td class="eal-col-check">
-                  <input type="checkbox" class="eal-custom-check" />
-                </td>
-                <td>3</td>
-                <td>25 Jan 2026, 01:40 PM</td>
-                <td>2FA Status Changed</td>
-                <td>Security Settings</td>
-                <td>
-                  <div class="eal-name-cell">
-                    <span class="eal-name-text">Super Admin</span>
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td class="eal-col-check">
-                  <input type="checkbox" class="eal-custom-check" />
-                </td>
-                <td>4</td>
-                <td>24 Jan 2026, 09:15 AM</td>
-                <td>API Key Regenerated</td>
-                <td>Security Settings</td>
-                <td>
-                  <div class="eal-name-cell">
-                    <span class="eal-name-text">System Auto</span>
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td class="eal-col-check">
-                  <input type="checkbox" class="eal-custom-check" />
-                </td>
-                <td>5</td>
-                <td>23 Jan 2026, 04:50 PM</td>
-                <td>Payment Method Added</td>
-                <td>Billing Settings</td>
-                <td>
-                  <div class="eal-name-cell">
-                    <span class="eal-name-text">Emma Finance</span>
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td class="eal-col-check">
-                  <input type="checkbox" class="eal-custom-check" />
-                </td>
-                <td>6</td>
-                <td>22 Jan 2026, 10:30 AM</td>
-                <td>Root Account Accessed</td>
-                <td>Tenant Config</td>
-                <td>
-                  <div class="eal-name-cell">
-                    <span class="eal-name-text">Security Team</span>
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td class="eal-col-check">
-                  <input type="checkbox" class="eal-custom-check" />
-                </td>
-                <td>7</td>
-                <td>21 Jan 2026, 02:15 PM</td>
-                <td>Database Backup Exported</td>
-                <td>Tenant Config</td>
-                <td>
-                  <div class="eal-name-cell">
-                    <span class="eal-name-text">System Admin</span>
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td class="eal-col-check">
-                  <input type="checkbox" class="eal-custom-check" />
-                </td>
-                <td>8</td>
-                <td>20 Jan 2026, 11:45 AM</td>
-                <td>Session Timeout Changed</td>
-                <td>Security Settings</td>
-                <td>
-                  <div class="eal-name-cell">
-                    <span class="eal-name-text">Sarah Manager</span>
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td class="eal-col-check">
-                  <input type="checkbox" class="eal-custom-check" />
-                </td>
-                <td>9</td>
-                <td>19 Jan 2026, 03:20 PM</td>
-                <td>SSO Integration Enabled</td>
-                <td>Security Settings</td>
-                <td>
-                  <div class="eal-name-cell">
-                    <span class="eal-name-text">Mark Administrator</span>
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td class="eal-col-check">
-                  <input type="checkbox" class="eal-custom-check" />
-                </td>
-                <td>10</td>
-                <td>18 Jan 2026, 09:10 AM</td>
-                <td>Subscription Cancelled</td>
-                <td>Billing Settings</td>
-                <td>
-                  <div class="eal-name-cell">
-                    <span class="eal-name-text">Finance Manager</span>
-                  </div>
-                </td>
-              </tr>
+              {% endfor %}
             </tbody>
           </table>
         </div>
@@ -371,19 +251,33 @@
         <div class="eal-pagination">
           <div class="eal-pagination-info">
             Showing
-            <strong>1&ndash;10</strong>
+            <strong>{{ critical_account_page_obj.start_index }}&ndash;{{ critical_account_page_obj.end_index }}</strong>
             of
-            <strong>10</strong>
-            ticket replies
+            <strong>{{ critical_account_total_changes }}</strong>
+            changes
           </div>
           <div class="eal-pagination-controls">
-            <button class="eal-page-btn" title="Previous">
+            {% if critical_account_page_obj.has_previous %}
+            <a class="eal-page-btn" title="Previous" href="?page={{ critical_account_page_obj.previous_page_number }}">
+              <i class="bi bi-chevron-left"></i>
+            </a>
+            {% else %}
+            <button class="eal-page-btn" title="Previous" disabled>
               <i class="bi bi-chevron-left"></i>
             </button>
-            <button class="eal-page-btn active">1</button>
-            <button class="eal-page-btn" title="Next">
+            {% endif %}
+
+            <button class="eal-page-btn active">{{ critical_account_page_obj.number }}</button>
+
+            {% if critical_account_page_obj.has_next %}
+            <a class="eal-page-btn" title="Next" href="?page={{ critical_account_page_obj.next_page_number }}">
+              <i class="bi bi-chevron-right"></i>
+            </a>
+            {% else %}
+            <button class="eal-page-btn" title="Next" disabled>
               <i class="bi bi-chevron-right"></i>
             </button>
+            {% endif %}
           </div>
         </div>
       </div>

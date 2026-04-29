@@ -1328,6 +1328,11 @@ def provision_tenant_from_order(order):
                 tenant.scheduled_downgrade_plan = target_plan
                 tenant.scheduled_downgrade_effective_date = eff
 
+    # Keep pending downgrade aligned with the active subscription end date.
+    # This prevents stale scheduled dates after renewals/upgrades move expiry.
+    if tenant.scheduled_downgrade_plan_id:
+        tenant.scheduled_downgrade_effective_date = tenant.subscription_expiry_date
+
     tenant.save()
     
     # CP-PCS-P1 §1.1: Ensure isolated database schema (django-tenants)

@@ -8,6 +8,45 @@
 <li class="breadcrumb-item active" aria-current="page">Subscription Billing</li>
 {% endblock %}
 
+{% block extra_css %}
+<style>
+  .bill-card-carousel-wrap { position: relative; }
+  .bill-card-nav-row {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 10px;
+  }
+  .bill-card-nav-row .bill-action-btn {
+    min-width: 38px;
+  }
+  .bill-current-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(45, 181, 93, 0.3);
+    background: rgba(45, 181, 93, 0.1);
+    color: #1f9a4f;
+    font-weight: 600;
+  }
+  .bill-section-header--compact {
+    align-items: center;
+    gap: 10px;
+  }
+  .bill-section-header--compact #currentInUseBadgeWrap {
+    margin-bottom: 0 !important;
+    margin-left: auto;
+  }
+  .current-badge-wrap {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 8px;
+  }
+</style>
+{% endblock %}
+
 {% block content %}
 
 <div class="page-header">
@@ -35,8 +74,8 @@
           </div>
           <div class="bill-overview-info">
             <span class="bill-overview-label">Current Plan</span>
-            <span class="bill-overview-value">Professional</span>
-            <span class="bill-overview-sub">Monthly Billing</span>
+            <span class="bill-overview-value">{% if current_plan %}{{ current_plan.plan_name_en }}{% else %}No Plan{% endif %}</span>
+            <span class="bill-overview-sub">{{ current_cycle_label }}</span>
           </div>
           <span class="bill-status-badge bill-status-badge--active"
             >Active</span
@@ -50,8 +89,8 @@
           </div>
           <div class="bill-overview-info">
             <span class="bill-overview-label">Next Payment</span>
-            <span class="bill-overview-value">$79.00</span>
-            <span class="bill-overview-sub">Due on Apr 1, 2026</span>
+            <span class="bill-overview-value">{{ active_currency }} {{ current_price }}</span>
+            <span class="bill-overview-sub">Due on {% if next_payment_due %}{{ next_payment_due|date:"M j, Y" }}{% else %}--{% endif %}</span>
           </div>
         </div>
 
@@ -62,8 +101,8 @@
           </div>
           <div class="bill-overview-info">
             <span class="bill-overview-label">Payment Method</span>
-            <span class="bill-overview-value">•••• 4242</span>
-            <span class="bill-overview-sub">Visa — Expires 09/27</span>
+            <span class="bill-overview-value">{% if default_card %}•••• {{ default_card.last4 }}{% else %}Not Set{% endif %}</span>
+            <span class="bill-overview-sub">{% if default_card %}{{ default_card.brand }} — Expires {{ default_card.expiry_month|stringformat:"02d" }}/{{ default_card.expiry_year|stringformat:"d"|slice:"2:" }}{% else %}Add a default card{% endif %}</span>
           </div>
         </div>
 
@@ -74,8 +113,8 @@
           </div>
           <div class="bill-overview-info">
             <span class="bill-overview-label">Total Spent (YTD)</span>
-            <span class="bill-overview-value">$237.00</span>
-            <span class="bill-overview-sub">3 invoices this year</span>
+            <span class="bill-overview-value">{{ active_currency }} {{ total_spent_ytd }}</span>
+            <span class="bill-overview-sub">{{ invoices|length }} invoices</span>
           </div>
         </div>
       </div>
@@ -90,10 +129,10 @@
                 View and download your past invoices
               </p>
             </div>
-            <button class="sub-help-btn sub-help-btn--outline" type="button">
+            <a class="sub-help-btn sub-help-btn--outline" href="{% url 'iroad_tenants:tenant_invoice_export_all' %}">
               <i class="bi bi-download"></i>
               Export All
-            </button>
+            </a>
           </div>
           <div class="bill-table-wrapper">
             <table class="bill-table">
@@ -108,152 +147,28 @@
                 </tr>
               </thead>
               <tbody>
+                {% for invoice in invoices %}
                 <tr>
-                  <td class="bill-invoice-id">#INV-2026-003</td>
-                  <td>Mar 1, 2026</td>
-                  <td>Professional</td>
-                  <td class="bill-amount">$79.00</td>
+                  <td class="bill-invoice-id">#{{ invoice.invoice_number }}</td>
+                  <td>{{ invoice.issue_date|date:"M j, Y" }}</td>
+                  <td>{% if invoice.order.projected_plan %}{{ invoice.order.projected_plan.plan_name_en }}{% elif current_plan %}{{ current_plan.plan_name_en }}{% else %}--{% endif %}</td>
+                  <td class="bill-amount">{{ invoice.currency.currency_code }} {{ invoice.grand_total }}</td>
                   <td>
-                    <span class="bill-status bill-status--paid">Paid</span>
+                    <span class="bill-status {% if invoice.status == 'Paid' or invoice.status == 'Issued' %}bill-status--paid{% elif invoice.status == 'Void' %}bill-status--refunded{% else %}bill-status--paid{% endif %}">
+                      {{ invoice.status }}
+                    </span>
                   </td>
                   <td>
-                    <button
-                      class="bill-action-btn"
-                      title="Download Invoice"
-                      type="button"
-                    >
+                    <a class="bill-action-btn" title="Download Invoice" href="{% url 'iroad_tenants:tenant_invoice_download' invoice.invoice_id %}">
                       <i class="bi bi-download"></i>
-                    </button>
+                    </a>
                   </td>
                 </tr>
+                {% empty %}
                 <tr>
-                  <td class="bill-invoice-id">#INV-2026-002</td>
-                  <td>Feb 1, 2026</td>
-                  <td>Professional</td>
-                  <td class="bill-amount">$79.00</td>
-                  <td>
-                    <span class="bill-status bill-status--paid">Paid</span>
-                  </td>
-                  <td>
-                    <button
-                      class="bill-action-btn"
-                      title="Download Invoice"
-                      type="button"
-                    >
-                      <i class="bi bi-download"></i>
-                    </button>
-                  </td>
+                  <td colspan="6" class="text-center py-4">No billing history available.</td>
                 </tr>
-                <tr>
-                  <td class="bill-invoice-id">#INV-2026-001</td>
-                  <td>Jan 1, 2026</td>
-                  <td>Professional</td>
-                  <td class="bill-amount">$79.00</td>
-                  <td>
-                    <span class="bill-status bill-status--paid">Paid</span>
-                  </td>
-                  <td>
-                    <button
-                      class="bill-action-btn"
-                      title="Download Invoice"
-                      type="button"
-                    >
-                      <i class="bi bi-download"></i>
-                    </button>
-                  </td>
-                </tr>
-                <tr>
-                  <td class="bill-invoice-id">#INV-2025-012</td>
-                  <td>Dec 1, 2025</td>
-                  <td>Professional</td>
-                  <td class="bill-amount">$79.00</td>
-                  <td>
-                    <span class="bill-status bill-status--paid">Paid</span>
-                  </td>
-                  <td>
-                    <button
-                      class="bill-action-btn"
-                      title="Download Invoice"
-                      type="button"
-                    >
-                      <i class="bi bi-download"></i>
-                    </button>
-                  </td>
-                </tr>
-                <tr>
-                  <td class="bill-invoice-id">#INV-2025-011</td>
-                  <td>Nov 1, 2025</td>
-                  <td>Professional</td>
-                  <td class="bill-amount">$79.00</td>
-                  <td>
-                    <span class="bill-status bill-status--paid">Paid</span>
-                  </td>
-                  <td>
-                    <button
-                      class="bill-action-btn"
-                      title="Download Invoice"
-                      type="button"
-                    >
-                      <i class="bi bi-download"></i>
-                    </button>
-                  </td>
-                </tr>
-                <tr>
-                  <td class="bill-invoice-id">#INV-2025-010</td>
-                  <td>Oct 1, 2025</td>
-                  <td>Starter</td>
-                  <td class="bill-amount">$29.00</td>
-                  <td>
-                    <span class="bill-status bill-status--paid">Paid</span>
-                  </td>
-                  <td>
-                    <button
-                      class="bill-action-btn"
-                      title="Download Invoice"
-                      type="button"
-                    >
-                      <i class="bi bi-download"></i>
-                    </button>
-                  </td>
-                </tr>
-                <tr>
-                  <td class="bill-invoice-id">#INV-2025-009</td>
-                  <td>Sep 1, 2025</td>
-                  <td>Starter</td>
-                  <td class="bill-amount">$29.00</td>
-                  <td>
-                    <span class="bill-status bill-status--paid">Paid</span>
-                  </td>
-                  <td>
-                    <button
-                      class="bill-action-btn"
-                      title="Download Invoice"
-                      type="button"
-                    >
-                      <i class="bi bi-download"></i>
-                    </button>
-                  </td>
-                </tr>
-                <tr>
-                  <td class="bill-invoice-id">#INV-2025-008</td>
-                  <td>Aug 1, 2025</td>
-                  <td>Starter</td>
-                  <td class="bill-amount">$29.00</td>
-                  <td>
-                    <span class="bill-status bill-status--refunded"
-                      >Refunded</span
-                    >
-                  </td>
-                  <td>
-                    <button
-                      class="bill-action-btn"
-                      title="Download Invoice"
-                      type="button"
-                    >
-                      <i class="bi bi-download"></i>
-                    </button>
-                  </td>
-                </tr>
+                {% endfor %}
               </tbody>
             </table>
           </div>
@@ -265,32 +180,95 @@
           <div class="bill-section">
             <div class="bill-section-header">
               <h2 class="bill-section-title">Payment Method</h2>
+              <div class="current-badge-wrap" id="currentInUseBadgeWrap" {% if not default_card %}style="display:none;"{% endif %}>
+                <span class="bill-current-badge">
+                  <i class="bi bi-check-circle-fill"></i>
+                  Default
+                </span>
+              </div>
+              <form method="post" id="removeCardForm">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="remove_card">
+                <input type="hidden" name="card_id" id="removeCardIdInput" value="">
+                <button
+                  id="removeCardBtn"
+                  class="sub-help-btn sub-help-btn--outline"
+                  type="submit"
+                  {% if not payment_cards or payment_cards|length <= 1 %}style="display:none;"{% endif %}
+                  onclick="return confirm('Remove this card?')"
+                  title="Remove card"
+                >
+                  <i class="bi bi-trash"></i>
+                </button>
+              </form>
             </div>
             <div class="bill-payment-card">
-              <div class="bill-card-visual">
+           
+              {% if default_card %}
+             
+              {% endif %}
+              <div class="bill-card-carousel-wrap">
+              <div id="paymentCardCarousel" data-default-card-id="{% if default_card %}{{ default_card.card_id }}{% endif %}">
+                {% for card in payment_cards %}
+              <div class="bill-card-visual" data-card-id="{{ card.card_id }}" data-holder="{{ card.cardholder_name|escape }}" data-expiry="{{ card.expiry_month|stringformat:'02d' }}/{{ card.expiry_year|stringformat:'d'|slice:'2:' }}" data-last4="{{ card.last4 }}" data-is-default="{% if card.is_default %}1{% else %}0{% endif %}">
                 <div class="bill-card-chip"></div>
-                <div class="bill-card-number">•••• •••• •••• 4242</div>
+                <div class="bill-card-number">•••• •••• •••• {{ card.last4 }}</div>
                 <div class="bill-card-details">
                   <div class="bill-card-holder">
                     <span class="bill-card-label">Card Holder</span>
-                    <span class="bill-card-value">Mark Jones</span>
+                    <span class="bill-card-value">{{ card.cardholder_name }}</span>
                   </div>
                   <div class="bill-card-expiry">
                     <span class="bill-card-label">Expires</span>
-                    <span class="bill-card-value">09/27</span>
+                    <span class="bill-card-value">{{ card.expiry_month|stringformat:"02d" }}/{{ card.expiry_year|stringformat:"d"|slice:"2:" }}</span>
                   </div>
                 </div>
-                <div class="bill-card-brand">VISA</div>
+                <div class="bill-card-brand">{{ card.brand }}</div>
               </div>
+                {% endfor %}
+                {% if not payment_cards %}
+                <div class="bill-card-visual">
+                  <div class="bill-card-chip"></div>
+                  <div class="bill-card-number">•••• •••• •••• ----</div>
+                  <div class="bill-card-details">
+                    <div class="bill-card-holder">
+                      <span class="bill-card-label">Card Holder</span>
+                      <span class="bill-card-value">{{ display_name }}</span>
+                    </div>
+                    <div class="bill-card-expiry">
+                      <span class="bill-card-label">Expires</span>
+                      <span class="bill-card-value">--/--</span>
+                    </div>
+                  </div>
+                  <div class="bill-card-brand">CARD</div>
+                </div>
+                {% endif %}
+              </div>
+              </div>
+              {% if payment_cards|length > 1 %}
+              <div class="bill-card-nav-row">
+                <button class="bill-action-btn" type="button" id="prevCardBtn" title="Previous card" aria-label="Previous card">
+                  <i class="bi bi-chevron-left"></i>
+                </button>
+                <button class="bill-action-btn" type="button" id="nextCardBtn" title="Next card" aria-label="Next card">
+                  <i class="bi bi-chevron-right"></i>
+                </button>
+              </div>
+              {% endif %}
               <div class="bill-payment-actions">
                 <button
+                  id="openUpdateCardBtn"
                   class="sub-help-btn sub-help-btn--primary"
                   type="button"
+                  data-bs-toggle="modal"
+                  data-bs-target="#addPaymentCardModal"
+                  {% if not payment_cards %}disabled{% endif %}
                 >
                   <i class="bi bi-pencil-square"></i>
                   Update Card
                 </button>
                 <button
+                  id="openAddCardBtn"
                   class="sub-help-btn sub-help-btn--outline"
                   type="button"
                   data-bs-toggle="modal"
@@ -301,6 +279,7 @@
                   <i class="bi bi-plus-lg"></i>
                   Add New
                 </button>
+
               </div>
             </div>
           </div>
@@ -315,30 +294,28 @@
                 <i class="bi bi-person"></i>
                 <div>
                   <span class="bill-contact-label">Name</span>
-                  <span class="bill-contact-value">Mark Jones</span>
+                  <span class="bill-contact-value">{{ display_name }}</span>
                 </div>
               </div>
               <div class="bill-contact-row">
                 <i class="bi bi-envelope"></i>
                 <div>
                   <span class="bill-contact-label">Email</span>
-                  <span class="bill-contact-value">mark@redsparkinfo.com</span>
+                  <span class="bill-contact-value">{{ tenant.primary_email }}</span>
                 </div>
               </div>
               <div class="bill-contact-row">
                 <i class="bi bi-building"></i>
                 <div>
                   <span class="bill-contact-label">Company</span>
-                  <span class="bill-contact-value">Redspark Technologies</span>
+                  <span class="bill-contact-value">{{ tenant.company_name }}</span>
                 </div>
               </div>
               <div class="bill-contact-row">
                 <i class="bi bi-geo-alt"></i>
                 <div>
                   <span class="bill-contact-label">Address</span>
-                  <span class="bill-contact-value"
-                    >Vadodara, Gujarat, India</span
-                  >
+                  <span class="bill-contact-value">{{ tenant.registered_address|default:"--" }}</span>
                 </div>
               </div>
             </div>
@@ -373,7 +350,10 @@
               aria-label="Close"
             ></button>
           </div>
-          <form id="addPaymentCardForm" class="needs-validation" novalidate>
+          <form id="addPaymentCardForm" class="needs-validation" novalidate method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" id="paymentCardActionInput" value="add_card">
+            <input type="hidden" name="card_id" id="paymentCardIdInput" value="">
             <div class="modal-body">
               
 
@@ -426,21 +406,21 @@
                 </div>
 
                 <div class="col-md-6">
-                  <label class="form-label" for="addCardExpMonth">
+                  <label class="form-label" for="addCardExpiry">
                     Expiry  <span class="text-danger">*</span>
                   </label>
                   <input
                     type="text"
                     class="form-control"
-                    id="addCardCvc"
-                    name="cvc"
-                    inputmode="numeric"
-                    autocomplete="cc-csc"
+                    id="addCardExpiry"
+                    name="expiry"
+                    inputmode="text"
+                    autocomplete="cc-exp"
                     placeholder="mm/yy"
                     required
-                    maxlength="4"
-                    minlength="3"
-                    pattern="\d{3,4}"
+                    maxlength="5"
+                    minlength="5"
+                    pattern="\d{2}/\d{2}"
                    
                     spellcheck="false"
                     autocorrect="off"
@@ -479,7 +459,7 @@
 
                 
 
-                <div class="col-12">
+                <div class="col-12" id="defaultCardOptionRow">
                   <div class="form-check">
                     <input
                       class="form-check-input"
@@ -504,7 +484,7 @@
               </button>
               <button type="submit" class="btn btn-primary">
                 <i class="bi bi-check-lg me-1" aria-hidden="true"></i>
-                Save card
+                <span id="paymentCardSubmitLabel">Save card</span>
               </button>
             </div>
           </form>
@@ -519,6 +499,31 @@
     var modalEl = document.getElementById("addPaymentCardModal");
     var form = document.getElementById("addPaymentCardForm");
     var cardInput = document.getElementById("addCardNumber");
+    var expiryInput = document.getElementById("addCardExpiry");
+    var carousel = document.getElementById("paymentCardCarousel");
+    var prevBtn = document.getElementById("prevCardBtn");
+    var nextBtn = document.getElementById("nextCardBtn");
+    var actionInput = document.getElementById("paymentCardActionInput");
+    var cardIdInput = document.getElementById("paymentCardIdInput");
+    var submitLabel = document.getElementById("paymentCardSubmitLabel");
+    var modalTitle = document.getElementById("addPaymentCardModalLabel");
+    var holderInput = document.getElementById("addCardCardholderName");
+    var cvcInput = document.getElementById("addCardCvc");
+    var defaultCheckbox = document.getElementById("addCardDefault");
+    var defaultCardOptionRow = document.getElementById("defaultCardOptionRow");
+    var removeCardIdInput = document.getElementById("removeCardIdInput");
+    var removeCardBtn = document.getElementById("removeCardBtn");
+    var currentInUseBadgeWrap = document.getElementById("currentInUseBadgeWrap");
+    var removeCardForm = document.getElementById("removeCardForm");
+    var paymentSectionHeader = document.querySelector(".bill-section-header");
+    var openAddBtn = document.getElementById("openAddCardBtn");
+    var openUpdateBtn = document.getElementById("openUpdateCardBtn");
+    var cardElements = carousel ? carousel.querySelectorAll(".bill-card-visual") : [];
+    var cardIds = Array.prototype.map.call(cardElements, function (el) {
+      return el.getAttribute("data-card-id");
+    });
+    var defaultCardId = carousel ? (carousel.getAttribute("data-default-card-id") || "") : "";
+    var activeCardIndex = 0;
     if (!modalEl || !form) return;
 
     if (cardInput) {
@@ -527,21 +532,150 @@
         e.target.value = digits.replace(/(\d{4})(?=\d)/g, "$1 ").trim();
       });
     }
+    if (expiryInput) {
+      expiryInput.addEventListener("input", function (e) {
+        var digits = e.target.value.replace(/\D/g, "").slice(0, 4);
+        if (digits.length >= 3) {
+          e.target.value = digits.slice(0, 2) + "/" + digits.slice(2);
+        } else {
+          e.target.value = digits;
+        }
+      });
+    }
+    var applyHeaderState = function () {
+      var activeEl = cardElements[activeCardIndex] || null;
+      var activeCardId = activeEl ? (activeEl.getAttribute("data-card-id") || "") : "";
+      var isDefault = !!activeCardId && !!defaultCardId && activeCardId === defaultCardId;
+      if (currentInUseBadgeWrap) {
+        currentInUseBadgeWrap.style.display = isDefault ? "" : "none";
+      }
+      if (removeCardBtn) {
+        removeCardBtn.style.display = (!isDefault && cardElements.length > 1) ? "" : "none";
+      }
+      if (removeCardForm && paymentSectionHeader) {
+        var trashVisible = removeCardBtn && removeCardBtn.style.display !== "none";
+        removeCardForm.style.display = trashVisible ? "" : "none";
+        paymentSectionHeader.classList.toggle("bill-section-header--compact", !trashVisible);
+      }
+      if (removeCardIdInput && cardIds[activeCardIndex]) {
+        removeCardIdInput.value = cardIds[activeCardIndex];
+      }
+    };
+
+    var setCard = function (nextIndex) {
+      activeCardIndex = nextIndex;
+      cardElements.forEach(function (el, idx) {
+        el.style.display = idx === activeCardIndex ? "block" : "none";
+      });
+      applyHeaderState();
+    };
+
+    if (cardElements.length > 1) {
+      cardElements.forEach(function (el, idx) {
+        el.style.display = idx === 0 ? "block" : "none";
+      });
+      setCard(0);
+      if (prevBtn) {
+        prevBtn.addEventListener("click", function () {
+          var nextIndex = (activeCardIndex - 1 + cardElements.length) % cardElements.length;
+          setCard(nextIndex);
+        });
+      }
+      if (nextBtn) {
+        nextBtn.addEventListener("click", function () {
+          var nextIndex = (activeCardIndex + 1) % cardElements.length;
+          setCard(nextIndex);
+        });
+      }
+    }
+    if (cardElements.length <= 1) {
+      if (cardElements.length === 1) {
+        cardElements[0].style.display = "block";
+      }
+      applyHeaderState();
+    }
+
+    var setAddMode = function () {
+      if (actionInput) actionInput.value = "add_card";
+      if (cardIdInput) cardIdInput.value = "";
+      if (modalTitle) modalTitle.textContent = "Add payment card";
+      if (submitLabel) submitLabel.textContent = "Save card";
+      if (cardInput) {
+        cardInput.value = "";
+        cardInput.setAttribute("pattern", "\\d{4}\\s\\d{4}\\s\\d{4}\\s\\d{4}");
+        cardInput.setAttribute("minlength", "19");
+        cardInput.setAttribute("maxlength", "19");
+      }
+      if (cvcInput) {
+        cvcInput.value = "";
+        cvcInput.setAttribute("pattern", "\\d{3,4}");
+        cvcInput.setAttribute("minlength", "3");
+        cvcInput.setAttribute("maxlength", "4");
+      }
+      if (holderInput) holderInput.value = "";
+      if (expiryInput) expiryInput.value = "";
+      if (defaultCheckbox) defaultCheckbox.checked = false;
+      if (defaultCardOptionRow) defaultCardOptionRow.style.display = "";
+    };
+
+    var setUpdateMode = function () {
+      if (!cardElements.length) return;
+      var activeCard = cardElements[activeCardIndex];
+      if (!activeCard) return;
+      if (actionInput) actionInput.value = "update_card";
+      if (cardIdInput) cardIdInput.value = activeCard.getAttribute("data-card-id") || "";
+      if (modalTitle) modalTitle.textContent = "Update payment card";
+      if (submitLabel) submitLabel.textContent = "Update card";
+      if (holderInput) holderInput.value = activeCard.getAttribute("data-holder") || "";
+      if (expiryInput) expiryInput.value = activeCard.getAttribute("data-expiry") || "";
+      if (defaultCheckbox) {
+        var isDefaultCard = activeCard.getAttribute("data-is-default") === "1";
+        defaultCheckbox.checked = isDefaultCard;
+        if (defaultCardOptionRow) {
+          defaultCardOptionRow.style.display = isDefaultCard ? "none" : "";
+        }
+      }
+      if (cardInput) {
+        cardInput.value = "•••• •••• •••• " + (activeCard.getAttribute("data-last4") || "----");
+        cardInput.removeAttribute("pattern");
+        cardInput.removeAttribute("minlength");
+        cardInput.setAttribute("maxlength", "19");
+      }
+      if (cvcInput) {
+        cvcInput.value = "•••";
+        cvcInput.removeAttribute("pattern");
+        cvcInput.removeAttribute("minlength");
+        cvcInput.setAttribute("maxlength", "4");
+      }
+      if (removeCardIdInput) {
+        removeCardIdInput.value = activeCard.getAttribute("data-card-id") || "";
+      }
+    };
+
+    if (openAddBtn) {
+      openAddBtn.addEventListener("click", function () {
+        setAddMode();
+      });
+    }
+    if (openUpdateBtn) {
+      openUpdateBtn.addEventListener("click", function () {
+        setUpdateMode();
+      });
+    }
 
     modalEl.addEventListener("hidden.bs.modal", function () {
       form.reset();
       form.classList.remove("was-validated");
+      if (defaultCheckbox) defaultCheckbox.checked = false;
+      if (defaultCardOptionRow) defaultCardOptionRow.style.display = "";
     });
 
     form.addEventListener("submit", function (e) {
-      e.preventDefault();
       if (!form.checkValidity()) {
+        e.preventDefault();
         form.classList.add("was-validated");
         return;
       }
-      form.classList.remove("was-validated");
-      var instance = bootstrap.Modal.getInstance(modalEl);
-      if (instance) instance.hide();
     });
   });
 </script>

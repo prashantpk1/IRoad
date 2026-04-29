@@ -1,6 +1,8 @@
 import csv
+from decimal import Decimal
 
 import logging
+import io
 from django.conf import settings
 from django.http import HttpResponse
 from django.shortcuts import redirect, render
@@ -8,14 +10,42 @@ from django.urls import reverse
 from django.views import View
 from django.contrib import messages
 from django.contrib.auth.hashers import make_password
+from django.core.paginator import Paginator
 from django.db import connection
+from django.db import transaction as db_transaction
+from django.db.models import Q
+from django.utils.dateparse import parse_datetime
 from django.utils import timezone
 import os
 import uuid
-from urllib.parse import quote
+from superadmin.billing_helpers import (
+    generate_invoice_pdf_bytes,
+    calculate_pro_rata_credit,
+    complete_order_payment_as_system,
+    get_fx_snapshot,
+    get_tax_code_for_tenant,
+    refresh_order_projected_fields,
+    resolve_upgrade_credit_basis_price,
+    sync_or_create_order_payment_transaction,
+    validate_downgrade_order,
+)
 from superadmin.models import TenantProfile, TenantSecuritySettings
-from superadmin.models import AdminUser, Country, Currency
+from superadmin.models import (
+    AccessLog,
+    AdminUser,
+    AuditLog,
+    Country,
+    Currency,
+    OrderPlanLine,
+    PaymentMethod,
+    PlanPricingCycle,
+    StandardInvoice,
+    SubscriptionOrder,
+    SubscriptionFAQ,
+    SubscriptionPlan,
+)
 from superadmin.redis_helpers import (
+    get_all_active_tenant_sessions,
     get_tenant_session,
     refresh_tenant_session,
     revoke_tenant_session_key,
@@ -33,33 +63,17 @@ from tenant_workspace.models import (
     TenantRolePermission,
     TenantUser,
 )
-from iroad_tenants.models import TenantRegistry
+from iroad_tenants.models import TenantPaymentCard, TenantRegistry
 
 logger = logging.getLogger(__name__)
 
 
 def _resolve_tenant_favicon_url(request, tenant):
-    """Return tenant favicon URL with a stable fallback."""
-    company_name = (getattr(tenant, 'company_name', '') or 'iRoad').strip() or 'iRoad'
-    default_icon = (
+    """Return the default IR favicon for all tenant pages."""
+    return (
         "https://ui-avatars.com/api/"
-        f"?name={quote(company_name)}&background=5051f9&color=fff&size=64&rounded=true&bold=true"
+        "?name=IR&background=5051f9&color=fff&size=64&rounded=true&bold=true"
     )
-    tenant_registry = _activate_tenant_workspace_schema(request)
-    if tenant_registry is None:
-        return default_icon
-    try:
-        profile = OrganizationProfile.objects.order_by('-updated_at', '-created_at').first()
-        if profile and getattr(profile, 'logo_file', None):
-            try:
-                return profile.logo_file.url or default_icon
-            except Exception:
-                return default_icon
-        return default_icon
-    except Exception:
-        return default_icon
-    finally:
-        connection.set_schema_to_public()
 
 
 def _tenant_context_from_session(request):
@@ -191,7 +205,127 @@ class TenantDashboardView(View):
 
 
 class TenantSubscriptionPlanView(View):
-    """Tenant subscription plan page (template-only for now)."""
+    """Tenant subscription plan page with upgrade/downgrade/renewal actions."""
+
+    _PLAN_ACTIONS = {'New_Subscription', 'Renewal', 'Upgrade', 'Downgrade'}
+
+    def _resolve_payment_method(self, tenant, currency_code):
+        has_default_card = TenantPaymentCard.objects.filter(
+            tenant_profile=tenant,
+            is_active=True,
+            is_default=True,
+        ).exists()
+        if not has_default_card:
+            return None
+        # Card-based subscription flow uses online gateway only.
+        return PaymentMethod.objects.filter(
+            is_active=True,
+            method_type='Online_Gateway',
+            supported_currencies__contains=[currency_code],
+        ).order_by('display_order').first()
+
+    def _load_plan_context(self, tenant):
+        current_plan = tenant.current_plan
+        selected_currency = (
+            SubscriptionOrder.objects.filter(tenant=tenant)
+            .select_related('currency')
+            .order_by('-created_at')
+            .values_list('currency__currency_code', flat=True)
+            .first()
+        )
+        if not selected_currency:
+            selected_currency = (
+                PlanPricingCycle.objects.select_related('currency')
+                .order_by('currency__currency_code')
+                .values_list('currency__currency_code', flat=True)
+                .first()
+            )
+        if not selected_currency:
+            selected_currency = (
+                Currency.objects.filter(is_active=True)
+                .order_by('currency_code')
+                .values_list('currency_code', flat=True)
+                .first()
+                or ''
+            )
+
+        plans = list(
+            SubscriptionPlan.objects.filter(is_active=True, is_deleted=False)
+            .order_by('plan_name_en')
+        )
+        pricing_rows = (
+            PlanPricingCycle.objects.select_related('currency')
+            .filter(plan__in=plans, number_of_cycles__in=[1, 12])
+            .order_by('plan__plan_name_en', 'number_of_cycles', 'currency__currency_code')
+        )
+        pricing_map = {}
+        for row in pricing_rows:
+            key = (str(row.plan_id), row.currency_id)
+            pricing_map.setdefault(key, {})[int(row.number_of_cycles)] = row
+
+        current_monthly_price = None
+        if current_plan and selected_currency:
+            current_monthly = pricing_map.get(
+                (str(current_plan.plan_id), selected_currency), {}
+            ).get(1)
+            if current_monthly:
+                current_monthly_price = current_monthly.price
+
+        plan_cards = []
+        for plan in plans:
+            prices_for_currency = pricing_map.get((str(plan.plan_id), selected_currency), {})
+            monthly_row = prices_for_currency.get(1)
+            yearly_row = prices_for_currency.get(12)
+            if not monthly_row and not yearly_row:
+                continue
+
+            if monthly_row and yearly_row:
+                default_cycle = 1
+            elif monthly_row:
+                default_cycle = 1
+            else:
+                default_cycle = 12
+            default_row = monthly_row or yearly_row
+
+            action_type = 'New_Subscription'
+            action_label = 'Choose Plan'
+            is_current = bool(current_plan and plan.plan_id == current_plan.plan_id)
+            if is_current:
+                action_type = 'Renewal'
+                action_label = 'Renew Plan'
+            elif current_plan and current_monthly_price is not None and monthly_row:
+                if monthly_row.price >= current_monthly_price:
+                    action_type = 'Upgrade'
+                    action_label = 'Upgrade Plan'
+                else:
+                    action_type = 'Downgrade'
+                    action_label = 'Downgrade Plan'
+
+            plan_cards.append(
+                {
+                    'plan': plan,
+                    'monthly_row': monthly_row,
+                    'yearly_row': yearly_row,
+                    'default_cycle': default_cycle,
+                    'default_price': default_row.price if default_row else Decimal('0.00'),
+                    'currency_code': selected_currency,
+                    'is_current': is_current,
+                    'action_type': action_type,
+                    'action_label': action_label,
+                }
+            )
+
+        has_yearly_option = any(card['yearly_row'] for card in plan_cards)
+        faqs = list(
+            SubscriptionFAQ.objects.filter(is_active=True)
+            .order_by('display_order', 'created_at')
+        )
+        return {
+            'plan_cards': plan_cards,
+            'selected_currency': selected_currency,
+            'has_yearly_option': has_yearly_option,
+            'subscription_faqs': faqs,
+        }
 
     def get(self, request):
         context = _tenant_context_from_session(request)
@@ -199,15 +333,190 @@ class TenantSubscriptionPlanView(View):
             response = redirect('login')
             clear_tenant_portal_cookie(response, request=request)
             return response
-        return render(
-            request,
-            'iroad_tenants/Subscription_Manage/Subscription-plan.html',
-            context,
-        )
+        context.update(self._load_plan_context(context['tenant']))
+        return render(request, 'iroad_tenants/Subscription_Manage/Subscription-plan.html', context)
+
+    def post(self, request):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+
+        tenant = context['tenant']
+        action_type = (request.POST.get('action_type') or '').strip()
+        plan_id = (request.POST.get('plan_id') or '').strip()
+        selected_cycle_raw = (request.POST.get('selected_cycle') or '1').strip()
+        selected_currency = (request.POST.get('currency_code') or '').strip()
+        try:
+            selected_cycle = int(selected_cycle_raw)
+        except ValueError:
+            selected_cycle = 1
+
+        if action_type not in self._PLAN_ACTIONS:
+            messages.error(request, 'Invalid subscription action.', extra_tags='tenant')
+            return _tenant_redirect(request, 'iroad_tenants:tenant_subscription_plan')
+
+        plan = SubscriptionPlan.objects.filter(
+            plan_id=plan_id,
+            is_active=True,
+            is_deleted=False,
+        ).first()
+        if not plan:
+            messages.error(request, 'Selected plan is not available.', extra_tags='tenant')
+            return _tenant_redirect(request, 'iroad_tenants:tenant_subscription_plan')
+
+        currency = Currency.objects.filter(
+            currency_code=selected_currency,
+            is_active=True,
+        ).first()
+        if not currency:
+            currency = (
+                SubscriptionOrder.objects.filter(tenant=tenant)
+                .select_related('currency')
+                .order_by('-created_at')
+                .values_list('currency__currency_code', flat=True)
+                .first()
+            )
+            currency = Currency.objects.filter(currency_code=currency, is_active=True).first()
+        if not currency:
+            messages.error(request, 'No active currency is configured.', extra_tags='tenant')
+            return _tenant_redirect(request, 'iroad_tenants:tenant_subscription_plan')
+
+        pricing_row = PlanPricingCycle.objects.filter(
+            plan=plan,
+            currency=currency,
+            number_of_cycles=selected_cycle,
+        ).first()
+        if not pricing_row:
+            messages.error(
+                request,
+                'Pricing is not configured for this cycle/currency.',
+                extra_tags='tenant',
+            )
+            return _tenant_redirect(request, 'iroad_tenants:tenant_subscription_plan')
+
+        if action_type == 'Downgrade':
+            error = validate_downgrade_order(tenant, plan)
+            if error:
+                messages.error(request, error, extra_tags='tenant')
+                return _tenant_redirect(request, 'iroad_tenants:tenant_subscription_plan')
+
+        tax = get_tax_code_for_tenant(tenant, client_ip=request.META.get('REMOTE_ADDR'))
+        if tax is None:
+            messages.error(
+                request,
+                'Tax settings are missing. Contact support.',
+                extra_tags='tenant',
+            )
+            return _tenant_redirect(request, 'iroad_tenants:tenant_subscription_plan')
+
+        fx = get_fx_snapshot(currency.currency_code, strict=True)
+        if fx is None:
+            messages.error(
+                request,
+                'Exchange rate is missing for selected currency.',
+                extra_tags='tenant',
+            )
+            return _tenant_redirect(request, 'iroad_tenants:tenant_subscription_plan')
+
+        payment_method = self._resolve_payment_method(tenant, currency.currency_code)
+        if payment_method is None:
+            messages.error(
+                request,
+                'Add a default payment card first. Offline bank transfer is not supported here.',
+                extra_tags='tenant',
+            )
+            return _tenant_redirect(request, 'iroad_tenants:tenant_subscription_plan')
+
+        tax_rate = tax.rate_percent or Decimal('0.00')
+        plan_price = pricing_row.price
+        pro_rata = Decimal('0.00')
+        if action_type == 'Upgrade' and tenant.current_plan:
+            old_price = resolve_upgrade_credit_basis_price(
+                tenant.current_plan,
+                currency.currency_code,
+            )
+            pro_rata = calculate_pro_rata_credit(tenant, old_price)
+        line_total = (plan_price + pro_rata).quantize(Decimal('0.01'))
+        sub_total = line_total
+        tax_amount = (sub_total * tax_rate / Decimal('100')).quantize(Decimal('0.01'))
+        grand_total = (sub_total + tax_amount).quantize(Decimal('0.01'))
+        base_equiv = (grand_total * fx).quantize(Decimal('0.01'))
+
+        with db_transaction.atomic():
+            order = SubscriptionOrder.objects.create(
+                tenant=tenant,
+                order_classification=action_type,
+                currency=currency,
+                payment_method=payment_method,
+                created_by=None,
+                promo_code=None,
+                tax_code=tax,
+                sub_total=sub_total,
+                discount_amount=Decimal('0.00'),
+                tax_amount=tax_amount,
+                grand_total=grand_total,
+                exchange_rate_snapshot=fx,
+                base_currency_equivalent=base_equiv,
+                order_status='Pending_Payment',
+            )
+            OrderPlanLine.objects.create(
+                order=order,
+                plan=plan,
+                number_of_cycles=selected_cycle,
+                plan_price=plan_price,
+                pro_rata_adjustment=pro_rata,
+                line_total=line_total,
+                plan_name_en_snapshot=plan.plan_name_en,
+                plan_name_ar_snapshot=plan.plan_name_ar or '',
+            )
+            refresh_order_projected_fields(order)
+            order.save(
+                update_fields=[
+                    'projected_plan',
+                    'projected_expiry_date',
+                    'projected_max_users',
+                    'projected_max_internal_trucks',
+                    'projected_max_external_trucks',
+                    'projected_max_drivers',
+                ]
+            )
+            sync_or_create_order_payment_transaction(order)
+
+        if complete_order_payment_as_system(order, None):
+            messages.success(
+                request,
+                f'{plan.plan_name_en} {action_type.replace("_", " ").lower()} completed successfully.',
+                extra_tags='tenant',
+            )
+        else:
+            messages.warning(
+                request,
+                'Order created, but payment capture did not complete.',
+                extra_tags='tenant',
+            )
+        return _tenant_redirect(request, 'iroad_tenants:tenant_subscription_billing')
 
 
 class TenantSubscriptionBillingView(View):
-    """Tenant subscription billing page (template-only for now)."""
+    """Tenant subscription billing page with live data."""
+
+    @staticmethod
+    def _parse_expiry(expiry_value):
+        raw = (expiry_value or '').strip()
+        if '/' not in raw:
+            return None, None
+        month_s, year_s = raw.split('/', 1)
+        try:
+            month = int(month_s)
+            yy = int(year_s)
+        except ValueError:
+            return None, None
+        if month < 1 or month > 12:
+            return None, None
+        year = 2000 + yy if yy < 100 else yy
+        return month, year
 
     def get(self, request):
         context = _tenant_context_from_session(request)
@@ -215,11 +524,641 @@ class TenantSubscriptionBillingView(View):
             response = redirect('login')
             clear_tenant_portal_cookie(response, request=request)
             return response
-        return render(
-            request,
-            'iroad_tenants/Subscription_Manage/Subscription-billing.html',
-            context,
+        tenant = context['tenant']
+        current_plan = tenant.current_plan
+
+        latest_plan_line = (
+            OrderPlanLine.objects.select_related('order')
+            .filter(order__tenant=tenant)
+            .order_by('-order__created_at')
+            .first()
         )
+        current_cycle = 1
+        if latest_plan_line and latest_plan_line.number_of_cycles in (1, 12):
+            current_cycle = latest_plan_line.number_of_cycles
+
+        active_currency = (
+            SubscriptionOrder.objects.filter(tenant=tenant)
+            .select_related('currency')
+            .order_by('-created_at')
+            .values_list('currency__currency_code', flat=True)
+            .first()
+        ) or 'SAR'
+
+        current_price = Decimal('0.00')
+        if current_plan:
+            current_pricing = PlanPricingCycle.objects.filter(
+                plan=current_plan,
+                currency_id=active_currency,
+                number_of_cycles=current_cycle,
+            ).first()
+            if current_pricing:
+                current_price = current_pricing.price
+
+        invoices = list(
+            StandardInvoice.objects.filter(tenant=tenant)
+            .select_related('currency')
+            .order_by('-issue_date')[:20]
+        )
+        start_of_year = timezone.now().date().replace(month=1, day=1)
+        total_spent_ytd = sum(
+            (
+                inv.grand_total
+                for inv in invoices
+                if inv.issue_date
+                and inv.issue_date.date() >= start_of_year
+                and inv.status in ('Issued', 'Paid')
+            ),
+            Decimal('0.00'),
+        )
+
+        next_payment_due = tenant.subscription_expiry_date
+        cards = list(
+            TenantPaymentCard.objects.filter(
+                tenant_profile=tenant,
+                is_active=True,
+            ).order_by('-is_default', '-updated_at')
+        )
+        # Safety normalization: keep exactly one default card per tenant.
+        if cards:
+            default_cards = [c for c in cards if c.is_default]
+            if len(default_cards) != 1:
+                keeper = default_cards[0] if default_cards else cards[0]
+                TenantPaymentCard.objects.filter(
+                    tenant_profile=tenant,
+                    is_active=True,
+                ).update(is_default=False)
+                keeper.is_default = True
+                keeper.save(update_fields=['is_default', 'updated_at'])
+                cards = list(
+                    TenantPaymentCard.objects.filter(
+                        tenant_profile=tenant,
+                        is_active=True,
+                    ).order_by('-is_default', '-updated_at')
+                )
+        default_card = next((c for c in cards if c.is_default), cards[0] if cards else None)
+
+        context.update(
+            {
+                'current_plan': current_plan,
+                'current_cycle': current_cycle,
+                'current_cycle_label': 'Yearly Billing' if current_cycle == 12 else 'Monthly Billing',
+                'current_price': current_price,
+                'active_currency': active_currency,
+                'next_payment_due': next_payment_due,
+                'invoices': invoices,
+                'total_spent_ytd': total_spent_ytd,
+                'default_card': default_card,
+                'payment_cards': cards,
+            }
+        )
+        return render(request, 'iroad_tenants/Subscription_Manage/Subscription-billing.html', context)
+
+    def post(self, request):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+
+        tenant = context['tenant']
+        action = (request.POST.get('action') or '').strip()
+        if action == 'remove_card':
+            target_card_id = (request.POST.get('card_id') or '').strip()
+            target_card = TenantPaymentCard.objects.filter(
+                tenant_profile=tenant,
+                card_id=target_card_id,
+                is_active=True,
+            ).first()
+            if not target_card:
+                messages.error(request, 'Card to remove was not found.', extra_tags='tenant')
+                return _tenant_redirect(request, 'iroad_tenants:tenant_subscription_billing')
+            active_cards = list(
+                TenantPaymentCard.objects.filter(
+                    tenant_profile=tenant,
+                    is_active=True,
+                ).order_by('-is_default', '-updated_at')
+            )
+            if len(active_cards) <= 1:
+                messages.error(request, 'At least one payment card is required.', extra_tags='tenant')
+                return _tenant_redirect(request, 'iroad_tenants:tenant_subscription_billing')
+            if target_card.is_default:
+                messages.error(request, 'Current in-use card cannot be deleted.', extra_tags='tenant')
+                return _tenant_redirect(request, 'iroad_tenants:tenant_subscription_billing')
+            was_default = target_card.is_default
+            target_card.is_active = False
+            target_card.is_default = False
+            target_card.save(update_fields=['is_active', 'is_default', 'updated_at'])
+            if was_default:
+                replacement = TenantPaymentCard.objects.filter(
+                    tenant_profile=tenant,
+                    is_active=True,
+                ).order_by('-updated_at').first()
+                if replacement:
+                    replacement.is_default = True
+                    replacement.save(update_fields=['is_default', 'updated_at'])
+            messages.success(request, 'Payment card removed successfully.', extra_tags='tenant')
+            return _tenant_redirect(request, 'iroad_tenants:tenant_subscription_billing')
+
+        if action not in ('add_card', 'update_card'):
+            messages.error(request, 'Invalid card action.', extra_tags='tenant')
+            return _tenant_redirect(request, 'iroad_tenants:tenant_subscription_billing')
+
+        cardholder_name = (request.POST.get('cardholderName') or '').strip()
+        card_number = (request.POST.get('cardNumber') or '').strip().replace(' ', '')
+        expiry = (request.POST.get('expiry') or '').strip()
+        cvc = (request.POST.get('cvc') or '').strip()
+        set_default = bool(request.POST.get('setAsDefault'))
+        target_card_id = (request.POST.get('card_id') or '').strip()
+
+        if not cardholder_name:
+            messages.error(request, 'Card holder name is required.', extra_tags='tenant')
+            return _tenant_redirect(request, 'iroad_tenants:tenant_subscription_billing')
+
+        expiry_month, expiry_year = self._parse_expiry(expiry)
+        if not expiry_month or not expiry_year:
+            messages.error(request, 'Enter expiry in MM/YY format.', extra_tags='tenant')
+            return _tenant_redirect(request, 'iroad_tenants:tenant_subscription_billing')
+
+        if action == 'update_card':
+            target_card = TenantPaymentCard.objects.filter(
+                tenant_profile=tenant,
+                card_id=target_card_id,
+                is_active=True,
+            ).first()
+            if not target_card:
+                messages.error(request, 'Card to update was not found.', extra_tags='tenant')
+                return _tenant_redirect(request, 'iroad_tenants:tenant_subscription_billing')
+            # Update modal shows masked card/CVC by default. If masked value is posted,
+            # retain existing stored last4 and only validate when a full new number is entered.
+            if '•' in card_number or card_number == '':
+                card_last4 = target_card.last4
+            else:
+                if not card_number.isdigit() or len(card_number) != 16:
+                    messages.error(request, 'Enter a valid 16-digit card number.', extra_tags='tenant')
+                    return _tenant_redirect(request, 'iroad_tenants:tenant_subscription_billing')
+                card_last4 = card_number[-4:]
+            if not ('•' in cvc or cvc == '') and (not cvc.isdigit() or len(cvc) not in (3, 4)):
+                messages.error(request, 'Enter a valid CVC.', extra_tags='tenant')
+                return _tenant_redirect(request, 'iroad_tenants:tenant_subscription_billing')
+        else:
+            target_card = None
+            if not card_number.isdigit() or len(card_number) != 16:
+                messages.error(request, 'Enter a valid 16-digit card number.', extra_tags='tenant')
+                return _tenant_redirect(request, 'iroad_tenants:tenant_subscription_billing')
+            if not cvc.isdigit() or len(cvc) not in (3, 4):
+                messages.error(request, 'Enter a valid CVC.', extra_tags='tenant')
+                return _tenant_redirect(request, 'iroad_tenants:tenant_subscription_billing')
+            card_last4 = card_number[-4:]
+
+        if set_default:
+            TenantPaymentCard.objects.filter(
+                tenant_profile=tenant,
+                is_active=True,
+            ).update(is_default=False)
+        if target_card is not None:
+            target_card.cardholder_name = cardholder_name
+            target_card.brand = 'VISA'
+            target_card.last4 = card_last4
+            target_card.expiry_month = expiry_month
+            target_card.expiry_year = expiry_year
+            target_card.is_default = set_default or target_card.is_default
+            target_card.save(
+                update_fields=[
+                    'cardholder_name',
+                    'brand',
+                    'last4',
+                    'expiry_month',
+                    'expiry_year',
+                    'is_default',
+                    'updated_at',
+                ]
+            )
+            messages.success(request, 'Payment card updated successfully.', extra_tags='tenant')
+        else:
+            TenantPaymentCard.objects.create(
+                tenant_profile=tenant,
+                cardholder_name=cardholder_name,
+                brand='VISA',
+                last4=card_last4,
+                expiry_month=expiry_month,
+                expiry_year=expiry_year,
+                is_default=set_default or not TenantPaymentCard.objects.filter(
+                    tenant_profile=tenant,
+                    is_active=True,
+                ).exists(),
+                is_active=True,
+            )
+            messages.success(request, 'Payment card saved successfully.', extra_tags='tenant')
+        return _tenant_redirect(request, 'iroad_tenants:tenant_subscription_billing')
+
+
+class TenantInvoiceDownloadView(View):
+    """Download a single invoice PDF for the logged-in tenant."""
+
+    def get(self, request, invoice_id):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+
+        tenant = context['tenant']
+        invoice = (
+            StandardInvoice.objects.select_related('tenant')
+            .filter(invoice_id=invoice_id, tenant=tenant)
+            .first()
+        )
+        if invoice is None:
+            return HttpResponse('Invoice not found.', status=404)
+
+        pdf_bytes = generate_invoice_pdf_bytes(invoice)
+        if pdf_bytes:
+            response = HttpResponse(pdf_bytes, content_type='application/pdf')
+            response['Content-Disposition'] = (
+                f'attachment; filename="{invoice.invoice_number}.pdf"'
+            )
+            return response
+
+        fallback = (
+            f'Invoice: {invoice.invoice_number}\n'
+            f'Status: {invoice.status}\n'
+            f'Amount: {invoice.currency_id} {invoice.grand_total}\n'
+            f'Due Date: {invoice.due_date or ""}\n'
+        )
+        response = HttpResponse(fallback, content_type='text/plain')
+        response['Content-Disposition'] = (
+            f'attachment; filename="{invoice.invoice_number}.txt"'
+        )
+        return response
+
+
+class TenantInvoiceExportAllView(View):
+    """Export tenant invoice history as CSV."""
+
+    def get(self, request):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+
+        tenant = context['tenant']
+        invoices = (
+            StandardInvoice.objects.select_related('currency')
+            .filter(tenant=tenant)
+            .order_by('-issue_date')
+        )
+
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(
+            [
+                'Invoice Number',
+                'Issue Date',
+                'Due Date',
+                'Plan',
+                'Currency',
+                'Sub Total',
+                'Tax',
+                'Discount',
+                'Grand Total',
+                'Status',
+            ]
+        )
+        for inv in invoices:
+            plan_name = ''
+            first_line = inv.order.plan_lines.select_related('plan').first() if inv.order_id else None
+            if first_line:
+                plan_name = first_line.plan_name_en_snapshot or first_line.plan.plan_name_en
+            writer.writerow(
+                [
+                    inv.invoice_number,
+                    inv.issue_date.strftime('%Y-%m-%d') if inv.issue_date else '',
+                    inv.due_date.strftime('%Y-%m-%d') if inv.due_date else '',
+                    plan_name,
+                    inv.currency_id,
+                    f'{inv.sub_total}',
+                    f'{inv.tax_amount}',
+                    f'{inv.discount_amount}',
+                    f'{inv.grand_total}',
+                    inv.status,
+                ]
+            )
+
+        response = HttpResponse(output.getvalue(), content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename="tenant_invoices.csv"'
+        return response
+
+
+def _build_login_session_events_context(request):
+    auth_payload = get_tenant_portal_cookie_payload(request) or {}
+    tenant_id = str(auth_payload.get('tenant_id') or '').strip()
+
+    events = []
+
+    # Live active sessions from Redis (tenant-specific).
+    for session in get_all_active_tenant_sessions():
+        if str(session.get('tenant_id') or '') != tenant_id:
+            continue
+        started_at = session.get('started_at')
+        if not started_at:
+            continue
+        started_dt = parse_datetime(str(started_at))
+        if started_dt is None:
+            continue
+        if timezone.is_naive(started_dt):
+            started_dt = timezone.make_aware(started_dt, timezone.get_current_timezone())
+        events.append(
+            {
+                'timestamp': started_dt,
+                'action': 'Session Active',
+                'module': 'Authentication',
+                'performed_by': session.get('reference_name') or session.get('reference_id') or 'Tenant User',
+                'event_type': 'active_session',
+            }
+        )
+
+    successful_logins = 0
+    failed_attempts = 0
+
+    # Tenant user login history and failed attempts from tenant workspace schema.
+    tenant_registry = _activate_tenant_workspace_schema(request)
+    if tenant_registry is not None:
+        try:
+            users = list(
+                TenantUser.objects.values(
+                    'full_name',
+                    'email',
+                    'last_login_at',
+                    'login_attempts',
+                )
+            )
+            for user in users:
+                if user.get('last_login_at'):
+                    successful_logins += 1
+                    events.append(
+                        {
+                            'timestamp': user.get('last_login_at'),
+                            'action': 'Login Success',
+                            'module': 'Authentication',
+                            'performed_by': user.get('full_name') or user.get('email') or 'Tenant User',
+                            'event_type': 'login_success',
+                        }
+                    )
+                failed_attempts += int(user.get('login_attempts') or 0)
+                if int(user.get('login_attempts') or 0) > 0:
+                    events.append(
+                        {
+                            'timestamp': timezone.now(),
+                            'action': f'Failed Attempts ({int(user.get("login_attempts") or 0)})',
+                            'module': 'Security',
+                            'performed_by': user.get('full_name') or user.get('email') or 'Tenant User',
+                            'event_type': 'failed_attempt',
+                        }
+                    )
+        finally:
+            connection.set_schema_to_public()
+
+    events.sort(key=lambda row: row.get('timestamp') or timezone.now(), reverse=True)
+    paginator = Paginator(events, 10)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
+    active_sessions = sum(1 for event in events if event.get('event_type') == 'active_session')
+    total_events = len(events)
+
+    rows = []
+    start_index = (page_obj.number - 1) * paginator.per_page
+    for index, event in enumerate(page_obj.object_list, start=start_index + 1):
+        rows.append(
+            {
+                'sl_no': index,
+                'timestamp': event.get('timestamp'),
+                'action': event.get('action'),
+                'module': event.get('module'),
+                'performed_by': event.get('performed_by'),
+            }
+        )
+
+    return {
+        'login_session_total_events': total_events,
+        'login_session_successful_logins': successful_logins,
+        'login_session_active_sessions': active_sessions,
+        'login_session_failed_attempts': failed_attempts,
+        'login_session_rows': rows,
+        'login_session_page_obj': page_obj,
+    }
+
+
+def _build_role_permission_changes_context(request):
+    rows = []
+    total_changes = 0
+    active_roles = 0
+    permissions_updated = 0
+    roles_deleted = 0
+    page_obj = Paginator([], 10).get_page(1)
+
+    tenant_registry = _activate_tenant_workspace_schema(request)
+    if tenant_registry is not None:
+        try:
+            role_events = list(
+                TenantRole.objects.values(
+                    'updated_at',
+                    'role_name_en',
+                    'status',
+                    'created_by_label',
+                    'created_at',
+                )
+            )
+            permission_events = list(
+                TenantRolePermission.objects.select_related('role').values(
+                    'updated_at',
+                    'module_name',
+                    'form_name',
+                    'role__role_name_en',
+                    'role__created_by_label',
+                    'created_at',
+                )
+            )
+
+            active_roles = TenantRole.objects.filter(
+                status=TenantRole.Status.ACTIVE
+            ).count()
+            permissions_updated = TenantRolePermission.objects.count()
+            # This card is labeled "Roles Deleted" in UI; use non-active roles
+            # as the closest live indicator since hard deletes are not tracked.
+            roles_deleted = TenantRole.objects.exclude(
+                status=TenantRole.Status.ACTIVE
+            ).count()
+            total_changes = len(role_events) + len(permission_events)
+
+            raw_events = []
+            for event in role_events:
+                created_at = event.get('created_at')
+                updated_at = event.get('updated_at')
+                action = 'Role Updated'
+                if created_at and updated_at and created_at == updated_at:
+                    action = 'Role Created'
+                if event.get('status') == TenantRole.Status.INACTIVE:
+                    action = 'Role Disabled'
+                raw_events.append(
+                    {
+                        'timestamp': updated_at,
+                        'action': action,
+                        'module': 'Roles',
+                        'performed_by': event.get('created_by_label') or 'System',
+                    }
+                )
+
+            for event in permission_events:
+                created_at = event.get('created_at')
+                updated_at = event.get('updated_at')
+                action = 'Permission Updated'
+                if created_at and updated_at and created_at == updated_at:
+                    action = 'Permission Added'
+                raw_events.append(
+                    {
+                        'timestamp': updated_at,
+                        'action': action,
+                        'module': event.get('module_name') or 'Permissions',
+                        'performed_by': (
+                            event.get('role__created_by_label')
+                            or event.get('role__role_name_en')
+                            or 'System'
+                        ),
+                    }
+                )
+
+            raw_events.sort(
+                key=lambda item: item.get('timestamp') or timezone.now(),
+                reverse=True,
+            )
+            paginator = Paginator(raw_events, 10)
+            page_obj = paginator.get_page(request.GET.get('page'))
+            start_index = (page_obj.number - 1) * paginator.per_page
+            for index, event in enumerate(page_obj.object_list, start=start_index + 1):
+                rows.append(
+                    {
+                        'sl_no': index,
+                        'timestamp': event.get('timestamp'),
+                        'action': event.get('action'),
+                        'module': event.get('module'),
+                        'performed_by': event.get('performed_by'),
+                    }
+                )
+        finally:
+            connection.set_schema_to_public()
+
+    return {
+        'role_permission_total_changes': total_changes,
+        'role_permission_active_roles': active_roles,
+        'role_permission_permissions_updated': permissions_updated,
+        'role_permission_roles_deleted': roles_deleted,
+        'role_permission_rows': rows,
+        'role_permission_page_obj': page_obj,
+    }
+
+
+def _build_critical_account_changes_context(request):
+    auth_payload = get_tenant_portal_cookie_payload(request) or {}
+    tenant_id = str(auth_payload.get('tenant_id') or '').strip()
+    tenant_actor_label = 'Tenant Admin'
+    if tenant_id:
+        tenant_obj = TenantProfile.objects.filter(pk=tenant_id).first()
+        if tenant_obj:
+            tenant_actor_label = (
+                tenant_obj.primary_email
+                or tenant_obj.company_name
+                or tenant_actor_label
+            )
+        session_data = get_tenant_session(
+            tenant_id,
+            str(auth_payload.get('jti') or '').strip(),
+        ) or {}
+        reference_id = str(session_data.get('reference_id') or '').strip()
+        if reference_id and reference_id != tenant_id:
+            tenant_registry = _activate_tenant_workspace_schema(request)
+            if tenant_registry is not None:
+                try:
+                    tenant_user = TenantUser.objects.filter(pk=reference_id).first()
+                    if tenant_user:
+                        tenant_actor_label = (
+                            tenant_user.full_name
+                            or tenant_user.email
+                            or tenant_actor_label
+                        )
+                finally:
+                    connection.set_schema_to_public()
+
+    security_terms = (
+        Q(module_name__icontains='security')
+        | Q(module_name__icontains='auth')
+        | Q(module_name__icontains='session')
+        | Q(module_name__icontains='login')
+    )
+    billing_terms = (
+        Q(module_name__icontains='billing')
+        | Q(module_name__icontains='invoice')
+        | Q(module_name__icontains='payment')
+        | Q(module_name__icontains='subscription')
+    )
+    critical_qs = AuditLog.objects.filter(
+        Q(module_name__icontains='security')
+        | Q(module_name__icontains='auth')
+        | Q(module_name__icontains='session')
+        | Q(module_name__icontains='login')
+        | Q(module_name__icontains='billing')
+        | Q(module_name__icontains='invoice')
+        | Q(module_name__icontains='payment')
+        | Q(module_name__icontains='subscription')
+        | Q(module_name__icontains='tenant')
+    ).select_related('admin').order_by('-timestamp')
+    paginator = Paginator(critical_qs, 10)
+    page_obj = paginator.get_page(request.GET.get('page'))
+    logs = list(page_obj.object_list)
+
+    total_changes = critical_qs.count()
+    billing_updates = critical_qs.filter(billing_terms).count()
+    security_updates = critical_qs.filter(security_terms).count()
+    critical_alerts = critical_qs.filter(
+        Q(action_type='Delete') | Q(action_type='Status_Change')
+    ).count()
+
+    rows = []
+    start_index = (page_obj.number - 1) * paginator.per_page
+    for index, log in enumerate(logs, start=start_index + 1):
+        module_name = (log.module_name or '').strip() or 'System'
+        module_lower = module_name.lower()
+        if any(key in module_lower for key in ('billing', 'invoice', 'payment', 'subscription')):
+            normalized_module = 'Billing Settings'
+        elif any(key in module_lower for key in ('security', 'auth', 'session', 'login')):
+            normalized_module = 'Security Settings'
+        else:
+            normalized_module = 'Tenant Config'
+        performed_by = (
+            tenant_actor_label
+            or getattr(log.admin, 'full_name', '')
+            or getattr(log.admin, 'email', '')
+            or 'Tenant Admin'
+        )
+        rows.append(
+            {
+                'sl_no': index,
+                'timestamp': log.timestamp,
+                'action': f'{log.action_type} ({module_name})',
+                'module': normalized_module,
+                'performed_by': performed_by,
+            }
+        )
+
+    return {
+        'critical_account_total_changes': total_changes,
+        'critical_account_billing_updates': billing_updates,
+        'critical_account_security_updates': security_updates,
+        'critical_account_critical_alerts': critical_alerts,
+        'critical_account_rows': rows,
+        'critical_account_page_obj': page_obj,
+    }
 
 
 class TenantRolePermissionChangesView(View):
@@ -231,6 +1170,7 @@ class TenantRolePermissionChangesView(View):
             response = redirect('login')
             clear_tenant_portal_cookie(response, request=request)
             return response
+        context.update(_build_role_permission_changes_context(request))
         return render(
             request,
             'iroad_tenants/Audit_log/Role--permission-changes.html',
@@ -247,6 +1187,7 @@ class TenantCriticalAccountChangesView(View):
             response = redirect('login')
             clear_tenant_portal_cookie(response, request=request)
             return response
+        context.update(_build_critical_account_changes_context(request))
         return render(
             request,
             'iroad_tenants/Audit_log/Critical-account-changes.html',
@@ -263,6 +1204,7 @@ class TenantLoginSessionEventsView(View):
             response = redirect('login')
             clear_tenant_portal_cookie(response, request=request)
             return response
+        context.update(_build_login_session_events_context(request))
         return render(
             request,
             'iroad_tenants/Audit_log/Login--session-events.html',
@@ -750,6 +1692,11 @@ class TenantUsersAdministrationCreateView(View):
                 form_errors['username'] = 'This username already exists in this tenant.'
             if form_data['email'] and TenantUser.objects.filter(email__iexact=form_data['email']).exists():
                 form_errors['email'] = 'This email already exists in this tenant.'
+            tenant_primary_email = (context['tenant'].primary_email or '').strip().lower()
+            if form_data['email'] and tenant_primary_email and form_data['email'] == tenant_primary_email:
+                form_errors['email'] = (
+                    'Tenant user email cannot be the same as the tenant primary login email.'
+                )
 
             if form_errors:
                 context.update(
@@ -785,6 +1732,7 @@ class TenantUsersAdministrationCreateView(View):
                 mobile_country_code=form_data['mobile_country_code'],
                 mobile_no=form_data['mobile_no'],
                 password_hash=make_password(password),
+                temp_password_expires_at=timezone.now() + timezone.timedelta(hours=24),
                 role_name=selected_role,
                 status=form_data['status'],
                 created_by_label=(context.get('display_name') or '').strip(),
@@ -884,7 +1832,6 @@ class TenantUsersAdministrationEditView(View):
                 return _tenant_redirect(request, 'iroad_tenants:tenant_users_administration')
 
             form_data = _tenant_user_form_data_from_post(request)
-            password = (request.POST.get('password') or '').strip()
             form_errors = {}
             role_options = _tenant_role_name_options()
             if tenant_user.role_name and tenant_user.role_name not in role_options:
@@ -902,13 +1849,15 @@ class TenantUsersAdministrationEditView(View):
                 invalid_roles = [role for role in form_data['roles'] if role not in role_options]
                 if invalid_roles:
                     form_errors['roles'] = 'Selected role is invalid. Please choose from Roles master.'
-            if password and len(password) < 8:
-                form_errors['password'] = 'Password must be at least 8 characters.'
-
             if form_data['username'] and TenantUser.objects.filter(username__iexact=form_data['username']).exclude(pk=tenant_user.pk).exists():
                 form_errors['username'] = 'This username already exists in this tenant.'
             if form_data['email'] and TenantUser.objects.filter(email__iexact=form_data['email']).exclude(pk=tenant_user.pk).exists():
                 form_errors['email'] = 'This email already exists in this tenant.'
+            tenant_primary_email = (context['tenant'].primary_email or '').strip().lower()
+            if form_data['email'] and tenant_primary_email and form_data['email'] == tenant_primary_email:
+                form_errors['email'] = (
+                    'Tenant user email cannot be the same as the tenant primary login email.'
+                )
 
             if form_errors:
                 context.update(
@@ -936,8 +1885,6 @@ class TenantUsersAdministrationEditView(View):
             tenant_user.mobile_no = form_data['mobile_no']
             tenant_user.status = form_data['status']
             tenant_user.role_name = form_data['roles'][0]
-            if password:
-                tenant_user.password_hash = make_password(password)
             tenant_user.save()
 
             messages.success(request, 'Tenant user updated successfully.', extra_tags='tenant')

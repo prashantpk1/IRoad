@@ -133,7 +133,7 @@
             <i class="bi bi-file-earmark-text"></i>
           </div>
           <div>
-            <div class="eal-stat-value">48</div>
+            <div class="eal-stat-value">{{ login_session_total_events }}</div>
             <div class="eal-stat-label">Total Events</div>
           </div>
         </div>
@@ -142,7 +142,7 @@
             <i class="bi bi-check-circle"></i>
           </div>
           <div>
-            <div class="eal-stat-value">32</div>
+            <div class="eal-stat-value">{{ login_session_successful_logins }}</div>
             <div class="eal-stat-label">Successful Logins</div>
           </div>
         </div>
@@ -151,7 +151,7 @@
             <i class="bi bi-hourglass-split"></i>
           </div>
           <div>
-            <div class="eal-stat-value">12</div>
+            <div class="eal-stat-value">{{ login_session_active_sessions }}</div>
             <div class="eal-stat-label">Active Sessions</div>
           </div>
         </div>
@@ -160,7 +160,7 @@
             <i class="bi bi-x-octagon"></i>
           </div>
           <div>
-            <div class="eal-stat-value">4</div>
+            <div class="eal-stat-value">{{ login_session_failed_attempts }}</div>
             <div class="eal-stat-label">Failed Attempts</div>
           </div>
         </div>
@@ -222,146 +222,26 @@
               </tr>
             </thead>
             <tbody>
+              {% for row in login_session_rows %}
               <tr>
                 <td class="eal-col-check">
                   <input type="checkbox" class="eal-custom-check" />
                 </td>
-                <td>1</td>
-                <td>28 Jan 2026, 09:30 AM</td>
-                <td>Login Successful</td>
-                <td>Authentication</td>
+                <td>{{ row.sl_no }}</td>
+                <td>{{ row.timestamp|date:"d M Y, h:i A" }}</td>
+                <td>{{ row.action }}</td>
+                <td>{{ row.module }}</td>
                 <td>
                   <div class="eal-name-cell">
-                    <span class="eal-name-text">Mark Administrator</span>
+                    <span class="eal-name-text">{{ row.performed_by }}</span>
                   </div>
                 </td>
               </tr>
+              {% empty %}
               <tr>
-                <td class="eal-col-check">
-                  <input type="checkbox" class="eal-custom-check" />
-                </td>
-                <td>2</td>
-                <td>28 Jan 2026, 11:15 AM</td>
-                <td>Failed Attempt</td>
-                <td>Security</td>
-                <td>
-                  <div class="eal-name-cell">
-                    <span class="eal-name-text">Unknown User</span>
-                  </div>
-                </td>
+                <td colspan="6" class="text-center text-muted py-4">No login/session events found.</td>
               </tr>
-              <tr>
-                <td class="eal-col-check">
-                  <input type="checkbox" class="eal-custom-check" />
-                </td>
-                <td>3</td>
-                <td>27 Jan 2026, 04:45 PM</td>
-                <td>Logged Out</td>
-                <td>Authentication</td>
-                <td>
-                  <div class="eal-name-cell">
-                    <span class="eal-name-text">Sarah Manager</span>
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td class="eal-col-check">
-                  <input type="checkbox" class="eal-custom-check" />
-                </td>
-                <td>4</td>
-                <td>26 Jan 2026, 02:20 PM</td>
-                <td>Session Renewed</td>
-                <td>Authentication</td>
-                <td>
-                  <div class="eal-name-cell">
-                    <span class="eal-name-text">John Doe</span>
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td class="eal-col-check">
-                  <input type="checkbox" class="eal-custom-check" />
-                </td>
-                <td>5</td>
-                <td>26 Jan 2026, 08:00 AM</td>
-                <td>Login Successful</td>
-                <td>Authentication</td>
-                <td>
-                  <div class="eal-name-cell">
-                    <span class="eal-name-text">Mike Operations</span>
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td class="eal-col-check">
-                  <input type="checkbox" class="eal-custom-check" />
-                </td>
-                <td>6</td>
-                <td>25 Jan 2026, 03:10 PM</td>
-                <td>Timeout Attempt</td>
-                <td>Security</td>
-                <td>
-                  <div class="eal-name-cell">
-                    <span class="eal-name-text">Emma Finance</span>
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td class="eal-col-check">
-                  <input type="checkbox" class="eal-custom-check" />
-                </td>
-                <td>7</td>
-                <td>25 Jan 2026, 09:15 AM</td>
-                <td>Login Successful</td>
-                <td>Authentication</td>
-                <td>
-                  <div class="eal-name-cell">
-                    <span class="eal-name-text">David Support</span>
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td class="eal-col-check">
-                  <input type="checkbox" class="eal-custom-check" />
-                </td>
-                <td>8</td>
-                <td>24 Jan 2026, 05:30 PM</td>
-                <td>Logged Out</td>
-                <td>Authentication</td>
-                <td>
-                  <div class="eal-name-cell">
-                    <span class="eal-name-text">Mark Administrator</span>
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td class="eal-col-check">
-                  <input type="checkbox" class="eal-custom-check" />
-                </td>
-                <td>9</td>
-                <td>24 Jan 2026, 01:45 PM</td>
-                <td>Session Renewed</td>
-                <td>Authentication</td>
-                <td>
-                  <div class="eal-name-cell">
-                    <span class="eal-name-text">Lisa HR</span>
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td class="eal-col-check">
-                  <input type="checkbox" class="eal-custom-check" />
-                </td>
-                <td>10</td>
-                <td>23 Jan 2026, 10:00 AM</td>
-                <td>Login Successful</td>
-                <td>Authentication</td>
-                <td>
-                  <div class="eal-name-cell">
-                    <span class="eal-name-text">System Admin</span>
-                  </div>
-                </td>
-              </tr>
+              {% endfor %}
             </tbody>
           </table>
         </div>
@@ -370,19 +250,33 @@
         <div class="eal-pagination">
           <div class="eal-pagination-info">
             Showing
-            <strong>1&ndash;10</strong>
+            <strong>{{ login_session_page_obj.start_index }}&ndash;{{ login_session_page_obj.end_index }}</strong>
             of
-            <strong>10</strong>
-            ticket replies
+            <strong>{{ login_session_total_events }}</strong>
+            events
           </div>
           <div class="eal-pagination-controls">
-            <button class="eal-page-btn" title="Previous">
+            {% if login_session_page_obj.has_previous %}
+            <a class="eal-page-btn" title="Previous" href="?page={{ login_session_page_obj.previous_page_number }}">
+              <i class="bi bi-chevron-left"></i>
+            </a>
+            {% else %}
+            <button class="eal-page-btn" title="Previous" disabled>
               <i class="bi bi-chevron-left"></i>
             </button>
-            <button class="eal-page-btn active">1</button>
-            <button class="eal-page-btn" title="Next">
+            {% endif %}
+
+            <button class="eal-page-btn active">{{ login_session_page_obj.number }}</button>
+
+            {% if login_session_page_obj.has_next %}
+            <a class="eal-page-btn" title="Next" href="?page={{ login_session_page_obj.next_page_number }}">
+              <i class="bi bi-chevron-right"></i>
+            </a>
+            {% else %}
+            <button class="eal-page-btn" title="Next" disabled>
               <i class="bi bi-chevron-right"></i>
             </button>
+            {% endif %}
           </div>
         </div>
       </div>

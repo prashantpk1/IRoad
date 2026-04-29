@@ -164,6 +164,7 @@ class TenantUser(models.Model):
     mobile_country_code = models.CharField(max_length=8, blank=True, default='')
     mobile_no = models.CharField(max_length=30, blank=True, default='')
     password_hash = models.CharField(max_length=255)
+    temp_password_expires_at = models.DateTimeField(null=True, blank=True)
     role_name = models.CharField(max_length=100, default='Administrator')
     status = models.CharField(max_length=12, choices=Status.choices, default=Status.ACTIVE)
     last_login_at = models.DateTimeField(null=True, blank=True)

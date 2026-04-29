@@ -1,0 +1,95 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block page_title %}{% translate "Subscription FAQs" %}{% endblock %}
+
+{% block breadcrumb_items %}
+  <li class="breadcrumb-item active" aria-current="page">{% translate "Subscription FAQs" %}</li>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">{% translate "Subscription FAQs" %}</h1>
+      <p class="page-subtitle">{% translate "Manage FAQs shown on tenant subscription plans page." %}</p>
+    </div>
+    <div class="page-header-right">
+      {% if request.user.is_root %}
+      <a href="{% url 'subscription_faq_create' %}" class="eal-btn eal-btn-primary">
+        <i class="bi bi-plus-lg"></i>
+        <span>{% translate "Add FAQ" %}</span>
+      </a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="eal-table-card">
+  <form method="get" class="eal-toolbar">
+    <div class="eal-toolbar-left" style="width: 100%; display: flex; gap: 16px; align-items: center; flex-wrap: wrap">
+      <div class="eal-search" style="flex: 1; min-width: 240px">
+        <i class="bi bi-search"></i>
+        <input type="text" name="q" placeholder="{% translate 'Search by question or answer' %}" value="{{ search_query }}" />
+      </div>
+      <div class="db-table-filters">
+        <a href="?q={{ search_query|urlencode }}&is_active=All&sort={{ current_sort }}&dir={{ current_dir }}" class="filter-chip {% if status_filter == 'All' %}active{% endif %}">{% translate "All" %}</a>
+        <a href="?q={{ search_query|urlencode }}&is_active=Active&sort={{ current_sort }}&dir={{ current_dir }}" class="filter-chip {% if status_filter == 'Active' %}active{% endif %}">{% translate "Active" %}</a>
+        <a href="?q={{ search_query|urlencode }}&is_active=Inactive&sort={{ current_sort }}&dir={{ current_dir }}" class="filter-chip {% if status_filter == 'Inactive' %}active{% endif %}">{% translate "Inactive" %}</a>
+      </div>
+    </div>
+  </form>
+
+  <div class="eal-table-wrap">
+    <table class="eal-table">
+      <thead>
+        <tr>
+          <th style="width:60px">#</th>
+          <th>{% translate "Question" %}</th>
+          <th>{% translate "Answer" %}</th>
+          <th style="width:120px">{% translate "Order" %}</th>
+          <th style="width:130px">{% translate "Status" %}</th>
+          <th style="width:180px">{% translate "Actions" %}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for faq in faqs %}
+        <tr>
+          <td>{{ faq.list_rank }}</td>
+          <td class="fw-semibold">{{ faq.question }}</td>
+          <td>{{ faq.answer|truncatechars:140 }}</td>
+          <td>{{ faq.display_order }}</td>
+          <td>
+            {% if faq.is_active %}
+              <span class="status-badge active">{% translate "Active" %}</span>
+            {% else %}
+              <span class="status-badge inactive">{% translate "Inactive" %}</span>
+            {% endif %}
+          </td>
+          <td>
+            <div class="eal-actions-cell">
+              {% if request.user.is_root %}
+              <a href="{% url 'subscription_faq_edit' faq.faq_id %}" class="eal-row-btn" title="{% translate 'Edit' %}">
+                <i class="bi bi-pencil"></i>
+              </a>
+              <form method="post" action="{% url 'subscription_faq_toggle' faq.faq_id %}" style="display:contents">
+                {% csrf_token %}
+                <button type="submit" class="eal-row-btn" title="{% translate 'Toggle Status' %}">
+                  <i class="bi bi-arrow-repeat"></i>
+                </button>
+              </form>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="6" class="text-center py-4">{% translate "No FAQs found." %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% include 'partials/pagination.html' with page_obj=faqs %}
+</div>
+{% endblock %}

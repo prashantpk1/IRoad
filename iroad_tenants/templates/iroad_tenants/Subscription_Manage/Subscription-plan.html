@@ -35,137 +35,56 @@
       </div>
 
 <div class="sub-plans-grid">
-        <!-- Starter Plan -->
-        <div class="sub-plan-card" id="starterPlan">
-          <div class="sub-plan-header">
-            <h3 class="sub-plan-name">Starter</h3>
-            <p class="sub-plan-desc">Perfect for small teams getting started</p>
-          </div>
-          <div class="sub-plan-price-section">
-            <div class="sub-plan-price">
-              <span class="sub-price-currency">$</span>
-              <span class="sub-price-amount" data-monthly="29" data-yearly="24"
-                >29</span
-              >
-              <span class="sub-price-period">/month</span>
-            </div>
-          </div>
-          <ul class="sub-plan-features">
-            <li class="sub-feature-item">
-              <i class="bi bi-check-circle-fill"></i>
-              <span>Up to 5 Users</span>
-            </li>
-            <li class="sub-feature-item">
-              <i class="bi bi-check-circle-fill"></i>
-              <span>Basic Reporting</span>
-            </li>
-            <li class="sub-feature-item">
-              <i class="bi bi-check-circle-fill"></i>
-              <span>Email Support</span>
-            </li>
-            <li class="sub-feature-item">
-              <i class="bi bi-check-circle-fill"></i>
-              <span>Standard Security</span>
-            </li>
-          </ul>
-          <button class="sub-plan-btn" type="button">Choose Starter</button>
-        </div>
-
-        <!-- Professional Plan (ACTIVE) -->
-        <div class="sub-plan-card sub-plan-card--active" id="professionalPlan">
-          <div class="sub-plan-badge">Current Plan</div>
-          <div class="sub-plan-header">
-            <h3 class="sub-plan-name">Professional</h3>
-            <p class="sub-plan-desc">Best for growing businesses</p>
-          </div>
-          <div class="sub-plan-price-section">
-            <div class="sub-plan-price">
-              <span class="sub-price-currency">$</span>
-              <span class="sub-price-amount" data-monthly="79" data-yearly="64"
-                >79</span
-              >
-              <span class="sub-price-period">/month</span>
-            </div>
-            <span class="sub-plan-subscribed"
-              >You are currently subscribed</span
-            >
-          </div>
-          <ul class="sub-plan-features">
-            <li class="sub-feature-item">
-              <i class="bi bi-check-circle-fill"></i>
-              <span>Up to 25 Users</span>
-            </li>
-            <li class="sub-feature-item">
-              <i class="bi bi-check-circle-fill"></i>
-              <span>Advanced Reporting</span>
-            </li>
-            <li class="sub-feature-item">
-              <i class="bi bi-check-circle-fill"></i>
-              <span>Priority Support</span>
-            </li>
-            <li class="sub-feature-item">
-              <i class="bi bi-check-circle-fill"></i>
-              <span>Role & Permissions</span>
-            </li>
-            <li class="sub-feature-item">
-              <i class="bi bi-check-circle-fill"></i>
-              <span>API Access</span>
-            </li>
-          </ul>
-          <button
-            class="sub-plan-btn sub-plan-btn--active"
-            type="button"
-            disabled
-          >
-            Current Plan
-          </button>
-        </div>
-
-        <!-- Enterprise Plan -->
-        <div class="sub-plan-card" id="enterprisePlan">
-          <div class="sub-plan-header">
-            <h3 class="sub-plan-name">Enterprise</h3>
-            <p class="sub-plan-desc">
-              For large organizations with custom needs
-            </p>
-          </div>
-          <div class="sub-plan-price-section">
-            <div class="sub-plan-price">
-              <span class="sub-price-currency">$</span>
-              <span
-                class="sub-price-amount"
-                data-monthly="149"
-                data-yearly="120"
-                >149</span
-              >
-              <span class="sub-price-period">/month</span>
-            </div>
-          </div>
-          <ul class="sub-plan-features">
-            <li class="sub-feature-item">
-              <i class="bi bi-check-circle-fill"></i>
-              <span>Unlimited Users</span>
-            </li>
-            <li class="sub-feature-item">
-              <i class="bi bi-check-circle-fill"></i>
-              <span>Custom Modules</span>
-            </li>
-            <li class="sub-feature-item">
-              <i class="bi bi-check-circle-fill"></i>
-              <span>Dedicated Manager</span>
-            </li>
-            <li class="sub-feature-item">
-              <i class="bi bi-check-circle-fill"></i>
-              <span>Advanced Security</span>
-            </li>
-            <li class="sub-feature-item">
-              <i class="bi bi-check-circle-fill"></i>
-              <span>SLA Guarantee</span>
-            </li>
-          </ul>
-          <button class="sub-plan-btn" type="button">Choose Enterprise</button>
-        </div>
+  {% for card in plan_cards %}
+  <div class="sub-plan-card{% if card.is_current %} sub-plan-card--active{% endif %}">
+    {% if card.is_current %}
+    <div class="sub-plan-badge">Current Plan</div>
+    {% endif %}
+    <div class="sub-plan-header">
+      <h3 class="sub-plan-name">{{ card.plan.plan_name_en }}</h3>
+      <p class="sub-plan-desc">Plan limits, status, and pricing cycles</p>
+    </div>
+    <div class="sub-plan-price-section">
+      <div class="sub-plan-price">
+        <span class="sub-price-currency">{{ selected_currency }}</span>
+        <span
+          class="sub-price-amount"
+          data-monthly="{% if card.monthly_row %}{{ card.monthly_row.price }}{% else %}{{ card.default_price }}{% endif %}"
+          data-yearly="{% if card.yearly_row %}{{ card.yearly_row.price }}{% else %}{{ card.default_price }}{% endif %}"
+        >{{ card.default_price }}</span>
+        <span class="sub-price-period">/cycle</span>
       </div>
+      {% if card.is_current %}
+      <span class="sub-plan-subscribed">You are currently subscribed</span>
+      {% endif %}
+    </div>
+    <ul class="sub-plan-features">
+      <li class="sub-feature-item"><i class="bi bi-check-circle-fill"></i><span>Users: {% if card.plan.max_internal_users == -1 %}Unlimited{% else %}{{ card.plan.max_internal_users }}{% endif %}</span></li>
+      <li class="sub-feature-item"><i class="bi bi-check-circle-fill"></i><span>Internal Trucks: {% if card.plan.max_internal_trucks == -1 %}Unlimited{% else %}{{ card.plan.max_internal_trucks }}{% endif %}</span></li>
+      <li class="sub-feature-item"><i class="bi bi-check-circle-fill"></i><span>External Trucks: {% if card.plan.max_external_trucks == -1 %}Unlimited{% else %}{{ card.plan.max_external_trucks }}{% endif %}</span></li>
+      <li class="sub-feature-item"><i class="bi bi-check-circle-fill"></i><span>Drivers: {% if card.plan.max_active_drivers == -1 %}Unlimited{% else %}{{ card.plan.max_active_drivers }}{% endif %}</span></li>
+      <li class="sub-feature-item"><i class="bi bi-check-circle-fill"></i><span>Storage: {% if card.plan.max_storage_gb == -1 %}Unlimited{% else %}{{ card.plan.max_storage_gb }} GB{% endif %}</span></li>
+    </ul>
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="plan_id" value="{{ card.plan.plan_id }}">
+      <input type="hidden" name="action_type" value="{{ card.action_type }}">
+      <input type="hidden" name="currency_code" value="{{ selected_currency }}">
+      <input type="hidden" class="selected-cycle-input" name="selected_cycle" value="{{ card.default_cycle }}">
+      <button class="sub-plan-btn{% if card.is_current %} sub-plan-btn--active{% endif %}" type="submit">
+        {{ card.action_label }}
+      </button>
+    </form>
+  </div>
+  {% empty %}
+  <div class="sub-plan-card">
+    <div class="sub-plan-header">
+      <h3 class="sub-plan-name">No active plans</h3>
+      <p class="sub-plan-desc">Please contact support to configure subscription plans.</p>
+    </div>
+  </div>
+  {% endfor %}
+</div>
 
 
 <div class="sub-section" id="subscriptionFaq">
@@ -176,6 +95,7 @@
           </p>
         </div>
         <div class="sub-faq-list">
+          {% for faq in subscription_faqs %}
           <div class="sub-faq-item">
             <button
               class="sub-faq-question"
@@ -184,120 +104,21 @@
                 this.parentElement.classList.toggle('sub-faq-item--open')
               "
             >
-              <span>Can I switch plans at any time?</span>
+              <span>{{ faq.question }}</span>
               <i class="bi bi-chevron-down"></i>
             </button>
             <div class="sub-faq-answer">
-              <p>
-                Yes, you can upgrade or downgrade your plan at any time. When
-                upgrading, the new features will be available immediately. When
-                downgrading, the change will take effect at the start of your
-                next billing cycle.
-              </p>
+              <p>{{ faq.answer }}</p>
             </div>
           </div>
-
+          {% empty %}
           <div class="sub-faq-item">
-            <button
-              class="sub-faq-question"
-              type="button"
-              onclick="
-                this.parentElement.classList.toggle('sub-faq-item--open')
-              "
-            >
-              <span>What payment methods do you accept?</span>
-              <i class="bi bi-chevron-down"></i>
+            <button class="sub-faq-question" type="button">
+              <span>No FAQ content available yet.</span>
+              <i class="bi bi-info-circle"></i>
             </button>
-            <div class="sub-faq-answer">
-              <p>
-                We accept all major credit cards (Visa, MasterCard, American
-                Express), bank transfers, and PayPal. For Enterprise plans, we
-                also support custom invoicing and purchase orders.
-              </p>
-            </div>
           </div>
-
-          <div class="sub-faq-item">
-            <button
-              class="sub-faq-question"
-              type="button"
-              onclick="
-                this.parentElement.classList.toggle('sub-faq-item--open')
-              "
-            >
-              <span>Is there a free trial available?</span>
-              <i class="bi bi-chevron-down"></i>
-            </button>
-            <div class="sub-faq-answer">
-              <p>
-                Yes, we offer a 14-day free trial on the Professional plan. No
-                credit card is required to start. You can explore all features
-                and decide which plan is right for your business.
-              </p>
-            </div>
-          </div>
-
-          <div class="sub-faq-item">
-            <button
-              class="sub-faq-question"
-              type="button"
-              onclick="
-                this.parentElement.classList.toggle('sub-faq-item--open')
-              "
-            >
-              <span>What happens when my subscription expires?</span>
-              <i class="bi bi-chevron-down"></i>
-            </button>
-            <div class="sub-faq-answer">
-              <p>
-                When your subscription expires, your account will switch to a
-                read-only mode. You will still be able to access and export your
-                data, but you won't be able to create new records or modify
-                existing ones until you renew your plan.
-              </p>
-            </div>
-          </div>
-
-          <div class="sub-faq-item">
-            <button
-              class="sub-faq-question"
-              type="button"
-              onclick="
-                this.parentElement.classList.toggle('sub-faq-item--open')
-              "
-            >
-              <span>Can I add more users without upgrading my plan?</span>
-              <i class="bi bi-chevron-down"></i>
-            </button>
-            <div class="sub-faq-answer">
-              <p>
-                Each plan has a user limit. If you need more users than your
-                current plan allows, you will need to upgrade to a higher tier.
-                The Enterprise plan offers unlimited users for organizations of
-                any size.
-              </p>
-            </div>
-          </div>
-
-          <div class="sub-faq-item">
-            <button
-              class="sub-faq-question"
-              type="button"
-              onclick="
-                this.parentElement.classList.toggle('sub-faq-item--open')
-              "
-            >
-              <span>Do you offer refunds?</span>
-              <i class="bi bi-chevron-down"></i>
-            </button>
-            <div class="sub-faq-answer">
-              <p>
-                We offer a 30-day money-back guarantee on all plans. If you're
-                not satisfied with our service within the first 30 days, contact
-                our support team for a full refund.
-              </p>
-            </div>
-          </div>
+          {% endfor %}
         </div>
       </div>
 
@@ -336,6 +157,8 @@
     const yearlyLabel = document.getElementById("yearlyLabel");
     const priceAmounts = document.querySelectorAll(".sub-price-amount");
 
+    const cycleInputs = document.querySelectorAll(".selected-cycle-input");
+
     if (!billingSwitch || !monthlyLabel || !yearlyLabel || !priceAmounts.length) {
       return;
     }
@@ -355,6 +178,9 @@
         const monthly = el.getAttribute("data-monthly");
         const yearly = el.getAttribute("data-yearly");
         el.textContent = isYearly ? yearly : monthly;
+      });
+      cycleInputs.forEach(function (input) {
+        input.value = isYearly ? "12" : "1";
       });
     });
   })();

@@ -412,11 +412,11 @@
 
       <!-- Support Management -->
       <li
-        class="nav-item has-submenu{% if 'support_category' in request.resolver_match.url_name or 'canned_response' in request.resolver_match.url_name or 'ticket' in request.resolver_match.url_name %} open{% endif %}"
+        class="nav-item has-submenu{% if 'support_category' in request.resolver_match.url_name or 'canned_response' in request.resolver_match.url_name or 'ticket' in request.resolver_match.url_name or 'subscription_faq' in request.resolver_match.url_name %} open{% endif %}"
       >
         <a
           href="#"
-          class="nav-link{% if 'support_category' in request.resolver_match.url_name or 'canned_response' in request.resolver_match.url_name or 'ticket' in request.resolver_match.url_name %} active{% endif %}"
+          class="nav-link{% if 'support_category' in request.resolver_match.url_name or 'canned_response' in request.resolver_match.url_name or 'ticket' in request.resolver_match.url_name or 'subscription_faq' in request.resolver_match.url_name %} active{% endif %}"
           data-tooltip="{% translate 'Support Management' %}"
         >
           <i class="bi bi-headset"></i>
@@ -440,6 +440,15 @@
             >
               <i class="bi bi-chat-square-text"></i>
               <span>{% translate "Canned Responses" %}</span>
+            </a>
+          </li>
+          <li class="submenu-item">
+            <a
+              href="{% url 'subscription_faq_list' %}"
+              class="submenu-link{% if 'subscription_faq' in request.resolver_match.url_name %} active{% endif %}"
+            >
+              <i class="bi bi-question-circle"></i>
+              <span>{% translate "Subscription FAQs" %}</span>
             </a>
           </li>
           <li class="submenu-item">

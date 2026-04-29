@@ -26,6 +26,7 @@ from .models import (
     PlanPricingCycle,
     PromoCode,
     Role,
+    SubscriptionFAQ,
     PushNotification,
     SupportCategory,
     SupportTicket,
@@ -1586,6 +1587,43 @@ class CannedResponseForm(forms.ModelForm):
         value = self.cleaned_data.get('message_body', '').strip()
         if not value:
             raise forms.ValidationError('Message content is required.')
+        return value
+
+
+class SubscriptionFAQForm(forms.ModelForm):
+    class Meta:
+        model = SubscriptionFAQ
+        fields = ['question', 'answer', 'display_order', 'is_active']
+        widgets = {
+            'answer': forms.Textarea(attrs={'rows': 6}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        apply_premium_styling(self)
+        self.fields['question'].widget.attrs.update({'maxlength': '255'})
+        self.fields['display_order'].widget.attrs.update({'min': 1})
+        self.fields['answer'].widget.attrs.update({'rows': 6})
+        if 'is_active' in self.fields:
+            self.fields['is_active'].widget = forms.CheckboxInput(
+                attrs={'class': 'form-check-input', 'role': 'switch'}
+            )
+
+    def clean_question(self):
+        value = (self.cleaned_data.get('question') or '').strip()
+        if not value:
+            raise forms.ValidationError('Question is required.')
+        qs = SubscriptionFAQ.objects.filter(question__iexact=value)
+        if self.instance.pk:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise forms.ValidationError('This FAQ question already exists.')
+        return value
+
+    def clean_answer(self):
+        value = (self.cleaned_data.get('answer') or '').strip()
+        if not value:
+            raise forms.ValidationError('Answer is required.')
         return value
 
 

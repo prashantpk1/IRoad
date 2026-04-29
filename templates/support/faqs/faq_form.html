@@ -1,0 +1,100 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block page_title %}{% if is_edit %}{% translate "Edit FAQ" %}{% else %}{% translate "Add New FAQ" %}{% endif %}{% endblock %}
+
+{% block breadcrumb_items %}
+  <li class="breadcrumb-item"><a href="{% url 'subscription_faq_list' %}">{% translate "Subscription FAQs" %}</a></li>
+  <li class="breadcrumb-item active" aria-current="page">{% if is_edit %}{% translate "Edit FAQ" %}{% else %}{% translate "New FAQ" %}{% endif %}</li>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">{% if is_edit %}{% translate "Edit FAQ" %}{% else %}{% translate "Add New FAQ" %}{% endif %}</h1>
+      <p class="page-subtitle">{% translate "Manage question and answer content for tenant subscription FAQ section." %}</p>
+    </div>
+    <div class="page-header-right">
+      <a href="{% url 'subscription_faq_list' %}" class="eal-btn eal-btn-outline">
+        <i class="bi bi-arrow-left"></i>
+        <span>{% translate "Back to List" %}</span>
+      </a>
+    </div>
+  </div>
+</div>
+
+<form method="post" autocomplete="off">
+  {% csrf_token %}
+
+  {% if messages %}
+    <div class="mb-3">
+      {% for message in messages %}
+        <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags|default:'info' }}{% endif %} alert-dismissible fade show" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  {% if form.non_field_errors %}
+    <div class="alert alert-danger mb-3">
+      {{ form.non_field_errors }}
+    </div>
+  {% endif %}
+
+  <div class="form-card mb-4">
+    <div class="form-card-header">
+      <div class="form-card-icon blue"><i class="bi bi-question-circle"></i></div>
+      <div class="form-card-header-text">
+        <h3 class="form-card-title">{% translate "FAQ Details" %}</h3>
+        <p class="form-card-desc">{% translate "Define question, answer, and display order." %}</p>
+      </div>
+    </div>
+    <div class="form-card-body">
+      <div class="row g-3">
+        <div class="col-12 col-md-6">
+          <label class="form-label">{% translate "Question" %}</label>
+          {{ form.question }}
+          {% for error in form.question.errors %}<div class="field-error text-danger small mt-1">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="col-12 col-md-6">
+          <label class="form-label">{% translate "Answer" %}</label>
+          {{ form.answer }}
+          {% for error in form.answer.errors %}<div class="field-error text-danger small mt-1">{{ error }}</div>{% endfor %}
+        </div>
+
+        <div class="col-12 col-md-4">
+          <label class="form-label">{% translate "Display Order" %}</label>
+          {{ form.display_order }}
+          {% for error in form.display_order.errors %}<div class="field-error text-danger small mt-1">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="col-12 col-md-8">
+          <label class="form-label">{% translate "Visibility Status" %}</label>
+          <div class="form-check form-switch">
+            {{ form.is_active }}
+            <label class="form-check-label" for="{{ form.is_active.id_for_label }}">
+              {% translate "Show this FAQ on tenant subscription plans page" %}
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-actions-bar">
+    <div class="form-actions-left">
+      <a href="{% url 'subscription_faq_list' %}" class="eal-btn eal-btn-outline">
+        <i class="bi bi-x-lg"></i><span>{% translate "Cancel" %}</span>
+      </a>
+    </div>
+    <div class="form-actions-right">
+      <button type="submit" class="eal-btn eal-btn-primary">
+        <i class="bi bi-check2-circle"></i>
+        <span>{% if is_edit %}{% translate "Update FAQ" %}{% else %}{% translate "Add FAQ" %}{% endif %}</span>
+      </button>
+    </div>
+  </div>
+</form>
+{% endblock %}

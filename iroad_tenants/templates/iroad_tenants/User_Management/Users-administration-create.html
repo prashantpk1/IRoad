@@ -176,14 +176,14 @@
                                     <div class="d-flex align-items-stretch gap-2">
                                         <div class="flex-grow-1 password-input-wrapper">
                                             <i class="bi bi-lock password-lock-inside"></i>
-                                            <input type="password" class="form-control {% if form_errors.password %}is-invalid{% endif %}" id="password" name="password" placeholder="••••••••" autocomplete="new-password" {% if is_view_mode %}disabled{% elif not is_edit_mode %}required{% endif %}/>
+                                            <input type="password" class="form-control {% if form_errors.password %}is-invalid{% endif %}" id="password" name="password" placeholder="••••••••" autocomplete="new-password" {% if is_view_mode or is_edit_mode %}disabled{% else %}required{% endif %}/>
                                             <button
                                               type="button"
                                               class="password-toggle-inside"
                                               id="togglePasswordBtn"
                                               title="Show password"
                                               aria-label="Show password"
-                                              {% if is_view_mode %}disabled{% endif %}
+                                              {% if is_view_mode or is_edit_mode %}disabled{% endif %}
                                             >
                                               <i class="bi bi-eye"></i>
                                             </button>
@@ -193,13 +193,13 @@
                                           class="btn btn-outline-secondary"
                                           id="generatePasswordBtn"
                                           title="Generate random password"
-                                          {% if is_view_mode %}disabled{% endif %}
+                                          {% if is_view_mode or is_edit_mode %}disabled{% endif %}
                                         >
                                           <i class="bi bi-shuffle me-1"></i>Generate
                                         </button>
                                     </div>
                                     {% if form_errors.password %}<div class="invalid-feedback d-block">{{ form_errors.password }}</div>{% endif %}
-                                    <span class="field-hint">Min 8 chars, number &amp; special char</span>
+                                    <span class="field-hint">{% if is_edit_mode %}Password can only be set when creating a new user.{% else %}Min 8 chars, number &amp; special char. Temporary password expires in 24 hours.{% endif %}</span>
                                 </div>
                                 <div class="field">
                                     <label class="form-label d-block mb-2">Account Status</label>

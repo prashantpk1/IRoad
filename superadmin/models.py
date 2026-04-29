@@ -2266,6 +2266,36 @@ class CannedResponse(models.Model):
         ordering = ['title']
 
 
+class SubscriptionFAQ(models.Model):
+    faq_id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    question = models.CharField(max_length=255, unique=True)
+    answer = models.TextField()
+    display_order = models.IntegerField(default=1, validators=[MinValueValidator(1)])
+    is_active = models.BooleanField(default=True)
+    created_by = models.ForeignKey(
+        'AdminUser',
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name='subscription_faqs_created',
+    )
+    updated_by = models.ForeignKey(
+        'AdminUser',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='subscription_faqs_updated',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.question
+
+    class Meta:
+        db_table = 'subscription_faqs'
+        ordering = ['display_order', 'created_at']
+
+
 class SupportTicket(models.Model):
     PRIORITY_CHOICES = [
         ('Low', 'Low'),
