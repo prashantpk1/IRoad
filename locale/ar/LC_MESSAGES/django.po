@@ -398,8 +398,8 @@ msgstr "نظرة عامة على الموظفين ورؤى النشاط"
 msgid "Stale Accounts"
 msgstr "الحسابات غير النشطة"
 
-msgid "Standard Invoices"
-msgstr "الفواتير القياسية"
+msgid "Subscription Receipts"
+msgstr "إيصالات الاشتراك"
 
 msgid "Status"
 msgstr "الحالة"

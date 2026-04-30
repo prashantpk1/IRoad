@@ -1,0 +1,213 @@
+{% extends 'iroad_tenants/base.html' %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}Client Account Setting | iRoad Admin{% endblock %}
+
+{% block breadcrumb %}{% endblock %}
+
+{% block content %}
+<!-- Top Header -->
+      
+
+      
+      <div class="page-header">
+        <nav aria-label="breadcrumb">
+          <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+              <a href="{% url 'iroad_tenants:tenant_dashboard' %}">Dashboard</a>
+            </li>
+            <li class="breadcrumb-item">CRM</li>
+            <li class="breadcrumb-item">Clients Management</li>
+            <li class="breadcrumb-item active" aria-current="page">
+              Client Account Settings
+            </li>
+          </ol>
+        </nav>
+
+        <div class="page-header-row">
+          <div class="page-header-left">
+            <h1 class="page-title">Client Account Setting</h1>
+            <p class="page-subtitle">
+              Configure default values and document requirements for client
+              accounts.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Client Account Setting Form -->
+      <form id="clientAccountSettingForm">
+        <!-- Section 1: Document Requirements -->
+        <div class="form-card" data-section="1">
+          <div class="form-card-header">
+            <div class="form-card-icon blue">
+              <i class="bi bi-file-earmark-check"></i>
+            </div>
+            <div class="form-card-header-text">
+              <h2 class="form-card-title">Document Requirements</h2>
+              <p class="form-card-desc">
+                Toggle which documents are required during client onboarding.
+              </p>
+            </div>
+          </div>
+          <div class="form-card-body">
+            <!-- Individual Requirements -->
+            <div class="field-group">
+              <h3 class="field-group-title">
+                <i class="bi bi-person"></i>
+                Individual Requirements
+              </h3>
+              <div class="setting-row">
+                <div class="setting-row-info">
+                  <label class="form-label"
+                    >Require National ID (Individual)</label
+                  >
+                  <span class="field-hint"
+                    >When enabled, individual clients must provide a National
+                    ID.</span
+                  >
+                </div>
+                <label class="setting-toggle">
+                  <input type="checkbox" id="requireNationalId" checked />
+                  <span class="toggle-track"></span>
+                  <span class="toggle-label">Enabled</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Business Requirements -->
+            <div class="field-group">
+              <h3 class="field-group-title">
+                <i class="bi bi-building"></i>
+                Business Requirements
+              </h3>
+              <div class="setting-row">
+                <div class="setting-row-info">
+                  <label class="form-label"
+                    >Require Commercial Registration (Business)</label
+                  >
+                  <span class="field-hint"
+                    >When enabled, business clients must provide a Commercial
+                    Registration number.</span
+                  >
+                </div>
+                <label class="setting-toggle">
+                  <input
+                    type="checkbox"
+                    id="requireCommercialRegistration"
+                    checked
+                  />
+                  <span class="toggle-track"></span>
+                  <span class="toggle-label">Enabled</span>
+                </label>
+              </div>
+              <div class="setting-row">
+                <div class="setting-row-info">
+                  <label class="form-label"
+                    >Require Tax/VAT Registration (Business)</label
+                  >
+                  <span class="field-hint"
+                    >When enabled, business clients must provide a Tax/VAT
+                    Registration number.</span
+                  >
+                </div>
+                <label class="setting-toggle">
+                  <input
+                    type="checkbox"
+                    id="requireTaxVatRegistration"
+                    checked
+                  />
+                  <span class="toggle-track"></span>
+                  <span class="toggle-label">Enabled</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 2: Default Values -->
+        <div class="form-card" data-section="2">
+          <div class="form-card-header">
+            <div class="form-card-icon green">
+              <i class="bi bi-sliders"></i>
+            </div>
+            <div class="form-card-header-text">
+              <h2 class="form-card-title">Default Values</h2>
+              <p class="form-card-desc">
+                Set default values that are automatically applied when creating
+                new client accounts.
+              </p>
+            </div>
+          </div>
+          <div class="form-card-body">
+            <!-- Account Defaults -->
+            <div class="field-group">
+              <h3 class="field-group-title">
+                <i class="bi bi-gear"></i>
+                Account Defaults
+              </h3>
+              <div class="fields-grid cols-2">
+                <div class="field">
+                  <label for="defaultClientStatus" class="form-label"
+                    >Default Client Status</label
+                  >
+                  <select class="form-select" id="defaultClientStatus">
+                    <option value="active" selected>Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                  <span class="field-hint"
+                    >Status assigned to newly created client accounts.</span
+                  >
+                </div>
+                <div class="field">
+                  <label for="defaultClientType" class="form-label"
+                    >Default Client Type</label
+                  >
+                  <select class="form-select" id="defaultClientType">
+                    <option value="individual" selected>Individual</option>
+                    <option value="business">Business</option>
+                  </select>
+                  <span class="field-hint"
+                    >Client type pre-selected for new accounts.</span
+                  >
+                </div>
+              </div>
+            
+            </div>
+          </div>
+        </div>
+
+        <!-- Form Actions -->
+        <div class="form-actions-bar">
+          <div class="form-actions-left">
+            <button type="reset" class="btn btn-outline-secondary">
+              <i class="bi bi-arrow-counterclockwise"></i>
+              Reset Form
+            </button>
+          </div>
+          <div class="form-actions-right">
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-check-circle"></i>
+              Save Settings
+            </button>
+          </div>
+        </div>
+      </form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+      // Update toggle labels dynamically
+      document.querySelectorAll(".setting-toggle input").forEach((input) => {
+        const label = input
+          .closest(".setting-toggle")
+          .querySelector(".toggle-label");
+        function updateLabel() {
+          label.textContent = input.checked ? "Enabled" : "Disabled";
+        }
+        updateLabel();
+        input.addEventListener("change", updateLabel);
+      });
+    </script>
+{% endblock %}

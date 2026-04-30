@@ -402,14 +402,14 @@ def scan_active_subscriptions_for_renewal(days_until_expiry=14):
 def get_next_invoice_number():
     """
     Generate sequential invoice number.
-    Format: INV-YYYY-NNNN
-    e.g. INV-2026-0001
+    Format: REC-YYYY-NNNN
+    e.g. REC-2026-0001
     """
     from django.utils import timezone
     from .models import StandardInvoice
 
     year = timezone.now().year
-    prefix = f"INV-{year}-"
+    prefix = f"REC-{year}-"
 
     last_invoice = StandardInvoice.objects.filter(
         invoice_number__startswith=prefix
@@ -1055,11 +1055,14 @@ def generate_invoice_pdf_bytes(invoice):
         return None
 
 
-def send_invoice_paid_notification(invoice, use_async_tasks=False):
+def send_invoice_paid_notification(
+        invoice,
+        use_async_tasks=False,
+        uploaded_attachment=None):
     """
     Dispatch Invoice_Paid notification to tenant billing email.
     Uses Event Mapping engine when configured, with direct email fallback.
-    Now includes the invoice PDF as an attachment.
+    Uses user-uploaded attachment when provided.
     """
     if not invoice or not getattr(invoice, 'tenant', None):
         return False
@@ -1119,13 +1122,28 @@ def send_invoice_paid_notification(invoice, use_async_tasks=False):
 
         # Generate Attachment
         attachments = []
-        pdf_bytes = generate_invoice_pdf_bytes(invoice)
-        if pdf_bytes:
+        if uploaded_attachment:
+            file_name = getattr(uploaded_attachment, 'name', '') or (
+                f'Invoice-{invoice.invoice_number}-attachment'
+            )
+            content_type = (
+                getattr(uploaded_attachment, 'content_type', None)
+                or 'application/octet-stream'
+            )
             attachments.append((
-                f'Invoice-{invoice.invoice_number}.pdf',
-                pdf_bytes,
-                'application/pdf'
+                file_name,
+                uploaded_attachment.read(),
+                content_type,
             ))
+        else:
+            # Legacy behavior (auto-generated PDF attachment).
+            pdf_bytes = generate_invoice_pdf_bytes(invoice)
+            if pdf_bytes:
+                attachments.append((
+                    f'Invoice-{invoice.invoice_number}.pdf',
+                    pdf_bytes,
+                    'application/pdf'
+                ))
 
         # Ensure default invoice template exists before direct named dispatch.
         ensure_default_notification_templates()

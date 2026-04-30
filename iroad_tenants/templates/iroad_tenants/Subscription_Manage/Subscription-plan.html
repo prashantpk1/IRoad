@@ -59,11 +59,21 @@
       {% endif %}
     </div>
     <ul class="sub-plan-features">
+      {% if card.plan.max_internal_users != 0 %}
       <li class="sub-feature-item"><i class="bi bi-check-circle-fill"></i><span>Users: {% if card.plan.max_internal_users == -1 %}Unlimited{% else %}{{ card.plan.max_internal_users }}{% endif %}</span></li>
+      {% endif %}
+      {% if card.plan.max_internal_trucks != 0 %}
       <li class="sub-feature-item"><i class="bi bi-check-circle-fill"></i><span>Internal Trucks: {% if card.plan.max_internal_trucks == -1 %}Unlimited{% else %}{{ card.plan.max_internal_trucks }}{% endif %}</span></li>
+      {% endif %}
+      {% if card.plan.max_external_trucks != 0 %}
       <li class="sub-feature-item"><i class="bi bi-check-circle-fill"></i><span>External Trucks: {% if card.plan.max_external_trucks == -1 %}Unlimited{% else %}{{ card.plan.max_external_trucks }}{% endif %}</span></li>
+      {% endif %}
+      {% if card.plan.max_active_drivers != 0 %}
       <li class="sub-feature-item"><i class="bi bi-check-circle-fill"></i><span>Drivers: {% if card.plan.max_active_drivers == -1 %}Unlimited{% else %}{{ card.plan.max_active_drivers }}{% endif %}</span></li>
+      {% endif %}
+      {% if card.plan.max_storage_gb != 0 %}
       <li class="sub-feature-item"><i class="bi bi-check-circle-fill"></i><span>Storage: {% if card.plan.max_storage_gb == -1 %}Unlimited{% else %}{{ card.plan.max_storage_gb }} GB{% endif %}</span></li>
+      {% endif %}
     </ul>
     <form method="post">
       {% csrf_token %}

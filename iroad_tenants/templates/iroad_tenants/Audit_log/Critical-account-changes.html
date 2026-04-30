@@ -172,10 +172,19 @@
         <!-- Toolbar -->
         <div class="eal-toolbar">
           <div class="eal-toolbar-left">
-            <div class="eal-search">
+            <form method="get" class="eal-search">
               <i class="bi bi-search"></i>
-              <input type="text" placeholder="Search events&hellip;" />
-            </div>
+              <input
+                type="text"
+                name="search"
+                value="{{ critical_account_search_query }}"
+                placeholder="Search events&hellip;"
+              />
+              <button type="submit" class="btn btn-sm btn-link text-decoration-none">Search</button>
+              {% if critical_account_search_query %}
+              <a href="{% url 'iroad_tenants:tenant_audit_critical_account_changes' %}" class="btn btn-sm btn-link text-decoration-none">Clear</a>
+              {% endif %}
+            </form>
           </div>
         </div>
 
@@ -258,7 +267,7 @@
           </div>
           <div class="eal-pagination-controls">
             {% if critical_account_page_obj.has_previous %}
-            <a class="eal-page-btn" title="Previous" href="?page={{ critical_account_page_obj.previous_page_number }}">
+            <a class="eal-page-btn" title="Previous" href="?page={{ critical_account_page_obj.previous_page_number }}{% if critical_account_search_query %}&amp;search={{ critical_account_search_query|urlencode }}{% endif %}">
               <i class="bi bi-chevron-left"></i>
             </a>
             {% else %}
@@ -270,7 +279,7 @@
             <button class="eal-page-btn active">{{ critical_account_page_obj.number }}</button>
 
             {% if critical_account_page_obj.has_next %}
-            <a class="eal-page-btn" title="Next" href="?page={{ critical_account_page_obj.next_page_number }}">
+            <a class="eal-page-btn" title="Next" href="?page={{ critical_account_page_obj.next_page_number }}{% if critical_account_search_query %}&amp;search={{ critical_account_search_query|urlencode }}{% endif %}">
               <i class="bi bi-chevron-right"></i>
             </a>
             {% else %}

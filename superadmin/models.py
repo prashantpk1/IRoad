@@ -754,6 +754,7 @@ class SubscriptionPlan(models.Model):
     max_monthly_shipments = models.IntegerField(default=-1)
     max_storage_gb = models.IntegerField(default=-1)
     has_driver_app = models.BooleanField(default=False)
+    is_admin_only_plan = models.BooleanField(default=False)
     backup_restore_level = models.CharField(
         max_length=20,
         choices=BACKUP_LEVEL_CHOICES,
@@ -797,6 +798,7 @@ class PlanPricingCycle(models.Model):
         decimal_places=2,
         validators=[MinValueValidator(Decimal('0.00'))],
     )
+    is_admin_only_cycle = models.BooleanField(default=False)
 
     def __str__(self):
         return (
@@ -2157,13 +2159,13 @@ class StandardInvoice(models.Model):
                 invoice_id=self.invoice_id).exists():
             if self.status not in ['Void']:
                 raise PermissionError(
-                    'Standard Invoices are immutable after generation. '
+                    'Subscription Receipts are immutable after generation. '
                     'Only status can be changed to Void.'
                 )
         super().save(*args, **kwargs)
 
     def delete(self, *args, **kwargs):
-        raise PermissionError('Standard Invoices cannot be deleted.')
+        raise PermissionError('Subscription Receipts cannot be deleted.')
 
     class Meta:
         db_table = 'crm_invoices'

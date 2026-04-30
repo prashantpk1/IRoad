@@ -1,0 +1,666 @@
+{% extends 'iroad_tenants/base.html' %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}New Client Account | iRoad Admin{% endblock %}
+
+{% block breadcrumb %}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+        <nav aria-label="breadcrumb">
+          <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+              <a href="{% url 'iroad_tenants:tenant_dashboard' %}">Dashboard</a>
+            </li>
+            <li class="breadcrumb-item">CRM</li>
+            <li class="breadcrumb-item">Clients Management</li>
+            <li class="breadcrumb-item">
+              <a href="{% url 'iroad_tenants:tenant_client_account' %}">Client Account</a>
+            </li>
+            <li class="breadcrumb-item active" aria-current="page">
+              New Client Account
+            </li>
+          </ol>
+        </nav>
+        <div class="page-header-row">
+          <div class="page-header-left">
+            <h1 class="page-title">New Client Account</h1>
+            <p class="page-subtitle">
+              Create a new client account. Fill in the details below; fields
+              marked with * are required.
+            </p>
+          </div>
+          <div class="page-header-right">
+            <div class="eal-header-actions">
+              <a href="{% url 'iroad_tenants:tenant_client_account' %}" class="eal-btn eal-btn-outline">
+                <i class="bi bi-arrow-left"></i>
+                <span>Back</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Client Account Form -->
+      <form id="clientAccountForm">
+        <!-- Section 1: Account & Status -->
+        <div class="form-card" data-section="1">
+          <div class="form-card-header">
+            <div class="form-card-icon blue">
+              <i class="bi bi-info-circle"></i>
+            </div>
+            <div class="form-card-header-text">
+              <h2 class="form-card-title">Account & Status</h2>
+              <p class="form-card-desc">
+                Account identifier, client type and status.
+              </p>
+            </div>
+          </div>
+          <div class="form-card-body">
+            <div class="field-group">
+              <h3 class="field-group-title">
+                <i class="bi bi-fingerprint"></i>
+                Identity
+              </h3>
+              <div class="fields-grid cols-2">
+                <div class="field">
+                  <label for="accountNo" class="form-label">Account No</label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="accountNo"
+                    name="account_no"
+                    placeholder="Auto"
+                    readonly
+                  />
+                  <span class="field-hint">Auto-number, unique per tenant</span>
+                </div>
+                <div class="field">
+                  <label for="clientType" class="form-label"
+                    >Client Type
+                    <span class="required">*</span>
+                  </label>
+                  <select
+                    class="form-select"
+                    id="clientType"
+                    name="client_type"
+                    required
+                  >
+                    <option value="" disabled>-Select type-</option>
+                    <option value="Individual" selected>Individual</option>
+                    <option value="Business">Business</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="createdAt" class="form-label">Created At</label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="createdAt"
+                    name="created_at"
+                    placeholder="—"
+                    readonly
+                  />
+                  <span class="field-hint">Set on save</span>
+                </div>
+                <div class="field">
+                  <label for="status" class="form-label"
+                    >Status
+                    <span class="required">*</span>
+                  </label>
+                  <select
+                    class="form-select"
+                    id="status"
+                    name="status"
+                    required
+                  >
+                    <option value="Active" selected>Active</option>
+                    <option value="Inactive">Inactive</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 2: Names & Currency -->
+        <div class="form-card" data-section="2">
+          <div class="form-card-header">
+            <div class="form-card-icon amber">
+              <i class="bi bi-person-badge"></i>
+            </div>
+            <div class="form-card-header-text">
+              <h2 class="form-card-title">Names & Currency</h2>
+              <p class="form-card-desc">
+                Client names and preferred currency for billing.
+              </p>
+            </div>
+          </div>
+          <div class="form-card-body">
+            <div class="field-group">
+              <h3 class="field-group-title">
+                <i class="bi bi-type"></i>
+                Naming
+              </h3>
+              <div class="fields-grid cols-2">
+                <div class="field">
+                  <label for="nameArabic" class="form-label"
+                    >Name (Arabic)</label
+                  >
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="nameArabic"
+                    name="name_arabic"
+                    placeholder="الاسم بالعربية"
+                    dir="rtl"
+                  />
+                </div>
+                <div class="field">
+                  <label for="nameEnglish" class="form-label"
+                    >Name (English)
+                    <span class="required">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="nameEnglish"
+                    name="name_english"
+                    placeholder="Enter name in English"
+                    required
+                  />
+                </div>
+                <div class="field">
+                  <label for="displayName" class="form-label"
+                    >Display Name
+                    <span class="required">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="displayName"
+                    name="display_name"
+                    placeholder="Shown in lists and reports"
+                    required
+                  />
+                </div>
+                <div class="field">
+                  <label for="preferredCurrency" class="form-label"
+                    >Preferred Currency
+                    <span class="required">*</span>
+                  </label>
+                  <select
+                    class="form-select"
+                    id="preferredCurrency"
+                    name="preferred_currency"
+                    required
+                  >
+                    <option value="" disabled>-Select currency-</option>
+                    <option value="SAR">SAR - Saudi Riyal</option>
+                    <option value="USD">USD - US Dollar</option>
+                    <option value="EUR">EUR - Euro</option>
+                    <option value="AED">AED - UAE Dirham</option>
+                    <option value="KWD">KWD - Kuwaiti Dinar</option>
+                  </select>
+                  <span class="field-hint">From Currency Master</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 3: Billing Address -->
+        <div class="form-card" data-section="3">
+          <div class="form-card-header">
+            <div class="form-card-icon green">
+              <i class="bi bi-geo-alt"></i>
+            </div>
+            <div class="form-card-header-text">
+              <h2 class="form-card-title">Billing Address</h2>
+              <p class="form-card-desc">Legal / billing address only.</p>
+            </div>
+          </div>
+          <div class="form-card-body">
+            <div class="field-group">
+              <h3 class="field-group-title">
+                <i class="bi bi-building"></i>
+                Address
+              </h3>
+              <div class="fields-grid cols-2">
+                <div class="field">
+                  <label for="billingStreet1" class="form-label"
+                    >Billing Street 1
+                    <span class="required">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="billingStreet1"
+                    name="billing_street_1"
+                    placeholder="Street address line 1"
+                    required
+                  />
+                </div>
+                <div class="field">
+                  <label for="billingStreet2" class="form-label"
+                    >Billing Street 2</label
+                  >
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="billingStreet2"
+                    name="billing_street_2"
+                    placeholder="Street address line 2"
+                  />
+                </div>
+              </div>
+              <div class="fields-grid cols-2">
+                <div class="field">
+                  <label for="billingCity" class="form-label"
+                    >Billing City
+                    <span class="required">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="billingCity"
+                    name="billing_city"
+                    placeholder="City"
+                    required
+                  />
+                </div>
+                <div class="field">
+                  <label for="billingRegion" class="form-label"
+                    >Billing Region/State</label
+                  >
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="billingRegion"
+                    name="billing_region"
+                    placeholder="Region or state"
+                  />
+                </div>
+                <div class="field">
+                  <label for="postalCode" class="form-label">Postal Code</label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="postalCode"
+                    name="postal_code"
+                    placeholder="e.g. 12345"
+                  />
+                </div>
+                <div class="field">
+                  <label for="country" class="form-label"
+                    >Country
+                    <span class="required">*</span>
+                  </label>
+                  <select
+                    class="form-select"
+                    id="country"
+                    name="country"
+                    required
+                  >
+                    <option value="" disabled>-Select country-</option>
+                    <option value="SA">Saudi Arabia</option>
+                    <option value="AE">United Arab Emirates</option>
+                    <option value="KW">Kuwait</option>
+                    <option value="BH">Bahrain</option>
+                    <option value="QA">Qatar</option>
+                    <option value="OM">Oman</option>
+                  </select>
+                  <span class="field-hint">From Country Master</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="field-group mt-4">
+              <h3 class="field-group-title">
+                <i class="bi bi-sliders"></i>
+                Billing Defaults
+              </h3>
+              <div class="fields-grid cols-2">
+                <div class="field">
+                  <label for="creditLimitAmount" class="form-label"
+                    >Credit Limit Amount</label
+                  >
+                  <div class="input-icon-wrapper">
+                    <i class="bi bi-currency-dollar"></i>
+                    <input
+                      type="number"
+                      class="form-control has-icon"
+                      id="creditLimitAmount"
+                      name="credit_limit_amount"
+                      placeholder="0.00"
+                      min="0"
+                      step="0.01"
+                    />
+                  </div>
+                  <span class="field-hint"
+                    >Final authoritative debt ceiling for this client, denominated in the System Base Currency.</span
+                  >
+                </div>
+                <div class="field">
+                  <label for="limitCurrencyCode" class="form-label"
+                    >Currency</label
+                  >
+                  <select
+                    class="form-select"
+                    id="limitCurrencyCode"
+                    name="limit_currency_code"
+                    disabled
+                  >
+                    <option value="SAR" selected>SAR</option>
+                    <option value="USD">USD</option>
+                    <option value="EUR">EUR</option>
+                  </select>
+                  <span class="field-hint"
+                    >Display-only field showing the Base Currency.</span
+                  >
+                </div>
+              </div>
+              <div class="fields-grid cols-2">
+                <div class="field">
+                  <label for="paymentTermDays" class="form-label"
+                    >Payment Term (Days)</label
+                  >
+                  <div class="input-icon-wrapper">
+                    <i class="bi bi-calendar3"></i>
+                    <input
+                      type="number"
+                      class="form-control has-icon"
+                      id="paymentTermDays"
+                      name="payment_term_days"
+                      placeholder="0"
+                      min="0"
+                      step="1"
+                    />
+                  </div>
+                  <span class="field-hint"
+                    >Number of days used to automatically calculate the due_date on the Sales Invoice header.</span
+                  >
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 4: Business Details (conditional: Client Type = Business) -->
+        <div
+          class="form-card client-account-business-section hidden"
+          data-section="4"
+          id="clientAccountBusinessSection"
+        >
+          <div class="form-card-header">
+            <div class="form-card-icon red">
+              <i class="bi bi-building"></i>
+            </div>
+            <div class="form-card-header-text">
+              <h2 class="form-card-title">Business Details</h2>
+              <p class="form-card-desc">Shown when Client Type is Business.</p>
+            </div>
+          </div>
+          <div class="form-card-body">
+            <div class="field-group">
+              <h3 class="field-group-title">
+                <i class="bi bi-card-text"></i>
+                Registration
+              </h3>
+              <div class="fields-grid cols-2">
+                <div class="field">
+                  <label for="commercialRegistrationNo" class="form-label"
+                    >Commercial Registration No.</label
+                  >
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="commercialRegistrationNo"
+                    name="commercial_registration_no"
+                    placeholder="Enter CR number"
+                  />
+                </div>
+                <div class="field">
+                  <label for="taxRegistrationNo" class="form-label"
+                    >Tax Registration No.</label
+                  >
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="taxRegistrationNo"
+                    name="tax_registration_no"
+                    placeholder="Enter tax registration number"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Form Actions -->
+        <div class="form-actions-bar">
+          <div class="form-actions-left">
+            <button type="reset" class="btn btn-outline-secondary">
+              <i class="bi bi-arrow-counterclockwise"></i>
+              Reset Form
+            </button>
+          </div>
+          <div class="form-actions-right">
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-check-circle"></i>
+              Create Client Account
+            </button>
+          </div>
+        </div>
+      </form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+      (function () {
+        var businessSection = document.getElementById(
+          "clientAccountBusinessSection",
+        );
+        var clientType = document.getElementById("clientType");
+        if (businessSection && clientType) {
+          function toggleBusinessSection() {
+            businessSection.classList.toggle(
+              "hidden",
+              clientType.value !== "Business",
+            );
+          }
+          toggleBusinessSection();
+          clientType.addEventListener("change", toggleBusinessSection);
+        }
+      })();
+    </script>
+
+<script>
+      (function () {
+        var STORAGE_KEY = "ir_clients_v1";
+        var DEMO_CLIENT = {
+          account_no: "CA-000123",
+          client_type: "Business",
+          status: "Active",
+          created_at: "Jan 28, 2026, 03:52 PM",
+          name_arabic: "شركة الصفا للخدمات اللوجستية",
+          name_english: "Al Safa Logistics",
+          display_name: "Al Safa Logistics",
+          preferred_currency: "SAR",
+          billing_street_1: "King Fahd Rd, Building 12",
+          billing_street_2: "Floor 4, Office 402",
+          billing_city: "Riyadh",
+          billing_region: "Riyadh",
+          postal_code: "11564",
+          country: "SA",
+          commercial_registration_no: "CR-1234567890",
+          tax_registration_no: "TR-9876543210",
+        };
+
+        function pad(n) {
+          return String(n).padStart(6, "0");
+        }
+
+        function formatCreatedAt(d) {
+          return d.toLocaleString("en-US", {
+            year: "numeric",
+            month: "short",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+          });
+        }
+
+        function loadClients() {
+          try {
+            var raw = localStorage.getItem(STORAGE_KEY);
+            var parsed = raw ? JSON.parse(raw) : [];
+            return Array.isArray(parsed) ? parsed : [];
+          } catch (e) {
+            return [];
+          }
+        }
+
+        function saveClients(list) {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+        }
+
+        function hasDemoQuery() {
+          try {
+            var params = new URLSearchParams(window.location.search);
+            return (params.get("demo") || "").toLowerCase() === "1";
+          } catch (e) {
+            return false;
+          }
+        }
+
+        function nextAccountNo(existing) {
+          var max = 0;
+          for (var i = 0; i < existing.length; i++) {
+            var id = existing[i] && existing[i].account_no;
+            if (typeof id !== "string") continue;
+            var m = id.match(/^CA-(\d+)$/i);
+            if (!m) continue;
+            var num = parseInt(m[1], 10);
+            if (!Number.isNaN(num)) max = Math.max(max, num);
+          }
+          return "CA-" + pad(max + 1);
+        }
+
+        function getFormValue(id) {
+          var el = document.getElementById(id);
+          if (!el) return "";
+          return (el.value || "").trim();
+        }
+
+        function setFormValue(id, value) {
+          var el = document.getElementById(id);
+          if (!el) return;
+          el.value = value == null ? "" : String(value);
+        }
+
+        function setSelectValue(id, value) {
+          var el = document.getElementById(id);
+          if (!el) return;
+          el.value = value == null ? "" : String(value);
+          el.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+
+        function applyDemoValues() {
+          setFormValue("accountNo", DEMO_CLIENT.account_no);
+          setSelectValue("clientType", DEMO_CLIENT.client_type);
+          setFormValue("createdAt", DEMO_CLIENT.created_at);
+          setSelectValue("status", DEMO_CLIENT.status);
+          setFormValue("nameArabic", DEMO_CLIENT.name_arabic);
+          setFormValue("nameEnglish", DEMO_CLIENT.name_english);
+          setFormValue("displayName", DEMO_CLIENT.display_name);
+          setSelectValue("preferredCurrency", DEMO_CLIENT.preferred_currency);
+          setFormValue("billingStreet1", DEMO_CLIENT.billing_street_1);
+          setFormValue("billingStreet2", DEMO_CLIENT.billing_street_2);
+          setFormValue("billingCity", DEMO_CLIENT.billing_city);
+          setFormValue("billingRegion", DEMO_CLIENT.billing_region);
+          setFormValue("postalCode", DEMO_CLIENT.postal_code);
+          setSelectValue("country", DEMO_CLIENT.country);
+          setFormValue(
+            "commercialRegistrationNo",
+            DEMO_CLIENT.commercial_registration_no,
+          );
+          setFormValue("taxRegistrationNo", DEMO_CLIENT.tax_registration_no);
+        }
+
+        function initDefaults() {
+          var clients = loadClients();
+          if (hasDemoQuery()) {
+            applyDemoValues();
+            return;
+          }
+          if (!getFormValue("accountNo")) {
+            setFormValue("accountNo", nextAccountNo(clients));
+          }
+          if (!getFormValue("createdAt")) {
+            setFormValue("createdAt", formatCreatedAt(new Date()));
+          }
+        }
+
+        function buildClientPayload() {
+          return {
+            account_no: getFormValue("accountNo"),
+            client_type: getFormValue("clientType"),
+            status: getFormValue("status"),
+            created_at: getFormValue("createdAt"),
+            name_arabic: getFormValue("nameArabic"),
+            name_english: getFormValue("nameEnglish"),
+            display_name: getFormValue("displayName"),
+            preferred_currency: getFormValue("preferredCurrency"),
+            billing_street_1: getFormValue("billingStreet1"),
+            billing_street_2: getFormValue("billingStreet2"),
+            billing_city: getFormValue("billingCity"),
+            billing_region: getFormValue("billingRegion"),
+            postal_code: getFormValue("postalCode"),
+            country: getFormValue("country"),
+            commercial_registration_no: getFormValue("commercialRegistrationNo"),
+            tax_registration_no: getFormValue("taxRegistrationNo"),
+          };
+        }
+
+        function upsertClient(list, client) {
+          var idx = -1;
+          for (var i = 0; i < list.length; i++) {
+            if (list[i] && list[i].account_no === client.account_no) {
+              idx = i;
+              break;
+            }
+          }
+          if (idx >= 0) list[idx] = client;
+          else list.unshift(client);
+          return list;
+        }
+
+        var form = document.getElementById("clientAccountForm");
+        if (!form) return;
+
+        initDefaults();
+
+        form.addEventListener("submit", function (e) {
+          e.preventDefault();
+
+          if (!form.checkValidity()) {
+            form.classList.add("was-validated");
+            return;
+          }
+
+          var clients = loadClients();
+          var payload = buildClientPayload();
+          saveClients(upsertClient(clients, payload));
+
+          window.location.href =
+            "client-details.html?id=" + encodeURIComponent(payload.account_no);
+        });
+
+        form.addEventListener("reset", function () {
+          setTimeout(initDefaults, 0);
+        });
+      })();
+    </script>
+{% endblock %}

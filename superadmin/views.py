@@ -22,6 +22,7 @@ from superadmin.redis_helpers import (
 )
 from django.shortcuts import get_object_or_404, redirect, render
 from django.core.paginator import Paginator
+from django.core.files.storage import default_storage
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.html import strip_tags
@@ -34,6 +35,7 @@ from django.views import View
 from django.views.generic import TemplateView
 from datetime import date, datetime, timedelta
 from decimal import Decimal
+from io import BytesIO
 import json
 import logging
 import os
@@ -44,6 +46,12 @@ import uuid
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+
+try:
+    from openpyxl import Workbook, load_workbook
+except Exception:  # pragma: no cover - optional dependency safety
+    Workbook = None
+    load_workbook = None
 
 logger = logging.getLogger(__name__)
 
@@ -340,6 +348,7 @@ def _issue_admin_login_otp(request, user):
         created_by=user if getattr(user, 'is_authenticated', False) else None
     )
     otp_code = f'{secrets.randbelow(1000000):06d}'
+    print("otp_code", otp_code)
     
     # PCS FRM-CP-11-01 — fetch dynamic OTP TTL from settings row.
     from .auth_helpers import get_security_settings
@@ -1041,7 +1050,18 @@ class OTPVerificationView(View):
                     messages.success(request, 'A new OTP has been sent to your email.')
             else:
                 try:
-                    _issue_tenant_login_otp(request, tenant)
+                    recipient_email = email
+                    recipient_name = (
+                        getattr(tenant_user, 'full_name', None)
+                        if tenant_user is not None
+                        else None
+                    )
+                    _issue_tenant_login_otp(
+                        request,
+                        tenant,
+                        recipient_email=recipient_email,
+                        recipient_name=recipient_name,
+                    )
                 except Exception:
                     logger.exception('Failed to resend tenant login OTP for %s', tenant.primary_email)
                     messages.error(request, 'Failed to resend OTP right now. Please try again shortly.')
@@ -1277,39 +1297,97 @@ class ForgotPasswordView(View):
                 {"admin_user": user, "reset_url": reset_url},
             )
         else:
-            tenant, tenant_resolution = _resolve_tenant_by_email(email)
-            if tenant and tenant.account_status == 'Active':
-                TenantAuthToken.objects.filter(
-                    tenant_profile=tenant,
-                    token_type=TenantAuthToken.TokenType.INVITE,
-                    is_used=False,
-                ).update(is_used=True)
-                tenant_token = TenantAuthToken.objects.create(
-                    tenant_profile=tenant,
-                    token=secrets.token_urlsafe(32),
-                    token_type=TenantAuthToken.TokenType.INVITE,
-                    expires_at=timezone.now() + timedelta(hours=1),
+            tenant_user_tenant, tenant_user, tenant_user_resolution = _resolve_tenant_user_by_tid_and_email(
+                None,
+                email,
+            )
+            if tenant_user_tenant and tenant_user and tenant_user_resolution is None:
+                temp_password = secrets.token_urlsafe(9)
+                registry = (
+                    TenantRegistry.objects.select_related('tenant_profile')
+                    .filter(tenant_profile_id=tenant_user_tenant.tenant_id)
+                    .first()
                 )
-                reset_url = request.build_absolute_uri(
-                    reverse('set_password', args=[tenant_token.token])
-                )
-                send_named_notification_email(
-                    'AUTH_PASSWORD_RESET',
-                    recipient_email=tenant.primary_email,
-                    context_dict={
-                        'admin_user': {'first_name': tenant.company_name},
-                        'reset_url': reset_url,
-                    },
-                    language='en',
-                    default_subject='Reset Your iRoad Password',
-                    trigger_source='TemplateName: AUTH_PASSWORD_RESET',
-                    force_django_smtp=True,
-                )
-            elif tenant_resolution in ('ambiguous_active', 'ambiguous_inactive'):
-                logger.warning(
-                    'Password reset skipped for duplicated tenant email: %s',
-                    email,
-                )
+                if registry:
+                    from tenant_workspace.models import TenantUser
+                    connection.set_schema_to_public()
+                    try:
+                        connection.set_tenant(registry)
+                        tenant_user_record = TenantUser.objects.filter(
+                            pk=tenant_user.user_id,
+                            email__iexact=email,
+                        ).first()
+                        if tenant_user_record and tenant_user_record.status == TenantUser.Status.ACTIVE:
+                            tenant_user_record.password_hash = make_password(temp_password)
+                            tenant_user_record.temp_password_expires_at = timezone.now() + timedelta(hours=24)
+                            tenant_user_record.save(
+                                update_fields=['password_hash', 'temp_password_expires_at', 'updated_at']
+                            )
+                            login_url = request.build_absolute_uri(reverse('login'))
+                            login_url = f'{login_url}?tid={tenant_user_tenant.tenant_id}'
+                            context_dict = {
+                                'name': tenant_user_record.full_name,
+                                'email': tenant_user_record.email,
+                                'password': temp_password,
+                                'role_name': tenant_user_record.role_name,
+                                'login_url': login_url,
+                                'user_name': tenant_user_record.full_name,
+                            }
+                            sent = send_named_notification_email(
+                                'TENANT_USER_WELCOME',
+                                recipient_email=tenant_user_record.email,
+                                context_dict=context_dict,
+                                language='en',
+                                default_subject='iRoad Temporary Password Reset',
+                                trigger_source='TemplateName: TENANT_USER_WELCOME',
+                                force_django_smtp=True,
+                            )
+                            if not sent:
+                                send_named_notification_email(
+                                    'SUBADMIN_WELCOME',
+                                    recipient_email=tenant_user_record.email,
+                                    context_dict=context_dict,
+                                    language='en',
+                                    default_subject='iRoad Temporary Password Reset',
+                                    trigger_source='TemplateName: SUBADMIN_WELCOME',
+                                    force_django_smtp=True,
+                                )
+                    finally:
+                        connection.set_schema_to_public()
+            else:
+                tenant, tenant_resolution = _resolve_tenant_by_email(email)
+                if tenant and tenant.account_status == 'Active':
+                    TenantAuthToken.objects.filter(
+                        tenant_profile=tenant,
+                        token_type=TenantAuthToken.TokenType.INVITE,
+                        is_used=False,
+                    ).update(is_used=True)
+                    tenant_token = TenantAuthToken.objects.create(
+                        tenant_profile=tenant,
+                        token=secrets.token_urlsafe(32),
+                        token_type=TenantAuthToken.TokenType.INVITE,
+                        expires_at=timezone.now() + timedelta(hours=1),
+                    )
+                    reset_url = request.build_absolute_uri(
+                        reverse('set_password', args=[tenant_token.token])
+                    )
+                    send_named_notification_email(
+                        'AUTH_PASSWORD_RESET',
+                        recipient_email=tenant.primary_email,
+                        context_dict={
+                            'admin_user': {'first_name': tenant.company_name},
+                            'reset_url': reset_url,
+                        },
+                        language='en',
+                        default_subject='Reset Your iRoad Password',
+                        trigger_source='TemplateName: AUTH_PASSWORD_RESET',
+                        force_django_smtp=True,
+                    )
+                elif tenant_resolution in ('ambiguous_active', 'ambiguous_inactive'):
+                    logger.warning(
+                        'Password reset skipped for duplicated tenant email: %s',
+                        email,
+                    )
 
         # Always show the same success_message text to avoid information leaks
         return render(
@@ -3440,6 +3518,150 @@ class CountryDeleteView(LoginRequiredMixin, View):
         return redirect(reverse('country_list'))
 
 
+class CountryImportExcelView(LoginRequiredMixin, View):
+    def post(self, request):
+        if not getattr(request.user, 'is_root', False):
+            messages.error(request, 'Access denied: root admin only.')
+            return redirect(reverse('country_list'))
+
+        if load_workbook is None:
+            messages.error(
+                request,
+                'Excel import dependency is unavailable. Please install openpyxl.',
+            )
+            return redirect(reverse('country_list'))
+
+        upload = request.FILES.get('excel_file')
+        if not upload:
+            messages.error(request, 'Please choose an Excel file to import.')
+            return redirect(reverse('country_list'))
+
+        filename = (upload.name or '').lower()
+        if not (
+            filename.endswith('.xlsx')
+            or filename.endswith('.xlsm')
+            or filename.endswith('.xltx')
+            or filename.endswith('.xltm')
+        ):
+            messages.error(request, 'Only Excel .xlsx files are supported.')
+            return redirect(reverse('country_list'))
+
+        try:
+            wb = load_workbook(upload, data_only=True)
+            ws = wb.active
+        except Exception:
+            messages.error(request, 'Invalid Excel file. Please use the provided sample.')
+            return redirect(reverse('country_list'))
+
+        header_row = [str(c.value).strip().lower() if c.value is not None else '' for c in ws[1]]
+        required_headers = {'country_code', 'name_en', 'name_ar'}
+        if not required_headers.issubset(set(header_row)):
+            messages.error(
+                request,
+                'Invalid template headers. Required: country_code, name_en, name_ar.',
+            )
+            return redirect(reverse('country_list'))
+
+        idx = {name: header_row.index(name) for name in required_headers}
+        is_active_idx = header_row.index('is_active') if 'is_active' in header_row else None
+
+        created_count = 0
+        skipped_count = 0
+        row_errors = []
+
+        for row_no, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+            country_code = str(row[idx['country_code']] or '').strip().upper()
+            name_en = str(row[idx['name_en']] or '').strip()
+            name_ar = str(row[idx['name_ar']] or '').strip()
+
+            if not country_code and not name_en and not name_ar:
+                continue
+
+            if not country_code or not name_en or not name_ar:
+                skipped_count += 1
+                row_errors.append(f'Row {row_no}: missing required value(s).')
+                continue
+
+            if Country.objects.filter(country_code=country_code).exists():
+                skipped_count += 1
+                continue
+
+            is_active = True
+            if is_active_idx is not None:
+                raw_active = row[is_active_idx]
+                if raw_active is not None and str(raw_active).strip() != '':
+                    norm = str(raw_active).strip().lower()
+                    is_active = norm in ('1', 'true', 'yes', 'y', 'active')
+
+            country = Country(
+                country_code=country_code,
+                name_en=name_en,
+                name_ar=name_ar,
+                is_active=is_active,
+                created_by=request.user,
+            )
+            try:
+                country.full_clean()
+                country.save()
+                log_audit_action(
+                    request,
+                    'Create',
+                    'Countries Master',
+                    str(country.country_code),
+                    new_instance=country,
+                )
+                created_count += 1
+            except Exception:
+                skipped_count += 1
+                row_errors.append(f'Row {row_no}: invalid data or duplicate.')
+
+        if created_count:
+            messages.success(
+                request,
+                f'Country import completed. Created {created_count}, skipped {skipped_count}.',
+            )
+        else:
+            messages.error(
+                request,
+                f'No countries imported. Skipped {skipped_count}.',
+            )
+        if row_errors:
+            messages.warning(request, ' | '.join(row_errors[:3]))
+        return redirect(reverse('country_list'))
+
+
+class CountrySampleExcelView(LoginRequiredMixin, View):
+    def get(self, request):
+        if not getattr(request.user, 'is_root', False):
+            messages.error(request, 'Access denied: root admin only.')
+            return redirect(reverse('country_list'))
+
+        if Workbook is None:
+            messages.error(
+                request,
+                'Excel sample dependency is unavailable. Please install openpyxl.',
+            )
+            return redirect(reverse('country_list'))
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = 'Countries'
+        ws.append(['country_code', 'name_en', 'name_ar', 'is_active'])
+        ws.append(['SA', 'Saudi Arabia', 'المملكة العربية السعودية', 'TRUE'])
+        ws.append(['AE', 'United Arab Emirates', 'الإمارات العربية المتحدة', 'TRUE'])
+
+        stream = BytesIO()
+        wb.save(stream)
+        stream.seek(0)
+
+        response = HttpResponse(
+            stream.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+        response['Content-Disposition'] = 'attachment; filename="country_import_sample.xlsx"'
+        return response
+
+
 class CurrencyListView(LoginRequiredMixin, View):
     template_name = 'master_data/currencies/currency_list.html'
 
@@ -3682,6 +3904,166 @@ class CurrencyDeleteView(LoginRequiredMixin, View):
     def get(self, request, pk):
         messages.error(request, 'Currencies cannot be deleted. Deactivate instead.')
         return redirect(reverse('currency_list'))
+
+
+class CurrencyImportExcelView(LoginRequiredMixin, View):
+    def post(self, request):
+        if not getattr(request.user, 'is_root', False):
+            messages.error(request, 'Access denied: root admin only.')
+            return redirect(reverse('currency_list'))
+
+        if load_workbook is None:
+            messages.error(
+                request,
+                'Excel import dependency is unavailable. Please install openpyxl.',
+            )
+            return redirect(reverse('currency_list'))
+
+        upload = request.FILES.get('excel_file')
+        if not upload:
+            messages.error(request, 'Please choose an Excel file to import.')
+            return redirect(reverse('currency_list'))
+
+        filename = (upload.name or '').lower()
+        if not (
+            filename.endswith('.xlsx')
+            or filename.endswith('.xlsm')
+            or filename.endswith('.xltx')
+            or filename.endswith('.xltm')
+        ):
+            messages.error(request, 'Only Excel .xlsx files are supported.')
+            return redirect(reverse('currency_list'))
+
+        try:
+            wb = load_workbook(upload, data_only=True)
+            ws = wb.active
+        except Exception:
+            messages.error(request, 'Invalid Excel file. Please use the provided sample.')
+            return redirect(reverse('currency_list'))
+
+        header_row = [str(c.value).strip().lower() if c.value is not None else '' for c in ws[1]]
+        required_headers = {'currency_code', 'name_en', 'name_ar', 'currency_symbol'}
+        if not required_headers.issubset(set(header_row)):
+            messages.error(
+                request,
+                'Invalid template headers. Required: currency_code, name_en, name_ar, currency_symbol.',
+            )
+            return redirect(reverse('currency_list'))
+
+        idx = {name: header_row.index(name) for name in required_headers}
+        decimal_idx = header_row.index('decimal_places') if 'decimal_places' in header_row else None
+        is_active_idx = header_row.index('is_active') if 'is_active' in header_row else None
+
+        created_count = 0
+        skipped_count = 0
+        row_errors = []
+
+        for row_no, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+            currency_code = str(row[idx['currency_code']] or '').strip().upper()
+            name_en = str(row[idx['name_en']] or '').strip()
+            name_ar = str(row[idx['name_ar']] or '').strip()
+            currency_symbol = str(row[idx['currency_symbol']] or '').strip()
+
+            if not currency_code and not name_en and not name_ar and not currency_symbol:
+                continue
+
+            if not currency_code or not name_en or not name_ar or not currency_symbol:
+                skipped_count += 1
+                row_errors.append(f'Row {row_no}: missing required value(s).')
+                continue
+
+            if Currency.objects.filter(currency_code=currency_code).exists():
+                skipped_count += 1
+                continue
+
+            decimal_places = 2
+            if decimal_idx is not None and row[decimal_idx] not in (None, ''):
+                try:
+                    decimal_places = int(row[decimal_idx])
+                except Exception:
+                    skipped_count += 1
+                    row_errors.append(f'Row {row_no}: decimal_places must be an integer.')
+                    continue
+
+            is_active = True
+            if is_active_idx is not None:
+                raw_active = row[is_active_idx]
+                if raw_active is not None and str(raw_active).strip() != '':
+                    norm = str(raw_active).strip().lower()
+                    is_active = norm in ('1', 'true', 'yes', 'y', 'active')
+
+            currency = Currency(
+                currency_code=currency_code,
+                name_en=name_en,
+                name_ar=name_ar,
+                currency_symbol=currency_symbol,
+                decimal_places=decimal_places,
+                is_active=is_active,
+                created_by=request.user,
+            )
+            try:
+                currency.full_clean()
+                currency.save()
+                log_audit_action(
+                    request,
+                    'Create',
+                    'Currencies Master',
+                    str(currency.currency_code),
+                    new_instance=currency,
+                )
+                created_count += 1
+            except Exception:
+                skipped_count += 1
+                row_errors.append(f'Row {row_no}: invalid data or duplicate.')
+
+        if created_count:
+            messages.success(
+                request,
+                f'Currency import completed. Created {created_count}, skipped {skipped_count}.',
+            )
+        else:
+            messages.error(
+                request,
+                f'No currencies imported. Skipped {skipped_count}.',
+            )
+        if row_errors:
+            messages.warning(request, ' | '.join(row_errors[:3]))
+        return redirect(reverse('currency_list'))
+
+
+class CurrencySampleExcelView(LoginRequiredMixin, View):
+    def get(self, request):
+        if not getattr(request.user, 'is_root', False):
+            messages.error(request, 'Access denied: root admin only.')
+            return redirect(reverse('currency_list'))
+
+        if Workbook is None:
+            messages.error(
+                request,
+                'Excel sample dependency is unavailable. Please install openpyxl.',
+            )
+            return redirect(reverse('currency_list'))
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = 'Currencies'
+        ws.append([
+            'currency_code', 'name_en', 'name_ar', 'currency_symbol',
+            'decimal_places', 'is_active',
+        ])
+        ws.append(['SAR', 'Saudi Riyal', 'ريال سعودي', 'ر.س', 2, 'TRUE'])
+        ws.append(['USD', 'US Dollar', 'دولار أمريكي', '$', 2, 'TRUE'])
+
+        stream = BytesIO()
+        wb.save(stream)
+        stream.seek(0)
+
+        response = HttpResponse(
+            stream.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+        response['Content-Disposition'] = 'attachment; filename=\"currency_import_sample.xlsx\"'
+        return response
 
 
 class GeneralTaxSettingsView(LoginRequiredMixin, View):
@@ -4284,6 +4666,179 @@ class FXRateChangeLogView(LoginRequiredMixin, View):
         return render(request, self.template_name, context)
 
 
+class ExchangeRateImportExcelView(LoginRequiredMixin, View):
+    def post(self, request):
+        redirect_resp = _require_root_or_redirect(request)
+        if redirect_resp:
+            return redirect_resp
+
+        if load_workbook is None:
+            messages.error(
+                request,
+                'Excel import dependency is unavailable. Please install openpyxl.',
+            )
+            return redirect(reverse('fx_rate_list'))
+
+        upload = request.FILES.get('excel_file')
+        if not upload:
+            messages.error(request, 'Please choose an Excel file to import.')
+            return redirect(reverse('fx_rate_list'))
+
+        filename = (upload.name or '').lower()
+        if not (
+            filename.endswith('.xlsx')
+            or filename.endswith('.xlsm')
+            or filename.endswith('.xltx')
+            or filename.endswith('.xltm')
+        ):
+            messages.error(request, 'Only Excel .xlsx files are supported.')
+            return redirect(reverse('fx_rate_list'))
+
+        try:
+            wb = load_workbook(upload, data_only=True)
+            ws = wb.active
+        except Exception:
+            messages.error(request, 'Invalid Excel file. Please use the provided sample.')
+            return redirect(reverse('fx_rate_list'))
+
+        header_row = [str(c.value).strip().lower() if c.value is not None else '' for c in ws[1]]
+        required_headers = {'currency_code', 'exchange_rate'}
+        if not required_headers.issubset(set(header_row)):
+            messages.error(
+                request,
+                'Invalid template headers. Required: currency_code, exchange_rate.',
+            )
+            return redirect(reverse('fx_rate_list'))
+
+        idx = {name: header_row.index(name) for name in required_headers}
+        is_active_idx = header_row.index('is_active') if 'is_active' in header_row else None
+        notes_idx = header_row.index('change_notes') if 'change_notes' in header_row else None
+
+        created_count = 0
+        skipped_count = 0
+        row_errors = []
+        base_code = _get_base_currency_code()
+
+        for row_no, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+            currency_code = str(row[idx['currency_code']] or '').strip().upper()
+            raw_rate = row[idx['exchange_rate']]
+
+            if not currency_code and raw_rate in (None, ''):
+                continue
+            if not currency_code or raw_rate in (None, ''):
+                skipped_count += 1
+                row_errors.append(f'Row {row_no}: missing required value(s).')
+                continue
+
+            if base_code and currency_code == base_code:
+                skipped_count += 1
+                row_errors.append(f'Row {row_no}: base currency is not allowed.')
+                continue
+
+            currency = Currency.objects.filter(currency_code=currency_code, is_active=True).first()
+            if not currency:
+                skipped_count += 1
+                row_errors.append(f'Row {row_no}: active currency not found.')
+                continue
+
+            try:
+                exchange_rate = Decimal(str(raw_rate))
+                if exchange_rate <= 0:
+                    raise ValueError('non-positive rate')
+            except Exception:
+                skipped_count += 1
+                row_errors.append(f'Row {row_no}: exchange_rate must be a positive number.')
+                continue
+
+            if ExchangeRate.objects.filter(currency=currency, is_active=True).exists():
+                skipped_count += 1
+                continue
+
+            is_active = True
+            if is_active_idx is not None:
+                raw_active = row[is_active_idx]
+                if raw_active is not None and str(raw_active).strip() != '':
+                    norm = str(raw_active).strip().lower()
+                    is_active = norm in ('1', 'true', 'yes', 'y', 'active')
+
+            rate = ExchangeRate(
+                currency=currency,
+                exchange_rate=exchange_rate,
+                is_active=is_active,
+                updated_by=request.user,
+            )
+            try:
+                rate.full_clean()
+                rate.save()
+                log_audit_action(
+                    request,
+                    'Create',
+                    'Exchange Rates',
+                    str(rate.fx_id),
+                    new_instance=rate,
+                )
+                notes = ''
+                if notes_idx is not None:
+                    notes = str(row[notes_idx] or '').strip()
+                FXRateChangeLog.objects.create(
+                    currency=rate.currency,
+                    old_rate=Decimal('0.000000'),
+                    new_rate=rate.exchange_rate,
+                    notes=notes or 'Imported from Excel',
+                    changed_by=request.user,
+                )
+                created_count += 1
+            except Exception:
+                skipped_count += 1
+                row_errors.append(f'Row {row_no}: invalid data or duplicate.')
+
+        if created_count:
+            messages.success(
+                request,
+                f'Exchange-rate import completed. Created {created_count}, skipped {skipped_count}.',
+            )
+        else:
+            messages.error(
+                request,
+                f'No exchange rates imported. Skipped {skipped_count}.',
+            )
+        if row_errors:
+            messages.warning(request, ' | '.join(row_errors[:3]))
+        return redirect(reverse('fx_rate_list'))
+
+
+class ExchangeRateSampleExcelView(LoginRequiredMixin, View):
+    def get(self, request):
+        redirect_resp = _require_root_or_redirect(request)
+        if redirect_resp:
+            return redirect_resp
+
+        if Workbook is None:
+            messages.error(
+                request,
+                'Excel sample dependency is unavailable. Please install openpyxl.',
+            )
+            return redirect(reverse('fx_rate_list'))
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = 'ExchangeRates'
+        ws.append(['currency_code', 'exchange_rate', 'is_active', 'change_notes'])
+        ws.append(['USD', '3.750000', 'TRUE', 'Initial import'])
+        ws.append(['EUR', '4.090000', 'TRUE', 'Initial import'])
+
+        stream = BytesIO()
+        wb.save(stream)
+        stream.seek(0)
+
+        response = HttpResponse(
+            stream.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+        response['Content-Disposition'] = 'attachment; filename="exchange_rate_import_sample.xlsx"'
+        return response
+
+
 class TaxCodeListView(LoginRequiredMixin, View):
     template_name = 'system_config/tax_codes/tax_code_list.html'
 
@@ -4599,6 +5154,7 @@ class PlanCreateView(LoginRequiredMixin, View):
                 'is_edit': False,
                 'pricing_rows': [self._empty_row(0)],
                 'currencies': Currency.objects.filter(is_active=True).order_by('name_en'),
+                'global_currency_code': '',
             },
         )
 
@@ -4609,11 +5165,16 @@ class PlanCreateView(LoginRequiredMixin, View):
 
         form = SubscriptionPlanForm(request.POST)
         rows = self._extract_rows(request.POST)
+        global_currency_code = request.POST.get('global_currency', '').strip()
+        rows = self._apply_global_currency(rows, global_currency_code)
         valid_rows, row_errors, duplicate_error = self._validate_rows(rows)
 
         has_errors = False
         if not form.is_valid():
             has_errors = True
+        if not global_currency_code:
+            has_errors = True
+            messages.error(request, 'Please select a currency for pricing cycles.')
         if not valid_rows:
             has_errors = True
             messages.error(request, 'At least one pricing cycle is required.')
@@ -4632,6 +5193,7 @@ class PlanCreateView(LoginRequiredMixin, View):
                     'is_edit': False,
                     'pricing_rows': self._rows_with_errors(rows, row_errors),
                     'currencies': Currency.objects.filter(is_active=True).order_by('name_en'),
+                    'global_currency_code': global_currency_code,
                 },
             )
 
@@ -4652,6 +5214,7 @@ class PlanCreateView(LoginRequiredMixin, View):
                 number_of_cycles=row['cleaned_data']['number_of_cycles'],
                 currency=row['cleaned_data']['currency'],
                 price=row['cleaned_data']['price'],
+                is_admin_only_cycle=row['cleaned_data']['is_admin_only_cycle'],
             )
 
         messages.success(request, 'Subscription plan created successfully.')
@@ -4664,6 +5227,7 @@ class PlanCreateView(LoginRequiredMixin, View):
             'number_of_cycles': '',
             'currency': '',
             'price': '',
+            'is_admin_only_cycle': False,
             'delete': False,
             'errors': [],
         }
@@ -4685,9 +5249,26 @@ class PlanCreateView(LoginRequiredMixin, View):
                 'number_of_cycles': post_data.get(prefix + 'number_of_cycles', '').strip(),
                 'currency': post_data.get(prefix + 'currency', '').strip(),
                 'price': post_data.get(prefix + 'price', '').strip(),
+                'is_admin_only_cycle': (
+                    post_data.get(prefix + 'is_admin_only_cycle', '').strip() in ('1', 'on', 'true', 'True')
+                ),
                 'delete': post_data.get(prefix + 'delete', '').strip() == '1',
             }
             rows.append(row)
+        return rows
+
+    def _apply_global_currency(self, rows, global_currency_code):
+        normalized_currency = (global_currency_code or '').strip()
+        for row in rows:
+            if row.get('delete'):
+                continue
+            if not any([
+                row.get('number_of_cycles'),
+                row.get('currency'),
+                row.get('price'),
+            ]):
+                continue
+            row['currency'] = normalized_currency
         return rows
 
     def _validate_rows(self, rows):
@@ -4711,6 +5292,7 @@ class PlanCreateView(LoginRequiredMixin, View):
                     'number_of_cycles': row.get('number_of_cycles'),
                     'currency': row.get('currency'),
                     'price': row.get('price'),
+                    'is_admin_only_cycle': row.get('is_admin_only_cycle', False),
                 }
             )
             if not form.is_valid():
@@ -4785,11 +5367,17 @@ class PlanUpdateView(PlanCreateView):
                 'number_of_cycles': pricing.number_of_cycles,
                 'currency': pricing.currency_id,
                 'price': pricing.price,
+                'is_admin_only_cycle': pricing.is_admin_only_cycle,
                 'delete': False,
                 'errors': [],
             })
         if not pricing_rows:
             pricing_rows = [self._empty_row(0)]
+        global_currency_code = ''
+        for row in pricing_rows:
+            if row.get('currency'):
+                global_currency_code = row['currency']
+                break
 
         return render(
             request,
@@ -4800,6 +5388,7 @@ class PlanUpdateView(PlanCreateView):
                 'plan': plan,
                 'pricing_rows': pricing_rows,
                 'currencies': Currency.objects.filter(is_active=True).order_by('name_en'),
+                'global_currency_code': global_currency_code,
             },
         )
 
@@ -4812,11 +5401,16 @@ class PlanUpdateView(PlanCreateView):
         old_obj = SubscriptionPlan.objects.get(pk=pk)
         form = SubscriptionPlanForm(request.POST, instance=plan)
         rows = self._extract_rows(request.POST)
+        global_currency_code = request.POST.get('global_currency', '').strip()
+        rows = self._apply_global_currency(rows, global_currency_code)
         valid_rows, row_errors, duplicate_error = self._validate_rows(rows)
 
         has_errors = False
         if not form.is_valid():
             has_errors = True
+        if not global_currency_code:
+            has_errors = True
+            messages.error(request, 'Please select a currency for pricing cycles.')
         if not valid_rows:
             has_errors = True
             messages.error(request, 'At least one pricing cycle is required.')
@@ -4836,6 +5430,7 @@ class PlanUpdateView(PlanCreateView):
                     'plan': plan,
                     'pricing_rows': self._rows_with_errors(rows, row_errors),
                     'currencies': Currency.objects.filter(is_active=True).order_by('name_en'),
+                    'global_currency_code': global_currency_code,
                 },
             )
 
@@ -4878,6 +5473,7 @@ class PlanUpdateView(PlanCreateView):
                     existing.number_of_cycles = cleaned['number_of_cycles']
                     existing.currency = cleaned['currency']
                     existing.price = cleaned['price']
+                    existing.is_admin_only_cycle = cleaned['is_admin_only_cycle']
                     existing.save()
                     keep_ids.add(str(existing.pricing_id))
                     continue
@@ -4887,6 +5483,7 @@ class PlanUpdateView(PlanCreateView):
                 number_of_cycles=cleaned['number_of_cycles'],
                 currency=cleaned['currency'],
                 price=cleaned['price'],
+                is_admin_only_cycle=cleaned['is_admin_only_cycle'],
             )
             keep_ids.add(str(new_obj.pricing_id))
 
@@ -7519,11 +8116,18 @@ class CRMNoteCreateView(LoginRequiredMixin, View):
         if not note_content:
             messages.error(request, 'Note content is required.')
             return redirect(reverse('tenant_detail', kwargs={'pk': pk}))
-        CRMNote.objects.create(
+        created_note = CRMNote.objects.create(
             tenant=tenant,
             admin=request.user,
             note_type=note_type,
             note_content=note_content,
+        )
+        log_audit_action(
+            request,
+            'Create',
+            'CRM Notes',
+            str(tenant.tenant_id),
+            new_instance=created_note,
         )
         messages.success(request, 'CRM note added successfully.')
         return redirect(reverse('tenant_detail', kwargs={'pk': pk}))
@@ -7728,11 +8332,16 @@ class OrderCreateView(RootRequiredMixin, View):
                 tenant_id=tenant_pre,
             ).first()
 
-        plan_qs = SubscriptionPlan.objects.filter(is_active=True).order_by(
-            'plan_name_en')
         pricing_qs = PlanPricingCycle.objects.filter(
             plan__is_active=True,
+            plan__is_deleted=False,
+            currency__is_active=True,
         ).select_related('plan', 'currency')
+        plan_qs = SubscriptionPlan.objects.filter(
+            is_active=True,
+            is_deleted=False,
+            pricing_cycles__in=pricing_qs,
+        ).distinct().order_by('plan_name_en')
         pricing_json = [
             {
                 'plan_id': str(r.plan_id),
@@ -7750,8 +8359,10 @@ class OrderCreateView(RootRequiredMixin, View):
                     _billing_addon_unit_price(policy, choice_code))
 
         upgrade_credits_by_currency = {}
-        active_currencies = Currency.objects.filter(is_active=True).order_by(
-            'currency_code')
+        active_currencies = Currency.objects.filter(
+            is_active=True,
+            plan_pricing__in=pricing_qs,
+        ).distinct().order_by('currency_code')
         if tenant_obj and tenant_obj.current_plan:
             for cur in active_currencies:
                 op = resolve_upgrade_credit_basis_price(
@@ -7861,7 +8472,10 @@ class OrderCreateView(RootRequiredMixin, View):
                 except ValueError:
                     cycles = 1
                 plan = SubscriptionPlan.objects.filter(
-                    plan_id=plan_id, is_active=True).first()
+                    plan_id=plan_id,
+                    is_active=True,
+                    is_deleted=False,
+                ).first()
                 if not plan:
                     messages.error(request, 'Select a valid plan.')
                     order.delete()
@@ -8108,6 +8722,7 @@ class OrderPreviewAjaxView(RootRequiredMixin, View):
                 selected_plan = SubscriptionPlan.objects.filter(
                     plan_id=plan_id,
                     is_active=True,
+                    is_deleted=False,
                 ).first()
             if selected_plan:
                 ppc = PlanPricingCycle.objects.filter(
@@ -8204,14 +8819,10 @@ class OrderPreviewAjaxView(RootRequiredMixin, View):
             proj_expiry = date.today() + timedelta(
                 days=get_plan_cycle_days(selected_plan) * cycles,
             )
-            if selected_plan.max_internal_users != -1:
-                proj_u = selected_plan.max_internal_users
-            if selected_plan.max_internal_trucks != -1:
-                proj_it = selected_plan.max_internal_trucks
-            if selected_plan.max_external_trucks != -1:
-                proj_et = selected_plan.max_external_trucks
-            if selected_plan.max_active_drivers != -1:
-                proj_d = selected_plan.max_active_drivers
+            proj_u = selected_plan.max_internal_users
+            proj_it = selected_plan.max_internal_trucks
+            proj_et = selected_plan.max_external_trucks
+            proj_d = selected_plan.max_active_drivers
         elif classification == 'Renewal' and selected_plan:
             proj_plan = selected_plan
             extra = get_plan_cycle_days(selected_plan) * cycles
@@ -8224,25 +8835,17 @@ class OrderPreviewAjaxView(RootRequiredMixin, View):
             proj_expiry = date.today() + timedelta(
                 days=get_plan_cycle_days(selected_plan) * cycles,
             )
-            if selected_plan.max_internal_users != -1:
-                proj_u = selected_plan.max_internal_users
-            if selected_plan.max_internal_trucks != -1:
-                proj_it = selected_plan.max_internal_trucks
-            if selected_plan.max_external_trucks != -1:
-                proj_et = selected_plan.max_external_trucks
-            if selected_plan.max_active_drivers != -1:
-                proj_d = selected_plan.max_active_drivers
+            proj_u = selected_plan.max_internal_users
+            proj_it = selected_plan.max_internal_trucks
+            proj_et = selected_plan.max_external_trucks
+            proj_d = selected_plan.max_active_drivers
         elif classification == 'Downgrade' and selected_plan:
             proj_plan = selected_plan
             proj_expiry = tenant.subscription_expiry_date
-            if selected_plan.max_internal_users != -1:
-                proj_u = selected_plan.max_internal_users
-            if selected_plan.max_internal_trucks != -1:
-                proj_it = selected_plan.max_internal_trucks
-            if selected_plan.max_external_trucks != -1:
-                proj_et = selected_plan.max_external_trucks
-            if selected_plan.max_active_drivers != -1:
-                proj_d = selected_plan.max_active_drivers
+            proj_u = selected_plan.max_internal_users
+            proj_it = selected_plan.max_internal_trucks
+            proj_et = selected_plan.max_external_trucks
+            proj_d = selected_plan.max_active_drivers
         elif classification == 'Add_ons':
             for row in addon_preview_rows:
                 qty = int(row['quantity'])
@@ -8984,6 +9587,39 @@ class InvoiceListView(LoginRequiredMixin, View):
         })
 
 
+def _invoice_attachment_session_key(invoice_pk):
+    return f'invoice_uploaded_attachment_{invoice_pk}'
+
+
+def _is_pdf_upload(uploaded_attachment):
+    if not uploaded_attachment:
+        return False
+    name = (uploaded_attachment.name or '').lower()
+    content_type = (getattr(uploaded_attachment, 'content_type', '') or '').lower()
+    return name.endswith('.pdf') and (
+        content_type in ('application/pdf', 'application/x-pdf', '')
+    )
+
+
+def _store_invoice_uploaded_attachment(request, invoice_pk, uploaded_attachment):
+    key = _invoice_attachment_session_key(invoice_pk)
+    old_meta = request.session.get(key)
+    if old_meta and old_meta.get('path') and default_storage.exists(old_meta['path']):
+        default_storage.delete(old_meta['path'])
+
+    file_ext = os.path.splitext(uploaded_attachment.name or '')[1] or '.bin'
+    stored_path = default_storage.save(
+        f'invoice_uploads/{invoice_pk}/{uuid.uuid4().hex}{file_ext}',
+        uploaded_attachment,
+    )
+    request.session[key] = {
+        'path': stored_path,
+        'name': uploaded_attachment.name or os.path.basename(stored_path),
+        'content_type': uploaded_attachment.content_type or 'application/octet-stream',
+    }
+    request.session.modified = True
+
+
 class InvoiceDetailView(LoginRequiredMixin, View):
     template_name = 'crm/invoices/invoice_detail.html'
 
@@ -9000,12 +9636,20 @@ class InvoiceDetailView(LoginRequiredMixin, View):
         legal_identity = LegalIdentity.objects.filter(
             identity_id='GLOBAL-LEGAL-IDENTITY',
         ).first()
+        attachment_meta = request.session.get(_invoice_attachment_session_key(pk))
+        if attachment_meta and not default_storage.exists(attachment_meta.get('path', '')):
+            request.session.pop(_invoice_attachment_session_key(pk), None)
+            attachment_meta = None
         return render(
             request,
             self.template_name,
             {
                 'invoice': invoice,
                 'legal_identity': legal_identity,
+                'has_uploaded_attachment': bool(attachment_meta),
+                'uploaded_attachment_name': (
+                    attachment_meta.get('name', '') if attachment_meta else ''
+                ),
                 'base_currency_code': (
                     base_cfg.base_currency_id if base_cfg and base_cfg.base_currency_id else None
                 ),
@@ -9082,7 +9726,115 @@ class InvoiceSendEmailView(LoginRequiredMixin, View):
             StandardInvoice.objects.select_related('tenant', 'currency'),
             invoice_id=pk,
         )
-        sent = send_invoice_paid_notification(invoice, use_async_tasks=False)
+        uploaded_attachment = request.FILES.get('email_attachment')
+        attachment_meta = request.session.get(_invoice_attachment_session_key(pk))
+        attachment_payload = None
+
+        if request.POST.get('upload_only') == '1':
+            if not uploaded_attachment:
+                messages.error(request, 'Please choose a file to upload.')
+                return redirect('invoice_detail', pk=pk)
+            if not _is_pdf_upload(uploaded_attachment):
+                messages.error(request, 'Only PDF files are allowed.')
+                return redirect('invoice_detail', pk=pk)
+            _store_invoice_uploaded_attachment(request, pk, uploaded_attachment)
+            messages.success(request, 'Attachment uploaded successfully.')
+            return redirect('invoice_detail', pk=pk)
+
+        if uploaded_attachment:
+            if not _is_pdf_upload(uploaded_attachment):
+                messages.error(request, 'Only PDF files are allowed.')
+                return redirect('invoice_detail', pk=pk)
+            _store_invoice_uploaded_attachment(request, pk, uploaded_attachment)
+            attachment_payload = [(
+                uploaded_attachment.name,
+                uploaded_attachment.read(),
+                uploaded_attachment.content_type or 'application/octet-stream',
+            )]
+        elif attachment_meta and default_storage.exists(attachment_meta.get('path', '')):
+            with default_storage.open(attachment_meta['path'], 'rb') as stored_file:
+                attachment_payload = [(
+                    attachment_meta.get('name') or 'invoice-attachment',
+                    stored_file.read(),
+                    attachment_meta.get('content_type') or 'application/octet-stream',
+                )]
+        else:
+            messages.error(
+                request,
+                'Please upload a file before sending invoice email.',
+            )
+            return redirect('invoice_detail', pk=pk)
+
+        # sent = send_invoice_paid_notification(invoice, use_async_tasks=False)
+        # sent = send_transactional_email(
+        #     invoice.tenant.primary_email,
+        #     f'Invoice {invoice.invoice_number} issued',
+        #     (
+        #         f'Hello,\n\n'
+        #         f'Your invoice {invoice.invoice_number} is issued.\n'
+        #         f'Amount: {invoice.grand_total} {invoice.currency_id}\n\n'
+        #         f'Thank you.'
+        #     ),
+        #     (
+        #         '<p>Hello,</p>'
+        #         f'<p>Your invoice <strong>{invoice.invoice_number}</strong> is issued.</p>'
+        #         f'<p><strong>Amount:</strong> {invoice.grand_total} {invoice.currency_id}</p>'
+        #         '<p>Thank you.</p>'
+        #     ),
+        #     trigger_source='Manual: Invoice Send Email',
+        #     client_id=str(invoice.tenant_id),
+        #     attachments=[(
+        #         uploaded_attachment.name,
+        #         uploaded_attachment.read(),
+        #         uploaded_attachment.content_type or 'application/octet-stream',
+        #     )],
+        # )
+        email_context = {
+            'invoice_number': invoice.invoice_number,
+            'invoice_amount': str(invoice.grand_total),
+            'invoice_amount_display': f'{invoice.grand_total} {invoice.currency_id}',
+            'currency_code': invoice.currency_id,
+            'company_name': invoice.customer_name,
+            'tenant_name': invoice.customer_name,
+            'issue_date': invoice.issue_date.strftime('%Y-%m-%d') if invoice.issue_date else '',
+            'due_date': invoice.due_date.strftime('%Y-%m-%d') if invoice.due_date else '',
+            'invoice_status': invoice.status or 'Issued',
+            'invoice_sub_total': str(invoice.sub_total),
+            'invoice_discount_amount': str(invoice.discount_amount),
+            'invoice_tax_amount': str(invoice.tax_amount),
+            'invoice_grand_total': str(invoice.grand_total),
+            'invoice_taxable_amount': str(invoice.taxable_amount),
+            'customer_tax_number': invoice.customer_tax_number or '',
+            'customer_address': invoice.customer_address or '',
+            'line_items': list(
+                invoice.line_items.values(
+                    'item_description',
+                    'quantity',
+                    'unit_price',
+                    'tax_rate',
+                    'tax_amount',
+                    'line_total',
+                )
+            ),
+        }
+        ensure_default_notification_templates()
+        sent = send_named_notification_email(
+            'INVOICE_PAID',
+            recipient_email=invoice.tenant.primary_email,
+            context_dict=email_context,
+            language='en',
+            default_subject=f'Invoice {invoice.invoice_number} issued',
+            trigger_source=f'Manual Template: INVOICE_PAID for {invoice.invoice_number}',
+            attachments=attachment_payload,
+        )
+        if not sent:
+            sent = dispatch_event_notification(
+                'Invoice_Paid',
+                recipient_email=invoice.tenant.primary_email,
+                context_dict=email_context,
+                use_async_tasks=False,
+                attachments=attachment_payload,
+            )
         if sent:
             messages.success(
                 request,
@@ -9093,6 +9845,21 @@ class InvoiceSendEmailView(LoginRequiredMixin, View):
                 request,
                 'Invoice email could not be sent. Check gateway/template configuration.',
             )
+        return redirect('invoice_detail', pk=pk)
+
+
+class InvoiceUploadAttachmentView(LoginRequiredMixin, View):
+    def post(self, request, pk):
+        get_object_or_404(StandardInvoice, invoice_id=pk)
+        uploaded_attachment = request.FILES.get('email_attachment')
+        if not uploaded_attachment:
+            messages.error(request, 'Please choose a file to upload.')
+            return redirect('invoice_detail', pk=pk)
+        if not _is_pdf_upload(uploaded_attachment):
+            messages.error(request, 'Only PDF files are allowed.')
+            return redirect('invoice_detail', pk=pk)
+        _store_invoice_uploaded_attachment(request, pk, uploaded_attachment)
+        messages.success(request, 'Attachment uploaded successfully.')
         return redirect('invoice_detail', pk=pk)
 
 

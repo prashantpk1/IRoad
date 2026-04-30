@@ -1,0 +1,2216 @@
+{% extends 'iroad_tenants/base.html' %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}Client Details | iRoad Admin{% endblock %}
+
+{% block breadcrumb %}{% endblock %}
+
+{% block extra_css %}
+<style>
+      .ch-header-card {
+        background: #fff;
+        border-radius: 12px;
+        padding: 24px;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        gap: 20px;
+        flex-wrap: wrap;
+      }
+      .ch-left {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      .ch-title-row {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+      }
+      .ch-logo {
+        width: 48px;
+        height: 48px;
+        background: #ebecfa;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #5051f9;
+        font-size: 1.25rem;
+      }
+      .ch-title {
+        font-size: 1.4rem;
+        font-weight: 700;
+        margin: 0;
+        color: #1a1a1a;
+      }
+      .ch-badges {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .ch-badge {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 14px;
+        border-radius: 20px;
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        font-size: 0.85rem;
+        font-weight: 500;
+        color: #4a4a4a;
+        background: #fff;
+      }
+      .ch-badge i {
+        color: #6b6b6b;
+      }
+
+      .ch-right {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        min-width: 250px;
+      }
+      .ch-contact-item {
+        display: flex;
+        align-items: stretch;
+        background: #f4f5f9;
+        border-radius: 6px;
+        overflow: hidden;
+        font-size: 0.85rem;
+        border: 1px solid rgba(0, 0, 0, 0.04);
+      }
+      .ch-contact-icon {
+        padding: 8px 12px;
+        background: #e4e6fb;
+        color: #5051f9;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .ch-contact-text {
+        padding: 8px 16px;
+        flex: 1;
+        display: flex;
+        align-items: center;
+        color: #1a1a1a;
+        font-weight: 500;
+      }
+      .ch-contact-copy {
+        padding: 8px 12px;
+        background: #ced3fa;
+        color: #5051f9;
+        border: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+      .ch-contact-copy:hover {
+        background: #b2baff;
+      }
+
+      .ch-actions {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin: 20px 0;
+        flex-wrap: wrap;
+      }
+      .ch-action-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 12px;
+        border: 1px solid #c2c4fa;
+        border-radius: 8px;
+        background: #fff;
+        color: #5051f9;
+        font-size: 0.9rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+        text-decoration: none;
+      }
+      .ch-action-btn:hover {
+        background: #f4f5fc;
+        color: #5051f9;
+      }
+
+      .cd-main-card {
+        background: #fff;
+        border-radius: 12px;
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        padding: 20px;
+      }
+      .cd-tabs-container {
+        background: #f4f5fc;
+        border-radius: 8px;
+        padding: 6px;
+        margin-bottom: 24px;
+      }
+      .cd-tabs-list {
+        display: flex;
+        gap: 6px;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        padding: 0;
+        margin: 0;
+        list-style: none;
+      }
+      .cd-tabs-list::-webkit-scrollbar {
+        display: none;
+      }
+      .cd-tab {
+        border: none;
+        background: transparent;
+        padding: 8px 20px;
+        font-size: 0.85rem;
+        color: #6b6b6b;
+        cursor: pointer;
+        border-radius: 6px;
+        font-weight: 500;
+        white-space: nowrap;
+        transition: all 0.2s;
+      }
+      .cd-tab.active {
+        background: #5051f9;
+        color: #fff;
+        box-shadow: 0 2px 4px rgba(80, 81, 249, 0.2);
+      }
+      .cd-tab:hover:not(.active) {
+        color: #1a1a1a;
+      }
+
+      .cd-details-section {
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .cd-details-header {
+        background: #f4f5fc;
+        padding: 16px 20px;
+        font-weight: 600;
+        font-size: 0.9rem;
+        color: #1a1a1a;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+      }
+      .cd-details-body {
+        background: #fff;
+        padding: 20px;
+      }
+      .cd-grid-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+        padding-bottom: 20px;
+        margin-bottom: 20px;
+        border-bottom: 1px dashed rgba(0, 0, 0, 0.1);
+      }
+      .cd-grid-row:last-child {
+        padding-bottom: 0;
+        margin-bottom: 0;
+        border-bottom: none;
+      }
+      .cd-field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .cd-field-label {
+        font-size: 0.8rem;
+        color: #6b6b6b;
+      }
+      .cd-field-value {
+        font-size: 1rem;
+        font-weight: 700;
+        color: #1a1a1a;
+      }
+
+      @media (max-width: 768px) {
+        .ch-header-card {
+          flex-direction: column;
+        }
+        .cd-grid-row {
+          grid-template-columns: 1fr;
+        }
+      }
+      .cd-empty {
+        border: 1px dashed rgba(0, 0, 0, 0.2);
+        border-radius: 14px;
+        padding: 18px;
+        background: rgba(0, 0, 0, 0.02);
+      }
+    </style>
+<style>
+              .cd-details-section
+                .cd-details-header[data-bs-toggle="collapse"] {
+                cursor: pointer;
+                user-select: none;
+                transition:
+                  background-color 0.2s ease,
+                  border-color 0.2s ease;
+              }
+              .cd-details-section
+                .cd-details-header[data-bs-toggle="collapse"]:hover {
+                background-color: #f8fafc;
+              }
+              .cd-details-section .collapse-icon {
+                transition: transform 0.3s ease;
+              }
+              .cd-details-section .cd-details-header.collapsed .collapse-icon {
+                transform: rotate(-90deg);
+              }
+            </style>
+{% endblock %}
+
+{% block content %}
+<!-- Top Header -->
+      
+
+      
+      <div class="page-header">
+        <nav aria-label="breadcrumb">
+          <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+              <a href="{% url 'iroad_tenants:tenant_dashboard' %}">Dashboard</a>
+            </li>
+            <li class="breadcrumb-item">CRM</li>
+            <li class="breadcrumb-item">Clients Management</li>
+            <li class="breadcrumb-item">
+              <a href="{% url 'iroad_tenants:tenant_client_account' %}">Client Account</a>
+            </li>
+            <li class="breadcrumb-item active" aria-current="page">
+              Client Details
+            </li>
+          </ol>
+        </nav>
+
+        <div class="page-header-row">
+          <div class="page-header-left">
+            <h1 class="page-title">Client Details</h1>
+            <p class="page-subtitle">
+              View client profile data in a structured, tabbed layout.
+            </p>
+          </div>
+          <div class="page-header-right">
+            <div class="eal-header-actions">
+              <a href="{% url 'iroad_tenants:tenant_client_account' %}" class="eal-btn eal-btn-outline">
+                <i class="bi bi-arrow-left"></i>
+                <span>Back to list</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="container-fluid pb-4">
+        <!-- Top Profile Card -->
+        <div class="ch-header-card">
+          <div class="ch-left">
+            <div class="ch-title-row">
+              <div class="ch-logo">
+                <i class="bi bi-window-dock"></i>
+              </div>
+              <h2 class="ch-title" id="cdTitle">Al Safa Logistics</h2>
+            </div>
+            <!-- Subtitle span kept hidden to avoid JS error but unused -->
+            <span id="cdSubtitle" class="d-none"></span>
+            <div class="ch-badges">
+              <div class="ch-badge">
+                <i class="bi bi-globe"></i>
+                <span id="cdAccountNo">CA-000123</span>
+              </div>
+              <div class="ch-badge">
+                <i class="bi bi-phone"></i>
+                <span id="cdClientType">Corporate</span>
+              </div>
+              <div class="ch-badge">
+                <i class="bi bi-check2-circle"></i>
+                <span id="cdStatus">Active</span>
+              </div>
+            </div>
+          </div>
+          <div class="ch-right">
+            <div class="ch-contact-item">
+              <div class="ch-contact-icon">
+                <i class="bi bi-envelope"></i>
+              </div>
+              <div class="ch-contact-text">ayman.alharbi@alsafa.com</div>
+              <button class="ch-contact-copy" title="Copy Email">
+                <i class="bi bi-files"></i>
+              </button>
+            </div>
+            <div class="ch-contact-item">
+              <div class="ch-contact-icon">
+                <i class="bi bi-telephone"></i>
+              </div>
+              <div class="ch-contact-text">+966 50 123 4567</div>
+              <button class="ch-contact-copy" title="Copy Phone">
+                <i class="bi bi-files"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Action Buttons Row -->
+        <div class="ch-actions">
+          <a href="#" class="ch-action-btn">
+            <i class="bi bi-pencil"></i> Edit
+          </a>
+          <button class="ch-action-btn">
+            <i class="bi bi-file-earmark-text"></i> Create Sales Report
+          </button>
+          <button class="ch-action-btn">
+            <i class="bi bi-person-plus"></i> Add Contact
+          </button>
+          <button class="ch-action-btn">
+            <i class="bi bi-paperclip"></i> Add Attachment
+          </button>
+          <button class="ch-action-btn text-danger" id="suspendAccountBtn">
+            <i class="bi bi-pause-circle"></i> Suspend Account
+          </button>
+          <button class="ch-action-btn text-success d-none" id="activateAccountBtn">
+            <i class="bi bi-play-circle"></i> Activate Account
+          </button>
+        </div>
+
+        <!-- Main Content Card with Tabs -->
+        <!-- Main Content Card with Tabs -->
+        <div class="cd-main-card">
+          <!-- Tabs Header -->
+          <div class="cd-tabs-container">
+            <ul class="nav cd-tabs-list" role="tablist" style="flex-wrap: wrap;">
+              <li class="nav-item" role="presentation">
+                <button class="cd-tab active" data-bs-toggle="tab" data-bs-target="#pane-overview" type="button" role="tab">Overview</button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="cd-tab" data-bs-toggle="tab" data-bs-target="#pane-contacts" type="button" role="tab">Contacts</button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="cd-tab" data-bs-toggle="tab" data-bs-target="#pane-attachments" type="button" role="tab">Attachments</button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="cd-tab" data-bs-toggle="tab" data-bs-target="#pane-addresses" type="button" role="tab">Addresses</button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="cd-tab" data-bs-toggle="tab" data-bs-target="#pane-contracts" type="button" role="tab">Contracts</button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="cd-tab" data-bs-toggle="tab" data-bs-target="#pane-price-lists" type="button" role="tab">Price Lists</button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="cd-tab" data-bs-toggle="tab" data-bs-target="#pane-cargo" type="button" role="tab">Cargo</button>
+              </li>
+            </ul>
+          </div>
+
+          <div class="tab-content">
+            <!-- Overview Pane -->
+            <div
+              class="tab-pane fade show active"
+              id="pane-overview"
+              role="tabpanel"
+            >
+              <!-- Section 1: Account & Status -->
+              <div class="cd-details-section mb-4">
+                <div class="cd-details-header">Account & Status</div>
+                <div class="cd-details-body">
+                  <div class="cd-grid-row">
+                    <div class="cd-field">
+                      <span class="cd-field-label">Account No.</span>
+                      <span class="cd-field-value" id="v_account_no">—</span>
+                    </div>
+                    <div class="cd-field">
+                      <span class="cd-field-label">Created At</span>
+                      <span class="cd-field-value" id="v_created_at">—</span>
+                    </div>
+                  </div>
+                  <div class="cd-grid-row">
+                    <div class="cd-field">
+                      <span class="cd-field-label">Client Type</span>
+                      <span class="cd-field-value" id="v_client_type">—</span>
+                    </div>
+                    <div class="cd-field">
+                      <span class="cd-field-label">Status</span>
+                      <span class="cd-field-value" id="v_status">—</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Section 2: Names & Currency -->
+              <div class="cd-details-section mb-4">
+                <div class="cd-details-header">Names & Currency</div>
+                <div class="cd-details-body">
+                  <div class="cd-grid-row">
+                    <div class="cd-field">
+                      <span class="cd-field-label">Name (English)</span>
+                      <span class="cd-field-value" id="v_name_english">—</span>
+                    </div>
+                    <div class="cd-field">
+                      <span class="cd-field-label">Name (Arabic)</span>
+                      <span class="cd-field-value" id="v_name_arabic">—</span>
+                    </div>
+                  </div>
+                  <div class="cd-grid-row">
+                    <div class="cd-field">
+                      <span class="cd-field-label">Display Name</span>
+                      <span class="cd-field-value" id="v_display_name">—</span>
+                    </div>
+                    <div class="cd-field">
+                      <span class="cd-field-label">Preferred Currency</span>
+                      <span class="cd-field-value" id="v_preferred_currency"
+                        >—</span
+                      >
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Section 3: Billing Address -->
+              <div class="cd-details-section mb-4">
+                <div class="cd-details-header">Billing Address</div>
+                <div class="cd-details-body">
+                  <div class="cd-grid-row">
+                    <div class="cd-field">
+                      <span class="cd-field-label">Billing Street 1</span>
+                      <span class="cd-field-value" id="v_billing_street_1"
+                        >—</span
+                      >
+                    </div>
+                    <div class="cd-field">
+                      <span class="cd-field-label">Billing Street 2</span>
+                      <span class="cd-field-value" id="v_billing_street_2"
+                        >—</span
+                      >
+                    </div>
+                  </div>
+                  <div class="cd-grid-row">
+                    <div class="cd-field">
+                      <span class="cd-field-label">Billing City</span>
+                      <span class="cd-field-value" id="v_billing_city">—</span>
+                    </div>
+                    <div class="cd-field">
+                      <span class="cd-field-label">Billing Region/State</span>
+                      <span class="cd-field-value" id="v_billing_region"
+                        >—</span
+                      >
+                    </div>
+                  </div>
+                  <div class="cd-grid-row">
+                    <div class="cd-field">
+                      <span class="cd-field-label">Postal Code</span>
+                      <span class="cd-field-value" id="v_postal_code">—</span>
+                    </div>
+                    <div class="cd-field">
+                      <span class="cd-field-label">Country</span>
+                      <span class="cd-field-value" id="v_country">—</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Section 4: Business Details -->
+              <div class="cd-details-section">
+                <div class="cd-details-header">Business Details</div>
+                <div class="cd-details-body">
+                  <div class="cd-empty mb-4" id="businessNotice">
+                    Business fields are only applicable when the client type is
+                    Business.
+                  </div>
+                  <div class="cd-grid-row">
+                    <div class="cd-field">
+                      <span class="cd-field-label"
+                        >Commercial Registration No.</span
+                      >
+                      <span
+                        class="cd-field-value"
+                        id="v_commercial_registration_no"
+                        >—</span
+                      >
+                    </div>
+                    <div class="cd-field">
+                      <span class="cd-field-label">Tax Registration No.</span>
+                      <span class="cd-field-value" id="v_tax_registration_no"
+                        >—</span
+                      >
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Addresses mapping (pane-addresses) -->
+            <style>
+              .cd-details-section
+                .cd-details-header[data-bs-toggle="collapse"] {
+                cursor: pointer;
+                user-select: none;
+                transition:
+                  background-color 0.2s ease,
+                  border-color 0.2s ease;
+              }
+              .cd-details-section
+                .cd-details-header[data-bs-toggle="collapse"]:hover {
+                background-color: #f8fafc;
+              }
+              .cd-details-section .collapse-icon {
+                transition: transform 0.3s ease;
+              }
+              .cd-details-section .cd-details-header.collapsed .collapse-icon {
+                transform: rotate(-90deg);
+              }
+            </style>
+            <div class="tab-pane fade" id="pane-addresses" role="tabpanel">
+              <div
+                class="d-flex justify-content-between align-items-center mb-3"
+              >
+                <h4
+                  class="m-0"
+                  style="font-size: 1.1rem; font-weight: 600; color: #1a1a1a"
+                >
+                  Client Addresses
+                </h4>
+                <a href="addresses.html" class="btn btn-primary btn-sm">
+                  <i class="bi bi-plus-lg"></i> Add Address
+                </a>
+              </div>
+
+              <!-- Address 1 -->
+              <div class="cd-details-section mb-4">
+                <div
+                  class="cd-details-header d-flex justify-content-between align-items-center"
+                  data-bs-toggle="collapse"
+                  href="#addrCollapse1"
+                  role="button"
+                  aria-expanded="true"
+                  aria-controls="addrCollapse1"
+                >
+                  <div class="d-flex align-items-center gap-2">
+                    <i
+                      class="bi bi-chevron-down collapse-icon me-1 text-muted"
+                    ></i>
+                    <span
+                      class="eal-type-badge ind"
+                      style="
+                        background: #eef2ff;
+                        color: #4f46e5;
+                        font-size: 0.75rem;
+                        padding: 4px 8px;
+                        border-radius: 4px;
+                      "
+                      ><i class="bi bi-geo-alt"></i> Delivery Site</span
+                    >
+                    <span style="font-weight: 600; color: #1a1a1a"
+                      >Jeddah Islamic Port (ADDR-00123)</span
+                    >
+                  </div>
+                  <div
+                    class="eal-actions-cell pt-0 pb-0"
+                    onclick="event.stopPropagation()"
+                  >
+                    <button class="eal-row-btn" title="Edit">
+                      <i class="bi bi-pencil"></i>
+                    </button>
+                  </div>
+                </div>
+                <div class="collapse show" id="addrCollapse1">
+                  <div class="cd-details-body" style="padding: 0">
+                    <!-- Basic Info & Geography -->
+                    <div
+                      style="padding: 20px; border-bottom: 1px dashed #eaedf1"
+                    >
+                      <h5
+                        style="
+                          font-size: 0.95rem;
+                          font-weight: 600;
+                          color: #1a1a1a;
+                          margin-bottom: 16px;
+                          display: flex;
+                          align-items: center;
+                          gap: 8px;
+                        "
+                      >
+                        <i class="bi bi-info-circle text-primary"></i> Basic &
+                        Geographical Info
+                      </h5>
+                      <div class="cd-grid-row">
+                        <div class="cd-field">
+                          <span class="cd-field-label">Address Code</span>
+                          <span class="cd-field-value">ADDR-00123</span>
+                        </div>
+                        <div class="cd-field">
+                          <span class="cd-field-label">Address Mode</span>
+                          <span class="cd-field-value"
+                            >Delivery
+                            <span class="badge bg-light text-dark border ms-2"
+                              >Default Unloading</span
+                            ></span
+                          >
+                        </div>
+                      </div>
+                      <div class="cd-grid-row">
+                        <div class="cd-field">
+                          <span class="cd-field-label">Display Name</span>
+                          <span class="cd-field-value"
+                            >Jeddah Islamic Port</span
+                          >
+                        </div>
+                        <div class="cd-field">
+                          <span class="cd-field-label">Labels (EN / AR)</span>
+                          <span class="cd-field-value"
+                            >JIP Gate 4 / بوابة 4 الميناء</span
+                          >
+                        </div>
+                      </div>
+                      <div class="cd-grid-row">
+                        <div class="cd-field">
+                          <span class="cd-field-label"
+                            >Country / Province / City</span
+                          >
+                          <span class="cd-field-value"
+                            >Saudi Arabia / Makkah / Jeddah</span
+                          >
+                        </div>
+                        <div class="cd-field">
+                          <span class="cd-field-label"
+                            >District / Street / Bldg No.</span
+                          >
+                          <span class="cd-field-value"
+                            >Al Mina / Gate 4 Rd / 15A</span
+                          >
+                        </div>
+                      </div>
+                      <div
+                        class="cd-grid-row"
+                        style="
+                          margin-bottom: 0;
+                          border-bottom: none;
+                          padding-bottom: 0;
+                        "
+                      >
+                        <div class="cd-field">
+                          <span class="cd-field-label">Address Line 1 & 2</span>
+                          <span class="cd-field-value"
+                            >Jeddah Islamic Port, Gate 4 Area, Near
+                            Customs</span
+                          >
+                        </div>
+                        <div class="cd-field">
+                          <span class="cd-field-label">Postal Code & Map</span>
+                          <span class="cd-field-value"
+                            >21146 •
+                            <a href="#" style="text-decoration: none"
+                              ><i class="bi bi-link-45deg"></i> View on Map</a
+                            ></span
+                          >
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Operating Hours & Contact -->
+                    <div style="padding: 20px">
+                      <div class="row m-0">
+                        <!-- Col 1: Operating -->
+                        <div
+                          class="col-md-6 p-0 pe-md-4 mb-4 mb-md-0 d-flex flex-column gap-3"
+                          style="border-right: 1px dashed #eaedf1"
+                        >
+                          <h5
+                            style="
+                              font-size: 0.95rem;
+                              font-weight: 600;
+                              color: #1a1a1a;
+                              margin-bottom: 8px;
+                              display: flex;
+                              align-items: center;
+                              gap: 8px;
+                            "
+                          >
+                            <i class="bi bi-clock text-success"></i> Operating &
+                            Handling
+                          </h5>
+                          <div class="cd-field">
+                            <span class="cd-field-label"
+                              >Working Days & Hours</span
+                            >
+                            <span class="cd-field-value"
+                              >Sun-Thu (08:00 AM - 05:00 PM)</span
+                            >
+                          </div>
+                          <div class="cd-field">
+                            <span class="cd-field-label"
+                              >Handling Time (Load / Unload)</span
+                            >
+                            <span class="cd-field-value">2 hrs / 3 hrs</span>
+                          </div>
+                          <div class="cd-field">
+                            <span class="cd-field-label"
+                              >Site Requirements</span
+                            >
+                            <span class="cd-field-value"
+                              >Permit Required, Government Site</span
+                            >
+                          </div>
+                          <div class="cd-field">
+                            <span class="cd-field-label">Instructions</span>
+                            <span
+                              class="cd-field-value"
+                              style="
+                                font-size: 0.9rem;
+                                font-weight: 400;
+                                color: #4a4a4a;
+                                line-height: 1.5;
+                              "
+                              >Drivers must wear full PPE. Pass required at gate
+                              4. Unloading at dock B only.</span
+                            >
+                          </div>
+                        </div>
+
+                        <!-- Col 2: Contact -->
+                        <div
+                          class="col-md-6 p-0 ps-md-4 d-flex flex-column gap-3"
+                        >
+                          <h5
+                            style="
+                              font-size: 0.95rem;
+                              font-weight: 600;
+                              color: #1a1a1a;
+                              margin-bottom: 8px;
+                              display: flex;
+                              align-items: center;
+                              gap: 8px;
+                            "
+                          >
+                            <i class="bi bi-telephone text-danger"></i> Contact
+                            Information
+                          </h5>
+                          <div class="cd-field">
+                            <span class="cd-field-label">Contact Person</span>
+                            <span class="cd-field-value"
+                              >Ahmad Al-Ghamdi (Port Manager)</span
+                            >
+                          </div>
+                          <div class="cd-field">
+                            <span class="cd-field-label">Email</span>
+                            <span class="cd-field-value"
+                              >ahmad@example.com</span
+                            >
+                          </div>
+                          <div class="cd-field">
+                            <span class="cd-field-label"
+                              >Phone & Extension</span
+                            >
+                            <span class="cd-field-value"
+                              >+966 12 345 6789 ext 102</span
+                            >
+                          </div>
+                          <div class="cd-field">
+                            <span class="cd-field-label"
+                              >Mobile & WhatsApp</span
+                            >
+                            <span class="cd-field-value"
+                              >+966 50 111 2233
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Address 2 -->
+              <div class="cd-details-section">
+                <div
+                  class="cd-details-header d-flex justify-content-between align-items-center"
+                  data-bs-toggle="collapse"
+                  href="#addrCollapse2"
+                  role="button"
+                  aria-expanded="true"
+                  aria-controls="addrCollapse2"
+                >
+                  <div class="d-flex align-items-center gap-2">
+                    <i
+                      class="bi bi-chevron-down collapse-icon me-1 text-muted"
+                    ></i>
+                    <span
+                      class="eal-type-badge org"
+                      style="
+                        background: #fff7ed;
+                        color: #ea580c;
+                        font-size: 0.75rem;
+                        padding: 4px 8px;
+                        border-radius: 4px;
+                      "
+                      ><i class="bi bi-box-seam"></i> Warehouse</span
+                    >
+                    <span style="font-weight: 600; color: #1a1a1a"
+                      >Dammam Main Hub (ADDR-00244)</span
+                    >
+                  </div>
+                  <div
+                    class="eal-actions-cell pt-0 pb-0"
+                    onclick="event.stopPropagation()"
+                  >
+                    <button class="eal-row-btn" title="Edit">
+                      <i class="bi bi-pencil"></i>
+                    </button>
+                  </div>
+                </div>
+                <div class="collapse show" id="addrCollapse2">
+                  <div class="cd-details-body" style="padding: 0">
+                    <!-- Basic Info & Geography -->
+                    <div
+                      style="padding: 20px; border-bottom: 1px dashed #eaedf1"
+                    >
+                      <h5
+                        style="
+                          font-size: 0.95rem;
+                          font-weight: 600;
+                          color: #1a1a1a;
+                          margin-bottom: 16px;
+                          display: flex;
+                          align-items: center;
+                          gap: 8px;
+                        "
+                      >
+                        <i class="bi bi-info-circle text-primary"></i> Basic &
+                        Geographical Info
+                      </h5>
+                      <div class="cd-grid-row">
+                        <div class="cd-field">
+                          <span class="cd-field-label">Address Code</span>
+                          <span class="cd-field-value">ADDR-00244</span>
+                        </div>
+                        <div class="cd-field">
+                          <span class="cd-field-label">Address Mode</span>
+                          <span class="cd-field-value"
+                            >Both
+                            <span class="badge bg-light text-dark border ms-2"
+                              >Default Loading</span
+                            ></span
+                          >
+                        </div>
+                      </div>
+                      <div class="cd-grid-row">
+                        <div class="cd-field">
+                          <span class="cd-field-label">Display Name</span>
+                          <span class="cd-field-value">Dammam Main Hub</span>
+                        </div>
+                        <div class="cd-field">
+                          <span class="cd-field-label">Labels (EN / AR)</span>
+                          <span class="cd-field-value"
+                            >Dammam Hub / المستودع الرئيسي</span
+                          >
+                        </div>
+                      </div>
+                      <div class="cd-grid-row">
+                        <div class="cd-field">
+                          <span class="cd-field-label"
+                            >Country / Province / City</span
+                          >
+                          <span class="cd-field-value"
+                            >Saudi Arabia / Eastern / Dammam</span
+                          >
+                        </div>
+                        <div class="cd-field">
+                          <span class="cd-field-label"
+                            >District / Street / Bldg No.</span
+                          >
+                          <span class="cd-field-value"
+                            >Industrial City 2 / St 15 / B2</span
+                          >
+                        </div>
+                      </div>
+                      <div
+                        class="cd-grid-row"
+                        style="
+                          margin-bottom: 0;
+                          border-bottom: none;
+                          padding-bottom: 0;
+                        "
+                      >
+                        <div class="cd-field">
+                          <span class="cd-field-label">Address Line 1 & 2</span>
+                          <span class="cd-field-value"
+                            >Industrial City Phase 2, Street 15, Block B2</span
+                          >
+                        </div>
+                        <div class="cd-field">
+                          <span class="cd-field-label">Postal Code & Map</span>
+                          <span class="cd-field-value"
+                            >31411 •
+                            <a href="#" style="text-decoration: none"
+                              ><i class="bi bi-link-45deg"></i> View on Map</a
+                            ></span
+                          >
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Operating Hours & Contact -->
+                    <div style="padding: 20px">
+                      <div class="row m-0">
+                        <!-- Col 1: Operating -->
+                        <div
+                          class="col-md-6 p-0 pe-md-4 mb-4 mb-md-0 d-flex flex-column gap-3"
+                          style="border-right: 1px dashed #eaedf1"
+                        >
+                          <h5
+                            style="
+                              font-size: 0.95rem;
+                              font-weight: 600;
+                              color: #1a1a1a;
+                              margin-bottom: 8px;
+                              display: flex;
+                              align-items: center;
+                              gap: 8px;
+                            "
+                          >
+                            <i class="bi bi-clock text-success"></i> Operating &
+                            Handling
+                          </h5>
+                          <div class="cd-field">
+                            <span class="cd-field-label"
+                              >Working Days & Hours</span
+                            >
+                            <span class="cd-field-value"
+                              >Mon-Sat (06:00 AM - 08:00 PM)</span
+                            >
+                          </div>
+                          <div class="cd-field">
+                            <span class="cd-field-label"
+                              >Handling Time (Load / Unload)</span
+                            >
+                            <span class="cd-field-value">1.5 hrs / 1 hrs</span>
+                          </div>
+                          <div class="cd-field">
+                            <span class="cd-field-label"
+                              >Site Requirements</span
+                            >
+                            <span class="cd-field-value"
+                              >Appointment Required</span
+                            >
+                          </div>
+                          <div class="cd-field">
+                            <span class="cd-field-label">Instructions</span>
+                            <span
+                              class="cd-field-value"
+                              style="
+                                font-size: 0.9rem;
+                                font-weight: 400;
+                                color: #4a4a4a;
+                                line-height: 1.5;
+                              "
+                              >Check in at security gate 1 before entering the
+                              dock area.</span
+                            >
+                          </div>
+                        </div>
+
+                        <!-- Col 2: Contact -->
+                        <div
+                          class="col-md-6 p-0 ps-md-4 d-flex flex-column gap-3"
+                        >
+                          <h5
+                            style="
+                              font-size: 0.95rem;
+                              font-weight: 600;
+                              color: #1a1a1a;
+                              margin-bottom: 8px;
+                              display: flex;
+                              align-items: center;
+                              gap: 8px;
+                            "
+                          >
+                            <i class="bi bi-telephone text-danger"></i> Contact
+                            Information
+                          </h5>
+                          <div class="cd-field">
+                            <span class="cd-field-label">Contact Person</span>
+                            <span class="cd-field-value"
+                              >Fahad Al-Qahtani (Warehouse Supervisor)</span
+                            >
+                          </div>
+                          <div class="cd-field">
+                            <span class="cd-field-label">Email</span>
+                            <span class="cd-field-value"
+                              >fahad.q@example.com</span
+                            >
+                          </div>
+                          <div class="cd-field">
+                            <span class="cd-field-label"
+                              >Phone & Extension</span
+                            >
+                            <span class="cd-field-value"
+                              ><span class="text-muted fst-italic"
+                                >Not provided</span
+                              ></span
+                            >
+                          </div>
+                          <div class="cd-field">
+                            <span class="cd-field-label"
+                              >Mobile & WhatsApp</span
+                            >
+                            <span class="cd-field-value"
+                              >+966 55 999 8877
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Contracts mapping (pane-contracts) -->
+            <div class="tab-pane fade" id="pane-contracts" role="tabpanel">
+              <div
+                class="d-flex justify-content-between align-items-center mb-3"
+              >
+                <h4
+                  class="m-0"
+                  style="font-size: 1.1rem; font-weight: 600; color: #1a1a1a"
+                >
+                  Client Contracts
+                </h4>
+                <a href="{% url 'iroad_tenants:tenant_client_contract' %}" class="btn btn-primary btn-sm">
+                  <i class="bi bi-plus-lg"></i> Add Contract
+                </a>
+              </div>
+
+              <!-- Contract 1 -->
+              <div class="cd-details-section mb-4">
+                <div
+                  class="cd-details-header d-flex justify-content-between align-items-center"
+                  data-bs-toggle="collapse"
+                  href="#contractCollapse1"
+                  role="button"
+                  aria-expanded="true"
+                  aria-controls="contractCollapse1"
+                >
+                  <div class="d-flex align-items-center gap-2">
+                    <i
+                      class="bi bi-chevron-down collapse-icon me-1 text-muted"
+                    ></i>
+                    <span style="font-weight: 600; color: #1a1a1a"
+                      >Contract #CNT-2025-044</span
+                    >
+                  </div>
+                  <div
+                    class="eal-actions-cell pt-0 pb-0"
+                    onclick="event.stopPropagation()"
+                  >
+                    <button class="eal-row-btn" title="Edit">
+                      <i class="bi bi-pencil"></i>
+                    </button>
+                  </div>
+                </div>
+                <div class="collapse show" id="contractCollapse1">
+                  <div class="cd-details-body">
+                    <div class="cd-grid-row">
+                      <div class="cd-field">
+                        <span class="cd-field-label">Contract No.</span>
+                        <span class="cd-field-value">CNT-2025-044</span>
+                      </div>
+                      <div class="cd-field">
+                        <span class="cd-field-label">Client Account</span>
+                        <span class="cd-field-value"
+                          >Al Safa Logistics (CA-000123)</span
+                        >
+                      </div>
+                    </div>
+                    <div class="cd-grid-row">
+                      <div class="cd-field">
+                        <span class="cd-field-label">Start Date</span>
+                        <span class="cd-field-value">01 Jan 2025</span>
+                      </div>
+                      <div class="cd-field">
+                        <span class="cd-field-label">End Date</span>
+                        <span class="cd-field-value">31 Dec 2025</span>
+                      </div>
+                    </div>
+                    <div class="cd-grid-row">
+                      <div class="cd-field">
+                        <span class="cd-field-label">Status</span>
+                        <span class="cd-field-value">
+                          <span
+                            class="status-badge active"
+                            style="background: #e6f8ef; color: #0d894f"
+                            >Active</span
+                          >
+                        </span>
+                      </div>
+                      <div class="cd-field">
+                        <span class="cd-field-label">Contract Attachment</span>
+                        <span class="cd-field-value">
+                          <a
+                            href="#"
+                            style="
+                              text-decoration: none;
+                              display: inline-flex;
+                              align-items: center;
+                              gap: 6px;
+                              color: #5051f9;
+                              font-size: 0.9rem;
+                              font-weight: 500;
+                            "
+                          >
+                            <i
+                              class="bi bi-file-earmark-pdf"
+                              style="font-size: 1.1rem"
+                            ></i>
+                            Annual_Logistics_SLA_2025.pdf
+                          </a>
+                        </span>
+                      </div>
+                    </div>
+                    <div
+                      class="cd-grid-row"
+                      style="
+                        border-bottom: none;
+                        margin-bottom: 0;
+                        padding-bottom: 0;
+                      "
+                    >
+                      <div class="cd-field" style="grid-column: 1 / -1">
+                        <span class="cd-field-label">Notes</span>
+                        <span
+                          class="cd-field-value"
+                          style="
+                            font-weight: 400;
+                            font-size: 0.9rem;
+                            color: #4a4a4a;
+                            line-height: 1.5;
+                          "
+                          >Annual Logistics SLA 2025 covering all inbound and
+                          outbound transport operations, with specific clauses
+                          for fuel surcharges and performance penalties.</span
+                        >
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Contract 2 -->
+              <div class="cd-details-section mb-4">
+                <div
+                  class="cd-details-header d-flex justify-content-between align-items-center"
+                  data-bs-toggle="collapse"
+                  href="#contractCollapse2"
+                  role="button"
+                  aria-expanded="true"
+                  aria-controls="contractCollapse2"
+                >
+                  <div class="d-flex align-items-center gap-2">
+                    <i
+                      class="bi bi-chevron-down collapse-icon me-1 text-muted"
+                    ></i>
+                    <span style="font-weight: 600; color: #1a1a1a"
+                      >Contract #CNT-2024-112</span
+                    >
+                  </div>
+                  <div
+                    class="eal-actions-cell pt-0 pb-0"
+                    onclick="event.stopPropagation()"
+                  >
+                    <button class="eal-row-btn" title="Edit">
+                      <i class="bi bi-pencil"></i>
+                    </button>
+                  </div>
+                </div>
+                <div class="collapse show" id="contractCollapse2">
+                  <div class="cd-details-body">
+                    <div class="cd-grid-row">
+                      <div class="cd-field">
+                        <span class="cd-field-label">Contract No.</span>
+                        <span class="cd-field-value">CNT-2024-112</span>
+                      </div>
+                      <div class="cd-field">
+                        <span class="cd-field-label">Client Account</span>
+                        <span class="cd-field-value"
+                          >Al Safa Logistics (CA-000123)</span
+                        >
+                      </div>
+                    </div>
+                    <div class="cd-grid-row">
+                      <div class="cd-field">
+                        <span class="cd-field-label">Start Date</span>
+                        <span class="cd-field-value">01 Jun 2024</span>
+                      </div>
+                      <div class="cd-field">
+                        <span class="cd-field-label">End Date</span>
+                        <span class="cd-field-value">31 May 2025</span>
+                      </div>
+                    </div>
+                    <div class="cd-grid-row">
+                      <div class="cd-field">
+                        <span class="cd-field-label">Status</span>
+                        <span class="cd-field-value">
+                          <span
+                            class="status-badge active"
+                            style="background: #e6f8ef; color: #0d894f"
+                            >Active</span
+                          >
+                        </span>
+                      </div>
+                      <div class="cd-field">
+                        <span class="cd-field-label">Contract Attachment</span>
+                        <span class="cd-field-value">
+                          <a
+                            href="#"
+                            style="
+                              text-decoration: none;
+                              display: inline-flex;
+                              align-items: center;
+                              gap: 6px;
+                              color: #5051f9;
+                              font-size: 0.9rem;
+                              font-weight: 500;
+                            "
+                          >
+                            <i
+                              class="bi bi-file-earmark-pdf"
+                              style="font-size: 1.1rem"
+                            ></i>
+                            Warehousing_Agreement_2024.pdf
+                          </a>
+                        </span>
+                      </div>
+                    </div>
+                    <div
+                      class="cd-grid-row"
+                      style="
+                        border-bottom: none;
+                        margin-bottom: 0;
+                        padding-bottom: 0;
+                      "
+                    >
+                      <div class="cd-field" style="grid-column: 1 / -1">
+                        <span class="cd-field-label">Notes</span>
+                        <span
+                          class="cd-field-value"
+                          style="
+                            font-weight: 400;
+                            font-size: 0.9rem;
+                            color: #4a4a4a;
+                            line-height: 1.5;
+                          "
+                          >Warehousing agreement covering cold storage and
+                          ambient temperature handling. Includes specific
+                          inventory count frequency.</span
+                        >
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Contract 3 -->
+              <div class="cd-details-section">
+                <div
+                  class="cd-details-header d-flex justify-content-between align-items-center collapsed"
+                  data-bs-toggle="collapse"
+                  href="#contractCollapse3"
+                  role="button"
+                  aria-expanded="false"
+                  aria-controls="contractCollapse3"
+                >
+                  <div class="d-flex align-items-center gap-2">
+                    <i
+                      class="bi bi-chevron-down collapse-icon me-1 text-muted"
+                    ></i>
+                    <span style="font-weight: 600; color: #1a1a1a"
+                      >Contract #CNT-2023-088</span
+                    >
+                  </div>
+                  <div
+                    class="eal-actions-cell pt-0 pb-0"
+                    onclick="event.stopPropagation()"
+                  >
+                    <button class="eal-row-btn" title="Edit">
+                      <i class="bi bi-pencil"></i>
+                    </button>
+                  </div>
+                </div>
+                <div class="collapse" id="contractCollapse3">
+                  <div class="cd-details-body">
+                    <div class="cd-grid-row">
+                      <div class="cd-field">
+                        <span class="cd-field-label">Contract No.</span>
+                        <span class="cd-field-value">CNT-2023-088</span>
+                      </div>
+                      <div class="cd-field">
+                        <span class="cd-field-label">Client Account</span>
+                        <span class="cd-field-value"
+                          >Al Safa Logistics (CA-000123)</span
+                        >
+                      </div>
+                    </div>
+                    <div class="cd-grid-row">
+                      <div class="cd-field">
+                        <span class="cd-field-label">Start Date</span>
+                        <span class="cd-field-value">01 Jan 2023</span>
+                      </div>
+                      <div class="cd-field">
+                        <span class="cd-field-label">End Date</span>
+                        <span class="cd-field-value">31 Dec 2023</span>
+                      </div>
+                    </div>
+                    <div class="cd-grid-row">
+                      <div class="cd-field">
+                        <span class="cd-field-label">Status</span>
+                        <span class="cd-field-value">
+                          <span
+                            class="status-badge inactive"
+                            style="background: #f1f5f9; color: #64748b"
+                            >Expired</span
+                          >
+                        </span>
+                      </div>
+                      <div class="cd-field">
+                        <span class="cd-field-label">Contract Attachment</span>
+                        <span class="cd-field-value">
+                          <a
+                            href="#"
+                            style="
+                              text-decoration: none;
+                              display: inline-flex;
+                              align-items: center;
+                              gap: 6px;
+                              color: #64748b;
+                              font-size: 0.9rem;
+                              font-weight: 500;
+                            "
+                          >
+                            <i
+                              class="bi bi-file-earmark-pdf"
+                              style="font-size: 1.1rem"
+                            ></i>
+                            Transport_SLA_2023.pdf
+                          </a>
+                        </span>
+                      </div>
+                    </div>
+                    <div
+                      class="cd-grid-row"
+                      style="
+                        border-bottom: none;
+                        margin-bottom: 0;
+                        padding-bottom: 0;
+                      "
+                    >
+                      <div class="cd-field" style="grid-column: 1 / -1">
+                        <span class="cd-field-label">Notes</span>
+                        <span
+                          class="cd-field-value"
+                          style="
+                            font-weight: 400;
+                            font-size: 0.9rem;
+                            color: #4a4a4a;
+                            line-height: 1.5;
+                          "
+                          >Expired contract - Replaced by CNT-2025-044.</span
+                        >
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Contacts Pane -->
+            <div class="tab-pane fade" id="pane-contacts" role="tabpanel">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4 class="m-0" style="font-size: 1.1rem; font-weight: 600; color: #1a1a1a">Client Contacts</h4>
+                <a href="{% url 'iroad_tenants:tenant_client_contacts' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Add Contact</a>
+              </div>
+              <!-- Contact 1 -->
+              <div class="cd-details-section mb-4">
+                <div class="cd-details-header d-flex justify-content-between align-items-center" data-bs-toggle="collapse" href="#contactCollapse1" role="button" aria-expanded="true" aria-controls="contactCollapse1">
+                  <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-chevron-down collapse-icon me-1 text-muted"></i>
+                    <span class="eal-type-badge ind" style="background: #eef2ff; color: #4f46e5; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px;"><i class="bi bi-person-star"></i> Primary Contact</span>
+                    <span style="font-weight: 600; color: #1a1a1a">Ahmad Al-Ghamdi</span>
+                  </div>
+                  <div class="eal-actions-cell pt-0 pb-0" onclick="event.stopPropagation()">
+                    <button class="eal-row-btn" title="Edit"><i class="bi bi-pencil"></i></button>
+                  </div>
+                </div>
+                <div class="collapse show" id="contactCollapse1">
+                  <div class="cd-details-body">
+                    <div class="cd-grid-row">
+                      <div class="cd-field">
+                        <span class="cd-field-label">Name</span>
+                        <span class="cd-field-value">Ahmad Al-Ghamdi</span>
+                      </div>
+                    </div>
+                    <div class="cd-grid-row">
+                      <div class="cd-field">
+                        <span class="cd-field-label">Email</span>
+                        <span class="cd-field-value">ahmad.g@alsafa.com</span>
+                      </div>
+                      <div class="cd-field">
+                        <span class="cd-field-label">Mobile Number</span>
+                        <span class="cd-field-value">+966 50 123 4567</span>
+                      </div>
+                    </div>
+                    <div class="cd-grid-row">
+                      <div class="cd-field">
+                        <span class="cd-field-label">Telephone Number</span>
+                        <span class="cd-field-value">+966 12 345 6789</span>
+                      </div>
+                      <div class="cd-field">
+                        <span class="cd-field-label">Extension</span>
+                        <span class="cd-field-value">104</span>
+                      </div>
+                    </div>
+                    <div class="cd-grid-row">
+                      <div class="cd-field">
+                        <span class="cd-field-label">Position</span>
+                        <span class="cd-field-value">Logistics Manager</span>
+                      </div>
+                      <div class="cd-field">
+                        <span class="cd-field-label">Status</span>
+                        <span class="cd-field-value">
+                          <span class="status-badge active" style="background:#e6f8ef;color:#0d894f">Active</span>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Contact 2 -->
+              <div class="cd-details-section">
+                <div class="cd-details-header d-flex justify-content-between align-items-center" data-bs-toggle="collapse" href="#contactCollapse2" role="button" aria-expanded="false" aria-controls="contactCollapse2">
+                  <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-chevron-down collapse-icon me-1 text-muted" style="transform: rotate(-90deg);"></i>
+                    <span class="eal-type-badge ind" style="background: #f1f5f9; color: #64748b; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px;"><i class="bi bi-person"></i> Secondary Contact</span>
+                    <span style="font-weight: 600; color: #1a1a1a">Sarah Ali</span>
+                  </div>
+                  <div class="eal-actions-cell pt-0 pb-0" onclick="event.stopPropagation()">
+                    <button class="eal-row-btn" title="Edit"><i class="bi bi-pencil"></i></button>
+                  </div>
+                </div>
+                <div class="collapse" id="contactCollapse2">
+                  <div class="cd-details-body">
+                    <div class="cd-grid-row">
+                      <div class="cd-field">
+                        <span class="cd-field-label">Client Account</span>
+                        <span class="cd-field-value">Alsafa Transport Group</span>
+                      </div>
+                      <div class="cd-field">
+                        <span class="cd-field-label">Name</span>
+                        <span class="cd-field-value">Sarah Ali</span>
+                      </div>
+                    </div>
+                    <div class="cd-grid-row">
+                      <div class="cd-field">
+                        <span class="cd-field-label">Email</span>
+                        <span class="cd-field-value">sarah.ali@alsafa.com</span>
+                      </div>
+                      <div class="cd-field">
+                        <span class="cd-field-label">Mobile Number</span>
+                        <span class="cd-field-value">+966 55 987 6543</span>
+                      </div>
+                    </div>
+                    <div class="cd-grid-row">
+                      <div class="cd-field">
+                        <span class="cd-field-label">Telephone Number</span>
+                        <span class="cd-field-value">—</span>
+                      </div>
+                      <div class="cd-field">
+                        <span class="cd-field-label">Extension</span>
+                        <span class="cd-field-value">223</span>
+                      </div>
+                    </div>
+                    <div class="cd-grid-row">
+                      <div class="cd-field">
+                        <span class="cd-field-label">Position</span>
+                        <span class="cd-field-value">Finance Director</span>
+                      </div>
+                      <div class="cd-field">
+                        <span class="cd-field-label">Status</span>
+                        <span class="cd-field-value">
+                          <span class="status-badge active" style="background:#e6f8ef;color:#0d894f">Active</span>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Attachments Pane -->
+            <div class="tab-pane fade" id="pane-attachments" role="tabpanel">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4 class="m-0" style="font-size: 1.1rem; font-weight: 600; color: #1a1a1a">Attachments & Documents</h4>
+                <a href="{% url 'iroad_tenants:tenant_client_attachments' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Upload File</a>
+              </div>
+              <div class="eal-table-card mt-0">
+                  <div class="eal-table-wrap" style="border: none; box-shadow: none;">
+                    <table class="eal-table mb-0">
+                      <thead>
+                        <tr>
+                          <th>Title</th>
+                          <th>Date</th>
+                          <th>Expiry Date</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td>
+                            <i class="bi bi-file-earmark-pdf text-danger mx-1"></i> Commercial_Registration.pdf
+                          </td>
+                          <td>12 Jan 2026</td>
+                          <td>12 Jan 2027</td>
+                          <td>
+                            <span class="status-badge active" style="background:#e6f8ef;color:#0d894f">Active</span>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td>
+                            <i class="bi bi-file-earmark-pdf text-danger mx-1"></i> VAT_Certificate_2026.pdf
+                          </td>
+                          <td>15 Jan 2026</td>
+                          <td>31 Dec 2026</td>
+                          <td>
+                            <span class="status-badge active" style="background:#e6f8ef;color:#0d894f">Active</span>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+              </div>
+            </div>
+
+            <!-- Price Lists Pane -->
+            <div class="tab-pane fade" id="pane-price-lists" role="tabpanel">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4 class="m-0" style="font-size: 1.1rem; font-weight: 600; color: #1a1a1a">Price Lists</h4>
+                <a href="Price-list.html" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Add Price List</a>
+              </div>
+              <div class="eal-table-card mt-0">
+                <div class="eal-table-wrap" style="border: none; box-shadow: none;">
+                  <table class="eal-table mb-0">
+                    <thead>
+                      <tr>
+                        <th>Code</th>
+                        <th>Name</th>
+                        <th>Currency</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td><span class="eal-entity-id">PL-2026-ABT</span></td>
+                        <td>Annual Bulk Transport 2026</td>
+                        <td>SAR</td>
+                        <td>
+                          <span class="status-badge active" style="background: #e6f8ef; color: #0d894f;">Active</span>
+                        </td>
+                        <td>
+                          <div class="eal-actions-cell">
+                            <a class="eal-row-btn" href="All-price-lists.html" title="View" aria-label="View">
+                              <i class="bi bi-eye"></i>
+                            </a>
+                            <a class="eal-row-btn" href="Price-list.html" title="Edit" aria-label="Edit">
+                              <i class="bi bi-pencil"></i>
+                            </a>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td><span class="eal-entity-id">PL-2026-EXP</span></td>
+                        <td>Express Delivery 2026</td>
+                        <td>USD</td>
+                        <td>
+                          <span class="status-badge inactive" style="background: #f1f5f9; color: #64748b;">Draft</span>
+                        </td>
+                        <td>
+                          <div class="eal-actions-cell">
+                            <a class="eal-row-btn" href="All-price-lists.html" title="View" aria-label="View">
+                              <i class="bi bi-eye"></i>
+                            </a>
+                            <a class="eal-row-btn" href="Price-list.html" title="Edit" aria-label="Edit">
+                              <i class="bi bi-pencil"></i>
+                            </a>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td><span class="eal-entity-id">PL-2025-OLD</span></td>
+                        <td>Legacy Contract Rates</td>
+                        <td>SAR</td>
+                        <td>
+                          <span class="status-badge inactive" style="background: #fef1f2; color: #ef4444;">Inactive</span>
+                        </td>
+                        <td>
+                          <div class="eal-actions-cell">
+                            <a class="eal-row-btn" href="All-price-lists.html" title="View" aria-label="View">
+                              <i class="bi bi-eye"></i>
+                            </a>
+                            <a class="eal-row-btn" href="Price-list.html" title="Edit" aria-label="Edit">
+                              <i class="bi bi-pencil"></i>
+                            </a>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td><span class="eal-entity-id">PL-2026-REG</span></td>
+                        <td>Regional Distribution Rates</td>
+                        <td>SAR</td>
+                        <td>
+                          <span class="status-badge inactive" style="background: #f1f5f9; color: #64748b;">Draft</span>
+                        </td>
+                        <td>
+                          <div class="eal-actions-cell">
+                            <a class="eal-row-btn" href="All-price-lists.html" title="View" aria-label="View">
+                              <i class="bi bi-eye"></i>
+                            </a>
+                            <a class="eal-row-btn" href="Price-list.html" title="Edit" aria-label="Edit">
+                              <i class="bi bi-pencil"></i>
+                            </a>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td><span class="eal-entity-id">PL-2026-INT</span></td>
+                        <td>International Freight Tariff</td>
+                        <td>USD</td>
+                        <td>
+                          <span class="status-badge active" style="background: #e6f8ef; color: #0d894f;">Active</span>
+                        </td>
+                        <td>
+                          <div class="eal-actions-cell">
+                            <a class="eal-row-btn" href="All-price-lists.html" title="View" aria-label="View">
+                              <i class="bi bi-eye"></i>
+                            </a>
+                            <a class="eal-row-btn" href="Price-list.html" title="Edit" aria-label="Edit">
+                              <i class="bi bi-pencil"></i>
+                            </a>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td><span class="eal-entity-id">PL-2026-WHS</span></td>
+                        <td>Warehousing & Handling</td>
+                        <td>SAR</td>
+                        <td>
+                          <span class="status-badge active" style="background: #e6f8ef; color: #0d894f;">Active</span>
+                        </td>
+                        <td>
+                          <div class="eal-actions-cell">
+                            <a class="eal-row-btn" href="All-price-lists.html" title="View" aria-label="View">
+                              <i class="bi bi-eye"></i>
+                            </a>
+                            <a class="eal-row-btn" href="Price-list.html" title="Edit" aria-label="Edit">
+                              <i class="bi bi-pencil"></i>
+                            </a>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td><span class="eal-entity-id">PL-2026-HAZ</span></td>
+                        <td>Hazmat Surcharges</td>
+                        <td>SAR</td>
+                        <td>
+                          <span class="status-badge inactive" style="background: #fef1f2; color: #ef4444;">Inactive</span>
+                        </td>
+                        <td>
+                          <div class="eal-actions-cell">
+                            <a class="eal-row-btn" href="All-price-lists.html" title="View" aria-label="View">
+                              <i class="bi bi-eye"></i>
+                            </a>
+                            <a class="eal-row-btn" href="Price-list.html" title="Edit" aria-label="Edit">
+                              <i class="bi bi-pencil"></i>
+                            </a>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td><span class="eal-entity-id">PL-2026-CHL</span></td>
+                        <td>Chiller Transport Rates</td>
+                        <td>SAR</td>
+                        <td>
+                          <span class="status-badge active" style="background: #e6f8ef; color: #0d894f;">Active</span>
+                        </td>
+                        <td>
+                          <div class="eal-actions-cell">
+                            <a class="eal-row-btn" href="All-price-lists.html" title="View" aria-label="View">
+                              <i class="bi bi-eye"></i>
+                            </a>
+                            <a class="eal-row-btn" href="Price-list.html" title="Edit" aria-label="Edit">
+                              <i class="bi bi-pencil"></i>
+                            </a>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td><span class="eal-entity-id">PL-2026-ULD</span></td>
+                        <td>ULD / Special Equipment</td>
+                        <td>EUR</td>
+                        <td>
+                          <span class="status-badge inactive" style="background: #f1f5f9; color: #64748b;">Draft</span>
+                        </td>
+                        <td>
+                          <div class="eal-actions-cell">
+                            <a class="eal-row-btn" href="All-price-lists.html" title="View" aria-label="View">
+                              <i class="bi bi-eye"></i>
+                            </a>
+                            <a class="eal-row-btn" href="Price-list.html" title="Edit" aria-label="Edit">
+                              <i class="bi bi-pencil"></i>
+                            </a>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td><span class="eal-entity-id">PL-2026-PRM</span></td>
+                        <td>Premium SLA Rates</td>
+                        <td>USD</td>
+                        <td>
+                          <span class="status-badge inactive" style="background: #fef1f2; color: #ef4444;">Inactive</span>
+                        </td>
+                        <td>
+                          <div class="eal-actions-cell">
+                            <a class="eal-row-btn" href="All-price-lists.html" title="View" aria-label="View">
+                              <i class="bi bi-eye"></i>
+                            </a>
+                            <a class="eal-row-btn" href="Price-list.html" title="Edit" aria-label="Edit">
+                              <i class="bi bi-pencil"></i>
+                            </a>
+                          </div>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- Cargo Pane -->
+            <div class="tab-pane fade" id="pane-cargo" role="tabpanel">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4 class="m-0" style="font-size: 1.1rem; font-weight: 600; color: #1a1a1a">Assigned Cargo Typologies</h4>
+                <a href="Cargo-master.html" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Register Cargo</a>
+              </div>
+              <div class="eal-table-card mt-0">
+                <div class="eal-table-wrap" style="border: none; box-shadow: none;">
+                  <table class="eal-table mb-0">
+                    <thead>
+                      <tr>
+                        <th>Code</th>
+                        <th>Cargo Name</th>
+                        <th>Category</th>
+                        <th>Unit</th>
+                        <th>Weight (kg)</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td><span class="eal-entity-id">CRG-001</span></td>
+                        <td>Consumer Electronics</td>
+                        <td>Electronics</td>
+                        <td>Palletized Cartons</td>
+                        <td>15.00</td>
+                        <td>
+                          <span class="status-badge active" style="background:#e6f8ef;color:#0d894f">Active</span>
+                        </td>
+                        <td>
+                          <div class="eal-actions-cell">
+                            <a class="eal-row-btn" href="Cargo-master.html" title="View" aria-label="View">
+                              <i class="bi bi-eye"></i>
+                            </a>
+                            <a class="eal-row-btn" href="Cargo-master.html" title="Edit" aria-label="Edit">
+                              <i class="bi bi-pencil"></i>
+                            </a>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td><span class="eal-entity-id">CRG-002</span></td>
+                        <td>Pharmaceuticals Sub-zero</td>
+                        <td>Medical</td>
+                        <td>Insulated Pallets</td>
+                        <td>200.00</td>
+                        <td>
+                          <span class="status-badge active" style="background:#e6f8ef;color:#0d894f">Active</span>
+                        </td>
+                        <td>
+                          <div class="eal-actions-cell">
+                            <a class="eal-row-btn" href="Cargo-master.html" title="View" aria-label="View">
+                              <i class="bi bi-eye"></i>
+                            </a>
+                            <a class="eal-row-btn" href="Cargo-master.html" title="Edit" aria-label="Edit">
+                              <i class="bi bi-pencil"></i>
+                            </a>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td><span class="eal-entity-id">CRG-003</span></td>
+                        <td>Automotive Parts</td>
+                        <td>Automotive</td>
+                        <td>Crates</td>
+                        <td>35.00</td>
+                        <td>
+                          <span class="status-badge active" style="background:#e6f8ef;color:#0d894f">Active</span>
+                        </td>
+                        <td>
+                          <div class="eal-actions-cell">
+                            <a class="eal-row-btn" href="Cargo-master.html" title="View" aria-label="View">
+                              <i class="bi bi-eye"></i>
+                            </a>
+                            <a class="eal-row-btn" href="Cargo-master.html" title="Edit" aria-label="Edit">
+                              <i class="bi bi-pencil"></i>
+                            </a>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td><span class="eal-entity-id">CRG-004</span></td>
+                        <td>FMCG Dry Goods</td>
+                        <td>FMCG</td>
+                        <td>Cartons</td>
+                        <td>10.00</td>
+                        <td>
+                          <span class="status-badge active" style="background:#e6f8ef;color:#0d894f">Active</span>
+                        </td>
+                        <td>
+                          <div class="eal-actions-cell">
+                            <a class="eal-row-btn" href="Cargo-master.html" title="View" aria-label="View">
+                              <i class="bi bi-eye"></i>
+                            </a>
+                            <a class="eal-row-btn" href="Cargo-master.html" title="Edit" aria-label="Edit">
+                              <i class="bi bi-pencil"></i>
+                            </a>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td><span class="eal-entity-id">CRG-005</span></td>
+                        <td>Chilled Dairy Products</td>
+                        <td>Food & Beverage</td>
+                        <td>Reefer Pallets</td>
+                        <td>500.00</td>
+                        <td>
+                          <span class="status-badge active" style="background:#e6f8ef;color:#0d894f">Active</span>
+                        </td>
+                        <td>
+                          <div class="eal-actions-cell">
+                            <a class="eal-row-btn" href="Cargo-master.html" title="View" aria-label="View">
+                              <i class="bi bi-eye"></i>
+                            </a>
+                            <a class="eal-row-btn" href="Cargo-master.html" title="Edit" aria-label="Edit">
+                              <i class="bi bi-pencil"></i>
+                            </a>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td><span class="eal-entity-id">CRG-006</span></td>
+                        <td>Bulk Construction Material</td>
+                        <td>Construction</td>
+                        <td>Loose Bulk</td>
+                        <td>1200.00</td>
+                        <td>
+                          <span class="status-badge inactive" style="background:#f1f5f9;color:#64748b">Inactive</span>
+                        </td>
+                        <td>
+                          <div class="eal-actions-cell">
+                            <a class="eal-row-btn" href="Cargo-master.html" title="View" aria-label="View">
+                              <i class="bi bi-eye"></i>
+                            </a>
+                            <a class="eal-row-btn" href="Cargo-master.html" title="Edit" aria-label="Edit">
+                              <i class="bi bi-pencil"></i>
+                            </a>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td><span class="eal-entity-id">CRG-007</span></td>
+                        <td>Hazardous Chemicals</td>
+                        <td>Chemicals</td>
+                        <td>Drums</td>
+                        <td>250.00</td>
+                        <td>
+                          <span class="status-badge inactive" style="background:#f1f5f9;color:#64748b">Inactive</span>
+                        </td>
+                        <td>
+                          <div class="eal-actions-cell">
+                            <a class="eal-row-btn" href="Cargo-master.html" title="View" aria-label="View">
+                              <i class="bi bi-eye"></i>
+                            </a>
+                            <a class="eal-row-btn" href="Cargo-master.html" title="Edit" aria-label="Edit">
+                              <i class="bi bi-pencil"></i>
+                            </a>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td><span class="eal-entity-id">CRG-008</span></td>
+                        <td>Pharma Ambient</td>
+                        <td>Medical</td>
+                        <td>Cartons</td>
+                        <td>80.00</td>
+                        <td>
+                          <span class="status-badge active" style="background:#e6f8ef;color:#0d894f">Active</span>
+                        </td>
+                        <td>
+                          <div class="eal-actions-cell">
+                            <a class="eal-row-btn" href="Cargo-master.html" title="View" aria-label="View">
+                              <i class="bi bi-eye"></i>
+                            </a>
+                            <a class="eal-row-btn" href="Cargo-master.html" title="Edit" aria-label="Edit">
+                              <i class="bi bi-pencil"></i>
+                            </a>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td><span class="eal-entity-id">CRG-009</span></td>
+                        <td>Luxury Fashion Items</td>
+                        <td>Retail</td>
+                        <td>Hanging Garments</td>
+                        <td>5.00</td>
+                        <td>
+                          <span class="status-badge active" style="background:#e6f8ef;color:#0d894f">Active</span>
+                        </td>
+                        <td>
+                          <div class="eal-actions-cell">
+                            <a class="eal-row-btn" href="Cargo-master.html" title="View" aria-label="View">
+                              <i class="bi bi-eye"></i>
+                            </a>
+                            <a class="eal-row-btn" href="Cargo-master.html" title="Edit" aria-label="Edit">
+                              <i class="bi bi-pencil"></i>
+                            </a>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td><span class="eal-entity-id">CRG-010</span></td>
+                        <td>Temperature Controlled Vaccines</td>
+                        <td>Medical</td>
+                        <td>Insulated Boxes</td>
+                        <td>12.00</td>
+                        <td>
+                          <span class="status-badge inactive" style="background:#f1f5f9;color:#64748b">Inactive</span>
+                        </td>
+                        <td>
+                          <div class="eal-actions-cell">
+                            <a class="eal-row-btn" href="Cargo-master.html" title="View" aria-label="View">
+                              <i class="bi bi-eye"></i>
+                            </a>
+                            <a class="eal-row-btn" href="Cargo-master.html" title="Edit" aria-label="Edit">
+                              <i class="bi bi-pencil"></i>
+                            </a>
+                          </div>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-3 cd-empty d-none" id="notFound">
+          <div class="d-flex align-items-start gap-3">
+            <div
+              class="cd-avatar"
+              style="background: rgba(220, 53, 69, 0.12); color: #dc3545"
+            >
+              <i class="bi bi-exclamation-triangle"></i>
+            </div>
+            <div>
+              <h3 class="m-0 fw-bold">Client not found</h3>
+              <p class="m-0 mt-1" style="color: rgba(0, 0, 0, 0.6)">
+                We couldn’t find a saved client record for this ID. Go back to
+                the list and select an existing client, or create a new one.
+              </p>
+              <div class="mt-3">
+                <a href="{% url 'iroad_tenants:tenant_client_account' %}" class="btn btn-outline-primary">
+                  Back to Client Account
+                </a>
+                <a href="{% url 'iroad_tenants:tenant_client_account_create' %}" class="btn btn-primary ms-2">
+                  Create Client Account
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+      (function () {
+        var STORAGE_KEY = "ir_clients_v1";
+        var DEMO_CLIENT = {
+          account_no: "CA-000123",
+          client_type: "Business",
+          status: "Active",
+          created_at: "Jan 28, 2026, 03:52 PM",
+          name_arabic: "شركة الصفا للخدمات اللوجستية",
+          name_english: "Al Safa Logistics",
+          display_name: "Al Safa Logistics",
+          preferred_currency: "SAR",
+          billing_street_1: "King Fahd Rd, Building 12",
+          billing_street_2: "Floor 4, Office 402",
+          billing_city: "Riyadh",
+          billing_region: "Riyadh",
+          postal_code: "11564",
+          country: "SA",
+          commercial_registration_no: "CR-1234567890",
+          tax_registration_no: "TR-9876543210",
+        };
+
+        function getIdFromQuery() {
+          try {
+            var params = new URLSearchParams(window.location.search);
+            return (params.get("id") || "").trim();
+          } catch (e) {
+            return "";
+          }
+        }
+
+        function loadClients() {
+          try {
+            var raw = localStorage.getItem(STORAGE_KEY);
+            var parsed = raw ? JSON.parse(raw) : [];
+            return Array.isArray(parsed) ? parsed : [];
+          } catch (e) {
+            return [];
+          }
+        }
+
+        function ensureDemoClient() {
+          var clients = loadClients();
+          var exists = false;
+          for (var i = 0; i < clients.length; i++) {
+            if (
+              clients[i] &&
+              clients[i].account_no === DEMO_CLIENT.account_no
+            ) {
+              exists = true;
+              break;
+            }
+          }
+          if (!exists) {
+            clients.unshift(DEMO_CLIENT);
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(clients));
+          }
+        }
+
+        function byId(list, id) {
+          for (var i = 0; i < list.length; i++) {
+            if (list[i] && list[i].account_no === id) return list[i];
+          }
+          return null;
+        }
+
+        function setText(id, value) {
+          var el = document.getElementById(id);
+          if (!el) return;
+          var v = value == null ? "" : String(value);
+          el.textContent = v.trim() ? v : "—";
+        }
+
+        function setDocTitle(client) {
+          var label =
+            client.display_name || client.name_english || client.account_no;
+          if (label) document.title = label + " | Client Details";
+        }
+
+        function displayClientType(value) {
+          var v = String(value || "").toLowerCase();
+          if (v === "business" || v === "corporate") return "Corporate";
+          if (v === "individual") return "Individual";
+          if (!v) return "";
+          return value;
+        }
+
+        var id = getIdFromQuery();
+        // Seed the demo client so `?id=CA-000123` always works for demos.
+        ensureDemoClient();
+        var client = id ? byId(loadClients(), id) : null;
+
+        // Fall back to demo client if no ID provided or client not found
+        if (!client) {
+          client = DEMO_CLIENT;
+        }
+
+        setDocTitle(client);
+
+        setText(
+          "cdTitle",
+          client.display_name || client.name_english || "Client",
+        );
+        setText(
+          "cdSubtitle",
+          (client.preferred_currency ? client.preferred_currency + " • " : "") +
+            (client.created_at || "—"),
+        );
+        setText("cdAccountNo", client.account_no);
+        setText("cdClientType", displayClientType(client.client_type));
+        setText("cdStatus", client.status);
+
+        // Toggle Suspend / Activate Account buttons based on status
+        var suspendBtn = document.getElementById("suspendAccountBtn");
+        var activateBtn = document.getElementById("activateAccountBtn");
+        if (suspendBtn && activateBtn) {
+          if ((client.status || "").toLowerCase() === "active") {
+            suspendBtn.classList.remove("d-none");
+            activateBtn.classList.add("d-none");
+          } else {
+            suspendBtn.classList.add("d-none");
+            activateBtn.classList.remove("d-none");
+          }
+        }
+
+        setText("v_account_no", client.account_no);
+        setText("v_created_at", client.created_at);
+        setText("v_client_type", displayClientType(client.client_type));
+        setText("v_status", client.status);
+
+        setText("v_name_english", client.name_english);
+        setText("v_name_arabic", client.name_arabic);
+        setText("v_display_name", client.display_name);
+        setText("v_preferred_currency", client.preferred_currency);
+
+        setText("v_billing_street_1", client.billing_street_1);
+        setText("v_billing_street_2", client.billing_street_2);
+        setText("v_billing_city", client.billing_city);
+        setText("v_billing_region", client.billing_region);
+        setText("v_postal_code", client.postal_code);
+        setText("v_country", client.country);
+
+        setText(
+          "v_commercial_registration_no",
+          client.commercial_registration_no,
+        );
+        setText("v_tax_registration_no", client.tax_registration_no);
+
+        var notice = document.getElementById("businessNotice");
+        if (notice) {
+          var isBiz = (client.client_type || "").toLowerCase() === "business";
+          notice.classList.toggle("d-none", isBiz);
+        }
+      })();
+    </script>
+{% endblock %}

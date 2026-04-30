@@ -112,6 +112,19 @@
         </div>
 
         <h3 style="margin:0 0 12px 0">Pricing Cycles</h3>
+        <div style="display:grid; grid-template-columns:minmax(240px, 360px); gap:12px; margin-bottom:12px">
+          <div>
+            <label class="form-label">Currency</label>
+            <select class="form-select" id="global-pricing-currency" name="global_currency" required>
+              <option value="">Select</option>
+              {% for c in currencies %}
+                <option value="{{ c.currency_code }}" {% if c.currency_code == global_currency_code %}selected{% endif %}>
+                  {{ c.name_en }} ({{ c.currency_code }})
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
         <div style="margin-bottom:12px">
           <button type="button" id="add-pricing-row" class="eal-btn eal-btn-primary" style="padding:8px 12px">Add Row</button>
         </div>
@@ -120,8 +133,8 @@
             <thead>
               <tr>
                 <th>Cycles</th>
-                <th>Currency</th>
                 <th>Price</th>
+                <th class="text-center" style="width: 120px;">Admin only</th>
                 <th>Delete</th>
               </tr>
             </thead>
@@ -130,20 +143,16 @@
                 <tr class="pricing-row" data-index="{{ row.row_index }}">
                   <td>
                     <input type="hidden" name="pricing-{{ row.row_index }}-pricing_id" value="{{ row.pricing_id|default:'' }}" />
+                    <input type="hidden" class="row-currency-value" name="pricing-{{ row.row_index }}-currency" value="{{ row.currency|default:global_currency_code|default:'' }}" />
                     <input type="number" min="1" class="form-control" name="pricing-{{ row.row_index }}-number_of_cycles" value="{{ row.number_of_cycles|default:'' }}" />
                   </td>
                   <td>
-                    <select class="form-select" name="pricing-{{ row.row_index }}-currency">
-                      <option value="">Select</option>
-                      {% for c in currencies %}
-                        <option value="{{ c.currency_code }}" {% if row.currency == c.currency_code %}selected{% endif %}>
-                          {{ c.name_en }} ({{ c.currency_code }})
-                        </option>
-                      {% endfor %}
-                    </select>
-                  </td>
-                  <td>
                     <input type="number" min="0" step="0.01" class="form-control" name="pricing-{{ row.row_index }}-price" value="{{ row.price|default:'' }}" />
+                  </td>
+                  <td class="text-center align-middle" style="width: 120px;">
+                    <div class="form-check form-switch d-inline-flex justify-content-center align-items-center m-0">
+                      <input type="checkbox" class="form-check-input" role="switch" name="pricing-{{ row.row_index }}-is_admin_only_cycle" {% if row.is_admin_only_cycle %}checked{% endif %}>
+                    </div>
                   </td>
                   <td>
                     <button type="button" class="eal-row-btn remove-row" title="Remove">
@@ -192,15 +201,13 @@
         <input type="number" min="1" class="form-control" name="pricing-__INDEX__-number_of_cycles" value="" />
       </td>
       <td>
-        <select class="form-select" name="pricing-__INDEX__-currency">
-          <option value="">Select</option>
-          {% for c in currencies %}
-            <option value="{{ c.currency_code }}">{{ c.name_en }} ({{ c.currency_code }})</option>
-          {% endfor %}
-        </select>
-      </td>
-      <td>
+        <input type="hidden" class="row-currency-value" name="pricing-__INDEX__-currency" value="" />
         <input type="number" min="0" step="0.01" class="form-control" name="pricing-__INDEX__-price" value="" />
+      </td>
+      <td class="text-center align-middle" style="width: 120px;">
+        <div class="form-check form-switch d-inline-flex justify-content-center align-items-center m-0">
+          <input type="checkbox" class="form-check-input" role="switch" name="pricing-__INDEX__-is_admin_only_cycle">
+        </div>
       </td>
       <td>
         <button type="button" class="eal-row-btn remove-row" title="Remove">
@@ -216,6 +223,7 @@
       const tbody = document.querySelector('#pricing-table tbody');
       const addBtn = document.getElementById('add-pricing-row');
       const tpl = document.getElementById('pricing-row-template').innerHTML;
+      const globalCurrencySelect = document.getElementById('global-pricing-currency');
 
       function nextIndex() {
         let max = -1;
@@ -231,7 +239,9 @@
         const html = tpl.replaceAll('__INDEX__', String(idx));
         const wrapper = document.createElement('tbody');
         wrapper.innerHTML = html.trim();
-        tbody.appendChild(wrapper.firstElementChild);
+        const newRow = wrapper.firstElementChild;
+        tbody.appendChild(newRow);
+        applyGlobalCurrencyToRow(newRow);
       });
 
       tbody.addEventListener('click', function (e) {
@@ -270,6 +280,39 @@
         // Ensure initial state is consistent on page load.
         syncToggleFromInput();
       });
+
+      function getGlobalCurrencySelection() {
+        if (!globalCurrencySelect) return { value: '', label: 'Select global currency' };
+        const selectedOption = globalCurrencySelect.options[globalCurrencySelect.selectedIndex];
+        return {
+          value: globalCurrencySelect.value || '',
+          label: selectedOption ? selectedOption.text.trim() : 'Select global currency',
+        };
+      }
+
+      function applyGlobalCurrencyToRow(row) {
+        if (!row) return;
+        const currencyValueInput = row.querySelector('.row-currency-value');
+        const currencyDisplayInput = row.querySelector('.row-currency-display');
+        if (!currencyValueInput) return;
+
+        const selectedCurrency = getGlobalCurrencySelection();
+        currencyValueInput.value = selectedCurrency.value;
+        if (currencyDisplayInput) {
+          currencyDisplayInput.value = selectedCurrency.value ? selectedCurrency.label : 'Select global currency';
+        }
+      }
+
+      function applyGlobalCurrencyToAllRows() {
+        document.querySelectorAll('#pricing-table .pricing-row').forEach((row) => {
+          applyGlobalCurrencyToRow(row);
+        });
+      }
+
+      if (globalCurrencySelect) {
+        globalCurrencySelect.addEventListener('change', applyGlobalCurrencyToAllRows);
+      }
+      applyGlobalCurrencyToAllRows();
     })();
   </script>
 {% endblock %}

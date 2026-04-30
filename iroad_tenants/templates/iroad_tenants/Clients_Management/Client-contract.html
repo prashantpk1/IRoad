@@ -1,0 +1,225 @@
+{% extends 'iroad_tenants/base.html' %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}Client Contract | iRoad Admin{% endblock %}
+
+{% block breadcrumb %}{% endblock %}
+
+{% block content %}
+<!-- Top Header -->
+      
+
+      
+      <div class="page-header">
+        <nav aria-label="breadcrumb">
+          <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+              <a href="{% url 'iroad_tenants:tenant_dashboard' %}">Dashboard</a>
+            </li>
+            <li class="breadcrumb-item">CRM</li>
+            <li class="breadcrumb-item">Clients Management</li>
+            <li class="breadcrumb-item active" aria-current="page">
+              Client Contracts
+            </li>
+          </ol>
+        </nav>
+
+        <div class="page-header-row">
+          <div class="page-header-left">
+            <h1 class="page-title">Create Client Contract</h1>
+            <p class="page-subtitle">
+              Fill in the details below to register a new client contract in the
+              system.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Client Contract Form -->
+      <form id="clientContractForm">
+        <!-- Section 1: Contract Details -->
+        <div class="form-card" data-section="1">
+          <div class="form-card-header">
+            <div class="form-card-icon blue">
+              <i class="bi bi-file-earmark-text"></i>
+            </div>
+            <div class="form-card-header-text">
+              <h2 class="form-card-title">Contract Details</h2>
+              <p class="form-card-desc">
+                Core contract identification, client account link and validity
+                period.
+              </p>
+            </div>
+          </div>
+          <div class="form-card-body">
+            <!-- Identity -->
+            <div class="field-group">
+              <h3 class="field-group-title">
+                <i class="bi bi-fingerprint"></i>
+                Identity
+              </h3>
+              <div class="fields-grid cols-3">
+                <div class="field">
+                  <label for="contractNo" class="form-label"
+                    >Contract No.
+                    <span class="required">*</span>
+                  </label>
+                  <div class="input-icon-wrapper">
+                    <i class="bi bi-hash"></i>
+                    <input
+                      type="text"
+                      class="form-control has-icon"
+                      id="contractNo"
+                      placeholder="e.g. CC-000123"
+                    />
+                  </div>
+                  <span class="field-hint">Unique contract identifier</span>
+                </div>
+                <div class="field">
+                  <label for="clientAccount" class="form-label"
+                    >Client Account
+                    <span class="required">*</span>
+                  </label>
+                  <select class="form-select" id="clientAccount">
+                    <option value="" selected disabled>
+                      -Select client account-
+                    </option>
+                    <option value="client1">Client Account 1</option>
+                    <option value="client2">Client Account 2</option>
+                    <option value="client3">Client Account 3</option>
+                  </select>
+                  <span class="field-hint">
+                    The contract will be linked to this account
+                  </span>
+                </div>
+                <div class="field">
+                  <label for="contractStatus" class="form-label"
+                    >Status
+                    <span class="required">*</span>
+                  </label>
+                  <select class="form-select" id="contractStatus">
+                    <option value="" selected disabled>-Select status-</option>
+                    <option value="draft">Draft</option>
+                    <option value="active">Active</option>
+                    <option value="expired">Expired</option>
+                    <option value="terminated">Terminated</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- Validity -->
+            <div class="field-group">
+              <h3 class="field-group-title">
+                <i class="bi bi-calendar-range"></i>
+                Validity Period
+              </h3>
+              <div class="fields-grid cols-3">
+                <div class="field">
+                  <label for="startDate" class="form-label"
+                    >Start Date
+                    <span class="required">*</span>
+                  </label>
+                  <div class="input-icon-wrapper">
+                    <i class="bi bi-calendar-event"></i>
+                    <input
+                      type="date"
+                      class="form-control has-icon"
+                      id="startDate"
+                    />
+                  </div>
+                </div>
+                <div class="field">
+                  <label for="endDate" class="form-label"
+                    >End Date
+                    <span class="required">*</span>
+                  </label>
+                  <div class="input-icon-wrapper">
+                    <i class="bi bi-calendar-event"></i>
+                    <input
+                      type="date"
+                      class="form-control has-icon"
+                      id="endDate"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 2: Notes & Attachments -->
+        <div class="form-card" data-section="2">
+          <div class="form-card-header">
+            <div class="form-card-icon green">
+              <i class="bi bi-card-text"></i>
+            </div>
+            <div class="form-card-header-text">
+              <h2 class="form-card-title">Notes &amp; Attachment</h2>
+              <p class="form-card-desc">
+                Additional information and primary contract document.
+              </p>
+            </div>
+          </div>
+          <div class="form-card-body">
+            <div class="field-group">
+              <h3 class="field-group-title">
+                <i class="bi bi-journal-text"></i>
+                Notes
+              </h3>
+              <div class="fields-grid cols-1">
+                <div class="field">
+                  <label for="contractNotes" class="form-label">Notes</label>
+                  <textarea
+                    class="form-control"
+                    id="contractNotes"
+                    rows="4"
+                    placeholder="Enter any special terms, remarks or internal notes about this contract..."
+                  ></textarea>
+                </div>
+              </div>
+            </div>
+
+            <div class="field-group">
+              <h3 class="field-group-title">
+                <i class="bi bi-paperclip"></i>
+                Contract Attachment
+              </h3>
+              <div class="fields-grid cols-2">
+                <div class="field">
+                  <label for="contractAttachment" class="form-label"
+                    >Contract Attachment</label
+                  >
+                  <input
+                    type="file"
+                    class="form-control"
+                    id="contractAttachment"
+                    accept=".pdf,.doc,.docx,image/*"
+                  />
+                  <span class="field-hint">
+                    Upload the signed contract document (PDF, DOC, or image).
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Form Actions -->
+        <div class="form-actions-bar">
+          <div class="form-actions-left">
+            <button type="reset" class="btn btn-outline-secondary">
+              <i class="bi bi-arrow-counterclockwise"></i>
+              Reset Form
+            </button>
+          </div>
+          <div class="form-actions-right">
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-check-circle"></i>
+              Create Client Contract
+            </button>
+          </div>
+        </div>
+      </form>
+{% endblock %}

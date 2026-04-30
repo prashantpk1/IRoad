@@ -69,10 +69,17 @@
 <div class="eal-table-card">
   <div class="eal-toolbar">
     <div class="eal-toolbar-left">
-      <div class="eal-search">
-        <i class="bi bi-search"></i>
-        <input type="text" placeholder="Search users by name, email, or role&hellip;" />
-      </div>
+      <form method="get" action="{% url 'iroad_tenants:tenant_users_administration' %}">
+        <div class="eal-search">
+          <i class="bi bi-search"></i>
+          <input
+            type="text"
+            name="q"
+            value="{{ search_query|default:'' }}"
+            placeholder="Search users by name, email, or role&hellip;"
+          />
+        </div>
+      </form>
     </div>
   </div>
 

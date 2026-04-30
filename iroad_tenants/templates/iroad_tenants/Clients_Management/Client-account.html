@@ -1,0 +1,1505 @@
+{% extends 'iroad_tenants/base.html' %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}Client Account | iRoad Admin{% endblock %}
+
+{% block breadcrumb %}{% endblock %}
+
+{% block extra_css %}
+<style>
+      .client-table-toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+        padding: 1rem 1.25rem 0;
+        flex-wrap: wrap;
+      }
+
+      .client-table-search {
+        position: relative;
+        min-width: 260px;
+        flex: 0 0 360px;
+        max-width: 460px;
+      }
+
+      .client-table-search i {
+        position: absolute;
+        top: 50%;
+        left: 0.95rem;
+        transform: translateY(-50%);
+        color: #98a2b3;
+        pointer-events: none;
+        font-size: 0.9rem;
+      }
+
+      .client-table-search input {
+        width: 100%;
+        padding-left: 2.3rem;
+        height: 40px;
+        border-radius: 999px;
+        border-color: #d0d5dd;
+        font-size: 0.9rem;
+      }
+
+      .client-table-search input:focus {
+        border-color: rgba(80, 81, 249, 0.6);
+        box-shadow: 0 0 0 0.2rem rgba(80, 81, 249, 0.12);
+        outline: none;
+      }
+
+      .client-table-search-note {
+        display: block;
+        margin-top: 0.22rem;
+        color: #98a2b3;
+        font-size: 0.78rem;
+        line-height: 1.2;
+      }
+
+      .eal-th-filter {
+        position: relative;
+      }
+
+      .eal-th-filter-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+      }
+
+      .eal-th-filter-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+      }
+
+      .eal-filter-menu-btn {
+        border: 0;
+        background: transparent;
+        color: #667085;
+        padding: 0;
+        line-height: 1;
+      }
+
+      .eal-filter-menu-btn.active {
+        color: #5051f9;
+      }
+
+      .eal-filter-menu {
+        position: absolute;
+        top: calc(100% + 0.4rem);
+        right: 0;
+        z-index: 30;
+        width: 220px;
+        background: #fff;
+        border: 1px solid #eaecf0;
+        border-radius: 12px;
+        box-shadow: 0 18px 40px rgba(16, 24, 40, 0.14);
+        padding: 0.8rem;
+        display: none;
+      }
+
+      .eal-filter-menu.open {
+        display: block;
+      }
+
+      .eal-filter-menu-title {
+        font-size: 0.78rem;
+        font-weight: 600;
+        color: #344054;
+        margin-bottom: 0.6rem;
+      }
+
+      .eal-filter-menu .form-control,
+      .eal-filter-menu .form-select {
+        min-height: 2.2rem;
+        font-size: 0.84rem;
+        margin-bottom: 0.55rem;
+      }
+
+      .eal-filter-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.45rem;
+      }
+
+      .eal-filter-action {
+        border: 1px solid #d0d5dd;
+        border-radius: 999px;
+        background: #fff;
+        color: #344054;
+        font-size: 0.78rem;
+        padding: 0.28rem 0.62rem;
+      }
+
+      .eal-filter-action:hover {
+        border-color: #5051f9;
+        color: #5051f9;
+      }
+
+      .eal-table-empty {
+        text-align: center;
+        color: #667085;
+        font-weight: 500;
+      }
+    </style>
+{% endblock %}
+
+{% block content %}
+<!-- Top Header -->
+      
+
+      
+      <div class="page-header">
+        <nav aria-label="breadcrumb">
+          <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+              <a href="{% url 'iroad_tenants:tenant_dashboard' %}">Dashboard</a>
+            </li>
+            <li class="breadcrumb-item">CRM</li>
+            <li class="breadcrumb-item">Clients Management</li>
+            <li class="breadcrumb-item active" aria-current="page">
+              Client Account
+            </li>
+          </ol>
+        </nav>
+
+        <div class="page-header-row">
+          <div class="page-header-left">
+            <h1 class="page-title">Client Account</h1>
+            <p class="page-subtitle">
+              Manage and view all registered client accounts
+            </p>
+          </div>
+          <div class="page-header-right">
+            <div class="eal-header-actions">
+              <button class="eal-btn eal-btn-outline">
+                <i class="bi bi-download"></i>
+                <span>Export</span>
+              </button>
+              <a href="{% url 'iroad_tenants:tenant_client_account_create' %}" class="eal-btn eal-btn-primary">
+                <i class="bi bi-plus-lg"></i>
+                <span>Add Client Account</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Table Card -->
+      <div class="eal-table-card">
+        <div class="client-table-toolbar">
+          <div class="eal-search">
+            <i class="bi bi-search"></i>
+            <input type="text" placeholder="Search attachments..." />
+          </div>
+        </div>
+
+        <!-- Table -->
+        <div class="eal-table-wrap">
+          <table class="eal-table">
+            <thead>
+              <tr>
+                <th class="eal-col-check">
+                  <input
+                    type="checkbox"
+                    class="eal-custom-check"
+                    id="ealSelectAll"
+                  />
+                </th>
+                <th class="eal-th-filter" data-column-index="1" data-filter-type="text">
+                  <div class="eal-th-filter-head">
+                    <span class="eal-th-filter-label">
+                      Account No.
+                      <span class="sort-indicator">
+                        <i class="bi bi-caret-up-fill"></i>
+                        <i class="bi bi-caret-down-fill"></i>
+                      </span>
+                    </span>
+                    <button type="button" class="eal-filter-menu-btn" aria-label="Filter Account No.">
+                      <i class="bi bi-funnel"></i>
+                    </button>
+                  </div>
+                  <div class="eal-filter-menu">
+                    <div class="eal-filter-menu-title">Account No.</div>
+                    <input type="text" class="form-control eal-column-filter-input" placeholder="Filter by text" />
+                    <div class="eal-filter-actions">
+                      <button type="button" class="eal-filter-action" data-sort="asc">Lowest</button>
+                      <button type="button" class="eal-filter-action" data-sort="desc">Highest</button>
+                      <button type="button" class="eal-filter-action" data-clear="true">Clear</button>
+                    </div>
+                  </div>
+                </th>
+                <th class="eal-th-filter" data-column-index="2" data-filter-type="text">
+                  <div class="eal-th-filter-head">
+                    <span class="eal-th-filter-label">
+                      Preferred Currency
+                      <span class="sort-indicator">
+                        <i class="bi bi-caret-up-fill"></i>
+                        <i class="bi bi-caret-down-fill"></i>
+                      </span>
+                    </span>
+                    <button type="button" class="eal-filter-menu-btn" aria-label="Filter Preferred Currency">
+                      <i class="bi bi-funnel"></i>
+                    </button>
+                  </div>
+                  <div class="eal-filter-menu">
+                    <div class="eal-filter-menu-title">Preferred Currency</div>
+                    <input type="text" class="form-control eal-column-filter-input" placeholder="Filter by text" />
+                    <div class="eal-filter-actions">
+                      <button type="button" class="eal-filter-action" data-sort="asc">A to Z</button>
+                      <button type="button" class="eal-filter-action" data-sort="desc">Z to A</button>
+                      <button type="button" class="eal-filter-action" data-clear="true">Clear</button>
+                    </div>
+                  </div>
+                </th>
+                <th class="eal-th-filter" data-column-index="3" data-filter-type="text">
+                  <div class="eal-th-filter-head">
+                    <span class="eal-th-filter-label">
+                      English Name
+                      <span class="sort-indicator">
+                        <i class="bi bi-caret-up-fill"></i>
+                        <i class="bi bi-caret-down-fill"></i>
+                      </span>
+                    </span>
+                    <button type="button" class="eal-filter-menu-btn" aria-label="Filter English Name">
+                      <i class="bi bi-funnel"></i>
+                    </button>
+                  </div>
+                  <div class="eal-filter-menu">
+                    <div class="eal-filter-menu-title">English Name</div>
+                    <input type="text" class="form-control eal-column-filter-input" placeholder="Filter by name" />
+                    <div class="eal-filter-actions">
+                      <button type="button" class="eal-filter-action" data-sort="asc">A to Z</button>
+                      <button type="button" class="eal-filter-action" data-sort="desc">Z to A</button>
+                      <button type="button" class="eal-filter-action" data-clear="true">Clear</button>
+                    </div>
+                  </div>
+                </th>
+                <th class="eal-th-filter" data-column-index="4" data-filter-type="text">
+                  <div class="eal-th-filter-head">
+                    <span class="eal-th-filter-label">Arabic Name</span>
+                    <button type="button" class="eal-filter-menu-btn" aria-label="Filter Arabic Name">
+                      <i class="bi bi-funnel"></i>
+                    </button>
+                  </div>
+                  <div class="eal-filter-menu">
+                    <div class="eal-filter-menu-title">Arabic Name</div>
+                    <input type="text" class="form-control eal-column-filter-input" placeholder="Filter by name" />
+                    <div class="eal-filter-actions">
+                      <button type="button" class="eal-filter-action" data-sort="asc">A to Z</button>
+                      <button type="button" class="eal-filter-action" data-sort="desc">Z to A</button>
+                      <button type="button" class="eal-filter-action" data-clear="true">Clear</button>
+                    </div>
+                  </div>
+                </th>
+                <th class="eal-th-filter" data-column-index="5" data-filter-type="text">
+                  <div class="eal-th-filter-head">
+                    <span class="eal-th-filter-label">
+                      Client Type
+                      <span class="sort-indicator">
+                        <i class="bi bi-caret-up-fill"></i>
+                        <i class="bi bi-caret-down-fill"></i>
+                      </span>
+                    </span>
+                    <button type="button" class="eal-filter-menu-btn" aria-label="Filter Client Type">
+                      <i class="bi bi-funnel"></i>
+                    </button>
+                  </div>
+                  <div class="eal-filter-menu">
+                    <div class="eal-filter-menu-title">Client Type</div>
+                    <input type="text" class="form-control eal-column-filter-input" placeholder="Filter by type" />
+                    <div class="eal-filter-actions">
+                      <button type="button" class="eal-filter-action" data-sort="asc">A to Z</button>
+                      <button type="button" class="eal-filter-action" data-sort="desc">Z to A</button>
+                      <button type="button" class="eal-filter-action" data-clear="true">Clear</button>
+                    </div>
+                  </div>
+                </th>
+                <th class="eal-th-filter" data-column-index="6" data-filter-type="text">
+                  <div class="eal-th-filter-head">
+                    <span class="eal-th-filter-label">
+                      Commercial Reg. No.
+                      <span class="sort-indicator">
+                        <i class="bi bi-caret-up-fill"></i>
+                        <i class="bi bi-caret-down-fill"></i>
+                      </span>
+                    </span>
+                    <button type="button" class="eal-filter-menu-btn" aria-label="Filter Commercial Registration Number">
+                      <i class="bi bi-funnel"></i>
+                    </button>
+                  </div>
+                  <div class="eal-filter-menu">
+                    <div class="eal-filter-menu-title">Commercial Reg. No.</div>
+                    <input type="text" class="form-control eal-column-filter-input" placeholder="Filter by text" />
+                    <div class="eal-filter-actions">
+                      <button type="button" class="eal-filter-action" data-sort="asc">Lowest</button>
+                      <button type="button" class="eal-filter-action" data-sort="desc">Highest</button>
+                      <button type="button" class="eal-filter-action" data-clear="true">Clear</button>
+                    </div>
+                  </div>
+                </th>
+                <th class="eal-th-filter" data-column-index="7" data-filter-type="text">
+                  <div class="eal-th-filter-head">
+                    <span class="eal-th-filter-label">
+                      Tax Reg. No.
+                      <span class="sort-indicator">
+                        <i class="bi bi-caret-up-fill"></i>
+                        <i class="bi bi-caret-down-fill"></i>
+                      </span>
+                    </span>
+                    <button type="button" class="eal-filter-menu-btn" aria-label="Filter Tax Registration Number">
+                      <i class="bi bi-funnel"></i>
+                    </button>
+                  </div>
+                  <div class="eal-filter-menu">
+                    <div class="eal-filter-menu-title">Tax Reg. No.</div>
+                    <input type="text" class="form-control eal-column-filter-input" placeholder="Filter by text" />
+                    <div class="eal-filter-actions">
+                      <button type="button" class="eal-filter-action" data-sort="asc">Lowest</button>
+                      <button type="button" class="eal-filter-action" data-sort="desc">Highest</button>
+                      <button type="button" class="eal-filter-action" data-clear="true">Clear</button>
+                    </div>
+                  </div>
+                </th>
+                <th class="eal-th-filter" data-column-index="8" data-filter-type="text">
+                  <div class="eal-th-filter-head">
+                    <span class="eal-th-filter-label">
+                      Status
+                      <span class="sort-indicator">
+                        <i class="bi bi-caret-up-fill"></i>
+                        <i class="bi bi-caret-down-fill"></i>
+                      </span>
+                    </span>
+                    <button type="button" class="eal-filter-menu-btn" aria-label="Filter Status">
+                      <i class="bi bi-funnel"></i>
+                    </button>
+                  </div>
+                  <div class="eal-filter-menu">
+                    <div class="eal-filter-menu-title">Status</div>
+                    <input type="text" class="form-control eal-column-filter-input" placeholder="Filter by status" />
+                    <div class="eal-filter-actions">
+                      <button type="button" class="eal-filter-action" data-sort="asc">A to Z</button>
+                      <button type="button" class="eal-filter-action" data-sort="desc">Z to A</button>
+                      <button type="button" class="eal-filter-action" data-clear="true">Clear</button>
+                    </div>
+                  </div>
+                </th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Row 1 -->
+              <tr>
+                <td class="eal-col-check">
+                  <input type="checkbox" class="eal-custom-check" />
+                </td>
+                <td>
+                  <span class="eal-entity-id">CA-000123</span>
+                </td>
+                <td>SAR - Saudi Riyal</td>
+                <td>
+                  <div class="eal-name-cell">
+                    <span class="eal-name-text">Al Safa Logistics</span>
+                  </div>
+                </td>
+                <td class="eal-arabic">شركة الصفا للخدمات اللوجستية</td>
+                <td>
+                  <span class="eal-type-badge org">
+                    <i class="bi bi-building"></i>
+                    Corporate</span
+                  >
+                </td>
+                <td>
+                  <span class="eal-pi-number">CR-1234567890</span>
+                </td>
+                <td>
+                  <span class="eal-pi-number">TR-9876543210</span>
+                </td>
+                <td>
+                  <span class="status-badge active">Active</span>
+                </td>
+                <td>
+                  <div class="dropdown eal-actions-cell">
+                    <button
+                      class="eal-row-btn"
+                      type="button"
+                      data-bs-toggle="dropdown"
+                      aria-expanded="false"
+                      title="Actions"
+                    >
+                      <i class="bi bi-three-dots-vertical"></i>
+                    </button>
+                    <ul
+                      class="dropdown-menu dropdown-menu-end shadow-sm"
+                      style="border-radius: 8px; border-color: #e2e8f0"
+                    >
+                      <li>
+                        <a class="dropdown-item" href="#"
+                          ><i class="bi bi-pencil text-primary me-2"></i>
+                          Edit</a
+                        >
+                      </li>
+                      <li>
+                        <a class="dropdown-item" href="{% url 'iroad_tenants:tenant_client_details' %}"
+                          ><i class="bi bi-eye text-info me-2"></i> View</a
+                        >
+                      </li>
+                      <li>
+                        <a class="dropdown-item" href="#"
+                          ><i
+                            class="bi bi-person-slash text-secondary me-2"
+                          ></i>
+                          Deactivate</a
+                        >
+                      </li>
+                      <li><hr class="dropdown-divider" /></li>
+                      <li>
+                        <a class="dropdown-item text-danger" href="#"
+                          ><i class="bi bi-trash3 me-2"></i> Delete</a
+                        >
+                      </li>
+                    </ul>
+                  </div>
+                </td>
+              </tr>
+              <!-- Row 2 -->
+              <tr>
+                <td class="eal-col-check">
+                  <input type="checkbox" class="eal-custom-check" />
+                </td>
+                <td>
+                  <span class="eal-entity-id">CA-000122</span>
+                </td>
+                <td>SAR - Saudi Riyal</td>
+                <td>
+                  <div class="eal-name-cell">
+                    <span class="eal-name-text">Riyadh Trading Co.</span>
+                  </div>
+                </td>
+                <td class="eal-arabic" lang="ar" dir="rtl">
+                  شركة الرياض للتجارة
+                </td>
+                <td>
+                  <span class="eal-type-badge org">
+                    <i class="bi bi-building"></i>
+                    Corporate</span
+                  >
+                </td>
+                <td>
+                  <span class="eal-pi-number">CR-2233445566</span>
+                </td>
+                <td>
+                  <span class="eal-pi-number">TR-6655443322</span>
+                </td>
+                <td>
+                  <span class="status-badge active">Active</span>
+                </td>
+                <td>
+                  <div class="dropdown eal-actions-cell">
+                    <button
+                      class="eal-row-btn"
+                      type="button"
+                      data-bs-toggle="dropdown"
+                      aria-expanded="false"
+                      title="Actions"
+                    >
+                      <i class="bi bi-three-dots-vertical"></i>
+                    </button>
+                    <ul
+                      class="dropdown-menu dropdown-menu-end shadow-sm"
+                      style="border-radius: 8px; border-color: #e2e8f0"
+                    >
+                      <li>
+                        <a class="dropdown-item" href="#"
+                          ><i class="bi bi-pencil text-primary me-2"></i>
+                          Edit</a
+                        >
+                      </li>
+                      <li>
+                        <a class="dropdown-item" href="{% url 'iroad_tenants:tenant_client_details' %}"
+                          ><i class="bi bi-eye text-info me-2"></i> View</a
+                        >
+                      </li>
+                      <li>
+                        <a class="dropdown-item" href="#"
+                          ><i
+                            class="bi bi-person-slash text-secondary me-2"
+                          ></i>
+                          Deactivate</a
+                        >
+                      </li>
+                      <li><hr class="dropdown-divider" /></li>
+                      <li>
+                        <a class="dropdown-item text-danger" href="#"
+                          ><i class="bi bi-trash3 me-2"></i> Delete</a
+                        >
+                      </li>
+                    </ul>
+                  </div>
+                </td>
+              </tr>
+              <!-- Row 3 -->
+              <tr>
+                <td class="eal-col-check">
+                  <input type="checkbox" class="eal-custom-check" />
+                </td>
+                <td>
+                  <span class="eal-entity-id">CA-000121</span>
+                </td>
+                <td>AED - UAE Dirham</td>
+                <td>
+                  <div class="eal-name-cell">
+                    <span class="eal-name-text">Desert Star Transport</span>
+                  </div>
+                </td>
+                <td class="eal-arabic" lang="ar" dir="rtl">
+                  نجم الصحراء للنقل
+                </td>
+                <td>
+                  <span class="eal-type-badge org">
+                    <i class="bi bi-building"></i>
+                    Corporate</span
+                  >
+                </td>
+                <td>
+                  <span class="eal-pi-number">CR-9988776655</span>
+                </td>
+                <td>
+                  <span class="eal-pi-number">TR-5566778899</span>
+                </td>
+                <td>
+                  <span class="status-badge active">Active</span>
+                </td>
+                <td>
+                  <div class="dropdown eal-actions-cell">
+                    <button
+                      class="eal-row-btn"
+                      type="button"
+                      data-bs-toggle="dropdown"
+                      aria-expanded="false"
+                      title="Actions"
+                    >
+                      <i class="bi bi-three-dots-vertical"></i>
+                    </button>
+                    <ul
+                      class="dropdown-menu dropdown-menu-end shadow-sm"
+                      style="border-radius: 8px; border-color: #e2e8f0"
+                    >
+                      <li>
+                        <a class="dropdown-item" href="#"
+                          ><i class="bi bi-pencil text-primary me-2"></i>
+                          Edit</a
+                        >
+                      </li>
+                      <li>
+                        <a class="dropdown-item" href="{% url 'iroad_tenants:tenant_client_details' %}"
+                          ><i class="bi bi-eye text-info me-2"></i> View</a
+                        >
+                      </li>
+                      <li>
+                        <a class="dropdown-item" href="#"
+                          ><i
+                            class="bi bi-person-slash text-secondary me-2"
+                          ></i>
+                          Deactivate</a
+                        >
+                      </li>
+                      <li><hr class="dropdown-divider" /></li>
+                      <li>
+                        <a class="dropdown-item text-danger" href="#"
+                          ><i class="bi bi-trash3 me-2"></i> Delete</a
+                        >
+                      </li>
+                    </ul>
+                  </div>
+                </td>
+              </tr>
+              <!-- Row 4 -->
+              <tr>
+                <td class="eal-col-check">
+                  <input type="checkbox" class="eal-custom-check" />
+                </td>
+                <td>
+                  <span class="eal-entity-id">CA-000120</span>
+                </td>
+                <td>SAR - Saudi Riyal</td>
+                <td>
+                  <div class="eal-name-cell">
+                    <span class="eal-name-text">Mariam Al Qahtani</span>
+                  </div>
+                </td>
+                <td class="eal-arabic" lang="ar" dir="rtl">مريم القحطاني</td>
+                <td>
+                  <span class="eal-type-badge ind">
+                    <i class="bi bi-person"></i>
+                    Individual</span
+                  >
+                </td>
+                <td>
+                  <span class="eal-pi-number">CR-4455667788</span>
+                </td>
+                <td>
+                  <span class="eal-pi-number">TR-8877665544</span>
+                </td>
+                <td>
+                  <span class="status-badge active">Active</span>
+                </td>
+                <td>
+                  <div class="dropdown eal-actions-cell">
+                    <button
+                      class="eal-row-btn"
+                      type="button"
+                      data-bs-toggle="dropdown"
+                      aria-expanded="false"
+                      title="Actions"
+                    >
+                      <i class="bi bi-three-dots-vertical"></i>
+                    </button>
+                    <ul
+                      class="dropdown-menu dropdown-menu-end shadow-sm"
+                      style="border-radius: 8px; border-color: #e2e8f0"
+                    >
+                      <li>
+                        <a class="dropdown-item" href="#"
+                          ><i class="bi bi-pencil text-primary me-2"></i>
+                          Edit</a
+                        >
+                      </li>
+                      <li>
+                        <a class="dropdown-item" href="{% url 'iroad_tenants:tenant_client_details' %}"
+                          ><i class="bi bi-eye text-info me-2"></i> View</a
+                        >
+                      </li>
+                      <li>
+                        <a class="dropdown-item" href="#"
+                          ><i
+                            class="bi bi-person-slash text-secondary me-2"
+                          ></i>
+                          Deactivate</a
+                        >
+                      </li>
+                      <li><hr class="dropdown-divider" /></li>
+                      <li>
+                        <a class="dropdown-item text-danger" href="#"
+                          ><i class="bi bi-trash3 me-2"></i> Delete</a
+                        >
+                      </li>
+                    </ul>
+                  </div>
+                </td>
+              </tr>
+              <!-- Row 5 -->
+              <tr>
+                <td class="eal-col-check">
+                  <input type="checkbox" class="eal-custom-check" />
+                </td>
+                <td>
+                  <span class="eal-entity-id">CA-000119</span>
+                </td>
+                <td>USD - US Dollar</td>
+                <td>
+                  <div class="eal-name-cell">
+                    <span class="eal-name-text">Blue Ocean Imports</span>
+                  </div>
+                </td>
+                <td class="eal-arabic" lang="ar" dir="rtl">
+                  بلو أوشن للاستيراد
+                </td>
+                <td>
+                  <span class="eal-type-badge org">
+                    <i class="bi bi-building"></i>
+                    Corporate</span
+                  >
+                </td>
+                <td>
+                  <span class="eal-pi-number">CR-1122334455</span>
+                </td>
+                <td>
+                  <span class="eal-pi-number">TR-5544332211</span>
+                </td>
+                <td>
+                  <span class="status-badge active">Active</span>
+                </td>
+                <td>
+                  <div class="dropdown eal-actions-cell">
+                    <button
+                      class="eal-row-btn"
+                      type="button"
+                      data-bs-toggle="dropdown"
+                      aria-expanded="false"
+                      title="Actions"
+                    >
+                      <i class="bi bi-three-dots-vertical"></i>
+                    </button>
+                    <ul
+                      class="dropdown-menu dropdown-menu-end shadow-sm"
+                      style="border-radius: 8px; border-color: #e2e8f0"
+                    >
+                      <li>
+                        <a class="dropdown-item" href="#"
+                          ><i class="bi bi-pencil text-primary me-2"></i>
+                          Edit</a
+                        >
+                      </li>
+                      <li>
+                        <a class="dropdown-item" href="{% url 'iroad_tenants:tenant_client_details' %}"
+                          ><i class="bi bi-eye text-info me-2"></i> View</a
+                        >
+                      </li>
+                      <li>
+                        <a class="dropdown-item" href="#"
+                          ><i
+                            class="bi bi-person-slash text-secondary me-2"
+                          ></i>
+                          Deactivate</a
+                        >
+                      </li>
+                      <li><hr class="dropdown-divider" /></li>
+                      <li>
+                        <a class="dropdown-item text-danger" href="#"
+                          ><i class="bi bi-trash3 me-2"></i> Delete</a
+                        >
+                      </li>
+                    </ul>
+                  </div>
+                </td>
+              </tr>
+              <!-- Row 6 -->
+              <tr>
+                <td class="eal-col-check">
+                  <input type="checkbox" class="eal-custom-check" />
+                </td>
+                <td>
+                  <span class="eal-entity-id">CA-000118</span>
+                </td>
+                <td>SAR - Saudi Riyal</td>
+                <td>
+                  <div class="eal-name-cell">
+                    <span class="eal-name-text">Jeddah Fresh Foods</span>
+                  </div>
+                </td>
+                <td class="eal-arabic" lang="ar" dir="rtl">
+                  جدة للأغذية الطازجة
+                </td>
+                <td>
+                  <span class="eal-type-badge org">
+                    <i class="bi bi-building"></i>
+                    Corporate</span
+                  >
+                </td>
+                <td>
+                  <span class="eal-pi-number">CR-3344556677</span>
+                </td>
+                <td>
+                  <span class="eal-pi-number">TR-7766554433</span>
+                </td>
+                <td>
+                  <span class="status-badge active">Active</span>
+                </td>
+                <td>
+                  <div class="dropdown eal-actions-cell">
+                    <button
+                      class="eal-row-btn"
+                      type="button"
+                      data-bs-toggle="dropdown"
+                      aria-expanded="false"
+                      title="Actions"
+                    >
+                      <i class="bi bi-three-dots-vertical"></i>
+                    </button>
+                    <ul
+                      class="dropdown-menu dropdown-menu-end shadow-sm"
+                      style="border-radius: 8px; border-color: #e2e8f0"
+                    >
+                      <li>
+                        <a class="dropdown-item" href="#"
+                          ><i class="bi bi-pencil text-primary me-2"></i>
+                          Edit</a
+                        >
+                      </li>
+                      <li>
+                        <a class="dropdown-item" href="{% url 'iroad_tenants:tenant_client_details' %}"
+                          ><i class="bi bi-eye text-info me-2"></i> View</a
+                        >
+                      </li>
+                      <li>
+                        <a class="dropdown-item" href="#"
+                          ><i
+                            class="bi bi-person-slash text-secondary me-2"
+                          ></i>
+                          Deactivate</a
+                        >
+                      </li>
+                      <li><hr class="dropdown-divider" /></li>
+                      <li>
+                        <a class="dropdown-item text-danger" href="#"
+                          ><i class="bi bi-trash3 me-2"></i> Delete</a
+                        >
+                      </li>
+                    </ul>
+                  </div>
+                </td>
+              </tr>
+              <!-- Row 7 -->
+              <tr>
+                <td class="eal-col-check">
+                  <input type="checkbox" class="eal-custom-check" />
+                </td>
+                <td>
+                  <span class="eal-entity-id">CA-000117</span>
+                </td>
+                <td>EUR - Euro</td>
+                <td>
+                  <div class="eal-name-cell">
+                    <span class="eal-name-text">Global Medical Supplies</span>
+                  </div>
+                </td>
+                <td class="eal-arabic" lang="ar" dir="rtl">
+                  جلوبال للمستلزمات الطبية
+                </td>
+                <td>
+                  <span class="eal-type-badge org">
+                    <i class="bi bi-building"></i>
+                    Corporate</span
+                  >
+                </td>
+                <td>
+                  <span class="eal-pi-number">CR-7788990011</span>
+                </td>
+                <td>
+                  <span class="eal-pi-number">TR-1100998877</span>
+                </td>
+                <td>
+                  <span class="status-badge active">Active</span>
+                </td>
+                <td>
+                  <div class="dropdown eal-actions-cell">
+                    <button
+                      class="eal-row-btn"
+                      type="button"
+                      data-bs-toggle="dropdown"
+                      aria-expanded="false"
+                      title="Actions"
+                    >
+                      <i class="bi bi-three-dots-vertical"></i>
+                    </button>
+                    <ul
+                      class="dropdown-menu dropdown-menu-end shadow-sm"
+                      style="border-radius: 8px; border-color: #e2e8f0"
+                    >
+                      <li>
+                        <a class="dropdown-item" href="#"
+                          ><i class="bi bi-pencil text-primary me-2"></i>
+                          Edit</a
+                        >
+                      </li>
+                      <li>
+                        <a class="dropdown-item" href="{% url 'iroad_tenants:tenant_client_details' %}"
+                          ><i class="bi bi-eye text-info me-2"></i> View</a
+                        >
+                      </li>
+                      <li>
+                        <a class="dropdown-item" href="#"
+                          ><i
+                            class="bi bi-person-slash text-secondary me-2"
+                          ></i>
+                          Deactivate</a
+                        >
+                      </li>
+                      <li><hr class="dropdown-divider" /></li>
+                      <li>
+                        <a class="dropdown-item text-danger" href="#"
+                          ><i class="bi bi-trash3 me-2"></i> Delete</a
+                        >
+                      </li>
+                    </ul>
+                  </div>
+                </td>
+              </tr>
+              <!-- Row 8 -->
+              <tr>
+                <td class="eal-col-check">
+                  <input type="checkbox" class="eal-custom-check" />
+                </td>
+                <td>
+                  <span class="eal-entity-id">CA-000116</span>
+                </td>
+                <td>INR - Indian Rupee</td>
+                <td>
+                  <div class="eal-name-cell">
+                    <span class="eal-name-text">Ahmed Khan</span>
+                  </div>
+                </td>
+                <td class="eal-arabic" lang="ar" dir="rtl">أحمد خان</td>
+                <td>
+                  <span class="eal-type-badge ind">
+                    <i class="bi bi-person"></i>
+                    Individual</span
+                  >
+                </td>
+                <td>
+                  <span class="eal-pi-number">CR-5566442200</span>
+                </td>
+                <td>
+                  <span class="eal-pi-number">TR-2200446655</span>
+                </td>
+                <td>
+                  <span class="status-badge active">Active</span>
+                </td>
+                <td>
+                  <div class="dropdown eal-actions-cell">
+                    <button
+                      class="eal-row-btn"
+                      type="button"
+                      data-bs-toggle="dropdown"
+                      aria-expanded="false"
+                      title="Actions"
+                    >
+                      <i class="bi bi-three-dots-vertical"></i>
+                    </button>
+                    <ul
+                      class="dropdown-menu dropdown-menu-end shadow-sm"
+                      style="border-radius: 8px; border-color: #e2e8f0"
+                    >
+                      <li>
+                        <a class="dropdown-item" href="#"
+                          ><i class="bi bi-pencil text-primary me-2"></i>
+                          Edit</a
+                        >
+                      </li>
+                      <li>
+                        <a class="dropdown-item" href="{% url 'iroad_tenants:tenant_client_details' %}"
+                          ><i class="bi bi-eye text-info me-2"></i> View</a
+                        >
+                      </li>
+                      <li>
+                        <a class="dropdown-item" href="#"
+                          ><i
+                            class="bi bi-person-slash text-secondary me-2"
+                          ></i>
+                          Deactivate</a
+                        >
+                      </li>
+                      <li><hr class="dropdown-divider" /></li>
+                      <li>
+                        <a class="dropdown-item text-danger" href="#"
+                          ><i class="bi bi-trash3 me-2"></i> Delete</a
+                        >
+                      </li>
+                    </ul>
+                  </div>
+                </td>
+              </tr>
+              <!-- Row 9 -->
+              <tr>
+                <td class="eal-col-check">
+                  <input type="checkbox" class="eal-custom-check" />
+                </td>
+                <td>
+                  <span class="eal-entity-id">CA-000115</span>
+                </td>
+                <td>KWD - Kuwaiti Dinar</td>
+                <td>
+                  <div class="eal-name-cell">
+                    <span class="eal-name-text">Kuwait Steel Works</span>
+                  </div>
+                </td>
+                <td class="eal-arabic" lang="ar" dir="rtl">
+                  الكويت لأعمال الحديد
+                </td>
+                <td>
+                  <span class="eal-type-badge gov">
+                    <i class="bi bi-bank"></i>
+                    Government</span
+                  >
+                </td>
+                <td>
+                  <span class="eal-pi-number">CR-6677889900</span>
+                </td>
+                <td>
+                  <span class="eal-pi-number">TR-0099887766</span>
+                </td>
+                <td>
+                  <span class="status-badge active">Active</span>
+                </td>
+                <td>
+                  <div class="dropdown eal-actions-cell">
+                    <button
+                      class="eal-row-btn"
+                      type="button"
+                      data-bs-toggle="dropdown"
+                      aria-expanded="false"
+                      title="Actions"
+                    >
+                      <i class="bi bi-three-dots-vertical"></i>
+                    </button>
+                    <ul
+                      class="dropdown-menu dropdown-menu-end shadow-sm"
+                      style="border-radius: 8px; border-color: #e2e8f0"
+                    >
+                      <li>
+                        <a class="dropdown-item" href="#"
+                          ><i class="bi bi-pencil text-primary me-2"></i>
+                          Edit</a
+                        >
+                      </li>
+                      <li>
+                        <a class="dropdown-item" href="{% url 'iroad_tenants:tenant_client_details' %}"
+                          ><i class="bi bi-eye text-info me-2"></i> View</a
+                        >
+                      </li>
+                      <li>
+                        <a class="dropdown-item" href="#"
+                          ><i
+                            class="bi bi-person-slash text-secondary me-2"
+                          ></i>
+                          Deactivate</a
+                        >
+                      </li>
+                      <li><hr class="dropdown-divider" /></li>
+                      <li>
+                        <a class="dropdown-item text-danger" href="#"
+                          ><i class="bi bi-trash3 me-2"></i> Delete</a
+                        >
+                      </li>
+                    </ul>
+                  </div>
+                </td>
+              </tr>
+              <!-- Row 10 -->
+              <tr>
+                <td class="eal-col-check">
+                  <input type="checkbox" class="eal-custom-check" />
+                </td>
+                <td>
+                  <span class="eal-entity-id">CA-000114</span>
+                </td>
+                <td>QAR - Qatari Riyal</td>
+                <td>
+                  <div class="eal-name-cell">
+                    <span class="eal-name-text">Qatar Energy Group</span>
+                  </div>
+                </td>
+                <td class="eal-arabic" lang="ar" dir="rtl">قطر إنرجي جروب</td>
+                <td>
+                  <span class="eal-type-badge gov">
+                    <i class="bi bi-bank"></i>
+                    Government</span
+                  >
+                </td>
+                <td>
+                  <span class="eal-pi-number">CR-8899001122</span>
+                </td>
+                <td>
+                  <span class="eal-pi-number">TR-2211009988</span>
+                </td>
+                <td>
+                  <span class="status-badge active">Active</span>
+                </td>
+                <td>
+                  <div class="dropdown eal-actions-cell">
+                    <button
+                      class="eal-row-btn"
+                      type="button"
+                      data-bs-toggle="dropdown"
+                      aria-expanded="false"
+                      title="Actions"
+                    >
+                      <i class="bi bi-three-dots-vertical"></i>
+                    </button>
+                    <ul
+                      class="dropdown-menu dropdown-menu-end shadow-sm"
+                      style="border-radius: 8px; border-color: #e2e8f0"
+                    >
+                      <li>
+                        <a class="dropdown-item" href="#"
+                          ><i class="bi bi-pencil text-primary me-2"></i>
+                          Edit</a
+                        >
+                      </li>
+                      <li>
+                        <a class="dropdown-item" href="{% url 'iroad_tenants:tenant_client_details' %}"
+                          ><i class="bi bi-eye text-info me-2"></i> View</a
+                        >
+                      </li>
+                      <li>
+                        <a class="dropdown-item" href="#"
+                          ><i
+                            class="bi bi-person-slash text-secondary me-2"
+                          ></i>
+                          Deactivate</a
+                        >
+                      </li>
+                      <li><hr class="dropdown-divider" /></li>
+                      <li>
+                        <a class="dropdown-item text-danger" href="#"
+                          ><i class="bi bi-trash3 me-2"></i> Delete</a
+                        >
+                      </li>
+                    </ul>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Pagination -->
+        <div class="eal-pagination">
+          <div class="eal-pagination-info">
+            Showing
+            <strong>1-10</strong>
+            of
+            <strong>10</strong>
+            client accounts
+          </div>
+          <div class="eal-pagination-controls">
+            <button class="eal-page-btn" title="Previous">
+              <i class="bi bi-chevron-left"></i>
+            </button>
+            <button class="eal-page-btn active">1</button>
+            <button class="eal-page-btn" title="Next">
+              <i class="bi bi-chevron-right"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+      <!-- ========== END NEW TABLE UI DESIGN ========== -->
+{% endblock %}
+
+{% block extra_js %}
+<script>
+      (function () {
+        var STORAGE_KEY = "ir_clients_v1";
+        var DEMO_CLIENT = {
+          account_no: "CA-000123",
+          client_type: "Business",
+          status: "Active",
+          created_at: "Jan 28, 2026, 03:52 PM",
+          name_arabic: "شركة الصفا للخدمات اللوجستية",
+          name_english: "Al Safa Logistics",
+          display_name: "Al Safa Logistics",
+          preferred_currency: "SAR",
+          billing_street_1: "King Fahd Rd, Building 12",
+          billing_street_2: "Floor 4, Office 402",
+          billing_city: "Riyadh",
+          billing_region: "Riyadh",
+          postal_code: "11564",
+          country: "SA",
+          commercial_registration_no: "CR-1234567890",
+          tax_registration_no: "TR-9876543210",
+        };
+
+        function loadClients() {
+          try {
+            var raw = localStorage.getItem(STORAGE_KEY);
+            var parsed = raw ? JSON.parse(raw) : [];
+            return Array.isArray(parsed) ? parsed : [];
+          } catch (e) {
+            return [];
+          }
+        }
+
+        function escapeHtml(s) {
+          return String(s || "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+        }
+
+        function typeBadge(type) {
+          var t = String(type || "").toLowerCase();
+          if (t === "business" || t === "corporate") {
+            return (
+              '<span class="eal-type-badge org"><i class="bi bi-building"></i> Corporate</span>'
+            );
+          }
+          if (t === "individual") {
+            return (
+              '<span class="eal-type-badge ind"><i class="bi bi-person"></i> Individual</span>'
+            );
+          }
+          return (
+            '<span class="eal-type-badge gov"><i class="bi bi-bank"></i> Government</span>'
+          );
+        }
+
+        function statusBadge(status) {
+          var s = String(status || "").toLowerCase();
+          if (s === "inactive") return '<span class="status-badge inactive">Inactive</span>';
+          return '<span class="status-badge active">Active</span>';
+        }
+
+        function preferredCurrencyLabel(code) {
+          var c = String(code || "").toUpperCase();
+          var map = {
+            SAR: "SAR - Saudi Riyal",
+            USD: "USD - US Dollar",
+            EUR: "EUR - Euro",
+            AED: "AED - UAE Dirham",
+            KWD: "KWD - Kuwaiti Dinar",
+          };
+          return map[c] || (c ? c : "—");
+        }
+
+        function ensureDemoClient() {
+          var clients = loadClients();
+          var exists = false;
+          for (var i = 0; i < clients.length; i++) {
+            if (clients[i] && clients[i].account_no === DEMO_CLIENT.account_no) {
+              exists = true;
+              break;
+            }
+          }
+          if (!exists) {
+            clients.unshift(DEMO_CLIENT);
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(clients));
+          }
+        }
+
+        function appendClientRow(tbody, client) {
+          var id = client && client.account_no;
+          if (!id) return;
+
+          // Avoid duplicates if a static row already exists
+          var existing = tbody.querySelectorAll(".eal-entity-id");
+          for (var i = 0; i < existing.length; i++) {
+            if (existing[i].textContent.trim() === id) return;
+          }
+
+          var nameEn = client.name_english || client.display_name || "—";
+          var nameAr = client.name_arabic || "—";
+          var cr = client.commercial_registration_no || "—";
+          var tr = client.tax_registration_no || "—";
+
+          var trEl = document.createElement("tr");
+          trEl.innerHTML =
+            '<td class="eal-col-check"><input type="checkbox" class="eal-custom-check" /></td>' +
+            '<td><span class="eal-entity-id">' +
+            escapeHtml(id) +
+            "</span></td>" +
+            "<td>" +
+            escapeHtml(preferredCurrencyLabel(client.preferred_currency)) +
+            "</td>" +
+            '<td><div class="eal-name-cell"><span class="eal-name-text">' +
+            escapeHtml(nameEn) +
+            "</span></div></td>" +
+            '<td class="eal-arabic" lang="ar" dir="rtl">' +
+            escapeHtml(nameAr) +
+            "</td>" +
+            "<td>" +
+            typeBadge(client.client_type) +
+            "</td>" +
+            '<td><span class="eal-pi-number">' +
+            escapeHtml(cr) +
+            "</span></td>" +
+            '<td><span class="eal-pi-number">' +
+            escapeHtml(tr) +
+            "</span></td>" +
+            "<td>" +
+            statusBadge(client.status) +
+            "</td>" +
+            '<td><div class="eal-actions-cell">' +
+            '<a href="client-details.html?id=' +
+            encodeURIComponent(id) +
+            '" class="eal-row-btn" title="View" style="display:inline-flex; align-items:center; justify-content:center; text-decoration:none;">' +
+            '<i class="bi bi-eye"></i></a>' +
+            '<button class="eal-row-btn" title="Edit"><i class="bi bi-pencil"></i></button>' +
+            '<button class="eal-row-btn danger" title="Delete"><i class="bi bi-trash3"></i></button>' +
+            "</div></td>";
+
+          tbody.insertBefore(trEl, tbody.firstChild);
+        }
+
+        function normalizeText(value) {
+          return String(value || "")
+            .toLowerCase()
+            .replace(/\s+/g, " ")
+            .trim();
+        }
+
+        function getCellText(row, index) {
+          if (!row || !row.cells || !row.cells[index]) return "";
+          return row.cells[index].textContent.replace(/\s+/g, " ").trim();
+        }
+
+        function initClientTableTools(table, tbody) {
+          var globalSearchInput = document.getElementById("clientTableSearch");
+          var filterHeaders = Array.prototype.slice.call(
+            table.querySelectorAll(".eal-th-filter")
+          );
+          var emptyRow = document.createElement("tr");
+          emptyRow.className = "eal-table-empty-row";
+          emptyRow.style.display = "none";
+          emptyRow.innerHTML =
+            '<td colspan="10" class="eal-table-empty">No client accounts match the selected search/filter criteria.</td>';
+          tbody.appendChild(emptyRow);
+
+          var state = {
+            globalSearch: "",
+            columnFilters: {},
+            sort: {
+              columnIndex: null,
+              direction: null,
+            },
+          };
+
+          function getRows() {
+            return Array.prototype.slice
+              .call(tbody.querySelectorAll("tr"))
+              .filter(function (row) {
+                return row !== emptyRow;
+              });
+          }
+
+          function applyTableState() {
+            var rows = getRows();
+            rows.forEach(function (row) {
+              var accountNo = normalizeText(getCellText(row, 1));
+              var englishName = normalizeText(getCellText(row, 3));
+              var arabicName = normalizeText(getCellText(row, 4));
+              var globalMatch = true;
+
+              if (state.globalSearch) {
+                globalMatch =
+                  accountNo.indexOf(state.globalSearch) !== -1 ||
+                  englishName.indexOf(state.globalSearch) !== -1 ||
+                  arabicName.indexOf(state.globalSearch) !== -1;
+              }
+
+              var columnsMatch = Object.keys(state.columnFilters).every(function (key) {
+                var filterValue = normalizeText(state.columnFilters[key]);
+                if (!filterValue) return true;
+                return normalizeText(getCellText(row, Number(key))).indexOf(filterValue) !== -1;
+              });
+
+              row.style.display = globalMatch && columnsMatch ? "" : "none";
+            });
+
+            var visibleRows = rows.filter(function (row) {
+              return row.style.display !== "none";
+            });
+
+            if (state.sort.columnIndex !== null && state.sort.direction) {
+              visibleRows
+                .sort(function (a, b) {
+                  var valueA = normalizeText(getCellText(a, state.sort.columnIndex));
+                  var valueB = normalizeText(getCellText(b, state.sort.columnIndex));
+                  return valueA.localeCompare(valueB, undefined, {
+                    numeric: true,
+                    sensitivity: "base",
+                  });
+                })
+                .forEach(function (row) {
+                  tbody.appendChild(row);
+                });
+
+              if (state.sort.direction === "desc") {
+                visibleRows.reverse().forEach(function (row) {
+                  tbody.appendChild(row);
+                });
+              }
+            }
+
+            emptyRow.style.display = visibleRows.length ? "none" : "";
+          }
+
+          if (globalSearchInput) {
+            globalSearchInput.addEventListener("input", function () {
+              state.globalSearch = normalizeText(globalSearchInput.value);
+              applyTableState();
+            });
+          }
+
+          filterHeaders.forEach(function (header) {
+            var menuButton = header.querySelector(".eal-filter-menu-btn");
+            var menu = header.querySelector(".eal-filter-menu");
+            var input = header.querySelector(".eal-column-filter-input");
+            var columnIndex = Number(header.getAttribute("data-column-index"));
+
+            if (!menuButton || !menu) return;
+
+            menuButton.addEventListener("click", function (event) {
+              event.stopPropagation();
+              filterHeaders.forEach(function (otherHeader) {
+                if (otherHeader !== header) {
+                  var otherMenu = otherHeader.querySelector(".eal-filter-menu");
+                  var otherButton = otherHeader.querySelector(".eal-filter-menu-btn");
+                  if (otherMenu) otherMenu.classList.remove("open");
+                  if (otherButton) otherButton.classList.remove("active");
+                }
+              });
+              menu.classList.toggle("open");
+              menuButton.classList.toggle("active", menu.classList.contains("open"));
+            });
+
+            if (input) {
+              input.addEventListener("input", function () {
+                state.columnFilters[columnIndex] = input.value;
+                applyTableState();
+              });
+            }
+
+            Array.prototype.slice
+              .call(menu.querySelectorAll("[data-sort]"))
+              .forEach(function (button) {
+                button.addEventListener("click", function () {
+                  state.sort.columnIndex = columnIndex;
+                  state.sort.direction = button.getAttribute("data-sort");
+                  applyTableState();
+                  menu.classList.remove("open");
+                  menuButton.classList.remove("active");
+                });
+              });
+
+            Array.prototype.slice
+              .call(menu.querySelectorAll("[data-clear]"))
+              .forEach(function (button) {
+                button.addEventListener("click", function () {
+                  if (input) input.value = "";
+                  delete state.columnFilters[columnIndex];
+                  if (state.sort.columnIndex === columnIndex) {
+                    state.sort.columnIndex = null;
+                    state.sort.direction = null;
+                  }
+                  applyTableState();
+                  menu.classList.remove("open");
+                  menuButton.classList.remove("active");
+                });
+              });
+          });
+
+          document.addEventListener("click", function (event) {
+            if (event.target.closest(".eal-th-filter")) return;
+            filterHeaders.forEach(function (header) {
+              var menu = header.querySelector(".eal-filter-menu");
+              var button = header.querySelector(".eal-filter-menu-btn");
+              if (menu) menu.classList.remove("open");
+              if (button) button.classList.remove("active");
+            });
+          });
+
+          applyTableState();
+        }
+
+        var table = document.querySelector(".eal-table");
+        if (!table) return;
+        var tbody = table.querySelector("tbody");
+        if (!tbody) return;
+
+        // Seed one fully-filled demo client for consistent demos.
+        ensureDemoClient();
+
+        var clients = loadClients();
+        clients.forEach(function (c) {
+          appendClientRow(tbody, c);
+        });
+
+        initClientTableTools(table, tbody);
+      })();
+    </script>
+{% endblock %}

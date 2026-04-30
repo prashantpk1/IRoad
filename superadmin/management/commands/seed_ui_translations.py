@@ -76,7 +76,7 @@ class Command(BaseCommand):
             "Subscribers List": "قائمة المشتركين",
             "Subscription Orders": "طلبات الاشتراك",
             "Transactions Ledger": "سجل المعاملات",
-            "Standard Invoices": "الفواتير القياسية",
+            "Subscription Receipts": "إيصالات الاشتراك",
             "Communication & Alerts": "الاتصالات والتنبيهات",
             "Gateway Settings": "إعدادات البوابات",
             "Notification Templates": "قوالب الإشعارات",

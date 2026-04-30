@@ -62,15 +62,42 @@
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
+        {% if request.user.is_root %}
+          <form
+            id="fxImportForm"
+            method="post"
+            action="{% url 'fx_rate_import_excel' %}"
+            enctype="multipart/form-data"
+            class="d-inline"
+          >
+            {% csrf_token %}
+            <input
+              type="file"
+              id="fxExcelFileInput"
+              name="excel_file"
+              accept=".xlsx,.xlsm,.xltx,.xltm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              class="d-none"
+              required
+            >
+            <button type="button" id="fxImportBtn" class="eal-btn eal-btn-outline">
+              <i class="bi bi-upload"></i>
+              <span>{% translate "Import Excel" %}</span>
+            </button>
+          </form>
+          <a href="{% url 'fx_rate_sample_excel' %}" class="eal-btn eal-btn-outline">
+            <i class="bi bi-file-earmark-arrow-down"></i>
+            <span>{% translate "Sample Excel" %}</span>
+          </a>
+        {% endif %}
         <a href="{% url 'fx_change_log' %}" class="eal-btn eal-btn-outline">
           <i class="bi bi-clock-history"></i>
           <span>{% translate "FX Change Log" %}</span>
         </a>
         {% if request.user.is_root %}
-          <a href="{% url 'fx_rate_create' %}" class="eal-btn eal-btn-primary">
-            <i class="bi bi-plus-lg"></i>
-            <span>{% translate "Add Exchange Rate" %}</span>
-          </a>
+        <a href="{% url 'fx_rate_create' %}" class="eal-btn eal-btn-primary">
+          <i class="bi bi-plus-lg"></i>
+          <span>{% translate "Add Exchange Rate" %}</span>
+        </a>
         {% endif %}
       </div>
     </div>
@@ -86,17 +113,6 @@
     </span>
   </div>
 </div>
-
-{% if messages %}
-  <div style="margin-bottom: 24px">
-    {% for message in messages %}
-      <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags|default:'info' }}{% endif %} alert-dismissible fade show" role="alert" style="border-radius: 12px; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-        {{ message }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-      </div>
-    {% endfor %}
-  </div>
-{% endif %}
 
 <div class="eal-table-card">
   <form method="get" action="{% url 'fx_rate_list' %}" class="eal-toolbar">
@@ -266,4 +282,22 @@
 
   {% include 'partials/pagination.html' with page_obj=exchange_rates %}
 </div>
+<script>
+  (function () {
+    var importBtn = document.getElementById('fxImportBtn');
+    var fileInput = document.getElementById('fxExcelFileInput');
+    var importForm = document.getElementById('fxImportForm');
+    if (!importBtn || !fileInput || !importForm) return;
+
+    importBtn.addEventListener('click', function () {
+      fileInput.click();
+    });
+
+    fileInput.addEventListener('change', function () {
+      if (fileInput.files && fileInput.files.length > 0) {
+        importForm.submit();
+      }
+    });
+  })();
+</script>
 {% endblock %}

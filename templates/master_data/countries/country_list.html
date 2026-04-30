@@ -66,6 +66,31 @@
     <div class="page-header-right">
       <div class="eal-header-actions">
         {% if request.user.is_root %}
+          <form
+            id="countryImportForm"
+            method="post"
+            action="{% url 'country_import_excel' %}"
+            enctype="multipart/form-data"
+            class="d-inline"
+          >
+            {% csrf_token %}
+            <input
+              type="file"
+              id="countryExcelFileInput"
+              name="excel_file"
+              accept=".xlsx,.xlsm,.xltx,.xltm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              class="d-none"
+              required
+            >
+            <button type="button" id="countryImportBtn" class="eal-btn eal-btn-outline">
+              <i class="bi bi-upload"></i>
+              <span>{% translate "Import Excel" %}</span>
+            </button>
+          </form>
+          <a href="{% url 'country_sample_excel' %}" class="eal-btn eal-btn-outline">
+            <i class="bi bi-file-earmark-arrow-down"></i>
+            <span>{% translate "Sample Excel" %}</span>
+          </a>
           <a href="{% url 'country_create' %}" class="eal-btn eal-btn-primary">
             <i class="bi bi-plus-lg"></i>
             <span>{% translate "Add Country" %}</span>
@@ -75,17 +100,6 @@
     </div>
   </div>
 </div>
-
-{% if messages %}
-  <div style="margin-bottom: 16px">
-    {% for message in messages %}
-      <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags|default:'info' }}{% endif %} alert-dismissible fade show" role="alert">
-        {{ message }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-      </div>
-    {% endfor %}
-  </div>
-{% endif %}
 
 <div class="eal-table-card">
   <form method="get" action="{% url 'country_list' %}" class="eal-toolbar">
@@ -268,6 +282,23 @@
 </div>
 
 <script>
+  (function () {
+    var importBtn = document.getElementById('countryImportBtn');
+    var fileInput = document.getElementById('countryExcelFileInput');
+    var importForm = document.getElementById('countryImportForm');
+    if (!importBtn || !fileInput || !importForm) return;
+
+    importBtn.addEventListener('click', function () {
+      fileInput.click();
+    });
+
+    fileInput.addEventListener('change', function () {
+      if (fileInput.files && fileInput.files.length > 0) {
+        importForm.submit();
+      }
+    });
+  })();
+
   document.querySelectorAll('[data-delete-url]')
     .forEach(btn => {
       btn.addEventListener('click', function() {

@@ -1,0 +1,636 @@
+{% extends 'iroad_tenants/base.html' %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}Client Contacts List | iRoad Admin{% endblock %}
+
+{% block breadcrumb %}{% endblock %}
+
+{% block content %}
+<!-- Top Header -->
+      
+
+      
+      <div class="page-header">
+        <nav aria-label="breadcrumb">
+          <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+              <a href="{% url 'iroad_tenants:tenant_dashboard' %}">Dashboard</a>
+            </li>
+            <li class="breadcrumb-item">CRM</li>
+            <li class="breadcrumb-item">Clients Management</li>
+            <li class="breadcrumb-item active" aria-current="page">
+              Client Contacts List
+            </li>
+          </ol>
+        </nav>
+
+        <div class="page-header-row">
+          <div class="page-header-left">
+            <h1 class="page-title">Client Contacts List</h1>
+            <p class="page-subtitle">
+              Manage and view all registered client contacts
+            </p>
+          </div>
+          <div class="page-header-right">
+            <div class="eal-header-actions">
+              <button class="eal-btn eal-btn-outline">
+                <i class="bi bi-download"></i>
+                <span>Export</span>
+              </button>
+              <a href="{% url 'iroad_tenants:tenant_client_contacts' %}" class="eal-btn eal-btn-primary">
+                <i class="bi bi-plus-lg"></i>
+                <span>Add Contact</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stats Row -->
+      <div class="eal-stats-row">
+        <div class="eal-stat-card">
+          <div class="eal-stat-icon purple">
+            <i class="bi bi-people-fill"></i>
+          </div>
+          <div>
+            <div class="eal-stat-value">12</div>
+            <div class="eal-stat-label">Total Contacts</div>
+          </div>
+        </div>
+        <div class="eal-stat-card">
+          <div class="eal-stat-icon blue">
+            <i class="bi bi-star-fill"></i>
+          </div>
+          <div>
+            <div class="eal-stat-value">5</div>
+            <div class="eal-stat-label">Primary Contacts</div>
+          </div>
+        </div>
+        <div class="eal-stat-card">
+          <div class="eal-stat-icon green">
+            <i class="bi bi-person-badge"></i>
+          </div>
+          <div>
+            <div class="eal-stat-value">7</div>
+            <div class="eal-stat-label">Secondary Contacts</div>
+          </div>
+        </div>
+        <div class="eal-stat-card">
+          <div class="eal-stat-icon amber">
+            <i class="bi bi-building"></i>
+          </div>
+          <div>
+            <div class="eal-stat-value">6</div>
+            <div class="eal-stat-label">Client Accounts</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Table Card -->
+      <div class="eal-table-card">
+        <!-- Toolbar -->
+        <div class="eal-toolbar">
+          <div class="eal-toolbar-left">
+            <div class="eal-search">
+              <i class="bi bi-search"></i>
+              <input type="text" placeholder="Search contacts..." />
+            </div>
+            <div class="eal-chip-group">
+              <button class="eal-chip active">All</button>
+              <button class="eal-chip">
+                <i class="bi bi-star"></i>
+                Primary
+              </button>
+              <button class="eal-chip">
+                <i class="bi bi-person"></i>
+                Secondary
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Table -->
+        <div class="eal-table-wrap">
+          <table class="eal-table">
+            <thead>
+              <tr>
+                <th class="eal-col-check">
+                  <input
+                    type="checkbox"
+                    class="eal-custom-check"
+                    id="ealSelectAll"
+                  />
+                </th>
+                <th>
+                  Client Account
+                  <span class="sort-indicator">
+                    <i class="bi bi-caret-up-fill"></i>
+                    <i class="bi bi-caret-down-fill"></i>
+                  </span>
+                </th>
+                <th>
+                  Name
+                  <span class="sort-indicator">
+                    <i class="bi bi-caret-up-fill"></i>
+                    <i class="bi bi-caret-down-fill"></i>
+                  </span>
+                </th>
+                <th>
+                  Email
+                  <span class="sort-indicator">
+                    <i class="bi bi-caret-up-fill"></i>
+                    <i class="bi bi-caret-down-fill"></i>
+                  </span>
+                </th>
+                <th>
+                  Mobile Number
+                  <span class="sort-indicator">
+                    <i class="bi bi-caret-up-fill"></i>
+                    <i class="bi bi-caret-down-fill"></i>
+                  </span>
+                </th>
+                <th>Telephone Number</th>
+                <th>Extension</th>
+                <th>Position</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Row 1 -->
+              <tr>
+                <td class="eal-col-check">
+                  <input type="checkbox" class="eal-custom-check" />
+                </td>
+                <td>
+                  <span class="eal-entity-id">CA-000123</span>
+                </td>
+                <td>
+                  <div class="eal-name-cell">
+                    <span class="eal-name-text">Ayman Al Harbi</span>
+                  </div>
+                </td>
+                <td>ayman.alharbi@alsafa.com</td>
+                <td>+966 50 123 4567</td>
+                <td>011 455 2100</td>
+                <td>104</td>
+                <td>Logistics Manager</td>
+                <td>
+                  <div class="eal-actions-cell">
+                    <button class="eal-row-btn" title="View">
+                      <i class="bi bi-eye"></i>
+                    </button>
+                    <button class="eal-row-btn" title="Edit">
+                      <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="eal-row-btn danger" title="Delete">
+                      <i class="bi bi-trash3"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <!-- Row 2 -->
+              <tr>
+                <td class="eal-col-check">
+                  <input type="checkbox" class="eal-custom-check" />
+                </td>
+                <td>
+                  <span class="eal-entity-id">CA-000123</span>
+                </td>
+                <td>
+                  <div class="eal-name-cell">
+                    <span class="eal-name-text">Sara Al Rasheed</span>
+                  </div>
+                </td>
+                <td>sara.rasheed@alsafa.com</td>
+                <td>+966 55 987 1144</td>
+                <td>011 455 2100</td>
+                <td>112</td>
+                <td>Operations Coordinator</td>
+                <td>
+                  <div class="eal-actions-cell">
+                    <button class="eal-row-btn" title="View">
+                      <i class="bi bi-eye"></i>
+                    </button>
+                    <button class="eal-row-btn" title="Edit">
+                      <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="eal-row-btn danger" title="Delete">
+                      <i class="bi bi-trash3"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <!-- Row 3 -->
+              <tr>
+                <td class="eal-col-check">
+                  <input type="checkbox" class="eal-custom-check" />
+                </td>
+                <td>
+                  <span class="eal-entity-id">CA-000122</span>
+                </td>
+                <td>
+                  <div class="eal-name-cell">
+                    <span class="eal-name-text">Hassan Nouri</span>
+                  </div>
+                </td>
+                <td>hassan.nouri@riyadhtrading.com</td>
+                <td>+966 50 222 9010</td>
+                <td>011 460 9000</td>
+                <td>201</td>
+                <td>Supply Lead</td>
+                <td>
+                  <div class="eal-actions-cell">
+                    <button class="eal-row-btn" title="View">
+                      <i class="bi bi-eye"></i>
+                    </button>
+                    <button class="eal-row-btn" title="Edit">
+                      <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="eal-row-btn danger" title="Delete">
+                      <i class="bi bi-trash3"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <!-- Row 4 -->
+              <tr>
+                <td class="eal-col-check">
+                  <input type="checkbox" class="eal-custom-check" />
+                </td>
+                <td>
+                  <span class="eal-entity-id">CA-000121</span>
+                </td>
+                <td>
+                  <div class="eal-name-cell">
+                    <span class="eal-name-text">Lina Qasim</span>
+                  </div>
+                </td>
+                <td>lina.qasim@desertstar.ae</td>
+                <td>+971 50 332 1100</td>
+                <td>04 221 7788</td>
+                <td>88</td>
+                <td>Account Executive</td>
+                <td>
+                  <div class="eal-actions-cell">
+                    <button class="eal-row-btn" title="View">
+                      <i class="bi bi-eye"></i>
+                    </button>
+                    <button class="eal-row-btn" title="Edit">
+                      <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="eal-row-btn danger" title="Delete">
+                      <i class="bi bi-trash3"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <!-- Row 5 -->
+              <tr>
+                <td class="eal-col-check">
+                  <input type="checkbox" class="eal-custom-check" />
+                </td>
+                <td>
+                  <span class="eal-entity-id">CA-000120</span>
+                </td>
+                <td>
+                  <div class="eal-name-cell">
+                    <span class="eal-name-text">Mariam Al Qahtani</span>
+                  </div>
+                </td>
+                <td>mariam.qahtani@private.me</td>
+                <td>+966 56 123 8899</td>
+                <td>011 401 4421</td>
+                <td>N/A</td>
+                <td>Owner</td>
+                <td>
+                  <div class="eal-actions-cell">
+                    <button class="eal-row-btn" title="View">
+                      <i class="bi bi-eye"></i>
+                    </button>
+                    <button class="eal-row-btn" title="Edit">
+                      <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="eal-row-btn danger" title="Delete">
+                      <i class="bi bi-trash3"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <!-- Row 6 -->
+              <tr>
+                <td class="eal-col-check">
+                  <input type="checkbox" class="eal-custom-check" />
+                </td>
+                <td>
+                  <span class="eal-entity-id">CA-000119</span>
+                </td>
+                <td>
+                  <div class="eal-name-cell">
+                    <span class="eal-name-text">Nasser Al Saeed</span>
+                  </div>
+                </td>
+                <td>nasser@blueocean.com</td>
+                <td>+966 55 443 2200</td>
+                <td>012 678 5551</td>
+                <td>77</td>
+                <td>Import Lead</td>
+                <td>
+                  <div class="eal-actions-cell">
+                    <button class="eal-row-btn" title="View">
+                      <i class="bi bi-eye"></i>
+                    </button>
+                    <button class="eal-row-btn" title="Edit">
+                      <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="eal-row-btn danger" title="Delete">
+                      <i class="bi bi-trash3"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <!-- Row 7 -->
+              <tr>
+                <td class="eal-col-check">
+                  <input type="checkbox" class="eal-custom-check" />
+                </td>
+                <td>
+                  <span class="eal-entity-id">CA-000118</span>
+                </td>
+                <td>
+                  <div class="eal-name-cell">
+                    <span class="eal-name-text">Reem Al Zahrani</span>
+                  </div>
+                </td>
+                <td>reem@jeddahfresh.com</td>
+                <td>+966 54 901 3322</td>
+                <td>012 660 1200</td>
+                <td>45</td>
+                <td>Dispatch Supervisor</td>
+                <td>
+                  <div class="eal-actions-cell">
+                    <button class="eal-row-btn" title="View">
+                      <i class="bi bi-eye"></i>
+                    </button>
+                    <button class="eal-row-btn" title="Edit">
+                      <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="eal-row-btn danger" title="Delete">
+                      <i class="bi bi-trash3"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <!-- Row 8 -->
+              <tr>
+                <td class="eal-col-check">
+                  <input type="checkbox" class="eal-custom-check" />
+                </td>
+                <td>
+                  <span class="eal-entity-id">CA-000117</span>
+                </td>
+                <td>
+                  <div class="eal-name-cell">
+                    <span class="eal-name-text">Yousef Kareem</span>
+                  </div>
+                </td>
+                <td>yousef@globalmed.com</td>
+                <td>+966 53 889 1100</td>
+                <td>011 777 8011</td>
+                <td>305</td>
+                <td>Procurement</td>
+                <td>
+                  <div class="eal-actions-cell">
+                    <button class="eal-row-btn" title="View">
+                      <i class="bi bi-eye"></i>
+                    </button>
+                    <button class="eal-row-btn" title="Edit">
+                      <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="eal-row-btn danger" title="Delete">
+                      <i class="bi bi-trash3"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <!-- Row 9 -->
+              <tr>
+                <td class="eal-col-check">
+                  <input type="checkbox" class="eal-custom-check" />
+                </td>
+                <td>
+                  <span class="eal-entity-id">CA-000116</span>
+                </td>
+                <td>
+                  <div class="eal-name-cell">
+                    <span class="eal-name-text">Ahmed Khan</span>
+                  </div>
+                </td>
+                <td>ahmed.khan@example.com</td>
+                <td>+91 98 2211 4400</td>
+                <td>011 490 7711</td>
+                <td>18</td>
+                <td>Client Liaison</td>
+                <td>
+                  <div class="eal-actions-cell">
+                    <button class="eal-row-btn" title="View">
+                      <i class="bi bi-eye"></i>
+                    </button>
+                    <button class="eal-row-btn" title="Edit">
+                      <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="eal-row-btn danger" title="Delete">
+                      <i class="bi bi-trash3"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <!-- Row 10 -->
+              <tr>
+                <td class="eal-col-check">
+                  <input type="checkbox" class="eal-custom-check" />
+                </td>
+                <td>
+                  <span class="eal-entity-id">CA-000115</span>
+                </td>
+                <td>
+                  <div class="eal-name-cell">
+                    <span class="eal-name-text">Faisal Al Sabah</span>
+                  </div>
+                </td>
+                <td>faisal@kuwaitsteel.com</td>
+                <td>+965 50 112 3344</td>
+                <td>00965 2244 1100</td>
+                <td>10</td>
+                <td>Project Manager</td>
+                <td>
+                  <div class="eal-actions-cell">
+                    <button class="eal-row-btn" title="View">
+                      <i class="bi bi-eye"></i>
+                    </button>
+                    <button class="eal-row-btn" title="Edit">
+                      <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="eal-row-btn danger" title="Delete">
+                      <i class="bi bi-trash3"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Pagination -->
+        <div class="eal-pagination">
+          <div class="eal-pagination-info">
+            Showing
+            <strong>1-10</strong>
+            of
+            <strong>10</strong>
+            contacts
+          </div>
+          <div class="eal-pagination-controls">
+            <button class="eal-page-btn" title="Previous">
+              <i class="bi bi-chevron-left"></i>
+            </button>
+            <button class="eal-page-btn active">1</button>
+            <button class="eal-page-btn" title="Next">
+              <i class="bi bi-chevron-right"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+      <!-- ========== END NEW TABLE UI DESIGN ========== -->
+{% endblock %}
+
+{% block extra_js %}
+<script>
+      (function () {
+        const panel = document.getElementById("detailPanel");
+        const overlay = document.getElementById("detailPanelOverlay");
+        const closeBtn = document.getElementById("detailCloseBtn");
+        const prevBtn = document.getElementById("detailPrevBtn");
+        const nextBtn = document.getElementById("detailNextBtn");
+        const rows = document.querySelectorAll(".eal-table tbody tr");
+        let currentIndex = -1;
+
+        /* ---- helpers ---- */
+        function txt(el) {
+          return el ? el.textContent.trim() : "Not provided";
+        }
+
+        function openPanel() {
+          panel.classList.add("active");
+          overlay.classList.add("active");
+          document.body.style.overflow = "hidden";
+        }
+
+        function closePanel() {
+          panel.classList.remove("active");
+          overlay.classList.remove("active");
+          document.body.style.overflow = "";
+          rows.forEach(function (r) {
+            r.classList.remove("row-selected");
+          });
+          currentIndex = -1;
+        }
+
+        function populatePanel(row) {
+          const cells = row.querySelectorAll("td");
+          // cells index: 0=check, 1=clientAccount, 2=name, 3=email,
+          //              4=mobile, 5=telephone, 6=extension,
+          //              7=position, 8=actions
+
+          document.getElementById("dpClientAccount").textContent = txt(
+            cells[1],
+          );
+
+          const nameEl = cells[2]
+            ? cells[2].querySelector(".eal-name-text")
+            : null;
+          const contactName = nameEl
+            ? nameEl.textContent.trim()
+            : "Not provided";
+          document.getElementById("dpContactName").textContent = contactName;
+
+          document.getElementById("dpEmail").textContent = txt(cells[3]);
+          document.getElementById("dpMobile").textContent = txt(cells[4]);
+          document.getElementById("dpTelephone").textContent = txt(cells[5]);
+          document.getElementById("dpExtension").textContent = txt(cells[6]);
+          document.getElementById("dpPosition").textContent = txt(cells[7]);
+
+          // Highlight the selected row
+          rows.forEach(function (r) {
+            r.classList.remove("row-selected");
+          });
+          row.classList.add("row-selected");
+        }
+
+        function showRow(index) {
+          if (index < 0 || index >= rows.length) return;
+
+          currentIndex = index;
+          populatePanel(rows[currentIndex]);
+          prevBtn.disabled = currentIndex === 0;
+          nextBtn.disabled = currentIndex === rows.length - 1;
+        }
+
+        /* ---- event listeners ---- */
+        rows.forEach(function (row, idx) {
+          row.style.cursor = "pointer";
+          row.addEventListener("click", function (e) {
+            // Don't trigger on checkbox or action button clicks
+            if (
+              e.target.closest(".eal-col-check") ||
+              e.target.closest(".eal-actions-cell") ||
+              e.target.closest('input[type="checkbox"]')
+            ) {
+              return;
+            }
+            currentIndex = idx;
+            showRow(currentIndex);
+            openPanel();
+          });
+        });
+
+        closeBtn.addEventListener("click", closePanel);
+        overlay.addEventListener("click", closePanel);
+
+        prevBtn.addEventListener("click", function () {
+          if (currentIndex > 0) showRow(currentIndex - 1);
+        });
+
+        nextBtn.addEventListener("click", function () {
+          if (currentIndex < rows.length - 1) showRow(currentIndex + 1);
+        });
+
+        document.addEventListener("keydown", function (e) {
+          if (!panel.classList.contains("active")) return;
+
+          if (e.key === "Escape") closePanel();
+
+          if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
+            e.preventDefault();
+            if (currentIndex > 0) showRow(currentIndex - 1);
+          }
+          if (e.key === "ArrowDown" || e.key === "ArrowRight") {
+            e.preventDefault();
+            if (currentIndex < rows.length - 1) showRow(currentIndex + 1);
+          }
+        });
+
+        // View button also opens panel
+        document
+          .querySelectorAll('.eal-row-btn[title="View"]')
+          .forEach(function (btn, idx) {
+            btn.addEventListener("click", function (e) {
+              e.stopPropagation();
+              currentIndex = idx;
+              showRow(currentIndex);
+              openPanel();
+            });
+          });
+      })();
+    </script>
+{% endblock %}

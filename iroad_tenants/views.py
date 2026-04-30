@@ -236,6 +236,7 @@ class TenantSubscriptionPlanView(View):
         if not selected_currency:
             selected_currency = (
                 PlanPricingCycle.objects.select_related('currency')
+                .filter(is_admin_only_cycle=False)
                 .order_by('currency__currency_code')
                 .values_list('currency__currency_code', flat=True)
                 .first()
@@ -249,13 +250,22 @@ class TenantSubscriptionPlanView(View):
                 or ''
             )
 
+        eligible_plan_ids = PlanPricingCycle.objects.filter(
+            is_admin_only_cycle=False,
+            plan__is_active=True,
+            plan__is_deleted=False,
+        ).values_list('plan_id', flat=True).distinct()
         plans = list(
-            SubscriptionPlan.objects.filter(is_active=True, is_deleted=False)
+            SubscriptionPlan.objects.filter(
+                is_active=True,
+                is_deleted=False,
+                plan_id__in=eligible_plan_ids,
+            )
             .order_by('plan_name_en')
         )
         pricing_rows = (
             PlanPricingCycle.objects.select_related('currency')
-            .filter(plan__in=plans, number_of_cycles__in=[1, 12])
+            .filter(plan__in=plans, number_of_cycles__in=[1, 12], is_admin_only_cycle=False)
             .order_by('plan__plan_name_en', 'number_of_cycles', 'currency__currency_code')
         )
         pricing_map = {}
@@ -387,6 +397,7 @@ class TenantSubscriptionPlanView(View):
             plan=plan,
             currency=currency,
             number_of_cycles=selected_cycle,
+            is_admin_only_cycle=False,
         ).first()
         if not pricing_row:
             messages.error(
@@ -1062,33 +1073,57 @@ def _build_role_permission_changes_context(request):
 def _build_critical_account_changes_context(request):
     auth_payload = get_tenant_portal_cookie_payload(request) or {}
     tenant_id = str(auth_payload.get('tenant_id') or '').strip()
+    search_query = (request.GET.get('search') or '').strip()
+    if not tenant_id:
+        empty_page = Paginator([], 10).get_page(1)
+        return {
+            'critical_account_total_changes': 0,
+            'critical_account_billing_updates': 0,
+            'critical_account_security_updates': 0,
+            'critical_account_critical_alerts': 0,
+            'critical_account_rows': [],
+            'critical_account_page_obj': empty_page,
+            'critical_account_search_query': search_query,
+        }
+
     tenant_actor_label = 'Tenant Admin'
-    if tenant_id:
-        tenant_obj = TenantProfile.objects.filter(pk=tenant_id).first()
-        if tenant_obj:
-            tenant_actor_label = (
-                tenant_obj.primary_email
-                or tenant_obj.company_name
-                or tenant_actor_label
-            )
-        session_data = get_tenant_session(
-            tenant_id,
-            str(auth_payload.get('jti') or '').strip(),
-        ) or {}
-        reference_id = str(session_data.get('reference_id') or '').strip()
-        if reference_id and reference_id != tenant_id:
-            tenant_registry = _activate_tenant_workspace_schema(request)
-            if tenant_registry is not None:
-                try:
-                    tenant_user = TenantUser.objects.filter(pk=reference_id).first()
-                    if tenant_user:
-                        tenant_actor_label = (
-                            tenant_user.full_name
-                            or tenant_user.email
-                            or tenant_actor_label
-                        )
-                finally:
-                    connection.set_schema_to_public()
+    tenant_user_map = {}
+    tenant_user_ids = []
+    tenant_obj = TenantProfile.objects.filter(pk=tenant_id).first()
+    if tenant_obj:
+        tenant_actor_label = (
+            tenant_obj.primary_email
+            or tenant_obj.company_name
+            or tenant_actor_label
+        )
+    session_data = get_tenant_session(
+        tenant_id,
+        str(auth_payload.get('jti') or '').strip(),
+    ) or {}
+    reference_id = str(session_data.get('reference_id') or '').strip()
+    tenant_registry = _activate_tenant_workspace_schema(request)
+    if tenant_registry is not None:
+        try:
+            for user in TenantUser.objects.values('user_id', 'full_name', 'email'):
+                user_id = str(user.get('user_id') or '').strip()
+                if not user_id:
+                    continue
+                tenant_user_ids.append(user_id)
+                tenant_user_map[user_id] = (
+                    (user.get('full_name') or '').strip()
+                    or (user.get('email') or '').strip()
+                )
+
+            if reference_id and reference_id != tenant_id:
+                tenant_user = TenantUser.objects.filter(pk=reference_id).first()
+                if tenant_user:
+                    tenant_actor_label = (
+                        tenant_user.full_name
+                        or tenant_user.email
+                        or tenant_actor_label
+                    )
+        finally:
+            connection.set_schema_to_public()
 
     security_terms = (
         Q(module_name__icontains='security')
@@ -1102,7 +1137,7 @@ def _build_critical_account_changes_context(request):
         | Q(module_name__icontains='payment')
         | Q(module_name__icontains='subscription')
     )
-    critical_qs = AuditLog.objects.filter(
+    module_scope_q = Q(
         Q(module_name__icontains='security')
         | Q(module_name__icontains='auth')
         | Q(module_name__icontains='session')
@@ -1112,7 +1147,32 @@ def _build_critical_account_changes_context(request):
         | Q(module_name__icontains='payment')
         | Q(module_name__icontains='subscription')
         | Q(module_name__icontains='tenant')
-    ).select_related('admin').order_by('-timestamp')
+        | Q(module_name__icontains='crm')
+        | Q(module_name__icontains='note')
+    )
+    tenant_scope_q = (
+        Q(record_id=tenant_id)
+        | Q(old_payload__contains={'tenant_id': tenant_id})
+        | Q(new_payload__contains={'tenant_id': tenant_id})
+        | Q(old_payload__contains={'tenant_profile': tenant_id})
+        | Q(new_payload__contains={'tenant_profile': tenant_id})
+        | Q(old_payload__contains={'tenant': tenant_id})
+        | Q(new_payload__contains={'tenant': tenant_id})
+    )
+    if tenant_user_ids:
+        tenant_scope_q |= Q(record_id__in=tenant_user_ids)
+
+    critical_qs = AuditLog.objects.filter(module_scope_q & tenant_scope_q).select_related('admin')
+    if search_query:
+        critical_qs = critical_qs.filter(
+            Q(action_type__icontains=search_query)
+            | Q(module_name__icontains=search_query)
+            | Q(record_id__icontains=search_query)
+            | Q(admin__email__icontains=search_query)
+            | Q(admin__first_name__icontains=search_query)
+            | Q(admin__last_name__icontains=search_query)
+        )
+    critical_qs = critical_qs.order_by('-timestamp')
     paginator = Paginator(critical_qs, 10)
     page_obj = paginator.get_page(request.GET.get('page'))
     logs = list(page_obj.object_list)
@@ -1135,10 +1195,18 @@ def _build_critical_account_changes_context(request):
             normalized_module = 'Security Settings'
         else:
             normalized_module = 'Tenant Config'
+        record_id = str(log.record_id or '').strip()
+        performed_by_user = tenant_user_map.get(record_id, '')
+        performed_by_admin = ''
+        if log.admin_id and log.admin:
+            performed_by_admin = (
+                f'{(log.admin.first_name or "").strip()} {(log.admin.last_name or "").strip()}'.strip()
+                or (log.admin.email or '').strip()
+            )
         performed_by = (
-            tenant_actor_label
-            or getattr(log.admin, 'full_name', '')
-            or getattr(log.admin, 'email', '')
+            performed_by_user
+            or performed_by_admin
+            or tenant_actor_label
             or 'Tenant Admin'
         )
         rows.append(
@@ -1158,6 +1226,7 @@ def _build_critical_account_changes_context(request):
         'critical_account_critical_alerts': critical_alerts,
         'critical_account_rows': rows,
         'critical_account_page_obj': page_obj,
+        'critical_account_search_query': search_query,
     }
 
 
@@ -1210,6 +1279,64 @@ class TenantLoginSessionEventsView(View):
             'iroad_tenants/Audit_log/Login--session-events.html',
             context,
         )
+
+
+class TenantSimplePageView(View):
+    """Render tenant templates via GET only."""
+
+    template_name = ''
+
+    def get(self, request):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        return render(request, self.template_name, context)
+
+
+class TenantClientAccountView(TenantSimplePageView):
+    template_name = 'iroad_tenants/Clients_Management/Client-account.html'
+
+
+class TenantClientAccountSettingsView(TenantSimplePageView):
+    template_name = 'iroad_tenants/Clients_Management/Client-account-setting.html'
+
+
+class TenantClientAccountCreateView(TenantSimplePageView):
+    template_name = 'iroad_tenants/Clients_Management/Client-account-new.html'
+
+
+class TenantClientAttachmentsView(TenantSimplePageView):
+    template_name = 'iroad_tenants/Clients_Management/Client-attachments.html'
+
+
+class TenantClientAttachmentsListView(TenantSimplePageView):
+    template_name = 'iroad_tenants/Clients_Management/Client-attachments-list.html'
+
+
+class TenantClientContactsView(TenantSimplePageView):
+    template_name = 'iroad_tenants/Clients_Management/Client-contacts.html'
+
+
+class TenantClientContactsListView(TenantSimplePageView):
+    template_name = 'iroad_tenants/Clients_Management/Client-contacts-list.html'
+
+
+class TenantClientContractView(TenantSimplePageView):
+    template_name = 'iroad_tenants/Clients_Management/Client-contract.html'
+
+
+class TenantClientContractListView(TenantSimplePageView):
+    template_name = 'iroad_tenants/Clients_Management/Client-contract-list.html'
+
+
+class TenantClientContractSettingsView(TenantSimplePageView):
+    template_name = 'iroad_tenants/Clients_Management/Client-contract-settings.html'
+
+
+class TenantClientDetailsView(TenantSimplePageView):
+    template_name = 'iroad_tenants/Clients_Management/client-details.html'
 
 
 class TenantMyAccountView(View):
@@ -1500,13 +1627,23 @@ class TenantUsersAdministrationView(View):
             clear_tenant_portal_cookie(response, request=request)
             return response
         try:
-            tenant_users = list(
-                TenantUser.objects.all().order_by('-created_at', '-updated_at')[:100]
-            )
-            total_users = len(tenant_users)
-            active_users = sum(1 for user in tenant_users if user.status == TenantUser.Status.ACTIVE)
+            search_query = (request.GET.get('q') or '').strip()
+            users_qs = TenantUser.objects.all()
+            if search_query:
+                users_qs = users_qs.filter(
+                    Q(full_name__icontains=search_query)
+                    | Q(email__icontains=search_query)
+                    | Q(role_name__icontains=search_query)
+                    | Q(username__icontains=search_query)
+                    | Q(tenant_ref_no__icontains=search_query)
+                )
+            tenant_users = list(users_qs.order_by('-created_at', '-updated_at')[:100])
+
+            all_users_qs = TenantUser.objects.all()
+            total_users = all_users_qs.count()
+            active_users = all_users_qs.filter(status=TenantUser.Status.ACTIVE).count()
             inactive_users = total_users - active_users
-            locked_accounts = sum(1 for user in tenant_users if user.login_attempts >= 3)
+            locked_accounts = all_users_qs.filter(login_attempts__gte=3).count()
             context.update(
                 {
                     'tenant_users': tenant_users,
@@ -1514,6 +1651,7 @@ class TenantUsersAdministrationView(View):
                     'users_active_count': active_users,
                     'users_inactive_count': inactive_users,
                     'users_locked_count': locked_accounts,
+                    'search_query': search_query,
                     'tenant_schema_name': tenant_registry.schema_name,
                 }
             )

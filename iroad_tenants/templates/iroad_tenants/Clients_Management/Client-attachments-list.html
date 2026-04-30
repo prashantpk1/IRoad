@@ -1,0 +1,711 @@
+{% extends 'iroad_tenants/base.html' %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}Client Attachments List | iRoad Admin{% endblock %}
+
+{% block breadcrumb %}{% endblock %}
+
+{% block content %}
+<!-- Top Header -->
+      
+
+      
+      <div class="page-header">
+        <nav aria-label="breadcrumb">
+          <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+              <a href="{% url 'iroad_tenants:tenant_dashboard' %}">Dashboard</a>
+            </li>
+            <li class="breadcrumb-item">CRM</li>
+            <li class="breadcrumb-item">Clients Management</li>
+            <li class="breadcrumb-item active" aria-current="page">
+              Client Attachments List
+            </li>
+          </ol>
+        </nav>
+
+        <div class="page-header-row">
+          <div class="page-header-left">
+            <h1 class="page-title">Client Attachments List</h1>
+            <p class="page-subtitle">
+              Manage and view all client attachment records
+            </p>
+          </div>
+          <div class="page-header-right">
+            <div class="eal-header-actions">
+              <button class="eal-btn eal-btn-outline">
+                <i class="bi bi-download"></i>
+                <span>Export</span>
+              </button>
+              <a href="{% url 'iroad_tenants:tenant_client_attachments' %}" class="eal-btn eal-btn-primary">
+                <i class="bi bi-plus-lg"></i>
+                <span>Add Attachment</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stats Row -->
+      <div class="eal-stats-row">
+        <div class="eal-stat-card">
+          <div class="eal-stat-icon purple">
+            <i class="bi bi-paperclip"></i>
+          </div>
+          <div>
+            <div class="eal-stat-value">8</div>
+            <div class="eal-stat-label">Total Attachments</div>
+          </div>
+        </div>
+        <div class="eal-stat-card">
+          <div class="eal-stat-icon green">
+            <i class="bi bi-check-circle-fill"></i>
+          </div>
+          <div>
+            <div class="eal-stat-value">5</div>
+            <div class="eal-stat-label">Active</div>
+          </div>
+        </div>
+        <div class="eal-stat-card">
+          <div class="eal-stat-icon amber">
+            <i class="bi bi-dash-circle-fill"></i>
+          </div>
+          <div>
+            <div class="eal-stat-value">1</div>
+            <div class="eal-stat-label">Inactive</div>
+          </div>
+        </div>
+        <div class="eal-stat-card">
+          <div class="eal-stat-icon blue">
+            <i class="bi bi-clock-history"></i>
+          </div>
+          <div>
+            <div class="eal-stat-value">2</div>
+            <div class="eal-stat-label">Expired</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Table Card -->
+      <div class="eal-table-card">
+        <!-- Toolbar -->
+        <div class="eal-toolbar">
+          <div class="eal-toolbar-left">
+            <div class="eal-search">
+              <i class="bi bi-search"></i>
+              <input type="text" placeholder="Search attachments..." />
+            </div>
+            <div class="eal-chip-group">
+              <button class="eal-chip active">All</button>
+              <button class="eal-chip">
+                <i class="bi bi-check-circle"></i>
+                Active
+              </button>
+              <button class="eal-chip">
+                <i class="bi bi-x-circle"></i>
+                Expired
+              </button>
+              <button class="eal-chip">
+                <i class="bi bi-clock"></i>
+                Inactive
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Table -->
+        <div class="eal-table-wrap">
+          <table class="eal-table">
+            <thead>
+              <tr>
+                <th class="eal-col-check">
+                  <input
+                    type="checkbox"
+                    class="eal-custom-check"
+                    id="ealSelectAll"
+                  />
+                </th>
+                <th>
+                  Attachment ID
+                  <span class="sort-indicator">
+                    <i class="bi bi-caret-up-fill"></i>
+                    <i class="bi bi-caret-down-fill"></i>
+                  </span>
+                </th>
+                <th>
+                  Client Account
+                  <span class="sort-indicator">
+                    <i class="bi bi-caret-up-fill"></i>
+                    <i class="bi bi-caret-down-fill"></i>
+                  </span>
+                </th>
+                <th>
+                  Attachment Date
+                  <span class="sort-indicator">
+                    <i class="bi bi-caret-up-fill"></i>
+                    <i class="bi bi-caret-down-fill"></i>
+                  </span>
+                </th>
+                <th>
+                  Expiry Applicable
+                  <span class="sort-indicator">
+                    <i class="bi bi-caret-up-fill"></i>
+                    <i class="bi bi-caret-down-fill"></i>
+                  </span>
+                </th>
+                <th>
+                  Expiry Date
+                  <span class="sort-indicator">
+                    <i class="bi bi-caret-up-fill"></i>
+                    <i class="bi bi-caret-down-fill"></i>
+                  </span>
+                </th>
+                <th>File Name</th>
+                <th>
+                  Status
+                  <span class="sort-indicator">
+                    <i class="bi bi-caret-up-fill"></i>
+                    <i class="bi bi-caret-down-fill"></i>
+                  </span>
+                </th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Row 1 -->
+              <tr>
+                <td class="eal-col-check">
+                  <input type="checkbox" class="eal-custom-check" />
+                </td>
+                <td>
+                  <span class="eal-entity-id">ATT-000108</span>
+                </td>
+                <td>
+                  <div class="eal-name-cell">
+                    <span class="eal-name-text">Al Safa Logistics</span>
+                  </div>
+                </td>
+                <td>2026-01-15</td>
+                <td>
+                  <span class="eal-type-badge org">
+                    <i class="bi bi-check-lg"></i>
+                    Yes</span
+                  >
+                </td>
+                <td>2027-01-15</td>
+                <td>
+                  <span class="eal-pi-number">
+                    <i class="bi bi-file-earmark-pdf"></i>
+                    trade_license.pdf</span
+                  >
+                </td>
+                <td>
+                  <span class="status-badge active">Active</span>
+                </td>
+                <td>
+                  <div class="eal-actions-cell">
+                    <button class="eal-row-btn" title="View">
+                      <i class="bi bi-eye"></i>
+                    </button>
+                    <button class="eal-row-btn" title="Edit">
+                      <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="eal-row-btn danger" title="Delete">
+                      <i class="bi bi-trash3"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <!-- Row 2 -->
+              <tr>
+                <td class="eal-col-check">
+                  <input type="checkbox" class="eal-custom-check" />
+                </td>
+                <td>
+                  <span class="eal-entity-id">ATT-000107</span>
+                </td>
+                <td>
+                  <div class="eal-name-cell">
+                    <span class="eal-name-text">Riyadh Trading Co.</span>
+                  </div>
+                </td>
+                <td>2026-01-10</td>
+                <td>
+                  <span class="eal-type-badge org">
+                    <i class="bi bi-check-lg"></i>
+                    Yes</span
+                  >
+                </td>
+                <td>2026-07-10</td>
+                <td>
+                  <span class="eal-pi-number">
+                    <i class="bi bi-file-earmark-image"></i>
+                    insurance_cert.jpg</span
+                  >
+                </td>
+                <td>
+                  <span class="status-badge active">Active</span>
+                </td>
+                <td>
+                  <div class="eal-actions-cell">
+                    <button class="eal-row-btn" title="View">
+                      <i class="bi bi-eye"></i>
+                    </button>
+                    <button class="eal-row-btn" title="Edit">
+                      <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="eal-row-btn danger" title="Delete">
+                      <i class="bi bi-trash3"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <!-- Row 3 -->
+              <tr>
+                <td class="eal-col-check">
+                  <input type="checkbox" class="eal-custom-check" />
+                </td>
+                <td>
+                  <span class="eal-entity-id">ATT-000106</span>
+                </td>
+                <td>
+                  <div class="eal-name-cell">
+                    <span class="eal-name-text">Desert Star Transport</span>
+                  </div>
+                </td>
+                <td>2025-12-20</td>
+                <td>
+                  <span class="eal-type-badge org">
+                    <i class="bi bi-check-lg"></i>
+                    Yes</span
+                  >
+                </td>
+                <td>2026-02-20</td>
+                <td>
+                  <span class="eal-pi-number">
+                    <i class="bi bi-file-earmark-word"></i>
+                    contract_doc.docx</span
+                  >
+                </td>
+                <td>
+                  <span class="status-badge expired">Expired</span>
+                </td>
+                <td>
+                  <div class="eal-actions-cell">
+                    <button class="eal-row-btn" title="View">
+                      <i class="bi bi-eye"></i>
+                    </button>
+                    <button class="eal-row-btn" title="Edit">
+                      <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="eal-row-btn danger" title="Delete">
+                      <i class="bi bi-trash3"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <!-- Row 4 -->
+              <tr>
+                <td class="eal-col-check">
+                  <input type="checkbox" class="eal-custom-check" />
+                </td>
+                <td>
+                  <span class="eal-entity-id">ATT-000105</span>
+                </td>
+                <td>
+                  <div class="eal-name-cell">
+                    <span class="eal-name-text">Mariam Al Qahtani</span>
+                  </div>
+                </td>
+                <td>2026-01-05</td>
+                <td>
+                  <span class="eal-type-badge ind">
+                    <i class="bi bi-x-lg"></i>
+                    No</span
+                  >
+                </td>
+                <td>—</td>
+                <td>
+                  <span class="eal-pi-number">
+                    <i class="bi bi-file-earmark-pdf"></i>
+                    id_copy.pdf</span
+                  >
+                </td>
+                <td>
+                  <span class="status-badge active">Active</span>
+                </td>
+                <td>
+                  <div class="eal-actions-cell">
+                    <button class="eal-row-btn" title="View">
+                      <i class="bi bi-eye"></i>
+                    </button>
+                    <button class="eal-row-btn" title="Edit">
+                      <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="eal-row-btn danger" title="Delete">
+                      <i class="bi bi-trash3"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <!-- Row 5 -->
+              <tr>
+                <td class="eal-col-check">
+                  <input type="checkbox" class="eal-custom-check" />
+                </td>
+                <td>
+                  <span class="eal-entity-id">ATT-000104</span>
+                </td>
+                <td>
+                  <div class="eal-name-cell">
+                    <span class="eal-name-text">Blue Ocean Imports</span>
+                  </div>
+                </td>
+                <td>2025-11-30</td>
+                <td>
+                  <span class="eal-type-badge org">
+                    <i class="bi bi-check-lg"></i>
+                    Yes</span
+                  >
+                </td>
+                <td>2026-03-15</td>
+                <td>
+                  <span class="eal-pi-number">
+                    <i class="bi bi-file-earmark-excel"></i>
+                    financial_report.xlsx</span
+                  >
+                </td>
+                <td>
+                  <span class="status-badge inactive">Inactive</span>
+                </td>
+                <td>
+                  <div class="eal-actions-cell">
+                    <button class="eal-row-btn" title="View">
+                      <i class="bi bi-eye"></i>
+                    </button>
+                    <button class="eal-row-btn" title="Edit">
+                      <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="eal-row-btn danger" title="Delete">
+                      <i class="bi bi-trash3"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <!-- Row 6 -->
+              <tr>
+                <td class="eal-col-check">
+                  <input type="checkbox" class="eal-custom-check" />
+                </td>
+                <td>
+                  <span class="eal-entity-id">ATT-000103</span>
+                </td>
+                <td>
+                  <div class="eal-name-cell">
+                    <span class="eal-name-text">Jeddah Fresh Foods</span>
+                  </div>
+                </td>
+                <td>2025-10-01</td>
+                <td>
+                  <span class="eal-type-badge org">
+                    <i class="bi bi-check-lg"></i>
+                    Yes</span
+                  >
+                </td>
+                <td>2026-01-01</td>
+                <td>
+                  <span class="eal-pi-number">
+                    <i class="bi bi-file-earmark-pdf"></i>
+                    health_permit.pdf</span
+                  >
+                </td>
+                <td>
+                  <span class="status-badge expired">Expired</span>
+                </td>
+                <td>
+                  <div class="eal-actions-cell">
+                    <button class="eal-row-btn" title="View">
+                      <i class="bi bi-eye"></i>
+                    </button>
+                    <button class="eal-row-btn" title="Edit">
+                      <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="eal-row-btn danger" title="Delete">
+                      <i class="bi bi-trash3"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <!-- Row 7 -->
+              <tr>
+                <td class="eal-col-check">
+                  <input type="checkbox" class="eal-custom-check" />
+                </td>
+                <td>
+                  <span class="eal-entity-id">ATT-000102</span>
+                </td>
+                <td>
+                  <div class="eal-name-cell">
+                    <span class="eal-name-text">Global Medical Supplies</span>
+                  </div>
+                </td>
+                <td>2026-02-01</td>
+                <td>
+                  <span class="eal-type-badge ind">
+                    <i class="bi bi-x-lg"></i>
+                    No</span
+                  >
+                </td>
+                <td>—</td>
+                <td>
+                  <span class="eal-pi-number">
+                    <i class="bi bi-file-earmark-image"></i>
+                    warehouse_photo.png</span
+                  >
+                </td>
+                <td>
+                  <span class="status-badge active">Active</span>
+                </td>
+                <td>
+                  <div class="eal-actions-cell">
+                    <button class="eal-row-btn" title="View">
+                      <i class="bi bi-eye"></i>
+                    </button>
+                    <button class="eal-row-btn" title="Edit">
+                      <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="eal-row-btn danger" title="Delete">
+                      <i class="bi bi-trash3"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <!-- Row 8 -->
+              <tr>
+                <td class="eal-col-check">
+                  <input type="checkbox" class="eal-custom-check" />
+                </td>
+                <td>
+                  <span class="eal-entity-id">ATT-000101</span>
+                </td>
+                <td>
+                  <div class="eal-name-cell">
+                    <span class="eal-name-text">Kuwait Steel Works</span>
+                  </div>
+                </td>
+                <td>2026-01-20</td>
+                <td>
+                  <span class="eal-type-badge org">
+                    <i class="bi bi-check-lg"></i>
+                    Yes</span
+                  >
+                </td>
+                <td>2028-01-20</td>
+                <td>
+                  <span class="eal-pi-number">
+                    <i class="bi bi-file-earmark-pdf"></i>
+                    safety_cert.pdf</span
+                  >
+                </td>
+                <td>
+                  <span class="status-badge active">Active</span>
+                </td>
+                <td>
+                  <div class="eal-actions-cell">
+                    <button class="eal-row-btn" title="View">
+                      <i class="bi bi-eye"></i>
+                    </button>
+                    <button class="eal-row-btn" title="Edit">
+                      <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="eal-row-btn danger" title="Delete">
+                      <i class="bi bi-trash3"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Pagination -->
+        <div class="eal-pagination">
+          <div class="eal-pagination-info">
+            Showing
+            <strong>1-8</strong>
+            of
+            <strong>8</strong>
+            attachments
+          </div>
+          <div class="eal-pagination-controls">
+            <button class="eal-page-btn" title="Previous">
+              <i class="bi bi-chevron-left"></i>
+            </button>
+            <button class="eal-page-btn active">1</button>
+            <button class="eal-page-btn" title="Next">
+              <i class="bi bi-chevron-right"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+      <!-- ========== END NEW TABLE UI DESIGN ========== -->
+{% endblock %}
+
+{% block extra_js %}
+<script>
+      (function () {
+        const panel = document.getElementById("detailPanel");
+        const overlay = document.getElementById("detailPanelOverlay");
+        const closeBtn = document.getElementById("detailCloseBtn");
+        const prevBtn = document.getElementById("detailPrevBtn");
+        const nextBtn = document.getElementById("detailNextBtn");
+        const rows = document.querySelectorAll(".eal-table tbody tr");
+        let currentIndex = -1;
+
+        /* ---- helpers ---- */
+        function txt(el) {
+          return el ? el.textContent.trim() : "Not provided";
+        }
+
+        function openPanel() {
+          panel.classList.add("active");
+          overlay.classList.add("active");
+          document.body.style.overflow = "hidden";
+        }
+
+        function closePanel() {
+          panel.classList.remove("active");
+          overlay.classList.remove("active");
+          document.body.style.overflow = "";
+          rows.forEach(function (r) {
+            r.classList.remove("row-selected");
+          });
+          currentIndex = -1;
+        }
+
+        function populatePanel(row) {
+          const cells = row.querySelectorAll("td");
+          // cells index: 0=check, 1=attachmentId, 2=clientAccount,
+          //              3=attachmentDate, 4=expiryApplicable,
+          //              5=expiryDate, 6=fileName, 7=status, 8=actions
+
+          document.getElementById("dpAttachmentId").textContent = txt(cells[1]);
+
+          const nameEl = cells[2]
+            ? cells[2].querySelector(".eal-name-text")
+            : null;
+          document.getElementById("dpClientAccount").textContent = nameEl
+            ? nameEl.textContent.trim()
+            : "Not provided";
+
+          document.getElementById("dpAttachmentDate").textContent = txt(
+            cells[3],
+          );
+
+          const expiryBadge = cells[4]
+            ? cells[4].querySelector(".eal-type-badge")
+            : null;
+          document.getElementById("dpExpiryApplicable").textContent =
+            expiryBadge ? expiryBadge.textContent.trim() : "Not provided";
+
+          document.getElementById("dpExpiryDate").textContent = txt(cells[5]);
+
+          // File name - strip icon
+          const fileEl = cells[6]
+            ? cells[6].querySelector(".eal-pi-number")
+            : null;
+          document.getElementById("dpFileName").textContent = fileEl
+            ? fileEl.textContent.trim()
+            : "Not provided";
+
+          // File notes - placeholder
+          document.getElementById("dpFileNotes").textContent = "Not provided";
+
+          // Status badge
+          const statusBadge = cells[7]
+            ? cells[7].querySelector(".status-badge")
+            : null;
+          const statusEl = document.getElementById("dpStatus");
+          if (statusBadge) {
+            statusEl.innerHTML = "";
+            const clone = statusBadge.cloneNode(true);
+            statusEl.appendChild(clone);
+          } else {
+            statusEl.textContent = txt(cells[7]);
+          }
+
+          // Highlight the selected row
+          rows.forEach(function (r) {
+            r.classList.remove("row-selected");
+          });
+          row.classList.add("row-selected");
+        }
+
+        function showRow(index) {
+          if (index < 0 || index >= rows.length) return;
+
+          currentIndex = index;
+          populatePanel(rows[currentIndex]);
+          prevBtn.disabled = currentIndex === 0;
+          nextBtn.disabled = currentIndex === rows.length - 1;
+        }
+
+        /* ---- event listeners ---- */
+        rows.forEach(function (row, idx) {
+          row.style.cursor = "pointer";
+          row.addEventListener("click", function (e) {
+            // Don't trigger on checkbox or action button clicks
+            if (
+              e.target.closest(".eal-col-check") ||
+              e.target.closest(".eal-actions-cell") ||
+              e.target.closest('input[type="checkbox"]')
+            ) {
+              return;
+            }
+            currentIndex = idx;
+            showRow(currentIndex);
+            openPanel();
+          });
+        });
+
+        closeBtn.addEventListener("click", closePanel);
+        overlay.addEventListener("click", closePanel);
+
+        prevBtn.addEventListener("click", function () {
+          if (currentIndex > 0) showRow(currentIndex - 1);
+        });
+
+        nextBtn.addEventListener("click", function () {
+          if (currentIndex < rows.length - 1) showRow(currentIndex + 1);
+        });
+
+        document.addEventListener("keydown", function (e) {
+          if (!panel.classList.contains("active")) return;
+
+          if (e.key === "Escape") closePanel();
+
+          if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
+            e.preventDefault();
+            if (currentIndex > 0) showRow(currentIndex - 1);
+          }
+          if (e.key === "ArrowDown" || e.key === "ArrowRight") {
+            e.preventDefault();
+            if (currentIndex < rows.length - 1) showRow(currentIndex + 1);
+          }
+        });
+
+        // View button also opens panel
+        document
+          .querySelectorAll('.eal-row-btn[title="View"]')
+          .forEach(function (btn, idx) {
+            btn.addEventListener("click", function (e) {
+              e.stopPropagation();
+              currentIndex = idx;
+              showRow(currentIndex);
+              openPanel();
+            });
+          });
+      })();
+    </script>
+{% endblock %}

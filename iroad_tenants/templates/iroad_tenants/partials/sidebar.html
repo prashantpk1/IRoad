@@ -34,7 +34,7 @@
 
           <!-- Account Management -->
           {% if is_tenant_admin %}
-          <li class="nav-item has-submenu open">
+          <li class="nav-item has-submenu {% if 'tenant_client_' in request.resolver_match.url_name %}open{% endif %}">
             <a href="#" class="nav-link" data-tooltip="Account Management">
               <i class="bi bi-building"></i>
               <span class="nav-text">Account Management</span>
@@ -171,40 +171,40 @@
             </a>
             <ul class="submenu">
               <li class="submenu-item">
-                <a href="Client-account.html" class="submenu-link">
+                <a href="{% url 'iroad_tenants:tenant_client_account' %}" class="submenu-link {% if request.resolver_match.url_name == 'tenant_client_account' or request.resolver_match.url_name == 'tenant_client_account_create' or request.resolver_match.url_name == 'tenant_client_details' %}active{% endif %}">
                   <i class="bi bi-person-vcard"></i>
                   <span>Client Account</span>
                 </a>
               </li>
               <li class="submenu-item">
-                <a href="Client-account-setting.html" class="submenu-link">
+                <a href="{% url 'iroad_tenants:tenant_client_account_settings' %}" class="submenu-link {% if request.resolver_match.url_name == 'tenant_client_account_settings' %}active{% endif %}">
                   <i class="bi bi-gear"></i>
                   <span>Client Account Settings</span>
                 </a>
               </li>
 
               <li class="submenu-item">
-                <a href="Client-attachments.html" class="submenu-link">
+                <a href="{% url 'iroad_tenants:tenant_client_attachments' %}" class="submenu-link {% if request.resolver_match.url_name == 'tenant_client_attachments' or request.resolver_match.url_name == 'tenant_client_attachments_list' %}active{% endif %}">
                   <i class="bi bi-paperclip"></i>
                   <span>Client Attachments</span>
                 </a>
               </li>
 
               <li class="submenu-item">
-                <a href="Client-contacts.html" class="submenu-link">
+                <a href="{% url 'iroad_tenants:tenant_client_contacts' %}" class="submenu-link {% if request.resolver_match.url_name == 'tenant_client_contacts' or request.resolver_match.url_name == 'tenant_client_contacts_list' %}active{% endif %}">
                   <i class="bi bi-person-rolodex"></i>
                   <span>Client Contacts</span>
                 </a>
               </li>
 
               <li class="submenu-item">
-                <a href="Client-contract.html" class="submenu-link">
+                <a href="{% url 'iroad_tenants:tenant_client_contract' %}" class="submenu-link {% if request.resolver_match.url_name == 'tenant_client_contract' or request.resolver_match.url_name == 'tenant_client_contract_list' %}active{% endif %}">
                   <i class="bi bi-file-earmark-text"></i>
                   <span>Client Contracts</span>
                 </a>
               </li>
               <li class="submenu-item">
-                <a href="Client-contract-settings.html" class="submenu-link">
+                <a href="{% url 'iroad_tenants:tenant_client_contract_settings' %}" class="submenu-link {% if request.resolver_match.url_name == 'tenant_client_contract_settings' %}active{% endif %}">
                   <i class="bi bi-gear"></i>
                   <span>Client Contract Settings</span>
                 </a>

@@ -1,0 +1,222 @@
+{% extends 'iroad_tenants/base.html' %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}Client Attachments | iRoad Admin{% endblock %}
+
+{% block breadcrumb %}{% endblock %}
+
+{% block content %}
+<!-- Top Header -->
+      
+
+      
+      <div class="page-header">
+        <nav aria-label="breadcrumb">
+          <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+              <a href="{% url 'iroad_tenants:tenant_dashboard' %}">Dashboard</a>
+            </li>
+            <li class="breadcrumb-item">CRM</li>
+            <li class="breadcrumb-item">Clients Management</li>
+            <li class="breadcrumb-item active" aria-current="page">
+              Client Attachments
+            </li>
+          </ol>
+        </nav>
+
+        <div class="page-header-row">
+          <div class="page-header-left">
+            <h1 class="page-title">Create Client Attachment</h1>
+            <p class="page-subtitle">
+              Fill in the details below to upload a new attachment for a client
+              account.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Client Attachment Form -->
+      <form id="clientAttachmentForm">
+        <!-- Section 1: Attachment Details -->
+        <div class="form-card" data-section="1">
+          <div class="form-card-header">
+            <div class="form-card-icon blue">
+              <i class="bi bi-paperclip"></i>
+            </div>
+            <div class="form-card-header-text">
+              <h2 class="form-card-title">Attachment Details</h2>
+            </div>
+          </div>
+          <div class="form-card-body">
+            <!-- Row 1: Client & Date -->
+            <div class="field-group">
+              <h3 class="field-group-title">
+                <i class="bi bi-fingerprint"></i>
+                Identity
+              </h3>
+              <div class="fields-grid cols-2">
+                <div class="field">
+                  <label for="clientAccount" class="form-label"
+                    >Client Account
+                    <span class="required">*</span>
+                  </label>
+                  <select class="form-select" id="clientAccount">
+                    <option value="" selected disabled>
+                      -Select client account-
+                    </option>
+                    <option value="client1">Client Account 1</option>
+                    <option value="client2">Client Account 2</option>
+                    <option value="client3">Client Account 3</option>
+                  </select>
+                  <span class="field-hint"
+                    >Select the client this attachment belongs to</span
+                  >
+                </div>
+                <div class="field">
+                  <label for="attachmentDate" class="form-label"
+                    >Attachment Date
+                    <span class="required">*</span>
+                  </label>
+                  <div class="input-icon-wrapper">
+                    <i class="bi bi-calendar-event"></i>
+                    <input
+                      type="date"
+                      class="form-control has-icon"
+                      id="attachmentDate"
+                    />
+                  </div>
+                  <span class="field-hint"
+                    >Date the attachment was created or received</span
+                  >
+                </div>
+              </div>
+            </div>
+
+            <!-- Row 2: Expiry & Status -->
+            <div class="field-group">
+              <h3 class="field-group-title">
+                <i class="bi bi-calendar-check"></i>
+                Expiry & Status
+              </h3>
+              <div class="fields-grid cols-3">
+                <div class="field">
+                  <label for="isExpiryApplicable" class="form-label"
+                    >Is Expiry Applicable</label
+                  >
+                  <select class="form-select" id="isExpiryApplicable">
+                    <option value="" selected disabled>-Select-</option>
+                    <option value="yes">Yes</option>
+                    <option value="no">No</option>
+                  </select>
+                  <span class="field-hint"
+                    >Indicate if this attachment has an expiry date</span
+                  >
+                </div>
+                <div class="field">
+                  <label for="expiryDate" class="form-label">Expiry Date</label>
+                  <div class="input-icon-wrapper">
+                    <i class="bi bi-calendar-x"></i>
+                    <input
+                      type="date"
+                      class="form-control has-icon"
+                      id="expiryDate"
+                    />
+                  </div>
+                  <span class="field-hint"
+                    >Applicable only if expiry is enabled</span
+                  >
+                </div>
+                <div class="field">
+                  <label for="status" class="form-label">Status</label>
+                  <select class="form-select" id="status">
+                    <option value="" selected disabled>-Select status-</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                    <option value="expired">Expired</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 2: File Upload & Notes -->
+        <div class="form-card" data-section="2">
+          <div class="form-card-header">
+            <div class="form-card-icon green">
+              <i class="bi bi-file-earmark-arrow-up"></i>
+            </div>
+            <div class="form-card-header-text">
+              <h2 class="form-card-title">File Upload &amp; Notes</h2>
+            </div>
+          </div>
+          <div class="form-card-body">
+            <!-- Row 1: File Upload -->
+            <div class="field-group">
+              <h3 class="field-group-title">
+                <i class="bi bi-cloud-arrow-up"></i>
+                Attachment File
+              </h3>
+              <div class="fields-grid cols-1">
+                <div class="field">
+                  <label for="attachmentFile" class="form-label"
+                    >Attachment File
+                    <span class="required">*</span>
+                  </label>
+                  <input
+                    type="file"
+                    class="form-control"
+                    id="attachmentFile"
+                    accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif"
+                  />
+                  <span class="field-hint"
+                    >Supported formats: PDF, DOC, DOCX, XLS, XLSX, JPG, PNG, GIF
+                    (Max 10MB)</span
+                  >
+                </div>
+              </div>
+            </div>
+
+            <!-- Row 2: File Notes -->
+            <div class="field-group">
+              <h3 class="field-group-title">
+                <i class="bi bi-card-text"></i>
+                File Notes
+              </h3>
+              <div class="fields-grid cols-1">
+                <div class="field">
+                  <label for="fileNotes" class="form-label">File Notes</label>
+                  <textarea
+                    class="form-control"
+                    id="fileNotes"
+                    rows="4"
+                    placeholder="Enter any notes or description for this attachment..."
+                  ></textarea>
+                  <span class="field-hint"
+                    >Optional notes about the attachment content or
+                    purpose</span
+                  >
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Form Actions -->
+        <div class="form-actions-bar">
+          <div class="form-actions-left">
+            <button type="reset" class="btn btn-outline-secondary">
+              <i class="bi bi-arrow-counterclockwise"></i>
+              Reset Form
+            </button>
+          </div>
+          <div class="form-actions-right">
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-check-circle"></i>
+              Upload Attachment
+            </button>
+          </div>
+        </div>
+      </form>
+{% endblock %}

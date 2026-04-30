@@ -22,10 +22,18 @@
           <i class="bi bi-arrow-left"></i>
           <span>{% translate "Back to list" %}</span>
         </a>
-        <a href="{% url 'invoice_print' invoice.invoice_id %}" target="_blank" class="eal-btn eal-btn-outline" title="{% translate 'Open print view' %}">
+        <a
+          id="invoicePrintBtn"
+          href="{% url 'invoice_print' invoice.invoice_id %}"
+          target="_blank"
+          class="eal-btn eal-btn-outline{% if not has_uploaded_attachment %} disabled-action-btn{% endif %}"
+          title="{% if not has_uploaded_attachment %}{% translate 'Upload a file first' %}{% else %}{% translate 'Open print view' %}{% endif %}"
+          aria-disabled="{% if has_uploaded_attachment %}false{% else %}true{% endif %}"
+        >
           <i class="bi bi-printer"></i>
           <span>{% translate "Print / Download" %}</span>
         </a>
+        {% comment %}
         <form method="post" action="{% url 'invoice_send_email' invoice.invoice_id %}">
           {% csrf_token %}
           <button type="submit" class="eal-btn eal-btn-outline">
@@ -33,6 +41,37 @@
             <span>{% translate "Send Email" %}</span>
           </button>
         </form>
+        {% endcomment %}
+      
+        {% comment %}
+        <form method="post" action="{% url 'invoice_send_email' invoice.invoice_id %}" enctype="multipart/form-data" class="d-flex align-items-center gap-2 flex-wrap">
+          {% csrf_token %}
+         
+          <button type="submit" class="eal-btn eal-btn-outline">
+            <i class="bi bi-envelope"></i>
+            <span>{% translate "Send Email" %}</span>
+          </button>
+        </form>
+        {% endcomment %}
+        <form
+          id="invoiceEmailHeaderForm"
+          method="post"
+          action="{% url 'invoice_send_email' invoice.invoice_id %}"
+          class="d-flex align-items-center"
+        >
+          {% csrf_token %}
+          <button
+            type="submit"
+            id="invoiceEmailSendBtn"
+            class="eal-btn eal-btn-outline{% if not has_uploaded_attachment %} disabled-action-btn{% endif %}"
+            {% if not has_uploaded_attachment %}disabled{% endif %}
+            title="{% if not has_uploaded_attachment %}{% translate 'Upload a file first' %}{% endif %}"
+          >
+            <i class="bi bi-envelope"></i>
+            <span>{% translate "Send Email" %}</span>
+          </button>
+        </form>
+      
       </div>
     </div>
   </div>
@@ -48,6 +87,63 @@
       <h3 class="form-card-title">{% translate "Parties" %}</h3>
       <p class="form-card-desc">{% translate "Supplier and customer details." %}</p>
     </div>
+    {% comment %}
+    <form
+      id="invoiceEmailUploadForm"
+      method="post"
+      action="{% url 'invoice_send_email' invoice.invoice_id %}"
+      enctype="multipart/form-data"
+      class="ms-auto"
+    >
+      {% csrf_token %}
+      <input
+        id="invoiceEmailAttachmentInput"
+        type="file"
+        name="email_attachment"
+        accept=".pdf,application/pdf"
+        class="d-none"
+        required
+      >
+      <button type="button" id="invoiceEmailUploadBtn" class="eal-btn eal-btn-outline me-2">
+        <i class="bi bi-upload"></i>
+        <span>{% translate "Upload" %}</span>
+      </button>
+      <button
+        type="submit"
+        id="invoiceEmailSendBtn"
+        class="eal-btn"
+        disabled
+        style="background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca;"
+        title="{% translate 'Upload a file first' %}"
+      >
+        <i class="bi bi-envelope"></i>
+        <span>{% translate "Send Email" %}</span>
+      </button>
+      <span id="invoiceEmailFileName" class="ms-2 text-muted small"></span>
+    </form>
+    {% endcomment %}
+    <form
+      id="invoiceEmailUploadForm"
+      method="post"
+      action="{% url 'invoice_send_email' invoice.invoice_id %}"
+      enctype="multipart/form-data"
+      class="ms-auto d-flex align-items-center gap-2"
+    >
+      {% csrf_token %}
+      <input type="hidden" name="upload_only" value="1">
+      <input
+        id="invoiceEmailAttachmentInput"
+        type="file"
+        name="email_attachment"
+        class="d-none"
+        required
+      >
+      <button type="button" id="invoiceEmailUploadBtn" class="eal-btn eal-btn-outline">
+        <i class="bi bi-upload"></i>
+        <span>{% translate "Upload Official Tax Invoice" %}</span>
+      </button>
+      <span id="invoiceEmailFileName" class="text-muted small">{{ uploaded_attachment_name }}</span>
+    </form>
   </div>
   <div class="form-card-body">
     <div class="row g-3">
@@ -204,4 +300,42 @@
   </form>
 </div>
 {% endif %}
+<style>
+  .disabled-action-btn {
+    background: #fef2f2 !important;
+    color: #b91c1c !important;
+    border-color: #fecaca !important;
+  }
+
+  a.disabled-action-btn[aria-disabled="true"] {
+    pointer-events: none;
+    opacity: 0.9;
+  }
+</style>
+<script>
+  (function () {
+    var uploadBtn = document.getElementById('invoiceEmailUploadBtn');
+    var fileInput = document.getElementById('invoiceEmailAttachmentInput');
+    var uploadForm = document.getElementById('invoiceEmailUploadForm');
+    if (!uploadBtn || !fileInput || !uploadForm) return;
+
+    uploadBtn.addEventListener('click', function () {
+      fileInput.click();
+    });
+
+    var sendBtn = document.getElementById('invoiceEmailSendBtn');
+    var printBtn = document.getElementById('invoicePrintBtn');
+    var fileNameLabel = document.getElementById('invoiceEmailFileName');
+
+    fileInput.addEventListener('change', function () {
+      var hasFile = !!(fileInput.files && fileInput.files.length > 0);
+      if (hasFile) {
+        if (fileNameLabel) {
+          fileNameLabel.textContent = fileInput.files[0].name;
+        }
+        uploadForm.submit();
+      }
+    });
+  })();
+</script>
 {% endblock %}

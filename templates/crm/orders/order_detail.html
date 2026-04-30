@@ -217,19 +217,19 @@
       </div>
       <div class="col-12 col-md-4">
         <label class="form-label">{% translate "Max users" %}</label>
-        <input class="form-control" value="{% if order.projected_max_users == 0 or order.projected_max_users == -1 %}Unlimited{% elif order.projected_max_users is None %}—{% else %}{{ order.projected_max_users }}{% endif %}" readonly>
+        <input class="form-control" value="{% if order.projected_max_users == -1 %}Unlimited{% elif order.projected_max_users == 0 %}{% if order.projected_plan %}-{% else %}0{% endif %}{% elif order.projected_max_users is None %}{% else %}{{ order.projected_max_users }}{% endif %}" readonly>
       </div>
       <div class="col-12 col-md-4">
         <label class="form-label">{% translate "Max int. trucks" %}</label>
-        <input class="form-control" value="{% if order.projected_max_internal_trucks == 0 or order.projected_max_internal_trucks == -1 %}Unlimited{% elif order.projected_max_internal_trucks is None %}—{% else %}{{ order.projected_max_internal_trucks }}{% endif %}" readonly>
+        <input class="form-control" value="{% if order.projected_max_internal_trucks == -1 %}Unlimited{% elif order.projected_max_internal_trucks == 0 %}{% if order.projected_plan %}-{% else %}0{% endif %}{% elif order.projected_max_internal_trucks is None %}{% else %}{{ order.projected_max_internal_trucks }}{% endif %}" readonly>
       </div>
       <div class="col-12 col-md-4">
         <label class="form-label">{% translate "Max ext. trucks" %}</label>
-        <input class="form-control" value="{% if order.projected_max_external_trucks == 0 or order.projected_max_external_trucks == -1 %}Unlimited{% elif order.projected_max_external_trucks is None %}—{% else %}{{ order.projected_max_external_trucks }}{% endif %}" readonly>
+        <input class="form-control" value="{% if order.projected_max_external_trucks == -1 %}Unlimited{% elif order.projected_max_external_trucks == 0 %}{% if order.projected_plan %}-{% else %}0{% endif %}{% elif order.projected_max_external_trucks is None %}{% else %}{{ order.projected_max_external_trucks }}{% endif %}" readonly>
       </div>
       <div class="col-12 col-md-4">
         <label class="form-label">{% translate "Max drivers" %}</label>
-        <input class="form-control" value="{% if order.projected_max_drivers == 0 or order.projected_max_drivers == -1 %}Unlimited{% elif order.projected_max_drivers is None %}—{% else %}{{ order.projected_max_drivers }}{% endif %}" readonly>
+        <input class="form-control" value="{% if order.projected_max_drivers == -1 %}Unlimited{% elif order.projected_max_drivers == 0 %}{% if order.projected_plan %}-{% else %}0{% endif %}{% elif order.projected_max_drivers is None %}{% else %}{{ order.projected_max_drivers }}{% endif %}" readonly>
       </div>
     </div>
   </div>

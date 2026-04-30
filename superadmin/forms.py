@@ -725,7 +725,7 @@ class SubscriptionPlanForm(forms.ModelForm):
 class PlanPricingCycleForm(forms.ModelForm):
     class Meta:
         model = PlanPricingCycle
-        fields = ['number_of_cycles', 'currency', 'price']
+        fields = ['number_of_cycles', 'currency', 'price', 'is_admin_only_cycle']
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

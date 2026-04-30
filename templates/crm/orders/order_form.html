@@ -567,18 +567,20 @@
     var pIt = document.getElementById('pv_projected_it');
     var pEt = document.getElementById('pv_projected_et');
     var pDr = document.getElementById('pv_projected_drivers');
-    function formatProjectedLimit(v) {
+    function formatProjectedLimit(v, hasProjectedPlan) {
       if (v == null || v === '') return '';
       var n = parseInt(String(v), 10);
-      if (!Number.isNaN(n) && (n === 0 || n === -1)) return 'Unlimited';
+      if (!Number.isNaN(n) && n === -1) return 'Unlimited';
+      if (!Number.isNaN(n) && n === 0) return hasProjectedPlan ? '-' : '0';
       return String(v);
     }
+    var hasProjectedPlan = !!(projected && (projected.plan_id || projected.plan_name));
     if (pPlan) pPlan.value = projected.plan_name || '';
     if (pExp) pExp.value = projected.expiry_date || '';
-    if (pUsers) pUsers.value = formatProjectedLimit(projected.max_users);
-    if (pIt) pIt.value = formatProjectedLimit(projected.max_internal_trucks);
-    if (pEt) pEt.value = formatProjectedLimit(projected.max_external_trucks);
-    if (pDr) pDr.value = formatProjectedLimit(projected.max_drivers);
+    if (pUsers) pUsers.value = formatProjectedLimit(projected.max_users, hasProjectedPlan);
+    if (pIt) pIt.value = formatProjectedLimit(projected.max_internal_trucks, hasProjectedPlan);
+    if (pEt) pEt.value = formatProjectedLimit(projected.max_external_trucks, hasProjectedPlan);
+    if (pDr) pDr.value = formatProjectedLimit(projected.max_drivers, hasProjectedPlan);
   }
 
   function setProjectedHint(message, isError) {
