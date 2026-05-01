@@ -37,7 +37,13 @@
       </div>
 
       <!-- Client Contract Form -->
-      <form id="clientContractForm">
+      <form
+        id="clientContractForm"
+        method="post"
+        enctype="multipart/form-data"
+        action="{% url 'iroad_tenants:tenant_client_contract' %}"
+      >
+        {% csrf_token %}
         <!-- Section 1: Contract Details -->
         <div class="form-card" data-section="1">
           <div class="form-card-header">
@@ -71,7 +77,10 @@
                       type="text"
                       class="form-control has-icon"
                       id="contractNo"
-                      placeholder="e.g. CC-000123"
+                      name="contract_no"
+                      value="{{ form_data.contract_no|default:'' }}"
+                      placeholder="Auto-number"
+                      readonly
                     />
                   </div>
                   <span class="field-hint">Unique contract identifier</span>
@@ -81,14 +90,17 @@
                     >Client Account
                     <span class="required">*</span>
                   </label>
-                  <select class="form-select" id="clientAccount">
+                  <select class="form-select {% if form_errors.client_account %}is-invalid{% endif %}" id="clientAccount" name="client_account" required>
                     <option value="" selected disabled>
                       -Select client account-
                     </option>
-                    <option value="client1">Client Account 1</option>
-                    <option value="client2">Client Account 2</option>
-                    <option value="client3">Client Account 3</option>
+                    {% for account in client_account_options %}
+                    <option value="{{ account.account_no }}" {% if form_data.client_account == account.account_no %}selected{% endif %}>
+                      {{ account.account_no }} - {{ account.display_name|default:account.name_english }}
+                    </option>
+                    {% endfor %}
                   </select>
+                  {% if form_errors.client_account %}<div class="invalid-feedback d-block">{{ form_errors.client_account }}</div>{% endif %}
                   <span class="field-hint">
                     The contract will be linked to this account
                   </span>
@@ -98,13 +110,10 @@
                     >Status
                     <span class="required">*</span>
                   </label>
-                  <select class="form-select" id="contractStatus">
-                    <option value="" selected disabled>-Select status-</option>
-                    <option value="draft">Draft</option>
-                    <option value="active">Active</option>
-                    <option value="expired">Expired</option>
-                    <option value="terminated">Terminated</option>
+                  <select class="form-select" id="contractStatus" disabled>
+                    <option value="" selected>Derived automatically (Upcoming / Active / Expired)</option>
                   </select>
+                  <span class="field-hint">Status is derived from Start/End dates.</span>
                 </div>
               </div>
             </div>
@@ -125,10 +134,14 @@
                     <i class="bi bi-calendar-event"></i>
                     <input
                       type="date"
-                      class="form-control has-icon"
+                      class="form-control has-icon {% if form_errors.start_date %}is-invalid{% endif %}"
                       id="startDate"
+                      name="start_date"
+                      value="{{ form_data.start_date|default:'' }}"
+                      required
                     />
                   </div>
+                  {% if form_errors.start_date %}<div class="invalid-feedback d-block">{{ form_errors.start_date }}</div>{% endif %}
                 </div>
                 <div class="field">
                   <label for="endDate" class="form-label"
@@ -139,10 +152,14 @@
                     <i class="bi bi-calendar-event"></i>
                     <input
                       type="date"
-                      class="form-control has-icon"
+                      class="form-control has-icon {% if form_errors.end_date %}is-invalid{% endif %}"
                       id="endDate"
+                      name="end_date"
+                      value="{{ form_data.end_date|default:'' }}"
+                      required
                     />
                   </div>
+                  {% if form_errors.end_date %}<div class="invalid-feedback d-block">{{ form_errors.end_date }}</div>{% endif %}
                 </div>
               </div>
             </div>
@@ -174,9 +191,10 @@
                   <textarea
                     class="form-control"
                     id="contractNotes"
+                    name="notes"
                     rows="4"
                     placeholder="Enter any special terms, remarks or internal notes about this contract..."
-                  ></textarea>
+                  >{{ form_data.notes|default:'' }}</textarea>
                 </div>
               </div>
             </div>
@@ -193,10 +211,13 @@
                   >
                   <input
                     type="file"
-                    class="form-control"
+                    class="form-control {% if form_errors.contract_attachment %}is-invalid{% endif %}"
                     id="contractAttachment"
+                    name="contract_attachment"
                     accept=".pdf,.doc,.docx,image/*"
+                    required
                   />
+                  {% if form_errors.contract_attachment %}<div class="invalid-feedback d-block">{{ form_errors.contract_attachment }}</div>{% endif %}
                   <span class="field-hint">
                     Upload the signed contract document (PDF, DOC, or image).
                   </span>

@@ -37,7 +37,8 @@
       </div>
 
       <!-- Client Contacts Form -->
-      <form id="clientContactForm">
+      <form id="clientContactForm" method="post" action="{% url 'iroad_tenants:tenant_client_contacts' %}">
+        {% csrf_token %}
         <!-- Section 1: Contact Details -->
         <div class="form-card" data-section="1">
           <div class="form-card-header">
@@ -60,14 +61,17 @@
                     >Client Account
                     <span class="required">*</span>
                   </label>
-                  <select class="form-select" id="contactClientAccount">
+                  <select class="form-select {% if form_errors.client_account %}is-invalid{% endif %}" id="contactClientAccount" name="client_account" required>
                     <option value="" selected disabled>
                       -Select client account-
                     </option>
-                    <option value="client1">Client Account 1</option>
-                    <option value="client2">Client Account 2</option>
-                    <option value="client3">Client Account 3</option>
+                    {% for account in client_account_options %}
+                    <option value="{{ account.account_no }}" {% if form_data.client_account == account.account_no %}selected{% endif %}>
+                      {{ account.account_no }} - {{ account.display_name|default:account.name_english }}
+                    </option>
+                    {% endfor %}
                   </select>
+                  {% if form_errors.client_account %}<div class="invalid-feedback d-block">{{ form_errors.client_account }}</div>{% endif %}
                 </div>
                 <div class="field">
                   <label for="contactName" class="form-label"
@@ -76,10 +80,14 @@
                   </label>
                   <input
                     type="text"
-                    class="form-control"
+                    class="form-control {% if form_errors.name %}is-invalid{% endif %}"
                     id="contactName"
+                    name="name"
                     placeholder="Enter full name"
+                    value="{{ form_data.name|default:'' }}"
+                    required
                   />
+                  {% if form_errors.name %}<div class="invalid-feedback d-block">{{ form_errors.name }}</div>{% endif %}
                 </div>
               </div>
             </div>
@@ -96,65 +104,42 @@
                     <i class="bi bi-envelope"></i>
                     <input
                       type="email"
-                      class="form-control has-icon"
+                      class="form-control has-icon {% if form_errors.email %}is-invalid{% endif %}"
                       id="contactEmail"
+                      name="email"
                       placeholder="name@company.com"
+                      value="{{ form_data.email|default:'' }}"
                     />
                   </div>
+                  {% if form_errors.email %}<div class="invalid-feedback d-block">{{ form_errors.email }}</div>{% endif %}
                 </div>
                 <div class="field">
                   <label for="contactMobile" class="form-label"
                     >Mobile Number</label
                   >
-                  <div class="phone-input-group">
-                    <select
-                      class="form-select country-code"
-                      id="phoneCountryCode"
-                    >
-                      <option value="+966">+966</option>
-                      <option value="+971">+971</option>
-                      <option value="+965">+965</option>
-                      <option value="+973">+973</option>
-                      <option value="+974">+974</option>
-                      <option value="+968">+968</option>
-                      <option value="+91">+91</option>
-                      <option value="+1">+1</option>
-                    </select>
-                    <input
-                      type="text"
-                      class="form-control phone-number"
-                      id="phoneNo"
-                      placeholder="Enter phone number"
-                      oninput="formatPhoneNumber(this)"
-                    />
-                  </div>
+                  <input
+                    type="text"
+                    class="form-control {% if form_errors.mobile_number %}is-invalid{% endif %}"
+                    id="contactMobile"
+                    name="mobile_number"
+                    placeholder="Enter mobile number"
+                    value="{{ form_data.mobile_number|default:'' }}"
+                  />
+                  {% if form_errors.mobile_number %}<div class="invalid-feedback d-block">{{ form_errors.mobile_number }}</div>{% endif %}
                 </div>
                 <div class="field">
                   <label for="contactTelephone" class="form-label"
                     >Telephone Number</label
                   >
-                  <div class="phone-input-group">
-                    <select
-                      class="form-select country-code"
-                      id="phoneCountryCode"
-                    >
-                      <option value="+966">+966</option>
-                      <option value="+971">+971</option>
-                      <option value="+965">+965</option>
-                      <option value="+973">+973</option>
-                      <option value="+974">+974</option>
-                      <option value="+968">+968</option>
-                      <option value="+91">+91</option>
-                      <option value="+1">+1</option>
-                    </select>
-                    <input
-                      type="text"
-                      class="form-control phone-number"
-                      id="phoneNo"
-                      placeholder="Enter phone number"
-                      oninput="formatPhoneNumber(this)"
-                    />
-                  </div>
+                  <input
+                    type="text"
+                    class="form-control {% if form_errors.telephone_number %}is-invalid{% endif %}"
+                    id="contactTelephone"
+                    name="telephone_number"
+                    placeholder="Enter telephone number"
+                    value="{{ form_data.telephone_number|default:'' }}"
+                  />
+                  {% if form_errors.telephone_number %}<div class="invalid-feedback d-block">{{ form_errors.telephone_number }}</div>{% endif %}
                 </div>
               </div>
               <div class="fields-grid cols-3">
@@ -164,10 +149,13 @@
                   >
                   <input
                     type="text"
-                    class="form-control"
+                    class="form-control {% if form_errors.extension %}is-invalid{% endif %}"
                     id="contactExtension"
+                    name="extension"
                     placeholder="e.g. 104"
+                    value="{{ form_data.extension|default:'' }}"
                   />
+                  {% if form_errors.extension %}<div class="invalid-feedback d-block">{{ form_errors.extension }}</div>{% endif %}
                 </div>
                 <div class="field">
                   <label for="contactPosition" class="form-label"
@@ -177,7 +165,9 @@
                     type="text"
                     class="form-control"
                     id="contactPosition"
+                    name="position"
                     placeholder="e.g. Logistics Manager"
+                    value="{{ form_data.position|default:'' }}"
                   />
                 </div>
                 <div class="field">
@@ -186,11 +176,15 @@
                       type="checkbox"
                       class="form-check-input"
                       id="contactIsPrimary"
+                      name="is_primary"
+                      value="true"
+                      {% if form_data.is_primary == 'true' or form_data.is_primary == 'on' or form_data.is_primary == '1' %}checked{% endif %}
                     />
                     <label class="form-check-label" for="contactIsPrimary"
                       >Is Primary</label
                     >
                   </div>
+                  {% if form_errors.is_primary %}<div class="invalid-feedback d-block">{{ form_errors.is_primary }}</div>{% endif %}
                 </div>
               </div>
             </div>

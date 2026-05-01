@@ -37,7 +37,8 @@
       </div>
 
       <!-- Client Account Setting Form -->
-      <form id="clientAccountSettingForm">
+      <form id="clientAccountSettingForm" method="post">
+        {% csrf_token %}
         <!-- Section 1: Document Requirements -->
         <div class="form-card" data-section="1">
           <div class="form-card-header">
@@ -69,7 +70,12 @@
                   >
                 </div>
                 <label class="setting-toggle">
-                  <input type="checkbox" id="requireNationalId" checked />
+                  <input
+                    type="checkbox"
+                    id="requireNationalId"
+                    name="require_national_id_individual"
+                    {% if settings_data.require_national_id_individual %}checked{% endif %}
+                  />
                   <span class="toggle-track"></span>
                   <span class="toggle-label">Enabled</span>
                 </label>
@@ -96,7 +102,8 @@
                   <input
                     type="checkbox"
                     id="requireCommercialRegistration"
-                    checked
+                    name="require_commercial_registration_business"
+                    {% if settings_data.require_commercial_registration_business %}checked{% endif %}
                   />
                   <span class="toggle-track"></span>
                   <span class="toggle-label">Enabled</span>
@@ -116,7 +123,8 @@
                   <input
                     type="checkbox"
                     id="requireTaxVatRegistration"
-                    checked
+                    name="require_tax_vat_registration_business"
+                    {% if settings_data.require_tax_vat_registration_business %}checked{% endif %}
                   />
                   <span class="toggle-track"></span>
                   <span class="toggle-label">Enabled</span>
@@ -152,10 +160,11 @@
                   <label for="defaultClientStatus" class="form-label"
                     >Default Client Status</label
                   >
-                  <select class="form-select" id="defaultClientStatus">
-                    <option value="active" selected>Active</option>
-                    <option value="inactive">Inactive</option>
+                  <select class="form-select {% if settings_errors.default_client_status %}is-invalid{% endif %}" id="defaultClientStatus" name="default_client_status">
+                    <option value="Active" {% if settings_data.default_client_status == 'Active' %}selected{% endif %}>Active</option>
+                    <option value="Inactive" {% if settings_data.default_client_status == 'Inactive' %}selected{% endif %}>Inactive</option>
                   </select>
+                  {% if settings_errors.default_client_status %}<div class="invalid-feedback d-block">{{ settings_errors.default_client_status }}</div>{% endif %}
                   <span class="field-hint"
                     >Status assigned to newly created client accounts.</span
                   >
@@ -164,16 +173,37 @@
                   <label for="defaultClientType" class="form-label"
                     >Default Client Type</label
                   >
-                  <select class="form-select" id="defaultClientType">
-                    <option value="individual" selected>Individual</option>
-                    <option value="business">Business</option>
+                  <select class="form-select {% if settings_errors.default_client_type %}is-invalid{% endif %}" id="defaultClientType" name="default_client_type">
+                    <option value="Individual" {% if settings_data.default_client_type == 'Individual' %}selected{% endif %}>Individual</option>
+                    <option value="Business" {% if settings_data.default_client_type == 'Business' %}selected{% endif %}>Business</option>
                   </select>
+                  {% if settings_errors.default_client_type %}<div class="invalid-feedback d-block">{{ settings_errors.default_client_type }}</div>{% endif %}
                   <span class="field-hint"
                     >Client type pre-selected for new accounts.</span
                   >
                 </div>
               </div>
-            
+
+              <div class="fields-grid cols-2">
+                <div class="field">
+                  <label for="defaultPreferredCurrency" class="form-label"
+                    >Default Preferred Currency</label
+                  >
+                  <select class="form-select {% if settings_errors.default_preferred_currency %}is-invalid{% endif %}" id="defaultPreferredCurrency" name="default_preferred_currency">
+                    <option value="">-No default currency-</option>
+                    {% for currency in currency_options %}
+                    <option value="{{ currency.currency_code }}" {% if settings_data.default_preferred_currency == currency.currency_code %}selected{% endif %}>
+                      {{ currency.currency_code }} - {{ currency.name_en }}
+                    </option>
+                    {% endfor %}
+                  </select>
+                  {% if settings_errors.default_preferred_currency %}<div class="invalid-feedback d-block">{{ settings_errors.default_preferred_currency }}</div>{% endif %}
+                  <span class="field-hint"
+                    >Applied when creating new client accounts.</span
+                  >
+                </div>
+              </div>
+
             </div>
           </div>
         </div>

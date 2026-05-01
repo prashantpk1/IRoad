@@ -340,7 +340,13 @@
               <div class="ch-contact-icon">
                 <i class="bi bi-envelope"></i>
               </div>
-              <div class="ch-contact-text">ayman.alharbi@alsafa.com</div>
+              <div class="ch-contact-text">
+                {% if primary_contact and primary_contact.email %}
+                  {{ primary_contact.email }}
+                {% else %}
+                  —
+                {% endif %}
+              </div>
               <button class="ch-contact-copy" title="Copy Email">
                 <i class="bi bi-files"></i>
               </button>
@@ -349,7 +355,15 @@
               <div class="ch-contact-icon">
                 <i class="bi bi-telephone"></i>
               </div>
-              <div class="ch-contact-text">+966 50 123 4567</div>
+              <div class="ch-contact-text">
+                {% if primary_contact and primary_contact.mobile_number %}
+                  {{ primary_contact.mobile_number }}
+                {% elif primary_contact and primary_contact.telephone_number %}
+                  {{ primary_contact.telephone_number }}
+                {% else %}
+                  —
+                {% endif %}
+              </div>
               <button class="ch-contact-copy" title="Copy Phone">
                 <i class="bi bi-files"></i>
               </button>
@@ -359,24 +373,41 @@
 
         <!-- Action Buttons Row -->
         <div class="ch-actions">
-          <a href="#" class="ch-action-btn">
+          {% if client_detail %}
+          <a href="{% url 'iroad_tenants:tenant_client_account_edit' client_detail.account_no %}" class="ch-action-btn">
             <i class="bi bi-pencil"></i> Edit
           </a>
-          <button class="ch-action-btn">
+          <a href="{% url 'iroad_tenants:tenant_client_sales_report' client_detail.account_no %}" class="ch-action-btn">
             <i class="bi bi-file-earmark-text"></i> Create Sales Report
-          </button>
-          <button class="ch-action-btn">
+          </a>
+          <a href="{% url 'iroad_tenants:tenant_client_contacts' %}?client_account={{ client_detail.account_no|urlencode }}" class="ch-action-btn">
             <i class="bi bi-person-plus"></i> Add Contact
-          </button>
-          <button class="ch-action-btn">
+          </a>
+          <a href="{% url 'iroad_tenants:tenant_client_attachments_create' %}?client_account={{ client_detail.account_no|urlencode }}" class="ch-action-btn">
             <i class="bi bi-paperclip"></i> Add Attachment
-          </button>
-          <button class="ch-action-btn text-danger" id="suspendAccountBtn">
-            <i class="bi bi-pause-circle"></i> Suspend Account
-          </button>
-          <button class="ch-action-btn text-success d-none" id="activateAccountBtn">
-            <i class="bi bi-play-circle"></i> Activate Account
-          </button>
+          </a>
+          <a href="{% url 'iroad_tenants:tenant_client_contract' %}?client_account={{ client_detail.account_no|urlencode }}" class="ch-action-btn">
+            <i class="bi bi-file-earmark-text"></i> Add Contract
+          </a>
+          <form method="post" action="{% url 'iroad_tenants:tenant_client_account_toggle_status' client_detail.account_no %}" class="d-inline">
+            {% csrf_token %}
+            <button type="submit" class="ch-action-btn text-danger" id="suspendAccountBtn">
+              <i class="bi bi-pause-circle"></i> Suspend Account
+            </button>
+          </form>
+          <form method="post" action="{% url 'iroad_tenants:tenant_client_account_toggle_status' client_detail.account_no %}" class="d-inline">
+            {% csrf_token %}
+            <button type="submit" class="ch-action-btn text-success d-none" id="activateAccountBtn">
+              <i class="bi bi-play-circle"></i> Activate Account
+            </button>
+          </form>
+          {% else %}
+          <button class="ch-action-btn" disabled><i class="bi bi-pencil"></i> Edit</button>
+          <button class="ch-action-btn" disabled><i class="bi bi-file-earmark-text"></i> Create Sales Report</button>
+          <button class="ch-action-btn" disabled><i class="bi bi-person-plus"></i> Add Contact</button>
+          <button class="ch-action-btn" disabled><i class="bi bi-paperclip"></i> Add Attachment</button>
+          <button class="ch-action-btn" disabled><i class="bi bi-file-earmark-text"></i> Add Contract</button>
+          {% endif %}
         </div>
 
         <!-- Main Content Card with Tabs -->
@@ -576,9 +607,15 @@
                 >
                   Client Addresses
                 </h4>
-                <a href="addresses.html" class="btn btn-primary btn-sm">
-                  <i class="bi bi-plus-lg"></i> Add Address
+                {% if client_detail %}
+                <a href="{% url 'iroad_tenants:tenant_client_account_edit' client_detail.account_no %}" class="btn btn-primary btn-sm">
+                  <i class="bi bi-plus-lg"></i> Add / Update Address
                 </a>
+                {% else %}
+                <button type="button" class="btn btn-primary btn-sm" disabled>
+                  <i class="bi bi-plus-lg"></i> Add / Update Address
+                </button>
+                {% endif %}
               </div>
 
               <!-- Address 1 -->
@@ -1082,517 +1119,163 @@
                 >
                   Client Contracts
                 </h4>
-                <a href="{% url 'iroad_tenants:tenant_client_contract' %}" class="btn btn-primary btn-sm">
+                <a href="{% url 'iroad_tenants:tenant_client_contract' %}?client_account={{ client_detail.account_no|urlencode }}" class="btn btn-primary btn-sm">
                   <i class="bi bi-plus-lg"></i> Add Contract
                 </a>
               </div>
-
-              <!-- Contract 1 -->
-              <div class="cd-details-section mb-4">
-                <div
-                  class="cd-details-header d-flex justify-content-between align-items-center"
-                  data-bs-toggle="collapse"
-                  href="#contractCollapse1"
-                  role="button"
-                  aria-expanded="true"
-                  aria-controls="contractCollapse1"
-                >
-                  <div class="d-flex align-items-center gap-2">
-                    <i
-                      class="bi bi-chevron-down collapse-icon me-1 text-muted"
-                    ></i>
-                    <span style="font-weight: 600; color: #1a1a1a"
-                      >Contract #CNT-2025-044</span
-                    >
-                  </div>
-                  <div
-                    class="eal-actions-cell pt-0 pb-0"
-                    onclick="event.stopPropagation()"
-                  >
-                    <button class="eal-row-btn" title="Edit">
-                      <i class="bi bi-pencil"></i>
-                    </button>
-                  </div>
-                </div>
-                <div class="collapse show" id="contractCollapse1">
-                  <div class="cd-details-body">
-                    <div class="cd-grid-row">
-                      <div class="cd-field">
-                        <span class="cd-field-label">Contract No.</span>
-                        <span class="cd-field-value">CNT-2025-044</span>
-                      </div>
-                      <div class="cd-field">
-                        <span class="cd-field-label">Client Account</span>
-                        <span class="cd-field-value"
-                          >Al Safa Logistics (CA-000123)</span
-                        >
-                      </div>
-                    </div>
-                    <div class="cd-grid-row">
-                      <div class="cd-field">
-                        <span class="cd-field-label">Start Date</span>
-                        <span class="cd-field-value">01 Jan 2025</span>
-                      </div>
-                      <div class="cd-field">
-                        <span class="cd-field-label">End Date</span>
-                        <span class="cd-field-value">31 Dec 2025</span>
-                      </div>
-                    </div>
-                    <div class="cd-grid-row">
-                      <div class="cd-field">
-                        <span class="cd-field-label">Status</span>
-                        <span class="cd-field-value">
-                          <span
-                            class="status-badge active"
-                            style="background: #e6f8ef; color: #0d894f"
-                            >Active</span
-                          >
-                        </span>
-                      </div>
-                      <div class="cd-field">
-                        <span class="cd-field-label">Contract Attachment</span>
-                        <span class="cd-field-value">
-                          <a
-                            href="#"
-                            style="
-                              text-decoration: none;
-                              display: inline-flex;
-                              align-items: center;
-                              gap: 6px;
-                              color: #5051f9;
-                              font-size: 0.9rem;
-                              font-weight: 500;
-                            "
-                          >
-                            <i
-                              class="bi bi-file-earmark-pdf"
-                              style="font-size: 1.1rem"
-                            ></i>
-                            Annual_Logistics_SLA_2025.pdf
-                          </a>
-                        </span>
-                      </div>
-                    </div>
-                    <div
-                      class="cd-grid-row"
-                      style="
-                        border-bottom: none;
-                        margin-bottom: 0;
-                        padding-bottom: 0;
-                      "
-                    >
-                      <div class="cd-field" style="grid-column: 1 / -1">
-                        <span class="cd-field-label">Notes</span>
-                        <span
-                          class="cd-field-value"
-                          style="
-                            font-weight: 400;
-                            font-size: 0.9rem;
-                            color: #4a4a4a;
-                            line-height: 1.5;
-                          "
-                          >Annual Logistics SLA 2025 covering all inbound and
-                          outbound transport operations, with specific clauses
-                          for fuel surcharges and performance penalties.</span
-                        >
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Contract 2 -->
-              <div class="cd-details-section mb-4">
-                <div
-                  class="cd-details-header d-flex justify-content-between align-items-center"
-                  data-bs-toggle="collapse"
-                  href="#contractCollapse2"
-                  role="button"
-                  aria-expanded="true"
-                  aria-controls="contractCollapse2"
-                >
-                  <div class="d-flex align-items-center gap-2">
-                    <i
-                      class="bi bi-chevron-down collapse-icon me-1 text-muted"
-                    ></i>
-                    <span style="font-weight: 600; color: #1a1a1a"
-                      >Contract #CNT-2024-112</span
-                    >
-                  </div>
-                  <div
-                    class="eal-actions-cell pt-0 pb-0"
-                    onclick="event.stopPropagation()"
-                  >
-                    <button class="eal-row-btn" title="Edit">
-                      <i class="bi bi-pencil"></i>
-                    </button>
-                  </div>
-                </div>
-                <div class="collapse show" id="contractCollapse2">
-                  <div class="cd-details-body">
-                    <div class="cd-grid-row">
-                      <div class="cd-field">
-                        <span class="cd-field-label">Contract No.</span>
-                        <span class="cd-field-value">CNT-2024-112</span>
-                      </div>
-                      <div class="cd-field">
-                        <span class="cd-field-label">Client Account</span>
-                        <span class="cd-field-value"
-                          >Al Safa Logistics (CA-000123)</span
-                        >
-                      </div>
-                    </div>
-                    <div class="cd-grid-row">
-                      <div class="cd-field">
-                        <span class="cd-field-label">Start Date</span>
-                        <span class="cd-field-value">01 Jun 2024</span>
-                      </div>
-                      <div class="cd-field">
-                        <span class="cd-field-label">End Date</span>
-                        <span class="cd-field-value">31 May 2025</span>
-                      </div>
-                    </div>
-                    <div class="cd-grid-row">
-                      <div class="cd-field">
-                        <span class="cd-field-label">Status</span>
-                        <span class="cd-field-value">
-                          <span
-                            class="status-badge active"
-                            style="background: #e6f8ef; color: #0d894f"
-                            >Active</span
-                          >
-                        </span>
-                      </div>
-                      <div class="cd-field">
-                        <span class="cd-field-label">Contract Attachment</span>
-                        <span class="cd-field-value">
-                          <a
-                            href="#"
-                            style="
-                              text-decoration: none;
-                              display: inline-flex;
-                              align-items: center;
-                              gap: 6px;
-                              color: #5051f9;
-                              font-size: 0.9rem;
-                              font-weight: 500;
-                            "
-                          >
-                            <i
-                              class="bi bi-file-earmark-pdf"
-                              style="font-size: 1.1rem"
-                            ></i>
-                            Warehousing_Agreement_2024.pdf
-                          </a>
-                        </span>
-                      </div>
-                    </div>
-                    <div
-                      class="cd-grid-row"
-                      style="
-                        border-bottom: none;
-                        margin-bottom: 0;
-                        padding-bottom: 0;
-                      "
-                    >
-                      <div class="cd-field" style="grid-column: 1 / -1">
-                        <span class="cd-field-label">Notes</span>
-                        <span
-                          class="cd-field-value"
-                          style="
-                            font-weight: 400;
-                            font-size: 0.9rem;
-                            color: #4a4a4a;
-                            line-height: 1.5;
-                          "
-                          >Warehousing agreement covering cold storage and
-                          ambient temperature handling. Includes specific
-                          inventory count frequency.</span
-                        >
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Contract 3 -->
+              {% if client_contract %}
               <div class="cd-details-section">
-                <div
-                  class="cd-details-header d-flex justify-content-between align-items-center collapsed"
-                  data-bs-toggle="collapse"
-                  href="#contractCollapse3"
-                  role="button"
-                  aria-expanded="false"
-                  aria-controls="contractCollapse3"
-                >
-                  <div class="d-flex align-items-center gap-2">
-                    <i
-                      class="bi bi-chevron-down collapse-icon me-1 text-muted"
-                    ></i>
-                    <span style="font-weight: 600; color: #1a1a1a"
-                      >Contract #CNT-2023-088</span
-                    >
+                <div class="cd-details-header">Current Client Contract</div>
+                <div class="cd-details-body">
+                  <div class="cd-grid-row">
+                    <div class="cd-field">
+                      <span class="cd-field-label">Contract No.</span>
+                      <span class="cd-field-value">{{ client_contract.contract_no }}</span>
+                    </div>
+                    <div class="cd-field">
+                      <span class="cd-field-label">Status</span>
+                      <span class="cd-field-value">{{ client_contract.status }}</span>
+                    </div>
                   </div>
-                  <div
-                    class="eal-actions-cell pt-0 pb-0"
-                    onclick="event.stopPropagation()"
-                  >
-                    <button class="eal-row-btn" title="Edit">
-                      <i class="bi bi-pencil"></i>
-                    </button>
+                  <div class="cd-grid-row">
+                    <div class="cd-field">
+                      <span class="cd-field-label">Start Date</span>
+                      <span class="cd-field-value">{{ client_contract.start_date|date:"d M Y" }}</span>
+                    </div>
+                    <div class="cd-field">
+                      <span class="cd-field-label">End Date</span>
+                      <span class="cd-field-value">{{ client_contract.end_date|date:"d M Y" }}</span>
+                    </div>
                   </div>
-                </div>
-                <div class="collapse" id="contractCollapse3">
-                  <div class="cd-details-body">
-                    <div class="cd-grid-row">
-                      <div class="cd-field">
-                        <span class="cd-field-label">Contract No.</span>
-                        <span class="cd-field-value">CNT-2023-088</span>
-                      </div>
-                      <div class="cd-field">
-                        <span class="cd-field-label">Client Account</span>
-                        <span class="cd-field-value"
-                          >Al Safa Logistics (CA-000123)</span
-                        >
-                      </div>
+                  <div class="cd-grid-row">
+                    <div class="cd-field" style="grid-column: 1 / -1">
+                      <span class="cd-field-label">Notes</span>
+                      <span class="cd-field-value">{{ client_contract.notes|default:"—" }}</span>
                     </div>
-                    <div class="cd-grid-row">
-                      <div class="cd-field">
-                        <span class="cd-field-label">Start Date</span>
-                        <span class="cd-field-value">01 Jan 2023</span>
-                      </div>
-                      <div class="cd-field">
-                        <span class="cd-field-label">End Date</span>
-                        <span class="cd-field-value">31 Dec 2023</span>
-                      </div>
-                    </div>
-                    <div class="cd-grid-row">
-                      <div class="cd-field">
-                        <span class="cd-field-label">Status</span>
-                        <span class="cd-field-value">
-                          <span
-                            class="status-badge inactive"
-                            style="background: #f1f5f9; color: #64748b"
-                            >Expired</span
-                          >
-                        </span>
-                      </div>
-                      <div class="cd-field">
-                        <span class="cd-field-label">Contract Attachment</span>
-                        <span class="cd-field-value">
-                          <a
-                            href="#"
-                            style="
-                              text-decoration: none;
-                              display: inline-flex;
-                              align-items: center;
-                              gap: 6px;
-                              color: #64748b;
-                              font-size: 0.9rem;
-                              font-weight: 500;
-                            "
-                          >
-                            <i
-                              class="bi bi-file-earmark-pdf"
-                              style="font-size: 1.1rem"
-                            ></i>
-                            Transport_SLA_2023.pdf
-                          </a>
-                        </span>
-                      </div>
-                    </div>
-                    <div
-                      class="cd-grid-row"
-                      style="
-                        border-bottom: none;
-                        margin-bottom: 0;
-                        padding-bottom: 0;
-                      "
-                    >
-                      <div class="cd-field" style="grid-column: 1 / -1">
-                        <span class="cd-field-label">Notes</span>
-                        <span
-                          class="cd-field-value"
-                          style="
-                            font-weight: 400;
-                            font-size: 0.9rem;
-                            color: #4a4a4a;
-                            line-height: 1.5;
-                          "
-                          >Expired contract - Replaced by CNT-2025-044.</span
-                        >
-                      </div>
+                  </div>
+                  <div class="cd-grid-row" style="border-bottom:none;margin-bottom:0;padding-bottom:0;">
+                    <div class="cd-field">
+                      <span class="cd-field-label">Contract Attachment</span>
+                      <span class="cd-field-value">
+                        {% if client_contract.contract_attachment %}
+                        <a href="{{ client_contract.contract_attachment.url }}" target="_blank" rel="noopener">
+                          {{ client_contract.contract_attachment.name }}
+                        </a>
+                        {% else %}
+                        —
+                        {% endif %}
+                      </span>
                     </div>
                   </div>
                 </div>
               </div>
+              {% else %}
+              <div class="cd-empty">No contract found for this client in this tenant.</div>
+              {% endif %}
             </div>
 
             <!-- Contacts Pane -->
             <div class="tab-pane fade" id="pane-contacts" role="tabpanel">
               <div class="d-flex justify-content-between align-items-center mb-3">
                 <h4 class="m-0" style="font-size: 1.1rem; font-weight: 600; color: #1a1a1a">Client Contacts</h4>
-                <a href="{% url 'iroad_tenants:tenant_client_contacts' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Add Contact</a>
+                <a href="{% url 'iroad_tenants:tenant_client_contacts' %}?client_account={{ client_detail.account_no|urlencode }}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Add Contact</a>
               </div>
-              <!-- Contact 1 -->
-              <div class="cd-details-section mb-4">
-                <div class="cd-details-header d-flex justify-content-between align-items-center" data-bs-toggle="collapse" href="#contactCollapse1" role="button" aria-expanded="true" aria-controls="contactCollapse1">
-                  <div class="d-flex align-items-center gap-2">
-                    <i class="bi bi-chevron-down collapse-icon me-1 text-muted"></i>
-                    <span class="eal-type-badge ind" style="background: #eef2ff; color: #4f46e5; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px;"><i class="bi bi-person-star"></i> Primary Contact</span>
-                    <span style="font-weight: 600; color: #1a1a1a">Ahmad Al-Ghamdi</span>
-                  </div>
-                  <div class="eal-actions-cell pt-0 pb-0" onclick="event.stopPropagation()">
-                    <button class="eal-row-btn" title="Edit"><i class="bi bi-pencil"></i></button>
-                  </div>
-                </div>
-                <div class="collapse show" id="contactCollapse1">
-                  <div class="cd-details-body">
-                    <div class="cd-grid-row">
-                      <div class="cd-field">
-                        <span class="cd-field-label">Name</span>
-                        <span class="cd-field-value">Ahmad Al-Ghamdi</span>
-                      </div>
-                    </div>
-                    <div class="cd-grid-row">
-                      <div class="cd-field">
-                        <span class="cd-field-label">Email</span>
-                        <span class="cd-field-value">ahmad.g@alsafa.com</span>
-                      </div>
-                      <div class="cd-field">
-                        <span class="cd-field-label">Mobile Number</span>
-                        <span class="cd-field-value">+966 50 123 4567</span>
-                      </div>
-                    </div>
-                    <div class="cd-grid-row">
-                      <div class="cd-field">
-                        <span class="cd-field-label">Telephone Number</span>
-                        <span class="cd-field-value">+966 12 345 6789</span>
-                      </div>
-                      <div class="cd-field">
-                        <span class="cd-field-label">Extension</span>
-                        <span class="cd-field-value">104</span>
-                      </div>
-                    </div>
-                    <div class="cd-grid-row">
-                      <div class="cd-field">
-                        <span class="cd-field-label">Position</span>
-                        <span class="cd-field-value">Logistics Manager</span>
-                      </div>
-                      <div class="cd-field">
-                        <span class="cd-field-label">Status</span>
-                        <span class="cd-field-value">
-                          <span class="status-badge active" style="background:#e6f8ef;color:#0d894f">Active</span>
-                        </span>
-                      </div>
-                    </div>
-                  </div>
+              {% if client_contacts %}
+              <div class="eal-table-card mt-0">
+                <div class="eal-table-wrap" style="border: none; box-shadow: none;">
+                  <table class="eal-table mb-0">
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Mobile</th>
+                        <th>Telephone</th>
+                        <th>Extension</th>
+                        <th>Position</th>
+                        <th>Type</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for contact in client_contacts %}
+                      <tr>
+                        <td>{{ contact.name }}</td>
+                        <td>{{ contact.email|default:"—" }}</td>
+                        <td>{{ contact.mobile_number|default:"—" }}</td>
+                        <td>{{ contact.telephone_number|default:"—" }}</td>
+                        <td>{{ contact.extension|default:"—" }}</td>
+                        <td>{{ contact.position|default:"—" }}</td>
+                        <td>{% if contact.is_primary %}Primary{% else %}Secondary{% endif %}</td>
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
                 </div>
               </div>
-
-              <!-- Contact 2 -->
-              <div class="cd-details-section">
-                <div class="cd-details-header d-flex justify-content-between align-items-center" data-bs-toggle="collapse" href="#contactCollapse2" role="button" aria-expanded="false" aria-controls="contactCollapse2">
-                  <div class="d-flex align-items-center gap-2">
-                    <i class="bi bi-chevron-down collapse-icon me-1 text-muted" style="transform: rotate(-90deg);"></i>
-                    <span class="eal-type-badge ind" style="background: #f1f5f9; color: #64748b; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px;"><i class="bi bi-person"></i> Secondary Contact</span>
-                    <span style="font-weight: 600; color: #1a1a1a">Sarah Ali</span>
-                  </div>
-                  <div class="eal-actions-cell pt-0 pb-0" onclick="event.stopPropagation()">
-                    <button class="eal-row-btn" title="Edit"><i class="bi bi-pencil"></i></button>
-                  </div>
-                </div>
-                <div class="collapse" id="contactCollapse2">
-                  <div class="cd-details-body">
-                    <div class="cd-grid-row">
-                      <div class="cd-field">
-                        <span class="cd-field-label">Client Account</span>
-                        <span class="cd-field-value">Alsafa Transport Group</span>
-                      </div>
-                      <div class="cd-field">
-                        <span class="cd-field-label">Name</span>
-                        <span class="cd-field-value">Sarah Ali</span>
-                      </div>
-                    </div>
-                    <div class="cd-grid-row">
-                      <div class="cd-field">
-                        <span class="cd-field-label">Email</span>
-                        <span class="cd-field-value">sarah.ali@alsafa.com</span>
-                      </div>
-                      <div class="cd-field">
-                        <span class="cd-field-label">Mobile Number</span>
-                        <span class="cd-field-value">+966 55 987 6543</span>
-                      </div>
-                    </div>
-                    <div class="cd-grid-row">
-                      <div class="cd-field">
-                        <span class="cd-field-label">Telephone Number</span>
-                        <span class="cd-field-value">—</span>
-                      </div>
-                      <div class="cd-field">
-                        <span class="cd-field-label">Extension</span>
-                        <span class="cd-field-value">223</span>
-                      </div>
-                    </div>
-                    <div class="cd-grid-row">
-                      <div class="cd-field">
-                        <span class="cd-field-label">Position</span>
-                        <span class="cd-field-value">Finance Director</span>
-                      </div>
-                      <div class="cd-field">
-                        <span class="cd-field-label">Status</span>
-                        <span class="cd-field-value">
-                          <span class="status-badge active" style="background:#e6f8ef;color:#0d894f">Active</span>
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              {% else %}
+              <div class="cd-empty">No contacts found for this client in this tenant.</div>
+              {% endif %}
             </div>
 
             <!-- Attachments Pane -->
             <div class="tab-pane fade" id="pane-attachments" role="tabpanel">
               <div class="d-flex justify-content-between align-items-center mb-3">
                 <h4 class="m-0" style="font-size: 1.1rem; font-weight: 600; color: #1a1a1a">Attachments & Documents</h4>
-                <a href="{% url 'iroad_tenants:tenant_client_attachments' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Upload File</a>
+                <a href="{% url 'iroad_tenants:tenant_client_attachments_create' %}?client_account={{ client_detail.account_no|urlencode }}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Upload File</a>
               </div>
+              {% if client_attachments %}
               <div class="eal-table-card mt-0">
-                  <div class="eal-table-wrap" style="border: none; box-shadow: none;">
-                    <table class="eal-table mb-0">
-                      <thead>
-                        <tr>
-                          <th>Title</th>
-                          <th>Date</th>
-                          <th>Expiry Date</th>
-                          <th>Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr>
-                          <td>
-                            <i class="bi bi-file-earmark-pdf text-danger mx-1"></i> Commercial_Registration.pdf
-                          </td>
-                          <td>12 Jan 2026</td>
-                          <td>12 Jan 2027</td>
-                          <td>
-                            <span class="status-badge active" style="background:#e6f8ef;color:#0d894f">Active</span>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td>
-                            <i class="bi bi-file-earmark-pdf text-danger mx-1"></i> VAT_Certificate_2026.pdf
-                          </td>
-                          <td>15 Jan 2026</td>
-                          <td>31 Dec 2026</td>
-                          <td>
-                            <span class="status-badge active" style="background:#e6f8ef;color:#0d894f">Active</span>
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
+                <div class="eal-table-wrap" style="border: none; box-shadow: none;">
+                  <table class="eal-table mb-0">
+                    <thead>
+                      <tr>
+                        <th>File Name</th>
+                        <th>Date</th>
+                        <th>Expiry Date</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for attachment in client_attachments %}
+                      <tr>
+                        <td>
+                          {% if attachment.attachment_file %}
+                          <a href="{{ attachment.attachment_file.url }}" target="_blank" rel="noopener">
+                            <span class="eal-pi-number">
+                              {% with file_name=attachment.file_name|default:attachment.attachment_no|lower %}
+                              {% if ".pdf" in file_name %}
+                              <i class="bi bi-file-earmark-pdf text-danger"></i>
+                              {% elif ".png" in file_name or ".jpg" in file_name or ".jpeg" in file_name or ".gif" in file_name or ".webp" in file_name %}
+                              <i class="bi bi-file-earmark-image text-primary"></i>
+                              {% else %}
+                              <i class="bi bi-file-earmark"></i>
+                              {% endif %}
+                              {% endwith %}
+                              {{ attachment.file_name|default:attachment.attachment_no }}
+                            </span>
+                          </a>
+                          {% else %}
+                          <span class="eal-pi-number">
+                            <i class="bi bi-file-earmark"></i>
+                            {{ attachment.attachment_no }}
+                          </span>
+                          {% endif %}
+                        </td>
+                        <td>{{ attachment.attachment_date|date:"d M Y" }}</td>
+                        <td>{% if attachment.expiry_date %}{{ attachment.expiry_date|date:"d M Y" }}{% else %}—{% endif %}</td>
+                        <td>
+                          <span class="status-badge {% if attachment.status == 'Expired' %}expired{% elif attachment.status == 'Valid' %}active{% else %}inactive{% endif %}">
+                            {{ attachment.status }}
+                          </span>
+                        </td>
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
               </div>
+              {% else %}
+              <div class="cd-empty">No attachments found for this client in this tenant.</div>
+              {% endif %}
             </div>
 
             <!-- Price Lists Pane -->
@@ -2058,70 +1741,19 @@
 {% endblock %}
 
 {% block extra_js %}
+{% if client_detail %}
+{{ client_detail|json_script:"client-detail-data" }}
+{% endif %}
 <script>
       (function () {
-        var STORAGE_KEY = "ir_clients_v1";
-        var DEMO_CLIENT = {
-          account_no: "CA-000123",
-          client_type: "Business",
-          status: "Active",
-          created_at: "Jan 28, 2026, 03:52 PM",
-          name_arabic: "شركة الصفا للخدمات اللوجستية",
-          name_english: "Al Safa Logistics",
-          display_name: "Al Safa Logistics",
-          preferred_currency: "SAR",
-          billing_street_1: "King Fahd Rd, Building 12",
-          billing_street_2: "Floor 4, Office 402",
-          billing_city: "Riyadh",
-          billing_region: "Riyadh",
-          postal_code: "11564",
-          country: "SA",
-          commercial_registration_no: "CR-1234567890",
-          tax_registration_no: "TR-9876543210",
-        };
-
-        function getIdFromQuery() {
+        var dataNode = document.getElementById("client-detail-data");
+        var client = null;
+        if (dataNode) {
           try {
-            var params = new URLSearchParams(window.location.search);
-            return (params.get("id") || "").trim();
+            client = JSON.parse(dataNode.textContent || "{}");
           } catch (e) {
-            return "";
+            client = null;
           }
-        }
-
-        function loadClients() {
-          try {
-            var raw = localStorage.getItem(STORAGE_KEY);
-            var parsed = raw ? JSON.parse(raw) : [];
-            return Array.isArray(parsed) ? parsed : [];
-          } catch (e) {
-            return [];
-          }
-        }
-
-        function ensureDemoClient() {
-          var clients = loadClients();
-          var exists = false;
-          for (var i = 0; i < clients.length; i++) {
-            if (
-              clients[i] &&
-              clients[i].account_no === DEMO_CLIENT.account_no
-            ) {
-              exists = true;
-              break;
-            }
-          }
-          if (!exists) {
-            clients.unshift(DEMO_CLIENT);
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(clients));
-          }
-        }
-
-        function byId(list, id) {
-          for (var i = 0; i < list.length; i++) {
-            if (list[i] && list[i].account_no === id) return list[i];
-          }
-          return null;
         }
 
         function setText(id, value) {
@@ -2145,14 +1777,16 @@
           return value;
         }
 
-        var id = getIdFromQuery();
-        // Seed the demo client so `?id=CA-000123` always works for demos.
-        ensureDemoClient();
-        var client = id ? byId(loadClients(), id) : null;
-
-        // Fall back to demo client if no ID provided or client not found
         if (!client) {
-          client = DEMO_CLIENT;
+          var detailsCard = document.querySelector(".cd-main-card");
+          var headerCard = document.querySelector(".ch-header-card");
+          var actionBar = document.querySelector(".ch-actions");
+          var notFound = document.getElementById("notFound");
+          if (detailsCard) detailsCard.classList.add("d-none");
+          if (headerCard) headerCard.classList.add("d-none");
+          if (actionBar) actionBar.classList.add("d-none");
+          if (notFound) notFound.classList.remove("d-none");
+          return;
         }
 
         setDocTitle(client);
@@ -2211,6 +1845,55 @@
           var isBiz = (client.client_type || "").toLowerCase() === "business";
           notice.classList.toggle("d-none", isBiz);
         }
+
+        // Keep tab behavior deterministic: active tab and pane stay in sync.
+        var tabs = Array.prototype.slice.call(
+          document.querySelectorAll(".cd-tab[data-bs-target]"),
+        );
+        var panes = Array.prototype.slice.call(
+          document.querySelectorAll(".tab-content > .tab-pane"),
+        );
+
+        function activateTabBySelector(targetSelector) {
+          if (!targetSelector || targetSelector.charAt(0) !== "#") return;
+          var targetPane = document.querySelector(targetSelector);
+          if (!targetPane) return;
+
+          tabs.forEach(function (tab) {
+            var isActive = tab.getAttribute("data-bs-target") === targetSelector;
+            tab.classList.toggle("active", isActive);
+            tab.setAttribute("aria-selected", isActive ? "true" : "false");
+          });
+
+          panes.forEach(function (pane) {
+            var isTarget = pane === targetPane;
+            pane.classList.toggle("show", isTarget);
+            pane.classList.toggle("active", isTarget);
+          });
+        }
+
+        tabs.forEach(function (tab) {
+          tab.addEventListener("click", function (event) {
+            event.preventDefault();
+            activateTabBySelector(tab.getAttribute("data-bs-target"));
+          });
+        });
+
+        // Ensure initial state is consistent (or honor hash if present).
+        var initialTarget = window.location.hash || (
+          document.querySelector(".cd-tab.active") &&
+          document.querySelector(".cd-tab.active").getAttribute("data-bs-target")
+        ) || "#pane-overview";
+        activateTabBySelector(initialTarget);
+
+        // Keep prototype links visually intact but prevent navigation to static .html files.
+        Array.prototype.slice
+          .call(document.querySelectorAll('a[href$=".html"]'))
+          .forEach(function (link) {
+            link.addEventListener("click", function (event) {
+              event.preventDefault();
+            });
+          });
       })();
     </script>
 {% endblock %}

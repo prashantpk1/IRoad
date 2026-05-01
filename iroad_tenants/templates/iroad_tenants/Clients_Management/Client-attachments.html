@@ -37,7 +37,13 @@
       </div>
 
       <!-- Client Attachment Form -->
-      <form id="clientAttachmentForm">
+      <form
+        id="clientAttachmentForm"
+        method="post"
+        enctype="multipart/form-data"
+        action="{% url 'iroad_tenants:tenant_client_attachments_create' %}"
+      >
+        {% csrf_token %}
         <!-- Section 1: Attachment Details -->
         <div class="form-card" data-section="1">
           <div class="form-card-header">
@@ -61,14 +67,17 @@
                     >Client Account
                     <span class="required">*</span>
                   </label>
-                  <select class="form-select" id="clientAccount">
+                  <select class="form-select {% if form_errors.client_account %}is-invalid{% endif %}" id="clientAccount" name="client_account" required>
                     <option value="" selected disabled>
                       -Select client account-
                     </option>
-                    <option value="client1">Client Account 1</option>
-                    <option value="client2">Client Account 2</option>
-                    <option value="client3">Client Account 3</option>
+                    {% for account in client_account_options %}
+                    <option value="{{ account.account_no }}" {% if form_data.client_account == account.account_no %}selected{% endif %}>
+                      {{ account.account_no }} - {{ account.display_name|default:account.name_english }}
+                    </option>
+                    {% endfor %}
                   </select>
+                  {% if form_errors.client_account %}<div class="invalid-feedback d-block">{{ form_errors.client_account }}</div>{% endif %}
                   <span class="field-hint"
                     >Select the client this attachment belongs to</span
                   >
@@ -82,10 +91,14 @@
                     <i class="bi bi-calendar-event"></i>
                     <input
                       type="date"
-                      class="form-control has-icon"
+                      class="form-control has-icon {% if form_errors.attachment_date %}is-invalid{% endif %}"
                       id="attachmentDate"
+                      name="attachment_date"
+                      value="{{ form_data.attachment_date|default:'' }}"
+                      required
                     />
                   </div>
+                  {% if form_errors.attachment_date %}<div class="invalid-feedback d-block">{{ form_errors.attachment_date }}</div>{% endif %}
                   <span class="field-hint"
                     >Date the attachment was created or received</span
                   >
@@ -104,10 +117,10 @@
                   <label for="isExpiryApplicable" class="form-label"
                     >Is Expiry Applicable</label
                   >
-                  <select class="form-select" id="isExpiryApplicable">
-                    <option value="" selected disabled>-Select-</option>
-                    <option value="yes">Yes</option>
-                    <option value="no">No</option>
+                  <select class="form-select" id="isExpiryApplicable" name="is_expiry_applicable" required>
+                    <option value="" disabled>-Select-</option>
+                    <option value="true" {% if form_data.is_expiry_applicable == 'true' %}selected{% endif %}>Yes</option>
+                    <option value="false" {% if form_data.is_expiry_applicable|default:'false' == 'false' %}selected{% endif %}>No</option>
                   </select>
                   <span class="field-hint"
                     >Indicate if this attachment has an expiry date</span
@@ -119,22 +132,25 @@
                     <i class="bi bi-calendar-x"></i>
                     <input
                       type="date"
-                      class="form-control has-icon"
+                      class="form-control has-icon {% if form_errors.expiry_date %}is-invalid{% endif %}"
                       id="expiryDate"
+                      name="expiry_date"
+                      value="{{ form_data.expiry_date|default:'' }}"
                     />
                   </div>
+                  {% if form_errors.expiry_date %}<div class="invalid-feedback d-block">{{ form_errors.expiry_date }}</div>{% endif %}
                   <span class="field-hint"
                     >Applicable only if expiry is enabled</span
                   >
                 </div>
                 <div class="field">
                   <label for="status" class="form-label">Status</label>
-                  <select class="form-select" id="status">
-                    <option value="" selected disabled>-Select status-</option>
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                    <option value="expired">Expired</option>
+                  <select class="form-select" id="status" disabled>
+                    <option value="" selected>
+                      Derived automatically (Valid / Expired / Does Not Expire)
+                    </option>
                   </select>
+                  <span class="field-hint">Derived field (not user editable).</span>
                 </div>
               </div>
             </div>
@@ -166,10 +182,13 @@
                   </label>
                   <input
                     type="file"
-                    class="form-control"
+                    class="form-control {% if form_errors.attachment_file %}is-invalid{% endif %}"
                     id="attachmentFile"
+                    name="attachment_file"
                     accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif"
+                    required
                   />
+                  {% if form_errors.attachment_file %}<div class="invalid-feedback d-block">{{ form_errors.attachment_file }}</div>{% endif %}
                   <span class="field-hint"
                     >Supported formats: PDF, DOC, DOCX, XLS, XLSX, JPG, PNG, GIF
                     (Max 10MB)</span
@@ -190,9 +209,10 @@
                   <textarea
                     class="form-control"
                     id="fileNotes"
+                    name="file_notes"
                     rows="4"
                     placeholder="Enter any notes or description for this attachment..."
-                  ></textarea>
+                  >{{ form_data.file_notes|default:'' }}</textarea>
                   <span class="field-hint"
                     >Optional notes about the attachment content or
                     purpose</span
@@ -219,4 +239,26 @@
           </div>
         </div>
       </form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  (function () {
+    var expiryApplicable = document.getElementById("isExpiryApplicable");
+    var expiryDate = document.getElementById("expiryDate");
+    if (!expiryApplicable || !expiryDate) return;
+
+    function syncExpiryDateState() {
+      var isEnabled = expiryApplicable.value === "true";
+      expiryDate.disabled = !isEnabled;
+      expiryDate.required = isEnabled;
+      if (!isEnabled) {
+        expiryDate.value = "";
+      }
+    }
+
+    expiryApplicable.addEventListener("change", syncExpiryDateState);
+    syncExpiryDateState();
+  })();
+</script>
 {% endblock %}

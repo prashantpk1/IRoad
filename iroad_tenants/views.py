@@ -1,5 +1,7 @@
 import csv
 from decimal import Decimal
+from django.core.exceptions import ValidationError
+import re
 
 import logging
 import io
@@ -10,11 +12,12 @@ from django.urls import reverse
 from django.views import View
 from django.contrib import messages
 from django.contrib.auth.hashers import make_password
+from django.core.validators import validate_email
 from django.core.paginator import Paginator
 from django.db import connection
 from django.db import transaction as db_transaction
 from django.db.models import Q
-from django.utils.dateparse import parse_datetime
+from django.utils.dateparse import parse_date, parse_datetime
 from django.utils import timezone
 import os
 import uuid
@@ -60,6 +63,11 @@ from tenant_workspace.models import (
     AutoNumberSequence,
     OrganizationProfile,
     TenantClientAccount,
+    TenantClientAttachment,
+    TenantClientContact,
+    TenantClientContract,
+    TenantClientContractSetting,
+    TenantClientAccountSetting,
     TenantRole,
     TenantRolePermission,
     TenantUser,
@@ -1299,9 +1307,144 @@ class TenantSimplePageView(View):
 class TenantClientAccountView(TenantSimplePageView):
     template_name = 'iroad_tenants/Clients_Management/Client-account.html'
 
+    def get(self, request):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        if tenant_registry is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        try:
+            client_accounts = list(
+                TenantClientAccount.objects.order_by('-created_at')
+            )
+        finally:
+            connection.set_schema_to_public()
+        context.update(
+            {
+                'client_accounts': client_accounts,
+                'client_accounts_count': len(client_accounts),
+                'tenant_schema_name': tenant_registry.schema_name,
+            }
+        )
+        return render(request, self.template_name, context)
+
 
 class TenantClientAccountSettingsView(TenantSimplePageView):
     template_name = 'iroad_tenants/Clients_Management/Client-account-setting.html'
+
+    def _get_client_account_settings(self):
+        return TenantClientAccountSetting.objects.get_or_create(
+            defaults={
+                'require_national_id_individual': True,
+                'require_commercial_registration_business': False,
+                'require_tax_vat_registration_business': False,
+                'default_client_status': TenantClientAccountSetting.DefaultClientStatus.ACTIVE,
+                'default_client_type': TenantClientAccountSetting.DefaultClientType.INDIVIDUAL,
+                'default_preferred_currency': '',
+            }
+        )[0]
+
+    def _available_currencies(self):
+        return list(
+            Currency.objects.filter(is_active=True)
+            .order_by('name_en')
+            .values('currency_code', 'name_en')
+        )
+
+    def get(self, request):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        if tenant_registry is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        try:
+            settings_obj = self._get_client_account_settings()
+            context.update(
+                {
+                    'settings_data': settings_obj,
+                    'currency_options': self._available_currencies(),
+                    'tenant_schema_name': tenant_registry.schema_name,
+                }
+            )
+            return render(request, self.template_name, context)
+        finally:
+            connection.set_schema_to_public()
+
+    def post(self, request):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        if tenant_registry is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        try:
+            settings_obj = self._get_client_account_settings()
+            default_status = (request.POST.get('default_client_status') or '').strip()
+            default_type = (request.POST.get('default_client_type') or '').strip()
+            default_currency = (request.POST.get('default_preferred_currency') or '').strip().upper()
+
+            errors = {}
+            if default_status not in {
+                TenantClientAccountSetting.DefaultClientStatus.ACTIVE,
+                TenantClientAccountSetting.DefaultClientStatus.INACTIVE,
+            }:
+                errors['default_client_status'] = 'Invalid default status selected.'
+            if default_type not in {
+                TenantClientAccountSetting.DefaultClientType.INDIVIDUAL,
+                TenantClientAccountSetting.DefaultClientType.BUSINESS,
+            }:
+                errors['default_client_type'] = 'Invalid default client type selected.'
+
+            if default_currency:
+                currency_exists = Currency.objects.filter(
+                    currency_code=default_currency,
+                    is_active=True,
+                ).exists()
+                if not currency_exists:
+                    errors['default_preferred_currency'] = 'Default preferred currency must exist in active Currency Master.'
+
+            if errors:
+                context.update(
+                    {
+                        'settings_data': settings_obj,
+                        'settings_errors': errors,
+                        'currency_options': self._available_currencies(),
+                        'tenant_schema_name': tenant_registry.schema_name,
+                    }
+                )
+                messages.error(request, 'Please fix the highlighted setting errors.', extra_tags='tenant')
+                return render(request, self.template_name, context)
+
+            settings_obj.require_national_id_individual = request.POST.get('require_national_id_individual') == 'on'
+            settings_obj.require_commercial_registration_business = (
+                request.POST.get('require_commercial_registration_business') == 'on'
+            )
+            settings_obj.require_tax_vat_registration_business = (
+                request.POST.get('require_tax_vat_registration_business') == 'on'
+            )
+            settings_obj.default_client_status = default_status
+            settings_obj.default_client_type = default_type
+            settings_obj.default_preferred_currency = default_currency
+            settings_obj.save()
+
+            messages.success(request, 'Client account settings saved successfully.', extra_tags='tenant')
+            return _tenant_redirect(request, 'iroad_tenants:tenant_client_account_settings')
+        finally:
+            connection.set_schema_to_public()
 
 
 class TenantClientAccountCreateView(TenantSimplePageView):
@@ -1310,6 +1453,25 @@ class TenantClientAccountCreateView(TenantSimplePageView):
     CLIENT_FORM_CODE = 'client-account'
     CLIENT_FORM_LABEL = 'Client Account'
     CLIENT_REF_PREFIX = 'CA'
+
+    def _get_client_account_settings(self):
+        return TenantClientAccountSetting.objects.get_or_create(
+            defaults={
+                'require_national_id_individual': True,
+                'require_commercial_registration_business': False,
+                'require_tax_vat_registration_business': False,
+                'default_client_status': TenantClientAccountSetting.DefaultClientStatus.ACTIVE,
+                'default_client_type': TenantClientAccountSetting.DefaultClientType.INDIVIDUAL,
+                'default_preferred_currency': '',
+            }
+        )[0]
+
+    def _currency_options(self):
+        return list(
+            Currency.objects.filter(is_active=True)
+            .order_by('name_en')
+            .values('currency_code', 'name_en')
+        )
 
     def _base_form_data(self):
         return {
@@ -1320,6 +1482,7 @@ class TenantClientAccountCreateView(TenantSimplePageView):
             'name_arabic': '',
             'name_english': '',
             'display_name': '',
+            'national_id': '',
             'preferred_currency': '',
             'billing_street_1': '',
             'billing_street_2': '',
@@ -1358,6 +1521,75 @@ class TenantClientAccountCreateView(TenantSimplePageView):
         next_number = int(sequence.next_number if sequence else 1)
         return _render_tenant_ref_no(next_number, config, prefix=self.CLIENT_REF_PREFIX)
 
+    def _validate_form_data(self, form_data):
+        form_errors = {}
+        settings_obj = self._get_client_account_settings()
+        if form_data['client_type'] not in {
+            TenantClientAccount.ClientType.INDIVIDUAL,
+            TenantClientAccount.ClientType.BUSINESS,
+        }:
+            form_errors['client_type'] = 'Invalid client type selected.'
+        if form_data['status'] not in {
+            TenantClientAccount.Status.ACTIVE,
+            TenantClientAccount.Status.INACTIVE,
+        }:
+            form_errors['status'] = 'Invalid status selected.'
+        if not form_data['name_english']:
+            form_errors['name_english'] = 'Name (English) is required.'
+        if not form_data['display_name']:
+            form_errors['display_name'] = 'Display Name is required.'
+        if not form_data['preferred_currency']:
+            form_errors['preferred_currency'] = 'Preferred Currency is required.'
+        if not form_data['billing_street_1']:
+            form_errors['billing_street_1'] = 'Billing Street 1 is required.'
+        if not form_data['billing_city']:
+            form_errors['billing_city'] = 'Billing City is required.'
+        if not form_data['country']:
+            form_errors['country'] = 'Country is required.'
+
+        if form_data['client_type'] == TenantClientAccount.ClientType.INDIVIDUAL:
+            if settings_obj.require_national_id_individual and not form_data['national_id']:
+                form_errors['national_id'] = 'National ID is required for Individual client type.'
+            # Business-only values should not carry for individual clients.
+            form_data['commercial_registration_no'] = ''
+            form_data['tax_registration_no'] = ''
+
+        if form_data['client_type'] == TenantClientAccount.ClientType.BUSINESS:
+            # Individual-only values should not carry for business clients.
+            form_data['national_id'] = ''
+            if (
+                settings_obj.require_commercial_registration_business
+                and not form_data['commercial_registration_no']
+            ):
+                form_errors['commercial_registration_no'] = (
+                    'Commercial Registration No. is required for Business client type.'
+                )
+            if (
+                settings_obj.require_tax_vat_registration_business
+                and not form_data['tax_registration_no']
+            ):
+                form_errors['tax_registration_no'] = (
+                    'Tax/VAT Registration No. is required for Business client type.'
+                )
+
+        credit_limit_raw = form_data['credit_limit_amount'] or '0'
+        payment_term_raw = form_data['payment_term_days'] or '0'
+        try:
+            credit_limit_amount = Decimal(credit_limit_raw)
+            if credit_limit_amount < 0:
+                raise ValueError
+        except Exception:
+            form_errors['credit_limit_amount'] = 'Credit Limit Amount must be 0 or greater.'
+            credit_limit_amount = Decimal('0')
+        try:
+            payment_term_days = int(payment_term_raw)
+            if payment_term_days < 0:
+                raise ValueError
+        except Exception:
+            form_errors['payment_term_days'] = 'Payment Term (Days) must be 0 or greater.'
+            payment_term_days = 0
+        return form_errors, credit_limit_amount, payment_term_days
+
     def get(self, request):
         context = _tenant_context_from_session(request)
         if context is None:
@@ -1371,11 +1603,17 @@ class TenantClientAccountCreateView(TenantSimplePageView):
             return response
         try:
             form_data = self._base_form_data()
+            settings_obj = self._get_client_account_settings()
+            form_data['client_type'] = settings_obj.default_client_type or TenantClientAccount.ClientType.INDIVIDUAL
+            form_data['status'] = settings_obj.default_client_status or TenantClientAccount.Status.ACTIVE
+            form_data['preferred_currency'] = settings_obj.default_preferred_currency or ''
             form_data['account_no'] = self._build_preview_account_no()
             context.update(
                 {
                     'form_data': form_data,
                     'form_errors': {},
+                    'settings_data': settings_obj,
+                    'currency_options': self._currency_options(),
                     'tenant_schema_name': tenant_registry.schema_name,
                 }
             )
@@ -1395,47 +1633,8 @@ class TenantClientAccountCreateView(TenantSimplePageView):
             clear_tenant_portal_cookie(response, request=request)
             return response
         form_data = self._collect_form_data(request)
-        form_errors = {}
         try:
-            if form_data['client_type'] not in {
-                TenantClientAccount.ClientType.INDIVIDUAL,
-                TenantClientAccount.ClientType.BUSINESS,
-            }:
-                form_errors['client_type'] = 'Invalid client type selected.'
-            if form_data['status'] not in {
-                TenantClientAccount.Status.ACTIVE,
-                TenantClientAccount.Status.INACTIVE,
-            }:
-                form_errors['status'] = 'Invalid status selected.'
-            if not form_data['name_english']:
-                form_errors['name_english'] = 'Name (English) is required.'
-            if not form_data['display_name']:
-                form_errors['display_name'] = 'Display Name is required.'
-            if not form_data['preferred_currency']:
-                form_errors['preferred_currency'] = 'Preferred Currency is required.'
-            if not form_data['billing_street_1']:
-                form_errors['billing_street_1'] = 'Billing Street 1 is required.'
-            if not form_data['billing_city']:
-                form_errors['billing_city'] = 'Billing City is required.'
-            if not form_data['country']:
-                form_errors['country'] = 'Country is required.'
-
-            credit_limit_raw = form_data['credit_limit_amount'] or '0'
-            payment_term_raw = form_data['payment_term_days'] or '0'
-            try:
-                credit_limit_amount = Decimal(credit_limit_raw)
-                if credit_limit_amount < 0:
-                    raise ValueError
-            except Exception:
-                form_errors['credit_limit_amount'] = 'Credit Limit Amount must be 0 or greater.'
-                credit_limit_amount = Decimal('0')
-            try:
-                payment_term_days = int(payment_term_raw)
-                if payment_term_days < 0:
-                    raise ValueError
-            except Exception:
-                form_errors['payment_term_days'] = 'Payment Term (Days) must be 0 or greater.'
-                payment_term_days = 0
+            form_errors, credit_limit_amount, payment_term_days = self._validate_form_data(form_data)
 
             if form_errors:
                 form_data['account_no'] = self._build_preview_account_no()
@@ -1443,6 +1642,8 @@ class TenantClientAccountCreateView(TenantSimplePageView):
                     {
                         'form_data': form_data,
                         'form_errors': form_errors,
+                        'settings_data': self._get_client_account_settings(),
+                        'currency_options': self._currency_options(),
                         'tenant_schema_name': tenant_registry.schema_name,
                     }
                 )
@@ -1462,6 +1663,7 @@ class TenantClientAccountCreateView(TenantSimplePageView):
                 name_arabic=form_data['name_arabic'],
                 name_english=form_data['name_english'],
                 display_name=form_data['display_name'],
+                national_id=form_data['national_id'],
                 preferred_currency=form_data['preferred_currency'],
                 billing_street_1=form_data['billing_street_1'],
                 billing_street_2=form_data['billing_street_2'],
@@ -1486,36 +1688,1128 @@ class TenantClientAccountCreateView(TenantSimplePageView):
             connection.set_schema_to_public()
 
 
+class TenantClientAccountEditView(TenantClientAccountCreateView):
+    """Edit existing tenant client account."""
+
+    def _form_data_from_model(self, client):
+        return {
+            'account_no': client.account_no,
+            'created_at': timezone.localtime(client.created_at).strftime('%b %d, %Y, %I:%M %p'),
+            'client_type': client.client_type,
+            'status': client.status,
+            'name_arabic': client.name_arabic,
+            'name_english': client.name_english,
+            'display_name': client.display_name,
+            'national_id': client.national_id,
+            'preferred_currency': client.preferred_currency,
+            'billing_street_1': client.billing_street_1,
+            'billing_street_2': client.billing_street_2,
+            'billing_city': client.billing_city,
+            'billing_region': client.billing_region,
+            'postal_code': client.postal_code,
+            'country': client.country,
+            'credit_limit_amount': str(client.credit_limit_amount),
+            'limit_currency_code': client.limit_currency_code or 'SAR',
+            'payment_term_days': str(client.payment_term_days),
+            'commercial_registration_no': client.commercial_registration_no,
+            'tax_registration_no': client.tax_registration_no,
+        }
+
+    def get(self, request, account_no):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        if tenant_registry is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        try:
+            client = TenantClientAccount.objects.filter(account_no=account_no).first()
+            if client is None:
+                messages.error(request, 'Client account not found.', extra_tags='tenant')
+                return _tenant_redirect(request, 'iroad_tenants:tenant_client_account')
+            context.update(
+                {
+                    'form_data': self._form_data_from_model(client),
+                    'form_errors': {},
+                    'settings_data': self._get_client_account_settings(),
+                    'currency_options': self._currency_options(),
+                    'is_edit_mode': True,
+                    'editing_account_no': client.account_no,
+                    'tenant_schema_name': tenant_registry.schema_name,
+                }
+            )
+            return render(request, self.template_name, context)
+        finally:
+            connection.set_schema_to_public()
+
+    def post(self, request, account_no):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        if tenant_registry is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        form_data = self._collect_form_data(request)
+        form_data['account_no'] = account_no
+        try:
+            client = TenantClientAccount.objects.filter(account_no=account_no).first()
+            if client is None:
+                messages.error(request, 'Client account not found.', extra_tags='tenant')
+                return _tenant_redirect(request, 'iroad_tenants:tenant_client_account')
+
+            form_errors, credit_limit_amount, payment_term_days = self._validate_form_data(form_data)
+            if form_errors:
+                context.update(
+                    {
+                        'form_data': form_data,
+                        'form_errors': form_errors,
+                        'settings_data': self._get_client_account_settings(),
+                        'currency_options': self._currency_options(),
+                        'is_edit_mode': True,
+                        'editing_account_no': account_no,
+                        'tenant_schema_name': tenant_registry.schema_name,
+                    }
+                )
+                messages.error(request, 'Please fix the highlighted errors.', extra_tags='tenant')
+                return render(request, self.template_name, context)
+
+            client.client_type = form_data['client_type']
+            client.status = form_data['status']
+            client.name_arabic = form_data['name_arabic']
+            client.name_english = form_data['name_english']
+            client.display_name = form_data['display_name']
+            client.national_id = form_data['national_id']
+            client.preferred_currency = form_data['preferred_currency']
+            client.billing_street_1 = form_data['billing_street_1']
+            client.billing_street_2 = form_data['billing_street_2']
+            client.billing_city = form_data['billing_city']
+            client.billing_region = form_data['billing_region']
+            client.postal_code = form_data['postal_code']
+            client.country = form_data['country']
+            client.credit_limit_amount = credit_limit_amount
+            client.limit_currency_code = form_data['limit_currency_code'] or 'SAR'
+            client.payment_term_days = payment_term_days
+            client.commercial_registration_no = form_data['commercial_registration_no']
+            client.tax_registration_no = form_data['tax_registration_no']
+            client.save()
+
+            messages.success(
+                request,
+                f'Client account {account_no} updated successfully.',
+                extra_tags='tenant',
+            )
+            return _tenant_redirect(request, 'iroad_tenants:tenant_client_account')
+        finally:
+            connection.set_schema_to_public()
+
+
+class TenantClientAccountToggleStatusView(View):
+    """Activate/deactivate tenant client account."""
+
+    def post(self, request, account_no):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        if tenant_registry is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        try:
+            client = TenantClientAccount.objects.filter(account_no=account_no).first()
+            if client is None:
+                messages.error(request, 'Client account not found.', extra_tags='tenant')
+                return _tenant_redirect(request, 'iroad_tenants:tenant_client_account')
+            client.status = (
+                TenantClientAccount.Status.INACTIVE
+                if client.status == TenantClientAccount.Status.ACTIVE
+                else TenantClientAccount.Status.ACTIVE
+            )
+            client.save(update_fields=['status', 'updated_at'])
+            messages.success(
+                request,
+                f'Client account {account_no} status changed to {client.status}.',
+                extra_tags='tenant',
+            )
+            return _tenant_redirect(request, 'iroad_tenants:tenant_client_account')
+        finally:
+            connection.set_schema_to_public()
+
+
+class TenantClientAccountDeleteView(View):
+    """Delete tenant client account."""
+
+    def post(self, request, account_no):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        if tenant_registry is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        try:
+            client = TenantClientAccount.objects.filter(account_no=account_no).first()
+            if client is None:
+                messages.error(request, 'Client account not found.', extra_tags='tenant')
+                return _tenant_redirect(request, 'iroad_tenants:tenant_client_account')
+            client.delete()
+            messages.success(
+                request,
+                f'Client account {account_no} deleted successfully.',
+                extra_tags='tenant',
+            )
+            return _tenant_redirect(request, 'iroad_tenants:tenant_client_account')
+        finally:
+            connection.set_schema_to_public()
+
+
+class TenantClientSalesReportView(View):
+    """Entry action for Client Details -> Create Sales Report button."""
+
+    def get(self, request, account_no):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        if tenant_registry is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        try:
+            client = TenantClientAccount.objects.filter(account_no=account_no).first()
+            if client is None:
+                messages.error(request, 'Client account not found.', extra_tags='tenant')
+                return _tenant_redirect(request, 'iroad_tenants:tenant_client_account')
+
+            # Phase 1 bridge: Sales Report module URL is not implemented yet.
+            # Route user to billing/invoice area with contextual toast.
+            messages.info(
+                request,
+                f'Sales Report flow for {account_no} will open in billing module. (Phase 1 bridge)',
+                extra_tags='tenant',
+            )
+            return _tenant_redirect(request, 'iroad_tenants:tenant_subscription_billing')
+        finally:
+            connection.set_schema_to_public()
+
+
 class TenantClientAttachmentsView(TenantSimplePageView):
     template_name = 'iroad_tenants/Clients_Management/Client-attachments.html'
+
+    ATTACHMENT_FORM_CODE = 'client-attachment'
+    ATTACHMENT_FORM_LABEL = 'Client Attachment'
+    ATTACHMENT_REF_PREFIX = 'ATT'
+    ALLOWED_EXTENSIONS = {'.pdf', '.doc', '.docx', '.xls', '.xlsx', '.jpg', '.jpeg', '.png', '.gif'}
+    MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024
+
+    def _client_account_options(self):
+        return list(
+            TenantClientAccount.objects.order_by('account_no').values(
+                'account_no',
+                'display_name',
+                'name_english',
+            )
+        )
+
+    def _base_form_data(self):
+        return {
+            'client_account': '',
+            'attachment_date': timezone.localdate().isoformat(),
+            'is_expiry_applicable': 'false',
+            'expiry_date': '',
+            'file_notes': '',
+        }
+
+    def _collect_form_data(self, request):
+        return {
+            'client_account': (request.POST.get('client_account') or '').strip(),
+            'attachment_date': (request.POST.get('attachment_date') or '').strip(),
+            'is_expiry_applicable': (request.POST.get('is_expiry_applicable') or '').strip(),
+            'expiry_date': (request.POST.get('expiry_date') or '').strip(),
+            'file_notes': (request.POST.get('file_notes') or '').strip(),
+        }
+
+    def _build_preview_attachment_no(self):
+        config, _ = AutoNumberConfiguration.objects.get_or_create(
+            form_code=self.ATTACHMENT_FORM_CODE,
+            defaults={
+                'form_label': self.ATTACHMENT_FORM_LABEL,
+                'number_of_digits': 6,
+                'sequence_format': AutoNumberConfiguration.SequenceFormat.NUMERIC,
+                'is_unique': True,
+            },
+        )
+        sequence = AutoNumberSequence.objects.filter(form_code=self.ATTACHMENT_FORM_CODE).first()
+        next_number = int(sequence.next_number if sequence else 1)
+        return _render_tenant_ref_no(next_number, config, prefix=self.ATTACHMENT_REF_PREFIX)
+
+    def _validate_form(self, form_data, request):
+        errors = {}
+        client_account = TenantClientAccount.objects.filter(
+            account_no=form_data['client_account']
+        ).first()
+        if client_account is None:
+            errors['client_account'] = 'Please select a valid Client Account.'
+
+        attachment_date = parse_date(form_data['attachment_date'] or '')
+        if attachment_date is None:
+            errors['attachment_date'] = 'Attachment Date is required.'
+
+        is_expiry_applicable = form_data['is_expiry_applicable'] == 'true'
+        expiry_date = None
+        if is_expiry_applicable:
+            expiry_date = parse_date(form_data['expiry_date'] or '')
+            if expiry_date is None:
+                errors['expiry_date'] = 'Expiry Date is required when expiry is applicable.'
+
+        attachment_file = request.FILES.get('attachment_file')
+        if attachment_file is None:
+            errors['attachment_file'] = 'Attachment File is required.'
+        else:
+            ext = os.path.splitext(attachment_file.name or '')[1].lower()
+            if ext not in self.ALLOWED_EXTENSIONS:
+                errors['attachment_file'] = 'Unsupported file type.'
+            elif attachment_file.size and attachment_file.size > self.MAX_FILE_SIZE_BYTES:
+                errors['attachment_file'] = 'Attachment file must be 10MB or smaller.'
+
+        return errors, client_account, attachment_date, is_expiry_applicable, expiry_date, attachment_file
+
+    def get(self, request):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        if tenant_registry is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        try:
+            # Keep legacy /attachments/ URL list-first in sidebar/navigation.
+            # Dedicated create route: /attachments/create/
+            if (
+                request.resolver_match
+                and request.resolver_match.url_name == 'tenant_client_attachments'
+                and not (request.GET.get('client_account') or '').strip()
+            ):
+                return _tenant_redirect(request, 'iroad_tenants:tenant_client_attachments_list')
+
+            form_data = self._base_form_data()
+            prefilled_account = (request.GET.get('client_account') or '').strip()
+            if prefilled_account:
+                form_data['client_account'] = prefilled_account
+            context.update(
+                {
+                    'form_data': form_data,
+                    'form_errors': {},
+                    'client_account_options': self._client_account_options(),
+                    'preview_attachment_no': self._build_preview_attachment_no(),
+                    'tenant_schema_name': tenant_registry.schema_name,
+                }
+            )
+            return render(request, self.template_name, context)
+        finally:
+            connection.set_schema_to_public()
+
+    def post(self, request):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        if tenant_registry is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        form_data = self._collect_form_data(request)
+        try:
+            (
+                errors,
+                client_account,
+                attachment_date,
+                is_expiry_applicable,
+                expiry_date,
+                attachment_file,
+            ) = self._validate_form(form_data, request)
+            if errors:
+                context.update(
+                    {
+                        'form_data': form_data,
+                        'form_errors': errors,
+                        'client_account_options': self._client_account_options(),
+                        'preview_attachment_no': self._build_preview_attachment_no(),
+                        'tenant_schema_name': tenant_registry.schema_name,
+                    }
+                )
+                messages.error(request, 'Please fix the highlighted errors.', extra_tags='tenant')
+                return render(request, self.template_name, context)
+
+            attachment_no, attachment_sequence = _next_auto_number_for_form(
+                form_code=self.ATTACHMENT_FORM_CODE,
+                form_label=self.ATTACHMENT_FORM_LABEL,
+                prefix=self.ATTACHMENT_REF_PREFIX,
+            )
+            original_ext = os.path.splitext(attachment_file.name or '')[1].lower()
+            safe_ext = original_ext if original_ext in self.ALLOWED_EXTENSIONS else '.bin'
+            attachment_file.name = (
+                f'att_{attachment_no.replace("-", "").lower()}_{uuid.uuid4().hex[:10]}{safe_ext}'
+            )
+            TenantClientAttachment.objects.create(
+                attachment_no=attachment_no,
+                attachment_sequence=attachment_sequence,
+                client_account=client_account,
+                attachment_date=attachment_date,
+                is_expiry_applicable=is_expiry_applicable,
+                expiry_date=expiry_date if is_expiry_applicable else None,
+                attachment_file=attachment_file,
+                file_notes=form_data['file_notes'],
+                created_by_label=(context.get('display_name') or '').strip(),
+            )
+            messages.success(
+                request,
+                f'Client attachment {attachment_no} uploaded successfully.',
+                extra_tags='tenant',
+            )
+            return _tenant_redirect(request, 'iroad_tenants:tenant_client_attachments_list')
+        finally:
+            connection.set_schema_to_public()
 
 
 class TenantClientAttachmentsListView(TenantSimplePageView):
     template_name = 'iroad_tenants/Clients_Management/Client-attachments-list.html'
 
+    def get(self, request):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        if tenant_registry is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        try:
+            attachments = list(
+                TenantClientAttachment.objects.select_related('client_account').order_by('-created_at')
+            )
+            stats = {
+                'total': len(attachments),
+                'valid': sum(1 for item in attachments if item.status == TenantClientAttachment.Status.VALID),
+                'expired': sum(1 for item in attachments if item.status == TenantClientAttachment.Status.EXPIRED),
+                'does_not_expire': sum(
+                    1
+                    for item in attachments
+                    if item.status == TenantClientAttachment.Status.DOES_NOT_EXPIRE
+                ),
+            }
+            context.update(
+                {
+                    'client_attachments': attachments,
+                    'client_attachments_count': len(attachments),
+                    'attachment_stats': stats,
+                    'tenant_schema_name': tenant_registry.schema_name,
+                }
+            )
+            return render(request, self.template_name, context)
+        finally:
+            connection.set_schema_to_public()
+
 
 class TenantClientContactsView(TenantSimplePageView):
     template_name = 'iroad_tenants/Clients_Management/Client-contacts.html'
+
+    def _client_account_options(self):
+        return list(
+            TenantClientAccount.objects.order_by('account_no').values(
+                'account_no',
+                'display_name',
+                'name_english',
+            )
+        )
+
+    def _base_form_data(self):
+        return {
+            'client_account': '',
+            'name': '',
+            'email': '',
+            'mobile_number': '',
+            'telephone_number': '',
+            'extension': '',
+            'position': '',
+            'is_primary': 'false',
+        }
+
+    def _collect_form_data(self, request):
+        return {
+            'client_account': (request.POST.get('client_account') or '').strip(),
+            'name': (request.POST.get('name') or '').strip(),
+            'email': (request.POST.get('email') or '').strip(),
+            'mobile_number': (request.POST.get('mobile_number') or '').strip(),
+            'telephone_number': (request.POST.get('telephone_number') or '').strip(),
+            'extension': (request.POST.get('extension') or '').strip(),
+            'position': (request.POST.get('position') or '').strip(),
+            'is_primary': (request.POST.get('is_primary') or '').strip(),
+        }
+
+    def _validate_form_data(self, form_data):
+        errors = {}
+        client_account = TenantClientAccount.objects.filter(
+            account_no=form_data['client_account']
+        ).first()
+        if client_account is None:
+            errors['client_account'] = 'Please select a valid Client Account.'
+
+        if not form_data['name']:
+            errors['name'] = 'Name is required.'
+
+        is_primary = str(form_data['is_primary']).lower() in {'true', 'on', '1', 'yes'}
+
+        if form_data['email']:
+            try:
+                validate_email(form_data['email'])
+            except ValidationError:
+                errors['email'] = 'Please enter a valid email address.'
+
+        phone_pattern = re.compile(r'^[0-9+\-\s()]+$')
+        if form_data['mobile_number'] and not phone_pattern.match(form_data['mobile_number']):
+            errors['mobile_number'] = 'Mobile Number should contain only numeric/phone characters.'
+        if form_data['telephone_number'] and not phone_pattern.match(form_data['telephone_number']):
+            errors['telephone_number'] = 'Telephone Number should contain only numeric/phone characters.'
+        if form_data['extension'] and not re.fullmatch(r'[0-9]+', form_data['extension']):
+            errors['extension'] = 'Extension should contain digits only.'
+
+        if client_account is not None:
+            has_any_contact = TenantClientContact.objects.filter(
+                client_account=client_account
+            ).exists()
+            has_primary_contact = TenantClientContact.objects.filter(
+                client_account=client_account,
+                is_primary=True,
+            ).exists()
+            # Hard rule: every client account must always have one primary contact.
+            if (not has_any_contact or not has_primary_contact) and not is_primary:
+                errors['is_primary'] = 'Client account must have a Primary Contact. First contact must be marked as Primary.'
+
+        if is_primary and not (
+            form_data['email'] or form_data['mobile_number'] or form_data['telephone_number']
+        ):
+            errors['is_primary'] = (
+                'Primary Contact requires at least one reachable method: Email, Mobile, or Telephone.'
+            )
+
+        return errors, client_account, is_primary
+
+    def get(self, request):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        if tenant_registry is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        try:
+            form_data = self._base_form_data()
+            prefilled_account = (request.GET.get('client_account') or '').strip()
+            if prefilled_account:
+                form_data['client_account'] = prefilled_account
+            context.update(
+                {
+                    'form_data': form_data,
+                    'form_errors': {},
+                    'client_account_options': self._client_account_options(),
+                    'tenant_schema_name': tenant_registry.schema_name,
+                }
+            )
+            return render(request, self.template_name, context)
+        finally:
+            connection.set_schema_to_public()
+
+    def post(self, request):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        if tenant_registry is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        form_data = self._collect_form_data(request)
+        try:
+            form_errors, client_account, is_primary = self._validate_form_data(form_data)
+            if form_errors:
+                context.update(
+                    {
+                        'form_data': form_data,
+                        'form_errors': form_errors,
+                        'client_account_options': self._client_account_options(),
+                        'tenant_schema_name': tenant_registry.schema_name,
+                    }
+                )
+                messages.error(request, 'Please fix the highlighted errors.', extra_tags='tenant')
+                return render(request, self.template_name, context)
+
+            try:
+                TenantClientContact.objects.create(
+                    client_account=client_account,
+                    name=form_data['name'],
+                    email=form_data['email'],
+                    mobile_number=form_data['mobile_number'],
+                    telephone_number=form_data['telephone_number'],
+                    extension=form_data['extension'],
+                    position=form_data['position'],
+                    is_primary=is_primary,
+                    created_by_label=(context.get('display_name') or '').strip(),
+                )
+            except ValidationError as exc:
+                error_payload = {}
+                if hasattr(exc, 'message_dict'):
+                    for field_name, field_messages in exc.message_dict.items():
+                        if field_messages:
+                            error_payload[field_name] = '; '.join(field_messages)
+                elif getattr(exc, 'messages', None):
+                    error_payload['is_primary'] = '; '.join(exc.messages)
+                if not error_payload:
+                    error_payload['is_primary'] = 'Invalid contact data.'
+                context.update(
+                    {
+                        'form_data': form_data,
+                        'form_errors': error_payload,
+                        'client_account_options': self._client_account_options(),
+                        'tenant_schema_name': tenant_registry.schema_name,
+                    }
+                )
+                messages.error(request, 'Please fix the highlighted errors.', extra_tags='tenant')
+                return render(request, self.template_name, context)
+
+            messages.success(request, 'Client contact created successfully.', extra_tags='tenant')
+            return _tenant_redirect(request, 'iroad_tenants:tenant_client_contacts_list')
+        finally:
+            connection.set_schema_to_public()
 
 
 class TenantClientContactsListView(TenantSimplePageView):
     template_name = 'iroad_tenants/Clients_Management/Client-contacts-list.html'
 
+    def get(self, request):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        if tenant_registry is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        try:
+            contacts = list(
+                TenantClientContact.objects.select_related('client_account').order_by('-created_at')
+            )
+            stats = {
+                'total': len(contacts),
+                'primary': sum(1 for c in contacts if c.is_primary),
+                'secondary': sum(1 for c in contacts if not c.is_primary),
+                'client_accounts': len({str(c.client_account_id) for c in contacts}),
+            }
+            context.update(
+                {
+                    'client_contacts': contacts,
+                    'client_contacts_count': len(contacts),
+                    'contact_stats': stats,
+                    'tenant_schema_name': tenant_registry.schema_name,
+                }
+            )
+            return render(request, self.template_name, context)
+        finally:
+            connection.set_schema_to_public()
+
 
 class TenantClientContractView(TenantSimplePageView):
     template_name = 'iroad_tenants/Clients_Management/Client-contract.html'
+
+    CONTRACT_FORM_CODE = 'client-contract'
+    CONTRACT_FORM_LABEL = 'Client Contract'
+    CONTRACT_REF_PREFIX = 'CC'
+    ALLOWED_EXTENSIONS = {'.pdf', '.doc', '.docx', '.jpg', '.jpeg', '.png', '.gif'}
+    MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024
+
+    def _get_contract_settings(self):
+        return TenantClientContractSetting.objects.get_or_create(
+            defaults={
+                'expired_contract_handling_mode': TenantClientContractSetting.ExpiredContractHandlingMode.DO_NOTHING,
+                'grace_period_days': 30,
+                'pre_expiry_notification_days': 30,
+                'post_expiry_notification_days': 30,
+                'notification_frequency': TenantClientContractSetting.NotificationFrequency.DAILY,
+                'notification_audience': TenantClientContractSetting.NotificationAudience.SYSTEM_ADMIN,
+            }
+        )[0]
+
+    def _client_account_options(self):
+        return list(
+            TenantClientAccount.objects.order_by('account_no').values(
+                'account_no',
+                'display_name',
+                'name_english',
+            )
+        )
+
+    def _base_form_data(self):
+        return {
+            'contract_no': '',
+            'client_account': '',
+            'start_date': '',
+            'end_date': '',
+            'notes': '',
+        }
+
+    def _collect_form_data(self, request):
+        return {
+            'contract_no': (request.POST.get('contract_no') or '').strip(),
+            'client_account': (request.POST.get('client_account') or '').strip(),
+            'start_date': (request.POST.get('start_date') or '').strip(),
+            'end_date': (request.POST.get('end_date') or '').strip(),
+            'notes': (request.POST.get('notes') or '').strip(),
+        }
+
+    def _build_preview_contract_no(self):
+        config, _ = AutoNumberConfiguration.objects.get_or_create(
+            form_code=self.CONTRACT_FORM_CODE,
+            defaults={
+                'form_label': self.CONTRACT_FORM_LABEL,
+                'number_of_digits': 6,
+                'sequence_format': AutoNumberConfiguration.SequenceFormat.NUMERIC,
+                'is_unique': True,
+            },
+        )
+        sequence = AutoNumberSequence.objects.filter(form_code=self.CONTRACT_FORM_CODE).first()
+        next_number = int(sequence.next_number if sequence else 1)
+        return _render_tenant_ref_no(next_number, config, prefix=self.CONTRACT_REF_PREFIX)
+
+    def _validate_form_data(self, form_data, request):
+        errors = {}
+        client_account = TenantClientAccount.objects.filter(
+            account_no=form_data['client_account']
+        ).first()
+        if client_account is None:
+            errors['client_account'] = 'Please select a valid Client Account.'
+
+        start_date = parse_date(form_data['start_date'] or '')
+        end_date = parse_date(form_data['end_date'] or '')
+        if start_date is None:
+            errors['start_date'] = 'Start Date is required.'
+        if end_date is None:
+            errors['end_date'] = 'End Date is required.'
+        if start_date is not None and end_date is not None and end_date <= start_date:
+            errors['end_date'] = 'End Date must be greater than Start Date.'
+
+        if client_account is not None and TenantClientContract.objects.filter(
+            client_account=client_account
+        ).exists():
+            errors['client_account'] = 'This Client Account already has a contract in Phase 1.'
+
+        contract_attachment = request.FILES.get('contract_attachment')
+        if contract_attachment is None:
+            errors['contract_attachment'] = 'Contract Attachment is required.'
+        else:
+            ext = os.path.splitext(contract_attachment.name or '')[1].lower()
+            if ext not in self.ALLOWED_EXTENSIONS:
+                errors['contract_attachment'] = 'Unsupported attachment file type.'
+            elif contract_attachment.size and contract_attachment.size > self.MAX_FILE_SIZE_BYTES:
+                errors['contract_attachment'] = 'Contract attachment must be 10MB or smaller.'
+
+        return errors, client_account, start_date, end_date, contract_attachment
+
+    def get(self, request):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        if tenant_registry is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        try:
+            form_data = self._base_form_data()
+            form_data['contract_no'] = self._build_preview_contract_no()
+            prefilled_account = (request.GET.get('client_account') or '').strip()
+            if prefilled_account:
+                form_data['client_account'] = prefilled_account
+            context.update(
+                {
+                    'form_data': form_data,
+                    'form_errors': {},
+                    'client_account_options': self._client_account_options(),
+                    'tenant_schema_name': tenant_registry.schema_name,
+                }
+            )
+            return render(request, self.template_name, context)
+        finally:
+            connection.set_schema_to_public()
+
+    def post(self, request):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        if tenant_registry is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        form_data = self._collect_form_data(request)
+        try:
+            # Contract settings are tenant-level and used later by daily checks / notifications.
+            # Keeping this call here guarantees the settings row exists in every tenant schema.
+            self._get_contract_settings()
+            (
+                form_errors,
+                client_account,
+                start_date,
+                end_date,
+                contract_attachment,
+            ) = self._validate_form_data(form_data, request)
+            if form_errors:
+                if not form_data['contract_no']:
+                    form_data['contract_no'] = self._build_preview_contract_no()
+                context.update(
+                    {
+                        'form_data': form_data,
+                        'form_errors': form_errors,
+                        'client_account_options': self._client_account_options(),
+                        'tenant_schema_name': tenant_registry.schema_name,
+                    }
+                )
+                messages.error(request, 'Please fix the highlighted errors.', extra_tags='tenant')
+                return render(request, self.template_name, context)
+
+            contract_no, contract_sequence = _next_auto_number_for_form(
+                form_code=self.CONTRACT_FORM_CODE,
+                form_label=self.CONTRACT_FORM_LABEL,
+                prefix=self.CONTRACT_REF_PREFIX,
+            )
+            TenantClientContract.objects.create(
+                contract_no=contract_no,
+                contract_sequence=contract_sequence,
+                client_account=client_account,
+                start_date=start_date,
+                end_date=end_date,
+                notes=form_data['notes'],
+                contract_attachment=contract_attachment,
+                created_by_label=(context.get('display_name') or '').strip(),
+            )
+            messages.success(
+                request,
+                f'Client contract {contract_no} created successfully.',
+                extra_tags='tenant',
+            )
+            return _tenant_redirect(request, 'iroad_tenants:tenant_client_contract_list')
+        finally:
+            connection.set_schema_to_public()
 
 
 class TenantClientContractListView(TenantSimplePageView):
     template_name = 'iroad_tenants/Clients_Management/Client-contract-list.html'
 
+    def get(self, request):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        if tenant_registry is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        try:
+            contracts = list(
+                TenantClientContract.objects.select_related('client_account').order_by('-created_at')
+            )
+            today = timezone.localdate()
+            expiring_soon_days = 30
+            stats = {
+                'total': len(contracts),
+                'active': sum(1 for c in contracts if c.status == TenantClientContract.Status.ACTIVE),
+                'upcoming': sum(1 for c in contracts if c.status == TenantClientContract.Status.UPCOMING),
+                'expiring_soon': sum(
+                    1
+                    for c in contracts
+                    if c.status == TenantClientContract.Status.ACTIVE
+                    and 0 <= (c.end_date - today).days <= expiring_soon_days
+                ),
+                'expired': sum(1 for c in contracts if c.status == TenantClientContract.Status.EXPIRED),
+            }
+            context.update(
+                {
+                    'client_contracts': contracts,
+                    'client_contracts_count': len(contracts),
+                    'contract_stats': stats,
+                    'tenant_schema_name': tenant_registry.schema_name,
+                }
+            )
+            return render(request, self.template_name, context)
+        finally:
+            connection.set_schema_to_public()
+
 
 class TenantClientContractSettingsView(TenantSimplePageView):
     template_name = 'iroad_tenants/Clients_Management/Client-contract-settings.html'
 
+    def _get_contract_settings(self):
+        return TenantClientContractSetting.objects.get_or_create(
+            defaults={
+                'expired_contract_handling_mode': TenantClientContractSetting.ExpiredContractHandlingMode.DO_NOTHING,
+                'grace_period_days': 30,
+                'pre_expiry_notification_days': 30,
+                'post_expiry_notification_days': 30,
+                'notification_frequency': TenantClientContractSetting.NotificationFrequency.DAILY,
+                'notification_audience': TenantClientContractSetting.NotificationAudience.SYSTEM_ADMIN,
+            }
+        )[0]
+
+    def _validate_form_data(self, form_data):
+        errors = {}
+
+        if form_data['expired_contract_handling_mode'] not in {
+            TenantClientContractSetting.ExpiredContractHandlingMode.AUTO_DEACTIVATE,
+            TenantClientContractSetting.ExpiredContractHandlingMode.DO_NOTHING,
+            TenantClientContractSetting.ExpiredContractHandlingMode.DEACTIVATE_AFTER_GRACE,
+        }:
+            errors['expired_contract_handling_mode'] = 'Invalid handling mode.'
+
+        if form_data['notification_frequency'] not in {
+            TenantClientContractSetting.NotificationFrequency.ONCE,
+            TenantClientContractSetting.NotificationFrequency.DAILY,
+            TenantClientContractSetting.NotificationFrequency.WEEKLY,
+        }:
+            errors['notification_frequency'] = 'Invalid notification frequency.'
+
+        if form_data['notification_audience'] not in {
+            TenantClientContractSetting.NotificationAudience.SYSTEM_ADMIN,
+            TenantClientContractSetting.NotificationAudience.ADMIN_FINANCE,
+        }:
+            errors['notification_audience'] = 'Invalid notification audience.'
+
+        def parse_int_with_range(value, field_key, min_val, max_val):
+            try:
+                parsed = int(value)
+            except Exception:
+                errors[field_key] = f'{field_key.replace("_", " ").title()} must be a number.'
+                return min_val
+            if parsed < min_val or parsed > max_val:
+                errors[field_key] = (
+                    f'{field_key.replace("_", " ").title()} must be between {min_val} and {max_val}.'
+                )
+            return parsed
+
+        grace_period_days = parse_int_with_range(
+            form_data['grace_period_days'], 'grace_period_days', 0, 365
+        )
+        pre_expiry_notification_days = parse_int_with_range(
+            form_data['pre_expiry_notification_days'], 'pre_expiry_notification_days', 0, 180
+        )
+        post_expiry_notification_days = parse_int_with_range(
+            form_data['post_expiry_notification_days'], 'post_expiry_notification_days', 0, 180
+        )
+
+        if (
+            form_data['expired_contract_handling_mode']
+            != TenantClientContractSetting.ExpiredContractHandlingMode.DEACTIVATE_AFTER_GRACE
+        ):
+            grace_period_days = 30 if grace_period_days < 0 else grace_period_days
+
+        return (
+            errors,
+            grace_period_days,
+            pre_expiry_notification_days,
+            post_expiry_notification_days,
+        )
+
+    def get(self, request):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        if tenant_registry is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        try:
+            settings_obj = self._get_contract_settings()
+            context.update(
+                {
+                    'settings_data': settings_obj,
+                    'settings_errors': {},
+                    'tenant_schema_name': tenant_registry.schema_name,
+                }
+            )
+            return render(request, self.template_name, context)
+        finally:
+            connection.set_schema_to_public()
+
+    def post(self, request):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        if tenant_registry is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        try:
+            settings_obj = self._get_contract_settings()
+            form_data = {
+                'expired_contract_handling_mode': (
+                    request.POST.get('expired_contract_handling_mode') or ''
+                ).strip(),
+                'grace_period_days': (request.POST.get('grace_period_days') or '').strip(),
+                'pre_expiry_notification_days': (
+                    request.POST.get('pre_expiry_notification_days') or ''
+                ).strip(),
+                'post_expiry_notification_days': (
+                    request.POST.get('post_expiry_notification_days') or ''
+                ).strip(),
+                'notification_frequency': (request.POST.get('notification_frequency') or '').strip(),
+                'notification_audience': (request.POST.get('notification_audience') or '').strip(),
+            }
+
+            (
+                settings_errors,
+                grace_period_days,
+                pre_expiry_notification_days,
+                post_expiry_notification_days,
+            ) = self._validate_form_data(form_data)
+
+            if settings_errors:
+                for key, value in form_data.items():
+                    setattr(settings_obj, key, value)
+                context.update(
+                    {
+                        'settings_data': settings_obj,
+                        'settings_errors': settings_errors,
+                        'tenant_schema_name': tenant_registry.schema_name,
+                    }
+                )
+                messages.error(request, 'Please fix the highlighted setting errors.', extra_tags='tenant')
+                return render(request, self.template_name, context)
+
+            settings_obj.expired_contract_handling_mode = form_data['expired_contract_handling_mode']
+            settings_obj.grace_period_days = grace_period_days
+            settings_obj.pre_expiry_notification_days = pre_expiry_notification_days
+            settings_obj.post_expiry_notification_days = post_expiry_notification_days
+            settings_obj.notification_frequency = form_data['notification_frequency']
+            settings_obj.notification_audience = form_data['notification_audience']
+            settings_obj.save()
+
+            messages.success(request, 'Client contract settings saved successfully.', extra_tags='tenant')
+            return _tenant_redirect(request, 'iroad_tenants:tenant_client_contract_settings')
+        finally:
+            connection.set_schema_to_public()
+
 
 class TenantClientDetailsView(TenantSimplePageView):
     template_name = 'iroad_tenants/Clients_Management/client-details.html'
+
+    def get(self, request):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        if tenant_registry is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        try:
+            account_no = (request.GET.get('id') or '').strip()
+            client = None
+            if account_no:
+                client = TenantClientAccount.objects.filter(account_no=account_no).first()
+            if client is None:
+                client = TenantClientAccount.objects.order_by('-created_at').first()
+
+            client_detail = None
+            client_contacts = []
+            client_attachments = []
+            client_contract = None
+            primary_contact = None
+            if client is not None:
+                client_contacts = list(
+                    TenantClientContact.objects.filter(client_account=client).order_by('-is_primary', 'name')
+                )
+                primary_contact = next((item for item in client_contacts if item.is_primary), None)
+                if primary_contact is None and client_contacts:
+                    primary_contact = client_contacts[0]
+                client_attachments = list(
+                    TenantClientAttachment.objects.filter(client_account=client).order_by('-created_at')
+                )
+                client_contract = TenantClientContract.objects.filter(client_account=client).first()
+                created_at = timezone.localtime(client.created_at).strftime('%b %d, %Y, %I:%M %p')
+                client_detail = {
+                    'account_no': client.account_no,
+                    'client_type': client.client_type,
+                    'status': client.status,
+                    'created_at': created_at,
+                    'name_arabic': client.name_arabic,
+                    'name_english': client.name_english,
+                    'display_name': client.display_name,
+                    'preferred_currency': client.preferred_currency,
+                    'billing_street_1': client.billing_street_1,
+                    'billing_street_2': client.billing_street_2,
+                    'billing_city': client.billing_city,
+                    'billing_region': client.billing_region,
+                    'postal_code': client.postal_code,
+                    'country': client.country,
+                    'commercial_registration_no': client.commercial_registration_no,
+                    'tax_registration_no': client.tax_registration_no,
+                }
+
+            context.update(
+                {
+                    'client_detail': client_detail,
+                    'client_contacts': client_contacts,
+                    'client_attachments': client_attachments,
+                    'client_contract': client_contract,
+                    'primary_contact': primary_contact,
+                    'client_not_found': client_detail is None,
+                    'tenant_schema_name': tenant_registry.schema_name,
+                }
+            )
+            return render(request, self.template_name, context)
+        finally:
+            connection.set_schema_to_public()
 
 
 class TenantMyAccountView(View):

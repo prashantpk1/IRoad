@@ -60,7 +60,7 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        color: #5051f9;
+        color: #3b82f6;
         font-size: 1.25rem;
       }
       .ch-title {
@@ -109,7 +109,7 @@
       .ch-contact-icon {
         padding: 8px 12px;
         background: #e4e6fb;
-        color: #5051f9;
+        color: #3b82f6;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -125,7 +125,7 @@
       .ch-contact-copy {
         padding: 8px 12px;
         background: #ced3fa;
-        color: #5051f9;
+        color: #3b82f6;
         border: none;
         display: flex;
         align-items: center;
@@ -152,7 +152,7 @@
         border: 1px solid #c2c4fa;
         border-radius: 8px;
         background: #fff;
-        color: #5051f9;
+        color: #3b82f6;
         font-size: 0.9rem;
         font-weight: 500;
         cursor: pointer;
@@ -161,7 +161,7 @@
       }
       .ch-action-btn:hover {
         background: #f4f5fc;
-        color: #5051f9;
+        color: #3b82f6;
       }
 
       .cd-main-card {
@@ -201,7 +201,7 @@
         transition: all 0.2s;
       }
       .cd-tab.active {
-        background: #5051f9;
+        background: #3b82f6;
         color: #fff;
         box-shadow: 0 2px 4px rgba(80, 81, 249, 0.2);
       }
@@ -970,7 +970,10 @@
           <button class="ch-action-btn text-danger" id="suspendAccountBtn">
             <i class="bi bi-pause-circle"></i> Suspend Account
           </button>
-          <button class="ch-action-btn text-success d-none" id="activateAccountBtn">
+          <button
+            class="ch-action-btn text-success d-none"
+            id="activateAccountBtn"
+          >
             <i class="bi bi-play-circle"></i> Activate Account
           </button>
         </div>
@@ -980,27 +983,83 @@
         <div class="cd-main-card">
           <!-- Tabs Header -->
           <div class="cd-tabs-container">
-            <ul class="nav cd-tabs-list" role="tablist" style="flex-wrap: wrap;">
+            <ul class="nav cd-tabs-list" role="tablist" style="flex-wrap: wrap">
               <li class="nav-item" role="presentation">
-                <button class="cd-tab active" data-bs-toggle="tab" data-bs-target="#pane-overview" type="button" role="tab">Overview</button>
+                <button
+                  class="cd-tab active"
+                  data-bs-toggle="tab"
+                  data-bs-target="#pane-overview"
+                  type="button"
+                  role="tab"
+                >
+                  Overview
+                </button>
               </li>
               <li class="nav-item" role="presentation">
-                <button class="cd-tab" data-bs-toggle="tab" data-bs-target="#pane-contacts" type="button" role="tab">Contacts</button>
+                <button
+                  class="cd-tab"
+                  data-bs-toggle="tab"
+                  data-bs-target="#pane-contacts"
+                  type="button"
+                  role="tab"
+                >
+                  Contacts
+                </button>
               </li>
               <li class="nav-item" role="presentation">
-                <button class="cd-tab" data-bs-toggle="tab" data-bs-target="#pane-attachments" type="button" role="tab">Attachments</button>
+                <button
+                  class="cd-tab"
+                  data-bs-toggle="tab"
+                  data-bs-target="#pane-attachments"
+                  type="button"
+                  role="tab"
+                >
+                  Attachments
+                </button>
               </li>
               <li class="nav-item" role="presentation">
-                <button class="cd-tab" data-bs-toggle="tab" data-bs-target="#pane-addresses" type="button" role="tab">Addresses</button>
+                <button
+                  class="cd-tab"
+                  data-bs-toggle="tab"
+                  data-bs-target="#pane-addresses"
+                  type="button"
+                  role="tab"
+                >
+                  Addresses
+                </button>
               </li>
               <li class="nav-item" role="presentation">
-                <button class="cd-tab" data-bs-toggle="tab" data-bs-target="#pane-contracts" type="button" role="tab">Contracts</button>
+                <button
+                  class="cd-tab"
+                  data-bs-toggle="tab"
+                  data-bs-target="#pane-contracts"
+                  type="button"
+                  role="tab"
+                >
+                  Contracts
+                </button>
               </li>
               <li class="nav-item" role="presentation">
-                <button class="cd-tab" data-bs-toggle="tab" data-bs-target="#pane-price-lists" type="button" role="tab">Price Lists</button>
+                <button
+                  class="cd-tab"
+                  data-bs-toggle="tab"
+                  data-bs-target="#pane-price-lists"
+                  type="button"
+                  role="tab"
+                >
+                  Price Lists
+                </button>
               </li>
               <li class="nav-item" role="presentation">
-                <button class="cd-tab" data-bs-toggle="tab" data-bs-target="#pane-cargo" type="button" role="tab">Cargo</button>
+                <button
+                  class="cd-tab"
+                  data-bs-toggle="tab"
+                  data-bs-target="#pane-cargo"
+                  type="button"
+                  role="tab"
+                >
+                  Cargo
+                </button>
               </li>
             </ul>
           </div>
@@ -1755,7 +1814,7 @@
                               display: inline-flex;
                               align-items: center;
                               gap: 6px;
-                              color: #5051f9;
+                              color: #3b82f6;
                               font-size: 0.9rem;
                               font-weight: 500;
                             "
@@ -1869,7 +1928,7 @@
                               display: inline-flex;
                               align-items: center;
                               gap: 6px;
-                              color: #5051f9;
+                              color: #3b82f6;
                               font-size: 0.9rem;
                               font-weight: 500;
                             "
@@ -2026,20 +2085,55 @@
 
             <!-- Contacts Pane -->
             <div class="tab-pane fade" id="pane-contacts" role="tabpanel">
-              <div class="d-flex justify-content-between align-items-center mb-3">
-                <h4 class="m-0" style="font-size: 1.1rem; font-weight: 600; color: #1a1a1a">Client Contacts</h4>
-                <a href="Client-contacts.html" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Add Contact</a>
+              <div
+                class="d-flex justify-content-between align-items-center mb-3"
+              >
+                <h4
+                  class="m-0"
+                  style="font-size: 1.1rem; font-weight: 600; color: #1a1a1a"
+                >
+                  Client Contacts
+                </h4>
+                <a href="Client-contacts.html" class="btn btn-primary btn-sm"
+                  ><i class="bi bi-plus-lg"></i> Add Contact</a
+                >
               </div>
               <!-- Contact 1 -->
               <div class="cd-details-section mb-4">
-                <div class="cd-details-header d-flex justify-content-between align-items-center" data-bs-toggle="collapse" href="#contactCollapse1" role="button" aria-expanded="true" aria-controls="contactCollapse1">
+                <div
+                  class="cd-details-header d-flex justify-content-between align-items-center"
+                  data-bs-toggle="collapse"
+                  href="#contactCollapse1"
+                  role="button"
+                  aria-expanded="true"
+                  aria-controls="contactCollapse1"
+                >
                   <div class="d-flex align-items-center gap-2">
-                    <i class="bi bi-chevron-down collapse-icon me-1 text-muted"></i>
-                    <span class="eal-type-badge ind" style="background: #eef2ff; color: #4f46e5; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px;"><i class="bi bi-person-star"></i> Primary Contact</span>
-                    <span style="font-weight: 600; color: #1a1a1a">Ahmad Al-Ghamdi</span>
+                    <i
+                      class="bi bi-chevron-down collapse-icon me-1 text-muted"
+                    ></i>
+                    <span
+                      class="eal-type-badge ind"
+                      style="
+                        background: #eef2ff;
+                        color: #4f46e5;
+                        font-size: 0.75rem;
+                        padding: 4px 8px;
+                        border-radius: 4px;
+                      "
+                      ><i class="bi bi-person-star"></i> Primary Contact</span
+                    >
+                    <span style="font-weight: 600; color: #1a1a1a"
+                      >Ahmad Al-Ghamdi</span
+                    >
                   </div>
-                  <div class="eal-actions-cell pt-0 pb-0" onclick="event.stopPropagation()">
-                    <button class="eal-row-btn" title="Edit"><i class="bi bi-pencil"></i></button>
+                  <div
+                    class="eal-actions-cell pt-0 pb-0"
+                    onclick="event.stopPropagation()"
+                  >
+                    <button class="eal-row-btn" title="Edit">
+                      <i class="bi bi-pencil"></i>
+                    </button>
                   </div>
                 </div>
                 <div class="collapse show" id="contactCollapse1">
@@ -2078,7 +2172,11 @@
                       <div class="cd-field">
                         <span class="cd-field-label">Status</span>
                         <span class="cd-field-value">
-                          <span class="status-badge active" style="background:#e6f8ef;color:#0d894f">Active</span>
+                          <span
+                            class="status-badge active"
+                            style="background: #e6f8ef; color: #0d894f"
+                            >Active</span
+                          >
                         </span>
                       </div>
                     </div>
@@ -2088,14 +2186,41 @@
 
               <!-- Contact 2 -->
               <div class="cd-details-section">
-                <div class="cd-details-header d-flex justify-content-between align-items-center" data-bs-toggle="collapse" href="#contactCollapse2" role="button" aria-expanded="false" aria-controls="contactCollapse2">
+                <div
+                  class="cd-details-header d-flex justify-content-between align-items-center"
+                  data-bs-toggle="collapse"
+                  href="#contactCollapse2"
+                  role="button"
+                  aria-expanded="false"
+                  aria-controls="contactCollapse2"
+                >
                   <div class="d-flex align-items-center gap-2">
-                    <i class="bi bi-chevron-down collapse-icon me-1 text-muted" style="transform: rotate(-90deg);"></i>
-                    <span class="eal-type-badge ind" style="background: #f1f5f9; color: #64748b; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px;"><i class="bi bi-person"></i> Secondary Contact</span>
-                    <span style="font-weight: 600; color: #1a1a1a">Sarah Ali</span>
+                    <i
+                      class="bi bi-chevron-down collapse-icon me-1 text-muted"
+                      style="transform: rotate(-90deg)"
+                    ></i>
+                    <span
+                      class="eal-type-badge ind"
+                      style="
+                        background: #f1f5f9;
+                        color: #64748b;
+                        font-size: 0.75rem;
+                        padding: 4px 8px;
+                        border-radius: 4px;
+                      "
+                      ><i class="bi bi-person"></i> Secondary Contact</span
+                    >
+                    <span style="font-weight: 600; color: #1a1a1a"
+                      >Sarah Ali</span
+                    >
                   </div>
-                  <div class="eal-actions-cell pt-0 pb-0" onclick="event.stopPropagation()">
-                    <button class="eal-row-btn" title="Edit"><i class="bi bi-pencil"></i></button>
+                  <div
+                    class="eal-actions-cell pt-0 pb-0"
+                    onclick="event.stopPropagation()"
+                  >
+                    <button class="eal-row-btn" title="Edit">
+                      <i class="bi bi-pencil"></i>
+                    </button>
                   </div>
                 </div>
                 <div class="collapse" id="contactCollapse2">
@@ -2103,7 +2228,9 @@
                     <div class="cd-grid-row">
                       <div class="cd-field">
                         <span class="cd-field-label">Client Account</span>
-                        <span class="cd-field-value">Alsafa Transport Group</span>
+                        <span class="cd-field-value"
+                          >Alsafa Transport Group</span
+                        >
                       </div>
                       <div class="cd-field">
                         <span class="cd-field-label">Name</span>
@@ -2138,7 +2265,11 @@
                       <div class="cd-field">
                         <span class="cd-field-label">Status</span>
                         <span class="cd-field-value">
-                          <span class="status-badge active" style="background:#e6f8ef;color:#0d894f">Active</span>
+                          <span
+                            class="status-badge active"
+                            style="background: #e6f8ef; color: #0d894f"
+                            >Active</span
+                          >
                         </span>
                       </div>
                     </div>
@@ -2149,56 +2280,94 @@
 
             <!-- Attachments Pane -->
             <div class="tab-pane fade" id="pane-attachments" role="tabpanel">
-              <div class="d-flex justify-content-between align-items-center mb-3">
-                <h4 class="m-0" style="font-size: 1.1rem; font-weight: 600; color: #1a1a1a">Attachments & Documents</h4>
-                <a href="Client-attachments.html" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Upload File</a>
+              <div
+                class="d-flex justify-content-between align-items-center mb-3"
+              >
+                <h4
+                  class="m-0"
+                  style="font-size: 1.1rem; font-weight: 600; color: #1a1a1a"
+                >
+                  Attachments & Documents
+                </h4>
+                <a href="Client-attachments.html" class="btn btn-primary btn-sm"
+                  ><i class="bi bi-plus-lg"></i> Upload File</a
+                >
               </div>
               <div class="eal-table-card mt-0">
-                  <div class="eal-table-wrap" style="border: none; box-shadow: none;">
-                    <table class="eal-table mb-0">
-                      <thead>
-                        <tr>
-                          <th>Title</th>
-                          <th>Date</th>
-                          <th>Expiry Date</th>
-                          <th>Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr>
-                          <td>
-                            <i class="bi bi-file-earmark-pdf text-danger mx-1"></i> Commercial_Registration.pdf
-                          </td>
-                          <td>12 Jan 2026</td>
-                          <td>12 Jan 2027</td>
-                          <td>
-                            <span class="status-badge active" style="background:#e6f8ef;color:#0d894f">Active</span>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td>
-                            <i class="bi bi-file-earmark-pdf text-danger mx-1"></i> VAT_Certificate_2026.pdf
-                          </td>
-                          <td>15 Jan 2026</td>
-                          <td>31 Dec 2026</td>
-                          <td>
-                            <span class="status-badge active" style="background:#e6f8ef;color:#0d894f">Active</span>
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
+                <div
+                  class="eal-table-wrap"
+                  style="border: none; box-shadow: none"
+                >
+                  <table class="eal-table mb-0">
+                    <thead>
+                      <tr>
+                        <th>Title</th>
+                        <th>Date</th>
+                        <th>Expiry Date</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>
+                          <i
+                            class="bi bi-file-earmark-pdf text-danger mx-1"
+                          ></i>
+                          Commercial_Registration.pdf
+                        </td>
+                        <td>12 Jan 2026</td>
+                        <td>12 Jan 2027</td>
+                        <td>
+                          <span
+                            class="status-badge active"
+                            style="background: #e6f8ef; color: #0d894f"
+                            >Active</span
+                          >
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>
+                          <i
+                            class="bi bi-file-earmark-pdf text-danger mx-1"
+                          ></i>
+                          VAT_Certificate_2026.pdf
+                        </td>
+                        <td>15 Jan 2026</td>
+                        <td>31 Dec 2026</td>
+                        <td>
+                          <span
+                            class="status-badge active"
+                            style="background: #e6f8ef; color: #0d894f"
+                            >Active</span
+                          >
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
 
             <!-- Price Lists Pane -->
             <div class="tab-pane fade" id="pane-price-lists" role="tabpanel">
-              <div class="d-flex justify-content-between align-items-center mb-3">
-                <h4 class="m-0" style="font-size: 1.1rem; font-weight: 600; color: #1a1a1a">Price Lists</h4>
-                <a href="Price-list.html" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Add Price List</a>
+              <div
+                class="d-flex justify-content-between align-items-center mb-3"
+              >
+                <h4
+                  class="m-0"
+                  style="font-size: 1.1rem; font-weight: 600; color: #1a1a1a"
+                >
+                  Price Lists
+                </h4>
+                <a href="Price-list.html" class="btn btn-primary btn-sm"
+                  ><i class="bi bi-plus-lg"></i> Add Price List</a
+                >
               </div>
               <div class="eal-table-card mt-0">
-                <div class="eal-table-wrap" style="border: none; box-shadow: none;">
+                <div
+                  class="eal-table-wrap"
+                  style="border: none; box-shadow: none"
+                >
                   <table class="eal-table mb-0">
                     <thead>
                       <tr>
@@ -2215,14 +2384,28 @@
                         <td>Annual Bulk Transport 2026</td>
                         <td>SAR</td>
                         <td>
-                          <span class="status-badge active" style="background: #e6f8ef; color: #0d894f;">Active</span>
+                          <span
+                            class="status-badge active"
+                            style="background: #e6f8ef; color: #0d894f"
+                            >Active</span
+                          >
                         </td>
                         <td>
                           <div class="eal-actions-cell">
-                            <a class="eal-row-btn" href="All-price-lists.html" title="View" aria-label="View">
+                            <a
+                              class="eal-row-btn"
+                              href="All-price-lists.html"
+                              title="View"
+                              aria-label="View"
+                            >
                               <i class="bi bi-eye"></i>
                             </a>
-                            <a class="eal-row-btn" href="Price-list.html" title="Edit" aria-label="Edit">
+                            <a
+                              class="eal-row-btn"
+                              href="Price-list.html"
+                              title="Edit"
+                              aria-label="Edit"
+                            >
                               <i class="bi bi-pencil"></i>
                             </a>
                           </div>
@@ -2233,14 +2416,28 @@
                         <td>Express Delivery 2026</td>
                         <td>USD</td>
                         <td>
-                          <span class="status-badge inactive" style="background: #f1f5f9; color: #64748b;">Draft</span>
+                          <span
+                            class="status-badge inactive"
+                            style="background: #f1f5f9; color: #64748b"
+                            >Draft</span
+                          >
                         </td>
                         <td>
                           <div class="eal-actions-cell">
-                            <a class="eal-row-btn" href="All-price-lists.html" title="View" aria-label="View">
+                            <a
+                              class="eal-row-btn"
+                              href="All-price-lists.html"
+                              title="View"
+                              aria-label="View"
+                            >
                               <i class="bi bi-eye"></i>
                             </a>
-                            <a class="eal-row-btn" href="Price-list.html" title="Edit" aria-label="Edit">
+                            <a
+                              class="eal-row-btn"
+                              href="Price-list.html"
+                              title="Edit"
+                              aria-label="Edit"
+                            >
                               <i class="bi bi-pencil"></i>
                             </a>
                           </div>
@@ -2251,14 +2448,28 @@
                         <td>Legacy Contract Rates</td>
                         <td>SAR</td>
                         <td>
-                          <span class="status-badge inactive" style="background: #fef1f2; color: #ef4444;">Inactive</span>
+                          <span
+                            class="status-badge inactive"
+                            style="background: #fef1f2; color: #ef4444"
+                            >Inactive</span
+                          >
                         </td>
                         <td>
                           <div class="eal-actions-cell">
-                            <a class="eal-row-btn" href="All-price-lists.html" title="View" aria-label="View">
+                            <a
+                              class="eal-row-btn"
+                              href="All-price-lists.html"
+                              title="View"
+                              aria-label="View"
+                            >
                               <i class="bi bi-eye"></i>
                             </a>
-                            <a class="eal-row-btn" href="Price-list.html" title="Edit" aria-label="Edit">
+                            <a
+                              class="eal-row-btn"
+                              href="Price-list.html"
+                              title="Edit"
+                              aria-label="Edit"
+                            >
                               <i class="bi bi-pencil"></i>
                             </a>
                           </div>
@@ -2269,14 +2480,28 @@
                         <td>Regional Distribution Rates</td>
                         <td>SAR</td>
                         <td>
-                          <span class="status-badge inactive" style="background: #f1f5f9; color: #64748b;">Draft</span>
+                          <span
+                            class="status-badge inactive"
+                            style="background: #f1f5f9; color: #64748b"
+                            >Draft</span
+                          >
                         </td>
                         <td>
                           <div class="eal-actions-cell">
-                            <a class="eal-row-btn" href="All-price-lists.html" title="View" aria-label="View">
+                            <a
+                              class="eal-row-btn"
+                              href="All-price-lists.html"
+                              title="View"
+                              aria-label="View"
+                            >
                               <i class="bi bi-eye"></i>
                             </a>
-                            <a class="eal-row-btn" href="Price-list.html" title="Edit" aria-label="Edit">
+                            <a
+                              class="eal-row-btn"
+                              href="Price-list.html"
+                              title="Edit"
+                              aria-label="Edit"
+                            >
                               <i class="bi bi-pencil"></i>
                             </a>
                           </div>
@@ -2287,14 +2512,28 @@
                         <td>International Freight Tariff</td>
                         <td>USD</td>
                         <td>
-                          <span class="status-badge active" style="background: #e6f8ef; color: #0d894f;">Active</span>
+                          <span
+                            class="status-badge active"
+                            style="background: #e6f8ef; color: #0d894f"
+                            >Active</span
+                          >
                         </td>
                         <td>
                           <div class="eal-actions-cell">
-                            <a class="eal-row-btn" href="All-price-lists.html" title="View" aria-label="View">
+                            <a
+                              class="eal-row-btn"
+                              href="All-price-lists.html"
+                              title="View"
+                              aria-label="View"
+                            >
                               <i class="bi bi-eye"></i>
                             </a>
-                            <a class="eal-row-btn" href="Price-list.html" title="Edit" aria-label="Edit">
+                            <a
+                              class="eal-row-btn"
+                              href="Price-list.html"
+                              title="Edit"
+                              aria-label="Edit"
+                            >
                               <i class="bi bi-pencil"></i>
                             </a>
                           </div>
@@ -2305,14 +2544,28 @@
                         <td>Warehousing & Handling</td>
                         <td>SAR</td>
                         <td>
-                          <span class="status-badge active" style="background: #e6f8ef; color: #0d894f;">Active</span>
+                          <span
+                            class="status-badge active"
+                            style="background: #e6f8ef; color: #0d894f"
+                            >Active</span
+                          >
                         </td>
                         <td>
                           <div class="eal-actions-cell">
-                            <a class="eal-row-btn" href="All-price-lists.html" title="View" aria-label="View">
+                            <a
+                              class="eal-row-btn"
+                              href="All-price-lists.html"
+                              title="View"
+                              aria-label="View"
+                            >
                               <i class="bi bi-eye"></i>
                             </a>
-                            <a class="eal-row-btn" href="Price-list.html" title="Edit" aria-label="Edit">
+                            <a
+                              class="eal-row-btn"
+                              href="Price-list.html"
+                              title="Edit"
+                              aria-label="Edit"
+                            >
                               <i class="bi bi-pencil"></i>
                             </a>
                           </div>
@@ -2323,14 +2576,28 @@
                         <td>Hazmat Surcharges</td>
                         <td>SAR</td>
                         <td>
-                          <span class="status-badge inactive" style="background: #fef1f2; color: #ef4444;">Inactive</span>
+                          <span
+                            class="status-badge inactive"
+                            style="background: #fef1f2; color: #ef4444"
+                            >Inactive</span
+                          >
                         </td>
                         <td>
                           <div class="eal-actions-cell">
-                            <a class="eal-row-btn" href="All-price-lists.html" title="View" aria-label="View">
+                            <a
+                              class="eal-row-btn"
+                              href="All-price-lists.html"
+                              title="View"
+                              aria-label="View"
+                            >
                               <i class="bi bi-eye"></i>
                             </a>
-                            <a class="eal-row-btn" href="Price-list.html" title="Edit" aria-label="Edit">
+                            <a
+                              class="eal-row-btn"
+                              href="Price-list.html"
+                              title="Edit"
+                              aria-label="Edit"
+                            >
                               <i class="bi bi-pencil"></i>
                             </a>
                           </div>
@@ -2341,14 +2608,28 @@
                         <td>Chiller Transport Rates</td>
                         <td>SAR</td>
                         <td>
-                          <span class="status-badge active" style="background: #e6f8ef; color: #0d894f;">Active</span>
+                          <span
+                            class="status-badge active"
+                            style="background: #e6f8ef; color: #0d894f"
+                            >Active</span
+                          >
                         </td>
                         <td>
                           <div class="eal-actions-cell">
-                            <a class="eal-row-btn" href="All-price-lists.html" title="View" aria-label="View">
+                            <a
+                              class="eal-row-btn"
+                              href="All-price-lists.html"
+                              title="View"
+                              aria-label="View"
+                            >
                               <i class="bi bi-eye"></i>
                             </a>
-                            <a class="eal-row-btn" href="Price-list.html" title="Edit" aria-label="Edit">
+                            <a
+                              class="eal-row-btn"
+                              href="Price-list.html"
+                              title="Edit"
+                              aria-label="Edit"
+                            >
                               <i class="bi bi-pencil"></i>
                             </a>
                           </div>
@@ -2359,14 +2640,28 @@
                         <td>ULD / Special Equipment</td>
                         <td>EUR</td>
                         <td>
-                          <span class="status-badge inactive" style="background: #f1f5f9; color: #64748b;">Draft</span>
+                          <span
+                            class="status-badge inactive"
+                            style="background: #f1f5f9; color: #64748b"
+                            >Draft</span
+                          >
                         </td>
                         <td>
                           <div class="eal-actions-cell">
-                            <a class="eal-row-btn" href="All-price-lists.html" title="View" aria-label="View">
+                            <a
+                              class="eal-row-btn"
+                              href="All-price-lists.html"
+                              title="View"
+                              aria-label="View"
+                            >
                               <i class="bi bi-eye"></i>
                             </a>
-                            <a class="eal-row-btn" href="Price-list.html" title="Edit" aria-label="Edit">
+                            <a
+                              class="eal-row-btn"
+                              href="Price-list.html"
+                              title="Edit"
+                              aria-label="Edit"
+                            >
                               <i class="bi bi-pencil"></i>
                             </a>
                           </div>
@@ -2377,14 +2672,28 @@
                         <td>Premium SLA Rates</td>
                         <td>USD</td>
                         <td>
-                          <span class="status-badge inactive" style="background: #fef1f2; color: #ef4444;">Inactive</span>
+                          <span
+                            class="status-badge inactive"
+                            style="background: #fef1f2; color: #ef4444"
+                            >Inactive</span
+                          >
                         </td>
                         <td>
                           <div class="eal-actions-cell">
-                            <a class="eal-row-btn" href="All-price-lists.html" title="View" aria-label="View">
+                            <a
+                              class="eal-row-btn"
+                              href="All-price-lists.html"
+                              title="View"
+                              aria-label="View"
+                            >
                               <i class="bi bi-eye"></i>
                             </a>
-                            <a class="eal-row-btn" href="Price-list.html" title="Edit" aria-label="Edit">
+                            <a
+                              class="eal-row-btn"
+                              href="Price-list.html"
+                              title="Edit"
+                              aria-label="Edit"
+                            >
                               <i class="bi bi-pencil"></i>
                             </a>
                           </div>
@@ -2398,12 +2707,24 @@
 
             <!-- Cargo Pane -->
             <div class="tab-pane fade" id="pane-cargo" role="tabpanel">
-              <div class="d-flex justify-content-between align-items-center mb-3">
-                <h4 class="m-0" style="font-size: 1.1rem; font-weight: 600; color: #1a1a1a">Assigned Cargo Typologies</h4>
-                <a href="Cargo-master.html" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Register Cargo</a>
+              <div
+                class="d-flex justify-content-between align-items-center mb-3"
+              >
+                <h4
+                  class="m-0"
+                  style="font-size: 1.1rem; font-weight: 600; color: #1a1a1a"
+                >
+                  Assigned Cargo Typologies
+                </h4>
+                <a href="Cargo-master.html" class="btn btn-primary btn-sm"
+                  ><i class="bi bi-plus-lg"></i> Register Cargo</a
+                >
               </div>
               <div class="eal-table-card mt-0">
-                <div class="eal-table-wrap" style="border: none; box-shadow: none;">
+                <div
+                  class="eal-table-wrap"
+                  style="border: none; box-shadow: none"
+                >
                   <table class="eal-table mb-0">
                     <thead>
                       <tr>
@@ -2424,14 +2745,28 @@
                         <td>Palletized Cartons</td>
                         <td>15.00</td>
                         <td>
-                          <span class="status-badge active" style="background:#e6f8ef;color:#0d894f">Active</span>
+                          <span
+                            class="status-badge active"
+                            style="background: #e6f8ef; color: #0d894f"
+                            >Active</span
+                          >
                         </td>
                         <td>
                           <div class="eal-actions-cell">
-                            <a class="eal-row-btn" href="Cargo-master.html" title="View" aria-label="View">
+                            <a
+                              class="eal-row-btn"
+                              href="Cargo-master.html"
+                              title="View"
+                              aria-label="View"
+                            >
                               <i class="bi bi-eye"></i>
                             </a>
-                            <a class="eal-row-btn" href="Cargo-master.html" title="Edit" aria-label="Edit">
+                            <a
+                              class="eal-row-btn"
+                              href="Cargo-master.html"
+                              title="Edit"
+                              aria-label="Edit"
+                            >
                               <i class="bi bi-pencil"></i>
                             </a>
                           </div>
@@ -2444,14 +2779,28 @@
                         <td>Insulated Pallets</td>
                         <td>200.00</td>
                         <td>
-                          <span class="status-badge active" style="background:#e6f8ef;color:#0d894f">Active</span>
+                          <span
+                            class="status-badge active"
+                            style="background: #e6f8ef; color: #0d894f"
+                            >Active</span
+                          >
                         </td>
                         <td>
                           <div class="eal-actions-cell">
-                            <a class="eal-row-btn" href="Cargo-master.html" title="View" aria-label="View">
+                            <a
+                              class="eal-row-btn"
+                              href="Cargo-master.html"
+                              title="View"
+                              aria-label="View"
+                            >
                               <i class="bi bi-eye"></i>
                             </a>
-                            <a class="eal-row-btn" href="Cargo-master.html" title="Edit" aria-label="Edit">
+                            <a
+                              class="eal-row-btn"
+                              href="Cargo-master.html"
+                              title="Edit"
+                              aria-label="Edit"
+                            >
                               <i class="bi bi-pencil"></i>
                             </a>
                           </div>
@@ -2464,14 +2813,28 @@
                         <td>Crates</td>
                         <td>35.00</td>
                         <td>
-                          <span class="status-badge active" style="background:#e6f8ef;color:#0d894f">Active</span>
+                          <span
+                            class="status-badge active"
+                            style="background: #e6f8ef; color: #0d894f"
+                            >Active</span
+                          >
                         </td>
                         <td>
                           <div class="eal-actions-cell">
-                            <a class="eal-row-btn" href="Cargo-master.html" title="View" aria-label="View">
+                            <a
+                              class="eal-row-btn"
+                              href="Cargo-master.html"
+                              title="View"
+                              aria-label="View"
+                            >
                               <i class="bi bi-eye"></i>
                             </a>
-                            <a class="eal-row-btn" href="Cargo-master.html" title="Edit" aria-label="Edit">
+                            <a
+                              class="eal-row-btn"
+                              href="Cargo-master.html"
+                              title="Edit"
+                              aria-label="Edit"
+                            >
                               <i class="bi bi-pencil"></i>
                             </a>
                           </div>
@@ -2484,14 +2847,28 @@
                         <td>Cartons</td>
                         <td>10.00</td>
                         <td>
-                          <span class="status-badge active" style="background:#e6f8ef;color:#0d894f">Active</span>
+                          <span
+                            class="status-badge active"
+                            style="background: #e6f8ef; color: #0d894f"
+                            >Active</span
+                          >
                         </td>
                         <td>
                           <div class="eal-actions-cell">
-                            <a class="eal-row-btn" href="Cargo-master.html" title="View" aria-label="View">
+                            <a
+                              class="eal-row-btn"
+                              href="Cargo-master.html"
+                              title="View"
+                              aria-label="View"
+                            >
                               <i class="bi bi-eye"></i>
                             </a>
-                            <a class="eal-row-btn" href="Cargo-master.html" title="Edit" aria-label="Edit">
+                            <a
+                              class="eal-row-btn"
+                              href="Cargo-master.html"
+                              title="Edit"
+                              aria-label="Edit"
+                            >
                               <i class="bi bi-pencil"></i>
                             </a>
                           </div>
@@ -2504,14 +2881,28 @@
                         <td>Reefer Pallets</td>
                         <td>500.00</td>
                         <td>
-                          <span class="status-badge active" style="background:#e6f8ef;color:#0d894f">Active</span>
+                          <span
+                            class="status-badge active"
+                            style="background: #e6f8ef; color: #0d894f"
+                            >Active</span
+                          >
                         </td>
                         <td>
                           <div class="eal-actions-cell">
-                            <a class="eal-row-btn" href="Cargo-master.html" title="View" aria-label="View">
+                            <a
+                              class="eal-row-btn"
+                              href="Cargo-master.html"
+                              title="View"
+                              aria-label="View"
+                            >
                               <i class="bi bi-eye"></i>
                             </a>
-                            <a class="eal-row-btn" href="Cargo-master.html" title="Edit" aria-label="Edit">
+                            <a
+                              class="eal-row-btn"
+                              href="Cargo-master.html"
+                              title="Edit"
+                              aria-label="Edit"
+                            >
                               <i class="bi bi-pencil"></i>
                             </a>
                           </div>
@@ -2524,14 +2915,28 @@
                         <td>Loose Bulk</td>
                         <td>1200.00</td>
                         <td>
-                          <span class="status-badge inactive" style="background:#f1f5f9;color:#64748b">Inactive</span>
+                          <span
+                            class="status-badge inactive"
+                            style="background: #f1f5f9; color: #64748b"
+                            >Inactive</span
+                          >
                         </td>
                         <td>
                           <div class="eal-actions-cell">
-                            <a class="eal-row-btn" href="Cargo-master.html" title="View" aria-label="View">
+                            <a
+                              class="eal-row-btn"
+                              href="Cargo-master.html"
+                              title="View"
+                              aria-label="View"
+                            >
                               <i class="bi bi-eye"></i>
                             </a>
-                            <a class="eal-row-btn" href="Cargo-master.html" title="Edit" aria-label="Edit">
+                            <a
+                              class="eal-row-btn"
+                              href="Cargo-master.html"
+                              title="Edit"
+                              aria-label="Edit"
+                            >
                               <i class="bi bi-pencil"></i>
                             </a>
                           </div>
@@ -2544,14 +2949,28 @@
                         <td>Drums</td>
                         <td>250.00</td>
                         <td>
-                          <span class="status-badge inactive" style="background:#f1f5f9;color:#64748b">Inactive</span>
+                          <span
+                            class="status-badge inactive"
+                            style="background: #f1f5f9; color: #64748b"
+                            >Inactive</span
+                          >
                         </td>
                         <td>
                           <div class="eal-actions-cell">
-                            <a class="eal-row-btn" href="Cargo-master.html" title="View" aria-label="View">
+                            <a
+                              class="eal-row-btn"
+                              href="Cargo-master.html"
+                              title="View"
+                              aria-label="View"
+                            >
                               <i class="bi bi-eye"></i>
                             </a>
-                            <a class="eal-row-btn" href="Cargo-master.html" title="Edit" aria-label="Edit">
+                            <a
+                              class="eal-row-btn"
+                              href="Cargo-master.html"
+                              title="Edit"
+                              aria-label="Edit"
+                            >
                               <i class="bi bi-pencil"></i>
                             </a>
                           </div>
@@ -2564,14 +2983,28 @@
                         <td>Cartons</td>
                         <td>80.00</td>
                         <td>
-                          <span class="status-badge active" style="background:#e6f8ef;color:#0d894f">Active</span>
+                          <span
+                            class="status-badge active"
+                            style="background: #e6f8ef; color: #0d894f"
+                            >Active</span
+                          >
                         </td>
                         <td>
                           <div class="eal-actions-cell">
-                            <a class="eal-row-btn" href="Cargo-master.html" title="View" aria-label="View">
+                            <a
+                              class="eal-row-btn"
+                              href="Cargo-master.html"
+                              title="View"
+                              aria-label="View"
+                            >
                               <i class="bi bi-eye"></i>
                             </a>
-                            <a class="eal-row-btn" href="Cargo-master.html" title="Edit" aria-label="Edit">
+                            <a
+                              class="eal-row-btn"
+                              href="Cargo-master.html"
+                              title="Edit"
+                              aria-label="Edit"
+                            >
                               <i class="bi bi-pencil"></i>
                             </a>
                           </div>
@@ -2584,14 +3017,28 @@
                         <td>Hanging Garments</td>
                         <td>5.00</td>
                         <td>
-                          <span class="status-badge active" style="background:#e6f8ef;color:#0d894f">Active</span>
+                          <span
+                            class="status-badge active"
+                            style="background: #e6f8ef; color: #0d894f"
+                            >Active</span
+                          >
                         </td>
                         <td>
                           <div class="eal-actions-cell">
-                            <a class="eal-row-btn" href="Cargo-master.html" title="View" aria-label="View">
+                            <a
+                              class="eal-row-btn"
+                              href="Cargo-master.html"
+                              title="View"
+                              aria-label="View"
+                            >
                               <i class="bi bi-eye"></i>
                             </a>
-                            <a class="eal-row-btn" href="Cargo-master.html" title="Edit" aria-label="Edit">
+                            <a
+                              class="eal-row-btn"
+                              href="Cargo-master.html"
+                              title="Edit"
+                              aria-label="Edit"
+                            >
                               <i class="bi bi-pencil"></i>
                             </a>
                           </div>
@@ -2604,14 +3051,28 @@
                         <td>Insulated Boxes</td>
                         <td>12.00</td>
                         <td>
-                          <span class="status-badge inactive" style="background:#f1f5f9;color:#64748b">Inactive</span>
+                          <span
+                            class="status-badge inactive"
+                            style="background: #f1f5f9; color: #64748b"
+                            >Inactive</span
+                          >
                         </td>
                         <td>
                           <div class="eal-actions-cell">
-                            <a class="eal-row-btn" href="Cargo-master.html" title="View" aria-label="View">
+                            <a
+                              class="eal-row-btn"
+                              href="Cargo-master.html"
+                              title="View"
+                              aria-label="View"
+                            >
                               <i class="bi bi-eye"></i>
                             </a>
-                            <a class="eal-row-btn" href="Cargo-master.html" title="Edit" aria-label="Edit">
+                            <a
+                              class="eal-row-btn"
+                              href="Cargo-master.html"
+                              title="Edit"
+                              aria-label="Edit"
+                            >
                               <i class="bi bi-pencil"></i>
                             </a>
                           </div>

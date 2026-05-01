@@ -25,9 +25,9 @@
         </nav>
         <div class="page-header-row">
           <div class="page-header-left">
-            <h1 class="page-title">New Client Account</h1>
+            <h1 class="page-title">{% if is_edit_mode %}Edit Client Account{% else %}New Client Account{% endif %}</h1>
             <p class="page-subtitle">
-              Create a new client account. Fill in the details below; fields
+              {% if is_edit_mode %}Update client account details. Fill in the details below; fields{% else %}Create a new client account. Fill in the details below; fields{% endif %}
               marked with * are required.
             </p>
           </div>
@@ -43,7 +43,7 @@
       </div>
 
       <!-- Client Account Form -->
-      <form id="clientAccountForm" method="post" novalidate>
+      <form id="clientAccountForm" method="post" novalidate {% if is_edit_mode %}action="{% url 'iroad_tenants:tenant_client_account_edit' editing_account_no %}"{% endif %}>
         {% csrf_token %}
         <!-- Section 1: Account & Status -->
         <div class="form-card" data-section="1">
@@ -94,6 +94,21 @@
                     <option value="Business" {% if form_data.client_type == 'Business' %}selected{% endif %}>Business</option>
                   </select>
                   {% if form_errors.client_type %}<div class="invalid-feedback d-block">{{ form_errors.client_type }}</div>{% endif %}
+                </div>
+                <div class="field client-account-individual-section" id="clientAccountIndividualSection">
+                  <label for="nationalId" class="form-label">
+                    National ID
+                    {% if settings_data.require_national_id_individual %}<span class="required">*</span>{% endif %}
+                  </label>
+                  <input
+                    type="text"
+                    class="form-control {% if form_errors.national_id %}is-invalid{% endif %}"
+                    id="nationalId"
+                    name="national_id"
+                    placeholder="Enter national ID"
+                    value="{{ form_data.national_id|default:'' }}"
+                  />
+                  {% if form_errors.national_id %}<div class="invalid-feedback d-block">{{ form_errors.national_id }}</div>{% endif %}
                 </div>
                 <div class="field">
                   <label for="createdAt" class="form-label">Created At</label>
@@ -207,11 +222,11 @@
                     required
                   >
                     <option value="" disabled>-Select currency-</option>
-                    <option value="SAR" {% if form_data.preferred_currency == 'SAR' %}selected{% endif %}>SAR - Saudi Riyal</option>
-                    <option value="USD" {% if form_data.preferred_currency == 'USD' %}selected{% endif %}>USD - US Dollar</option>
-                    <option value="EUR" {% if form_data.preferred_currency == 'EUR' %}selected{% endif %}>EUR - Euro</option>
-                    <option value="AED" {% if form_data.preferred_currency == 'AED' %}selected{% endif %}>AED - UAE Dirham</option>
-                    <option value="KWD" {% if form_data.preferred_currency == 'KWD' %}selected{% endif %}>KWD - Kuwaiti Dinar</option>
+                    {% for currency in currency_options %}
+                    <option value="{{ currency.currency_code }}" {% if form_data.preferred_currency == currency.currency_code %}selected{% endif %}>
+                      {{ currency.currency_code }} - {{ currency.name_en }}
+                    </option>
+                    {% endfor %}
                   </select>
                   {% if form_errors.preferred_currency %}<div class="invalid-feedback d-block">{{ form_errors.preferred_currency }}</div>{% endif %}
                   <span class="field-hint">From Currency Master</span>
@@ -435,29 +450,31 @@
               <div class="fields-grid cols-2">
                 <div class="field">
                   <label for="commercialRegistrationNo" class="form-label"
-                    >Commercial Registration No.</label
+                    >Commercial Registration No.{% if settings_data.require_commercial_registration_business %} <span class="required">*</span>{% endif %}</label
                   >
                   <input
                     type="text"
-                    class="form-control"
+                    class="form-control {% if form_errors.commercial_registration_no %}is-invalid{% endif %}"
                     id="commercialRegistrationNo"
                     name="commercial_registration_no"
                     placeholder="Enter CR number"
                     value="{{ form_data.commercial_registration_no|default:'' }}"
                   />
+                  {% if form_errors.commercial_registration_no %}<div class="invalid-feedback d-block">{{ form_errors.commercial_registration_no }}</div>{% endif %}
                 </div>
                 <div class="field">
                   <label for="taxRegistrationNo" class="form-label"
-                    >Tax Registration No.</label
+                    >Tax Registration No.{% if settings_data.require_tax_vat_registration_business %} <span class="required">*</span>{% endif %}</label
                   >
                   <input
                     type="text"
-                    class="form-control"
+                    class="form-control {% if form_errors.tax_registration_no %}is-invalid{% endif %}"
                     id="taxRegistrationNo"
                     name="tax_registration_no"
                     placeholder="Enter tax registration number"
                     value="{{ form_data.tax_registration_no|default:'' }}"
                   />
+                  {% if form_errors.tax_registration_no %}<div class="invalid-feedback d-block">{{ form_errors.tax_registration_no }}</div>{% endif %}
                 </div>
               </div>
             </div>
@@ -475,7 +492,7 @@
           <div class="form-actions-right">
             <button type="submit" class="btn btn-primary">
               <i class="bi bi-check-circle"></i>
-              Create Client Account
+              {% if is_edit_mode %}Update Client Account{% else %}Create Client Account{% endif %}
             </button>
           </div>
         </div>
@@ -485,19 +502,21 @@
 {% block extra_js %}
 <script>
       (function () {
-        var businessSection = document.getElementById(
-          "clientAccountBusinessSection",
-        );
+        var businessSection = document.getElementById("clientAccountBusinessSection");
+        var individualSection = document.getElementById("clientAccountIndividualSection");
         var clientType = document.getElementById("clientType");
-        if (businessSection && clientType) {
-          function toggleBusinessSection() {
-            businessSection.classList.toggle(
-              "hidden",
-              clientType.value !== "Business",
-            );
+        if (clientType) {
+          function toggleTypeSections() {
+            var isBusiness = clientType.value === "Business";
+            if (businessSection) {
+              businessSection.classList.toggle("hidden", !isBusiness);
+            }
+            if (individualSection) {
+              individualSection.classList.toggle("hidden", isBusiness);
+            }
           }
-          toggleBusinessSection();
-          clientType.addEventListener("change", toggleBusinessSection);
+          toggleTypeSections();
+          clientType.addEventListener("change", toggleTypeSections);
         }
       })();
     </script>

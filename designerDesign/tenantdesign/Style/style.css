@@ -8,10 +8,10 @@
    ============================================ */
 :root {
   /* Brand Colors */
-  --primary-color: #5051f9;
-  --primary-hover: #3d3ed6;
+  --primary-color: #3b82f6;
+  --primary-hover: #2673e2;
   --primary-light: #eff6ff; /* Very light blue for icon bg */
-  --primary-gradient: linear-gradient(135deg, #5051f9 0%, #3d3ed6 100%);
+  --primary-gradient: linear-gradient(135deg, #3b82f6 0%, #3d3ed6 100%);
 
   /* Sidebar Colors — Light Theme */
   --sidebar-bg-start: #ffffff;
@@ -26,7 +26,7 @@
   /* Background Colors */
   --bg-white: #ffffff;
   --bg-light: #f8f9fa;
-  --bg-gray: #f1f5f9;
+  --bg-gray: #f3f4f6;
 
   /* Text Colors */
   --text-dark: #1e293b;
@@ -74,7 +74,7 @@ html {
 }
 
 body {
-  font-family: "Inter", sans-serif;
+  font-family: "Segoe UI", sans-serif;
   font-size: 14px;
   line-height: 1.5;
   color: var(--text-dark);
@@ -829,7 +829,10 @@ a {
   width: auto;
 }
 
-.sidebar.collapsed.is-hovered .nav-item > .submenu .submenu-group-title:first-child {
+.sidebar.collapsed.is-hovered
+  .nav-item
+  > .submenu
+  .submenu-group-title:first-child {
   padding-top: 8px;
 }
 
@@ -2005,7 +2008,7 @@ textarea.form-control {
 
 .stat-card .stat-icon.blue {
   background: rgba(80, 81, 249, 0.1);
-  color: #5051f9;
+  color: #3b82f6;
 }
 
 .stat-card .stat-icon.green {
@@ -2087,7 +2090,7 @@ textarea.form-control {
 
 .dashboard-card .view-all {
   font-size: 0.875rem;
-  color: #5051f9;
+  color: #3b82f6;
   text-decoration: none;
   font-weight: 500;
 }
@@ -2154,7 +2157,7 @@ textarea.form-control {
 
 .status-badge.in-transit {
   background: rgba(80, 81, 249, 0.1);
-  color: #5051f9;
+  color: #3b82f6;
 }
 
 /* Quick Actions */
@@ -2181,13 +2184,13 @@ textarea.form-control {
 
 .quick-action-btn:hover {
   background: #f9fafb;
-  border-color: #5051f9;
-  color: #5051f9;
+  border-color: #3b82f6;
+  color: #3b82f6;
 }
 
 .quick-action-btn i {
   font-size: 1.25rem;
-  color: #5051f9;
+  color: #3b82f6;
 }
 
 /* Fleet Status */
@@ -2223,7 +2226,7 @@ textarea.form-control {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #5051f9;
+  color: #3b82f6;
 }
 
 .fleet-item .fleet-name {
@@ -2425,7 +2428,7 @@ textarea.form-control {
    ============================================ */
 .arabic-text {
   direction: rtl;
-  font-family: "Inter", sans-serif;
+  font-family: "Segoe UI", sans-serif;
 }
 
 /* ============================================
@@ -2608,7 +2611,7 @@ textarea.form-control {
   width: 16px;
   height: 16px;
   margin: 0;
-  accent-color: var(--primary-color, #5051f9);
+  accent-color: var(--primary-color, #3b82f6);
   cursor: pointer;
   flex-shrink: 0;
 }
@@ -2619,7 +2622,7 @@ textarea.form-control {
 }
 
 .role-list-check:focus-visible {
-  outline: 2px solid var(--primary-color, #5051f9);
+  outline: 2px solid var(--primary-color, #3b82f6);
   outline-offset: 2px;
 }
 
@@ -2664,7 +2667,7 @@ textarea.form-control {
 }
 
 .setting-toggle input:checked + .toggle-track {
-  background: var(--primary-color, #5051f9);
+  background: var(--primary-color, #3b82f6);
 }
 
 .setting-toggle input:checked + .toggle-track::after {
@@ -2680,7 +2683,7 @@ textarea.form-control {
 }
 
 .setting-toggle input:checked ~ .toggle-label {
-  color: var(--primary-color, #5051f9);
+  color: var(--primary-color, #3b82f6);
 }
 
 .setting-toggle:hover .toggle-track {
@@ -3453,7 +3456,7 @@ textarea.form-control {
 
 .form-card-icon.blue {
   background: rgba(80, 81, 249, 0.1);
-  color: #5051f9;
+  color: #3b82f6;
 }
 
 .form-card-icon.amber {
@@ -3822,7 +3825,7 @@ textarea.form-control {
 }
 
 .setting-toggle input:checked + .toggle-track {
-  background: var(--primary-color, #5051f9);
+  background: var(--primary-color, #3b82f6);
 }
 
 .setting-toggle input:checked + .toggle-track::after {
@@ -3838,7 +3841,7 @@ textarea.form-control {
 }
 
 .setting-toggle input:checked ~ .toggle-label {
-  color: var(--primary-color, #5051f9);
+  color: var(--primary-color, #3b82f6);
 }
 
 .setting-toggle:hover .toggle-track {
@@ -3876,7 +3879,7 @@ textarea.form-control {
   color: #8b8fa3;
 }
 .eal-breadcrumb a {
-  color: #5051f9;
+  color: #3b82f6;
   text-decoration: none;
 }
 .eal-breadcrumb a:hover {
@@ -3915,13 +3918,13 @@ textarea.form-control {
   border: none;
   cursor: pointer;
   transition: all 0.2s;
-  font-family: "Inter", sans-serif;
+  font-family: "Segoe UI", sans-serif;
 }
 .eal-btn i {
   font-size: 15px;
 }
 .eal-btn-primary {
-  background: linear-gradient(135deg, #5051f9 0%, #7b6cf6 100%);
+  background: linear-gradient(135deg, #3b82f6 0%, #2673e2 100%);
   color: #fff;
   box-shadow: 0 2px 8px rgba(80, 81, 249, 0.25);
 }
@@ -3974,7 +3977,7 @@ textarea.form-control {
 }
 .eal-stat-icon.purple {
   background: #eeedfe;
-  color: #5051f9;
+  color: #3b82f6;
 }
 .eal-stat-icon.blue {
   background: #e8f4fd;
@@ -4022,7 +4025,7 @@ textarea.form-control {
   height: 40px;
   border-radius: 12px;
   background: #eeedfe;
-  color: #5051f9;
+  color: #3b82f6;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -4053,7 +4056,7 @@ textarea.form-control {
 }
 
 .eal-search-tabs.nav-pills .nav-link.active {
-  background: #5051f9;
+  background: #3b82f6;
   color: #fff;
 }
 
@@ -4175,7 +4178,7 @@ textarea.form-control {
     background 0.2s;
 }
 .eal-search:focus-within {
-  border-color: #5051f9;
+  border-color: #3b82f6;
   background: #fff;
 }
 .eal-search i {
@@ -4189,7 +4192,7 @@ textarea.form-control {
   font-size: 13.5px;
   color: #2d2f3a;
   width: 100%;
-  font-family: "Inter", sans-serif;
+  font-family: "Segoe UI", sans-serif;
 }
 .eal-search input::placeholder {
   color: #b0b4c4;
@@ -4210,8 +4213,8 @@ textarea.form-control {
   position: relative;
 }
 .eal-icon-btn:hover {
-  border-color: #5051f9;
-  color: #5051f9;
+  border-color: #3b82f6;
+  color: #3b82f6;
   background: #f2f2ff;
 }
 .eal-chip-group {
@@ -4230,11 +4233,11 @@ textarea.form-control {
   cursor: pointer;
   border: 1.5px solid transparent;
   transition: all 0.2s;
-  font-family: "Inter", sans-serif;
+  font-family: "Segoe UI", sans-serif;
 }
 .eal-chip.active {
   background: #eeedfe;
-  color: #5051f9;
+  color: #3b82f6;
   border-color: #d4d5f9;
 }
 .eal-chip:not(.active) {
@@ -4243,7 +4246,7 @@ textarea.form-control {
 }
 .eal-chip:not(.active):hover {
   background: #eeedfe;
-  color: #5051f9;
+  color: #3b82f6;
 }
 
 /* ── Table ───────────────────────────────────── */
@@ -4270,7 +4273,7 @@ textarea.form-control {
   transition: color 0.2s;
 }
 .eal-table thead th:hover {
-  color: #5051f9;
+  color: #3b82f6;
 }
 .eal-table thead th .sort-indicator {
   display: inline-flex;
@@ -4321,8 +4324,8 @@ textarea.form-control {
   position: relative;
 }
 .eal-custom-check:checked {
-  background: #5051f9;
-  border-color: #5051f9;
+  background: #3b82f6;
+  border-color: #3b82f6;
 }
 .eal-custom-check:checked::after {
   content: "";
@@ -4339,7 +4342,7 @@ textarea.form-control {
 /* Entity ID column */
 .eal-entity-id {
   font-weight: 700;
-  color: #5051f9;
+  color: #3b82f6;
   font-size: 13px;
   background: #f0f0ff;
   padding: 4px 10px;
@@ -4373,7 +4376,7 @@ textarea.form-control {
 }
 .eal-type-badge.org {
   background: #eeedfe;
-  color: #5051f9;
+  color: #3b82f6;
 }
 .eal-type-badge.ind {
   background: #e8f4fd;
@@ -4386,7 +4389,7 @@ textarea.form-control {
 
 /* PI Number */
 .eal-pi-number {
-  font-family: "Inter", sans-serif;
+  font-family: "Segoe UI", sans-serif;
   font-size: 13px;
   color: #4b4e5e;
   letter-spacing: 0.3px;
@@ -4435,7 +4438,7 @@ textarea.form-control {
 }
 .eal-row-btn:hover {
   background: #eeedfe;
-  color: #5051f9;
+  color: #3b82f6;
 }
 .eal-row-btn.danger:hover {
   background: #fde8e8;
@@ -4478,16 +4481,16 @@ textarea.form-control {
   justify-content: center;
   cursor: pointer;
   transition: all 0.18s;
-  font-family: "Inter", sans-serif;
+  font-family: "Segoe UI", sans-serif;
 }
 .eal-page-btn:hover {
-  border-color: #5051f9;
-  color: #5051f9;
+  border-color: #3b82f6;
+  color: #3b82f6;
 }
 .eal-page-btn.active {
-  background: #5051f9;
+  background: #3b82f6;
   color: #fff;
-  border-color: #5051f9;
+  border-color: #3b82f6;
 }
 
 /* ============================================
@@ -4564,8 +4567,8 @@ textarea.form-control {
   font-size: 14px;
 }
 .detail-nav-btn:hover:not(:disabled) {
-  border-color: #5051f9;
-  color: #5051f9;
+  border-color: #3b82f6;
+  color: #3b82f6;
 }
 .detail-nav-btn:disabled {
   opacity: 0.35;
@@ -4588,12 +4591,12 @@ textarea.form-control {
   cursor: pointer;
   border: 1.5px solid transparent;
   transition: all 0.2s;
-  font-family: "Inter", sans-serif;
+  font-family: "Segoe UI", sans-serif;
   background: #fff;
 }
 .detail-action-btn.edit {
-  border-color: #5051f9;
-  color: #5051f9;
+  border-color: #3b82f6;
+  color: #3b82f6;
 }
 .detail-action-btn.edit:hover {
   background: #eff6ff;
@@ -4681,7 +4684,7 @@ textarea.form-control {
   flex: 0 0 170px;
   font-size: 14px;
   font-weight: 500;
-  color: #5051f9;
+  color: #3b82f6;
 }
 .detail-field-value {
   /* flex: 1; */
@@ -4710,7 +4713,7 @@ textarea.form-control {
 .detail-arabic {
   direction: rtl;
   text-align: right;
-  font-family: "Inter", sans-serif;
+  font-family: "Segoe UI", sans-serif;
 }
 
 /* Comments section */
@@ -4731,7 +4734,7 @@ textarea.form-control {
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: #5051f9;
+  background: #3b82f6;
   color: #fff;
   display: flex;
   align-items: center;
@@ -4752,7 +4755,7 @@ textarea.form-control {
   padding: 0px 3px 0px 0px;
 }
 .detail-comment-input-wrap:focus-within {
-  border-color: #5051f9;
+  border-color: #3b82f6;
   background: #fff;
 }
 .detail-comment-input {
@@ -4762,7 +4765,7 @@ textarea.form-control {
   padding: 10px 14px;
   font-size: 13px;
   background: transparent;
-  font-family: "Inter", sans-serif;
+  font-family: "Segoe UI", sans-serif;
   color: #334155;
 }
 .detail-comment-input::placeholder {
@@ -4771,14 +4774,14 @@ textarea.form-control {
 .detail-comment-btn {
   padding: 8px 18px;
   border: none;
-  background: #5051f9;
+  background: #3b82f6;
   color: #fff;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   border-radius: 8px;
   transition: background 0.2s;
-  font-family: "Inter", sans-serif;
+  font-family: "Segoe UI", sans-serif;
 }
 .detail-comment-btn:hover {
   background: #3d3ed6;
@@ -4938,7 +4941,7 @@ textarea.form-control {
 }
 
 .setting-toggle input:checked + .toggle-track {
-  background: var(--primary-color, #5051f9);
+  background: var(--primary-color, #3b82f6);
 }
 
 .setting-toggle input:checked + .toggle-track::after {
@@ -4954,7 +4957,7 @@ textarea.form-control {
 }
 
 .setting-toggle input:checked ~ .toggle-label {
-  color: var(--primary-color, #5051f9);
+  color: var(--primary-color, #3b82f6);
 }
 
 .setting-toggle:hover .toggle-track {
@@ -5945,7 +5948,7 @@ textarea.form-control {
   font-weight: 500;
   letter-spacing: 3px;
   margin-bottom: 16px;
-  font-family: "Courier New", Courier, monospace;
+  font-family: "Segoe UI", sans-serif;
 }
 
 .bill-card-details {
@@ -6194,21 +6197,21 @@ textarea.form-control {
   color: #6b6f82;
   cursor: pointer;
   transition: all 0.2s;
-  font-family: "Inter", sans-serif;
+  font-family: "Segoe UI", sans-serif;
   position: relative;
   margin-right: -1px;
 }
 .report-tab-bar .report-tab-btn:hover {
   background: #eeedfe;
-  color: #5051f9;
+  color: #3b82f6;
   border-color: #d4d5f9;
 }
 
 /* ── Active tab ────────────────────────────── */
 .report-tab-bar .report-tab-btn.active {
-  background: #5051f9;
+  background: #3b82f6;
   color: #fff;
-  border-color: #5051f9;
+  border-color: #3b82f6;
   border-bottom: none;
   z-index: 3;
 }
@@ -6249,7 +6252,7 @@ textarea.form-control {
   background: #f5f6fa;
   font-size: 13.5px;
   font-weight: 500;
-  font-family: "Inter", sans-serif;
+  font-family: "Segoe UI", sans-serif;
   color: #4b4e5e;
   cursor: pointer;
   transition:
@@ -6266,7 +6269,7 @@ textarea.form-control {
   border-color: #d4d5f9;
 }
 .eal-filter-select:focus {
-  border-color: #5051f9;
+  border-color: #3b82f6;
   background: #fff;
   outline: none;
   box-shadow: 0 0 0 3px rgba(80, 81, 249, 0.1);
@@ -6279,7 +6282,7 @@ textarea.form-control {
   background: #f5f6fa;
   font-size: 13.5px;
   font-weight: 500;
-  font-family: "Inter", sans-serif;
+  font-family: "Segoe UI", sans-serif;
   color: #4b4e5e;
   cursor: pointer;
   transition:
@@ -6291,7 +6294,7 @@ textarea.form-control {
   border-color: #d4d5f9;
 }
 .eal-filter-date:focus {
-  border-color: #5051f9;
+  border-color: #3b82f6;
   background: #fff;
   outline: none;
   box-shadow: 0 0 0 3px rgba(80, 81, 249, 0.1);
@@ -6363,7 +6366,7 @@ textarea.form-control {
   color: var(--text-dark);
   outline: none;
   width: 100%;
-  font-family: "Inter", sans-serif;
+  font-family: "Segoe UI", sans-serif;
 }
 
 .auto-number-sidebar-search input::placeholder {
@@ -6481,7 +6484,7 @@ textarea.form-control {
   width: 100%;
   padding: 10px 14px;
   font-size: 14px;
-  font-family: "Inter", sans-serif;
+  font-family: "Segoe UI", sans-serif;
   color: var(--text-dark);
   background: var(--bg-white);
   border: 1px solid var(--border-color);
@@ -7193,7 +7196,7 @@ textarea.form-control {
 
 .pod-rule-icon.blue {
   background: rgba(80, 81, 249, 0.1);
-  color: #5051f9;
+  color: #3b82f6;
 }
 
 .pod-rule-icon.amber {

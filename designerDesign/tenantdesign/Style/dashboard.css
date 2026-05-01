@@ -96,7 +96,7 @@
   color: var(--text-dark);
   font-size: 12.5px;
   font-weight: 500;
-  font-family: inherit;
+  font-family: "Segoe UI", sans-serif;
   outline: none;
   appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' fill='%2364748b' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");
@@ -770,7 +770,7 @@
   border-radius: var(--radius-sm);
   color: var(--text-dark);
   font-size: 12.5px;
-  font-family: inherit;
+  font-family: "Segoe UI", sans-serif;
   outline: none;
   transition: border-color var(--transition-fast);
 }
@@ -2272,7 +2272,7 @@
 }
 
 .resource-progress .bar.indigo {
-  background: #5051f9;
+  background: #3b82f6;
 }
 .resource-progress .bar.purple {
   background: #7c3aed;
@@ -3203,7 +3203,7 @@
 }
 
 .fih-metric.blue::before {
-  background-color: #5051f9;
+  background-color: #3b82f6;
 }
 .fih-metric.green::before {
   background-color: #10b981;
@@ -4064,7 +4064,9 @@
   background-image:
     linear-gradient(to right, rgba(148, 163, 184, 0.14) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(148, 163, 184, 0.14) 1px, transparent 1px);
-  background-size: 20% 100%, 100% 20%;
+  background-size:
+    20% 100%,
+    100% 20%;
 }
 
 .pih-line-svg-wrap {
@@ -4155,7 +4157,9 @@
   background-image:
     linear-gradient(to bottom, transparent 19%, rgba(148, 163, 184, 0.1) 20%),
     linear-gradient(to right, rgba(148, 163, 184, 0.08) 1px, transparent 1px);
-  background-size: 100% 20%, 16.6% 100%;
+  background-size:
+    100% 20%,
+    16.6% 100%;
 }
 
 .pih-bar-group {
@@ -4333,7 +4337,9 @@
   cursor: pointer;
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
-  transition: color 0.2s, border-color 0.2s;
+  transition:
+    color 0.2s,
+    border-color 0.2s;
 }
 
 .fi-list-tab:hover {
@@ -4341,8 +4347,8 @@
 }
 
 .fi-list-tab.active {
-  color: #5051f9;
-  border-bottom-color: #5051f9;
+  color: #3b82f6;
+  border-bottom-color: #3b82f6;
 }
 
 .fi-list-tab.fi-list-tab--att.active {
@@ -4399,7 +4405,7 @@
   height: 44px;
   border-radius: 50%;
   background: rgba(80, 81, 249, 0.12);
-  color: #5051f9;
+  color: #3b82f6;
   font-weight: 800;
   font-size: 13px;
   letter-spacing: 0.02em;
@@ -4458,7 +4464,7 @@
   height: 48px;
   border-radius: 10px;
   background: rgba(80, 81, 249, 0.1);
-  color: #5051f9;
+  color: #3b82f6;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -4541,7 +4547,7 @@
   gap: 6px;
   font-size: 12px;
   font-weight: 600;
-  color: #5051f9;
+  color: #3b82f6;
   text-decoration: none;
   white-space: nowrap;
 }
@@ -4561,5 +4567,5 @@
 }
 
 .fi-list-map-canvas.leaflet-container {
-  font-family: inherit;
+  font-family: "Segoe UI", sans-serif;
 }

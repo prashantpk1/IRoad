@@ -30,7 +30,7 @@
     </div>
     <ul class="auto-number-form-list" id="formNameList">
       <li class="form-list-section">Client</li>
-      <li class="form-list-item" data-form="client-account">Client Account</li>
+      <li class="form-list-item {% if auto_number_form_code == 'client-account' %}active{% endif %}" data-form="client-account">Client Account</li>
       <li class="form-list-item" data-form="client-payment">Client Payment</li>
 
       <li class="form-list-section">Vendor</li>
@@ -307,7 +307,11 @@
     const sequenceFormatEl = document.getElementById("sequenceFormat");
     const nextNumberEl = document.getElementById("nextNumber");
     const baseNextNumberEl = document.getElementById("baseNextNumber");
-    const ENABLED_FORM_CODES = new Set(["organization-profile", "users-administration"]);
+    const ENABLED_FORM_CODES = new Set([
+      "organization-profile",
+      "users-administration",
+      "client-account",
+    ]);
 
     function toAlpha(num) {
       let n = Math.max(1, num);

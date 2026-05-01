@@ -88,6 +88,7 @@ from .views import (
     OrderPreviewAjaxView,
     OrderStatusUpdateView,
     ResetPasswordConfirmView,
+    TenantUserResetPasswordConfirmView,
     SetPasswordView,
     SupportCategoryCreateView,
     SupportCategoryDeleteView,
@@ -190,6 +191,11 @@ urlpatterns = [
         'new-password/<str:token>/',
         ResetPasswordConfirmView.as_view(),
         name='new_password',
+    ),
+    path(
+        'tenant-user/new-password/<str:token>/',
+        TenantUserResetPasswordConfirmView.as_view(),
+        name='tenant_user_new_password',
     ),
     path(
         'set-password/<str:token>/',

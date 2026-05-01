@@ -3,7 +3,11 @@ from django.urls import path
 from .views import (
     TenantAutoNumberConfigurationView,
     TenantClientAccountCreateView,
+    TenantClientAccountDeleteView,
+    TenantClientAccountEditView,
+    TenantClientSalesReportView,
     TenantClientAccountSettingsView,
+    TenantClientAccountToggleStatusView,
     TenantClientAccountView,
     TenantClientAttachmentsListView,
     TenantClientAttachmentsView,
@@ -165,6 +169,26 @@ urlpatterns = [
         name='tenant_client_account_create',
     ),
     path(
+        'crm/clients/account/<str:account_no>/edit/',
+        TenantClientAccountEditView.as_view(),
+        name='tenant_client_account_edit',
+    ),
+    path(
+        'crm/clients/account/<str:account_no>/toggle-status/',
+        TenantClientAccountToggleStatusView.as_view(),
+        name='tenant_client_account_toggle_status',
+    ),
+    path(
+        'crm/clients/account/<str:account_no>/delete/',
+        TenantClientAccountDeleteView.as_view(),
+        name='tenant_client_account_delete',
+    ),
+    path(
+        'crm/clients/account/<str:account_no>/sales-report/',
+        TenantClientSalesReportView.as_view(),
+        name='tenant_client_sales_report',
+    ),
+    path(
         'crm/clients/account/settings/',
         TenantClientAccountSettingsView.as_view(),
         name='tenant_client_account_settings',
@@ -173,6 +197,11 @@ urlpatterns = [
         'crm/clients/attachments/',
         TenantClientAttachmentsView.as_view(),
         name='tenant_client_attachments',
+    ),
+    path(
+        'crm/clients/attachments/create/',
+        TenantClientAttachmentsView.as_view(),
+        name='tenant_client_attachments_create',
     ),
     path(
         'crm/clients/attachments/list/',

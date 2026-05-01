@@ -716,7 +716,6 @@
               proof, and audit-ready attachments.
             </p>
           </div>
-          
         </div>
       </div>
 
@@ -738,11 +737,19 @@
           </div>
           <div class="form-card-body">
             <div class="field-group">
-              <h3 class="field-group-title"><i class="bi bi-hash"></i> Header Info</h3>
+              <h3 class="field-group-title">
+                <i class="bi bi-hash"></i> Header Info
+              </h3>
               <div class="fields-grid cols-2">
                 <div class="field">
                   <label for="recordNo" class="form-label">Record No</label>
-                  <input type="text" class="form-control" id="recordNo" placeholder="Auto-generated" readonly />
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="recordNo"
+                    placeholder="Auto-generated"
+                    readonly
+                  />
                 </div>
                 <div class="field">
                   <label for="recordDate" class="form-label">Record Date</label>
@@ -752,24 +759,39 @@
             </div>
 
             <div class="field-group">
-              <h3 class="field-group-title"><i class="bi bi-file-earmark-text"></i> Document Info</h3>
+              <h3 class="field-group-title">
+                <i class="bi bi-file-earmark-text"></i> Document Info
+              </h3>
               <div class="fields-grid cols-3">
                 <div class="field">
                   <label for="docNo" class="form-label">Doc No (list)</label>
                   <select class="form-select" id="docNo">
-                    <option value="" selected disabled>- Select Doc No -</option>
+                    <option value="" selected disabled>
+                      - Select Doc No -
+                    </option>
                     <option value="DOC-001">DOC-001</option>
                     <option value="DOC-002">DOC-002</option>
                   </select>
                 </div>
                 <div class="field">
-                  <label for="documentDate" class="form-label">Doc Date (fetch)</label>
-                  <input type="date" class="form-control" id="documentDate" readonly />
+                  <label for="documentDate" class="form-label"
+                    >Doc Date (fetch)</label
+                  >
+                  <input
+                    type="date"
+                    class="form-control"
+                    id="documentDate"
+                    readonly
+                  />
                 </div>
                 <div class="field">
-                  <label for="documentType" class="form-label">Doc Type (list)</label>
+                  <label for="documentType" class="form-label"
+                    >Doc Type (list)</label
+                  >
                   <select class="form-select" id="documentType">
-                    <option value="" selected disabled>- Select Doc Type -</option>
+                    <option value="" selected disabled>
+                      - Select Doc Type -
+                    </option>
                     <option value="delivery_note">Delivery Note</option>
                     <option value="invoice">Invoice</option>
                     <option value="pod">POD</option>
@@ -778,43 +800,69 @@
               </div>
               <div class="fields-grid cols-2" style="margin-top: 20px">
                 <div class="field">
-                  <label for="documentRefNo" class="form-label">Doc Ref (list)</label>
+                  <label for="documentRefNo" class="form-label"
+                    >Doc Ref (list)</label
+                  >
                   <select class="form-select" id="documentRefNo">
-                    <option value="" selected disabled>- Select Doc Ref -</option>
+                    <option value="" selected disabled>
+                      - Select Doc Ref -
+                    </option>
                     <option value="DREF-001">DREF-001</option>
                     <option value="DREF-002">DREF-002</option>
                   </select>
                 </div>
                 <div class="field">
-                  <label for="pageCount" class="form-label">Page Count (fetch)</label>
-                  <input type="number" class="form-control" id="pageCount" min="1" readonly />
+                  <label for="pageCount" class="form-label"
+                    >Page Count (fetch)</label
+                  >
+                  <input
+                    type="number"
+                    class="form-control"
+                    id="pageCount"
+                    min="1"
+                    readonly
+                  />
                 </div>
               </div>
             </div>
 
             <div class="field-group">
-              <h3 class="field-group-title"><i class="bi bi-truck"></i> Booking and Shipment Info</h3>
+              <h3 class="field-group-title">
+                <i class="bi bi-truck"></i> Booking and Shipment Info
+              </h3>
               <div class="fields-grid cols-3">
                 <div class="field">
-                  <label for="bookingNo" class="form-label">Booking No (list)</label>
+                  <label for="bookingNo" class="form-label"
+                    >Booking No (list)</label
+                  >
                   <select class="form-select" id="bookingNo">
-                    <option value="" selected disabled>- Select Booking No -</option>
+                    <option value="" selected disabled>
+                      - Select Booking No -
+                    </option>
                     <option value="BK-2026-001">BK-2026-001</option>
                     <option value="BK-2026-002">BK-2026-002</option>
                   </select>
                 </div>
                 <div class="field">
-                  <label for="bookingItem" class="form-label">Booking Item (list)</label>
+                  <label for="bookingItem" class="form-label"
+                    >Booking Item (list)</label
+                  >
                   <select class="form-select" id="bookingItem">
-                    <option value="" selected disabled>- Select Booking Item -</option>
+                    <option value="" selected disabled>
+                      - Select Booking Item -
+                    </option>
                     <option value="BI-001">BI-001</option>
                     <option value="BI-002">BI-002</option>
                   </select>
                 </div>
                 <div class="field">
-                  <label for="shipmentRef" class="form-label">Shipment (list)</label>
+                  <label for="shipmentRef" class="form-label"
+                    >Shipment (list)</label
+                  >
                   <select class="form-select" id="shipmentRef">
-                    <option value="" selected disabled>- Select Shipment -</option>
+                    <option value="" selected disabled>
+                      - Select Shipment -
+                    </option>
                     <option value="SHP-2026-00142">SHP-2026-00142</option>
                     <option value="SHP-2026-00143">SHP-2026-00143</option>
                   </select>
@@ -823,24 +871,42 @@
             </div>
 
             <div class="field-group" id="locationHandoverGroup">
-              <h3 class="field-group-title"><i class="bi bi-shield-check"></i> POD Status Info</h3>
+              <h3 class="field-group-title">
+                <i class="bi bi-shield-check"></i> POD Status Info
+              </h3>
               <div class="fields-grid cols-3">
                 <div class="field">
-                  <label for="podType" class="form-label">POD Type (list)</label>
+                  <label for="podType" class="form-label"
+                    >POD Type (list)</label
+                  >
                   <select class="form-select" id="podType">
-                    <option value="" selected disabled>- Select POD Type -</option>
+                    <option value="" selected disabled>
+                      - Select POD Type -
+                    </option>
                     <option value="soft">Soft Copy</option>
                     <option value="hard">Hard Copy</option>
                   </select>
                 </div>
                 <div class="field">
-                  <label for="podStatus" class="form-label">POD Status (auto update)</label>
-                  <input type="text" class="form-control" id="podStatus" value="pending" readonly />
+                  <label for="podStatus" class="form-label"
+                    >POD Status (auto update)</label
+                  >
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="podStatus"
+                    value="pending"
+                    readonly
+                  />
                 </div>
                 <div class="field">
-                  <label for="documentLocation" class="form-label">Physical Location (list)</label>
+                  <label for="documentLocation" class="form-label"
+                    >Physical Location (list)</label
+                  >
                   <select class="form-select" id="documentLocation">
-                    <option value="" selected disabled>- Select Location -</option>
+                    <option value="" selected disabled>
+                      - Select Location -
+                    </option>
                     <option value="with_driver">With Driver</option>
                     <option value="with_admin">With Admin</option>
                     <option value="out_of_company">Out of Company</option>
@@ -856,11 +922,17 @@
                     <option value="user2">Sara Mohammed</option>
                     <option value="user3">Khalid Ibrahim</option>
                   </select>
-                  <span class="field-hint">Empty when location is out of company.</span>
+                  <span class="field-hint"
+                    >Empty when location is out of company.</span
+                  >
                 </div>
                 <div class="field">
                   <label class="form-label">Location Status</label>
-                  <div class="pod-location-badge" id="locationStatusBadge" data-status="none">
+                  <div
+                    class="pod-location-badge"
+                    id="locationStatusBadge"
+                    data-status="none"
+                  >
                     <i class="bi bi-dash-circle"></i>
                     <span>Select a location</span>
                   </div>
@@ -868,23 +940,35 @@
               </div>
               <div class="fields-grid cols-3" style="margin-top: 20px">
                 <div class="field">
-                  <label for="podHardCopyStatus" class="form-label">POD Hard Copy Status (list)</label>
+                  <label for="podHardCopyStatus" class="form-label"
+                    >POD Hard Copy Status (list)</label
+                  >
                   <select class="form-select" id="podHardCopyStatus">
-                    <option value="Not Collected" selected>Not Collected</option>
+                    <option value="Not Collected" selected>
+                      Not Collected
+                    </option>
                     <option value="Collected">Collected</option>
                   </select>
                 </div>
                 <div class="field">
-                  <label for="podSoftCopyStatus" class="form-label">POD Soft Copy Status (list)</label>
+                  <label for="podSoftCopyStatus" class="form-label"
+                    >POD Soft Copy Status (list)</label
+                  >
                   <select class="form-select" id="podSoftCopyStatus">
-                    <option value="Not Collected" selected>Not Collected</option>
+                    <option value="Not Collected" selected>
+                      Not Collected
+                    </option>
                     <option value="Collected">Collected</option>
                   </select>
                 </div>
                 <div class="field">
-                  <label for="podDigitalEvidenceStatus" class="form-label">POD Digital Evidence Status (list)</label>
+                  <label for="podDigitalEvidenceStatus" class="form-label"
+                    >POD Digital Evidence Status (list)</label
+                  >
                   <select class="form-select" id="podDigitalEvidenceStatus">
-                    <option value="Not Collected" selected>Not Collected</option>
+                    <option value="Not Collected" selected>
+                      Not Collected
+                    </option>
                     <option value="Collected">Collected</option>
                   </select>
                 </div>
@@ -892,8 +976,6 @@
             </div>
           </div>
         </div>
-
-        
 
         <!-- Section 3: Hard Copy — Document Location & User (Dynamic Visibility) -->
         <div
@@ -935,14 +1017,8 @@
               <div class="fields-grid cols-2">
                 <div class="field">
                   <label class="form-label">Current Document Location</label>
-                  <div
-                    class="pod-location-visual"
-                    id="hardCopyLocationVisual"
-                  >
-                    <div
-                      class="pod-loc-option"
-                      data-value="not_collected"
-                    >
+                  <div class="pod-location-visual" id="hardCopyLocationVisual">
+                    <div class="pod-loc-option" data-value="not_collected">
                       <div class="pod-loc-icon error">
                         <i class="bi bi-x-circle"></i>
                       </div>
@@ -973,9 +1049,7 @@
                     >Current User (Holder)</label
                   >
                   <select class="form-select" id="hardCurrentUser">
-                    <option value="" selected disabled>
-                      - Select User -
-                    </option>
+                    <option value="" selected disabled>- Select User -</option>
                     <option value="user1">Ahmed Al-Rashid</option>
                     <option value="user2">Sara Mohammed</option>
                     <option value="user3">Khalid Ibrahim</option>
@@ -998,7 +1072,8 @@
             <div class="form-card-header-text">
               <h2 class="form-card-title">POD Pages</h2>
               <p class="form-card-desc">
-                Page-level POD tracking with source, status, map, and attachments.
+                Page-level POD tracking with source, status, map, and
+                attachments.
               </p>
             </div>
             <button
@@ -1061,13 +1136,17 @@
                     </td>
                     <td>
                       <select class="form-select form-select-sm">
-                        <option value="Not Collected" selected>Not Collected</option>
+                        <option value="Not Collected" selected>
+                          Not Collected
+                        </option>
                         <option value="Collected">Collected</option>
                       </select>
                     </td>
                     <td>
                       <select class="form-select form-select-sm">
-                        <option value="Not Collected" selected>Not Collected</option>
+                        <option value="Not Collected" selected>
+                          Not Collected
+                        </option>
                         <option value="Collected">Collected</option>
                       </select>
                     </td>
@@ -1079,10 +1158,7 @@
                       />
                     </td>
                     <td>
-                      <input
-                        type="file"
-                        class="form-control form-control-sm"
-                      />
+                      <input type="file" class="form-control form-control-sm" />
                     </td>
                     <td class="pod-td-actions">
                       <button
@@ -1127,13 +1203,17 @@
                     </td>
                     <td>
                       <select class="form-select form-select-sm">
-                        <option value="Not Collected" selected>Not Collected</option>
+                        <option value="Not Collected" selected>
+                          Not Collected
+                        </option>
                         <option value="Collected">Collected</option>
                       </select>
                     </td>
                     <td>
                       <select class="form-select form-select-sm">
-                        <option value="Not Collected" selected>Not Collected</option>
+                        <option value="Not Collected" selected>
+                          Not Collected
+                        </option>
                         <option value="Collected">Collected</option>
                       </select>
                     </td>
@@ -1145,10 +1225,7 @@
                       />
                     </td>
                     <td>
-                      <input
-                        type="file"
-                        class="form-control form-control-sm"
-                      />
+                      <input type="file" class="form-control form-control-sm" />
                     </td>
                     <td class="pod-td-actions">
                       <button
@@ -1164,14 +1241,19 @@
               </table>
             </div>
             <!-- Empty State -->
-            <div class="pod-subform-empty" id="podSubformEmpty" style="display: none">
+            <div
+              class="pod-subform-empty"
+              id="podSubformEmpty"
+              style="display: none"
+            >
               <i class="bi bi-file-earmark-x"></i>
-              <p>No POD lines added yet. Click <strong>"Add Line"</strong> to begin tracking document pages.</p>
+              <p>
+                No POD lines added yet. Click <strong>"Add Line"</strong> to
+                begin tracking document pages.
+              </p>
             </div>
           </div>
         </div>
-
-       
 
         <!-- Form Actions -->
         <div class="form-actions-bar">
@@ -1182,7 +1264,6 @@
             </button>
           </div>
           <div class="form-actions-right">
-            
             <button type="submit" class="btn btn-primary">
               <i class="bi bi-check-circle"></i>
               Save & Submit
@@ -1215,7 +1296,6 @@
               softSection.style.display = "";
               hardSection.style.display = "none";
               modeIndicator.className = "pod-mode-indicator";
-             
             } else if (value === "hard") {
               softSection.style.display = "none";
               hardSection.style.display = "";
@@ -1229,11 +1309,9 @@
 
         // ── POD Status → Lifecycle Tracker ─────────────
         const podStatusSelect = document.getElementById("podStatus");
-        const lifecycleSteps = document.querySelectorAll(
-          ".pod-lifecycle-step"
-        );
+        const lifecycleSteps = document.querySelectorAll(".pod-lifecycle-step");
         const lifecycleConnectors = document.querySelectorAll(
-          ".pod-lifecycle-connector"
+          ".pod-lifecycle-connector",
         );
         const statusOrder = ["pending", "collected", "verified", "finalized"];
 
@@ -1247,7 +1325,7 @@
           lifecycleConnectors.forEach((conn, i) => {
             if (i < activeIdx) {
               conn.style.background =
-                "linear-gradient(90deg, #22c55e 0%, #5051f9 100%)";
+                "linear-gradient(90deg, #22c55e 0%, #3B82F6 100%)";
             } else {
               conn.style.background = "";
             }
@@ -1263,8 +1341,7 @@
         }
 
         // ── Document Location → Badge ──────────────────
-        const docLocationSelect =
-          document.getElementById("documentLocation");
+        const docLocationSelect = document.getElementById("documentLocation");
         const locationBadge = document.getElementById("locationStatusBadge");
 
         const locationConfig = {
@@ -1302,7 +1379,7 @@
 
             // If Hard copy mode — sync hard copy visual
             const hardVisual = document.getElementById(
-              "hardCopyLocationVisual"
+              "hardCopyLocationVisual",
             );
             if (hardVisual) {
               hardVisual
@@ -1310,7 +1387,7 @@
                 .forEach(function (opt) {
                   opt.classList.toggle(
                     "selected",
-                    opt.getAttribute("data-value") === val
+                    opt.getAttribute("data-value") === val,
                   );
                 });
             }
@@ -1324,9 +1401,7 @@
         }
 
         // ── Hard Copy Visual Location Selector ─────────
-        const hardVisual = document.getElementById(
-          "hardCopyLocationVisual"
-        );
+        const hardVisual = document.getElementById("hardCopyLocationVisual");
         if (hardVisual) {
           hardVisual
             .querySelectorAll(".pod-loc-option")

@@ -32,7 +32,12 @@
       </div>
 
       <!-- Client Contract Settings Form -->
-      <form id="clientContractSettingForm">
+      <form
+        id="clientContractSettingForm"
+        method="post"
+        action="{% url 'iroad_tenants:tenant_client_contract_settings' %}"
+      >
+        {% csrf_token %}
         <!-- Section 1: Tenant-Level Configuration -->
         <div class="form-card" data-section="1">
           <div class="form-card-header">
@@ -58,13 +63,18 @@
                   <label for="handlingMode" class="form-label"
                     >Expired Contract Handling Mode</label
                   >
-                  <select class="form-select" id="handlingMode">
-                    <option value="deactivateGrace">
+                  <select class="form-select {% if settings_errors.expired_contract_handling_mode %}is-invalid{% endif %}" id="handlingMode" name="expired_contract_handling_mode">
+                    <option value="Auto-Deactivate" {% if settings_data.expired_contract_handling_mode == 'Auto-Deactivate' %}selected{% endif %}>
+                      Auto-Deactivate
+                    </option>
+                    <option value="Do Nothing" {% if settings_data.expired_contract_handling_mode == 'Do Nothing' %}selected{% endif %}>
+                      Do Nothing
+                    </option>
+                    <option value="Deactivate After Grace" {% if settings_data.expired_contract_handling_mode == 'Deactivate After Grace' %}selected{% endif %}>
                       Deactivate After Grace
                     </option>
-                    <option value="autoRenew" selected>Auto Renew</option>
-                    <option value="manualReview">Manual Review</option>
                   </select>
+                  {% if settings_errors.expired_contract_handling_mode %}<div class="invalid-feedback d-block">{{ settings_errors.expired_contract_handling_mode }}</div>{% endif %}
                 </div>
                 <div class="field">
                   <label for="gracePeriodDays" class="form-label"
@@ -72,11 +82,13 @@
                   >
                   <input
                     type="number"
-                    class="form-control"
+                    class="form-control {% if settings_errors.grace_period_days %}is-invalid{% endif %}"
                     id="gracePeriodDays"
+                    name="grace_period_days"
                     placeholder="e.g., 30"
-                    disabled
+                    value="{{ settings_data.grace_period_days|default:30 }}"
                   />
+                  {% if settings_errors.grace_period_days %}<div class="invalid-feedback d-block">{{ settings_errors.grace_period_days }}</div>{% endif %}
                   <span class="field-hint"
                     >Used only if Handling Mode is "Deactivate After
                     Grace".</span
@@ -99,11 +111,13 @@
                   >
                   <input
                     type="number"
-                    class="form-control"
+                    class="form-control {% if settings_errors.pre_expiry_notification_days %}is-invalid{% endif %}"
                     id="preExpiryDays"
-                    value="30"
+                    name="pre_expiry_notification_days"
+                    value="{{ settings_data.pre_expiry_notification_days|default:30 }}"
                     placeholder="e.g., 30"
                   />
+                  {% if settings_errors.pre_expiry_notification_days %}<div class="invalid-feedback d-block">{{ settings_errors.pre_expiry_notification_days }}</div>{% endif %}
                   <span class="field-hint"
                     >0 disables pre-expiry warnings.</span
                   >
@@ -114,11 +128,13 @@
                   >
                   <input
                     type="number"
-                    class="form-control"
+                    class="form-control {% if settings_errors.post_expiry_notification_days %}is-invalid{% endif %}"
                     id="postExpiryDuration"
-                    value="15"
+                    name="post_expiry_notification_days"
+                    value="{{ settings_data.post_expiry_notification_days|default:30 }}"
                     placeholder="e.g., 15"
                   />
+                  {% if settings_errors.post_expiry_notification_days %}<div class="invalid-feedback d-block">{{ settings_errors.post_expiry_notification_days }}</div>{% endif %}
                   <span class="field-hint"
                     >0 disables post-expiry warnings.</span
                   >
@@ -127,69 +143,24 @@
                   <label for="notificationFrequency" class="form-label"
                     >Notification Frequency</label
                   >
-                  <select class="form-select" id="notificationFrequency">
-                    <option value="once" selected>Once</option>
-                    <option value="daily">Daily</option>
-                    <option value="weekly">Weekly</option>
+                  <select class="form-select {% if settings_errors.notification_frequency %}is-invalid{% endif %}" id="notificationFrequency" name="notification_frequency">
+                    <option value="Once" {% if settings_data.notification_frequency == 'Once' %}selected{% endif %}>Once</option>
+                    <option value="Daily" {% if settings_data.notification_frequency == 'Daily' %}selected{% endif %}>Daily</option>
+                    <option value="Weekly" {% if settings_data.notification_frequency == 'Weekly' %}selected{% endif %}>Weekly</option>
                   </select>
+                  {% if settings_errors.notification_frequency %}<div class="invalid-feedback d-block">{{ settings_errors.notification_frequency }}</div>{% endif %}
                 </div>
                 <div class="field">
                   <label for="notificationAudience" class="form-label"
                     >Notification Audience</label
                   >
-                  <div class="dropdown">
-                    <button
-                      class="form-select text-start bg-white d-flex justify-content-between align-items-center w-100"
-                      type="button"
-                      id="notificationAudienceDropdown"
-                      data-bs-toggle="dropdown"
-                      aria-expanded="false"
-                      data-bs-auto-close="outside"
-                    >
-                      <span id="selectedAudienceText" class="text-truncate"
-                        >System Admin</span
-                      >
-                    </button>
-                    <ul
-                      class="dropdown-menu w-100 p-2 shadow-sm"
-                      aria-labelledby="notificationAudienceDropdown"
-                      style="max-height: 200px; overflow-y: auto"
-                    >
-                      <li>
-                        <div class="form-check mb-1">
-                          <input
-                            class="form-check-input audience-checkbox"
-                            type="checkbox"
-                            value="systemAdmin"
-                            id="audienceSystemAdmin"
-                            checked
-                          />
-                          <label
-                            class="form-check-label w-100 cursor-pointer"
-                            for="audienceSystemAdmin"
-                            >System Admin</label
-                          >
-                        </div>
-                      </li>
-                      <li>
-                        <div class="form-check mb-1">
-                          <input
-                            class="form-check-input audience-checkbox"
-                            type="checkbox"
-                            value="adminFinance"
-                            id="audienceAdminFinance"
-                          />
-                          <label
-                            class="form-check-label w-100 cursor-pointer"
-                            for="audienceAdminFinance"
-                            >Admin + Finance</label
-                          >
-                        </div>
-                      </li>
-                    </ul>
-                  </div>
+                  <select class="form-select {% if settings_errors.notification_audience %}is-invalid{% endif %}" id="notificationAudience" name="notification_audience">
+                    <option value="System Admin" {% if settings_data.notification_audience == 'System Admin' %}selected{% endif %}>System Admin</option>
+                    <option value="Admin+Finance" {% if settings_data.notification_audience == 'Admin+Finance' %}selected{% endif %}>Admin + Finance</option>
+                  </select>
+                  {% if settings_errors.notification_audience %}<div class="invalid-feedback d-block">{{ settings_errors.notification_audience }}</div>{% endif %}
                   <span class="field-hint"
-                    >Select one or more audiences from the dropdown</span
+                    >Select notification target audience.</span
                   >
                 </div>
               </div>
@@ -217,56 +188,15 @@
 
 {% block extra_js %}
 <script>
-      // Logic for Grace Period Days field
       const handlingModeSelect = document.getElementById("handlingMode");
       const gracePeriodInput = document.getElementById("gracePeriodDays");
-
-      function updateGracePeriodState() {
-        if (handlingModeSelect.value === "deactivateGrace") {
-          gracePeriodInput.disabled = false;
-        } else {
-          gracePeriodInput.disabled = true;
-          gracePeriodInput.value = ""; // Clear value when disabled
+      if (handlingModeSelect && gracePeriodInput) {
+        function updateGracePeriodState() {
+          const isGraceMode = handlingModeSelect.value === "Deactivate After Grace";
+          gracePeriodInput.disabled = !isGraceMode;
         }
+        updateGracePeriodState();
+        handlingModeSelect.addEventListener("change", updateGracePeriodState);
       }
-
-      // Initial state
-      updateGracePeriodState();
-
-      // Listen for changes
-      handlingModeSelect.addEventListener("change", updateGracePeriodState);
-
-      // Notification Audience (multi-select) — same pattern as System Roles
-      (function () {
-        const audienceCheckboxes = document.querySelectorAll(
-          ".audience-checkbox",
-        );
-        const selectedAudienceText =
-          document.getElementById("selectedAudienceText");
-        if (!audienceCheckboxes.length || !selectedAudienceText) return;
-
-        function updateSelectedAudience() {
-          const selected = Array.from(audienceCheckboxes)
-            .filter((cb) => cb.checked)
-            .map((cb) => cb.nextElementSibling.textContent.trim());
-
-          if (selected.length === 0) {
-            selectedAudienceText.textContent = "Select Audience";
-            selectedAudienceText.classList.add("text-muted");
-          } else if (selected.length <= 2) {
-            selectedAudienceText.textContent = selected.join(", ");
-            selectedAudienceText.classList.remove("text-muted");
-          } else {
-            selectedAudienceText.textContent =
-              selected.length + " Audiences Selected";
-            selectedAudienceText.classList.remove("text-muted");
-          }
-        }
-
-        audienceCheckboxes.forEach((cb) => {
-          cb.addEventListener("change", updateSelectedAudience);
-        });
-        updateSelectedAudience();
-      })();
     </script>
 {% endblock %}

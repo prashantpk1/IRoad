@@ -184,7 +184,7 @@
               </li>
 
               <li class="submenu-item">
-                <a href="{% url 'iroad_tenants:tenant_client_attachments' %}" class="submenu-link {% if request.resolver_match.url_name == 'tenant_client_attachments' or request.resolver_match.url_name == 'tenant_client_attachments_list' %}active{% endif %}">
+                <a href="{% url 'iroad_tenants:tenant_client_attachments_list' %}" class="submenu-link {% if request.resolver_match.url_name == 'tenant_client_attachments' or request.resolver_match.url_name == 'tenant_client_attachments_list' %}active{% endif %}">
                   <i class="bi bi-paperclip"></i>
                   <span>Client Attachments</span>
                 </a>

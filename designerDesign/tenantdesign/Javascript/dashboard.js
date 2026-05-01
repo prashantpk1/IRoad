@@ -394,11 +394,36 @@ function initFihFleetMap() {
       .bindPopup(title);
   }
 
-  addUnit(24.7136, 46.6753, "#5051f9", "<strong>Internal</strong><br>J H A 9921 · Riyadh");
-  addUnit(21.4858, 39.1925, "#5051f9", "<strong>Internal</strong><br>R R M 4410 · Jeddah");
-  addUnit(26.4207, 50.0888, "#8b5cf6", "<strong>External</strong><br>A B C 7711 · Dammam");
-  addUnit(18.2164, 42.5044, "#8b5cf6", "<strong>External</strong><br>N X T 9022 · Abha");
-  addUnit(24.4681, 39.6142, "#5051f9", "<strong>Internal</strong><br>K S A 2201 · Madinah");
+  addUnit(
+    24.7136,
+    46.6753,
+    "#3B82F6",
+    "<strong>Internal</strong><br>J H A 9921 · Riyadh",
+  );
+  addUnit(
+    21.4858,
+    39.1925,
+    "#3B82F6",
+    "<strong>Internal</strong><br>R R M 4410 · Jeddah",
+  );
+  addUnit(
+    26.4207,
+    50.0888,
+    "#8b5cf6",
+    "<strong>External</strong><br>A B C 7711 · Dammam",
+  );
+  addUnit(
+    18.2164,
+    42.5044,
+    "#8b5cf6",
+    "<strong>External</strong><br>N X T 9022 · Abha",
+  );
+  addUnit(
+    24.4681,
+    39.6142,
+    "#3B82F6",
+    "<strong>Internal</strong><br>K S A 2201 · Madinah",
+  );
 
   function addDriver(lat, lng, title) {
     L.circleMarker([lat, lng], {
@@ -422,13 +447,21 @@ function initFihFleetMap() {
     50.0888,
     "<strong>Driver</strong><br>Sami Al-Otaibi · Dammam",
   );
-  addDriver(24.0892, 38.0618, "<strong>Driver</strong><br>Omar Muhammad · Yanbu");
+  addDriver(
+    24.0892,
+    38.0618,
+    "<strong>Driver</strong><br>Omar Muhammad · Yanbu",
+  );
   addDriver(
     24.7136,
     46.6753,
     "<strong>Driver</strong><br>Fahad Al-Anzi · Riyadh",
   );
-  addDriver(18.2164, 42.5053, "<strong>Driver</strong><br>Yousef Sharif · Abha");
+  addDriver(
+    18.2164,
+    42.5053,
+    "<strong>Driver</strong><br>Yousef Sharif · Abha",
+  );
 
   window.fihFleetMapInstance = map;
 }

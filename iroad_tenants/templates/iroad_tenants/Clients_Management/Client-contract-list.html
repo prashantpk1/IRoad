@@ -54,7 +54,7 @@
             <i class="bi bi-file-earmark-text"></i>
           </div>
           <div>
-            <div class="eal-stat-value">10</div>
+            <div class="eal-stat-value">{{ contract_stats.total|default:0 }}</div>
             <div class="eal-stat-label">Total Contracts</div>
           </div>
         </div>
@@ -63,7 +63,7 @@
             <i class="bi bi-check-circle"></i>
           </div>
           <div>
-            <div class="eal-stat-value">7</div>
+            <div class="eal-stat-value">{{ contract_stats.active|default:0 }}</div>
             <div class="eal-stat-label">Active Contracts</div>
           </div>
         </div>
@@ -72,8 +72,8 @@
             <i class="bi bi-pause-circle"></i>
           </div>
           <div>
-            <div class="eal-stat-value">0</div>
-            <div class="eal-stat-label">Suspended</div>
+            <div class="eal-stat-value">{{ contract_stats.upcoming|default:0 }}</div>
+            <div class="eal-stat-label">Upcoming</div>
           </div>
         </div>
         <div class="eal-stat-card">
@@ -81,7 +81,7 @@
             <i class="bi bi-hourglass-split"></i>
           </div>
           <div>
-            <div class="eal-stat-value">2</div>
+            <div class="eal-stat-value">{{ contract_stats.expiring_soon|default:0 }}</div>
             <div class="eal-stat-label">Expiring Soon</div>
           </div>
         </div>
@@ -90,8 +90,8 @@
             <i class="bi bi-x-octagon"></i>
           </div>
           <div>
-            <div class="eal-stat-value">1</div>
-            <div class="eal-stat-label">Expired / Terminated</div>
+            <div class="eal-stat-value">{{ contract_stats.expired|default:0 }}</div>
+            <div class="eal-stat-label">Expired</div>
           </div>
         </div>
       </div>
@@ -176,687 +176,42 @@
               </tr>
             </thead>
             <tbody>
-              <!-- Sample rows (static demo data) -->
+              {% for contract in client_contracts %}
               <tr>
-                <td class="eal-col-check">
-                  <input type="checkbox" class="eal-custom-check" />
-                </td>
-                <td>
-                  <span class="eal-entity-id">CC-000123</span>
-                </td>
+                <td class="eal-col-check"><input type="checkbox" class="eal-custom-check" /></td>
+                <td><span class="eal-entity-id">{{ contract.contract_no }}</span></td>
                 <td>
                   <div class="eal-name-cell">
-                    <span class="eal-name-text">Al Safa Logistics</span>
+                    <span class="eal-name-text">{{ contract.client_account.account_no }} - {{ contract.client_account.display_name|default:contract.client_account.name_english }}</span>
                   </div>
                 </td>
-                <td>01 Jan 2026</td>
-                <td>31 Dec 2026</td>
-                <td>Annual primary transport contract.</td>
+                <td>{{ contract.start_date|date:"d M Y" }}</td>
+                <td>{{ contract.end_date|date:"d M Y" }}</td>
+                <td>{{ contract.notes|default:"—" }}</td>
                 <td>
-                  <span class="status-badge in-transit">
+                  <span class="status-badge {% if contract.contract_attachment %}in-transit{% else %}pending{% endif %}">
                     <i class="bi bi-paperclip"></i>
-                    Yes</span
-                  >
+                    {% if contract.contract_attachment %}Yes{% else %}No{% endif %}
+                  </span>
                 </td>
                 <td>
-                  <span class="status-badge active">Active</span>
+                  <span class="status-badge {% if contract.status == 'Active' %}active{% elif contract.status == 'Upcoming' %}pending{% else %}inactive{% endif %}">
+                    {{ contract.status }}
+                  </span>
                 </td>
                 <td>
-                  <div class="dropdown eal-actions-cell">
-                    <button
-                      class="eal-row-btn"
-                      type="button"
-                      data-bs-toggle="dropdown"
-                      aria-expanded="false"
-                      title="Actions"
-                    >
-                      <i class="bi bi-three-dots-vertical"></i>
-                    </button>
-                    <ul
-                      class="dropdown-menu dropdown-menu-end shadow-sm"
-                      style="border-radius: 8px; border-color: #e2e8f0"
-                    >
-                      <li>
-                        <a class="dropdown-item" href="#"
-                          ><i class="bi bi-pencil text-primary me-2"></i>
-                          Edit</a
-                        >
-                      </li>
-                      <li>
-                        <a class="dropdown-item" href="#"
-                          ><i class="bi bi-eye text-info me-2"></i> View</a
-                        >
-                      </li>
-                      <li>
-                        <a class="dropdown-item" href="#"
-                          ><i
-                            class="bi bi-person-slash text-secondary me-2"
-                          ></i>
-                          Deactivate</a
-                        >
-                      </li>
-                      <li><hr class="dropdown-divider" /></li>
-                      <li>
-                        <a class="dropdown-item text-danger" href="#"
-                          ><i class="bi bi-trash3 me-2"></i> Delete</a
-                        >
-                      </li>
-                    </ul>
+                  <div class="eal-actions-cell">
+                    {% if contract.contract_attachment %}
+                    <a class="eal-row-btn" title="View" href="{{ contract.contract_attachment.url }}" target="_blank" rel="noopener"><i class="bi bi-eye"></i></a>
+                    {% endif %}
                   </div>
                 </td>
               </tr>
+              {% empty %}
               <tr>
-                <td class="eal-col-check">
-                  <input type="checkbox" class="eal-custom-check" />
-                </td>
-                <td>
-                  <span class="eal-entity-id">CC-000122</span>
-                </td>
-                <td>
-                  <div class="eal-name-cell">
-                    <span class="eal-name-text">Riyadh Trading Co.</span>
-                  </div>
-                </td>
-                <td>15 Feb 2026</td>
-                <td>14 Feb 2027</td>
-                <td>Dedicated FTL lanes Riyadh&ndash;Jeddah.</td>
-                <td>
-                  <span class="status-badge in-transit">
-                    <i class="bi bi-paperclip"></i>
-                    Yes</span
-                  >
-                </td>
-                <td>
-                  <span class="status-badge active">Active</span>
-                </td>
-                <td>
-                  <div class="dropdown eal-actions-cell">
-                    <button
-                      class="eal-row-btn"
-                      type="button"
-                      data-bs-toggle="dropdown"
-                      aria-expanded="false"
-                      title="Actions"
-                    >
-                      <i class="bi bi-three-dots-vertical"></i>
-                    </button>
-                    <ul
-                      class="dropdown-menu dropdown-menu-end shadow-sm"
-                      style="border-radius: 8px; border-color: #e2e8f0"
-                    >
-                      <li>
-                        <a class="dropdown-item" href="#"
-                          ><i class="bi bi-pencil text-primary me-2"></i>
-                          Edit</a
-                        >
-                      </li>
-                      <li>
-                        <a class="dropdown-item" href="#"
-                          ><i class="bi bi-eye text-info me-2"></i> View</a
-                        >
-                      </li>
-                      <li>
-                        <a class="dropdown-item" href="#"
-                          ><i
-                            class="bi bi-person-slash text-secondary me-2"
-                          ></i>
-                          Deactivate</a
-                        >
-                      </li>
-                      <li><hr class="dropdown-divider" /></li>
-                      <li>
-                        <a class="dropdown-item text-danger" href="#"
-                          ><i class="bi bi-trash3 me-2"></i> Delete</a
-                        >
-                      </li>
-                    </ul>
-                  </div>
-                </td>
+                <td colspan="9" class="eal-table-empty">No client contracts found.</td>
               </tr>
-              <tr>
-                <td class="eal-col-check">
-                  <input type="checkbox" class="eal-custom-check" />
-                </td>
-                <td>
-                  <span class="eal-entity-id">CC-000121</span>
-                </td>
-                <td>
-                  <div class="eal-name-cell">
-                    <span class="eal-name-text">Desert Star Transport</span>
-                  </div>
-                </td>
-                <td>01 Feb 2026</td>
-                <td>31 Jan 2027</td>
-                <td>Draft contract under negotiation.</td>
-                <td>
-                  <span class="status-badge pending">
-                    <i class="bi bi-paperclip"></i>
-                    No</span
-                  >
-                </td>
-                <td>
-                  <span class="status-badge pending">Draft</span>
-                </td>
-                <td>
-                  <div class="dropdown eal-actions-cell">
-                    <button
-                      class="eal-row-btn"
-                      type="button"
-                      data-bs-toggle="dropdown"
-                      aria-expanded="false"
-                      title="Actions"
-                    >
-                      <i class="bi bi-three-dots-vertical"></i>
-                    </button>
-                    <ul
-                      class="dropdown-menu dropdown-menu-end shadow-sm"
-                      style="border-radius: 8px; border-color: #e2e8f0"
-                    >
-                      <li>
-                        <a class="dropdown-item" href="#"
-                          ><i class="bi bi-pencil text-primary me-2"></i>
-                          Edit</a
-                        >
-                      </li>
-                      <li>
-                        <a class="dropdown-item" href="#"
-                          ><i class="bi bi-eye text-info me-2"></i> View</a
-                        >
-                      </li>
-                      <li>
-                        <a class="dropdown-item" href="#"
-                          ><i
-                            class="bi bi-person-slash text-secondary me-2"
-                          ></i>
-                          Deactivate</a
-                        >
-                      </li>
-                      <li><hr class="dropdown-divider" /></li>
-                      <li>
-                        <a class="dropdown-item text-danger" href="#"
-                          ><i class="bi bi-trash3 me-2"></i> Delete</a
-                        >
-                      </li>
-                    </ul>
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td class="eal-col-check">
-                  <input type="checkbox" class="eal-custom-check" />
-                </td>
-                <td>
-                  <span class="eal-entity-id">CC-000120</span>
-                </td>
-                <td>
-                  <div class="eal-name-cell">
-                    <span class="eal-name-text">National Water Co.</span>
-                  </div>
-                </td>
-                <td>01 Jan 2025</td>
-                <td>31 Dec 2025</td>
-                <td>Previous-year distribution contract.</td>
-                <td>
-                  <span class="status-badge in-transit">
-                    <i class="bi bi-paperclip"></i>
-                    Yes</span
-                  >
-                </td>
-                <td>
-                  <span class="status-badge inactive">Expired</span>
-                </td>
-                <td>
-                  <div class="dropdown eal-actions-cell">
-                    <button
-                      class="eal-row-btn"
-                      type="button"
-                      data-bs-toggle="dropdown"
-                      aria-expanded="false"
-                      title="Actions"
-                    >
-                      <i class="bi bi-three-dots-vertical"></i>
-                    </button>
-                    <ul
-                      class="dropdown-menu dropdown-menu-end shadow-sm"
-                      style="border-radius: 8px; border-color: #e2e8f0"
-                    >
-                      <li>
-                        <a class="dropdown-item" href="#"
-                          ><i class="bi bi-pencil text-primary me-2"></i>
-                          Edit</a
-                        >
-                      </li>
-                      <li>
-                        <a class="dropdown-item" href="#"
-                          ><i class="bi bi-eye text-info me-2"></i> View</a
-                        >
-                      </li>
-                      <li>
-                        <a class="dropdown-item" href="#"
-                          ><i
-                            class="bi bi-person-slash text-secondary me-2"
-                          ></i>
-                          Deactivate</a
-                        >
-                      </li>
-                      <li><hr class="dropdown-divider" /></li>
-                      <li>
-                        <a class="dropdown-item text-danger" href="#"
-                          ><i class="bi bi-trash3 me-2"></i> Delete</a
-                        >
-                      </li>
-                    </ul>
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td class="eal-col-check">
-                  <input type="checkbox" class="eal-custom-check" />
-                </td>
-                <td>
-                  <span class="eal-entity-id">CC-000119</span>
-                </td>
-                <td>
-                  <div class="eal-name-cell">
-                    <span class="eal-name-text">Blue Ocean Imports</span>
-                  </div>
-                </td>
-                <td>01 Mar 2026</td>
-                <td>28 Feb 2027</td>
-                <td>Cross-border clearance &amp; linehaul agreement.</td>
-                <td>
-                  <span class="status-badge in-transit">
-                    <i class="bi bi-paperclip"></i>
-                    Yes</span
-                  >
-                </td>
-                <td>
-                  <span class="status-badge active">Active</span>
-                </td>
-                <td>
-                  <div class="dropdown eal-actions-cell">
-                    <button
-                      class="eal-row-btn"
-                      type="button"
-                      data-bs-toggle="dropdown"
-                      aria-expanded="false"
-                      title="Actions"
-                    >
-                      <i class="bi bi-three-dots-vertical"></i>
-                    </button>
-                    <ul
-                      class="dropdown-menu dropdown-menu-end shadow-sm"
-                      style="border-radius: 8px; border-color: #e2e8f0"
-                    >
-                      <li>
-                        <a class="dropdown-item" href="#"
-                          ><i class="bi bi-pencil text-primary me-2"></i>
-                          Edit</a
-                        >
-                      </li>
-                      <li>
-                        <a class="dropdown-item" href="#"
-                          ><i class="bi bi-eye text-info me-2"></i> View</a
-                        >
-                      </li>
-                      <li>
-                        <a class="dropdown-item" href="#"
-                          ><i
-                            class="bi bi-person-slash text-secondary me-2"
-                          ></i>
-                          Deactivate</a
-                        >
-                      </li>
-                      <li><hr class="dropdown-divider" /></li>
-                      <li>
-                        <a class="dropdown-item text-danger" href="#"
-                          ><i class="bi bi-trash3 me-2"></i> Delete</a
-                        >
-                      </li>
-                    </ul>
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td class="eal-col-check">
-                  <input type="checkbox" class="eal-custom-check" />
-                </td>
-                <td>
-                  <span class="eal-entity-id">CC-000118</span>
-                </td>
-                <td>
-                  <div class="eal-name-cell">
-                    <span class="eal-name-text">Jeddah Fresh Foods</span>
-                  </div>
-                </td>
-                <td>01 Apr 2026</td>
-                <td>31 Mar 2027</td>
-                <td>Temperature-controlled deliveries &amp; returns.</td>
-                <td>
-                  <span class="status-badge in-transit">
-                    <i class="bi bi-paperclip"></i>
-                    Yes</span
-                  >
-                </td>
-                <td>
-                  <span class="status-badge active">Active</span>
-                </td>
-                <td>
-                  <div class="dropdown eal-actions-cell">
-                    <button
-                      class="eal-row-btn"
-                      type="button"
-                      data-bs-toggle="dropdown"
-                      aria-expanded="false"
-                      title="Actions"
-                    >
-                      <i class="bi bi-three-dots-vertical"></i>
-                    </button>
-                    <ul
-                      class="dropdown-menu dropdown-menu-end shadow-sm"
-                      style="border-radius: 8px; border-color: #e2e8f0"
-                    >
-                      <li>
-                        <a class="dropdown-item" href="#"
-                          ><i class="bi bi-pencil text-primary me-2"></i>
-                          Edit</a
-                        >
-                      </li>
-                      <li>
-                        <a class="dropdown-item" href="#"
-                          ><i class="bi bi-eye text-info me-2"></i> View</a
-                        >
-                      </li>
-                      <li>
-                        <a class="dropdown-item" href="#"
-                          ><i
-                            class="bi bi-person-slash text-secondary me-2"
-                          ></i>
-                          Deactivate</a
-                        >
-                      </li>
-                      <li><hr class="dropdown-divider" /></li>
-                      <li>
-                        <a class="dropdown-item text-danger" href="#"
-                          ><i class="bi bi-trash3 me-2"></i> Delete</a
-                        >
-                      </li>
-                    </ul>
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td class="eal-col-check">
-                  <input type="checkbox" class="eal-custom-check" />
-                </td>
-                <td>
-                  <span class="eal-entity-id">CC-000117</span>
-                </td>
-                <td>
-                  <div class="eal-name-cell">
-                    <span class="eal-name-text">Global Medical Supplies</span>
-                  </div>
-                </td>
-                <td>10 May 2025</td>
-                <td>09 May 2026</td>
-                <td>Terminated due to change in service scope.</td>
-                <td>
-                  <span class="status-badge in-transit">
-                    <i class="bi bi-paperclip"></i>
-                    Yes</span
-                  >
-                </td>
-                <td>
-                  <span class="status-badge inactive">Terminated</span>
-                </td>
-                <td>
-                  <div class="dropdown eal-actions-cell">
-                    <button
-                      class="eal-row-btn"
-                      type="button"
-                      data-bs-toggle="dropdown"
-                      aria-expanded="false"
-                      title="Actions"
-                    >
-                      <i class="bi bi-three-dots-vertical"></i>
-                    </button>
-                    <ul
-                      class="dropdown-menu dropdown-menu-end shadow-sm"
-                      style="border-radius: 8px; border-color: #e2e8f0"
-                    >
-                      <li>
-                        <a class="dropdown-item" href="#"
-                          ><i class="bi bi-pencil text-primary me-2"></i>
-                          Edit</a
-                        >
-                      </li>
-                      <li>
-                        <a class="dropdown-item" href="#"
-                          ><i class="bi bi-eye text-info me-2"></i> View</a
-                        >
-                      </li>
-                      <li>
-                        <a class="dropdown-item" href="#"
-                          ><i
-                            class="bi bi-person-slash text-secondary me-2"
-                          ></i>
-                          Deactivate</a
-                        >
-                      </li>
-                      <li><hr class="dropdown-divider" /></li>
-                      <li>
-                        <a class="dropdown-item text-danger" href="#"
-                          ><i class="bi bi-trash3 me-2"></i> Delete</a
-                        >
-                      </li>
-                    </ul>
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td class="eal-col-check">
-                  <input type="checkbox" class="eal-custom-check" />
-                </td>
-                <td>
-                  <span class="eal-entity-id">CC-000116</span>
-                </td>
-                <td>
-                  <div class="eal-name-cell">
-                    <span class="eal-name-text">Ahmed Khan</span>
-                  </div>
-                </td>
-                <td>01 Jun 2026</td>
-                <td>31 May 2027</td>
-                <td>Monthly courier runs for spare parts.</td>
-                <td>
-                  <span class="status-badge pending">
-                    <i class="bi bi-paperclip"></i>
-                    No</span
-                  >
-                </td>
-                <td>
-                  <span class="status-badge active">Active</span>
-                </td>
-                <td>
-                  <div class="dropdown eal-actions-cell">
-                    <button
-                      class="eal-row-btn"
-                      type="button"
-                      data-bs-toggle="dropdown"
-                      aria-expanded="false"
-                      title="Actions"
-                    >
-                      <i class="bi bi-three-dots-vertical"></i>
-                    </button>
-                    <ul
-                      class="dropdown-menu dropdown-menu-end shadow-sm"
-                      style="border-radius: 8px; border-color: #e2e8f0"
-                    >
-                      <li>
-                        <a class="dropdown-item" href="#"
-                          ><i class="bi bi-pencil text-primary me-2"></i>
-                          Edit</a
-                        >
-                      </li>
-                      <li>
-                        <a class="dropdown-item" href="#"
-                          ><i class="bi bi-eye text-info me-2"></i> View</a
-                        >
-                      </li>
-                      <li>
-                        <a class="dropdown-item" href="#"
-                          ><i
-                            class="bi bi-person-slash text-secondary me-2"
-                          ></i>
-                          Deactivate</a
-                        >
-                      </li>
-                      <li><hr class="dropdown-divider" /></li>
-                      <li>
-                        <a class="dropdown-item text-danger" href="#"
-                          ><i class="bi bi-trash3 me-2"></i> Delete</a
-                        >
-                      </li>
-                    </ul>
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td class="eal-col-check">
-                  <input type="checkbox" class="eal-custom-check" />
-                </td>
-                <td>
-                  <span class="eal-entity-id">CC-000115</span>
-                </td>
-                <td>
-                  <div class="eal-name-cell">
-                    <span class="eal-name-text">Kuwait Steel Works</span>
-                  </div>
-                </td>
-                <td>01 Jul 2026</td>
-                <td>30 Jun 2027</td>
-                <td>Heavy haulage and project moves.</td>
-                <td>
-                  <span class="status-badge in-transit">
-                    <i class="bi bi-paperclip"></i>
-                    Yes</span
-                  >
-                </td>
-                <td>
-                  <span class="status-badge active">Active</span>
-                </td>
-                <td>
-                  <div class="dropdown eal-actions-cell">
-                    <button
-                      class="eal-row-btn"
-                      type="button"
-                      data-bs-toggle="dropdown"
-                      aria-expanded="false"
-                      title="Actions"
-                    >
-                      <i class="bi bi-three-dots-vertical"></i>
-                    </button>
-                    <ul
-                      class="dropdown-menu dropdown-menu-end shadow-sm"
-                      style="border-radius: 8px; border-color: #e2e8f0"
-                    >
-                      <li>
-                        <a class="dropdown-item" href="#"
-                          ><i class="bi bi-pencil text-primary me-2"></i>
-                          Edit</a
-                        >
-                      </li>
-                      <li>
-                        <a class="dropdown-item" href="#"
-                          ><i class="bi bi-eye text-info me-2"></i> View</a
-                        >
-                      </li>
-                      <li>
-                        <a class="dropdown-item" href="#"
-                          ><i
-                            class="bi bi-person-slash text-secondary me-2"
-                          ></i>
-                          Deactivate</a
-                        >
-                      </li>
-                      <li><hr class="dropdown-divider" /></li>
-                      <li>
-                        <a class="dropdown-item text-danger" href="#"
-                          ><i class="bi bi-trash3 me-2"></i> Delete</a
-                        >
-                      </li>
-                    </ul>
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td class="eal-col-check">
-                  <input type="checkbox" class="eal-custom-check" />
-                </td>
-                <td>
-                  <span class="eal-entity-id">CC-000114</span>
-                </td>
-                <td>
-                  <div class="eal-name-cell">
-                    <span class="eal-name-text">Qatar Energy Group</span>
-                  </div>
-                </td>
-                <td>15 Aug 2026</td>
-                <td>14 Aug 2027</td>
-                <td>Awaiting signed contract and attachment upload.</td>
-                <td>
-                  <span class="status-badge pending">
-                    <i class="bi bi-paperclip"></i>
-                    No</span
-                  >
-                </td>
-                <td>
-                  <span class="status-badge pending">Draft</span>
-                </td>
-                <td>
-                  <div class="dropdown eal-actions-cell">
-                    <button
-                      class="eal-row-btn"
-                      type="button"
-                      data-bs-toggle="dropdown"
-                      aria-expanded="false"
-                      title="Actions"
-                    >
-                      <i class="bi bi-three-dots-vertical"></i>
-                    </button>
-                    <ul
-                      class="dropdown-menu dropdown-menu-end shadow-sm"
-                      style="border-radius: 8px; border-color: #e2e8f0"
-                    >
-                      <li>
-                        <a class="dropdown-item" href="#"
-                          ><i class="bi bi-pencil text-primary me-2"></i>
-                          Edit</a
-                        >
-                      </li>
-                      <li>
-                        <a class="dropdown-item" href="#"
-                          ><i class="bi bi-eye text-info me-2"></i> View</a
-                        >
-                      </li>
-                      <li>
-                        <a class="dropdown-item" href="#"
-                          ><i
-                            class="bi bi-person-slash text-secondary me-2"
-                          ></i>
-                          Deactivate</a
-                        >
-                      </li>
-                      <li><hr class="dropdown-divider" /></li>
-                      <li>
-                        <a class="dropdown-item text-danger" href="#"
-                          ><i class="bi bi-trash3 me-2"></i> Delete</a
-                        >
-                      </li>
-                    </ul>
-                  </div>
-                </td>
-              </tr>
+              {% endfor %}
             </tbody>
           </table>
         </div>
@@ -865,9 +220,9 @@
         <div class="eal-pagination">
           <div class="eal-pagination-info">
             Showing
-            <strong>1&ndash;10</strong>
+            <strong>{% if client_contracts_count %}1-{{ client_contracts_count }}{% else %}0-0{% endif %}</strong>
             of
-            <strong>10</strong>
+            <strong>{{ client_contracts_count|default:0 }}</strong>
             client contracts
           </div>
           <div class="eal-pagination-controls">
@@ -894,6 +249,7 @@
         const nextBtn = document.getElementById("detailNextBtn");
         const rows = document.querySelectorAll(".eal-table tbody tr");
         let currentIndex = -1;
+        if (!panel || !overlay || !closeBtn || !prevBtn || !nextBtn) return;
 
         /* ---- helpers ---- */
         function txt(el) {
@@ -946,7 +302,7 @@
 
           // Status badge
           const statusBadge = cells[7]
-            ? cells[3].querySelector(".status-badge")
+            ? cells[7].querySelector(".status-badge")
             : null;
           const statusEl = document.getElementById("dpStatus");
           if (statusBadge) {

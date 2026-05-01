@@ -1,147 +1,447 @@
-﻿      <div style="padding: 24px;">
-      <!-- Page Header -->
-      <div class="page-header" style="margin-bottom: 24px;">
-        <nav aria-label="breadcrumb">
-          <ol class="breadcrumb" style="font-size: 12px; color: #6b7280; font-weight: 500; margin-bottom: 8px;">
-            <li class="breadcrumb-item"><a href="index.html" style="color: inherit; text-decoration: none;">Dashboard</a></li>
-            <li class="breadcrumb-item">Administration</li>
-            <li class="breadcrumb-item"><a href="Support-ticket-master.html" style="color: inherit; text-decoration: none;">Support Management</a></li>
-            <li class="breadcrumb-item active" aria-current="page" style="color: #5051f9;">New Ticket Reply</li>
-          </ol>
-        </nav>
-        <div class="page-header-row" style="display: flex; justify-content: space-between; align-items: center;">
-          <div class="page-header-left">
-            <h1 class="page-title" style="font-size: 24px; font-weight: 700; color: #1e293b; margin: 0;">Ahmed Ali (Tenant User)</h1>
+﻿<div style="padding: 24px">
+  <!-- Page Header -->
+  <div class="page-header" style="margin-bottom: 24px">
+    <nav aria-label="breadcrumb">
+      <ol
+        class="breadcrumb"
+        style="
+          font-size: 12px;
+          color: #6b7280;
+          font-weight: 500;
+          margin-bottom: 8px;
+        "
+      >
+        <li class="breadcrumb-item">
+          <a href="index.html" style="color: inherit; text-decoration: none"
+            >Dashboard</a
+          >
+        </li>
+        <li class="breadcrumb-item">Administration</li>
+        <li class="breadcrumb-item">
+          <a
+            href="Support-ticket-master.html"
+            style="color: inherit; text-decoration: none"
+            >Support Management</a
+          >
+        </li>
+        <li
+          class="breadcrumb-item active"
+          aria-current="page"
+          style="color: #3b82f6"
+        >
+          New Ticket Reply
+        </li>
+      </ol>
+    </nav>
+    <div
+      class="page-header-row"
+      style="display: flex; justify-content: space-between; align-items: center"
+    >
+      <div class="page-header-left">
+        <h1
+          class="page-title"
+          style="font-size: 24px; font-weight: 700; color: #1e293b; margin: 0"
+        >
+          Ahmed Ali (Tenant User)
+        </h1>
+      </div>
+      <div class="page-header-right">
+        <a
+          href="Support-ticket-master.html"
+          class="btn btn-light"
+          style="
+            border: 1px solid #e2e8f0;
+            background: #fff;
+            color: #334155;
+            font-size: 13px;
+            font-weight: 600;
+            padding: 6px 16px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+          "
+        >
+          <i class="bi bi-arrow-left"></i> Back
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ticket Details Summary Card -->
+  <div
+    class="card border-0 mb-4"
+    style="
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+    "
+  >
+    <div
+      style="
+        padding: 16px 24px;
+        border-bottom: 1px solid #f1f5f9;
+        font-weight: 700;
+        color: #475569;
+        font-size: 14px;
+      "
+    >
+      Ticket Details Summary
+    </div>
+    <div style="padding: 24px">
+      <div class="row mb-4">
+        <div class="col-md-4">
+          <div
+            style="
+              font-size: 11px;
+              color: #94a3b8;
+              text-transform: capitalize;
+              margin-bottom: 4px;
+            "
+          >
+            Ticket No.
           </div>
-          <div class="page-header-right">
-            <a href="Support-ticket-master.html" class="btn btn-light" style="border: 1px solid #e2e8f0; background: #fff; color: #334155; font-size: 13px; font-weight: 600; padding: 6px 16px; border-radius: 6px; display: flex; align-items: center; gap: 6px;">
-              <i class="bi bi-arrow-left"></i> Back
-            </a>
+          <div style="font-weight: 700; color: #1e293b; font-size: 16px">
+            TKT-10045
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div
+            style="
+              font-size: 11px;
+              color: #94a3b8;
+              text-transform: capitalize;
+              margin-bottom: 4px;
+            "
+          >
+            Priority
+          </div>
+          <div
+            style="
+              font-weight: 700;
+              color: #ef4444;
+              font-size: 15px;
+              text-transform: uppercase;
+            "
+          >
+            HIGH
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div
+            style="
+              font-size: 11px;
+              color: #94a3b8;
+              text-transform: capitalize;
+              margin-bottom: 4px;
+            "
+          >
+            Creation Date &amp; Time
+          </div>
+          <div style="font-weight: 700; color: #1e293b; font-size: 15px">
+            2026-04-07 | 10:00:15 AM
+          </div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col-md-4">
+          <div
+            style="
+              font-size: 11px;
+              color: #94a3b8;
+              text-transform: capitalize;
+              margin-bottom: 4px;
+            "
+          >
+            Category
+          </div>
+          <div style="font-weight: 700; color: #1e293b; font-size: 15px">
+            Support - Driver App
+          </div>
+        </div>
+        <div class="col-md-8">
+          <div
+            style="
+              font-size: 11px;
+              color: #94a3b8;
+              text-transform: capitalize;
+              margin-bottom: 4px;
+            "
+          >
+            Subject
+          </div>
+          <div style="font-weight: 700; color: #1e293b; font-size: 15px">
+            Login access issue after password reset
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabs & Replies Card -->
+  <div
+    class="card border-0"
+    style="
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+    "
+  >
+    <div
+      style="display: flex; border-bottom: 1px solid #f1f5f9; padding: 0 8px"
+      id="ticketTabs"
+    >
+      <button
+        class="ticket-tab active"
+        data-target="conversations-pane"
+        style="
+          background: transparent;
+          border: none;
+          border-bottom: 2px solid #3b82f6;
+          padding: 16px 16px;
+          color: #3b82f6;
+          font-weight: 600;
+          font-size: 14px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          cursor: pointer;
+          transition: 0.2s;
+        "
+      >
+        <i class="bi bi-chat-dots"></i> Conversation &amp; Replies
+      </button>
+      <button
+        class="ticket-tab"
+        data-target="attachments-pane"
+        style="
+          background: transparent;
+          border: none;
+          border-bottom: 2px solid transparent;
+          padding: 16px 16px;
+          color: #64748b;
+          font-weight: 600;
+          font-size: 14px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          cursor: pointer;
+          transition: 0.2s;
+        "
+      >
+        <i class="bi bi-paperclip"></i> Attachments
+      </button>
+    </div>
+
+    <div style="padding: 32px 24px">
+      <!-- Conversation Pane -->
+      <div id="conversations-pane" class="ticket-pane" style="display: block">
+        <!-- Message 1 -->
+        <div
+          style="
+            background: #f8fafc;
+            border-left: 3px solid #cbd5e1;
+            padding: 16px 20px;
+            margin-bottom: 24px;
+            display: flex;
+            justify-content: space-between;
+            border-radius: 0 8px 8px 0;
+          "
+        >
+          <div>
+            <div
+              style="
+                font-size: 11px;
+                font-weight: 700;
+                color: #64748b;
+                text-transform: uppercase;
+                margin-bottom: 8px;
+                letter-spacing: 0.5px;
+              "
+            >
+              AHMED ALI
+            </div>
+            <div style="font-size: 14px; color: #64748b; font-style: italic">
+              Your ticket TKT-10045 has been received successfully. Our support
+              team will review it shortly.
+            </div>
+          </div>
+          <div style="font-size: 11px; color: #94a3b8; white-space: nowrap">
+            2026-04-07 | 10:00:20 AM
+          </div>
+        </div>
+
+        <!-- Message 2 -->
+        <div
+          style="
+            background: #ffffff;
+            border-left: 3px solid #3b82f6;
+            padding: 16px 20px;
+            margin-bottom: 40px;
+            display: flex;
+            justify-content: space-between;
+            border-radius: 0 8px 8px 0;
+          "
+        >
+          <div>
+            <div
+              style="
+                font-size: 11px;
+                font-weight: 700;
+                color: #10b981;
+                text-transform: uppercase;
+                margin-bottom: 8px;
+                letter-spacing: 0.5px;
+              "
+            >
+              SARAH KHALID (SUPPORT TEAM)
+            </div>
+            <div style="font-size: 14px; color: #334155">
+              Hello Ahmed. We are currently verifying the Geofence settings for
+              the Yanbu region. Does the issue appear for all drivers or a
+              specific group?
+            </div>
+          </div>
+          <div style="font-size: 11px; color: #94a3b8; white-space: nowrap">
+            2026-04-07 | 10:45:33 AM
           </div>
         </div>
       </div>
 
-      <!-- Ticket Details Summary Card -->
-      <div class="card border-0 mb-4" style="background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);">
-        <div style="padding: 16px 24px; border-bottom: 1px solid #f1f5f9; font-weight: 700; color: #475569; font-size: 14px;">
-          Ticket Details Summary
-        </div>
-        <div style="padding: 24px;">
-          <div class="row mb-4">
-            <div class="col-md-4">
-              <div style="font-size: 11px; color: #94a3b8; text-transform: capitalize; margin-bottom: 4px;">Ticket No.</div>
-              <div style="font-weight: 700; color: #1e293b; font-size: 16px;">TKT-10045</div>
-            </div>
-            <div class="col-md-4">
-              <div style="font-size: 11px; color: #94a3b8; text-transform: capitalize; margin-bottom: 4px;">Priority</div>
-              <div style="font-weight: 700; color: #ef4444; font-size: 15px; text-transform: uppercase;">HIGH</div>
-            </div>
-            <div class="col-md-4">
-              <div style="font-size: 11px; color: #94a3b8; text-transform: capitalize; margin-bottom: 4px;">Creation Date &amp; Time</div>
-              <div style="font-weight: 700; color: #1e293b; font-size: 15px;">2026-04-07 | 10:00:15 AM</div>
-            </div>
-          </div>
-          <div class="row">
-            <div class="col-md-4">
-              <div style="font-size: 11px; color: #94a3b8; text-transform: capitalize; margin-bottom: 4px;">Category</div>
-              <div style="font-weight: 700; color: #1e293b; font-size: 15px;">Support - Driver App</div>
-            </div>
-            <div class="col-md-8">
-              <div style="font-size: 11px; color: #94a3b8; text-transform: capitalize; margin-bottom: 4px;">Subject</div>
-              <div style="font-weight: 700; color: #1e293b; font-size: 15px;">Login access issue after password reset</div>
-            </div>
-          </div>
+      <!-- Attachments Pane -->
+      <div
+        id="attachments-pane"
+        class="ticket-pane"
+        style="display: none; text-align: center; padding: 60px 0"
+      >
+        <i
+          class="bi bi-folder2-open"
+          style="
+            font-size: 48px;
+            color: #cbd5e1;
+            margin-bottom: 16px;
+            display: block;
+          "
+        ></i>
+        <div style="font-size: 16px; color: #64748b; font-style: italic">
+          No documents attached yet.
         </div>
       </div>
 
-      <!-- Tabs & Replies Card -->
-      <div class="card border-0" style="background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);">
-        <div style="display: flex; border-bottom: 1px solid #f1f5f9; padding: 0 8px;" id="ticketTabs">
-          <button class="ticket-tab active" data-target="conversations-pane" style="background: transparent; border: none; border-bottom: 2px solid #5051f9; padding: 16px 16px; color: #5051f9; font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 8px; cursor: pointer; transition: 0.2s;">
-            <i class="bi bi-chat-dots"></i> Conversation &amp; Replies
+      <!-- Add Reply Box -->
+      <div style="margin-top: 32px">
+        <div
+          style="
+            display: flex;
+            align-items: center;
+            margin-bottom: 12px;
+            gap: 8px;
+          "
+        >
+          <div
+            style="
+              width: 6px;
+              height: 6px;
+              border-radius: 50%;
+              background: #3b82f6;
+            "
+          ></div>
+          <div
+            style="
+              font-size: 11px;
+              font-weight: 700;
+              color: #3b82f6;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+            "
+          >
+            ADD YOUR REPLY
+          </div>
+        </div>
+
+        <textarea
+          class="form-control"
+          rows="5"
+          placeholder="Type your additional details or reply here..."
+          style="
+            resize: none;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            box-shadow: none;
+            font-size: 14px;
+            color: #475569;
+            padding: 16px;
+          "
+        ></textarea>
+
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 16px;
+          "
+        >
+          <button
+            style="
+              background: none;
+              border: none;
+              color: #64748b;
+              font-size: 11px;
+              font-weight: 700;
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              padding: 0;
+            "
+          >
+            <i class="bi bi-camera" style="font-size: 16px"></i> ATTACH EVIDENCE
+            (PDF/IMAGE)
           </button>
-          <button class="ticket-tab" data-target="attachments-pane" style="background: transparent; border: none; border-bottom: 2px solid transparent; padding: 16px 16px; color: #64748b; font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 8px; cursor: pointer; transition: 0.2s;">
-            <i class="bi bi-paperclip"></i> Attachments
+          <button
+            class="btn"
+            style="
+              background: #3b82f6;
+              color: #fff;
+              padding: 8px 24px;
+              font-weight: 600;
+              font-size: 14px;
+              border-radius: 6px;
+            "
+          >
+            Send Reply
           </button>
         </div>
-        
-        <div style="padding: 32px 24px;">
-          
-          <!-- Conversation Pane -->
-          <div id="conversations-pane" class="ticket-pane" style="display: block;">
-            <!-- Message 1 -->
-            <div style="background: #f8fafc; border-left: 3px solid #cbd5e1; padding: 16px 20px; margin-bottom: 24px; display: flex; justify-content: space-between; border-radius: 0 8px 8px 0;">
-              <div>
-                <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.5px;">AHMED ALI</div>
-                <div style="font-size: 14px; color: #64748b; font-style: italic;">Your ticket TKT-10045 has been received successfully. Our support team will review it shortly.</div>
-              </div>
-              <div style="font-size: 11px; color: #94a3b8; white-space: nowrap;">2026-04-07 | 10:00:20 AM</div>
-            </div>
-
-            <!-- Message 2 -->
-            <div style="background: #ffffff; border-left: 3px solid #5051f9; padding: 16px 20px; margin-bottom: 40px; display: flex; justify-content: space-between; border-radius: 0 8px 8px 0;">
-              <div>
-                <div style="font-size: 11px; font-weight: 700; color: #10b981; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.5px;">SARAH KHALID (SUPPORT TEAM)</div>
-                <div style="font-size: 14px; color: #334155;">Hello Ahmed. We are currently verifying the Geofence settings for the Yanbu region. Does the issue appear for all drivers or a specific group?</div>
-              </div>
-              <div style="font-size: 11px; color: #94a3b8; white-space: nowrap;">2026-04-07 | 10:45:33 AM</div>
-            </div>
-          </div>
-
-          <!-- Attachments Pane -->
-          <div id="attachments-pane" class="ticket-pane" style="display: none; text-align: center; padding: 60px 0;">
-            <i class="bi bi-folder2-open" style="font-size: 48px; color: #cbd5e1; margin-bottom: 16px; display: block;"></i>
-            <div style="font-size: 16px; color: #64748b; font-style: italic;">No documents attached yet.</div>
-          </div>
-          
-          <!-- Add Reply Box -->
-          <div style="margin-top: 32px;">
-            <div style="display: flex; align-items: center; margin-bottom: 12px; gap: 8px;">
-              <div style="width: 6px; height: 6px; border-radius: 50%; background: #5051f9;"></div>
-              <div style="font-size: 11px; font-weight: 700; color: #5051f9; text-transform: uppercase; letter-spacing: 0.5px;">ADD YOUR REPLY</div>
-            </div>
-            
-            <textarea class="form-control" rows="5" placeholder="Type your additional details or reply here..." style="resize: none; border: 1px solid #e2e8f0; border-radius: 6px; box-shadow: none; font-size: 14px; color: #475569; padding: 16px;"></textarea>
-            
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px;">
-              <button style="background: none; border: none; color: #64748b; font-size: 11px; font-weight: 700; display: flex; align-items: center; gap: 8px; padding: 0;">
-                <i class="bi bi-camera" style="font-size: 16px;"></i> ATTACH EVIDENCE (PDF/IMAGE)
-              </button>
-              <button class="btn" style="background: #5051f9; color: #fff; padding: 8px 24px; font-weight: 600; font-size: 14px; border-radius: 6px;">
-                Send Reply
-              </button>
-            </div>
-          </div>
-
-        </div>
       </div>
-      </div>
-      
-      <script>
-        document.addEventListener('DOMContentLoaded', function() {
-          const tabs = document.querySelectorAll('.ticket-tab');
-          const panes = document.querySelectorAll('.ticket-pane');
-          
-          tabs.forEach(tab => {
-            tab.addEventListener('click', function() {
-              tabs.forEach(t => {
-                t.style.borderBottomColor = 'transparent';
-                t.style.color = '#64748b';
-              });
-              
-              this.style.borderBottomColor = '#5051f9';
-              this.style.color = '#5051f9';
-              
-              const targetId = this.getAttribute('data-target');
-              
-              panes.forEach(pane => {
-                if (pane.id === targetId) {
-                  pane.style.display = 'block';
-                } else {
-                  pane.style.display = 'none';
-                }
-              });
-            });
-          });
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const tabs = document.querySelectorAll(".ticket-tab");
+    const panes = document.querySelectorAll(".ticket-pane");
+
+    tabs.forEach((tab) => {
+      tab.addEventListener("click", function () {
+        tabs.forEach((t) => {
+          t.style.borderBottomColor = "transparent";
+          t.style.color = "#64748b";
         });
-      </script>
+
+        this.style.borderBottomColor = "#3B82F6";
+        this.style.color = "#3B82F6";
+
+        const targetId = this.getAttribute("data-target");
+
+        panes.forEach((pane) => {
+          if (pane.id === targetId) {
+            pane.style.display = "block";
+          } else {
+            pane.style.display = "none";
+          }
+        });
+      });
+    });
+  });
+</script>

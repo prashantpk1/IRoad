@@ -23,6 +23,7 @@ from superadmin.redis_helpers import (
 from django.shortcuts import get_object_or_404, redirect, render
 from django.core.paginator import Paginator
 from django.core.files.storage import default_storage
+from django.core import signing
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.html import strip_tags
@@ -54,6 +55,8 @@ except Exception:  # pragma: no cover - optional dependency safety
     load_workbook = None
 
 logger = logging.getLogger(__name__)
+TENANT_USER_PASSWORD_RESET_TOKEN_SALT = 'tenant-user-password-reset'
+TENANT_USER_PASSWORD_RESET_TOKEN_MAX_AGE_SECONDS = 3600
 
 
 def _rename_txn_attachment(uploaded_file, txn_id):
@@ -71,6 +74,27 @@ def _write_txn_approve_debug(message):
             fh.write(f'[{stamp}] {message}\n')
     except Exception:
         logger.exception('Failed writing transaction approve debug log')
+
+
+def _build_tenant_user_password_reset_token(*, tenant_id, email):
+    payload = {
+        'tenant_id': str(tenant_id),
+        'email': (email or '').strip().lower(),
+    }
+    return signing.dumps(payload, salt=TENANT_USER_PASSWORD_RESET_TOKEN_SALT)
+
+
+def _read_tenant_user_password_reset_token(raw_token):
+    try:
+        return signing.loads(
+            raw_token,
+            salt=TENANT_USER_PASSWORD_RESET_TOKEN_SALT,
+            max_age=TENANT_USER_PASSWORD_RESET_TOKEN_MAX_AGE_SECONDS,
+        )
+    except signing.SignatureExpired:
+        return None
+    except signing.BadSignature:
+        return None
 
 
 from .billing_helpers import (
@@ -1302,7 +1326,6 @@ class ForgotPasswordView(View):
                 email,
             )
             if tenant_user_tenant and tenant_user and tenant_user_resolution is None:
-                temp_password = secrets.token_urlsafe(9)
                 registry = (
                     TenantRegistry.objects.select_related('tenant_profile')
                     .filter(tenant_profile_id=tenant_user_tenant.tenant_id)
@@ -1318,19 +1341,18 @@ class ForgotPasswordView(View):
                             email__iexact=email,
                         ).first()
                         if tenant_user_record and tenant_user_record.status == TenantUser.Status.ACTIVE:
-                            tenant_user_record.password_hash = make_password(temp_password)
-                            tenant_user_record.temp_password_expires_at = timezone.now() + timedelta(hours=24)
-                            tenant_user_record.save(
-                                update_fields=['password_hash', 'temp_password_expires_at', 'updated_at']
+                            reset_token = _build_tenant_user_password_reset_token(
+                                tenant_id=tenant_user_tenant.tenant_id,
+                                email=tenant_user_record.email,
                             )
-                            login_url = request.build_absolute_uri(reverse('login'))
-                            login_url = f'{login_url}?tid={tenant_user_tenant.tenant_id}'
+                            reset_url = request.build_absolute_uri(
+                                reverse('tenant_user_new_password', args=[reset_token])
+                            )
                             context_dict = {
                                 'name': tenant_user_record.full_name,
                                 'email': tenant_user_record.email,
-                                'password': temp_password,
-                                'role_name': tenant_user_record.role_name,
-                                'login_url': login_url,
+                                'reset_url': reset_url,
+                                'login_url': reset_url,
                                 'user_name': tenant_user_record.full_name,
                             }
                             sent = send_named_notification_email(
@@ -1338,7 +1360,7 @@ class ForgotPasswordView(View):
                                 recipient_email=tenant_user_record.email,
                                 context_dict=context_dict,
                                 language='en',
-                                default_subject='iRoad Temporary Password Reset',
+                                default_subject='Reset Your iRoad Password',
                                 trigger_source='TemplateName: TENANT_USER_PASSWORD_RESET',
                                 force_django_smtp=True,
                             )
@@ -1482,6 +1504,97 @@ class ResetPasswordConfirmView(View):
             'Password reset successful. Please login.',
         )
         return redirect(reverse('login'))
+
+
+class TenantUserResetPasswordConfirmView(View):
+    """Public: set a new password for tenant user via signed reset token."""
+
+    template_form = 'auth/new_password.html'
+    template_error = 'auth/token_error.html'
+
+    def _render_error(self, request, message):
+        return render(
+            request,
+            self.template_error,
+            {'error_message': message},
+        )
+
+    def _resolve_token_user(self, token):
+        payload = _read_tenant_user_password_reset_token(token)
+        if not payload:
+            return None, None
+        tenant_id = (payload.get('tenant_id') or '').strip()
+        email = (payload.get('email') or '').strip().lower()
+        if not tenant_id or not email:
+            return None, None
+        registry = (
+            TenantRegistry.objects.select_related('tenant_profile')
+            .filter(tenant_profile_id=tenant_id)
+            .first()
+        )
+        if not registry:
+            return None, None
+        from tenant_workspace.models import TenantUser
+
+        connection.set_schema_to_public()
+        try:
+            connection.set_tenant(registry)
+            tenant_user = TenantUser.objects.filter(
+                email__iexact=email,
+                status=TenantUser.Status.ACTIVE,
+            ).first()
+            if not tenant_user:
+                return None, None
+            return registry, tenant_user
+        finally:
+            connection.set_schema_to_public()
+
+    def get(self, request, token):
+        registry, tenant_user = self._resolve_token_user(token)
+        if not registry or not tenant_user:
+            return self._render_error(request, 'Invalid or expired reset link.')
+        return render(
+            request,
+            self.template_form,
+            {
+                'form': SetPasswordForm(),
+                'account_email': tenant_user.email,
+            },
+        )
+
+    def post(self, request, token):
+        registry, tenant_user = self._resolve_token_user(token)
+        if not registry or not tenant_user:
+            return self._render_error(request, 'Invalid or expired reset link.')
+
+        form = SetPasswordForm(request.POST)
+        if not form.is_valid():
+            return render(
+                request,
+                self.template_form,
+                {
+                    'form': form,
+                    'account_email': tenant_user.email,
+                },
+            )
+
+        from tenant_workspace.models import TenantUser
+
+        connection.set_schema_to_public()
+        try:
+            connection.set_tenant(registry)
+            fresh_user = TenantUser.objects.filter(pk=tenant_user.pk).first()
+            if not fresh_user or fresh_user.status != TenantUser.Status.ACTIVE:
+                return self._render_error(request, 'User account is not available.')
+            fresh_user.password_hash = make_password(form.cleaned_data['password'])
+            fresh_user.temp_password_expires_at = None
+            fresh_user.save(update_fields=['password_hash', 'temp_password_expires_at', 'updated_at'])
+        finally:
+            connection.set_schema_to_public()
+
+        messages.success(request, 'Password reset successful. Please login.')
+        login_url = f"{reverse('login')}?tid={registry.tenant_profile.tenant_id}"
+        return redirect(login_url)
 
 
 class DashboardView(LoginRequiredMixin, View):
