@@ -1,0 +1,550 @@
+{% extends 'iroad_tenants/base.html' %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}{% translate "Address Master List" %} | iRoad{% endblock %}
+{% block breadcrumb %}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item">
+        <a href="{% url 'iroad_tenants:tenant_dashboard' %}">{% translate "Dashboard" %}</a>
+      </li>
+      <li class="breadcrumb-item">{% translate "Master Data" %}</li>
+      <li class="breadcrumb-item">{% translate "Address Management" %}</li>
+      <li class="breadcrumb-item active" aria-current="page">{% translate "Address Master List" %}</li>
+    </ol>
+  </nav>
+
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">{% translate "Address Master List" %}</h1>
+    </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <button type="button" class="eal-btn eal-btn-outline" disabled title="{% translate 'Export (coming soon)' %}">
+          <i class="bi bi-download"></i>
+          <span>{% translate "Export" %}</span>
+        </button>
+        <a
+          href="{% url 'iroad_tenants:tenant_address_master_create' %}{% if request.GET.tid %}?tid={{ request.GET.tid }}{% endif %}"
+          class="eal-btn eal-btn-primary"
+        >
+          <i class="bi bi-plus-lg"></i>
+          <span>{% translate "Add Address" %}</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="eal-stats-row">
+  <div class="eal-stat-card">
+    <div class="eal-stat-icon purple">
+      <i class="bi bi-geo-alt"></i>
+    </div>
+    <div>
+      <div class="eal-stat-value">{{ stats.total }}</div>
+      <div class="eal-stat-label">{% translate "Total Addresses" %}</div>
+    </div>
+  </div>
+  <div class="eal-stat-card">
+    <div class="eal-stat-icon blue">
+      <i class="bi bi-box-arrow-up"></i>
+    </div>
+    <div>
+      <div class="eal-stat-value">{{ stats.pickup_only }}</div>
+      <div class="eal-stat-label">{% translate "Pickup Only" %}</div>
+    </div>
+  </div>
+  <div class="eal-stat-card">
+    <div class="eal-stat-icon green">
+      <i class="bi bi-box-arrow-down"></i>
+    </div>
+    <div>
+      <div class="eal-stat-value">{{ stats.delivery_only }}</div>
+      <div class="eal-stat-label">{% translate "Delivery Only" %}</div>
+    </div>
+  </div>
+  <div class="eal-stat-card">
+    <div class="eal-stat-icon amber">
+      <i class="bi bi-arrow-left-right"></i>
+    </div>
+    <div>
+      <div class="eal-stat-value">{{ stats.both }}</div>
+      <div class="eal-stat-label">{% translate "Both" %}</div>
+    </div>
+  </div>
+</div>
+
+<div class="eal-table-card">
+  <form method="get" class="eal-toolbar">
+    {% if request.GET.tid %}
+    <input type="hidden" name="tid" value="{{ request.GET.tid }}" />
+    {% endif %}
+    <div class="eal-toolbar-left">
+      <div class="d-flex flex-wrap align-items-end gap-3 w-100">
+        <div class="eal-search flex-grow-1" style="min-width: 220px">
+          <i class="bi bi-search"></i>
+          <input type="text" name="q" value="{{ search_q }}" placeholder="{% translate 'Search addresses...' %}" />
+        </div>
+        <div class="d-flex flex-wrap align-items-end gap-2">
+          <div>
+            <label class="form-label small mb-0 text-muted" for="addrListStatus">{% translate "Status" %}</label>
+            <select name="status" id="addrListStatus" class="form-select form-select-sm" style="min-width: 10rem">
+              <option value="active" {% if filter_status == '' or filter_status == 'active' %}selected{% endif %}>
+                {% translate "Active" %}
+              </option>
+              <option value="all" {% if filter_status == 'all' %}selected{% endif %}>{% translate "All" %}</option>
+              <option value="inactive" {% if filter_status == 'inactive' %}selected{% endif %}>{% translate "Inactive" %}</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label small mb-0 text-muted" for="addrListClient">{% translate "Client" %}</label>
+            <select name="client" id="addrListClient" class="form-select form-select-sm" style="min-width: 12rem">
+              <option value="">{% translate "All clients" %}</option>
+              {% for ca in client_filter_choices %}
+              <option value="{{ ca.account_id }}" {% if filter_client_id and ca.account_id|stringformat:'s' == filter_client_id %}selected{% endif %}>
+                {{ ca.display_name }} ({{ ca.account_no }})
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <button type="submit" class="btn btn-sm btn-primary mb-1">{% translate "Apply" %}</button>
+        </div>
+      </div>
+    </div>
+  </form>
+
+  <div class="eal-table-wrap">
+    <table class="eal-table">
+      <thead>
+        <tr>
+          <th class="eal-col-check">
+            <input type="checkbox" class="eal-custom-check" id="ealSelectAll" disabled title="{% translate 'Bulk actions coming soon' %}" />
+          </th>
+          <th>
+            {% translate "Address Code" %}
+            <span class="sort-indicator">
+              <i class="bi bi-caret-up-fill"></i>
+              <i class="bi bi-caret-down-fill"></i>
+            </span>
+          </th>
+          <th>
+            {% translate "Client Account" %}
+            <span class="sort-indicator">
+              <i class="bi bi-caret-up-fill"></i>
+              <i class="bi bi-caret-down-fill"></i>
+            </span>
+          </th>
+          <th>
+            {% translate "Display Name" %}
+            <span class="sort-indicator">
+              <i class="bi bi-caret-up-fill"></i>
+              <i class="bi bi-caret-down-fill"></i>
+            </span>
+          </th>
+          <th>{% translate "Address Category" %}</th>
+          <th>
+            {% translate "City / Country" %}
+            <span class="sort-indicator">
+              <i class="bi bi-caret-up-fill"></i>
+              <i class="bi bi-caret-down-fill"></i>
+            </span>
+          </th>
+          <th>
+            {% translate "Contact Name" %}
+            <span class="sort-indicator">
+              <i class="bi bi-caret-up-fill"></i>
+              <i class="bi bi-caret-down-fill"></i>
+            </span>
+          </th>
+          <th>
+            {% translate "Phone No." %}
+            <span class="sort-indicator">
+              <i class="bi bi-caret-up-fill"></i>
+              <i class="bi bi-caret-down-fill"></i>
+            </span>
+          </th>
+          <th>{% translate "Actions" %}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in addresses_page %}
+        <tr
+          class="address-master-row"
+          data-edit-url="{% url 'iroad_tenants:tenant_address_master_edit' row.address_id %}{% if request.GET.tid %}?tid={{ request.GET.tid }}{% endif %}"
+          data-address-code="{{ row.address_code|escape }}"
+          data-client-account="{{ row.client_account.account_no|escape }}"
+          data-display-name="{{ row.display_name|escape }}"
+          data-english-label="{{ row.english_label|default:''|escape }}"
+          data-arabic-label="{{ row.arabic_label|default:''|escape }}"
+          data-address-category="{{ row.address_category|escape }}"
+          data-city-country="{{ row.city_country_cell|escape }}"
+          data-contact-name="{{ row.contact_name|default:''|escape }}"
+          data-phone="{{ row.phone_display_cell|escape }}"
+          data-def-loading="{% if row.default_pickup_address %}{% translate 'Yes' %}{% else %}{% translate 'No' %}{% endif %}"
+          data-def-unloading="{% if row.default_delivery_address %}{% translate 'Yes' %}{% else %}{% translate 'No' %}{% endif %}"
+        >
+          <td class="eal-col-check">
+            <input type="checkbox" class="eal-custom-check" disabled />
+          </td>
+          <td>
+            <span class="eal-entity-id">{{ row.address_code }}</span>
+          </td>
+          <td>
+            <span class="eal-pi-number">{{ row.client_account.account_no }}</span>
+          </td>
+          <td>
+            <div class="eal-name-cell">
+              <span class="eal-name-text">{{ row.display_name }}</span>
+            </div>
+          </td>
+          <td>
+            {% if row.address_category == 'Pickup Address' %}
+            <span class="status-badge mode-pickup">
+              <i class="bi bi-box-arrow-up"></i>
+              {% translate "Pickup" %}
+            </span>
+            {% elif row.address_category == 'Delivery Address' %}
+            <span class="status-badge mode-delivery">
+              <i class="bi bi-box-arrow-down"></i>
+              {% translate "Delivery" %}
+            </span>
+            {% else %}
+            <span class="status-badge mode-both">
+              <i class="bi bi-arrow-left-right"></i>
+              {% translate "Both" %}
+            </span>
+            {% endif %}
+          </td>
+          <td>{{ row.city_country_cell }}</td>
+          <td>{{ row.contact_name|default:"—" }}</td>
+          <td>
+            <span class="eal-pi-number">{{ row.phone_display_cell }}</span>
+          </td>
+          <td>
+            <div class="eal-actions-cell" onclick="event.stopPropagation();">
+              <button type="button" class="eal-row-btn" title="{% translate 'View' %}" data-action="view-panel">
+                <i class="bi bi-eye"></i>
+              </button>
+              <a
+                href="{% url 'iroad_tenants:tenant_address_master_edit' row.address_id %}{% if request.GET.tid %}?tid={{ request.GET.tid }}{% endif %}"
+                class="eal-row-btn"
+                title="{% translate 'Edit' %}"
+                onclick="event.stopPropagation();"
+              >
+                <i class="bi bi-pencil"></i>
+              </a>
+              {% if row.status == 'Active' %}
+              <button
+                type="button"
+                class="eal-row-btn danger addr-status-trigger"
+                title="{% translate 'Deactivate' %}"
+                data-address-id="{{ row.address_id }}"
+                data-new-status="Inactive"
+              >
+                <i class="bi bi-trash3"></i>
+              </button>
+              {% else %}
+              <button
+                type="button"
+                class="eal-row-btn text-success border-0 bg-transparent addr-status-trigger"
+                title="{% translate 'Activate' %}"
+                data-address-id="{{ row.address_id }}"
+                data-new-status="Active"
+              >
+                <i class="bi bi-arrow-counterclockwise"></i>
+              </button>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="9" class="text-center text-muted py-5">{% translate "No addresses found." %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if pagination_total > 0 %}
+  <div class="eal-pagination">
+    <div class="eal-pagination-info">
+      {% blocktranslate with s=pagination_start e=pagination_end t=pagination_total %}Showing <strong>{{ s }}-{{ e }}</strong> of <strong>{{ t }}</strong> addresses{% endblocktranslate %}
+    </div>
+    <div class="eal-pagination-controls">
+      {% if pagination_prev_url %}
+      <a class="eal-page-btn" href="{{ pagination_prev_url }}" title="{% translate 'Previous' %}">
+        <i class="bi bi-chevron-left"></i>
+      </a>
+      {% else %}
+      <span class="eal-page-btn disabled opacity-50"><i class="bi bi-chevron-left"></i></span>
+      {% endif %}
+      {% for num, page_href in pagination_page_links %}
+      <a class="eal-page-btn{% if num == addresses_page.number %} active{% endif %}" href="{{ page_href }}">{{ num }}</a>
+      {% endfor %}
+      {% if pagination_next_url %}
+      <a class="eal-page-btn" href="{{ pagination_next_url }}" title="{% translate 'Next' %}">
+        <i class="bi bi-chevron-right"></i>
+      </a>
+      {% else %}
+      <span class="eal-page-btn disabled opacity-50"><i class="bi bi-chevron-right"></i></span>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+{% translate "Deactivate address" as js_modal_title_deactivate %}
+{% translate "Activate address" as js_modal_title_activate %}
+{% translate "Deactivate" as js_btn_deactivate %}
+{% translate "Activate" as js_btn_activate %}
+
+<div class="modal fade" id="addressStatusConfirmModal" tabindex="-1" aria-labelledby="addressStatusConfirmTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post" action="{% url 'iroad_tenants:tenant_address_master' %}" id="addressStatusConfirmForm">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="set_status" />
+        <input type="hidden" name="address_id" id="addrConfirmAddressId" value="" />
+        <input type="hidden" name="new_status" id="addrConfirmNewStatus" value="" />
+        <input type="hidden" name="redirect_query" value="{{ request.GET.urlencode }}" />
+        <div class="modal-header">
+          <h5 class="modal-title" id="addressStatusConfirmTitle">{% translate "Confirm" %}</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% translate 'Close' %}"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-0 d-none" id="addrConfirmMsgDeactivate">
+            {% translate "Deactivate this address? It will be hidden from operational flows until you activate it again." %}
+          </p>
+          <p class="mb-0 d-none" id="addrConfirmMsgActivate">
+            {% translate "Activate this address? It will be available again in operational flows." %}
+          </p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
+          <button type="submit" class="btn" id="addrConfirmSubmitBtn"></button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="detail-panel-overlay" id="detailPanelOverlay"></div>
+<aside class="detail-panel" id="detailPanel">
+  <div class="detail-panel-header">
+    <div class="detail-panel-nav">
+      <button type="button" class="detail-nav-btn" id="detailPrevBtn" title="{% translate 'Previous' %}">
+        <i class="bi bi-chevron-left"></i>
+      </button>
+      <button type="button" class="detail-nav-btn" id="detailNextBtn" title="{% translate 'Next' %}">
+        <i class="bi bi-chevron-right"></i>
+      </button>
+    </div>
+    <div class="detail-panel-actions">
+      <a href="#" class="detail-action-btn edit" id="detailEditLink" title="{% translate 'Edit' %}">
+        <i class="bi bi-pencil-square"></i>
+        <span>{% translate "Edit" %}</span>
+      </a>
+      <button type="button" class="detail-action-btn duplicate opacity-50" disabled title="{% translate 'Not available' %}">
+        <i class="bi bi-copy"></i>
+        <span>{% translate "Duplicate" %}</span>
+      </button>
+      <button type="button" class="detail-action-btn delete opacity-50" disabled title="{% translate 'Not available' %}">
+        <i class="bi bi-trash3"></i>
+        <span>{% translate "Delete" %}</span>
+      </button>
+    </div>
+    <button type="button" class="detail-close-btn" id="detailCloseBtn" title="{% translate 'Close' %}">
+      <i class="bi bi-x-lg"></i>
+    </button>
+  </div>
+  <div class="detail-panel-body">
+    <div class="detail-section">
+      <h3 class="detail-section-title">{% translate "Basic Information" %}</h3>
+      <div class="detail-field">
+        <span class="detail-field-label">{% translate "Address Code" %}</span>
+        <span class="detail-field-value" id="dpAddressCode">—</span>
+      </div>
+      <div class="detail-field">
+        <span class="detail-field-label">{% translate "Client Account" %}</span>
+        <span class="detail-field-value" id="dpClientAccount">—</span>
+      </div>
+      <div class="detail-field">
+        <span class="detail-field-label">{% translate "Display Name" %}</span>
+        <span class="detail-field-value" id="dpDisplayName">—</span>
+      </div>
+      <div class="detail-field">
+        <span class="detail-field-label">{% translate "Address Category" %}</span>
+        <span class="detail-field-value" id="dpAddressCategory">—</span>
+      </div>
+    </div>
+    <div class="detail-section">
+      <h3 class="detail-section-title">{% translate "Localization Details" %}</h3>
+      <div class="detail-field">
+        <span class="detail-field-label">{% translate "English Label" %}</span>
+        <span class="detail-field-value" id="dpEnglishLabel">—</span>
+      </div>
+      <div class="detail-field">
+        <span class="detail-field-label">{% translate "Arabic Label" %}</span>
+        <span class="detail-field-value detail-arabic" id="dpArabicLabel" dir="auto">—</span>
+      </div>
+      <div class="detail-field">
+        <span class="detail-field-label">{% translate "Default Loading" %}</span>
+        <span class="detail-field-value" id="dpDefLoading">—</span>
+      </div>
+      <div class="detail-field">
+        <span class="detail-field-label">{% translate "Default Unloading" %}</span>
+        <span class="detail-field-value" id="dpDefUnloading">—</span>
+      </div>
+    </div>
+    <div class="detail-section">
+      <h3 class="detail-section-title">{% translate "Geographical Info" %}</h3>
+      <div class="detail-field">
+        <span class="detail-field-label">{% translate "City / Country" %}</span>
+        <span class="detail-field-value" id="dpCountry">—</span>
+      </div>
+      <div class="detail-field">
+        <span class="detail-field-label">{% translate "Contact Name" %}</span>
+        <span class="detail-field-value" id="dpContactName">—</span>
+      </div>
+      <div class="detail-field">
+        <span class="detail-field-label">{% translate "Phone No." %}</span>
+        <span class="detail-field-value" id="dpPhoneNo">—</span>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<script>
+(function () {
+  const panel = document.getElementById("detailPanel");
+  const overlay = document.getElementById("detailPanelOverlay");
+  const closeBtn = document.getElementById("detailCloseBtn");
+  const prevBtn = document.getElementById("detailPrevBtn");
+  const nextBtn = document.getElementById("detailNextBtn");
+  const editLink = document.getElementById("detailEditLink");
+  const rows = Array.prototype.slice.call(document.querySelectorAll(".address-master-row"));
+  let currentIndex = -1;
+
+  const statusModalEl = document.getElementById("addressStatusConfirmModal");
+  const statusModal = statusModalEl ? bootstrap.Modal.getOrCreateInstance(statusModalEl) : null;
+  const addrConfirmSubmitBtn = document.getElementById("addrConfirmSubmitBtn");
+  const addrConfirmTitle = document.getElementById("addressStatusConfirmTitle");
+  const addrMsgDeactivate = document.getElementById("addrConfirmMsgDeactivate");
+  const addrMsgActivate = document.getElementById("addrConfirmMsgActivate");
+  const i18nDeactivate = "{{ js_modal_title_deactivate|escapejs }}";
+  const i18nActivate = "{{ js_modal_title_activate|escapejs }}";
+  const i18nBtnDeactivate = "{{ js_btn_deactivate|escapejs }}";
+  const i18nBtnActivate = "{{ js_btn_activate|escapejs }}";
+
+  function txt(v) {
+    return v != null && v !== "" ? String(v) : "—";
+  }
+
+  function openPanel() {
+    panel.classList.add("active");
+    overlay.classList.add("active");
+    document.body.style.overflow = "hidden";
+  }
+
+  function closePanel() {
+    panel.classList.remove("active");
+    overlay.classList.remove("active");
+    document.body.style.overflow = "";
+    rows.forEach(function (r) {
+      r.classList.remove("row-selected");
+    });
+    currentIndex = -1;
+  }
+
+  function populateFromRow(row) {
+    var d = row.dataset;
+    document.getElementById("dpAddressCode").textContent = txt(d.addressCode);
+    document.getElementById("dpClientAccount").textContent = txt(d.clientAccount);
+    document.getElementById("dpDisplayName").textContent = txt(d.displayName);
+    document.getElementById("dpEnglishLabel").textContent = txt(d.englishLabel);
+    document.getElementById("dpArabicLabel").textContent = txt(d.arabicLabel);
+    document.getElementById("dpAddressCategory").textContent = txt(d.addressCategory);
+    document.getElementById("dpCountry").textContent = txt(d.cityCountry);
+    document.getElementById("dpContactName").textContent = txt(d.contactName);
+    document.getElementById("dpPhoneNo").textContent = txt(d.phone);
+    document.getElementById("dpDefLoading").textContent = txt(d.defLoading);
+    document.getElementById("dpDefUnloading").textContent = txt(d.defUnloading);
+    if (editLink) editLink.href = d.editUrl || "#";
+
+    rows.forEach(function (r) {
+      r.classList.remove("row-selected");
+    });
+    row.classList.add("row-selected");
+  }
+
+  function showRow(index) {
+    if (index < 0 || index >= rows.length) return;
+    currentIndex = index;
+    populateFromRow(rows[currentIndex]);
+    prevBtn.disabled = currentIndex === 0;
+    nextBtn.disabled = currentIndex === rows.length - 1;
+  }
+
+  rows.forEach(function (row, idx) {
+    row.style.cursor = "pointer";
+    row.addEventListener("click", function (e) {
+      if (e.target.closest(".eal-col-check") || e.target.closest(".eal-actions-cell")) return;
+      showRow(idx);
+      openPanel();
+    });
+    row.querySelectorAll('[data-action="view-panel"]').forEach(function (btn) {
+      btn.addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        showRow(idx);
+        openPanel();
+      });
+    });
+  });
+
+  if (closeBtn) closeBtn.addEventListener("click", closePanel);
+  if (overlay) overlay.addEventListener("click", closePanel);
+
+  if (prevBtn) {
+    prevBtn.addEventListener("click", function () {
+      if (currentIndex > 0) showRow(currentIndex - 1);
+    });
+  }
+  if (nextBtn) {
+    nextBtn.addEventListener("click", function () {
+      if (currentIndex < rows.length - 1) showRow(currentIndex + 1);
+    });
+  }
+
+  document.addEventListener("keydown", function (e) {
+    if (!panel || !panel.classList.contains("active")) return;
+    if (e.key === "Escape") closePanel();
+  });
+
+  if (statusModal && addrConfirmSubmitBtn && addrConfirmTitle && addrMsgDeactivate && addrMsgActivate) {
+    document.querySelectorAll(".addr-status-trigger").forEach(function (btn) {
+      btn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        var newStatus = btn.getAttribute("data-new-status") || "";
+        var id = btn.getAttribute("data-address-id") || "";
+        document.getElementById("addrConfirmAddressId").value = id;
+        document.getElementById("addrConfirmNewStatus").value = newStatus;
+        var deact = newStatus === "Inactive";
+        addrConfirmTitle.textContent = deact ? i18nDeactivate : i18nActivate;
+        addrMsgDeactivate.classList.toggle("d-none", !deact);
+        addrMsgActivate.classList.toggle("d-none", deact);
+        addrConfirmSubmitBtn.className = "btn " + (deact ? "btn-danger" : "btn-success");
+        addrConfirmSubmitBtn.textContent = deact ? i18nBtnDeactivate : i18nBtnActivate;
+        statusModal.show();
+      });
+    });
+  }
+})();
+</script>
+{% endblock %}

@@ -10,12 +10,14 @@ from django.urls import reverse
 from django.views import View
 from django.contrib import messages
 from django.contrib.auth.hashers import make_password
+from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
-from django.db import connection
+from django.db import IntegrityError, connection
 from django.db import transaction as db_transaction
 from django.db.models import Q
 from django.utils.dateparse import parse_datetime
 from django.utils import timezone
+from django_tenants.utils import schema_context
 import os
 import uuid
 from superadmin.billing_helpers import (
@@ -59,14 +61,20 @@ from tenant_workspace.models import (
     AutoNumberConfiguration,
     AutoNumberSequence,
     OrganizationProfile,
+    TenantAddressMaster,
     TenantClientAccount,
     TenantRole,
     TenantRolePermission,
     TenantUser,
 )
 from iroad_tenants.models import TenantPaymentCard, TenantRegistry
+from iroad_tenants.forms_tenant_address import TenantAddressMasterForm
 
 logger = logging.getLogger(__name__)
+
+ADDRESS_MASTER_AUTO_FORM_CODE = 'address-master'
+ADDRESS_MASTER_AUTO_FORM_LABEL = 'Address Master'
+ADDRESS_MASTER_REF_PREFIX = 'AD'
 
 
 def _resolve_tenant_favicon_url(request, tenant):
@@ -1518,10 +1526,573 @@ class TenantClientDetailsView(TenantSimplePageView):
     template_name = 'iroad_tenants/Clients_Management/client-details.html'
 
 
-class TenantAddressMasterView(TenantSimplePageView):
-    """Master data: address create form (template-only for now)."""
+def _tenant_address_master_access(request, context):
+    if context is None:
+        response = redirect('login')
+        clear_tenant_portal_cookie(response, request=request)
+        return response
+    if not context.get('is_tenant_admin'):
+        messages.error(
+            request,
+            'You do not have access to Address Master.',
+            extra_tags='tenant',
+        )
+        return _tenant_redirect(request, 'iroad_tenants:tenant_dashboard')
+    return None
 
-    template_name = 'iroad_tenants/Master_Data/addresses.html'
+
+def _format_digits_display(value: str) -> str:
+    """Group digits for list display (+966 50 123 4567 style, simplified)."""
+    d = ''.join(ch for ch in (value or '') if ch.isdigit())
+    if not d:
+        return '—'
+    if len(d) <= 12:
+        return ' '.join(d[i : i + 3] for i in range(0, len(d), 3))
+    return d
+
+
+def _hydrate_address_master_list_rows(addresses_page):
+    """Annotate pagination rows for list UI (Country master + display strings)."""
+    rows = list(addresses_page.object_list)
+    codes = {getattr(r, 'country_id', None) for r in rows}
+    codes.discard(None)
+    cmap = {}
+    if codes:
+        with schema_context('public'):
+            for c in Country.objects.filter(pk__in=codes):
+                cmap[c.country_code] = {
+                    'label': f'{c.country_code} — {c.name_en}',
+                    'code': c.country_code,
+                    'name_en': (c.name_en or '').strip(),
+                }
+
+    for row in rows:
+        cid = getattr(row, 'country_id', None)
+        if cid and cid in cmap:
+            info = cmap[cid]
+            city = (row.city or '').strip()
+            name_en = info['name_en']
+            setattr(row, 'country_display_label', info['label'])
+            setattr(row, 'country_code_short', info['code'])
+            setattr(
+                row,
+                'city_country_cell',
+                f'{city} / {name_en}' if city else f'— / {name_en}',
+            )
+        else:
+            setattr(row, 'country_display_label', '—')
+            setattr(row, 'country_code_short', '—')
+            setattr(row, 'city_country_cell', '—')
+        setattr(row, 'phone_display_cell', _format_digits_display(row.mobile_no_1))
+
+
+def _address_master_list_stats(filtered_qs):
+    addr = TenantAddressMaster
+    return {
+        'total': filtered_qs.count(),
+        'pickup_only': filtered_qs.filter(
+            address_category=addr.AddressCategory.PICKUP_ADDRESS
+        ).count(),
+        'delivery_only': filtered_qs.filter(
+            address_category=addr.AddressCategory.DELIVERY_ADDRESS
+        ).count(),
+        'both': filtered_qs.filter(address_category=addr.AddressCategory.BOTH).count(),
+    }
+
+
+class TenantAddressMasterListView(View):
+    """AD-001 list with search/filter and deactivate (inactive) via POST."""
+
+    template_name = 'iroad_tenants/Master_Data/address_master_list.html'
+
+    def get(self, request):
+        context = _tenant_context_from_session(request)
+        denied = _tenant_address_master_access(request, context)
+        if denied:
+            return denied
+
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        if tenant_registry is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+
+        qs = TenantAddressMaster.objects.select_related('client_account')
+        sq = request.GET.get('q', '').strip()
+        cid = request.GET.get('client', '').strip()
+        filter_client_id = ''
+
+        # AD-001: default list = Active only; All / Inactive only when explicitly requested.
+        status_raw = (request.GET.get('status') or '').strip().lower()
+        if 'status' not in request.GET:
+            qs = qs.filter(status=TenantAddressMaster.Status.ACTIVE)
+            filter_status = ''
+        elif not status_raw:
+            qs = qs.filter(status=TenantAddressMaster.Status.ACTIVE)
+            filter_status = 'active'
+        elif status_raw == 'all':
+            filter_status = 'all'
+        elif status_raw == 'inactive':
+            qs = qs.filter(status=TenantAddressMaster.Status.INACTIVE)
+            filter_status = 'inactive'
+        elif status_raw == 'active':
+            qs = qs.filter(status=TenantAddressMaster.Status.ACTIVE)
+            filter_status = 'active'
+        else:
+            qs = qs.filter(status=TenantAddressMaster.Status.ACTIVE)
+            filter_status = 'active'
+
+        if sq:
+            qs = qs.filter(
+                Q(display_name__icontains=sq)
+                | Q(address_code__icontains=sq)
+                | Q(city__icontains=sq)
+                | Q(client_account__display_name__icontains=sq)
+            )
+        if cid:
+            try:
+                cid_uuid = uuid.UUID(cid)
+                qs = qs.filter(client_account_id=cid_uuid)
+                filter_client_id = str(cid_uuid)
+            except ValueError:
+                filter_client_id = ''
+
+        qs_ordered = qs.order_by('-created_at')
+        stats = _address_master_list_stats(qs_ordered)
+        paginator = Paginator(qs_ordered, 10)
+        try:
+            page_no = max(1, int(request.GET.get('page') or 1))
+        except ValueError:
+            page_no = 1
+        page = paginator.get_page(page_no)
+        _hydrate_address_master_list_rows(page)
+
+        total_count = paginator.count
+        if total_count == 0:
+            ps, pe = 0, 0
+        else:
+            ps = (page.number - 1) * paginator.per_page + 1
+            pe = ps + len(page.object_list) - 1
+
+        def _page_url(page_num):
+            q = request.GET.copy()
+            q.pop('stype', None)
+            try:
+                pn = int(page_num)
+            except (TypeError, ValueError):
+                pn = 1
+            if pn > 1:
+                q['page'] = str(pn)
+            else:
+                q.pop('page', None)
+            return '?' + q.urlencode()
+
+        pagination_page_links = [(n, _page_url(n)) for n in page.paginator.page_range]
+        prev_url = _page_url(page.previous_page_number()) if page.has_previous() else None
+        next_url = _page_url(page.next_page_number()) if page.has_next() else None
+
+        clients = list(
+            TenantClientAccount.objects.filter(
+                status=TenantClientAccount.Status.ACTIVE,
+            ).order_by('display_name')[:500]
+        )
+
+        context.update(
+            {
+                'addresses_page': page,
+                'search_q': sq,
+                'filter_status': filter_status,
+                'filter_client_id': filter_client_id,
+                'pagination_page_links': pagination_page_links,
+                'pagination_prev_url': prev_url,
+                'pagination_next_url': next_url,
+                'stats': stats,
+                'pagination_start': ps,
+                'pagination_end': pe,
+                'pagination_total': total_count,
+                'client_filter_choices': clients,
+                'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+            }
+        )
+        try:
+            return render(request, self.template_name, context)
+        finally:
+            connection.set_schema_to_public()
+
+    def post(self, request):
+        """Set status Active / Inactivate (PCS: keep row, no delete)."""
+
+        context = _tenant_context_from_session(request)
+        denied = _tenant_address_master_access(request, context)
+        if denied:
+            return denied
+
+        if request.POST.get('action') != 'set_status':
+            return self.get(request)
+
+        address_id = (request.POST.get('address_id') or '').strip()
+        new_status = (request.POST.get('new_status') or '').strip()
+        if new_status not in (
+            TenantAddressMaster.Status.ACTIVE,
+            TenantAddressMaster.Status.INACTIVE,
+        ):
+            messages.error(request, 'Invalid status.', extra_tags='tenant')
+            rq = (request.POST.get('redirect_query') or '').strip()
+            base = reverse('iroad_tenants:tenant_address_master')
+            if rq:
+                return redirect(f'{base}?{rq}')
+            return _tenant_redirect(request, 'iroad_tenants:tenant_address_master')
+
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        if tenant_registry is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+
+        try:
+            addr = TenantAddressMaster.objects.filter(pk=address_id).first()
+            if not addr:
+                messages.error(request, 'Address not found.', extra_tags='tenant')
+            else:
+                addr.status = new_status
+                addr.save(update_fields=['status', 'updated_at'])
+                messages.success(request, f'Address set to {new_status.lower()}.', extra_tags='tenant')
+        finally:
+            connection.set_schema_to_public()
+
+        rq = (request.POST.get('redirect_query') or '').strip()
+        base = reverse('iroad_tenants:tenant_address_master')
+        if rq:
+            return redirect(f'{base}?{rq}')
+        return _tenant_redirect(request, 'iroad_tenants:tenant_address_master')
+
+
+class TenantAddressMasterCreateView(View):
+
+    template_name = 'iroad_tenants/Master_Data/address_master_form.html'
+
+    def get(self, request):
+        context = _tenant_context_from_session(request)
+        denied = _tenant_address_master_access(request, context)
+        if denied:
+            return denied
+
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        if tenant_registry is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+
+        try:
+            preview = _preview_next_address_master_code()
+
+            initial = {}
+            cid = (request.GET.get('client') or '').strip()
+            if cid:
+                try:
+                    initial['client_account'] = uuid.UUID(cid)
+                except ValueError:
+                    pass
+
+            form = TenantAddressMasterForm(
+                is_create=True,
+                initial=initial,
+            )
+            context.update(
+                {
+                    'form': form,
+                    'preview_address_code': preview,
+                    'is_edit': False,
+                    'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                }
+            )
+            return render(request, self.template_name, context)
+        finally:
+            connection.set_schema_to_public()
+
+    def post(self, request):
+        context = _tenant_context_from_session(request)
+        denied = _tenant_address_master_access(request, context)
+        if denied:
+            return denied
+
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        if tenant_registry is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+
+        redirect_resp = None
+        try:
+            logger.info(
+                'Address Master create POST: keys=%s',
+                sorted(request.POST.keys()),
+            )
+            form = TenantAddressMasterForm(
+                request.POST,
+                is_create=True,
+            )
+
+            if not form.is_valid():
+                logger.warning(
+                    'Address Master create validation failed errors=%s',
+                    form.errors.as_json(),
+                )
+                preview = _preview_next_address_master_code()
+                context.update(
+                    {
+                        'form': form,
+                        'preview_address_code': preview,
+                        'is_edit': False,
+                        'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                    }
+                )
+                messages.error(request, 'Please fix the highlighted errors.', extra_tags='tenant')
+                return render(request, self.template_name, context)
+
+            try:
+                with db_transaction.atomic():
+                    addr_code, addr_seq = _next_auto_number_for_form(
+                        ADDRESS_MASTER_AUTO_FORM_CODE,
+                        ADDRESS_MASTER_AUTO_FORM_LABEL,
+                        ADDRESS_MASTER_REF_PREFIX,
+                    )
+                    addr = form.save(commit=False)
+                    addr.address_code = addr_code
+                    addr.address_sequence = addr_seq
+                    addr.save()
+            except IntegrityError:
+                logger.exception('Address Master create integrity violation')
+                preview = _preview_next_address_master_code()
+                form.add_error(
+                    None,
+                    ValidationError(
+                        'Unable to allocate a unique address code. Please retry.',
+                        code='address_integrity',
+                    ),
+                )
+                context.update(
+                    {
+                        'form': form,
+                        'preview_address_code': preview,
+                        'is_edit': False,
+                        'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                    }
+                )
+                messages.error(request, 'Could not save the address.', extra_tags='tenant')
+                return render(request, self.template_name, context)
+            except ValidationError as ve:
+                logger.warning('Address Master create raised ValidationError: %s', ve)
+                preview = _preview_next_address_master_code()
+                if getattr(ve, 'error_dict', None):
+                    for field_name, errs in ve.error_dict.items():
+                        for err in errs:
+                            form.add_error(field_name, err)
+                else:
+                    for msg in getattr(ve, 'messages', []) or [str(ve)]:
+                        form.add_error(None, msg)
+                context.update(
+                    {
+                        'form': form,
+                        'preview_address_code': preview,
+                        'is_edit': False,
+                        'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                    }
+                )
+                messages.error(request, 'Could not save the address.', extra_tags='tenant')
+                return render(request, self.template_name, context)
+            except Exception:
+                logger.exception('Address Master create save failed')
+                preview = _preview_next_address_master_code()
+                form.add_error(
+                    None,
+                    ValidationError(
+                        'Saving failed unexpectedly. Try again or contact support.',
+                        code='address_save_failed',
+                    ),
+                )
+                context.update(
+                    {
+                        'form': form,
+                        'preview_address_code': preview,
+                        'is_edit': False,
+                        'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                    }
+                )
+                messages.error(request, 'Could not save the address.', extra_tags='tenant')
+                return render(request, self.template_name, context)
+
+            messages.success(
+                request,
+                f'Address {addr.address_code} created successfully.',
+                extra_tags='tenant',
+            )
+
+            redirect_resp = _tenant_redirect(request, 'iroad_tenants:tenant_address_master')
+        finally:
+            connection.set_schema_to_public()
+
+        return redirect_resp
+
+
+class TenantAddressMasterEditView(View):
+
+    template_name = 'iroad_tenants/Master_Data/address_master_form.html'
+
+    def _load(self, address_id):
+        return TenantAddressMaster.objects.select_related('client_account').filter(
+            pk=address_id
+        ).first()
+
+    def get(self, request, address_id):
+        context = _tenant_context_from_session(request)
+        denied = _tenant_address_master_access(request, context)
+        if denied:
+            return denied
+
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        if tenant_registry is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+
+        try:
+            instance = self._load(address_id)
+            if not instance:
+                messages.error(request, 'Address not found.', extra_tags='tenant')
+                return _tenant_redirect(request, 'iroad_tenants:tenant_address_master')
+
+            form = TenantAddressMasterForm(
+                instance=instance,
+                is_create=False,
+            )
+
+            context.update(
+                {
+                    'form': form,
+                    'is_edit': True,
+                    'address_record': instance,
+                    'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                }
+            )
+            return render(request, self.template_name, context)
+        finally:
+            connection.set_schema_to_public()
+
+    def post(self, request, address_id):
+        context = _tenant_context_from_session(request)
+        denied = _tenant_address_master_access(request, context)
+        if denied:
+            return denied
+
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        if tenant_registry is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+
+        redirect_resp = None
+        try:
+            instance = self._load(address_id)
+            if not instance:
+                messages.error(request, 'Address not found.', extra_tags='tenant')
+                return _tenant_redirect(request, 'iroad_tenants:tenant_address_master')
+
+            logger.info(
+                'Address Master edit POST address_id=%s keys=%s',
+                address_id,
+                sorted(request.POST.keys()),
+            )
+            form = TenantAddressMasterForm(
+                request.POST,
+                instance=instance,
+                is_create=False,
+            )
+
+            if not form.is_valid():
+                logger.warning(
+                    'Address Master edit validation failed address_id=%s errors=%s',
+                    address_id,
+                    form.errors.as_json(),
+                )
+                context.update(
+                    {
+                        'form': form,
+                        'is_edit': True,
+                        'address_record': instance,
+                        'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                    }
+                )
+                messages.error(request, 'Please fix the highlighted errors.', extra_tags='tenant')
+                return render(request, self.template_name, context)
+
+            try:
+                with db_transaction.atomic():
+                    form.save()
+            except IntegrityError:
+                logger.exception('Address Master edit integrity violation address_id=%s', address_id)
+                form.add_error(
+                    None,
+                    ValidationError(
+                        'Conflict while saving this address.',
+                        code='address_integrity',
+                    ),
+                )
+                context.update(
+                    {
+                        'form': form,
+                        'is_edit': True,
+                        'address_record': instance,
+                        'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                    }
+                )
+                messages.error(request, 'Could not save changes.', extra_tags='tenant')
+                return render(request, self.template_name, context)
+            except ValidationError as ve:
+                logger.warning('Address Master edit ValidationError address_id=%s detail=%s', address_id, ve)
+                if getattr(ve, 'error_dict', None):
+                    for field_name, errs in ve.error_dict.items():
+                        for err in errs:
+                            form.add_error(field_name, err)
+                else:
+                    for msg in getattr(ve, 'messages', []) or [str(ve)]:
+                        form.add_error(None, msg)
+                context.update(
+                    {
+                        'form': form,
+                        'is_edit': True,
+                        'address_record': instance,
+                        'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                    }
+                )
+                messages.error(request, 'Could not save changes.', extra_tags='tenant')
+                return render(request, self.template_name, context)
+            except Exception:
+                logger.exception('Address Master edit save failed address_id=%s', address_id)
+                form.add_error(
+                    None,
+                    ValidationError(
+                        'Saving failed unexpectedly. Try again or contact support.',
+                        code='address_save_failed',
+                    ),
+                )
+                context.update(
+                    {
+                        'form': form,
+                        'is_edit': True,
+                        'address_record': instance,
+                        'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                    }
+                )
+                messages.error(request, 'Could not save changes.', extra_tags='tenant')
+                return render(request, self.template_name, context)
+
+            messages.success(request, 'Address updated successfully.', extra_tags='tenant')
+            redirect_resp = _tenant_redirect(request, 'iroad_tenants:tenant_address_master')
+        finally:
+            connection.set_schema_to_public()
+
+        return redirect_resp
 
 
 class TenantMyAccountView(View):
@@ -1592,6 +2163,7 @@ class TenantAutoNumberConfigurationView(View):
         ORGANIZATION_FORM_CODE: ORGANIZATION_FORM_LABEL,
         USERS_FORM_CODE: USERS_FORM_LABEL,
         CLIENT_ACCOUNT_FORM_CODE: CLIENT_ACCOUNT_FORM_LABEL,
+        ADDRESS_MASTER_AUTO_FORM_CODE: ADDRESS_MASTER_AUTO_FORM_LABEL,
     }
 
     def _load_config(self, form_code):
@@ -2959,6 +3531,24 @@ def _next_auto_number_for_form(form_code, form_label, prefix):
     sequence.next_number = account_sequence + 1
     sequence.save(update_fields=['next_number', 'updated_at'])
     return ref_no, account_sequence
+
+
+def _preview_next_address_master_code():
+    """Next AD-xxxx preview in tenant schema without consuming the sequence."""
+    config, _ = AutoNumberConfiguration.objects.get_or_create(
+        form_code=ADDRESS_MASTER_AUTO_FORM_CODE,
+        defaults={
+            'form_label': ADDRESS_MASTER_AUTO_FORM_LABEL,
+            'number_of_digits': 4,
+            'sequence_format': AutoNumberConfiguration.SequenceFormat.NUMERIC,
+            'is_unique': True,
+        },
+    )
+    sequence = AutoNumberSequence.objects.filter(
+        form_code=ADDRESS_MASTER_AUTO_FORM_CODE,
+    ).first()
+    next_seq = sequence.next_number if sequence else 1
+    return _render_tenant_ref_no(next_seq, config, prefix=ADDRESS_MASTER_REF_PREFIX)
 
 
 def _int_to_alpha(value):

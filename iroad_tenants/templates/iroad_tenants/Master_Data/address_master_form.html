@@ -1,0 +1,330 @@
+{% extends 'iroad_tenants/base.html' %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}
+  {% if is_edit %}{% translate "Edit Address" %}{% else %}{% translate "Create Address" %}{% endif %} | iRoad
+{% endblock %}
+{% block breadcrumb %}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item">
+        <a href="{% url 'iroad_tenants:tenant_dashboard' %}">{% translate "Dashboard" %}</a>
+      </li>
+      <li class="breadcrumb-item">{% translate "Master Data" %}</li>
+      <li class="breadcrumb-item">{% translate "Address Management" %}</li>
+      <li class="breadcrumb-item active" aria-current="page">
+        {% if is_edit %}{% translate "Edit Address" %}{% else %}{% translate "Create Address" %}{% endif %}
+      </li>
+    </ol>
+  </nav>
+  <div class="page-header-row align-items-start">
+    <div class="page-header-left">
+      <h1 class="page-title">
+        {% if is_edit %}{% translate "Edit Address" %}{% else %}{% translate "Create Address" %}{% endif %}
+      </h1>
+    </div>
+    <div class="page-header-right ms-auto">
+      <a
+        href="{% url 'iroad_tenants:tenant_address_master' %}{% if request.GET.tid %}?tid={{ request.GET.tid }}{% endif %}"
+        class="btn btn-outline-secondary"
+      >
+        <i class="bi bi-arrow-left me-1"></i>{% translate "Back" %}
+      </a>
+    </div>
+  </div>
+</div>
+
+<form method="post" id="addressForm" class="needs-validation" novalidate>
+  {% csrf_token %}
+  {% if request.GET.tid %}<input type="hidden" name="tid" value="{{ request.GET.tid }}" />{% endif %}
+
+  {% if form.non_field_errors %}
+  <div class="alert alert-danger" role="alert">{{ form.non_field_errors }}</div>
+  {% endif %}
+
+  <!-- 1. Identity & Client -->
+  <div class="form-card mb-3">
+    <div class="form-card-body">
+      <h2 class="form-card-title mb-4">{% translate "Identity & Client" %}</h2>
+
+      <p class="small text-uppercase fw-semibold text-secondary mb-3" style="letter-spacing: 0.06em">
+        {% translate "Identity" %}
+      </p>
+      <div class="fields-grid cols-2 mb-4">
+        <div class="field">
+          <label class="form-label" for="{% if is_edit %}{{ form.address_code_preview.id_for_label }}{% else %}addressCodePreview{% endif %}">
+            {% translate "Address Code" %}
+          </label>
+          {% if is_edit %}
+            {{ form.address_code_preview }}
+          {% else %}
+            <input
+              type="text"
+              class="form-control"
+              id="addressCodePreview"
+              readonly
+              value="{{ preview_address_code|default:'' }}"
+              placeholder="{% translate 'Auto generated' %}"
+              aria-readonly="true"
+            />
+          {% endif %}
+          {% if is_edit and form.address_code_preview.errors %}<div class="text-danger small">{{ form.address_code_preview.errors }}</div>{% endif %}
+        </div>
+        <div class="field">
+          <label class="form-label" for="{{ form.client_account.id_for_label }}">
+            {% translate "Client Account" %} <span class="required">*</span>
+          </label>
+          {{ form.client_account }}
+          {% if form.client_account.errors %}<div class="text-danger small">{{ form.client_account.errors }}</div>{% endif %}
+        </div>
+      </div>
+      <div class="fields-grid cols-3 mb-4">
+        <div class="field">
+          <label class="form-label" for="{{ form.display_name.id_for_label }}">
+            {{ form.display_name.label }} <span class="required">*</span>
+          </label>
+          {{ form.display_name }}
+          {% if form.display_name.errors %}<div class="text-danger small">{{ form.display_name.errors }}</div>{% endif %}
+        </div>
+        <div class="field">
+          <label class="form-label" for="{{ form.arabic_label.id_for_label }}">{{ form.arabic_label.label }}</label>
+          {{ form.arabic_label }}
+        </div>
+        <div class="field">
+          <label class="form-label" for="{{ form.english_label.id_for_label }}">{{ form.english_label.label }}</label>
+          {{ form.english_label }}
+        </div>
+      </div>
+
+      <p class="small text-uppercase fw-semibold text-secondary mb-3" style="letter-spacing: 0.06em">
+        {% translate "Category & defaults" %}
+      </p>
+      <div class="fields-grid cols-2 mb-3">
+        <div class="field">
+          <label class="form-label" for="{{ form.address_category.id_for_label }}">
+            {{ form.address_category.label }} <span class="required">*</span>
+          </label>
+          {{ form.address_category }}
+          {% if form.address_category.errors %}<div class="text-danger small">{{ form.address_category.errors }}</div>{% endif %}
+        </div>
+        <div class="field">
+          <label class="form-label" for="{{ form.status.id_for_label }}">{{ form.status.label }}</label>
+          {{ form.status }}
+          {% if form.status.errors %}<div class="text-danger small">{{ form.status.errors }}</div>{% endif %}
+        </div>
+      </div>
+      <div class="fields-grid cols-2">
+        <div class="field">
+          <div class="form-check form-switch mb-1">
+            {{ form.default_pickup_address }}
+            <label class="form-check-label" for="{{ form.default_pickup_address.id_for_label }}">
+              {% translate "Default Pickup Address" %}
+            </label>
+          </div>
+          <span class="field-hint d-block small text-muted">{% translate "Only one default pickup per client." %}</span>
+          {% if form.default_pickup_address.errors %}<div class="text-danger small">{{ form.default_pickup_address.errors }}</div>{% endif %}
+        </div>
+        <div class="field">
+          <div class="form-check form-switch mb-1">
+            {{ form.default_delivery_address }}
+            <label class="form-check-label" for="{{ form.default_delivery_address.id_for_label }}">
+              {% translate "Default Delivery Address" %}
+            </label>
+          </div>
+          <span class="field-hint d-block small text-muted">{% translate "Only one default delivery per client." %}</span>
+          {% if form.default_delivery_address.errors %}<div class="text-danger small">{{ form.default_delivery_address.errors }}</div>{% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. Location -->
+  <div class="form-card mb-3">
+    <div class="form-card-body">
+      <h2 class="form-card-title mb-4">{% translate "Location" %}</h2>
+
+      <p class="small text-uppercase fw-semibold text-secondary mb-3" style="letter-spacing: 0.06em">
+        {% translate "Region" %}
+      </p>
+      <div class="fields-grid cols-3 mb-3">
+        <div class="field">
+          <label class="form-label" for="{{ form.country.id_for_label }}">
+            {{ form.country.label }} <span class="required">*</span>
+          </label>
+          {{ form.country }}
+          {% if form.country.errors %}<div class="text-danger small">{{ form.country.errors }}</div>{% endif %}
+        </div>
+        <div class="field">
+          <label class="form-label" for="{{ form.province.id_for_label }}">
+            {{ form.province.label }} <span class="required">*</span>
+          </label>
+          {{ form.province }}
+          {% if form.province.errors %}<div class="text-danger small">{{ form.province.errors }}</div>{% endif %}
+        </div>
+        <div class="field">
+          <label class="form-label" for="{{ form.city.id_for_label }}">
+            {{ form.city.label }} <span class="required">*</span>
+          </label>
+          {{ form.city }}
+          {% if form.city.errors %}<div class="text-danger small">{{ form.city.errors }}</div>{% endif %}
+        </div>
+      </div>
+      <div class="fields-grid cols-3 mb-4">
+        <div class="field">
+          <label class="form-label" for="{{ form.district.id_for_label }}">{{ form.district.label }}</label>
+          {{ form.district }}
+        </div>
+        <div class="field">
+          <label class="form-label" for="{{ form.street.id_for_label }}">{{ form.street.label }}</label>
+          {{ form.street }}
+        </div>
+        <div class="field">
+          <label class="form-label" for="{{ form.building_no.id_for_label }}">{{ form.building_no.label }}</label>
+          {{ form.building_no }}
+          {% if form.building_no.errors %}<div class="text-danger small">{{ form.building_no.errors }}</div>{% endif %}
+        </div>
+      </div>
+      <div class="fields-grid cols-3 mb-4">
+        <div class="field">
+          <label class="form-label" for="{{ form.postal_code.id_for_label }}">{{ form.postal_code.label }}</label>
+          {{ form.postal_code }}
+        </div>
+      </div>
+
+      <p class="small text-uppercase fw-semibold text-secondary mb-3" style="letter-spacing: 0.06em">
+        {% translate "Address lines & map" %}
+      </p>
+      <div class="fields-grid cols-2 mb-3">
+        <div class="field">
+          <label class="form-label" for="{{ form.address_line_1.id_for_label }}">
+            {{ form.address_line_1.label }} <span class="required">*</span>
+          </label>
+          {{ form.address_line_1 }}
+          {% if form.address_line_1.errors %}<div class="text-danger small">{{ form.address_line_1.errors }}</div>{% endif %}
+        </div>
+        <div class="field">
+          <label class="form-label" for="{{ form.address_line_2.id_for_label }}">{{ form.address_line_2.label }}</label>
+          {{ form.address_line_2 }}
+        </div>
+      </div>
+      <div class="field mb-3">
+        <label class="form-label" for="{{ form.map_link.id_for_label }}">{{ form.map_link.label }}</label>
+        {{ form.map_link }}
+        {% if form.map_link.errors %}<div class="text-danger small">{{ form.map_link.errors }}</div>{% endif %}
+      </div>
+      <div class="field">
+        <label class="form-label" for="{{ form.site_instructions.id_for_label }}">{{ form.site_instructions.label }}</label>
+        {{ form.site_instructions }}
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. Contact -->
+  <div class="form-card mb-3">
+    <div class="form-card-body">
+      <h2 class="form-card-title mb-4">{% translate "Contact" %}</h2>
+
+      <p class="small text-uppercase fw-semibold text-secondary mb-3" style="letter-spacing: 0.06em">
+        {% translate "Contact details" %}
+      </p>
+      <div class="fields-grid cols-2 mb-3">
+        <div class="field">
+          <label class="form-label" for="{{ form.contact_name.id_for_label }}">{{ form.contact_name.label }}</label>
+          {{ form.contact_name }}
+        </div>
+        <div class="field">
+          <label class="form-label" for="{{ form.position.id_for_label }}">{{ form.position.label }}</label>
+          {{ form.position }}
+        </div>
+      </div>
+      <div class="fields-grid cols-2 mb-3">
+        <div class="field">
+          <label class="form-label" for="{{ form.mobile_no_1.id_for_label }}">
+            {{ form.mobile_no_1.label }} <span class="required">*</span>
+          </label>
+          <div class="phone-input-group">
+            <select class="form-select country-code" aria-hidden="true" disabled tabindex="-1">
+              <option value="+966">+966</option>
+              <option value="+971">+971</option>
+              <option value="+965">+965</option>
+              <option value="+973">+973</option>
+              <option value="+974">+974</option>
+              <option value="+968">+968</option>
+              <option value="+91">+91</option>
+              <option value="+1">+1</option>
+            </select>
+            {{ form.mobile_no_1 }}
+          </div>
+          {% if form.mobile_no_1.errors %}<div class="text-danger small">{{ form.mobile_no_1.errors }}</div>{% endif %}
+        </div>
+        <div class="field">
+          <label class="form-label" for="{{ form.mobile_no_2.id_for_label }}">{{ form.mobile_no_2.label }}</label>
+          <div class="phone-input-group">
+            <select class="form-select country-code" aria-hidden="true" disabled tabindex="-1">
+              <option value="+966">+966</option>
+              <option value="+971">+971</option>
+              <option value="+965">+965</option>
+              <option value="+973">+973</option>
+              <option value="+974">+974</option>
+              <option value="+968">+968</option>
+              <option value="+91">+91</option>
+              <option value="+1">+1</option>
+            </select>
+            {{ form.mobile_no_2 }}
+          </div>
+          {% if form.mobile_no_2.errors %}<div class="text-danger small">{{ form.mobile_no_2.errors }}</div>{% endif %}
+        </div>
+      </div>
+      <div class="fields-grid cols-2 mb-3">
+        <div class="field">
+          <label class="form-label" for="{{ form.whatsapp_no.id_for_label }}">{{ form.whatsapp_no.label }}</label>
+          <div class="phone-input-group">
+            <select class="form-select country-code" aria-hidden="true" disabled tabindex="-1">
+              <option value="+966">+966</option>
+              <option value="+971">+971</option>
+              <option value="+965">+965</option>
+              <option value="+973">+973</option>
+              <option value="+974">+974</option>
+              <option value="+968">+968</option>
+              <option value="+91">+91</option>
+              <option value="+1">+1</option>
+            </select>
+            {{ form.whatsapp_no }}
+          </div>
+          {% if form.whatsapp_no.errors %}<div class="text-danger small">{{ form.whatsapp_no.errors }}</div>{% endif %}
+        </div>
+      </div>
+      <div class="fields-grid cols-2 mb-3">
+        <div class="field">
+          <label class="form-label" for="{{ form.phone_no.id_for_label }}">{{ form.phone_no.label }}</label>
+          {{ form.phone_no }}
+          {% if form.phone_no.errors %}<div class="text-danger small">{{ form.phone_no.errors }}</div>{% endif %}
+        </div>
+        <div class="field">
+          <label class="form-label" for="{{ form.extension.id_for_label }}">{{ form.extension.label }}</label>
+          {{ form.extension }}
+          {% if form.extension.errors %}<div class="text-danger small">{{ form.extension.errors }}</div>{% endif %}
+        </div>
+      </div>
+      <div class="field">
+        <label class="form-label" for="{{ form.email.id_for_label }}">{{ form.email.label }}</label>
+        {{ form.email }}
+        {% if form.email.errors %}<div class="text-danger small">{{ form.email.errors }}</div>{% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="form-actions-bar">
+    <div class="form-actions-left">
+      <button type="reset" class="btn btn-outline-secondary">{% translate "Reset" %}</button>
+    </div>
+    <div class="form-actions-right">
+      <button type="submit" class="btn btn-primary">{% translate "Save Address" %}</button>
+    </div>
+  </div>
+</form>
+{% endblock %}

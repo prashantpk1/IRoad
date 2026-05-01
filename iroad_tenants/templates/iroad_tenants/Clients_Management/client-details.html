@@ -576,7 +576,7 @@
                 >
                   Client Addresses
                 </h4>
-                <a href="addresses.html" class="btn btn-primary btn-sm">
+                <a href="{% url 'iroad_tenants:tenant_address_master_create' %}{% if request.GET.tid %}?tid={{ request.GET.tid }}{% endif %}" class="btn btn-primary btn-sm">
                   <i class="bi bi-plus-lg"></i> Add Address
                 </a>
               </div>
@@ -645,7 +645,7 @@
                           <span class="cd-field-value">ADDR-00123</span>
                         </div>
                         <div class="cd-field">
-                          <span class="cd-field-label">Address Mode</span>
+                          <span class="cd-field-label">Address Category</span>
                           <span class="cd-field-value"
                             >Delivery
                             <span class="badge bg-light text-dark border ms-2"
@@ -890,7 +890,7 @@
                           <span class="cd-field-value">ADDR-00244</span>
                         </div>
                         <div class="cd-field">
-                          <span class="cd-field-label">Address Mode</span>
+                          <span class="cd-field-label">Address Category</span>
                           <span class="cd-field-value"
                             >Both
                             <span class="badge bg-light text-dark border ms-2"

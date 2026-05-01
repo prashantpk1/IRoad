@@ -1,7 +1,9 @@
 from django.urls import path
 
 from .views import (
-    TenantAddressMasterView,
+    TenantAddressMasterCreateView,
+    TenantAddressMasterEditView,
+    TenantAddressMasterListView,
     TenantAutoNumberConfigurationView,
     TenantClientAccountCreateView,
     TenantClientAccountSettingsView,
@@ -212,8 +214,18 @@ urlpatterns = [
     ),
     path(
         'master-data/addresses/',
-        TenantAddressMasterView.as_view(),
+        TenantAddressMasterListView.as_view(),
         name='tenant_address_master',
+    ),
+    path(
+        'master-data/addresses/create/',
+        TenantAddressMasterCreateView.as_view(),
+        name='tenant_address_master_create',
+    ),
+    path(
+        'master-data/addresses/<uuid:address_id>/edit/',
+        TenantAddressMasterEditView.as_view(),
+        name='tenant_address_master_edit',
     ),
     path('my-account/', TenantMyAccountView.as_view(), name='tenant_my_account'),
     path('logout/', TenantLogoutView.as_view(), name='tenant_logout'),
