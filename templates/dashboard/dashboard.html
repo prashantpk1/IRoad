@@ -322,13 +322,15 @@
           .heatmap-container { display: flex; gap: 8px; font-size: 11px; color: #64748b; }
           .heatmap-y-axis { display: flex; flex-direction: column; padding-bottom: 24px; text-align: right; width: 30px; font-weight: 500; }
           .heatmap-y-axis span { height: 26px; line-height: 26px; margin-bottom: 4px; }
-          .heatmap-scrollable { flex: 1; overflow-x: auto; padding-bottom: 4px; }
-          .heatmap-grid { display: grid; grid-template-columns: repeat(24, minmax(18px, 1fr)); gap: 4px; }
+          .heatmap-scrollable { flex: 1; overflow-x: auto; overflow-y: hidden; padding-bottom: 10px; scrollbar-gutter: stable; }
+          .heatmap-scrollable::-webkit-scrollbar { height: 8px; }
+          .heatmap-scrollable::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 999px; }
+          .heatmap-grid { display: grid; grid-template-columns: repeat(24, minmax(18px, 1fr)); gap: 4px; min-width: 560px; }
           .heatmap-cell { height: 26px; border-radius: 4px; cursor: pointer; transition: transform 0.1s; position: relative; background: #f1f5f9; }
           .heatmap-cell:hover { transform: scale(1.15); z-index: 2; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
           .heatmap-cell::after { content: attr(data-tooltip); position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); background: #1e293b; color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 10px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity 0.2s; margin-bottom: 6px; z-index: 10; }
           .heatmap-cell:hover::after { opacity: 1; }
-          .heatmap-x-axis { display: flex; justify-content: space-between; margin-top: 8px; font-weight: 500; }
+          .heatmap-x-axis { display: flex; justify-content: space-between; margin-top: 8px; font-weight: 500; min-width: 560px; }
           .heatmap-legend { display: flex; align-items: center; justify-content: flex-end; gap: 4px; font-size: 11px; color: #64748b; margin-top: 8px; }
           .legend-color { width: 14px; height: 14px; border-radius: 3px; }
           .legend-label { margin: 0 4px; font-weight: 500; }
@@ -608,18 +610,57 @@ function initEnhancedCharts() {
         const heatmapData = JSON.parse(heatmapRaw.textContent);
         const days = 7;
         const hours = 24;
-        let maxCount = 1;
-        heatmapData.forEach(day => day.forEach(count => { if(count > maxCount) maxCount = count; }));
+        const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        const colors = ['#f1f5f9', '#cbd5e1', '#818cf8', '#6366f1', '#4338ca'];
+        const nonZeroValues = heatmapData.flat().filter((v) => Number(v) > 0).sort((a, b) => a - b);
+
+        // Clear any previously rendered placeholders/random cells before drawing real data.
+        heatmapGrid.innerHTML = '';
+
+        // Quantile buckets keep highlighting meaningful even when one hour has a huge spike.
+        const pickQuantile = (arr, q) => {
+            if (!arr.length) return 0;
+            const idx = Math.floor((arr.length - 1) * q);
+            return arr[idx];
+        };
+        const q1 = pickQuantile(nonZeroValues, 0.25);
+        const q2 = pickQuantile(nonZeroValues, 0.5);
+        const q3 = pickQuantile(nonZeroValues, 0.75);
+        const q4 = pickQuantile(nonZeroValues, 0.95);
+
+        const now = new Date();
+        const monday = new Date(now);
+        const weekdayFromMonday = (now.getDay() + 6) % 7; // Mon=0...Sun=6
+        monday.setDate(now.getDate() - weekdayFromMonday);
+        monday.setHours(0, 0, 0, 0);
+        const dayDates = Array.from({ length: 7 }, (_, idx) => {
+            const d = new Date(monday);
+            d.setDate(monday.getDate() + idx);
+            return d.toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' });
+        });
+
+        const getIntensity = (count) => {
+            if (count <= 0 || !nonZeroValues.length) return 0;
+            if (count <= q1) return 1;
+            if (count <= q2) return 2;
+            if (count <= q3) return 3;
+            if (count <= q4) return 4;
+            return 4;
+        };
 
         for (let d = 0; d < days; d++) {
             for (let h = 0; h < hours; h++) {
-                const count = heatmapData[d][h] || 0;
+                const count = Number(heatmapData[d]?.[h] || 0);
+                const hourText = `${String(h).padStart(2, '0')}:00`;
                 const cell = document.createElement('div');
+                const intensity = getIntensity(count);
+
                 cell.className = 'heatmap-cell';
-                let intensity = count > 0 ? Math.min(4, Math.ceil((count / maxCount) * 4)) : 0;
-                const colors = ['#f1f5f9', '#cbd5e1', '#818cf8', '#6366f1', '#4338ca'];
                 cell.style.backgroundColor = colors[intensity];
-                cell.setAttribute('data-tooltip', `${count} Login(s) at ${h}:00`);
+                cell.setAttribute(
+                    'data-tooltip',
+                    `${dayLabels[d]}, ${dayDates[d]} ${hourText} - ${count} login(s)`
+                );
                 heatmapGrid.appendChild(cell);
             }
         }

@@ -1,6 +1,7 @@
 from django.urls import path
 
 from .views import (
+    TenantAddressMasterView,
     TenantAutoNumberConfigurationView,
     TenantClientAccountCreateView,
     TenantClientAccountSettingsView,
@@ -208,6 +209,11 @@ urlpatterns = [
         'crm/clients/details/',
         TenantClientDetailsView.as_view(),
         name='tenant_client_details',
+    ),
+    path(
+        'master-data/addresses/',
+        TenantAddressMasterView.as_view(),
+        name='tenant_address_master',
     ),
     path('my-account/', TenantMyAccountView.as_view(), name='tenant_my_account'),
     path('logout/', TenantLogoutView.as_view(), name='tenant_logout'),

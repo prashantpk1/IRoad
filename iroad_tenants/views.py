@@ -1518,6 +1518,12 @@ class TenantClientDetailsView(TenantSimplePageView):
     template_name = 'iroad_tenants/Clients_Management/client-details.html'
 
 
+class TenantAddressMasterView(TenantSimplePageView):
+    """Master data: address create form (template-only for now)."""
+
+    template_name = 'iroad_tenants/Master_Data/addresses.html'
+
+
 class TenantMyAccountView(View):
     """Tenant self account summary page."""
 

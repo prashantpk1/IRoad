@@ -156,7 +156,7 @@
             </p>
           </div>
 
-          <form class="auth-form" method="post" action="{% url 'otp_verify' %}">
+          <form class="auth-form" method="post" action="{% url 'otp_verify' %}" id="otp-verify-form">
             {% csrf_token %}
 
             {% if messages %}
@@ -234,16 +234,16 @@
             </div>
 
 
-            <button type="submit" class="auth-btn auth-btn-primary">
+            <button type="submit" class="auth-btn auth-btn-primary" id="otp-verify-submit-btn">
               <i class="bi bi-shield-check"></i>
               Verify OTP
             </button>
           </form>
 
-          <form method="post" action="{% url 'otp_verify' %}" style="margin-top: 10px">
+          <form method="post" action="{% url 'otp_verify' %}" style="margin-top: 10px" id="otp-resend-form">
             {% csrf_token %}
             <input type="hidden" name="action" value="resend" />
-            <button type="submit" class="auth-btn auth-btn-outline" style="width: 100%">
+            <button type="submit" class="auth-btn auth-btn-outline" style="width: 100%" id="otp-resend-submit-btn">
               <i class="bi bi-arrow-clockwise"></i>
               Resend OTP
             </button>
@@ -355,7 +355,12 @@
 
         const timerText = document.getElementById('otp-timer');
         const timerBar = document.getElementById('otp-timer-bar');
-        const submitBtn = document.querySelector('.auth-btn-primary');
+        const submitBtn = document.getElementById('otp-verify-submit-btn');
+        const verifyForm = document.getElementById('otp-verify-form');
+        const resendForm = document.getElementById('otp-resend-form');
+        const resendBtn = document.getElementById('otp-resend-submit-btn');
+        let isVerifySubmitting = false;
+        let isResendSubmitting = false;
 
         const formatTime = (seconds) => {
           const mins = Math.floor(seconds / 60);
@@ -393,6 +398,52 @@
 
         const timerInterval = setInterval(updateTimer, 1000);
         updateTimer();
+
+        if (verifyForm && submitBtn) {
+          const verifyDefaultContent = submitBtn.innerHTML;
+          verifyForm.addEventListener('submit', function(e) {
+            if (isVerifySubmitting) {
+              e.preventDefault();
+              return;
+            }
+            isVerifySubmitting = true;
+            submitBtn.disabled = true;
+            submitBtn.style.opacity = '0.7';
+            submitBtn.style.cursor = 'not-allowed';
+            submitBtn.innerHTML = '<i class="bi bi-arrow-repeat"></i> Verifying...';
+
+            if (!verifyForm.checkValidity()) {
+              isVerifySubmitting = false;
+              submitBtn.disabled = false;
+              submitBtn.style.opacity = '';
+              submitBtn.style.cursor = '';
+              submitBtn.innerHTML = verifyDefaultContent;
+            }
+          });
+        }
+
+        if (resendForm && resendBtn) {
+          const resendDefaultContent = resendBtn.innerHTML;
+          resendForm.addEventListener('submit', function(e) {
+            if (isResendSubmitting) {
+              e.preventDefault();
+              return;
+            }
+            isResendSubmitting = true;
+            resendBtn.disabled = true;
+            resendBtn.style.opacity = '0.7';
+            resendBtn.style.cursor = 'not-allowed';
+            resendBtn.innerHTML = '<i class="bi bi-arrow-repeat"></i> Sending...';
+
+            if (!resendForm.checkValidity()) {
+              isResendSubmitting = false;
+              resendBtn.disabled = false;
+              resendBtn.style.opacity = '';
+              resendBtn.style.cursor = '';
+              resendBtn.innerHTML = resendDefaultContent;
+            }
+          });
+        }
       });
     </script>
   </body>

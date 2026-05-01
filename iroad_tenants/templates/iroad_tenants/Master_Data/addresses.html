@@ -1,0 +1,824 @@
+{% extends 'iroad_tenants/base.html' %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}{% translate "Address Master" %} | iRoad{% endblock %}
+
+{% block breadcrumb %}{% endblock %}
+
+{% block content %}
+      <!-- Page Header -->
+      <div class="page-header">
+        <nav aria-label="breadcrumb">
+          <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+              <a href="{% url 'iroad_tenants:tenant_dashboard' %}">Dashboard</a>
+            </li>
+            <li class="breadcrumb-item">Master Data</li>
+            <li class="breadcrumb-item">Address Management</li>
+            <li class="breadcrumb-item active" aria-current="page">
+              Address Master
+            </li>
+          </ol>
+        </nav>
+
+        <div class="page-header-row">
+          <div class="page-header-left">
+            <h1 class="page-title">Create Address</h1>
+            <p class="page-subtitle">
+              Fill in the details below to register a new address in the system.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Address Form -->
+      <form id="addressForm">
+        <!-- Section 1: Basic Information -->
+        <div class="form-card" data-section="1">
+          <div class="form-card-header">
+            <div class="form-card-icon blue">
+              <i class="bi bi-info-circle"></i>
+            </div>
+            <div class="form-card-header-text">
+              <h2 class="form-card-title">Basic Information</h2>
+              <p class="form-card-desc">
+                Primary details and classification of the address.
+              </p>
+            </div>
+          </div>
+          <div class="form-card-body">
+            <!-- Row 1: Identity -->
+            <div class="field-group">
+              <h3 class="field-group-title">
+                <i class="bi bi-fingerprint"></i>
+                Identity
+              </h3>
+              <div class="fields-grid cols-3">
+                <div class="field">
+                  <label for="addressCode" class="form-label"
+                    >Address Code
+                    <span class="required">*</span>
+                  </label>
+                  <div class="input-icon-wrapper">
+                    <i class="bi bi-hash"></i>
+                    <input
+                      type="text"
+                      class="form-control has-icon"
+                      id="addressCode"
+                      placeholder="e.g. ADDR-00123"
+                    />
+                  </div>
+                  <span class="field-hint">Unique address identifier</span>
+                </div>
+                <div class="field">
+                  <label for="clientAccount" class="form-label"
+                    >Client Account
+                    <span class="required">*</span>
+                  </label>
+                  <select class="form-select" id="clientAccount">
+                    <option value="" selected disabled>
+                      -Select client account-
+                    </option>
+                    <option value="client1">Client Account 1</option>
+                    <option value="client2">Client Account 2</option>
+                    <option value="client3">Client Account 3</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="addressMode" class="form-label"
+                    >Address Mode
+                    <span class="required">*</span>
+                  </label>
+                  <select class="form-select" id="addressMode">
+                    <option value="" selected disabled>-Select mode-</option>
+                    <option value="pickup">Pickup</option>
+                    <option value="delivery">Delivery</option>
+                    <option value="both">Both</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- Row 2: Naming -->
+            <div class="field-group">
+              <h3 class="field-group-title">
+                <i class="bi bi-type"></i>
+                Naming
+              </h3>
+              <div class="fields-grid cols-3">
+                <div class="field">
+                  <label for="displayName" class="form-label"
+                    >Display Name
+                    <span class="required">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="displayName"
+                    placeholder="Enter display name"
+                  />
+                  <span class="field-hint">Shown in lists and reports</span>
+                </div>
+                <div class="field">
+                  <label for="englishLabel" class="form-label"
+                    >English Label</label
+                  >
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="englishLabel"
+                    placeholder="Enter English label"
+                  />
+                </div>
+                <div class="field">
+                  <label for="arabicLabel" class="form-label"
+                    >Arabic Label</label
+                  >
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="arabicLabel"
+                    placeholder="Enter Arabic label"
+                    dir="rtl"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <!-- Row 3: Classification -->
+            <div class="field-group">
+              <h3 class="field-group-title">
+                <i class="bi bi-toggles"></i>
+                Classification
+              </h3>
+              <div class="fields-grid cols-3">
+                <div class="field">
+                  <label for="siteType" class="form-label">Site Type</label>
+                  <select class="form-select" id="siteType">
+                    <option value="" selected disabled>
+                      -Select site type-
+                    </option>
+                    <option value="warehouse">Warehouse</option>
+                    <option value="office">Office</option>
+                    <option value="retail">Retail Store</option>
+                    <option value="distribution">Distribution Center</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <div class="form-check mt-4">
+                    <input
+                      type="checkbox"
+                      class="form-check-input"
+                      id="defaultLoading"
+                    />
+                    <label class="form-check-label" for="defaultLoading"
+                      >Default Loading Address</label
+                    >
+                  </div>
+                </div>
+                <div class="field">
+                  <div class="form-check mt-4">
+                    <input
+                      type="checkbox"
+                      class="form-check-input"
+                      id="defaultUnloading"
+                    />
+                    <label class="form-check-label" for="defaultUnloading"
+                      >Default Unloading Address</label
+                    >
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 2: Geographical Information -->
+        <div class="form-card" data-section="2">
+          <div class="form-card-header">
+            <div class="form-card-icon amber">
+              <i class="bi bi-globe"></i>
+            </div>
+            <div class="form-card-header-text">
+              <h2 class="form-card-title">Geographical Information</h2>
+              <p class="form-card-desc">
+                Location and address details for the site.
+              </p>
+            </div>
+          </div>
+          <div class="form-card-body">
+            <!-- Row 1: Region -->
+            <div class="field-group">
+              <h3 class="field-group-title">
+                <i class="bi bi-geo"></i>
+                Region
+              </h3>
+              <div class="fields-grid cols-3">
+                <div class="field">
+                  <label for="country" class="form-label"
+                    >Country
+                    <span class="required">*</span>
+                  </label>
+                  <select class="form-select" id="country">
+                    <option value="" selected disabled>-Select country-</option>
+                    <option value="sa">Saudi Arabia</option>
+                    <option value="ae">United Arab Emirates</option>
+                    <option value="kw">Kuwait</option>
+                    <option value="bh">Bahrain</option>
+                    <option value="qa">Qatar</option>
+                    <option value="om">Oman</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="province" class="form-label"
+                    >Province
+                    <span class="required">*</span>
+                  </label>
+                  <select class="form-select" id="province">
+                    <option value="" selected disabled>
+                      -Select province-
+                    </option>
+                    <option value="riyadh">Riyadh</option>
+                    <option value="makkah">Makkah</option>
+                    <option value="eastern">Eastern Province</option>
+                    <option value="madinah">Madinah</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="city" class="form-label"
+                    >City
+                    <span class="required">*</span>
+                  </label>
+                  <select class="form-select" id="city">
+                    <option value="" selected disabled>-Select city-</option>
+                    <option value="riyadh">Riyadh</option>
+                    <option value="jeddah">Jeddah</option>
+                    <option value="dammam">Dammam</option>
+                    <option value="makkah">Makkah</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- Row 2: Address Details -->
+            <div class="field-group">
+              <h3 class="field-group-title">
+                <i class="bi bi-building"></i>
+                Address Details
+              </h3>
+              <div class="fields-grid cols-3">
+                <div class="field">
+                  <label for="district" class="form-label">District</label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="district"
+                    placeholder="Enter district"
+                  />
+                </div>
+                <div class="field">
+                  <label for="street" class="form-label">Street</label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="street"
+                    placeholder="Enter street name"
+                  />
+                </div>
+                <div class="field">
+                  <label for="buildingNo" class="form-label">Building No</label>
+                  <div class="input-icon-wrapper">
+                    <i class="bi bi-building"></i>
+                    <input
+                      type="text"
+                      class="form-control has-icon"
+                      id="buildingNo"
+                      placeholder="e.g. 1234"
+                      oninput="validateNumericInput(this)"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div class="fields-grid cols-3">
+                <div class="field">
+                  <label for="addressLine1" class="form-label"
+                    >Address Line 1</label
+                  >
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="addressLine1"
+                    placeholder="Enter address line 1"
+                  />
+                </div>
+                <div class="field">
+                  <label for="addressLine2" class="form-label"
+                    >Address Line 2</label
+                  >
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="addressLine2"
+                    placeholder="Enter address line 2"
+                  />
+                </div>
+                <div class="field">
+                  <label for="postalCode" class="form-label">Postal Code</label>
+                  <div class="input-icon-wrapper">
+                    <i class="bi bi-mailbox"></i>
+                    <input
+                      type="text"
+                      class="form-control has-icon"
+                      id="postalCode"
+                      placeholder="e.g. 12345"
+                      oninput="validateNumericInput(this)"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Row 3: Map -->
+            <div class="field-group">
+              <h3 class="field-group-title">
+                <i class="bi bi-pin-map"></i>
+                Map Location
+              </h3>
+              <div class="fields-grid cols-1">
+                <div class="field">
+                  <label for="mapLink" class="form-label">Map Link</label>
+                  <div class="input-icon-wrapper">
+                    <i class="bi bi-link-45deg"></i>
+                    <input
+                      type="url"
+                      class="form-control has-icon"
+                      id="mapLink"
+                      placeholder="https://maps.google.com/..."
+                      onblur="validateMapLink(this)"
+                    />
+                  </div>
+                  <span class="field-hint">Google Maps or similar map URL</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 3: Operating Hours & Handling -->
+        <div class="form-card" data-section="3">
+          <div class="form-card-header">
+            <div class="form-card-icon green">
+              <i class="bi bi-clock"></i>
+            </div>
+            <div class="form-card-header-text">
+              <h2 class="form-card-title">Operating Hours & Handling</h2>
+              <p class="form-card-desc">
+                Working schedule, loading/unloading times, and site
+                requirements.
+              </p>
+            </div>
+          </div>
+          <div class="form-card-body">
+            <!-- Row 1: Working Days -->
+            <div class="field-group">
+              <h3 class="field-group-title">
+                <i class="bi bi-calendar-week"></i>
+                Working Days
+              </h3>
+              <div class="fields-grid cols-1">
+                <div class="field">
+                  <div class="working-days-group">
+                    <div class="form-check">
+                      <input
+                        type="checkbox"
+                        class="form-check-input working-day-checkbox"
+                        id="sunday"
+                      />
+                      <label class="form-check-label" for="sunday"
+                        >Sunday</label
+                      >
+                    </div>
+                    <div class="form-check">
+                      <input
+                        type="checkbox"
+                        class="form-check-input working-day-checkbox"
+                        id="monday"
+                      />
+                      <label class="form-check-label" for="monday"
+                        >Monday</label
+                      >
+                    </div>
+                    <div class="form-check">
+                      <input
+                        type="checkbox"
+                        class="form-check-input working-day-checkbox"
+                        id="tuesday"
+                      />
+                      <label class="form-check-label" for="tuesday"
+                        >Tuesday</label
+                      >
+                    </div>
+                    <div class="form-check">
+                      <input
+                        type="checkbox"
+                        class="form-check-input working-day-checkbox"
+                        id="wednesday"
+                      />
+                      <label class="form-check-label" for="wednesday"
+                        >Wednesday</label
+                      >
+                    </div>
+                    <div class="form-check">
+                      <input
+                        type="checkbox"
+                        class="form-check-input working-day-checkbox"
+                        id="thursday"
+                      />
+                      <label class="form-check-label" for="thursday"
+                        >Thursday</label
+                      >
+                    </div>
+                    <div class="form-check">
+                      <input
+                        type="checkbox"
+                        class="form-check-input working-day-checkbox"
+                        id="thursday"
+                      />
+                      <label class="form-check-label" for="friday"
+                        >Friday</label
+                      >
+                    </div>
+                    <div class="form-check">
+                      <input
+                        type="checkbox"
+                        class="form-check-input working-day-checkbox"
+                        id="saturday"
+                      />
+                      <label class="form-check-label" for="saturday"
+                        >Saturday</label
+                      >
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Row 2: Schedule -->
+            <div class="field-group">
+              <h3 class="field-group-title">
+                <i class="bi bi-stopwatch"></i>
+                Schedule
+              </h3>
+              <div class="fields-grid cols-2">
+                <div class="field">
+                  <label for="workingTimeFrom" class="form-label"
+                    >Working Time From</label
+                  >
+                  <div class="input-icon-wrapper">
+                    <i class="bi bi-clock"></i>
+                    <input
+                      type="time"
+                      class="form-control has-icon"
+                      id="workingTimeFrom"
+                    />
+                  </div>
+                </div>
+                <div class="field">
+                  <label for="workingTimeTo" class="form-label"
+                    >Working Time To</label
+                  >
+                  <div class="input-icon-wrapper">
+                    <i class="bi bi-clock"></i>
+                    <input
+                      type="time"
+                      class="form-control has-icon"
+                      id="workingTimeTo"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Row 3: Handling Times -->
+            <div class="field-group">
+              <h3 class="field-group-title">
+                <i class="bi bi-box-arrow-in-down"></i>
+                Handling Times
+              </h3>
+              <div class="fields-grid cols-2">
+                <div class="field">
+                  <label for="loadingTime" class="form-label"
+                    >Loading Time (h)</label
+                  >
+                  <div class="input-icon-wrapper">
+                    <i class="bi bi-box-arrow-up"></i>
+                    <input
+                      type="text"
+                      class="form-control has-icon"
+                      id="loadingTime"
+                      placeholder="e.g. 2"
+                      oninput="validateNumericInput(this)"
+                    />
+                  </div>
+                  <span class="field-hint">Time in hours for loading</span>
+                </div>
+                <div class="field">
+                  <label for="unloadingTime" class="form-label"
+                    >Unloading Time (h)</label
+                  >
+                  <div class="input-icon-wrapper">
+                    <i class="bi bi-box-arrow-down"></i>
+                    <input
+                      type="text"
+                      class="form-control has-icon"
+                      id="unloadingTime"
+                      placeholder="e.g. 3"
+                      oninput="validateNumericInput(this)"
+                    />
+                  </div>
+                  <span class="field-hint">Time in hours for unloading</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Row 4: Site Instructions -->
+            <div class="field-group">
+              <h3 class="field-group-title">
+                <i class="bi bi-card-text"></i>
+                Site Instructions
+              </h3>
+              <div class="fields-grid cols-1">
+                <div class="field">
+                  <label for="siteInstructions" class="form-label"
+                    >Instructions</label
+                  >
+                  <textarea
+                    class="form-control"
+                    id="siteInstructions"
+                    rows="4"
+                    placeholder="Enter any special instructions for this site..."
+                  ></textarea>
+                </div>
+              </div>
+            </div>
+
+            <!-- Row 5: Site Requirements -->
+            <div class="field-group">
+              <h3 class="field-group-title">
+                <i class="bi bi-shield-check"></i>
+                Site Requirements
+              </h3>
+              <div class="fields-grid cols-3">
+                <div class="field">
+                  <div class="form-check mt-2">
+                    <input
+                      type="checkbox"
+                      class="form-check-input"
+                      id="appointmentRequired"
+                    />
+                    <label class="form-check-label" for="appointmentRequired"
+                      >Appointment Required</label
+                    >
+                  </div>
+                </div>
+                <div class="field">
+                  <div class="form-check mt-2">
+                    <input
+                      type="checkbox"
+                      class="form-check-input"
+                      id="permitRequired"
+                    />
+                    <label class="form-check-label" for="permitRequired"
+                      >Permit Required</label
+                    >
+                  </div>
+                </div>
+                <div class="field">
+                  <div class="form-check mt-2">
+                    <input
+                      type="checkbox"
+                      class="form-check-input"
+                      id="isGovernmentSite"
+                    />
+                    <label class="form-check-label" for="isGovernmentSite"
+                      >Is Government Site</label
+                    >
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 4: Contact Information -->
+        <div class="form-card" data-section="4">
+          <div class="form-card-header">
+            <div class="form-card-icon red">
+              <i class="bi bi-telephone"></i>
+            </div>
+            <div class="form-card-header-text">
+              <h2 class="form-card-title">Contact Information</h2>
+              <p class="form-card-desc">
+                Contact person details and communication numbers.
+              </p>
+            </div>
+          </div>
+          <div class="form-card-body">
+            <!-- Row 1: Contact Person -->
+            <div class="field-group">
+              <h3 class="field-group-title">
+                <i class="bi bi-person"></i>
+                Contact Person
+              </h3>
+              <div class="fields-grid cols-3">
+                <div class="field">
+                  <label for="contactName" class="form-label"
+                    >Name
+                    <span class="required">*</span>
+                  </label>
+                  <div class="input-icon-wrapper">
+                    <i class="bi bi-person"></i>
+                    <input
+                      type="text"
+                      class="form-control has-icon"
+                      id="contactName"
+                      placeholder="Enter contact name"
+                    />
+                  </div>
+                </div>
+                <div class="field">
+                  <label for="position" class="form-label">Position</label>
+                  <div class="input-icon-wrapper">
+                    <i class="bi bi-briefcase"></i>
+                    <input
+                      type="text"
+                      class="form-control has-icon"
+                      id="position"
+                      placeholder="Enter position"
+                    />
+                  </div>
+                </div>
+                <div class="field">
+                  <label for="email" class="form-label">Email</label>
+                  <div class="input-icon-wrapper">
+                    <i class="bi bi-envelope"></i>
+                    <input
+                      type="email"
+                      class="form-control has-icon"
+                      id="email"
+                      placeholder="Enter email address"
+                      onblur="validateEmail(this)"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Row 2: Phone Numbers -->
+            <div class="field-group">
+              <h3 class="field-group-title">
+                <i class="bi bi-phone"></i>
+                Phone Numbers
+              </h3>
+              <div class="fields-grid cols-2">
+                <div class="field">
+                  <label for="phoneNo" class="form-label">Phone No</label>
+                  <div class="phone-input-group">
+                    <select
+                      class="form-select country-code"
+                      id="phoneCountryCode"
+                    >
+                      <option value="+966">+966</option>
+                      <option value="+971">+971</option>
+                      <option value="+965">+965</option>
+                      <option value="+973">+973</option>
+                      <option value="+974">+974</option>
+                      <option value="+968">+968</option>
+                      <option value="+91">+91</option>
+                      <option value="+1">+1</option>
+                    </select>
+                    <input
+                      type="text"
+                      class="form-control phone-number"
+                      id="phoneNo"
+                      placeholder="Enter phone number"
+                      oninput="formatPhoneNumber(this)"
+                    />
+                  </div>
+                </div>
+                <div class="field">
+                  <label for="extension" class="form-label">Extension</label>
+                  <div class="input-icon-wrapper">
+                    <i class="bi bi-hash"></i>
+                    <input
+                      type="text"
+                      class="form-control has-icon"
+                      id="extension"
+                      placeholder="e.g. 101"
+                      oninput="validateNumericInput(this)"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div class="fields-grid cols-2">
+                <div class="field">
+                  <label for="mobileNo1" class="form-label">Mobile No 1</label>
+                  <div class="phone-input-group">
+                    <select
+                      class="form-select country-code"
+                      id="mobile1CountryCode"
+                    >
+                      <option value="+966">+966</option>
+                      <option value="+971">+971</option>
+                      <option value="+965">+965</option>
+                      <option value="+973">+973</option>
+                      <option value="+974">+974</option>
+                      <option value="+968">+968</option>
+                      <option value="+91">+91</option>
+                      <option value="+1">+1</option>
+                    </select>
+                    <input
+                      type="text"
+                      class="form-control phone-number"
+                      id="mobileNo1"
+                      placeholder="Enter mobile number"
+                      oninput="formatPhoneNumber(this)"
+                    />
+                  </div>
+                </div>
+                <div class="field">
+                  <label for="mobileNo2" class="form-label">Mobile No 2</label>
+                  <div class="phone-input-group">
+                    <select
+                      class="form-select country-code"
+                      id="mobile2CountryCode"
+                    >
+                      <option value="+966">+966</option>
+                      <option value="+971">+971</option>
+                      <option value="+965">+965</option>
+                      <option value="+973">+973</option>
+                      <option value="+974">+974</option>
+                      <option value="+968">+968</option>
+                      <option value="+91">+91</option>
+                      <option value="+1">+1</option>
+                    </select>
+                    <input
+                      type="text"
+                      class="form-control phone-number"
+                      id="mobileNo2"
+                      placeholder="Enter mobile number"
+                      oninput="formatPhoneNumber(this)"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div class="fields-grid cols-2">
+                <div class="field">
+                  <label for="whatsappNo" class="form-label">WhatsApp No</label>
+                  <div class="phone-input-group">
+                    <select
+                      class="form-select country-code"
+                      id="whatsappCountryCode"
+                    >
+                      <option value="+966">+966</option>
+                      <option value="+971">+971</option>
+                      <option value="+965">+965</option>
+                      <option value="+973">+973</option>
+                      <option value="+974">+974</option>
+                      <option value="+968">+968</option>
+                      <option value="+91">+91</option>
+                      <option value="+1">+1</option>
+                    </select>
+                    <input
+                      type="text"
+                      class="form-control phone-number"
+                      id="whatsappNo"
+                      placeholder="Enter WhatsApp number"
+                      oninput="formatPhoneNumber(this)"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Form Actions -->
+        <div class="form-actions-bar">
+          <div class="form-actions-left">
+            <button type="reset" class="btn btn-outline-secondary">
+              <i class="bi bi-arrow-counterclockwise"></i>
+              Reset Form
+            </button>
+          </div>
+          <div class="form-actions-right">
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-check-circle"></i>
+              Create Address
+            </button>
+          </div>
+        </div>
+      </form>
+
+{% endblock %}
