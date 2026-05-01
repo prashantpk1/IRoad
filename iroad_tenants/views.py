@@ -59,6 +59,7 @@ from tenant_workspace.models import (
     AutoNumberConfiguration,
     AutoNumberSequence,
     OrganizationProfile,
+    TenantClientAccount,
     TenantRole,
     TenantRolePermission,
     TenantUser,
@@ -1306,6 +1307,184 @@ class TenantClientAccountSettingsView(TenantSimplePageView):
 class TenantClientAccountCreateView(TenantSimplePageView):
     template_name = 'iroad_tenants/Clients_Management/Client-account-new.html'
 
+    CLIENT_FORM_CODE = 'client-account'
+    CLIENT_FORM_LABEL = 'Client Account'
+    CLIENT_REF_PREFIX = 'CA'
+
+    def _base_form_data(self):
+        return {
+            'account_no': '',
+            'created_at': timezone.localtime().strftime('%b %d, %Y, %I:%M %p'),
+            'client_type': TenantClientAccount.ClientType.INDIVIDUAL,
+            'status': TenantClientAccount.Status.ACTIVE,
+            'name_arabic': '',
+            'name_english': '',
+            'display_name': '',
+            'preferred_currency': '',
+            'billing_street_1': '',
+            'billing_street_2': '',
+            'billing_city': '',
+            'billing_region': '',
+            'postal_code': '',
+            'country': '',
+            'credit_limit_amount': '',
+            'limit_currency_code': 'SAR',
+            'payment_term_days': '',
+            'commercial_registration_no': '',
+            'tax_registration_no': '',
+        }
+
+    def _collect_form_data(self, request):
+        data = self._base_form_data()
+        for key in data.keys():
+            if key in {'status', 'client_type'}:
+                data[key] = (request.POST.get(key) or '').strip() or data[key]
+            else:
+                data[key] = (request.POST.get(key) or '').strip()
+        data['limit_currency_code'] = data['limit_currency_code'] or 'SAR'
+        return data
+
+    def _build_preview_account_no(self):
+        config, _ = AutoNumberConfiguration.objects.get_or_create(
+            form_code=self.CLIENT_FORM_CODE,
+            defaults={
+                'form_label': self.CLIENT_FORM_LABEL,
+                'number_of_digits': 4,
+                'sequence_format': AutoNumberConfiguration.SequenceFormat.NUMERIC,
+                'is_unique': True,
+            },
+        )
+        sequence = AutoNumberSequence.objects.filter(form_code=self.CLIENT_FORM_CODE).first()
+        next_number = int(sequence.next_number if sequence else 1)
+        return _render_tenant_ref_no(next_number, config, prefix=self.CLIENT_REF_PREFIX)
+
+    def get(self, request):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        if tenant_registry is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        try:
+            form_data = self._base_form_data()
+            form_data['account_no'] = self._build_preview_account_no()
+            context.update(
+                {
+                    'form_data': form_data,
+                    'form_errors': {},
+                    'tenant_schema_name': tenant_registry.schema_name,
+                }
+            )
+            return render(request, self.template_name, context)
+        finally:
+            connection.set_schema_to_public()
+
+    def post(self, request):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        if tenant_registry is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        form_data = self._collect_form_data(request)
+        form_errors = {}
+        try:
+            if form_data['client_type'] not in {
+                TenantClientAccount.ClientType.INDIVIDUAL,
+                TenantClientAccount.ClientType.BUSINESS,
+            }:
+                form_errors['client_type'] = 'Invalid client type selected.'
+            if form_data['status'] not in {
+                TenantClientAccount.Status.ACTIVE,
+                TenantClientAccount.Status.INACTIVE,
+            }:
+                form_errors['status'] = 'Invalid status selected.'
+            if not form_data['name_english']:
+                form_errors['name_english'] = 'Name (English) is required.'
+            if not form_data['display_name']:
+                form_errors['display_name'] = 'Display Name is required.'
+            if not form_data['preferred_currency']:
+                form_errors['preferred_currency'] = 'Preferred Currency is required.'
+            if not form_data['billing_street_1']:
+                form_errors['billing_street_1'] = 'Billing Street 1 is required.'
+            if not form_data['billing_city']:
+                form_errors['billing_city'] = 'Billing City is required.'
+            if not form_data['country']:
+                form_errors['country'] = 'Country is required.'
+
+            credit_limit_raw = form_data['credit_limit_amount'] or '0'
+            payment_term_raw = form_data['payment_term_days'] or '0'
+            try:
+                credit_limit_amount = Decimal(credit_limit_raw)
+                if credit_limit_amount < 0:
+                    raise ValueError
+            except Exception:
+                form_errors['credit_limit_amount'] = 'Credit Limit Amount must be 0 or greater.'
+                credit_limit_amount = Decimal('0')
+            try:
+                payment_term_days = int(payment_term_raw)
+                if payment_term_days < 0:
+                    raise ValueError
+            except Exception:
+                form_errors['payment_term_days'] = 'Payment Term (Days) must be 0 or greater.'
+                payment_term_days = 0
+
+            if form_errors:
+                form_data['account_no'] = self._build_preview_account_no()
+                context.update(
+                    {
+                        'form_data': form_data,
+                        'form_errors': form_errors,
+                        'tenant_schema_name': tenant_registry.schema_name,
+                    }
+                )
+                messages.error(request, 'Please fix the highlighted errors.', extra_tags='tenant')
+                return render(request, self.template_name, context)
+
+            account_no, account_sequence = _next_auto_number_for_form(
+                form_code=self.CLIENT_FORM_CODE,
+                form_label=self.CLIENT_FORM_LABEL,
+                prefix=self.CLIENT_REF_PREFIX,
+            )
+            TenantClientAccount.objects.create(
+                account_no=account_no,
+                account_sequence=account_sequence,
+                client_type=form_data['client_type'],
+                status=form_data['status'],
+                name_arabic=form_data['name_arabic'],
+                name_english=form_data['name_english'],
+                display_name=form_data['display_name'],
+                preferred_currency=form_data['preferred_currency'],
+                billing_street_1=form_data['billing_street_1'],
+                billing_street_2=form_data['billing_street_2'],
+                billing_city=form_data['billing_city'],
+                billing_region=form_data['billing_region'],
+                postal_code=form_data['postal_code'],
+                country=form_data['country'],
+                credit_limit_amount=credit_limit_amount,
+                limit_currency_code=form_data['limit_currency_code'] or 'SAR',
+                payment_term_days=payment_term_days,
+                commercial_registration_no=form_data['commercial_registration_no'],
+                tax_registration_no=form_data['tax_registration_no'],
+                created_by_label=(context.get('display_name') or '').strip(),
+            )
+            messages.success(
+                request,
+                f'Client account {account_no} created successfully.',
+                extra_tags='tenant',
+            )
+            return _tenant_redirect(request, 'iroad_tenants:tenant_client_account')
+        finally:
+            connection.set_schema_to_public()
+
 
 class TenantClientAttachmentsView(TenantSimplePageView):
     template_name = 'iroad_tenants/Clients_Management/Client-attachments.html'
@@ -1399,11 +1578,14 @@ class TenantAutoNumberConfigurationView(View):
     ORGANIZATION_FORM_LABEL = 'Organization Profile'
     USERS_FORM_CODE = 'users-administration'
     USERS_FORM_LABEL = 'Users Administration'
+    CLIENT_ACCOUNT_FORM_CODE = 'client-account'
+    CLIENT_ACCOUNT_FORM_LABEL = 'Client Account'
     ALLOWED_SEQUENCE_FORMATS = {'numeric', 'alpha', 'alphanumeric'}
 
     FORM_LABELS = {
         ORGANIZATION_FORM_CODE: ORGANIZATION_FORM_LABEL,
         USERS_FORM_CODE: USERS_FORM_LABEL,
+        CLIENT_ACCOUNT_FORM_CODE: CLIENT_ACCOUNT_FORM_LABEL,
     }
 
     def _load_config(self, form_code):

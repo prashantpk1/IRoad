@@ -148,6 +148,53 @@ class OrganizationProfile(models.Model):
         return self.name_en or self.tenant_ref_no
 
 
+class TenantClientAccount(models.Model):
+    """Tenant-scoped CRM client account master."""
+
+    class ClientType(models.TextChoices):
+        INDIVIDUAL = 'Individual', 'Individual'
+        BUSINESS = 'Business', 'Business'
+
+    class Status(models.TextChoices):
+        ACTIVE = 'Active', 'Active'
+        INACTIVE = 'Inactive', 'Inactive'
+
+    account_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    account_no = models.CharField(max_length=64, unique=True)
+    account_sequence = models.PositiveIntegerField(default=0)
+    client_type = models.CharField(
+        max_length=20,
+        choices=ClientType.choices,
+        default=ClientType.INDIVIDUAL,
+    )
+    status = models.CharField(max_length=12, choices=Status.choices, default=Status.ACTIVE)
+    name_arabic = models.CharField(max_length=200, blank=True, default='')
+    name_english = models.CharField(max_length=200)
+    display_name = models.CharField(max_length=200)
+    preferred_currency = models.CharField(max_length=10, blank=True, default='')
+    billing_street_1 = models.CharField(max_length=255)
+    billing_street_2 = models.CharField(max_length=255, blank=True, default='')
+    billing_city = models.CharField(max_length=100)
+    billing_region = models.CharField(max_length=100, blank=True, default='')
+    postal_code = models.CharField(max_length=30, blank=True, default='')
+    country = models.CharField(max_length=10)
+    credit_limit_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    limit_currency_code = models.CharField(max_length=10, blank=True, default='SAR')
+    payment_term_days = models.PositiveIntegerField(default=0)
+    commercial_registration_no = models.CharField(max_length=80, blank=True, default='')
+    tax_registration_no = models.CharField(max_length=80, blank=True, default='')
+    created_by_label = models.CharField(max_length=200, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'tenant_client_accounts'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return self.display_name or self.name_english or self.account_no
+
+
 class TenantUser(models.Model):
     """Tenant-scoped internal users (stored per tenant schema)."""
 

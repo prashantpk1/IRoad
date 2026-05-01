@@ -572,6 +572,45 @@ DEFAULT_NOTIFICATION_EMAIL_TEMPLATES = [
         ),
     },
     {
+        'template_name': 'TENANT_PASSWORD_RESET',
+        'category': 'Transactional',
+        'subject_en': 'Reset Your iRoad Tenant Password',
+        'subject_ar': 'إعادة تعيين كلمة مرور حساب المؤسسة في iRoad',
+        'body_en': _wrap_email_body(
+            '<h2>Reset Your Password 🔐</h2>'
+            '<p>Hello {{ tenant.company_name|default:admin_user.first_name|default:"Tenant" }},</p>'
+            '<p>We received a request to reset the password for your iRoad tenant account. '
+            'Click the button below to set a new password:</p>'
+            '<div style="text-align:center;margin:28px 0;">'
+            '<a href="{{ reset_url }}" style="background:linear-gradient(135deg,#4f46e5,#6366f1);'
+            'color:#fff!important;padding:14px 32px;text-decoration:none;border-radius:10px;'
+            'font-weight:700;font-size:15px;display:inline-block;'
+            'box-shadow:0 4px 14px rgba(79,70,229,.3);">Reset Password &rarr;</a>'
+            '</div>'
+            '<div style="height:1px;background:#e2e8f0;margin:28px 0;"></div>'
+            '<p style="font-size:13px;color:#94a3b8;line-height:1.6;">'
+            'If you did not request this password reset, you can safely ignore this email. '
+            'Your password will not be changed.</p>'
+        ),
+        'body_ar': _wrap_email_body(
+            '<div dir="rtl" style="text-align:right;">'
+            '<h2>إعادة تعيين كلمة المرور 🔐</h2>'
+            '<p>مرحباً {{ tenant.company_name|default:admin_user.first_name|default:"Tenant" }}،</p>'
+            '<p>تلقينا طلباً لإعادة تعيين كلمة المرور لحساب المؤسسة الخاص بك في iRoad. '
+            'اضغط الزر أدناه لتعيين كلمة مرور جديدة:</p>'
+            '<div style="text-align:center;margin:28px 0;">'
+            '<a href="{{ reset_url }}" style="background:linear-gradient(135deg,#4f46e5,#6366f1);'
+            'color:#fff!important;padding:14px 32px;text-decoration:none;border-radius:10px;'
+            'font-weight:700;font-size:15px;display:inline-block;'
+            'box-shadow:0 4px 14px rgba(79,70,229,.3);">إعادة تعيين كلمة المرور &larr;</a>'
+            '</div>'
+            '<div style="height:1px;background:#e2e8f0;margin:28px 0;"></div>'
+            '<p style="font-size:13px;color:#94a3b8;line-height:1.6;">'
+            'إذا لم تطلب ذلك، يمكنك تجاهل هذه الرسالة. لن يتم تغيير كلمة المرور.</p>'
+            '</div>'
+        ),
+    },
+    {
         'template_name': 'AUTH_ADMIN_INVITE',
         'category': 'Transactional',
         'subject_en': 'Activate Your iRoad Admin Account',
@@ -760,6 +799,59 @@ DEFAULT_NOTIFICATION_EMAIL_TEMPLATES = [
             '</div>'
             '<p style="font-size:13px;color:#94a3b8;">'
             'يرجى تغيير كلمة المرور بعد أول تسجيل دخول.</p>'
+            '</div>',
+            use_rtl=True
+        ),
+    },
+    {
+        'template_name': 'TENANT_USER_PASSWORD_RESET',
+        'category': 'Transactional',
+        'subject_en': 'iRoad Temporary Password Reset',
+        'subject_ar': 'إعادة تعيين كلمة المرور المؤقتة في iRoad',
+        'body_en': _wrap_email_body(
+            '<h2>Password Reset Requested 🔐</h2>'
+            '<p>Hello {{ name }},</p>'
+            '<p>We received a request to reset your tenant workspace password. '
+            'Use the temporary password below to log in, then change it immediately.</p>'
+            '<div style="background:linear-gradient(135deg,#f8fafc,#f1f5f9);'
+            'padding:20px 22px;border-radius:12px;border:1px solid #e2e8f0;margin-bottom:20px;">'
+            '<p style="margin:0 0 8px;font-size:14px;color:#334155;"><strong>Login Email:</strong> {{ email }}</p>'
+            '<p style="margin:0 0 8px;font-size:14px;color:#334155;"><strong>Assigned Role:</strong> {{ role_name }}</p>'
+            '<p style="margin:0;font-size:14px;color:#334155;"><strong>Temporary Password:</strong></p>'
+            '<div style="background:#1e293b;color:#e2e8f0;padding:12px 16px;border-radius:8px;'
+            'font-family:monospace;font-size:14px;margin-top:8px;border:1px solid #334155;">{{ password }}</div>'
+            '</div>'
+            '<div style="text-align:center;margin:28px 0;">'
+            '<a href="{{ login_url }}" style="background:linear-gradient(135deg,#4f46e5,#6366f1);'
+            'color:#fff!important;padding:14px 32px;text-decoration:none;border-radius:10px;'
+            'font-weight:700;font-size:15px;display:inline-block;'
+            'box-shadow:0 4px 14px rgba(79,70,229,.3);">Login to Workspace &rarr;</a>'
+            '</div>'
+            '<p style="font-size:13px;color:#94a3b8;">'
+            'If you did not request this reset, please contact your administrator.</p>'
+        ),
+        'body_ar': _wrap_email_body(
+            '<div dir="rtl" style="text-align:right;">'
+            '<h2>تم طلب إعادة تعيين كلمة المرور 🔐</h2>'
+            '<p>مرحباً {{ name }}،</p>'
+            '<p>تلقينا طلباً لإعادة تعيين كلمة مرور مساحة العمل الخاصة بك. '
+            'استخدم كلمة المرور المؤقتة أدناه لتسجيل الدخول ثم قم بتغييرها فوراً.</p>'
+            '<div style="background:linear-gradient(135deg,#f8fafc,#f1f5f9);'
+            'padding:20px 22px;border-radius:12px;border:1px solid #e2e8f0;margin-bottom:20px;">'
+            '<p style="margin:0 0 8px;font-size:14px;color:#334155;"><strong>البريد الإلكتروني:</strong> {{ email }}</p>'
+            '<p style="margin:0 0 8px;font-size:14px;color:#334155;"><strong>الدور المعيّن:</strong> {{ role_name }}</p>'
+            '<p style="margin:0;font-size:14px;color:#334155;"><strong>كلمة المرور المؤقتة:</strong></p>'
+            '<div style="background:#1e293b;color:#e2e8f0;padding:12px 16px;border-radius:8px;'
+            'font-family:monospace;font-size:14px;margin-top:8px;border:1px solid #334155;">{{ password }}</div>'
+            '</div>'
+            '<div style="text-align:center;margin:28px 0;">'
+            '<a href="{{ login_url }}" style="background:linear-gradient(135deg,#4f46e5,#6366f1);'
+            'color:#fff!important;padding:14px 32px;text-decoration:none;border-radius:10px;'
+            'font-weight:700;font-size:15px;display:inline-block;'
+            'box-shadow:0 4px 14px rgba(79,70,229,.3);">الدخول إلى مساحة العمل &larr;</a>'
+            '</div>'
+            '<p style="font-size:13px;color:#94a3b8;">'
+            'إذا لم تطلب إعادة التعيين، يرجى التواصل مع المسؤول.</p>'
             '</div>',
             use_rtl=True
         ),

@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IRoad - Professional Logo System</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    html, body { 
+      background: linear-gradient(135deg, #f8f9fa 0%, #eef2f5 100%);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+      color: #1f2937;
+    }
+    
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 60px 40px;
+    }
+    
+    .header {
+      text-align: center;
+      margin-bottom: 80px;
+      padding: 40px 0;
+      border-bottom: 3px solid #1E40AF;
+    }
+    
+    .header h1 {
+      font-size: 48px;
+      font-weight: 900;
+      color: #1E40AF;
+      margin-bottom: 8px;
+      letter-spacing: -1px;
+    }
+    
+    .header p {
+      font-size: 14px;
+      color: #6B7280;
+      font-weight: 500;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+    
+    .section {
+      margin-bottom: 100px;
+    }
+    
+    .section-title {
+      font-size: 32px;
+      font-weight: 800;
+      color: #1F2937;
+      margin-bottom: 10px;
+      position: relative;
+      padding-left: 20px;
+    }
+    
+    .section-title::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 4px;
+      height: 28px;
+      background: #1E40AF;
+      border-radius: 2px;
+    }
+    
+    .section-description {
+      font-size: 14px;
+      color: #6B7280;
+      margin-bottom: 40px;
+    }
+    
+    /* COLOR PALETTE DISPLAY */
+    .color-palette {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 30px;
+      margin-bottom: 60px;
+    }
+    
+    .color-card {
+      background: white;
+      border-radius: 16px;
+      border: 1px solid #E5E7EB;
+      overflow: hidden;
+      transition: all 0.3s ease;
+    }
+    
+    .color-card:hover {
+      border-color: #1E40AF;
+      box-shadow: 0 15px 40px rgba(30, 64, 175, 0.12);
+      transform: translateY(-3px);
+    }
+    
+    .color-swatch {
+      width: 100%;
+      height: 140px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: flex-start;
+      padding: 12px;
+      color: white;
+      font-weight: 600;
+      font-size: 12px;
+      position: relative;
+    }
+    
+    .color-info {
+      padding: 24px;
+    }
+    
+    .color-name {
+      font-size: 16px;
+      font-weight: 700;
+      color: #1F2937;
+      margin-bottom: 8px;
+    }
+    
+    .color-code {
+      font-family: 'Monaco', 'Courier New', monospace;
+      font-size: 14px;
+      font-weight: 600;
+      color: #1E40AF;
+      margin-bottom: 12px;
+      letter-spacing: 0.5px;
+    }
+    
+    .color-usage {
+      font-size: 13px;
+      color: #6B7280;
+      line-height: 1.6;
+    }
+    
+    /* LOGO VERSIONS */
+    .logo-versions {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 30px;
+    }
+    
+    .logo-box {
+      background: white;
+      border-radius: 16px;
+      border: 1px solid #E5E7EB;
+      padding: 50px 40px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 320px;
+      transition: all 0.3s ease;
+    }
+    
+    .logo-box:hover {
+      border-color: #1E40AF;
+      box-shadow: 0 15px 40px rgba(30, 64, 175, 0.12);
+    }
+    
+    .logo-box.dark {
+      background: linear-gradient(135deg, #1E40AF 0%, #1a348a 100%);
+      border: none;
+    }
+    
+    .logo-label {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      color: #6B7280;
+      background: white;
+      padding: 4px 10px;
+      border-radius: 6px;
+      text-transform: uppercase;
+    }
+    
+    .logo-box.dark .logo-label {
+      background: rgba(255, 255, 255, 0.15);
+      color: rgba(255, 255, 255, 0.8);
+    }
+    
+    .logo-display {
+      position: relative;
+      width: 100%;
+    }
+    
+    .logo-main {
+      font-size: 72px;
+      font-weight: 900;
+      letter-spacing: -2px;
+      margin-bottom: 12px;
+      line-height: 1;
+      color: #1E40AF;
+    }
+    
+    .logo-box.dark .logo-main {
+      color: white;
+    }
+    
+    .logo-sub {
+      font-size: 16px;
+      font-weight: 500;
+      letter-spacing: 1px;
+      color: #6B7280;
+      margin-bottom: 16px;
+      font-style: italic;
+    }
+    
+    .logo-box.dark .logo-sub {
+      color: #B5D4F4;
+    }
+    
+    .accent-line {
+      width: 120px;
+      height: 3px;
+      background: #F59E0B;
+      border-radius: 2px;
+      margin: 0 auto;
+    }
+    
+    /* USAGE GUIDELINES */
+    .guidelines {
+      background: white;
+      border-radius: 16px;
+      border: 1px solid #E5E7EB;
+      padding: 40px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 40px;
+    }
+    
+    .guideline-box h3 {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .guideline-box.do h3 {
+      color: #10B981;
+    }
+    
+    .guideline-box.dont h3 {
+      color: #EF4444;
+    }
+    
+    .guideline-box ul {
+      list-style: none;
+    }
+    
+    .guideline-box li {
+      padding: 10px 0;
+      color: #4B5563;
+      font-size: 13px;
+      padding-left: 24px;
+      position: relative;
+    }
+    
+    .guideline-box.do li::before {
+      content: '✓';
+      position: absolute;
+      left: 0;
+      color: #10B981;
+      font-weight: bold;
+    }
+    
+    .guideline-box.dont li::before {
+      content: '✕';
+      position: absolute;
+      left: 0;
+      color: #EF4444;
+      font-weight: bold;
+    }
+    
+    /* SPECIFICATIONS TABLE */
+    .specs-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid #E5E7EB;
+    }
+    
+    .specs-table tr {
+      border-bottom: 1px solid #E5E7EB;
+    }
+    
+    .specs-table tr:last-child {
+      border-bottom: none;
+    }
+    
+    .specs-table tr:hover {
+      background: #f9fafb;
+    }
+    
+    .specs-table td {
+      padding: 16px 20px;
+      font-size: 14px;
+    }
+    
+    .specs-table td:first-child {
+      font-weight: 600;
+      color: #1E40AF;
+      width: 35%;
+      background: #f9fafb;
+    }
+    
+    .specs-table td:last-child {
+      color: #4B5563;
+    }
+    
+    /* FOOTER */
+    .footer {
+      text-align: center;
+      padding: 40px;
+      border-top: 2px solid #E5E7EB;
+      margin-top: 80px;
+    }
+    
+    .footer h3 {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: #1F2937;
+    }
+    
+    .footer p {
+      font-size: 12px;
+      color: #6B7280;
+      margin: 4px 0;
+    }
+    
+    @media (max-width: 768px) {
+      .container { padding: 30px 20px; }
+      .header h1 { font-size: 32px; }
+      .section-title { font-size: 24px; }
+      .guidelines { grid-template-columns: 1fr; }
+      .color-palette { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    
+    <!-- HEADER -->
+    <div class="header">
+      <h1>IRoad</h1>
+      <p>Professional Brand Identity System</p>
+    </div>
+    
+    <!-- COLOR PALETTE -->
+    <div class="section">
+      <h2 class="section-title">Logo Color Palette</h2>
+      <p class="section-description">Two primary logo colors for all brand applications</p>
+      
+      <div class="color-palette">
+        
+        <!-- DYNAMIC BLUE -->
+        <div class="color-card" style="border: 2px solid #3B82F6;">
+          <div class="color-swatch" style="background: #3B82F6;">
+            #3B82F6
+          </div>
+          <div class="color-info">
+            <div class="color-name" style="color: #3B82F6;">Dynamic Blue (Primary)</div>
+            <div class="color-code">#3B82F6</div>
+            <div class="color-usage">
+              Main logo color for light backgrounds. Use for: Primary branding, corporate communications, websites, digital applications
+            </div>
+          </div>
+        </div>
+        
+        <!-- WHITE -->
+        <div class="color-card" style="border: 2px solid #3B82F6;">
+          <div class="color-swatch" style="background: white; border: 2px solid #E5E7EB;">
+            #FFFFFF
+          </div>
+          <div class="color-info">
+            <div class="color-name" style="color: #3B82F6;">White (Primary)</div>
+            <div class="color-code">#FFFFFF</div>
+            <div class="color-usage">
+              Main logo color for dark backgrounds. Use for: Dark-themed applications, inverse branding, contrasting displays
+            </div>
+          </div>
+        </div>
+        
+      </div>
+    </div>
+    
+    <!-- LOGO VARIATIONS -->
+    <div class="section">
+      <h2 class="section-title">Logo Variations</h2>
+      <p class="section-description">Two primary logo colors - Dynamic Blue and White only</p>
+      
+      <div class="logo-versions">
+        
+        <!-- Dynamic Blue on White -->
+        <div class="logo-box">
+          <div class="logo-label">Dynamic Blue</div>
+          <div class="logo-display" style="display: flex; align-items: center; justify-content: center; height: 100%;">
+            <div class="logo-main" style="color: #3B82F6;">IRoad</div>
+          </div>
+        </div>
+        
+        <!-- White on Dynamic Blue -->
+        <div class="logo-box" style="background: #3B82F6; border: 1px solid #3B82F6;">
+          <div class="logo-label" style="background: rgba(255, 255, 255, 0.2); color: white;">White</div>
+          <div class="logo-display" style="display: flex; align-items: center; justify-content: center; height: 100%;">
+            <div class="logo-main" style="color: white;">IRoad</div>
+          </div>
+        </div>
+        
+      </div>
+    </div>
+    
+    <!-- SUPPORTING COLORS -->
+    <div class="section">
+      <h2 class="section-title">Supporting Colors</h2>
+      <p class="section-description">Additional colors for UI, design elements, and extended brand applications</p>
+      
+      <div class="color-palette">
+        
+        <!-- PRIMARY BLUE -->
+        <div class="color-card">
+          <div class="color-swatch" style="background: #1E40AF;">
+            #1E40AF
+          </div>
+          <div class="color-info">
+            <div class="color-name">Primary Blue</div>
+            <div class="color-code">#1E40AF</div>
+            <div class="color-usage">
+              Supporting color for links, buttons, interactive elements, and UI components
+            </div>
+          </div>
+        </div>
+        
+        <!-- SPEED ORANGE -->
+        <div class="color-card">
+          <div class="color-swatch" style="background: #F59E0B;">
+            #F59E0B
+          </div>
+          <div class="color-info">
+            <div class="color-name">Speed Orange</div>
+            <div class="color-code">#F59E0B</div>
+            <div class="color-usage">
+              Accent color for call-to-action, highlights, alerts, and decorative elements
+            </div>
+          </div>
+        </div>
+        
+        <!-- ACCENT GRAY -->
+        <div class="color-card">
+          <div class="color-swatch" style="background: #E5E7EB; color: #6B7280;">
+            #E5E7EB
+          </div>
+          <div class="color-info">
+            <div class="color-name">Accent Gray</div>
+            <div class="color-code">#E5E7EB</div>
+            <div class="color-usage">
+              Neutral color for borders, dividers, subtle backgrounds, and separations
+            </div>
+          </div>
+        </div>
+        
+        <!-- TEXT PRIMARY -->
+        <div class="color-card">
+          <div class="color-swatch" style="background: #1F2937; color: white;">
+            #1F2937
+          </div>
+          <div class="color-info">
+            <div class="color-name">Text Primary</div>
+            <div class="color-code">#1F2937</div>
+            <div class="color-usage">
+              Primary text color for body copy, headings, and main content
+            </div>
+          </div>
+        </div>
+        
+        <!-- TEXT SECONDARY -->
+        <div class="color-card">
+          <div class="color-swatch" style="background: #6B7280; color: white;">
+            #6B7280
+          </div>
+          <div class="color-info">
+            <div class="color-name">Text Secondary</div>
+            <div class="color-code">#6B7280</div>
+            <div class="color-usage">
+              Secondary text for subtitles, descriptions, and supporting information
+            </div>
+          </div>
+        </div>
+        
+        <!-- BACKGROUND -->
+        <div class="color-card">
+          <div class="color-swatch" style="background: #F3F4F6; border: 1px solid #E5E7EB;">
+            #F3F4F6
+          </div>
+          <div class="color-info">
+            <div class="color-name">Background Light</div>
+            <div class="color-code">#F3F4F6</div>
+            <div class="color-usage">
+              Light background for sections, cards, and subtle backgrounds
+            </div>
+          </div>
+        </div>
+        
+      </div>
+    </div>
+    
+    <!-- SPECIFICATIONS -->
+    <div class="section">
+      <h2 class="section-title">Brand Specifications</h2>
+      <p class="section-description">Technical standards for consistent application</p>
+      
+      <table class="specs-table">
+        <tr>
+          <td>Logo Type</td>
+          <td>Text-Based Typography Logo</td>
+        </tr>
+        <tr>
+          <td>Primary Font</td>
+          <td>Segoe UI Bold / Helvetica Bold / Arial Bold</td>
+        </tr>
+        <tr>
+          <td>Font Weight</td>
+          <td>900 (Main)</td>
+        </tr>
+        <tr>
+          <td>Logo Size Range</td>
+          <td>24px - 320px (responsive)</td>
+        </tr>
+        <tr>
+          <td>Primary Logo Color #1</td>
+          <td>#3B82F6 (Dynamic Blue) - Light backgrounds</td>
+        </tr>
+        <tr>
+          <td>Primary Logo Color #2</td>
+          <td>#FFFFFF (White) - Dark backgrounds</td>
+        </tr>
+        <tr>
+          <td>Letter Spacing</td>
+          <td>-2px</td>
+        </tr>
+        <tr>
+          <td>Minimum Size</td>
+          <td>24px (digital) / 0.5 inch (print)</td>
+        </tr>
+        <tr>
+          <td>Clear Space</td>
+          <td>20px minimum around logo</td>
+        </tr>
+        <tr>
+          <td>Logo Usage</td>
+          <td>Use only Dynamic Blue or White - no other colors for logo text</td>
+        </tr>
+      </table>
+    </div>
+    
+    <!-- GUIDELINES -->
+    <div class="section">
+      <h2 class="section-title">Usage Guidelines</h2>
+      <p class="section-description">Best practices for consistent brand application</p>
+      
+      <div class="guidelines">
+        
+        <div class="guideline-box do">
+          <h3>✓ DO</h3>
+          <ul>
+            <li>Use Dynamic Blue (#3B82F6) on light backgrounds</li>
+            <li>Use White (#FFFFFF) on dark backgrounds</li>
+            <li>Maintain proper spacing around logo</li>
+            <li>Scale proportionally to all sizes</li>
+            <li>Keep typography clean and readable</li>
+            <li>Use supporting colors for UI elements</li>
+            <li>Maintain color consistency across materials</li>
+            <li>Test contrast on different backgrounds</li>
+          </ul>
+        </div>
+        
+        <div class="guideline-box dont">
+          <h3>✕ DON'T</h3>
+          <ul>
+            <li>Use Primary Blue (#1E40AF) for logo text</li>
+            <li>Use Speed Orange (#F59E0B) for logo text</li>
+            <li>Use other colors for logo - only Dynamic Blue or White</li>
+            <li>Distort or transform the logo text</li>
+            <li>Add drop shadows or effects to logo</li>
+            <li>Mix logo colors with non-approved shades</li>
+            <li>Use on low-contrast backgrounds</li>
+            <li>Reduce size below minimum specifications</li>
+          </ul>
+        </div>
+        
+      </div>
+    </div>
+    
+    <!-- FOOTER -->
+    <div class="footer">
+      <h3>IRoad Professional Brand Identity</h3>
+      <p>Version 2.0 | Professional Edition | April 2026</p>
+      <p style="margin-top: 12px; color: #9CA3AF;">2 Primary Logo Colors • 4 Supporting System Colors • Production Ready</p>
+    </div>
+    
+  </div>
+</body>
+</html>

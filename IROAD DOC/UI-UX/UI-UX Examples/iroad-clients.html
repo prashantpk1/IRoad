@@ -1,0 +1,1103 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IRoad - إدارة العملاء</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #0F172A;
+            --primary-light: #1E293B;
+            --accent: #F59E0B;
+            --accent-dark: #D97706;
+            --success: #10B981;
+            --warning: #EF4444;
+            --bg: #F8FAFC;
+            --surface: #FFFFFF;
+            --text: #0F172A;
+            --text-muted: #64748B;
+            --border: #E2E8F0;
+            --shadow: rgba(15, 23, 42, 0.08);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'IBM Plex Sans Arabic', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        /* Breadcrumb */
+        .breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+
+        .breadcrumb a {
+            color: var(--accent);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .breadcrumb a:hover {
+            color: var(--accent-dark);
+        }
+
+        .breadcrumb-separator {
+            color: var(--border);
+        }
+
+        /* Page Header */
+        .page-header {
+            background: var(--surface);
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 1px 3px var(--shadow);
+            border: 1px solid var(--border);
+        }
+
+        .page-header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .page-title {
+            font-family: 'Cairo', sans-serif;
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: 10px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+            font-size: 0.9rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-dark);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+        }
+
+        .btn-secondary {
+            background: var(--surface);
+            color: var(--text);
+            border: 2px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #059669;
+            transform: translateY(-1px);
+        }
+
+        /* Search Bar */
+        .search-bar {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .search-input-wrapper {
+            position: relative;
+            flex: 1;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 0.875rem 1rem 0.875rem 3rem;
+            border: 2px solid var(--border);
+            border-radius: 10px;
+            font-size: 0.9rem;
+            font-family: inherit;
+            transition: all 0.2s;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.1);
+        }
+
+        .search-icon {
+            position: absolute;
+            right: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+        }
+
+        .filter-btn {
+            padding: 0.875rem 1.25rem;
+            background: var(--surface);
+            border: 2px solid var(--border);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .filter-btn:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        /* Tabs */
+        .tabs {
+            background: var(--surface);
+            border-radius: 16px;
+            padding: 1.5rem 2rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 1px 3px var(--shadow);
+            border: 1px solid var(--border);
+        }
+
+        .tab-list {
+            display: flex;
+            gap: 2rem;
+            border-bottom: 2px solid var(--border);
+            margin-bottom: 0;
+        }
+
+        .tab {
+            padding: 1rem 0;
+            font-weight: 600;
+            color: var(--text-muted);
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            margin-bottom: -2px;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .tab:hover {
+            color: var(--text);
+        }
+
+        .tab.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+
+        .tab-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 24px;
+            height: 24px;
+            padding: 0 0.5rem;
+            border-radius: 12px;
+            background: var(--bg);
+            font-size: 0.75rem;
+            margin-right: 0.5rem;
+        }
+
+        .tab.active .tab-badge {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--accent);
+        }
+
+        /* Table Card */
+        .table-card {
+            background: var(--surface);
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px var(--shadow);
+            border: 1px solid var(--border);
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead {
+            background: var(--bg);
+        }
+
+        th {
+            text-align: right;
+            padding: 1.25rem 1.5rem;
+            font-weight: 600;
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        td {
+            padding: 1.25rem 1.5rem;
+            border-top: 1px solid var(--border);
+        }
+
+        tr:hover td {
+            background: var(--bg);
+        }
+
+        .client-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .client-avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: white;
+            font-size: 1.25rem;
+            flex-shrink: 0;
+        }
+
+        .client-details {
+            flex: 1;
+        }
+
+        .client-name {
+            font-weight: 600;
+            color: var(--primary);
+            margin-bottom: 0.25rem;
+        }
+
+        .client-id {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+
+        .status-badge.active {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+        }
+
+        .status-badge.inactive {
+            background: rgba(100, 116, 139, 0.1);
+            color: var(--text-muted);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: currentColor;
+        }
+
+        .client-type {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.375rem 0.875rem;
+            border-radius: 6px;
+            background: var(--bg);
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+
+        .action-btn {
+            padding: 0.5rem;
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--text-muted);
+            border-radius: 6px;
+            transition: all 0.2s;
+            font-size: 1.25rem;
+        }
+
+        .action-btn:hover {
+            background: var(--bg);
+            color: var(--accent);
+        }
+
+        .actions-group {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        /* Pagination */
+        .pagination {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.5rem 2rem;
+            background: var(--surface);
+            border-top: 1px solid var(--border);
+        }
+
+        .pagination-info {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
+
+        .pagination-controls {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .page-btn {
+            padding: 0.625rem 1rem;
+            border: 2px solid var(--border);
+            background: var(--surface);
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+
+        .page-btn:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .page-btn.active {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: white;
+        }
+
+        .page-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(15, 23, 42, 0.7);
+            backdrop-filter: blur(4px);
+            z-index: 1000;
+            padding: 2rem;
+            overflow-y: auto;
+        }
+
+        .modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: var(--surface);
+            border-radius: 20px;
+            max-width: 900px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            animation: modalSlideIn 0.3s ease-out;
+        }
+
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .modal-header {
+            padding: 2rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-title {
+            font-family: 'Cairo', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .close-btn {
+            padding: 0.5rem;
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-muted);
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+
+        .close-btn:hover {
+            background: var(--bg);
+            color: var(--text);
+        }
+
+        .modal-body {
+            padding: 2rem;
+        }
+
+        .form-section {
+            margin-bottom: 2rem;
+        }
+
+        .section-title {
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 1.5rem;
+            font-size: 1.125rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 2px solid var(--border);
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group.full-width {
+            grid-column: 1 / -1;
+        }
+
+        label {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: var(--text);
+            font-size: 0.9rem;
+        }
+
+        label .required {
+            color: var(--warning);
+            margin-right: 0.25rem;
+        }
+
+        input, select, textarea {
+            padding: 0.875rem 1rem;
+            border: 2px solid var(--border);
+            border-radius: 10px;
+            font-size: 0.9rem;
+            font-family: inherit;
+            transition: all 0.2s;
+            background: var(--surface);
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.1);
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .radio-group {
+            display: flex;
+            gap: 1.5rem;
+            margin-top: 0.5rem;
+        }
+
+        .radio-option {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            cursor: pointer;
+        }
+
+        .radio-option input[type="radio"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+
+        .modal-footer {
+            padding: 1.5rem 2rem;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: flex-start;
+            gap: 1rem;
+        }
+
+        /* Animations */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        tbody tr {
+            animation: fadeIn 0.3s ease-out forwards;
+            opacity: 0;
+        }
+
+        tbody tr:nth-child(1) { animation-delay: 0.05s; }
+        tbody tr:nth-child(2) { animation-delay: 0.1s; }
+        tbody tr:nth-child(3) { animation-delay: 0.15s; }
+        tbody tr:nth-child(4) { animation-delay: 0.2s; }
+        tbody tr:nth-child(5) { animation-delay: 0.25s; }
+        tbody tr:nth-child(6) { animation-delay: 0.3s; }
+        tbody tr:nth-child(7) { animation-delay: 0.35s; }
+        tbody tr:nth-child(8) { animation-delay: 0.4s; }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+
+            .page-header-top {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 1rem;
+            }
+
+            .header-actions {
+                width: 100%;
+                flex-direction: column;
+            }
+
+            .btn {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .search-bar {
+                flex-direction: column;
+            }
+
+            .tab-list {
+                overflow-x: auto;
+                gap: 1rem;
+            }
+
+            .table-card {
+                overflow-x: auto;
+            }
+
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Breadcrumb -->
+        <nav class="breadcrumb">
+            <a href="#">الرئيسية</a>
+            <span class="breadcrumb-separator">←</span>
+            <span>إدارة العملاء</span>
+        </nav>
+
+        <!-- Page Header -->
+        <div class="page-header">
+            <div class="page-header-top">
+                <h1 class="page-title">إدارة العملاء</h1>
+                <div class="header-actions">
+                    <button class="btn btn-primary" onclick="openModal()">
+                        <span>➕</span>
+                        عميل جديد
+                    </button>
+                    <button class="btn btn-secondary">
+                        <span>📊</span>
+                        تصدير
+                    </button>
+                </div>
+            </div>
+            <div class="search-bar">
+                <div class="search-input-wrapper">
+                    <span class="search-icon">🔍</span>
+                    <input type="text" class="search-input" placeholder="البحث عن عميل...">
+                </div>
+                <button class="filter-btn">🎛️ تصفية</button>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <div class="tab-list">
+                <div class="tab active">
+                    <span class="tab-badge">247</span>
+                    جميع العملاء
+                </div>
+                <div class="tab">
+                    <span class="tab-badge">215</span>
+                    نشط
+                </div>
+                <div class="tab">
+                    <span class="tab-badge">32</span>
+                    غير نشط
+                </div>
+                <div class="tab">
+                    <span class="tab-badge">178</span>
+                    شركات
+                </div>
+                <div class="tab">
+                    <span class="tab-badge">69</span>
+                    أفراد
+                </div>
+            </div>
+        </div>
+
+        <!-- Table -->
+        <div class="table-card">
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>العميل</th>
+                            <th>نوع العميل</th>
+                            <th>رقم السجل</th>
+                            <th>المدينة</th>
+                            <th>العملة المفضلة</th>
+                            <th>الحالة</th>
+                            <th>الإجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>
+                                <div class="client-info">
+                                    <div class="client-avatar">ن</div>
+                                    <div class="client-details">
+                                        <div class="client-name">شركة النقل السريع</div>
+                                        <div class="client-id">CA-2026-001</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="client-type">🏢 شركة</span>
+                            </td>
+                            <td>1010234567</td>
+                            <td>جدة</td>
+                            <td>SAR</td>
+                            <td>
+                                <span class="status-badge active">
+                                    <span class="status-dot"></span>
+                                    نشط
+                                </span>
+                            </td>
+                            <td>
+                                <div class="actions-group">
+                                    <button class="action-btn" title="عرض">👁️</button>
+                                    <button class="action-btn" title="تعديل">✏️</button>
+                                    <button class="action-btn" title="حذف">🗑️</button>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <div class="client-info">
+                                    <div class="client-avatar">ل</div>
+                                    <div class="client-details">
+                                        <div class="client-name">مؤسسة اللوجستيات المتقدمة</div>
+                                        <div class="client-id">CA-2026-002</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="client-type">🏢 شركة</span>
+                            </td>
+                            <td>1010345678</td>
+                            <td>الرياض</td>
+                            <td>SAR</td>
+                            <td>
+                                <span class="status-badge active">
+                                    <span class="status-dot"></span>
+                                    نشط
+                                </span>
+                            </td>
+                            <td>
+                                <div class="actions-group">
+                                    <button class="action-btn" title="عرض">👁️</button>
+                                    <button class="action-btn" title="تعديل">✏️</button>
+                                    <button class="action-btn" title="حذف">🗑️</button>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <div class="client-info">
+                                    <div class="client-avatar">أ</div>
+                                    <div class="client-details">
+                                        <div class="client-name">أحمد محمد العتيبي</div>
+                                        <div class="client-id">CA-2026-003</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="client-type">👤 فرد</span>
+                            </td>
+                            <td>1098765432</td>
+                            <td>مكة المكرمة</td>
+                            <td>SAR</td>
+                            <td>
+                                <span class="status-badge active">
+                                    <span class="status-dot"></span>
+                                    نشط
+                                </span>
+                            </td>
+                            <td>
+                                <div class="actions-group">
+                                    <button class="action-btn" title="عرض">👁️</button>
+                                    <button class="action-btn" title="تعديل">✏️</button>
+                                    <button class="action-btn" title="حذف">🗑️</button>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <div class="client-info">
+                                    <div class="client-avatar">ش</div>
+                                    <div class="client-details">
+                                        <div class="client-name">شركة الشحن الدولي</div>
+                                        <div class="client-id">CA-2026-004</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="client-type">🏢 شركة</span>
+                            </td>
+                            <td>1010456789</td>
+                            <td>الدمام</td>
+                            <td>USD</td>
+                            <td>
+                                <span class="status-badge inactive">
+                                    <span class="status-dot"></span>
+                                    غير نشط
+                                </span>
+                            </td>
+                            <td>
+                                <div class="actions-group">
+                                    <button class="action-btn" title="عرض">👁️</button>
+                                    <button class="action-btn" title="تعديل">✏️</button>
+                                    <button class="action-btn" title="حذف">🗑️</button>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <div class="client-info">
+                                    <div class="client-avatar">م</div>
+                                    <div class="client-details">
+                                        <div class="client-name">مجموعة النقل الوطني</div>
+                                        <div class="client-id">CA-2026-005</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="client-type">🏢 شركة</span>
+                            </td>
+                            <td>1010567890</td>
+                            <td>الرياض</td>
+                            <td>SAR</td>
+                            <td>
+                                <span class="status-badge active">
+                                    <span class="status-dot"></span>
+                                    نشط
+                                </span>
+                            </td>
+                            <td>
+                                <div class="actions-group">
+                                    <button class="action-btn" title="عرض">👁️</button>
+                                    <button class="action-btn" title="تعديل">✏️</button>
+                                    <button class="action-btn" title="حذف">🗑️</button>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <div class="pagination">
+                <div class="pagination-info">
+                    عرض 1-5 من 247 عميل
+                </div>
+                <div class="pagination-controls">
+                    <button class="page-btn" disabled>السابق</button>
+                    <button class="page-btn active">1</button>
+                    <button class="page-btn">2</button>
+                    <button class="page-btn">3</button>
+                    <button class="page-btn">...</button>
+                    <button class="page-btn">50</button>
+                    <button class="page-btn">التالي</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Client Modal -->
+    <div class="modal" id="clientModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">إضافة عميل جديد</h2>
+                <button class="close-btn" onclick="closeModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <form>
+                    <!-- Basic Information -->
+                    <div class="form-section">
+                        <h3 class="section-title">المعلومات الأساسية</h3>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label><span class="required">*</span> نوع العميل</label>
+                                <div class="radio-group">
+                                    <label class="radio-option">
+                                        <input type="radio" name="clientType" value="business" checked>
+                                        <span>🏢 شركة</span>
+                                    </label>
+                                    <label class="radio-option">
+                                        <input type="radio" name="clientType" value="individual">
+                                        <span>👤 فرد</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label><span class="required">*</span> الحالة</label>
+                                <select>
+                                    <option value="active">نشط</option>
+                                    <option value="inactive">غير نشط</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label><span class="required">*</span> الاسم العربي</label>
+                                <input type="text" placeholder="أدخل الاسم العربي">
+                            </div>
+
+                            <div class="form-group">
+                                <label><span class="required">*</span> الاسم الإنجليزي</label>
+                                <input type="text" placeholder="Enter English Name">
+                            </div>
+
+                            <div class="form-group">
+                                <label><span class="required">*</span> الاسم المختصر</label>
+                                <input type="text" placeholder="الاسم المختصر للعرض">
+                            </div>
+
+                            <div class="form-group">
+                                <label>العملة المفضلة</label>
+                                <select>
+                                    <option value="SAR">SAR - ريال سعودي</option>
+                                    <option value="USD">USD - دولار أمريكي</option>
+                                    <option value="EUR">EUR - يورو</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Registration Information -->
+                    <div class="form-section">
+                        <h3 class="section-title">معلومات التسجيل</h3>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label><span class="required">*</span> رقم السجل التجاري</label>
+                                <input type="text" placeholder="1010234567">
+                            </div>
+
+                            <div class="form-group">
+                                <label>رقم التسجيل الضريبي</label>
+                                <input type="text" placeholder="300012345678903">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Address Information -->
+                    <div class="form-section">
+                        <h3 class="section-title">عنوان الفوترة</h3>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label><span class="required">*</span> الدولة</label>
+                                <select>
+                                    <option value="SA">المملكة العربية السعودية</option>
+                                    <option value="AE">الإمارات العربية المتحدة</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label><span class="required">*</span> المنطقة</label>
+                                <input type="text" placeholder="مكة المكرمة">
+                            </div>
+
+                            <div class="form-group">
+                                <label><span class="required">*</span> المدينة</label>
+                                <input type="text" placeholder="جدة">
+                            </div>
+
+                            <div class="form-group">
+                                <label>الرمز البريدي</label>
+                                <input type="text" placeholder="23234">
+                            </div>
+
+                            <div class="form-group full-width">
+                                <label><span class="required">*</span> عنوان الشارع 1</label>
+                                <input type="text" placeholder="شارع الأمير سلطان">
+                            </div>
+
+                            <div class="form-group full-width">
+                                <label>عنوان الشارع 2</label>
+                                <input type="text" placeholder="حي الروضة">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Contact Information -->
+                    <div class="form-section">
+                        <h3 class="section-title">جهة الاتصال الرئيسية</h3>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label><span class="required">*</span> الاسم</label>
+                                <input type="text" placeholder="أحمد محمد">
+                            </div>
+
+                            <div class="form-group">
+                                <label>المنصب</label>
+                                <input type="text" placeholder="مدير المشتريات">
+                            </div>
+
+                            <div class="form-group">
+                                <label><span class="required">*</span> البريد الإلكتروني</label>
+                                <input type="email" placeholder="ahmad@company.com">
+                            </div>
+
+                            <div class="form-group">
+                                <label><span class="required">*</span> رقم الجوال</label>
+                                <input type="tel" placeholder="0501234567">
+                            </div>
+
+                            <div class="form-group">
+                                <label>رقم الهاتف</label>
+                                <input type="tel" placeholder="0126543210">
+                            </div>
+
+                            <div class="form-group">
+                                <label>التحويلة</label>
+                                <input type="text" placeholder="123">
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-success">
+                    <span>✓</span>
+                    حفظ
+                </button>
+                <button class="btn btn-secondary" onclick="closeModal()">
+                    إلغاء
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function openModal() {
+            document.getElementById('clientModal').classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeModal() {
+            document.getElementById('clientModal').classList.remove('active');
+            document.body.style.overflow = 'auto';
+        }
+
+        // Close modal on outside click
+        document.getElementById('clientModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeModal();
+            }
+        });
+
+        // Tab switching
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', function() {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                this.classList.add('active');
+            });
+        });
+    </script>
+</body>
+</html>

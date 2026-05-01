@@ -1334,23 +1334,17 @@ class ForgotPasswordView(View):
                                 'user_name': tenant_user_record.full_name,
                             }
                             sent = send_named_notification_email(
-                                'TENANT_USER_WELCOME',
+                                'TENANT_USER_PASSWORD_RESET',
                                 recipient_email=tenant_user_record.email,
                                 context_dict=context_dict,
                                 language='en',
                                 default_subject='iRoad Temporary Password Reset',
-                                trigger_source='TemplateName: TENANT_USER_WELCOME',
+                                trigger_source='TemplateName: TENANT_USER_PASSWORD_RESET',
                                 force_django_smtp=True,
                             )
                             if not sent:
-                                send_named_notification_email(
-                                    'SUBADMIN_WELCOME',
-                                    recipient_email=tenant_user_record.email,
-                                    context_dict=context_dict,
-                                    language='en',
-                                    default_subject='iRoad Temporary Password Reset',
-                                    trigger_source='TemplateName: SUBADMIN_WELCOME',
-                                    force_django_smtp=True,
+                                logger.warning(
+                                    'No active notification template found for TENANT_USER_PASSWORD_RESET'
                                 )
                     finally:
                         connection.set_schema_to_public()
@@ -1372,15 +1366,16 @@ class ForgotPasswordView(View):
                         reverse('set_password', args=[tenant_token.token])
                     )
                     send_named_notification_email(
-                        'AUTH_PASSWORD_RESET',
+                        'TENANT_PASSWORD_RESET',
                         recipient_email=tenant.primary_email,
                         context_dict={
                             'admin_user': {'first_name': tenant.company_name},
+                            'tenant': {'company_name': tenant.company_name},
                             'reset_url': reset_url,
                         },
                         language='en',
                         default_subject='Reset Your iRoad Password',
-                        trigger_source='TemplateName: AUTH_PASSWORD_RESET',
+                        trigger_source='TemplateName: TENANT_PASSWORD_RESET',
                         force_django_smtp=True,
                     )
                 elif tenant_resolution in ('ambiguous_active', 'ambiguous_inactive'):

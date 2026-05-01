@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IRoad - نظام إدارة النقل</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #0F172A;
+            --primary-light: #1E293B;
+            --accent: #F59E0B;
+            --accent-dark: #D97706;
+            --success: #10B981;
+            --warning: #EF4444;
+            --bg: #F8FAFC;
+            --surface: #FFFFFF;
+            --text: #0F172A;
+            --text-muted: #64748B;
+            --border: #E2E8F0;
+            --shadow: rgba(15, 23, 42, 0.08);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'IBM Plex Sans Arabic', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            position: fixed;
+            right: 0;
+            top: 0;
+            width: 280px;
+            height: 100vh;
+            background: var(--primary);
+            color: white;
+            padding: 2rem 0;
+            z-index: 1000;
+            overflow-y: auto;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .logo {
+            padding: 0 2rem 2rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            margin-bottom: 2rem;
+        }
+
+        .logo h1 {
+            font-family: 'Cairo', sans-serif;
+            font-size: 2rem;
+            font-weight: 900;
+            background: linear-gradient(135deg, #FFFFFF 0%, var(--accent) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+            letter-spacing: -1px;
+        }
+
+        .logo p {
+            font-size: 0.875rem;
+            color: rgba(255, 255, 255, 0.6);
+            font-weight: 300;
+        }
+
+        .nav-section {
+            margin-bottom: 2rem;
+        }
+
+        .nav-section-title {
+            padding: 0 2rem;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.4);
+            font-weight: 600;
+            letter-spacing: 1px;
+            margin-bottom: 0.5rem;
+        }
+
+        .nav-item {
+            padding: 0.875rem 2rem;
+            color: rgba(255, 255, 255, 0.7);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            transition: all 0.2s;
+            position: relative;
+            font-weight: 500;
+        }
+
+        .nav-item::before {
+            content: '';
+            position: absolute;
+            right: 0;
+            top: 0;
+            height: 100%;
+            width: 4px;
+            background: var(--accent);
+            transform: scaleY(0);
+            transition: transform 0.2s;
+        }
+
+        .nav-item:hover {
+            background: rgba(255, 255, 255, 0.05);
+            color: white;
+        }
+
+        .nav-item:hover::before {
+            transform: scaleY(1);
+        }
+
+        .nav-item.active {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--accent);
+        }
+
+        .nav-item.active::before {
+            transform: scaleY(1);
+        }
+
+        .nav-icon {
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Main Content */
+        .main-content {
+            margin-right: 280px;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        /* Header */
+        .header {
+            background: var(--surface);
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 1px 3px var(--shadow);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid var(--border);
+        }
+
+        .header-info h2 {
+            font-family: 'Cairo', sans-serif;
+            font-size: 1.875rem;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .header-info p {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: 10px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+            font-size: 0.9rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-dark);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+        }
+
+        .btn-secondary {
+            background: var(--surface);
+            color: var(--text);
+            border: 2px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: var(--surface);
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: 0 1px 3px var(--shadow);
+            border: 1px solid var(--border);
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s;
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, var(--accent), var(--accent-dark));
+            transform: scaleX(0);
+            transform-origin: right;
+            transition: transform 0.3s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+        }
+
+        .stat-card:hover::before {
+            transform: scaleX(1);
+        }
+
+        .stat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1.5rem;
+        }
+
+        .stat-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+
+        .stat-icon.orange {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--accent);
+        }
+
+        .stat-icon.green {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+        }
+
+        .stat-icon.red {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--warning);
+        }
+
+        .stat-icon.blue {
+            background: rgba(59, 130, 246, 0.1);
+            color: #3B82F6;
+        }
+
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            font-family: 'Cairo', sans-serif;
+            color: var(--primary);
+            line-height: 1;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-label {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+            font-weight: 500;
+            margin-bottom: 1rem;
+        }
+
+        .stat-change {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+            padding: 0.25rem 0.75rem;
+            border-radius: 6px;
+        }
+
+        .stat-change.positive {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+        }
+
+        .stat-change.negative {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--warning);
+        }
+
+        /* Content Grid */
+        .content-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .card {
+            background: var(--surface);
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: 0 1px 3px var(--shadow);
+            border: 1px solid var(--border);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .card-title {
+            font-family: 'Cairo', sans-serif;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .card-link {
+            color: var(--accent);
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.875rem;
+            transition: color 0.2s;
+        }
+
+        .card-link:hover {
+            color: var(--accent-dark);
+        }
+
+        /* Table */
+        .table-wrapper {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+
+        th {
+            text-align: right;
+            padding: 1rem;
+            font-weight: 600;
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            background: var(--bg);
+            border-bottom: 2px solid var(--border);
+        }
+
+        td {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:hover td {
+            background: var(--bg);
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.375rem 0.875rem;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.8rem;
+        }
+
+        .status-badge.active {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+        }
+
+        .status-badge.pending {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--accent);
+        }
+
+        .status-badge.completed {
+            background: rgba(59, 130, 246, 0.1);
+            color: #3B82F6;
+        }
+
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: currentColor;
+        }
+
+        /* Activity List */
+        .activity-item {
+            display: flex;
+            gap: 1rem;
+            padding: 1rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .activity-item:last-child {
+            border-bottom: none;
+        }
+
+        .activity-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            flex-shrink: 0;
+        }
+
+        .activity-content {
+            flex: 1;
+        }
+
+        .activity-title {
+            font-weight: 600;
+            color: var(--primary);
+            margin-bottom: 0.25rem;
+        }
+
+        .activity-desc {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+
+        .activity-time {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+        }
+
+        /* Quick Actions */
+        .quick-actions {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        .quick-action {
+            background: var(--bg);
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+            color: var(--text);
+        }
+
+        .quick-action:hover {
+            border-color: var(--accent);
+            background: var(--surface);
+            transform: translateY(-2px);
+        }
+
+        .quick-action-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin: 0 auto 1rem;
+        }
+
+        .quick-action-title {
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        /* Animations */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .stat-card {
+            animation: fadeIn 0.5s ease-out forwards;
+            opacity: 0;
+        }
+
+        .stat-card:nth-child(1) { animation-delay: 0.1s; }
+        .stat-card:nth-child(2) { animation-delay: 0.2s; }
+        .stat-card:nth-child(3) { animation-delay: 0.3s; }
+        .stat-card:nth-child(4) { animation-delay: 0.4s; }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .content-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(100%);
+            }
+
+            .sidebar.active {
+                transform: translateX(0);
+            }
+
+            .main-content {
+                margin-right: 0;
+            }
+
+            .header {
+                flex-direction: column;
+                gap: 1rem;
+                align-items: flex-start;
+            }
+
+            .header-actions {
+                width: 100%;
+                flex-direction: column;
+            }
+
+            .btn {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="logo">
+            <h1>IRoad</h1>
+            <p>نظام إدارة النقل المتكامل</p>
+        </div>
+
+        <nav>
+            <div class="nav-section">
+                <div class="nav-section-title">القائمة الرئيسية</div>
+                <a href="#" class="nav-item active">
+                    <span class="nav-icon">📊</span>
+                    لوحة التحكم
+                </a>
+            </div>
+
+            <div class="nav-section">
+                <div class="nav-section-title">إدارة العملاء والموردين</div>
+                <a href="#" class="nav-item">
+                    <span class="nav-icon">👥</span>
+                    إدارة العملاء
+                </a>
+                <a href="#" class="nav-item">
+                    <span class="nav-icon">🏢</span>
+                    إدارة الموردين
+                </a>
+                <a href="#" class="nav-item">
+                    <span class="nav-icon">📍</span>
+                    إدارة العناوين
+                </a>
+                <a href="#" class="nav-item">
+                    <span class="nav-icon">📦</span>
+                    إدارة البضائع
+                </a>
+            </div>
+
+            <div class="nav-section">
+                <div class="nav-section-title">العمليات التجارية</div>
+                <a href="#" class="nav-item">
+                    <span class="nav-icon">📋</span>
+                    طلبات المبيعات
+                </a>
+                <a href="#" class="nav-item">
+                    <span class="nav-icon">🛒</span>
+                    طلبات الشراء
+                </a>
+                <a href="#" class="nav-item">
+                    <span class="nav-icon">📅</span>
+                    الحجوزات
+                </a>
+                <a href="#" class="nav-item">
+                    <span class="nav-icon">🚛</span>
+                    الشحنات
+                </a>
+            </div>
+
+            <div class="nav-section">
+                <div class="nav-section-title">إدارة الأسطول</div>
+                <a href="#" class="nav-item">
+                    <span class="nav-icon">🚚</span>
+                    الشاحنات
+                </a>
+                <a href="#" class="nav-item">
+                    <span class="nav-icon">👨‍✈️</span>
+                    السائقون
+                </a>
+            </div>
+
+            <div class="nav-section">
+                <div class="nav-section-title">المالية والتسعير</div>
+                <a href="#" class="nav-item">
+                    <span class="nav-icon">💰</span>
+                    الفواتير
+                </a>
+                <a href="#" class="nav-item">
+                    <span class="nav-icon">💳</span>
+                    المدفوعات
+                </a>
+                <a href="#" class="nav-item">
+                    <span class="nav-icon">📊</span>
+                    قوائم الأسعار
+                </a>
+            </div>
+
+            <div class="nav-section">
+                <div class="nav-section-title">النظام</div>
+                <a href="#" class="nav-item">
+                    <span class="nav-icon">📈</span>
+                    التقارير
+                </a>
+                <a href="#" class="nav-item">
+                    <span class="nav-icon">⚙️</span>
+                    الإعدادات
+                </a>
+            </div>
+        </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-info">
+                <h2>مرحباً بك في IRoad</h2>
+                <p>السبت، 7 فبراير 2026 - نظرة عامة على عملياتك اليوم</p>
+            </div>
+            <div class="header-actions">
+                <button class="btn btn-primary">
+                    <span>➕</span>
+                    حجز جديد
+                </button>
+                <button class="btn btn-secondary">
+                    <span>📊</span>
+                    تقرير
+                </button>
+            </div>
+        </header>
+
+        <!-- Stats Grid -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div>
+                        <div class="stat-value">247</div>
+                        <div class="stat-label">طلبات نشطة</div>
+                    </div>
+                    <div class="stat-icon orange">📋</div>
+                </div>
+                <div class="stat-change positive">
+                    <span>↑</span>
+                    12% عن الشهر الماضي
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div>
+                        <div class="stat-value">156</div>
+                        <div class="stat-label">شحنات قيد التنفيذ</div>
+                    </div>
+                    <div class="stat-icon green">🚛</div>
+                </div>
+                <div class="stat-change positive">
+                    <span>↑</span>
+                    8% عن الأسبوع الماضي
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div>
+                        <div class="stat-value">89</div>
+                        <div class="stat-label">شاحنات متاحة</div>
+                    </div>
+                    <div class="stat-icon blue">🚚</div>
+                </div>
+                <div class="stat-change negative">
+                    <span>↓</span>
+                    5 شاحنات قيد الصيانة
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div>
+                        <div class="stat-value">1.2M</div>
+                        <div class="stat-label">إجمالي الإيرادات (ريال)</div>
+                    </div>
+                    <div class="stat-icon green">💰</div>
+                </div>
+                <div class="stat-change positive">
+                    <span>↑</span>
+                    18% عن الشهر الماضي
+                </div>
+            </div>
+        </div>
+
+        <!-- Content Grid -->
+        <div class="content-grid">
+            <!-- Recent Orders -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">طلبات المبيعات الأخيرة</h3>
+                    <a href="#" class="card-link">عرض الكل ←</a>
+                </div>
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>رقم الطلب</th>
+                                <th>العميل</th>
+                                <th>المسار</th>
+                                <th>الحالة</th>
+                                <th>القيمة</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>SO-2026-001</strong></td>
+                                <td>شركة النقل السريع</td>
+                                <td>جدة ↔ ينبع</td>
+                                <td><span class="status-badge active"><span class="status-dot"></span>نشط</span></td>
+                                <td><strong>15,750 ر.س</strong></td>
+                            </tr>
+                            <tr>
+                                <td><strong>SO-2026-002</strong></td>
+                                <td>مؤسسة الشحن الدولي</td>
+                                <td>الرياض ↔ الدمام</td>
+                                <td><span class="status-badge pending"><span class="status-dot"></span>قيد المعالجة</span></td>
+                                <td><strong>22,400 ر.س</strong></td>
+                            </tr>
+                            <tr>
+                                <td><strong>SO-2026-003</strong></td>
+                                <td>شركة اللوجستيات المتقدمة</td>
+                                <td>مكة ↔ الطائف</td>
+                                <td><span class="status-badge completed"><span class="status-dot"></span>مكتمل</span></td>
+                                <td><strong>8,900 ر.س</strong></td>
+                            </tr>
+                            <tr>
+                                <td><strong>SO-2026-004</strong></td>
+                                <td>مجموعة النقل الوطني</td>
+                                <td>جدة ↔ الرياض</td>
+                                <td><span class="status-badge active"><span class="status-dot"></span>نشط</span></td>
+                                <td><strong>31,200 ر.س</strong></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Recent Activity -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">النشاطات الأخيرة</h3>
+                    <a href="#" class="card-link">عرض الكل ←</a>
+                </div>
+                <div>
+                    <div class="activity-item">
+                        <div class="activity-icon orange">
+                            📋
+                        </div>
+                        <div class="activity-content">
+                            <div class="activity-title">طلب مبيعات جديد</div>
+                            <div class="activity-desc">SO-2026-004 من شركة النقل الوطني</div>
+                            <div class="activity-time">منذ 15 دقيقة</div>
+                        </div>
+                    </div>
+
+                    <div class="activity-item">
+                        <div class="activity-icon green">
+                            ✅
+                        </div>
+                        <div class="activity-content">
+                            <div class="activity-title">شحنة مكتملة</div>
+                            <div class="activity-desc">تم تسليم الشحنة #SH-789 بنجاح</div>
+                            <div class="activity-time">منذ 45 دقيقة</div>
+                        </div>
+                    </div>
+
+                    <div class="activity-item">
+                        <div class="activity-icon blue">
+                            🚚
+                        </div>
+                        <div class="activity-content">
+                            <div class="activity-title">شاحنة جديدة</div>
+                            <div class="activity-desc">تم إضافة شاحنة رقم TR-145 للأسطول</div>
+                            <div class="activity-time">منذ ساعة</div>
+                        </div>
+                    </div>
+
+                    <div class="activity-item">
+                        <div class="activity-icon orange">
+                            💰
+                        </div>
+                        <div class="activity-content">
+                            <div class="activity-title">دفعة مستلمة</div>
+                            <div class="activity-desc">تم استلام 45,000 ر.س من العميل</div>
+                            <div class="activity-time">منذ ساعتين</div>
+                        </div>
+                    </div>
+
+                    <div class="activity-item">
+                        <div class="activity-icon green">
+                            👨‍✈️
+                        </div>
+                        <div class="activity-content">
+                            <div class="activity-title">سائق جديد</div>
+                            <div class="activity-desc">تم تسجيل السائق أحمد محمد</div>
+                            <div class="activity-time">منذ 3 ساعات</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">إجراءات سريعة</h3>
+            </div>
+            <div class="quick-actions">
+                <a href="#" class="quick-action">
+                    <div class="quick-action-icon orange">📋</div>
+                    <div class="quick-action-title">طلب مبيعات جديد</div>
+                </a>
+                <a href="#" class="quick-action">
+                    <div class="quick-action-icon blue">📅</div>
+                    <div class="quick-action-title">حجز جديد</div>
+                </a>
+                <a href="#" class="quick-action">
+                    <div class="quick-action-icon green">🚛</div>
+                    <div class="quick-action-title">إنشاء شحنة</div>
+                </a>
+                <a href="#" class="quick-action">
+                    <div class="quick-action-icon orange">👥</div>
+                    <div class="quick-action-title">عميل جديد</div>
+                </a>
+            </div>
+        </div>
+    </main>
+</body>
+</html>

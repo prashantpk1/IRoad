@@ -1,0 +1,1207 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IRoad - نظام إدارة النقل</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #0F172A;
+            --primary-light: #1E293B;
+            --accent: #F59E0B;
+            --accent-dark: #D97706;
+            --success: #10B981;
+            --warning: #EF4444;
+            --bg: #F8FAFC;
+            --surface: #FFFFFF;
+            --text: #0F172A;
+            --text-muted: #64748B;
+            --border: #E2E8F0;
+            --shadow: rgba(15, 23, 42, 0.08);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'IBM Plex Sans Arabic', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            overflow-x: hidden;
+            transition: all 0.3s ease;
+        }
+
+        body[dir="ltr"] {
+            font-family: 'Inter', sans-serif;
+        }
+
+        /* Language Switcher */
+        .language-switcher {
+            position: fixed;
+            top: 2rem;
+            left: 2rem;
+            z-index: 2000;
+            background: var(--surface);
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            padding: 0.5rem;
+            display: flex;
+            gap: 0.5rem;
+            box-shadow: 0 4px 12px var(--shadow);
+            transition: all 0.3s ease;
+        }
+
+        body[dir="ltr"] .language-switcher {
+            left: auto;
+            right: 2rem;
+        }
+
+        .lang-btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            background: transparent;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+
+        .lang-btn:hover {
+            background: var(--bg);
+            color: var(--text);
+        }
+
+        .lang-btn.active {
+            background: var(--accent);
+            color: white;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            position: fixed;
+            right: 0;
+            top: 0;
+            width: 280px;
+            height: 100vh;
+            background: var(--primary);
+            color: white;
+            padding: 2rem 0;
+            z-index: 1000;
+            overflow-y: auto;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        body[dir="ltr"] .sidebar {
+            right: auto;
+            left: 0;
+        }
+
+        .logo {
+            padding: 0 2rem 2rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            margin-bottom: 2rem;
+        }
+
+        .logo h1 {
+            font-family: 'Cairo', sans-serif;
+            font-size: 2rem;
+            font-weight: 900;
+            background: linear-gradient(135deg, #FFFFFF 0%, var(--accent) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+            letter-spacing: -1px;
+        }
+
+        body[dir="ltr"] .logo h1 {
+            font-family: 'Inter', sans-serif;
+        }
+
+        .logo p {
+            font-size: 0.875rem;
+            color: rgba(255, 255, 255, 0.6);
+            font-weight: 300;
+        }
+
+        .nav-section {
+            margin-bottom: 2rem;
+        }
+
+        .nav-section-title {
+            padding: 0 2rem;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.4);
+            font-weight: 600;
+            letter-spacing: 1px;
+            margin-bottom: 0.5rem;
+        }
+
+        .nav-item {
+            padding: 0.875rem 2rem;
+            color: rgba(255, 255, 255, 0.7);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            transition: all 0.2s;
+            position: relative;
+            font-weight: 500;
+        }
+
+        .nav-item::before {
+            content: '';
+            position: absolute;
+            right: 0;
+            top: 0;
+            height: 100%;
+            width: 4px;
+            background: var(--accent);
+            transform: scaleY(0);
+            transition: transform 0.2s;
+        }
+
+        body[dir="ltr"] .nav-item::before {
+            right: auto;
+            left: 0;
+        }
+
+        .nav-item:hover {
+            background: rgba(255, 255, 255, 0.05);
+            color: white;
+        }
+
+        .nav-item:hover::before {
+            transform: scaleY(1);
+        }
+
+        .nav-item.active {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--accent);
+        }
+
+        .nav-item.active::before {
+            transform: scaleY(1);
+        }
+
+        .nav-icon {
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Main Content */
+        .main-content {
+            margin-right: 280px;
+            min-height: 100vh;
+            padding: 2rem;
+            transition: margin 0.3s ease;
+        }
+
+        body[dir="ltr"] .main-content {
+            margin-right: 0;
+            margin-left: 280px;
+        }
+
+        /* Header */
+        .header {
+            background: var(--surface);
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 1px 3px var(--shadow);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid var(--border);
+        }
+
+        .header-info h2 {
+            font-family: 'Cairo', sans-serif;
+            font-size: 1.875rem;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 0.5rem;
+        }
+
+        body[dir="ltr"] .header-info h2 {
+            font-family: 'Inter', sans-serif;
+        }
+
+        .header-info p {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: 10px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+            font-size: 0.9rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-dark);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+        }
+
+        .btn-secondary {
+            background: var(--surface);
+            color: var(--text);
+            border: 2px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: var(--surface);
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: 0 1px 3px var(--shadow);
+            border: 1px solid var(--border);
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s;
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, var(--accent), var(--accent-dark));
+            transform: scaleX(0);
+            transform-origin: right;
+            transition: transform 0.3s;
+        }
+
+        body[dir="ltr"] .stat-card::before {
+            transform-origin: left;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+        }
+
+        .stat-card:hover::before {
+            transform: scaleX(1);
+        }
+
+        .stat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1.5rem;
+        }
+
+        .stat-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+
+        .stat-icon.orange {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--accent);
+        }
+
+        .stat-icon.green {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+        }
+
+        .stat-icon.red {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--warning);
+        }
+
+        .stat-icon.blue {
+            background: rgba(59, 130, 246, 0.1);
+            color: #3B82F6;
+        }
+
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            font-family: 'Cairo', sans-serif;
+            color: var(--primary);
+            line-height: 1;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-label {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+            font-weight: 500;
+            margin-bottom: 1rem;
+        }
+
+        .stat-change {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+            padding: 0.25rem 0.75rem;
+            border-radius: 6px;
+        }
+
+        .stat-change.positive {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+        }
+
+        .stat-change.negative {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--warning);
+        }
+
+        /* Content Grid */
+        .content-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .card {
+            background: var(--surface);
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: 0 1px 3px var(--shadow);
+            border: 1px solid var(--border);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .card-title {
+            font-family: 'Cairo', sans-serif;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        body[dir="ltr"] .card-title {
+            font-family: 'Inter', sans-serif;
+        }
+
+        .card-link {
+            color: var(--accent);
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.875rem;
+            transition: color 0.2s;
+        }
+
+        .card-link:hover {
+            color: var(--accent-dark);
+        }
+
+        /* Table */
+        .table-wrapper {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+
+        th {
+            text-align: right;
+            padding: 1rem;
+            font-weight: 600;
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            background: var(--bg);
+            border-bottom: 2px solid var(--border);
+        }
+
+        body[dir="ltr"] th {
+            text-align: left;
+        }
+
+        td {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:hover td {
+            background: var(--bg);
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.375rem 0.875rem;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.8rem;
+        }
+
+        .status-badge.active {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+        }
+
+        .status-badge.pending {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--accent);
+        }
+
+        .status-badge.completed {
+            background: rgba(59, 130, 246, 0.1);
+            color: #3B82F6;
+        }
+
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: currentColor;
+        }
+
+        /* Activity List */
+        .activity-item {
+            display: flex;
+            gap: 1rem;
+            padding: 1rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .activity-item:last-child {
+            border-bottom: none;
+        }
+
+        .activity-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            flex-shrink: 0;
+        }
+
+        .activity-content {
+            flex: 1;
+        }
+
+        .activity-title {
+            font-weight: 600;
+            color: var(--primary);
+            margin-bottom: 0.25rem;
+        }
+
+        .activity-desc {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+
+        .activity-time {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+        }
+
+        /* Quick Actions */
+        .quick-actions {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        .quick-action {
+            background: var(--bg);
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+            color: var(--text);
+        }
+
+        .quick-action:hover {
+            border-color: var(--accent);
+            background: var(--surface);
+            transform: translateY(-2px);
+        }
+
+        .quick-action-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin: 0 auto 1rem;
+        }
+
+        .quick-action-title {
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        /* Animations */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .stat-card {
+            animation: fadeIn 0.5s ease-out forwards;
+            opacity: 0;
+        }
+
+        .stat-card:nth-child(1) { animation-delay: 0.1s; }
+        .stat-card:nth-child(2) { animation-delay: 0.2s; }
+        .stat-card:nth-child(3) { animation-delay: 0.3s; }
+        .stat-card:nth-child(4) { animation-delay: 0.4s; }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .content-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(100%);
+            }
+
+            body[dir="ltr"] .sidebar {
+                transform: translateX(-100%);
+            }
+
+            .sidebar.active {
+                transform: translateX(0);
+            }
+
+            .main-content {
+                margin-right: 0;
+            }
+
+            body[dir="ltr"] .main-content {
+                margin-left: 0;
+            }
+
+            .header {
+                flex-direction: column;
+                gap: 1rem;
+                align-items: flex-start;
+            }
+
+            .header-actions {
+                width: 100%;
+                flex-direction: column;
+            }
+
+            .btn {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Language Switcher -->
+    <div class="language-switcher">
+        <button class="lang-btn active" onclick="switchLanguage('ar')">العربية</button>
+        <button class="lang-btn" onclick="switchLanguage('en')">English</button>
+    </div>
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="logo">
+            <h1>IRoad</h1>
+            <p data-i18n="logoSubtitle">نظام إدارة النقل المتكامل</p>
+        </div>
+
+        <nav>
+            <div class="nav-section">
+                <div class="nav-section-title" data-i18n="mainMenu">القائمة الرئيسية</div>
+                <a href="#" class="nav-item active">
+                    <span class="nav-icon">📊</span>
+                    <span data-i18n="dashboard">لوحة التحكم</span>
+                </a>
+            </div>
+
+            <div class="nav-section">
+                <div class="nav-section-title" data-i18n="clientVendorMgmt">إدارة العملاء والموردين</div>
+                <a href="#" class="nav-item">
+                    <span class="nav-icon">👥</span>
+                    <span data-i18n="clientMgmt">إدارة العملاء</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <span class="nav-icon">🏢</span>
+                    <span data-i18n="vendorMgmt">إدارة الموردين</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <span class="nav-icon">📍</span>
+                    <span data-i18n="addressMgmt">إدارة العناوين</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <span class="nav-icon">📦</span>
+                    <span data-i18n="cargoMgmt">إدارة البضائع</span>
+                </a>
+            </div>
+
+            <div class="nav-section">
+                <div class="nav-section-title" data-i18n="operations">العمليات التجارية</div>
+                <a href="#" class="nav-item">
+                    <span class="nav-icon">📋</span>
+                    <span data-i18n="salesOrders">طلبات المبيعات</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <span class="nav-icon">🛒</span>
+                    <span data-i18n="purchaseOrders">طلبات الشراء</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <span class="nav-icon">📅</span>
+                    <span data-i18n="bookings">الحجوزات</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <span class="nav-icon">🚛</span>
+                    <span data-i18n="shipments">الشحنات</span>
+                </a>
+            </div>
+
+            <div class="nav-section">
+                <div class="nav-section-title" data-i18n="fleetMgmt">إدارة الأسطول</div>
+                <a href="#" class="nav-item">
+                    <span class="nav-icon">🚚</span>
+                    <span data-i18n="trucks">الشاحنات</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <span class="nav-icon">👨‍✈️</span>
+                    <span data-i18n="drivers">السائقون</span>
+                </a>
+            </div>
+
+            <div class="nav-section">
+                <div class="nav-section-title" data-i18n="financePricing">المالية والتسعير</div>
+                <a href="#" class="nav-item">
+                    <span class="nav-icon">💰</span>
+                    <span data-i18n="invoices">الفواتير</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <span class="nav-icon">💳</span>
+                    <span data-i18n="payments">المدفوعات</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <span class="nav-icon">📊</span>
+                    <span data-i18n="priceLists">قوائم الأسعار</span>
+                </a>
+            </div>
+
+            <div class="nav-section">
+                <div class="nav-section-title" data-i18n="system">النظام</div>
+                <a href="#" class="nav-item">
+                    <span class="nav-icon">📈</span>
+                    <span data-i18n="reports">التقارير</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <span class="nav-icon">⚙️</span>
+                    <span data-i18n="settings">الإعدادات</span>
+                </a>
+            </div>
+        </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-info">
+                <h2 data-i18n="welcomeTitle">مرحباً بك في IRoad</h2>
+                <p data-i18n="welcomeSubtitle">السبت، 7 فبراير 2026 - نظرة عامة على عملياتك اليوم</p>
+            </div>
+            <div class="header-actions">
+                <button class="btn btn-primary">
+                    <span>➕</span>
+                    <span data-i18n="newBooking">حجز جديد</span>
+                </button>
+                <button class="btn btn-secondary">
+                    <span>📊</span>
+                    <span data-i18n="report">تقرير</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Stats Grid -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div>
+                        <div class="stat-value">247</div>
+                        <div class="stat-label" data-i18n="activeOrders">طلبات نشطة</div>
+                    </div>
+                    <div class="stat-icon orange">📋</div>
+                </div>
+                <div class="stat-change positive">
+                    <span>↑</span>
+                    <span data-i18n="vsLastMonth12">12% عن الشهر الماضي</span>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div>
+                        <div class="stat-value">156</div>
+                        <div class="stat-label" data-i18n="activeShipments">شحنات قيد التنفيذ</div>
+                    </div>
+                    <div class="stat-icon green">🚛</div>
+                </div>
+                <div class="stat-change positive">
+                    <span>↑</span>
+                    <span data-i18n="vsLastWeek8">8% عن الأسبوع الماضي</span>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div>
+                        <div class="stat-value">89</div>
+                        <div class="stat-label" data-i18n="availableTrucks">شاحنات متاحة</div>
+                    </div>
+                    <div class="stat-icon blue">🚚</div>
+                </div>
+                <div class="stat-change negative">
+                    <span>↓</span>
+                    <span data-i18n="trucksInMaintenance">5 شاحنات قيد الصيانة</span>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div>
+                        <div class="stat-value">1.2M</div>
+                        <div class="stat-label" data-i18n="totalRevenue">إجمالي الإيرادات (ريال)</div>
+                    </div>
+                    <div class="stat-icon green">💰</div>
+                </div>
+                <div class="stat-change positive">
+                    <span>↑</span>
+                    <span data-i18n="vsLastMonth18">18% عن الشهر الماضي</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Content Grid -->
+        <div class="content-grid">
+            <!-- Recent Orders -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title" data-i18n="recentOrders">طلبات المبيعات الأخيرة</h3>
+                    <a href="#" class="card-link" data-i18n="viewAll">عرض الكل ←</a>
+                </div>
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th data-i18n="orderNumber">رقم الطلب</th>
+                                <th data-i18n="client">العميل</th>
+                                <th data-i18n="route">المسار</th>
+                                <th data-i18n="status">الحالة</th>
+                                <th data-i18n="value">القيمة</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>SO-2026-001</strong></td>
+                                <td data-i18n="client1">شركة النقل السريع</td>
+                                <td data-i18n="route1">جدة ↔ ينبع</td>
+                                <td><span class="status-badge active"><span class="status-dot"></span><span data-i18n="active">نشط</span></span></td>
+                                <td><strong data-i18n="value1">15,750 ر.س</strong></td>
+                            </tr>
+                            <tr>
+                                <td><strong>SO-2026-002</strong></td>
+                                <td data-i18n="client2">مؤسسة الشحن الدولي</td>
+                                <td data-i18n="route2">الرياض ↔ الدمام</td>
+                                <td><span class="status-badge pending"><span class="status-dot"></span><span data-i18n="processing">قيد المعالجة</span></span></td>
+                                <td><strong data-i18n="value2">22,400 ر.س</strong></td>
+                            </tr>
+                            <tr>
+                                <td><strong>SO-2026-003</strong></td>
+                                <td data-i18n="client3">شركة اللوجستيات المتقدمة</td>
+                                <td data-i18n="route3">مكة ↔ الطائف</td>
+                                <td><span class="status-badge completed"><span class="status-dot"></span><span data-i18n="completed">مكتمل</span></span></td>
+                                <td><strong data-i18n="value3">8,900 ر.س</strong></td>
+                            </tr>
+                            <tr>
+                                <td><strong>SO-2026-004</strong></td>
+                                <td data-i18n="client4">مجموعة النقل الوطني</td>
+                                <td data-i18n="route4">جدة ↔ الرياض</td>
+                                <td><span class="status-badge active"><span class="status-dot"></span><span data-i18n="active">نشط</span></span></td>
+                                <td><strong data-i18n="value4">31,200 ر.س</strong></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Recent Activity -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title" data-i18n="recentActivity">النشاطات الأخيرة</h3>
+                    <a href="#" class="card-link" data-i18n="viewAll">عرض الكل ←</a>
+                </div>
+                <div>
+                    <div class="activity-item">
+                        <div class="activity-icon orange">📋</div>
+                        <div class="activity-content">
+                            <div class="activity-title" data-i18n="newSalesOrder">طلب مبيعات جديد</div>
+                            <div class="activity-desc" data-i18n="activityDesc1">SO-2026-004 من شركة النقل الوطني</div>
+                            <div class="activity-time" data-i18n="minutesAgo">منذ 15 دقيقة</div>
+                        </div>
+                    </div>
+
+                    <div class="activity-item">
+                        <div class="activity-icon green">✅</div>
+                        <div class="activity-content">
+                            <div class="activity-title" data-i18n="completedShipment">شحنة مكتملة</div>
+                            <div class="activity-desc" data-i18n="activityDesc2">تم تسليم الشحنة #SH-789 بنجاح</div>
+                            <div class="activity-time" data-i18n="minutes45Ago">منذ 45 دقيقة</div>
+                        </div>
+                    </div>
+
+                    <div class="activity-item">
+                        <div class="activity-icon blue">🚚</div>
+                        <div class="activity-content">
+                            <div class="activity-title" data-i18n="newTruck">شاحنة جديدة</div>
+                            <div class="activity-desc" data-i18n="activityDesc3">تم إضافة شاحنة رقم TR-145 للأسطول</div>
+                            <div class="activity-time" data-i18n="hour1Ago">منذ ساعة</div>
+                        </div>
+                    </div>
+
+                    <div class="activity-item">
+                        <div class="activity-icon orange">💰</div>
+                        <div class="activity-content">
+                            <div class="activity-title" data-i18n="paymentReceived">دفعة مستلمة</div>
+                            <div class="activity-desc" data-i18n="activityDesc4">تم استلام 45,000 ر.س من العميل</div>
+                            <div class="activity-time" data-i18n="hours2Ago">منذ ساعتين</div>
+                        </div>
+                    </div>
+
+                    <div class="activity-item">
+                        <div class="activity-icon green">👨‍✈️</div>
+                        <div class="activity-content">
+                            <div class="activity-title" data-i18n="newDriver">سائق جديد</div>
+                            <div class="activity-desc" data-i18n="activityDesc5">تم تسجيل السائق أحمد محمد</div>
+                            <div class="activity-time" data-i18n="hours3Ago">منذ 3 ساعات</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title" data-i18n="quickActions">إجراءات سريعة</h3>
+            </div>
+            <div class="quick-actions">
+                <a href="#" class="quick-action">
+                    <div class="quick-action-icon orange">📋</div>
+                    <div class="quick-action-title" data-i18n="newSalesOrderAction">طلب مبيعات جديد</div>
+                </a>
+                <a href="#" class="quick-action">
+                    <div class="quick-action-icon blue">📅</div>
+                    <div class="quick-action-title" data-i18n="newBookingAction">حجز جديد</div>
+                </a>
+                <a href="#" class="quick-action">
+                    <div class="quick-action-icon green">🚛</div>
+                    <div class="quick-action-title" data-i18n="createShipment">إنشاء شحنة</div>
+                </a>
+                <a href="#" class="quick-action">
+                    <div class="quick-action-icon orange">👥</div>
+                    <div class="quick-action-title" data-i18n="newClient">عميل جديد</div>
+                </a>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Language translations
+        const translations = {
+            ar: {
+                logoSubtitle: "نظام إدارة النقل المتكامل",
+                mainMenu: "القائمة الرئيسية",
+                dashboard: "لوحة التحكم",
+                clientVendorMgmt: "إدارة العملاء والموردين",
+                clientMgmt: "إدارة العملاء",
+                vendorMgmt: "إدارة الموردين",
+                addressMgmt: "إدارة العناوين",
+                cargoMgmt: "إدارة البضائع",
+                operations: "العمليات التجارية",
+                salesOrders: "طلبات المبيعات",
+                purchaseOrders: "طلبات الشراء",
+                bookings: "الحجوزات",
+                shipments: "الشحنات",
+                fleetMgmt: "إدارة الأسطول",
+                trucks: "الشاحنات",
+                drivers: "السائقون",
+                financePricing: "المالية والتسعير",
+                invoices: "الفواتير",
+                payments: "المدفوعات",
+                priceLists: "قوائم الأسعار",
+                system: "النظام",
+                reports: "التقارير",
+                settings: "الإعدادات",
+                welcomeTitle: "مرحباً بك في IRoad",
+                welcomeSubtitle: "السبت، 7 فبراير 2026 - نظرة عامة على عملياتك اليوم",
+                newBooking: "حجز جديد",
+                report: "تقرير",
+                activeOrders: "طلبات نشطة",
+                activeShipments: "شحنات قيد التنفيذ",
+                availableTrucks: "شاحنات متاحة",
+                totalRevenue: "إجمالي الإيرادات (ريال)",
+                vsLastMonth12: "12% عن الشهر الماضي",
+                vsLastWeek8: "8% عن الأسبوع الماضي",
+                trucksInMaintenance: "5 شاحنات قيد الصيانة",
+                vsLastMonth18: "18% عن الشهر الماضي",
+                recentOrders: "طلبات المبيعات الأخيرة",
+                viewAll: "عرض الكل ←",
+                orderNumber: "رقم الطلب",
+                client: "العميل",
+                route: "المسار",
+                status: "الحالة",
+                value: "القيمة",
+                active: "نشط",
+                processing: "قيد المعالجة",
+                completed: "مكتمل",
+                client1: "شركة النقل السريع",
+                route1: "جدة ↔ ينبع",
+                value1: "15,750 ر.س",
+                client2: "مؤسسة الشحن الدولي",
+                route2: "الرياض ↔ الدمام",
+                value2: "22,400 ر.س",
+                client3: "شركة اللوجستيات المتقدمة",
+                route3: "مكة ↔ الطائف",
+                value3: "8,900 ر.س",
+                client4: "مجموعة النقل الوطني",
+                route4: "جدة ↔ الرياض",
+                value4: "31,200 ر.س",
+                recentActivity: "النشاطات الأخيرة",
+                newSalesOrder: "طلب مبيعات جديد",
+                completedShipment: "شحنة مكتملة",
+                newTruck: "شاحنة جديدة",
+                paymentReceived: "دفعة مستلمة",
+                newDriver: "سائق جديد",
+                activityDesc1: "SO-2026-004 من شركة النقل الوطني",
+                activityDesc2: "تم تسليم الشحنة #SH-789 بنجاح",
+                activityDesc3: "تم إضافة شاحنة رقم TR-145 للأسطول",
+                activityDesc4: "تم استلام 45,000 ر.س من العميل",
+                activityDesc5: "تم تسجيل السائق أحمد محمد",
+                minutesAgo: "منذ 15 دقيقة",
+                minutes45Ago: "منذ 45 دقيقة",
+                hour1Ago: "منذ ساعة",
+                hours2Ago: "منذ ساعتين",
+                hours3Ago: "منذ 3 ساعات",
+                quickActions: "إجراءات سريعة",
+                newSalesOrderAction: "طلب مبيعات جديد",
+                newBookingAction: "حجز جديد",
+                createShipment: "إنشاء شحنة",
+                newClient: "عميل جديد"
+            },
+            en: {
+                logoSubtitle: "Integrated Transport Management System",
+                mainMenu: "MAIN MENU",
+                dashboard: "Dashboard",
+                clientVendorMgmt: "CLIENT & VENDOR MANAGEMENT",
+                clientMgmt: "Client Management",
+                vendorMgmt: "Vendor Management",
+                addressMgmt: "Address Management",
+                cargoMgmt: "Cargo Management",
+                operations: "BUSINESS OPERATIONS",
+                salesOrders: "Sales Orders",
+                purchaseOrders: "Purchase Orders",
+                bookings: "Bookings",
+                shipments: "Shipments",
+                fleetMgmt: "FLEET MANAGEMENT",
+                trucks: "Trucks",
+                drivers: "Drivers",
+                financePricing: "FINANCE & PRICING",
+                invoices: "Invoices",
+                payments: "Payments",
+                priceLists: "Price Lists",
+                system: "SYSTEM",
+                reports: "Reports",
+                settings: "Settings",
+                welcomeTitle: "Welcome to IRoad",
+                welcomeSubtitle: "Saturday, February 7, 2026 - Overview of your operations today",
+                newBooking: "New Booking",
+                report: "Report",
+                activeOrders: "Active Orders",
+                activeShipments: "Shipments in Progress",
+                availableTrucks: "Available Trucks",
+                totalRevenue: "Total Revenue (SAR)",
+                vsLastMonth12: "12% vs last month",
+                vsLastWeek8: "8% vs last week",
+                trucksInMaintenance: "5 trucks in maintenance",
+                vsLastMonth18: "18% vs last month",
+                recentOrders: "Recent Sales Orders",
+                viewAll: "View All →",
+                orderNumber: "Order No.",
+                client: "Client",
+                route: "Route",
+                status: "Status",
+                value: "Value",
+                active: "Active",
+                processing: "Processing",
+                completed: "Completed",
+                client1: "Fast Shipping Company",
+                route1: "Jeddah ↔ Yanbu",
+                value1: "15,750 SAR",
+                client2: "International Freight Corporation",
+                route2: "Riyadh ↔ Dammam",
+                value2: "22,400 SAR",
+                client3: "Advanced Logistics Company",
+                route3: "Makkah ↔ Taif",
+                value3: "8,900 SAR",
+                client4: "National Transport Group",
+                route4: "Jeddah ↔ Riyadh",
+                value4: "31,200 SAR",
+                recentActivity: "Recent Activity",
+                newSalesOrder: "New Sales Order",
+                completedShipment: "Completed Shipment",
+                newTruck: "New Truck",
+                paymentReceived: "Payment Received",
+                newDriver: "New Driver",
+                activityDesc1: "SO-2026-004 from National Transport Group",
+                activityDesc2: "Shipment #SH-789 delivered successfully",
+                activityDesc3: "Truck TR-145 added to fleet",
+                activityDesc4: "Received 45,000 SAR from client",
+                activityDesc5: "Driver Ahmed Mohamed registered",
+                minutesAgo: "15 minutes ago",
+                minutes45Ago: "45 minutes ago",
+                hour1Ago: "1 hour ago",
+                hours2Ago: "2 hours ago",
+                hours3Ago: "3 hours ago",
+                quickActions: "Quick Actions",
+                newSalesOrderAction: "New Sales Order",
+                newBookingAction: "New Booking",
+                createShipment: "Create Shipment",
+                newClient: "New Client"
+            }
+        };
+
+        let currentLang = 'ar';
+
+        function switchLanguage(lang) {
+            currentLang = lang;
+            const html = document.documentElement;
+            const body = document.body;
+            
+            // Update direction and language
+            html.lang = lang;
+            html.dir = lang === 'ar' ? 'rtl' : 'ltr';
+            body.dir = lang === 'ar' ? 'rtl' : 'ltr';
+            
+            // Update active button
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // Update all translatable elements
+            updateContent(lang);
+            
+            // Save preference
+            localStorage.setItem('preferredLanguage', lang);
+        }
+
+        function updateContent(lang) {
+            const t = translations[lang];
+            
+            // Update all elements with data-i18n attribute
+            document.querySelectorAll('[data-i18n]').forEach(element => {
+                const key = element.getAttribute('data-i18n');
+                if (t[key]) {
+                    element.textContent = t[key];
+                }
+            });
+        }
+
+        // Initialize language on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            const savedLang = localStorage.getItem('preferredLanguage') || 'ar';
+            if (savedLang === 'en') {
+                const enBtn = document.querySelectorAll('.lang-btn')[1];
+                enBtn.click();
+            }
+        });
+    </script>
+</body>
+</html>

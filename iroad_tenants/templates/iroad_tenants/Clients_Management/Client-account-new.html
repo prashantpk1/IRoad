@@ -43,7 +43,8 @@
       </div>
 
       <!-- Client Account Form -->
-      <form id="clientAccountForm">
+      <form id="clientAccountForm" method="post" novalidate>
+        {% csrf_token %}
         <!-- Section 1: Account & Status -->
         <div class="form-card" data-section="1">
           <div class="form-card-header">
@@ -72,6 +73,7 @@
                     id="accountNo"
                     name="account_no"
                     placeholder="Auto"
+                    value="{{ form_data.account_no|default:'' }}"
                     readonly
                   />
                   <span class="field-hint">Auto-number, unique per tenant</span>
@@ -82,15 +84,16 @@
                     <span class="required">*</span>
                   </label>
                   <select
-                    class="form-select"
+                    class="form-select {% if form_errors.client_type %}is-invalid{% endif %}"
                     id="clientType"
                     name="client_type"
                     required
                   >
                     <option value="" disabled>-Select type-</option>
-                    <option value="Individual" selected>Individual</option>
-                    <option value="Business">Business</option>
+                    <option value="Individual" {% if form_data.client_type|default:'Individual' == 'Individual' %}selected{% endif %}>Individual</option>
+                    <option value="Business" {% if form_data.client_type == 'Business' %}selected{% endif %}>Business</option>
                   </select>
+                  {% if form_errors.client_type %}<div class="invalid-feedback d-block">{{ form_errors.client_type }}</div>{% endif %}
                 </div>
                 <div class="field">
                   <label for="createdAt" class="form-label">Created At</label>
@@ -100,6 +103,7 @@
                     id="createdAt"
                     name="created_at"
                     placeholder="—"
+                    value="{{ form_data.created_at|default:'' }}"
                     readonly
                   />
                   <span class="field-hint">Set on save</span>
@@ -110,14 +114,15 @@
                     <span class="required">*</span>
                   </label>
                   <select
-                    class="form-select"
+                    class="form-select {% if form_errors.status %}is-invalid{% endif %}"
                     id="status"
                     name="status"
                     required
                   >
-                    <option value="Active" selected>Active</option>
-                    <option value="Inactive">Inactive</option>
+                    <option value="Active" {% if form_data.status|default:'Active' == 'Active' %}selected{% endif %}>Active</option>
+                    <option value="Inactive" {% if form_data.status == 'Inactive' %}selected{% endif %}>Inactive</option>
                   </select>
+                  {% if form_errors.status %}<div class="invalid-feedback d-block">{{ form_errors.status }}</div>{% endif %}
                 </div>
               </div>
             </div>
@@ -154,6 +159,7 @@
                     id="nameArabic"
                     name="name_arabic"
                     placeholder="الاسم بالعربية"
+                    value="{{ form_data.name_arabic|default:'' }}"
                     dir="rtl"
                   />
                 </div>
@@ -164,12 +170,14 @@
                   </label>
                   <input
                     type="text"
-                    class="form-control"
+                    class="form-control {% if form_errors.name_english %}is-invalid{% endif %}"
                     id="nameEnglish"
                     name="name_english"
                     placeholder="Enter name in English"
+                    value="{{ form_data.name_english|default:'' }}"
                     required
                   />
+                  {% if form_errors.name_english %}<div class="invalid-feedback d-block">{{ form_errors.name_english }}</div>{% endif %}
                 </div>
                 <div class="field">
                   <label for="displayName" class="form-label"
@@ -178,12 +186,14 @@
                   </label>
                   <input
                     type="text"
-                    class="form-control"
+                    class="form-control {% if form_errors.display_name %}is-invalid{% endif %}"
                     id="displayName"
                     name="display_name"
                     placeholder="Shown in lists and reports"
+                    value="{{ form_data.display_name|default:'' }}"
                     required
                   />
+                  {% if form_errors.display_name %}<div class="invalid-feedback d-block">{{ form_errors.display_name }}</div>{% endif %}
                 </div>
                 <div class="field">
                   <label for="preferredCurrency" class="form-label"
@@ -191,18 +201,19 @@
                     <span class="required">*</span>
                   </label>
                   <select
-                    class="form-select"
+                    class="form-select {% if form_errors.preferred_currency %}is-invalid{% endif %}"
                     id="preferredCurrency"
                     name="preferred_currency"
                     required
                   >
                     <option value="" disabled>-Select currency-</option>
-                    <option value="SAR">SAR - Saudi Riyal</option>
-                    <option value="USD">USD - US Dollar</option>
-                    <option value="EUR">EUR - Euro</option>
-                    <option value="AED">AED - UAE Dirham</option>
-                    <option value="KWD">KWD - Kuwaiti Dinar</option>
+                    <option value="SAR" {% if form_data.preferred_currency == 'SAR' %}selected{% endif %}>SAR - Saudi Riyal</option>
+                    <option value="USD" {% if form_data.preferred_currency == 'USD' %}selected{% endif %}>USD - US Dollar</option>
+                    <option value="EUR" {% if form_data.preferred_currency == 'EUR' %}selected{% endif %}>EUR - Euro</option>
+                    <option value="AED" {% if form_data.preferred_currency == 'AED' %}selected{% endif %}>AED - UAE Dirham</option>
+                    <option value="KWD" {% if form_data.preferred_currency == 'KWD' %}selected{% endif %}>KWD - Kuwaiti Dinar</option>
                   </select>
+                  {% if form_errors.preferred_currency %}<div class="invalid-feedback d-block">{{ form_errors.preferred_currency }}</div>{% endif %}
                   <span class="field-hint">From Currency Master</span>
                 </div>
               </div>
@@ -235,12 +246,14 @@
                   </label>
                   <input
                     type="text"
-                    class="form-control"
+                    class="form-control {% if form_errors.billing_street_1 %}is-invalid{% endif %}"
                     id="billingStreet1"
                     name="billing_street_1"
                     placeholder="Street address line 1"
+                    value="{{ form_data.billing_street_1|default:'' }}"
                     required
                   />
+                  {% if form_errors.billing_street_1 %}<div class="invalid-feedback d-block">{{ form_errors.billing_street_1 }}</div>{% endif %}
                 </div>
                 <div class="field">
                   <label for="billingStreet2" class="form-label"
@@ -252,6 +265,7 @@
                     id="billingStreet2"
                     name="billing_street_2"
                     placeholder="Street address line 2"
+                    value="{{ form_data.billing_street_2|default:'' }}"
                   />
                 </div>
               </div>
@@ -263,12 +277,14 @@
                   </label>
                   <input
                     type="text"
-                    class="form-control"
+                    class="form-control {% if form_errors.billing_city %}is-invalid{% endif %}"
                     id="billingCity"
                     name="billing_city"
                     placeholder="City"
+                    value="{{ form_data.billing_city|default:'' }}"
                     required
                   />
+                  {% if form_errors.billing_city %}<div class="invalid-feedback d-block">{{ form_errors.billing_city }}</div>{% endif %}
                 </div>
                 <div class="field">
                   <label for="billingRegion" class="form-label"
@@ -280,6 +296,7 @@
                     id="billingRegion"
                     name="billing_region"
                     placeholder="Region or state"
+                    value="{{ form_data.billing_region|default:'' }}"
                   />
                 </div>
                 <div class="field">
@@ -290,6 +307,7 @@
                     id="postalCode"
                     name="postal_code"
                     placeholder="e.g. 12345"
+                    value="{{ form_data.postal_code|default:'' }}"
                   />
                 </div>
                 <div class="field">
@@ -298,19 +316,20 @@
                     <span class="required">*</span>
                   </label>
                   <select
-                    class="form-select"
+                    class="form-select {% if form_errors.country %}is-invalid{% endif %}"
                     id="country"
                     name="country"
                     required
                   >
                     <option value="" disabled>-Select country-</option>
-                    <option value="SA">Saudi Arabia</option>
-                    <option value="AE">United Arab Emirates</option>
-                    <option value="KW">Kuwait</option>
-                    <option value="BH">Bahrain</option>
-                    <option value="QA">Qatar</option>
-                    <option value="OM">Oman</option>
+                    <option value="SA" {% if form_data.country == 'SA' %}selected{% endif %}>Saudi Arabia</option>
+                    <option value="AE" {% if form_data.country == 'AE' %}selected{% endif %}>United Arab Emirates</option>
+                    <option value="KW" {% if form_data.country == 'KW' %}selected{% endif %}>Kuwait</option>
+                    <option value="BH" {% if form_data.country == 'BH' %}selected{% endif %}>Bahrain</option>
+                    <option value="QA" {% if form_data.country == 'QA' %}selected{% endif %}>Qatar</option>
+                    <option value="OM" {% if form_data.country == 'OM' %}selected{% endif %}>Oman</option>
                   </select>
+                  {% if form_errors.country %}<div class="invalid-feedback d-block">{{ form_errors.country }}</div>{% endif %}
                   <span class="field-hint">From Country Master</span>
                 </div>
               </div>
@@ -330,10 +349,11 @@
                     <i class="bi bi-currency-dollar"></i>
                     <input
                       type="number"
-                      class="form-control has-icon"
+                      class="form-control has-icon {% if form_errors.credit_limit_amount %}is-invalid{% endif %}"
                       id="creditLimitAmount"
                       name="credit_limit_amount"
                       placeholder="0.00"
+                      value="{{ form_data.credit_limit_amount|default:'' }}"
                       min="0"
                       step="0.01"
                     />
@@ -341,6 +361,7 @@
                   <span class="field-hint"
                     >Final authoritative debt ceiling for this client, denominated in the System Base Currency.</span
                   >
+                  {% if form_errors.credit_limit_amount %}<div class="invalid-feedback d-block">{{ form_errors.credit_limit_amount }}</div>{% endif %}
                 </div>
                 <div class="field">
                   <label for="limitCurrencyCode" class="form-label"
@@ -356,6 +377,7 @@
                     <option value="USD">USD</option>
                     <option value="EUR">EUR</option>
                   </select>
+                  <input type="hidden" name="limit_currency_code" value="{{ form_data.limit_currency_code|default:'SAR' }}">
                   <span class="field-hint"
                     >Display-only field showing the Base Currency.</span
                   >
@@ -370,10 +392,11 @@
                     <i class="bi bi-calendar3"></i>
                     <input
                       type="number"
-                      class="form-control has-icon"
+                      class="form-control has-icon {% if form_errors.payment_term_days %}is-invalid{% endif %}"
                       id="paymentTermDays"
                       name="payment_term_days"
                       placeholder="0"
+                      value="{{ form_data.payment_term_days|default:'' }}"
                       min="0"
                       step="1"
                     />
@@ -381,6 +404,7 @@
                   <span class="field-hint"
                     >Number of days used to automatically calculate the due_date on the Sales Invoice header.</span
                   >
+                  {% if form_errors.payment_term_days %}<div class="invalid-feedback d-block">{{ form_errors.payment_term_days }}</div>{% endif %}
                 </div>
               </div>
             </div>
@@ -419,6 +443,7 @@
                     id="commercialRegistrationNo"
                     name="commercial_registration_no"
                     placeholder="Enter CR number"
+                    value="{{ form_data.commercial_registration_no|default:'' }}"
                   />
                 </div>
                 <div class="field">
@@ -431,6 +456,7 @@
                     id="taxRegistrationNo"
                     name="tax_registration_no"
                     placeholder="Enter tax registration number"
+                    value="{{ form_data.tax_registration_no|default:'' }}"
                   />
                 </div>
               </div>
@@ -476,191 +502,4 @@
       })();
     </script>
 
-<script>
-      (function () {
-        var STORAGE_KEY = "ir_clients_v1";
-        var DEMO_CLIENT = {
-          account_no: "CA-000123",
-          client_type: "Business",
-          status: "Active",
-          created_at: "Jan 28, 2026, 03:52 PM",
-          name_arabic: "شركة الصفا للخدمات اللوجستية",
-          name_english: "Al Safa Logistics",
-          display_name: "Al Safa Logistics",
-          preferred_currency: "SAR",
-          billing_street_1: "King Fahd Rd, Building 12",
-          billing_street_2: "Floor 4, Office 402",
-          billing_city: "Riyadh",
-          billing_region: "Riyadh",
-          postal_code: "11564",
-          country: "SA",
-          commercial_registration_no: "CR-1234567890",
-          tax_registration_no: "TR-9876543210",
-        };
-
-        function pad(n) {
-          return String(n).padStart(6, "0");
-        }
-
-        function formatCreatedAt(d) {
-          return d.toLocaleString("en-US", {
-            year: "numeric",
-            month: "short",
-            day: "2-digit",
-            hour: "2-digit",
-            minute: "2-digit",
-          });
-        }
-
-        function loadClients() {
-          try {
-            var raw = localStorage.getItem(STORAGE_KEY);
-            var parsed = raw ? JSON.parse(raw) : [];
-            return Array.isArray(parsed) ? parsed : [];
-          } catch (e) {
-            return [];
-          }
-        }
-
-        function saveClients(list) {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
-        }
-
-        function hasDemoQuery() {
-          try {
-            var params = new URLSearchParams(window.location.search);
-            return (params.get("demo") || "").toLowerCase() === "1";
-          } catch (e) {
-            return false;
-          }
-        }
-
-        function nextAccountNo(existing) {
-          var max = 0;
-          for (var i = 0; i < existing.length; i++) {
-            var id = existing[i] && existing[i].account_no;
-            if (typeof id !== "string") continue;
-            var m = id.match(/^CA-(\d+)$/i);
-            if (!m) continue;
-            var num = parseInt(m[1], 10);
-            if (!Number.isNaN(num)) max = Math.max(max, num);
-          }
-          return "CA-" + pad(max + 1);
-        }
-
-        function getFormValue(id) {
-          var el = document.getElementById(id);
-          if (!el) return "";
-          return (el.value || "").trim();
-        }
-
-        function setFormValue(id, value) {
-          var el = document.getElementById(id);
-          if (!el) return;
-          el.value = value == null ? "" : String(value);
-        }
-
-        function setSelectValue(id, value) {
-          var el = document.getElementById(id);
-          if (!el) return;
-          el.value = value == null ? "" : String(value);
-          el.dispatchEvent(new Event("change", { bubbles: true }));
-        }
-
-        function applyDemoValues() {
-          setFormValue("accountNo", DEMO_CLIENT.account_no);
-          setSelectValue("clientType", DEMO_CLIENT.client_type);
-          setFormValue("createdAt", DEMO_CLIENT.created_at);
-          setSelectValue("status", DEMO_CLIENT.status);
-          setFormValue("nameArabic", DEMO_CLIENT.name_arabic);
-          setFormValue("nameEnglish", DEMO_CLIENT.name_english);
-          setFormValue("displayName", DEMO_CLIENT.display_name);
-          setSelectValue("preferredCurrency", DEMO_CLIENT.preferred_currency);
-          setFormValue("billingStreet1", DEMO_CLIENT.billing_street_1);
-          setFormValue("billingStreet2", DEMO_CLIENT.billing_street_2);
-          setFormValue("billingCity", DEMO_CLIENT.billing_city);
-          setFormValue("billingRegion", DEMO_CLIENT.billing_region);
-          setFormValue("postalCode", DEMO_CLIENT.postal_code);
-          setSelectValue("country", DEMO_CLIENT.country);
-          setFormValue(
-            "commercialRegistrationNo",
-            DEMO_CLIENT.commercial_registration_no,
-          );
-          setFormValue("taxRegistrationNo", DEMO_CLIENT.tax_registration_no);
-        }
-
-        function initDefaults() {
-          var clients = loadClients();
-          if (hasDemoQuery()) {
-            applyDemoValues();
-            return;
-          }
-          if (!getFormValue("accountNo")) {
-            setFormValue("accountNo", nextAccountNo(clients));
-          }
-          if (!getFormValue("createdAt")) {
-            setFormValue("createdAt", formatCreatedAt(new Date()));
-          }
-        }
-
-        function buildClientPayload() {
-          return {
-            account_no: getFormValue("accountNo"),
-            client_type: getFormValue("clientType"),
-            status: getFormValue("status"),
-            created_at: getFormValue("createdAt"),
-            name_arabic: getFormValue("nameArabic"),
-            name_english: getFormValue("nameEnglish"),
-            display_name: getFormValue("displayName"),
-            preferred_currency: getFormValue("preferredCurrency"),
-            billing_street_1: getFormValue("billingStreet1"),
-            billing_street_2: getFormValue("billingStreet2"),
-            billing_city: getFormValue("billingCity"),
-            billing_region: getFormValue("billingRegion"),
-            postal_code: getFormValue("postalCode"),
-            country: getFormValue("country"),
-            commercial_registration_no: getFormValue("commercialRegistrationNo"),
-            tax_registration_no: getFormValue("taxRegistrationNo"),
-          };
-        }
-
-        function upsertClient(list, client) {
-          var idx = -1;
-          for (var i = 0; i < list.length; i++) {
-            if (list[i] && list[i].account_no === client.account_no) {
-              idx = i;
-              break;
-            }
-          }
-          if (idx >= 0) list[idx] = client;
-          else list.unshift(client);
-          return list;
-        }
-
-        var form = document.getElementById("clientAccountForm");
-        if (!form) return;
-
-        initDefaults();
-
-        form.addEventListener("submit", function (e) {
-          e.preventDefault();
-
-          if (!form.checkValidity()) {
-            form.classList.add("was-validated");
-            return;
-          }
-
-          var clients = loadClients();
-          var payload = buildClientPayload();
-          saveClients(upsertClient(clients, payload));
-
-          window.location.href =
-            "client-details.html?id=" + encodeURIComponent(payload.account_no);
-        });
-
-        form.addEventListener("reset", function () {
-          setTimeout(initDefaults, 0);
-        });
-      })();
-    </script>
 {% endblock %}

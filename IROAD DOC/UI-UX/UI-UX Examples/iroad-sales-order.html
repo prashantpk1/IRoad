@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IRoad - طلب مبيعات جديد</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #0F172A;
+            --primary-light: #1E293B;
+            --accent: #F59E0B;
+            --accent-dark: #D97706;
+            --success: #10B981;
+            --warning: #EF4444;
+            --info: #3B82F6;
+            --bg: #F8FAFC;
+            --surface: #FFFFFF;
+            --text: #0F172A;
+            --text-muted: #64748B;
+            --border: #E2E8F0;
+            --shadow: rgba(15, 23, 42, 0.08);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'IBM Plex Sans Arabic', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+
+        .breadcrumb a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        /* Layout Grid */
+        .layout-grid {
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            gap: 2rem;
+        }
+
+        /* Main Form Area */
+        .form-area {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        /* Card Styles */
+        .card {
+            background: var(--surface);
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            box-shadow: 0 1px 3px var(--shadow);
+            overflow: hidden;
+        }
+
+        .card-header {
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: linear-gradient(to bottom, var(--surface), var(--bg));
+        }
+
+        .card-title {
+            font-family: 'Cairo', sans-serif;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .card-body {
+            padding: 2rem;
+        }
+
+        .card-icon {
+            font-size: 1.5rem;
+        }
+
+        /* Form Groups */
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group.full {
+            grid-column: 1 / -1;
+        }
+
+        label {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: var(--text);
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .required {
+            color: var(--warning);
+        }
+
+        .label-hint {
+            color: var(--text-muted);
+            font-weight: 400;
+            font-size: 0.8rem;
+        }
+
+        input, select, textarea {
+            padding: 0.875rem 1rem;
+            border: 2px solid var(--border);
+            border-radius: 10px;
+            font-size: 0.9rem;
+            font-family: inherit;
+            transition: all 0.2s;
+            background: var(--surface);
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.1);
+        }
+
+        input:disabled, select:disabled {
+            background: var(--bg);
+            cursor: not-allowed;
+            color: var(--text-muted);
+        }
+
+        .input-with-icon {
+            position: relative;
+        }
+
+        .input-icon {
+            position: absolute;
+            left: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+        }
+
+        .input-with-icon input {
+            padding-left: 3rem;
+        }
+
+        /* Info Card */
+        .info-card {
+            background: linear-gradient(135deg, var(--bg), rgba(245, 158, 11, 0.05));
+            border: 2px dashed var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .info-row:last-child {
+            border-bottom: none;
+        }
+
+        .info-label {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        .info-value {
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        /* Client Card */
+        .client-card {
+            background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+            color: white;
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .client-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .client-avatar {
+            width: 64px;
+            height: 64px;
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            font-weight: 700;
+        }
+
+        .client-info h3 {
+            font-family: 'Cairo', sans-serif;
+            font-size: 1.25rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .client-id {
+            opacity: 0.8;
+            font-size: 0.875rem;
+        }
+
+        .client-details {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .client-detail {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 0.9rem;
+        }
+
+        .client-detail-icon {
+            opacity: 0.8;
+        }
+
+        /* Lines Table */
+        .lines-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin-top: 1rem;
+        }
+
+        .lines-table thead {
+            background: var(--bg);
+        }
+
+        .lines-table th {
+            padding: 1rem;
+            text-align: right;
+            font-weight: 600;
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            border-bottom: 2px solid var(--border);
+        }
+
+        .lines-table td {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .lines-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .line-input {
+            padding: 0.5rem 0.75rem;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 0.875rem;
+            width: 100%;
+        }
+
+        .line-input:focus {
+            border-color: var(--accent);
+            outline: none;
+        }
+
+        .delete-line-btn {
+            padding: 0.5rem;
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--warning);
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1.25rem;
+            transition: all 0.2s;
+        }
+
+        .delete-line-btn:hover {
+            background: rgba(239, 68, 68, 0.2);
+        }
+
+        .add-line-btn {
+            width: 100%;
+            padding: 1rem;
+            background: var(--bg);
+            border: 2px dashed var(--border);
+            border-radius: 10px;
+            color: var(--accent);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .add-line-btn:hover {
+            background: rgba(245, 158, 11, 0.05);
+            border-color: var(--accent);
+        }
+
+        /* Summary Card */
+        .summary-card {
+            background: var(--surface);
+            border: 2px solid var(--border);
+            border-radius: 16px;
+            padding: 2rem;
+        }
+
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .summary-row:last-child {
+            border-bottom: none;
+            border-top: 2px solid var(--border);
+            padding-top: 1.5rem;
+            margin-top: 0.5rem;
+        }
+
+        .summary-label {
+            font-weight: 500;
+            color: var(--text-muted);
+        }
+
+        .summary-value {
+            font-weight: 700;
+            font-size: 1.125rem;
+            color: var(--primary);
+        }
+
+        .summary-row:last-child .summary-label {
+            font-weight: 700;
+            color: var(--primary);
+            font-size: 1.125rem;
+        }
+
+        .summary-row:last-child .summary-value {
+            font-size: 1.75rem;
+            color: var(--accent);
+        }
+
+        /* Status Badge */
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+
+        .status-badge.draft {
+            background: rgba(100, 116, 139, 0.1);
+            color: var(--text-muted);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: currentColor;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 0.875rem 1.75rem;
+            border-radius: 10px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+            font-size: 0.95rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.75rem;
+            justify-content: center;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #059669;
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: var(--surface);
+            color: var(--text);
+            border: 2px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .btn-full {
+            width: 100%;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+
+        /* Alert */
+        .alert {
+            padding: 1rem 1.5rem;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .alert-info {
+            background: rgba(59, 130, 246, 0.1);
+            color: var(--info);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+        }
+
+        .alert-icon {
+            font-size: 1.5rem;
+        }
+
+        /* Animations */
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .card {
+            animation: slideIn 0.4s ease-out;
+        }
+
+        .card:nth-child(1) { animation-delay: 0.1s; }
+        .card:nth-child(2) { animation-delay: 0.2s; }
+        .card:nth-child(3) { animation-delay: 0.3s; }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .layout-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .sidebar {
+                order: -1;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .button-group {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Breadcrumb -->
+        <nav class="breadcrumb">
+            <a href="#">الرئيسية</a>
+            <span>←</span>
+            <a href="#">طلبات المبيعات</a>
+            <span>←</span>
+            <span>طلب جديد</span>
+        </nav>
+
+        <div class="layout-grid">
+            <!-- Main Form Area -->
+            <div class="form-area">
+                <!-- Order Information -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">
+                            <span class="card-icon">📋</span>
+                            معلومات الطلب
+                        </h2>
+                        <span class="status-badge draft">
+                            <span class="status-dot"></span>
+                            مسودة
+                        </span>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>رقم الطلب</label>
+                                <input type="text" value="SO-2026-NEW" disabled>
+                            </div>
+
+                            <div class="form-group">
+                                <label>تاريخ الطلب</label>
+                                <input type="date" value="2026-02-07">
+                            </div>
+
+                            <div class="form-group">
+                                <label><span class="required">*</span> العميل</label>
+                                <select>
+                                    <option value="">اختر العميل</option>
+                                    <option value="1" selected>شركة النقل السريع</option>
+                                    <option value="2">مؤسسة اللوجستيات المتقدمة</option>
+                                    <option value="3">مجموعة النقل الوطني</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label>قائمة الأسعار</label>
+                                <select>
+                                    <option value="">السعر الأساسي</option>
+                                    <option value="1">قائمة أسعار VIP</option>
+                                    <option value="2">قائمة أسعار الشركات</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label>صالح من</label>
+                                <input type="date">
+                            </div>
+
+                            <div class="form-group">
+                                <label>صالح إلى</label>
+                                <input type="date">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Order Lines -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">
+                            <span class="card-icon">📦</span>
+                            بنود الطلب
+                        </h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info">
+                            <span class="alert-icon">💡</span>
+                            <div>
+                                <strong>ملاحظة:</strong> الكمية تمثل عدد الشحنات. الرحلة الواحدة = 1، الرحلة ذهاب وإياب = 2 رحلة.
+                            </div>
+                        </div>
+
+                        <div class="table-wrapper">
+                            <table class="lines-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 5%">#</th>
+                                        <th style="width: 30%">الخدمة</th>
+                                        <th style="width: 15%">نوع الرحلة</th>
+                                        <th style="width: 12%">سعر الوحدة</th>
+                                        <th style="width: 10%">الكمية</th>
+                                        <th style="width: 10%">عدد الرحلات</th>
+                                        <th style="width: 13%">الإجمالي</th>
+                                        <th style="width: 5%"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="linesTable">
+                                    <tr>
+                                        <td>1</td>
+                                        <td>
+                                            <select class="line-input">
+                                                <option value="">اختر الخدمة</option>
+                                                <option value="1" selected>جدة ↔ ينبع</option>
+                                                <option value="2">الرياض ↔ الدمام</option>
+                                                <option value="3">مكة ↔ الطائف</option>
+                                            </select>
+                                        </td>
+                                        <td>
+                                            <select class="line-input">
+                                                <option value="oneway">ذهاب فقط (1 رحلة)</option>
+                                                <option value="round" selected>ذهاب وإياب (2 رحلة)</option>
+                                            </select>
+                                        </td>
+                                        <td>
+                                            <input type="number" class="line-input" value="5250" step="0.01">
+                                        </td>
+                                        <td>
+                                            <input type="number" class="line-input" value="3" min="1">
+                                        </td>
+                                        <td>
+                                            <input type="text" class="line-input" value="6" disabled>
+                                        </td>
+                                        <td>
+                                            <strong>15,750 ر.س</strong>
+                                        </td>
+                                        <td>
+                                            <button class="delete-line-btn">🗑️</button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <button class="add-line-btn">
+                            <span>➕</span>
+                            إضافة بند جديد
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Notes -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">
+                            <span class="card-icon">📝</span>
+                            ملاحظات
+                        </h2>
+                    </div>
+                    <div class="card-body">
+                        <textarea rows="4" placeholder="أضف أي ملاحظات إضافية هنا..."></textarea>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="button-group">
+                    <button class="btn btn-success">
+                        <span>✓</span>
+                        حفظ وتأكيد
+                    </button>
+                    <button class="btn btn-primary">
+                        <span>💾</span>
+                        حفظ كمسودة
+                    </button>
+                    <button class="btn btn-secondary">
+                        إلغاء
+                    </button>
+                </div>
+            </div>
+
+            <!-- Sidebar -->
+            <div class="sidebar">
+                <!-- Client Info -->
+                <div class="client-card">
+                    <div class="client-header">
+                        <div class="client-avatar">ن</div>
+                        <div class="client-info">
+                            <h3>شركة النقل السريع</h3>
+                            <div class="client-id">CA-2026-001</div>
+                        </div>
+                    </div>
+                    <div class="client-details">
+                        <div class="client-detail">
+                            <span class="client-detail-icon">📧</span>
+                            <span>info@fastshipping.sa</span>
+                        </div>
+                        <div class="client-detail">
+                            <span class="client-detail-icon">📱</span>
+                            <span>0501234567</span>
+                        </div>
+                        <div class="client-detail">
+                            <span class="client-detail-icon">📍</span>
+                            <span>جدة، المملكة العربية السعودية</span>
+                        </div>
+                        <div class="client-detail">
+                            <span class="client-detail-icon">💰</span>
+                            <span>العملة: SAR</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Summary -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">
+                            <span class="card-icon">💰</span>
+                            ملخص الطلب
+                        </h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="summary-card">
+                            <div class="summary-row">
+                                <span class="summary-label">المجموع الفرعي</span>
+                                <span class="summary-value">15,750 ر.س</span>
+                            </div>
+                            <div class="summary-row">
+                                <span class="summary-label">الضريبة (15%)</span>
+                                <span class="summary-value">2,362.50 ر.س</span>
+                            </div>
+                            <div class="summary-row">
+                                <span class="summary-label">الإجمالي الكلي</span>
+                                <span class="summary-value">18,112.50 ر.س</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Stats -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">
+                            <span class="card-icon">📊</span>
+                            إحصائيات سريعة
+                        </h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="info-card">
+                            <div class="info-row">
+                                <span class="info-label">إجمالي البنود</span>
+                                <span class="info-value">1</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">إجمالي الكمية</span>
+                                <span class="info-value">3 شحنات</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">إجمالي الرحلات</span>
+                                <span class="info-value">6 رحلات</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Calculate line totals
+        function calculateLineTotal(row) {
+            const price = parseFloat(row.querySelector('input[type="number"]').value) || 0;
+            const qty = parseFloat(row.querySelectorAll('input[type="number"]')[1].value) || 0;
+            const tripType = row.querySelector('select:nth-of-type(2)').value;
+            const trips = tripType === 'round' ? 2 : 1;
+            
+            row.querySelectorAll('input[type="text"]')[0].value = qty * trips;
+            
+            const total = price * qty;
+            row.querySelector('td:nth-last-child(2)').innerHTML = `<strong>${total.toLocaleString('ar-SA')} ر.س</strong>`;
+            
+            updateOrderSummary();
+        }
+
+        // Update order summary
+        function updateOrderSummary() {
+            let subtotal = 0;
+            document.querySelectorAll('#linesTable tr').forEach(row => {
+                const priceInput = row.querySelector('input[type="number"]');
+                const qtyInput = row.querySelectorAll('input[type="number"]')[1];
+                if (priceInput && qtyInput) {
+                    subtotal += (parseFloat(priceInput.value) || 0) * (parseFloat(qtyInput.value) || 0);
+                }
+            });
+            
+            const tax = subtotal * 0.15;
+            const total = subtotal + tax;
+            
+            document.querySelector('.summary-row:nth-child(1) .summary-value').textContent = 
+                `${subtotal.toLocaleString('ar-SA')} ر.س`;
+            document.querySelector('.summary-row:nth-child(2) .summary-value').textContent = 
+                `${tax.toLocaleString('ar-SA')} ر.س`;
+            document.querySelector('.summary-row:nth-child(3) .summary-value').textContent = 
+                `${total.toLocaleString('ar-SA')} ر.س`;
+                
+            // Update quick stats
+            const totalLines = document.querySelectorAll('#linesTable tr').length;
+            let totalQty = 0;
+            let totalTrips = 0;
+            
+            document.querySelectorAll('#linesTable tr').forEach(row => {
+                const qtyInput = row.querySelectorAll('input[type="number"]')[1];
+                const tripsInput = row.querySelector('input[type="text"]');
+                if (qtyInput && tripsInput) {
+                    totalQty += parseFloat(qtyInput.value) || 0;
+                    totalTrips += parseFloat(tripsInput.value) || 0;
+                }
+            });
+            
+            document.querySelector('.info-row:nth-child(1) .info-value').textContent = totalLines;
+            document.querySelector('.info-row:nth-child(2) .info-value').textContent = `${totalQty} شحنات`;
+            document.querySelector('.info-row:nth-child(3) .info-value').textContent = `${totalTrips} رحلات`;
+        }
+
+        // Add event listeners to existing row
+        document.querySelectorAll('#linesTable tr').forEach(row => {
+            row.querySelectorAll('input, select').forEach(input => {
+                input.addEventListener('change', () => calculateLineTotal(row));
+            });
+        });
+
+        // Add new line
+        document.querySelector('.add-line-btn').addEventListener('click', function() {
+            const table = document.getElementById('linesTable');
+            const newRow = table.rows[0].cloneNode(true);
+            const rowNum = table.rows.length + 1;
+            
+            newRow.querySelector('td:first-child').textContent = rowNum;
+            newRow.querySelectorAll('input[type="number"]').forEach(input => input.value = '');
+            newRow.querySelector('input[type="text"]').value = '';
+            newRow.querySelector('td:nth-last-child(2)').innerHTML = '<strong>0 ر.س</strong>';
+            
+            table.appendChild(newRow);
+            
+            newRow.querySelectorAll('input, select').forEach(input => {
+                input.addEventListener('change', () => calculateLineTotal(newRow));
+            });
+            
+            newRow.querySelector('.delete-line-btn').addEventListener('click', function() {
+                newRow.remove();
+                updateOrderSummary();
+            });
+        });
+
+        // Delete line
+        document.querySelectorAll('.delete-line-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                if (document.querySelectorAll('#linesTable tr').length > 1) {
+                    this.closest('tr').remove();
+                    updateOrderSummary();
+                } else {
+                    alert('يجب أن يحتوي الطلب على بند واحد على الأقل');
+                }
+            });
+        });
+    </script>
+</body>
+</html>
