@@ -299,12 +299,21 @@
   {% endif %}
 </div>
 
-{% translate "Deactivate address" as js_modal_title_deactivate %}
-{% translate "Activate address" as js_modal_title_activate %}
-{% translate "Deactivate" as js_btn_deactivate %}
-{% translate "Activate" as js_btn_activate %}
-
-<div class="modal fade" id="addressStatusConfirmModal" tabindex="-1" aria-labelledby="addressStatusConfirmTitle" aria-hidden="true">
+{% translate "Deactivate address" as label_title_deactivate %}
+{% translate "Activate address" as label_title_activate %}
+{% translate "Deactivate" as label_btn_deactivate %}
+{% translate "Activate" as label_btn_activate %}
+<div
+  class="modal fade"
+  id="addressStatusConfirmModal"
+  tabindex="-1"
+  aria-labelledby="addressStatusConfirmTitle"
+  aria-hidden="true"
+  data-label-title-deactivate="{{ label_title_deactivate }}"
+  data-label-title-activate="{{ label_title_activate }}"
+  data-label-btn-deactivate="{{ label_btn_deactivate }}"
+  data-label-btn-activate="{{ label_btn_activate }}"
+>
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <form method="post" action="{% url 'iroad_tenants:tenant_address_master' %}" id="addressStatusConfirmForm">
@@ -325,9 +334,10 @@
             {% translate "Activate this address? It will be available again in operational flows." %}
           </p>
         </div>
-        <div class="modal-footer">
+        <div class="modal-footer gap-2">
           <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{% translate "Cancel" %}</button>
-          <button type="submit" class="btn" id="addrConfirmSubmitBtn"></button>
+          {# Default text + Bootstrap variant so UI is correct before/alongside JS updates #}
+          <button type="submit" class="btn btn-danger px-4" id="addrConfirmSubmitBtn">{% translate "Deactivate" %}</button>
         </div>
       </form>
     </div>
@@ -420,6 +430,10 @@
   </div>
 </aside>
 
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
 <script>
 (function () {
   const panel = document.getElementById("detailPanel");
@@ -432,15 +446,38 @@
   let currentIndex = -1;
 
   const statusModalEl = document.getElementById("addressStatusConfirmModal");
-  const statusModal = statusModalEl ? bootstrap.Modal.getOrCreateInstance(statusModalEl) : null;
+  const statusModal =
+    statusModalEl && typeof bootstrap !== "undefined"
+      ? bootstrap.Modal.getOrCreateInstance(statusModalEl)
+      : null;
   const addrConfirmSubmitBtn = document.getElementById("addrConfirmSubmitBtn");
   const addrConfirmTitle = document.getElementById("addressStatusConfirmTitle");
   const addrMsgDeactivate = document.getElementById("addrConfirmMsgDeactivate");
   const addrMsgActivate = document.getElementById("addrConfirmMsgActivate");
-  const i18nDeactivate = "{{ js_modal_title_deactivate|escapejs }}";
-  const i18nActivate = "{{ js_modal_title_activate|escapejs }}";
-  const i18nBtnDeactivate = "{{ js_btn_deactivate|escapejs }}";
-  const i18nBtnActivate = "{{ js_btn_activate|escapejs }}";
+
+  function attrOr(el, key, fallback) {
+    var v = el && typeof el.getAttribute === "function" ? el.getAttribute(key) : null;
+    if (v === null || v === "") return fallback;
+    return v;
+  }
+
+  function modalStatusLabels() {
+    var root = statusModalEl;
+    if (!root) {
+      return {
+        titleDeact: "Deactivate address",
+        titleAct: "Activate address",
+        btnDeact: "Deactivate",
+        btnAct: "Activate",
+      };
+    }
+    return {
+      titleDeact: attrOr(root, "data-label-title-deactivate", "Deactivate address"),
+      titleAct: attrOr(root, "data-label-title-activate", "Activate address"),
+      btnDeact: attrOr(root, "data-label-btn-deactivate", "Deactivate"),
+      btnAct: attrOr(root, "data-label-btn-activate", "Activate"),
+    };
+  }
 
   function txt(v) {
     return v != null && v !== "" ? String(v) : "—";
@@ -536,15 +573,21 @@
         document.getElementById("addrConfirmAddressId").value = id;
         document.getElementById("addrConfirmNewStatus").value = newStatus;
         var deact = newStatus === "Inactive";
-        addrConfirmTitle.textContent = deact ? i18nDeactivate : i18nActivate;
+        var L = modalStatusLabels();
+        addrConfirmTitle.textContent = deact ? L.titleDeact : L.titleAct;
         addrMsgDeactivate.classList.toggle("d-none", !deact);
         addrMsgActivate.classList.toggle("d-none", deact);
-        addrConfirmSubmitBtn.className = "btn " + (deact ? "btn-danger" : "btn-success");
-        addrConfirmSubmitBtn.textContent = deact ? i18nBtnDeactivate : i18nBtnActivate;
+        addrConfirmSubmitBtn.className =
+          "btn px-4 " + (deact ? "btn-danger" : "btn-success");
+        addrConfirmSubmitBtn.textContent = deact ? L.btnDeact : L.btnAct;
+        addrConfirmSubmitBtn.setAttribute(
+          "aria-label",
+          deact ? L.btnDeact : L.btnAct
+        );
         statusModal.show();
       });
     });
   }
 })();
 </script>
-{% endblock %}
+{% endblock extra_js %}
