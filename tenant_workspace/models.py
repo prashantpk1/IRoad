@@ -4,13 +4,11 @@ Tables that exist **only** inside each tenant's Postgres schema.
 Control Panel / billing ORM stays in ``public`` (``SHARED_APPS``); this app is
 listed in ``TENANT_APPS`` and is migrated per tenant via django-tenants.
 """
-from django.db import models
-from django.db import transaction
-from django.core.exceptions import ValidationError
 import uuid
-import os
-import re
-from django.utils import timezone
+
+from django.core.exceptions import ValidationError
+from django.db import models, transaction
+from django.utils.translation import gettext_lazy as _
 
 
 class TenantSchemaVersion(models.Model):
@@ -176,7 +174,6 @@ class TenantClientAccount(models.Model):
     name_arabic = models.CharField(max_length=200, blank=True, default='')
     name_english = models.CharField(max_length=200)
     display_name = models.CharField(max_length=200)
-    national_id = models.CharField(max_length=80, blank=True, default='')
     preferred_currency = models.CharField(max_length=10, blank=True, default='')
     billing_street_1 = models.CharField(max_length=255)
     billing_street_2 = models.CharField(max_length=255, blank=True, default='')
@@ -201,251 +198,171 @@ class TenantClientAccount(models.Model):
         return self.display_name or self.name_english or self.account_no
 
 
-class TenantClientAccountSetting(models.Model):
-    """Tenant-scoped client account onboarding/settings rules."""
+class TenantAddressMaster(models.Model):
+    """AD-001 Address Master — shipping addresses per client account (tenant schema).
 
-    class DefaultClientStatus(models.TextChoices):
+    Country is stored as a logical FK to ``superadmin.Country`` (PK = ``country_code``).
+    ``db_constraint=False`` avoids brittle cross-schema DB constraints under django-tenants;
+    Django ORM and forms still enforce FK integrity.
+
+    Operational code MUST use ``tenant_workspace.operational_addresses`` —
+    e.g. ``get_active_addresses(client_id)`` and
+    ``resolve_active_address_for_client(address_id, client_id)`` — so only
+    **Active** rows for the **current client** are shown or accepted.
+    The ``active_objects`` manager is Active-only and must always be combined
+    with ``client_account_id`` (prefer the operational helpers above).
+    """
+
+    class AddressCategory(models.TextChoices):
+        PICKUP_ADDRESS = 'Pickup Address', 'Pickup Address'
+        DELIVERY_ADDRESS = 'Delivery Address', 'Delivery Address'
+        BOTH = 'Both', 'Both'
+
+    class Status(models.TextChoices):
         ACTIVE = 'Active', 'Active'
         INACTIVE = 'Inactive', 'Inactive'
 
-    class DefaultClientType(models.TextChoices):
-        INDIVIDUAL = 'Individual', 'Individual'
-        BUSINESS = 'Business', 'Business'
+    objects = models.Manager()
 
-    setting_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    require_national_id_individual = models.BooleanField(default=True)
-    require_commercial_registration_business = models.BooleanField(default=False)
-    require_tax_vat_registration_business = models.BooleanField(default=False)
-    default_client_status = models.CharField(
-        max_length=12,
-        choices=DefaultClientStatus.choices,
-        default=DefaultClientStatus.ACTIVE,
-    )
-    default_client_type = models.CharField(
-        max_length=20,
-        choices=DefaultClientType.choices,
-        default=DefaultClientType.INDIVIDUAL,
-    )
-    default_preferred_currency = models.CharField(max_length=10, blank=True, default='')
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        db_table = 'tenant_client_account_settings'
-
-    def __str__(self):
-        return f'Client Account Settings ({self.setting_id})'
-
-
-class TenantClientAttachment(models.Model):
-    """Tenant-scoped client attachment master (CA-ATT-002)."""
-
-    class Status(models.TextChoices):
-        VALID = 'Valid', 'Valid'
-        EXPIRED = 'Expired', 'Expired'
-        DOES_NOT_EXPIRE = 'Does Not Expire', 'Does Not Expire'
-
-    attachment_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    attachment_no = models.CharField(max_length=64, unique=True)
-    attachment_sequence = models.PositiveIntegerField(default=0)
-    client_account = models.ForeignKey(
-        TenantClientAccount,
-        on_delete=models.CASCADE,
-        related_name='attachments',
-        db_column='client_id',
-    )
-    attachment_date = models.DateField(default=timezone.localdate)
-    is_expiry_applicable = models.BooleanField(default=False)
-    expiry_date = models.DateField(null=True, blank=True)
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.DOES_NOT_EXPIRE)
-    attachment_file = models.FileField(upload_to='tenant/client_attachments/')
-    file_notes = models.TextField(blank=True, default='')
-    created_by_label = models.CharField(max_length=200, blank=True, default='')
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        db_table = 'tenant_client_attachments'
-        ordering = ['-created_at']
-
-    def _derived_status(self):
-        if not self.is_expiry_applicable:
-            return self.Status.DOES_NOT_EXPIRE
-        if not self.expiry_date:
-            return self.Status.DOES_NOT_EXPIRE
-        return self.Status.EXPIRED if self.expiry_date < timezone.localdate() else self.Status.VALID
-
-    def save(self, *args, **kwargs):
-        if not self.is_expiry_applicable:
-            self.expiry_date = None
-        self.status = self._derived_status()
-        super().save(*args, **kwargs)
-
-    def __str__(self):
-        return f'{self.attachment_no} - {self.client_account.account_no}'
-
-    @property
-    def file_name(self):
-        return os.path.basename(self.attachment_file.name or '')
-
-
-class TenantClientContact(models.Model):
-    """Tenant-scoped client contacts (CA-CC-003)."""
-
-    contact_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    client_account = models.ForeignKey(
-        TenantClientAccount,
-        on_delete=models.CASCADE,
-        related_name='contacts',
-        db_column='client_id',
-    )
-    name = models.CharField(max_length=200)
-    email = models.EmailField(max_length=150, blank=True, default='')
-    mobile_number = models.CharField(max_length=30, blank=True, default='')
-    telephone_number = models.CharField(max_length=30, blank=True, default='')
-    extension = models.CharField(max_length=30, blank=True, default='')
-    position = models.CharField(max_length=120, blank=True, default='')
-    is_primary = models.BooleanField(default=False)
-    created_by_label = models.CharField(max_length=200, blank=True, default='')
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        db_table = 'tenant_client_contacts'
-        ordering = ['-created_at']
-
-    def clean(self):
-        errors = {}
-        if self.is_primary and not (self.email or self.mobile_number or self.telephone_number):
-            errors['is_primary'] = (
-                'Primary contact must have at least one reachable method: Email, Mobile, or Telephone.'
+    class ActiveAddressManager(models.Manager):
+        def get_queryset(self):
+            return super().get_queryset().filter(
+                status=TenantAddressMaster.Status.ACTIVE,
             )
 
-        phone_pattern = re.compile(r'^[0-9+\-\s()]+$')
-        if self.mobile_number and not phone_pattern.match(self.mobile_number):
-            errors['mobile_number'] = 'Mobile Number should contain only numeric/phone characters.'
-        if self.telephone_number and not phone_pattern.match(self.telephone_number):
-            errors['telephone_number'] = 'Telephone Number should contain only numeric/phone characters.'
-        if self.extension and not re.fullmatch(r'[0-9]+', self.extension):
-            errors['extension'] = 'Extension should contain digits only.'
+    active_objects = ActiveAddressManager()
+
+    address_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    address_code = models.CharField(max_length=64, unique=True)
+    address_sequence = models.PositiveIntegerField(default=0)
+    client_account = models.ForeignKey(
+        TenantClientAccount,
+        on_delete=models.PROTECT,
+        related_name='addresses',
+    )
+    display_name = models.CharField(max_length=200)
+    arabic_label = models.CharField(max_length=200, blank=True, default='')
+    english_label = models.CharField(max_length=200, blank=True, default='')
+    address_category = models.CharField(
+        max_length=32,
+        choices=AddressCategory.choices,
+    )
+    default_pickup_address = models.BooleanField(default=False)
+    default_delivery_address = models.BooleanField(default=False)
+    status = models.CharField(
+        max_length=12,
+        choices=Status.choices,
+        default=Status.ACTIVE,
+    )
+    country = models.ForeignKey(
+        'superadmin.Country',
+        on_delete=models.PROTECT,
+        related_name='+',
+        to_field='country_code',
+        db_column='country_id',
+        db_constraint=False,
+    )
+    province = models.CharField(max_length=120)
+    city = models.CharField(max_length=120)
+    district = models.CharField(max_length=120, blank=True, default='')
+    street = models.CharField(max_length=200, blank=True, default='')
+    building_no = models.CharField(max_length=50, blank=True, default='')
+    postal_code = models.CharField(max_length=30, blank=True, default='')
+    address_line_1 = models.CharField(max_length=255)
+    address_line_2 = models.CharField(max_length=255, blank=True, default='')
+    map_link = models.CharField(max_length=512, blank=True, default='')
+    site_instructions = models.TextField(blank=True, default='')
+    contact_name = models.CharField(max_length=200, blank=True, default='')
+    position = models.CharField(max_length=120, blank=True, default='')
+    mobile_no_1 = models.CharField(max_length=30)
+    mobile_no_2 = models.CharField(max_length=30, blank=True, default='')
+    whatsapp_no = models.CharField(max_length=30, blank=True, default='')
+    phone_no = models.CharField(max_length=30, blank=True, default='')
+    extension = models.CharField(max_length=20, blank=True, default='')
+    email = models.EmailField(blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'tenant_address_master'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(
+                fields=['client_account', 'status'],
+                name='tenant_addr_client_status_idx',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.address_code} — {self.display_name}'
+
+    def _normalize_category_from_defaults(self):
+        """PCS: defaults force category toward Both."""
+        cat = self.address_category
+        if self.default_pickup_address and cat == self.AddressCategory.DELIVERY_ADDRESS:
+            self.address_category = self.AddressCategory.BOTH
+        if self.default_delivery_address and cat == self.AddressCategory.PICKUP_ADDRESS:
+            self.address_category = self.AddressCategory.BOTH
+
+    def clean(self):
+        """AD-001 validations for programmatic saves (ModelForm invokes this via ``full_clean``)."""
+        self._normalize_category_from_defaults()
+        errors = {}
+
+        def add(field: str, message):
+            errors.setdefault(field, []).append(message)
+
+        if self.client_account_id is None:
+            add('client_account', _('Client account is required.'))
+
+        if not (self.display_name or '').strip():
+            add('display_name', _('Display name is required.'))
+
+        cat = getattr(self, 'address_category', None)
+        valid_categories = {c for c, _ in self.AddressCategory.choices}
+        if not cat or cat not in valid_categories:
+            add('address_category', _('Address category is required.'))
+
+        if not (self.address_line_1 or '').strip():
+            add('address_line_1', _('Address line 1 is required.'))
+
+        mob = ''.join(ch for ch in (self.mobile_no_1 or '') if ch.isdigit())
+        if not mob:
+            add('mobile_no_1', _('Mobile number is required (digits only).'))
+
+        if not (self.country_id or '').strip():
+            add('country', _('Country is required.'))
+
+        if not (self.province or '').strip():
+            add('province', _('Province / region is required.'))
+
+        if not (self.city or '').strip():
+            add('city', _('City is required.'))
 
         if errors:
             raise ValidationError(errors)
 
+    def _enforce_default_uniqueness(self):
+        """At most one active default pickup and one active default delivery per client."""
+        if self.status != self.Status.ACTIVE:
+            return
+        from tenant_workspace import operational_addresses as op_addr
+
+        qs_base = op_addr.get_active_addresses(
+            self.client_account_id,
+            select_related_client=False,
+        ).exclude(pk=self.address_id)
+
+        if self.default_pickup_address:
+            qs_base.filter(default_pickup_address=True).update(default_pickup_address=False)
+        if self.default_delivery_address:
+            qs_base.filter(default_delivery_address=True).update(default_delivery_address=False)
+
+    @transaction.atomic
     def save(self, *args, **kwargs):
-        self.full_clean()
-        with transaction.atomic():
-            super().save(*args, **kwargs)
-            if self.is_primary:
-                self.__class__.objects.filter(client_account=self.client_account).exclude(
-                    pk=self.pk
-                ).update(is_primary=False)
-
-    def __str__(self):
-        return f'{self.name} - {self.client_account.account_no}'
-
-
-class TenantClientContract(models.Model):
-    """Tenant-scoped client contract master (CA-CTR-004)."""
-
-    class Status(models.TextChoices):
-        UPCOMING = 'Upcoming', 'Upcoming'
-        ACTIVE = 'Active', 'Active'
-        EXPIRED = 'Expired', 'Expired'
-
-    contract_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    contract_no = models.CharField(max_length=64, unique=True)
-    contract_sequence = models.PositiveIntegerField(default=0)
-    client_account = models.OneToOneField(
-        TenantClientAccount,
-        on_delete=models.CASCADE,
-        related_name='contract',
-        db_column='client_id',
-    )
-    start_date = models.DateField()
-    end_date = models.DateField()
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.UPCOMING)
-    notes = models.TextField(blank=True, default='')
-    contract_attachment = models.FileField(upload_to='tenant/client_contracts/')
-    created_by_label = models.CharField(max_length=200, blank=True, default='')
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        db_table = 'tenant_client_contracts'
-        ordering = ['-created_at']
-
-    def clean(self):
-        if self.end_date <= self.start_date:
-            raise ValidationError('End Date must be greater than Start Date.')
-
-    def _derived_status(self):
-        today = timezone.localdate()
-        if self.end_date < today:
-            return self.Status.EXPIRED
-        if self.start_date > today:
-            return self.Status.UPCOMING
-        return self.Status.ACTIVE
-
-    def save(self, *args, **kwargs):
-        self.full_clean()
-        self.status = self._derived_status()
+        self._normalize_category_from_defaults()
         super().save(*args, **kwargs)
-
-    def __str__(self):
-        return f'{self.contract_no} - {self.client_account.account_no}'
-
-
-class TenantClientContractSetting(models.Model):
-    """Tenant-level settings controlling expired contract behavior."""
-
-    class ExpiredContractHandlingMode(models.TextChoices):
-        AUTO_DEACTIVATE = 'Auto-Deactivate', 'Auto-Deactivate'
-        DO_NOTHING = 'Do Nothing', 'Do Nothing'
-        DEACTIVATE_AFTER_GRACE = 'Deactivate After Grace', 'Deactivate After Grace'
-
-    class NotificationFrequency(models.TextChoices):
-        ONCE = 'Once', 'Once'
-        DAILY = 'Daily', 'Daily'
-        WEEKLY = 'Weekly', 'Weekly'
-
-    class NotificationAudience(models.TextChoices):
-        SYSTEM_ADMIN = 'System Admin', 'System Admin'
-        ADMIN_FINANCE = 'Admin+Finance', 'Admin+Finance'
-
-    setting_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    expired_contract_handling_mode = models.CharField(
-        max_length=30,
-        choices=ExpiredContractHandlingMode.choices,
-        default=ExpiredContractHandlingMode.DO_NOTHING,
-    )
-    grace_period_days = models.PositiveSmallIntegerField(default=30)
-    pre_expiry_notification_days = models.PositiveSmallIntegerField(default=30)
-    post_expiry_notification_days = models.PositiveSmallIntegerField(default=30)
-    notification_frequency = models.CharField(
-        max_length=10,
-        choices=NotificationFrequency.choices,
-        default=NotificationFrequency.DAILY,
-    )
-    notification_audience = models.CharField(
-        max_length=20,
-        choices=NotificationAudience.choices,
-        default=NotificationAudience.SYSTEM_ADMIN,
-    )
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        db_table = 'tenant_client_contract_settings'
-
-    def clean(self):
-        if self.grace_period_days < 0 or self.grace_period_days > 365:
-            raise ValidationError('Grace Period Days must be between 0 and 365.')
-        if self.pre_expiry_notification_days < 0 or self.pre_expiry_notification_days > 180:
-            raise ValidationError('Pre-Expiry Notification Days must be between 0 and 180.')
-        if self.post_expiry_notification_days < 0 or self.post_expiry_notification_days > 180:
-            raise ValidationError('Post-Expiry Notification Days must be between 0 and 180.')
-
-    def __str__(self):
-        return f'Client Contract Settings ({self.setting_id})'
+        self._enforce_default_uniqueness()
 
 
 class TenantUser(models.Model):

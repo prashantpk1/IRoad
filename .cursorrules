@@ -17,6 +17,7 @@
 - Never use SQLite — PostgreSQL only
 
 ## Template Rules
+- **Do not change visual/UI design unless the user explicitly requests it.** Preserve layout, typography, spacing, colors, and designer HTML structure; wire backend (views, forms, URLs, data) without redesigning pages.
 - base.html must be the master layout extended by every page
 - sidebar.html, navbar.html, footer.html must be separate partials included in base.html
 - Every template extends base.html using {% extends 'base.html' %}

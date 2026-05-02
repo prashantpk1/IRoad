@@ -117,32 +117,81 @@ function buildLoginHeatmapChart() {
   if (!grid) return;
   
   grid.innerHTML = "";
-  const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const dayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const colors = ["#f1f5f9", "#cbd5e1", "#818cf8", "#6366f1", "#4338ca"];
+
+  // Prefer server-provided real data when available.
+  const heatmapRaw = document.getElementById("heatmap-data");
+  let heatmapData = null;
+  if (heatmapRaw) {
+    try {
+      heatmapData = JSON.parse(heatmapRaw.textContent || "[]");
+    } catch (e) {
+      heatmapData = null;
+    }
+  }
+
+  // Fallback for pages that do not provide real data.
+  if (!Array.isArray(heatmapData) || heatmapData.length !== 7) {
+    heatmapData = [];
+    for (let d = 0; d < 7; d++) {
+      const dayArr = [];
+      for (let h = 0; h < 24; h++) {
+        let activity = Math.floor(Math.random() * 20);
+        if (d < 5 && h >= 8 && h <= 18) activity += Math.floor(Math.random() * 80);
+        else if (h >= 10 && h <= 22) activity += Math.floor(Math.random() * 40);
+        dayArr.push(activity);
+      }
+      heatmapData.push(dayArr);
+    }
+  }
+
+  const nonZeroValues = heatmapData.flat().filter((v) => Number(v) > 0).sort((a, b) => a - b);
+  const pickQuantile = (arr, q) => {
+    if (!arr.length) return 0;
+    const idx = Math.floor((arr.length - 1) * q);
+    return arr[idx];
+  };
+  const q1 = pickQuantile(nonZeroValues, 0.25);
+  const q2 = pickQuantile(nonZeroValues, 0.5);
+  const q3 = pickQuantile(nonZeroValues, 0.75);
+  const q4 = pickQuantile(nonZeroValues, 0.95);
+  const getIntensity = (count) => {
+    if (count <= 0 || !nonZeroValues.length) return 0;
+    if (count <= q1) return 1;
+    if (count <= q2) return 2;
+    if (count <= q3) return 3;
+    if (count <= q4) return 4;
+    return 4;
+  };
+
+  // Build Monday..Sunday date labels for tooltip display.
+  const now = new Date();
+  const monday = new Date(now);
+  const weekdayFromMonday = (now.getDay() + 6) % 7; // Mon=0...Sun=6
+  monday.setDate(now.getDate() - weekdayFromMonday);
+  monday.setHours(0, 0, 0, 0);
+  const dayDates = Array.from({ length: 7 }, (_, idx) => {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + idx);
+    return d.toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
+  });
   
   // Create 7 rows x 24 columns
   for (let d = 0; d < 7; d++) {
     for (let h = 0; h < 24; h++) {
       const cell = document.createElement("div");
       cell.className = "heatmap-cell";
-      
-      let activity = Math.floor(Math.random() * 20);
-      if (d < 5 && h >= 8 && h <= 18) {
-         activity += Math.floor(Math.random() * 80);
-      } else if (h >= 10 && h <= 22) {
-         activity += Math.floor(Math.random() * 40);
-      }
-      
-      let bgColor = ""; // Keep empty to use CSS default (#f1f5f9)
-      if (activity > 0 && activity <= 20) bgColor = "#cbd5e1";
-      else if (activity > 20 && activity <= 50) bgColor = "#818cf8";
-      else if (activity > 50 && activity <= 80) bgColor = "#6366f1";
-      else if (activity > 80) bgColor = "#4338ca";
-      
-      if (bgColor) cell.style.backgroundColor = bgColor;
-      
-      const hourFmt = h.toString().padStart(2, '0') + ":00";
-      cell.setAttribute("data-tooltip", `${days[d]} ${hourFmt} — ${activity} Logins`);
-      
+
+      const activity = Number(heatmapData[d]?.[h] || 0);
+      const intensity = getIntensity(activity);
+      cell.style.backgroundColor = colors[intensity];
+
+      const hourFmt = h.toString().padStart(2, "0") + ":00";
+      cell.setAttribute(
+        "data-tooltip",
+        `${dayLabels[d]}, ${dayDates[d]} ${hourFmt} - ${activity} login(s)`
+      );
       grid.appendChild(cell);
     }
   }

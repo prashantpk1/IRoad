@@ -338,15 +338,12 @@ function initFormValidation() {
 
   if (form) {
     form.addEventListener("submit", function (e) {
-      e.preventDefault();
-
-      // Validate time range
       if (!validateTimeRange()) {
+        e.preventDefault();
         showAlert("End time must be after start time", "error");
         return;
       }
 
-      // Validate required fields
       const requiredFields = form.querySelectorAll("[required]");
       let isValid = true;
 
@@ -359,12 +356,10 @@ function initFormValidation() {
         }
       });
 
-      if (isValid) {
-        // Form is valid - you can submit or process data
-        showAlert("Form submitted successfully!", "success");
-        // form.submit(); // Uncomment to actually submit
-      } else {
+      if (!isValid) {
+        e.preventDefault();
         showAlert("Please fill in all required fields", "error");
+        return;
       }
     });
 

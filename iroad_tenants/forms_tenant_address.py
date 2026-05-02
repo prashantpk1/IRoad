@@ -1,0 +1,275 @@
+from django import forms
+from django.core.exceptions import ValidationError
+from django.core.validators import URLValidator
+from django.db.models import Q
+from django.utils.translation import gettext_lazy as _
+from django_tenants.utils import schema_context
+
+from superadmin.models import Country
+from tenant_workspace.models import TenantAddressMaster, TenantClientAccount
+
+
+class PublicCountryChoiceField(forms.ChoiceField):
+    """
+    Countries are loaded from the shared (public) schema. ModelChoice/queryset
+    iteration on tenant connections produces empty choices or failing lookups,
+    so we materialize labels in ``schema_context('public')`` and return a live
+    ``Country`` instance from ``clean()``.
+    """
+
+    def __init__(self, *, address_instance, **kwargs):
+        self._address_instance = address_instance
+        kwargs.setdefault('label', _('Country'))
+        super().__init__(**kwargs)
+
+    def clean(self, value):
+        value = super().clean(value)
+        if value in self.empty_values:
+            return None
+        with schema_context('public'):
+            row = Country.objects.filter(pk=value).first()
+        if row is None:
+            raise ValidationError(_('Select a country from the master list.'))
+        if not row.is_active:
+            prior = getattr(self._address_instance, 'country_id', None)
+            if (
+                self._address_instance
+                and self._address_instance.pk
+                and prior
+                and str(prior).strip().upper() == str(row.pk).strip().upper()
+            ):
+                return row
+            raise ValidationError(_('Select a country from the master list.'))
+        return row
+
+
+def _digits_only(value: str, required: bool) -> str:
+    s = ''.join(ch for ch in (value or '') if ch.isdigit())
+    if required and not s:
+        raise ValidationError('Digits only.')
+    if value and ''.join(ch for ch in value if not ch.isspace()) and not s:
+        raise ValidationError('Digits only.')
+    return s
+
+
+class TenantAddressMasterForm(forms.ModelForm):
+    address_code_preview = forms.CharField(
+        label=_('Address Code'),
+        required=False,
+        widget=forms.TextInput(
+            attrs={
+                'class': 'form-control',
+                'readonly': True,
+                'placeholder': _('Auto generated'),
+            }
+        ),
+    )
+
+    class Meta:
+        model = TenantAddressMaster
+        fields = (
+            'client_account',
+            'display_name',
+            'arabic_label',
+            'english_label',
+            'address_category',
+            'default_pickup_address',
+            'default_delivery_address',
+            'status',
+            'country',
+            'province',
+            'city',
+            'district',
+            'street',
+            'building_no',
+            'postal_code',
+            'address_line_1',
+            'address_line_2',
+            'map_link',
+            'site_instructions',
+            'contact_name',
+            'position',
+            'mobile_no_1',
+            'mobile_no_2',
+            'whatsapp_no',
+            'phone_no',
+            'extension',
+            'email',
+        )
+        labels = {
+            'address_category': _('Address Category'),
+            'country': _('Country'),
+        }
+        widgets = {
+            'client_account': forms.Select(attrs={'class': 'form-select'}),
+            'display_name': forms.TextInput(
+                attrs={'class': 'form-control', 'placeholder': _('e.g. Main Warehouse')}
+            ),
+            'arabic_label': forms.TextInput(
+                attrs={'class': 'form-control', 'dir': 'rtl', 'placeholder': _('مثال: المستودع الرئيسي')}
+            ),
+            'english_label': forms.TextInput(
+                attrs={'class': 'form-control', 'placeholder': _('e.g. Head Office')}
+            ),
+            'address_category': forms.Select(attrs={'class': 'form-select'}),
+            'default_pickup_address': forms.CheckboxInput(
+                attrs={'class': 'form-check-input', 'role': 'switch'}
+            ),
+            'default_delivery_address': forms.CheckboxInput(
+                attrs={'class': 'form-check-input', 'role': 'switch'}
+            ),
+            'status': forms.Select(attrs={'class': 'form-select'}),
+            'country': forms.Select(attrs={'class': 'form-select'}),
+            'province': forms.TextInput(
+                attrs={'class': 'form-control', 'placeholder': _('Select province...')}
+            ),
+            'city': forms.TextInput(
+                attrs={'class': 'form-control', 'placeholder': _('Select city...')}
+            ),
+            'district': forms.TextInput(
+                attrs={'class': 'form-control', 'placeholder': _('District')}
+            ),
+            'street': forms.TextInput(
+                attrs={'class': 'form-control', 'placeholder': _('Street name')}
+            ),
+            'building_no': forms.TextInput(
+                attrs={'class': 'form-control', 'placeholder': _('e.g. 42')}
+            ),
+            'postal_code': forms.TextInput(
+                attrs={'class': 'form-control', 'placeholder': _('Postal code')}
+            ),
+            'address_line_1': forms.TextInput(
+                attrs={'class': 'form-control', 'placeholder': _('Full address line')}
+            ),
+            'address_line_2': forms.TextInput(
+                attrs={'class': 'form-control', 'placeholder': _('Optional second line')}
+            ),
+            'map_link': forms.URLInput(
+                attrs={
+                    'class': 'form-control',
+                    'placeholder': 'https://maps.google.com/...',
+                }
+            ),
+            'site_instructions': forms.Textarea(
+                attrs={
+                    'class': 'form-control',
+                    'rows': 3,
+                    'placeholder': _('Delivery or pickup instructions.'),
+                }
+            ),
+            'contact_name': forms.TextInput(
+                attrs={'class': 'form-control', 'placeholder': _('Full name')}
+            ),
+            'position': forms.TextInput(
+                attrs={'class': 'form-control', 'placeholder': _('Job title')}
+            ),
+            'mobile_no_1': forms.TextInput(
+                attrs={'class': 'form-control phone-number', 'placeholder': _('Mobile number')}
+            ),
+            'mobile_no_2': forms.TextInput(
+                attrs={'class': 'form-control phone-number', 'placeholder': _('Mobile number')}
+            ),
+            'whatsapp_no': forms.TextInput(
+                attrs={'class': 'form-control phone-number', 'placeholder': _('WhatsApp number')}
+            ),
+            'phone_no': forms.TextInput(
+                attrs={'class': 'form-control', 'placeholder': _('Landline')}
+            ),
+            'extension': forms.TextInput(
+                attrs={'class': 'form-control', 'placeholder': _('Ext.')}
+            ),
+            'email': forms.EmailInput(
+                attrs={'class': 'form-control', 'placeholder': 'email@example.com'}
+            ),
+        }
+
+    def __init__(self, *args, is_create=False, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.fields['address_category'].choices = [
+            (TenantAddressMaster.AddressCategory.PICKUP_ADDRESS, 'Pickup Address'),
+            (TenantAddressMaster.AddressCategory.DELIVERY_ADDRESS, 'Delivery Address'),
+            (TenantAddressMaster.AddressCategory.BOTH, 'Both'),
+        ]
+
+        if not self.instance.pk:
+            self.fields.pop('address_code_preview', None)
+            self.initial.setdefault('status', TenantAddressMaster.Status.ACTIVE)
+            self.initial.setdefault('address_category', TenantAddressMaster.AddressCategory.PICKUP_ADDRESS)
+            self.initial.setdefault('default_pickup_address', False)
+            self.initial.setdefault('default_delivery_address', False)
+        else:
+            self.fields['address_code_preview'].initial = self.instance.address_code
+
+        if is_create:
+            self.fields['status'].choices = [(TenantAddressMaster.Status.ACTIVE, 'Active')]
+            self.fields['status'].initial = TenantAddressMaster.Status.ACTIVE
+
+        self.fields['client_account'].empty_label = _('- Select client -')
+        self.fields['client_account'].queryset = TenantClientAccount.objects.all().order_by(
+            '-created_at'
+        )
+        self.fields.pop('country', None)
+        country_pairs = self._build_country_choices()
+        self.fields['country'] = PublicCountryChoiceField(
+            address_instance=self.instance,
+            choices=country_pairs,
+            required=True,
+            label=_('Country'),
+            widget=forms.Select(attrs={'class': 'form-select'}),
+        )
+        cid_val = getattr(self.instance, 'country_id', None)
+        if self.instance.pk and cid_val:
+            self.fields['country'].initial = cid_val
+
+    def _build_country_choices(self):
+        with schema_context('public'):
+            cid = getattr(self.instance, 'country_id', None)
+            if cid:
+                qs = (
+                    Country.objects.filter(Q(is_active=True) | Q(pk=cid))
+                    .distinct()
+                    .order_by('name_en')
+                )
+            else:
+                qs = Country.objects.filter(is_active=True).order_by('name_en')
+            rows = list(qs)
+        return [('', _('Select country...'))] + [
+            (c.country_code, f'{c.country_code} — {c.name_en}') for c in rows
+        ]
+
+    def clean_map_link(self):
+        v = (self.cleaned_data.get('map_link') or '').strip()
+        if not v:
+            return ''
+        try:
+            URLValidator()(v)
+        except ValidationError:
+            raise ValidationError(_('Enter a valid URL.'))
+        return v
+
+    def clean_building_no(self):
+        raw = self.cleaned_data.get('building_no') or ''
+        if not raw.strip():
+            return ''
+        if not raw.strip().isdigit():
+            raise ValidationError(_('Numeric only.'))
+        return raw.strip()
+
+    def clean_mobile_no_1(self):
+        return _digits_only(self.cleaned_data.get('mobile_no_1'), required=True)
+
+    def clean_mobile_no_2(self):
+        return _digits_only(self.cleaned_data.get('mobile_no_2'), required=False)
+
+    def clean_whatsapp_no(self):
+        return _digits_only(self.cleaned_data.get('whatsapp_no'), required=False)
+
+    def clean_phone_no(self):
+        return _digits_only(self.cleaned_data.get('phone_no'), required=False)
+
+    def clean_extension(self):
+        return _digits_only(self.cleaned_data.get('extension'), required=False)
+
+    def clean_email(self):
+        return (self.cleaned_data.get('email') or '').strip()

@@ -248,7 +248,7 @@
             </div>
 
             <!-- Submit Button -->
-            <button type="submit" class="auth-btn auth-btn-primary">
+            <button type="submit" class="auth-btn auth-btn-primary" id="login-submit-btn">
               <i class="bi bi-box-arrow-in-right"></i>
               Sign In
             </button>
@@ -290,7 +290,9 @@
 
         const timerText = document.getElementById('lockout-timer');
         const timerBar = document.getElementById('lockout-bar');
-        const submitBtn = document.querySelector('.auth-btn-primary');
+        const submitBtn = document.getElementById('login-submit-btn');
+        const loginForm = document.querySelector('form.auth-form');
+        let isLoginSubmitting = false;
 
         if (isLocked) {
           let secondsLeft = remainingSeconds;
@@ -411,6 +413,33 @@
             window.location.reload();
           }
         });
+
+        if (loginForm && submitBtn) {
+          const defaultBtnContent = submitBtn.innerHTML;
+          loginForm.addEventListener('submit', function(e) {
+            if (isLoginSubmitting) {
+              e.preventDefault();
+              return;
+            }
+
+            isLoginSubmitting = true;
+            submitBtn.disabled = true;
+            submitBtn.classList.add('disabled');
+            submitBtn.style.opacity = '0.7';
+            submitBtn.style.cursor = 'not-allowed';
+            submitBtn.innerHTML = '<i class="bi bi-arrow-repeat"></i> Signing in...';
+
+            // Restore state if browser-side validation blocks submission.
+            if (!loginForm.checkValidity()) {
+              isLoginSubmitting = false;
+              submitBtn.disabled = false;
+              submitBtn.classList.remove('disabled');
+              submitBtn.style.opacity = '';
+              submitBtn.style.cursor = '';
+              submitBtn.innerHTML = defaultBtnContent;
+            }
+          });
+        }
       });
     </script>
   </body>

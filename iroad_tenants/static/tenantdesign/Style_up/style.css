@@ -1859,6 +1859,46 @@ textarea.form-control {
   transform: translateY(0);
 }
 
+/* Bootstrap semantic variants: base .btn above sets primary text/border for all .btn —
+   that must not override .btn-danger / .btn-success (e.g. modals showed blue label on red). */
+.btn.btn-danger {
+  background-color: #dc3545;
+  border-color: #dc3545;
+  color: #fff;
+}
+.btn.btn-danger:hover {
+  background-color: #bb2d3b;
+  border-color: #b02a37;
+  color: #fff;
+  box-shadow: none;
+  transform: none;
+}
+.btn.btn-danger:focus-visible {
+  background-color: #bb2d3b;
+  border-color: #b02a37;
+  color: #fff;
+  box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.45);
+}
+
+.btn.btn-success {
+  background-color: #198754;
+  border-color: #198754;
+  color: #fff;
+}
+.btn.btn-success:hover {
+  background-color: #157347;
+  border-color: #146c43;
+  color: #fff;
+  box-shadow: none;
+  transform: none;
+}
+.btn.btn-success:focus-visible {
+  background-color: #157347;
+  border-color: #146c43;
+  color: #fff;
+  box-shadow: 0 0 0 0.2rem rgba(25, 135, 84, 0.45);
+}
+
 /* Submit Section */
 .submit-section {
   padding: 20px 30px;
