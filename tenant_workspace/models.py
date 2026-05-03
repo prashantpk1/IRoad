@@ -4,10 +4,12 @@ Tables that exist **only** inside each tenant's Postgres schema.
 Control Panel / billing ORM stays in ``public`` (``SHARED_APPS``); this app is
 listed in ``TENANT_APPS`` and is migrated per tenant via django-tenants.
 """
+import os
 import uuid
 
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 
@@ -184,6 +186,7 @@ class TenantClientAccount(models.Model):
     credit_limit_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     limit_currency_code = models.CharField(max_length=10, blank=True, default='SAR')
     payment_term_days = models.PositiveIntegerField(default=0)
+    national_id = models.CharField(max_length=80, blank=True, default='')
     commercial_registration_no = models.CharField(max_length=80, blank=True, default='')
     tax_registration_no = models.CharField(max_length=80, blank=True, default='')
     created_by_label = models.CharField(max_length=200, blank=True, default='')
@@ -196,6 +199,258 @@ class TenantClientAccount(models.Model):
 
     def __str__(self):
         return self.display_name or self.name_english or self.account_no
+
+    def save(self, *args, **kwargs):
+        """Enforce tenant Client Account Settings on every persist (not only HTML forms)."""
+        from django.core.exceptions import ValidationError
+
+        from tenant_workspace.client_account_document_rules import (
+            collect_client_account_document_rule_errors,
+        )
+
+        update_fields = kwargs.get('update_fields')
+        doc_keys = {
+            'client_type',
+            'national_id',
+            'commercial_registration_no',
+            'tax_registration_no',
+        }
+        needs_doc_rules = update_fields is None or bool(
+            doc_keys.intersection(set(update_fields))
+        )
+        if needs_doc_rules:
+            setting = TenantClientAccountSetting.objects.order_by('-updated_at').first()
+            if setting is None:
+                setting = TenantClientAccountSetting.objects.create()
+            errs = collect_client_account_document_rule_errors(
+                client_type=self.client_type,
+                national_id=self.national_id,
+                commercial_registration_no=self.commercial_registration_no,
+                tax_registration_no=self.tax_registration_no,
+                require_national_id_individual=bool(setting.require_national_id_individual),
+                require_commercial_registration_business=bool(
+                    setting.require_commercial_registration_business
+                ),
+                require_tax_vat_registration_business=bool(
+                    setting.require_tax_vat_registration_business
+                ),
+            )
+            if errs:
+                raise ValidationError({k: [v] for k, v in errs.items()})
+        super().save(*args, **kwargs)
+
+
+class TenantClientAccountSetting(models.Model):
+    """Singleton-style CRM defaults and document rules (one row per tenant schema)."""
+
+    setting_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    require_national_id_individual = models.BooleanField(default=True)
+    require_commercial_registration_business = models.BooleanField(default=False)
+    require_tax_vat_registration_business = models.BooleanField(default=False)
+    default_client_status = models.CharField(
+        max_length=12,
+        choices=[
+            (TenantClientAccount.Status.ACTIVE, TenantClientAccount.Status.ACTIVE),
+            (TenantClientAccount.Status.INACTIVE, TenantClientAccount.Status.INACTIVE),
+        ],
+        default=TenantClientAccount.Status.ACTIVE,
+    )
+    default_client_type = models.CharField(
+        max_length=20,
+        choices=[
+            (TenantClientAccount.ClientType.INDIVIDUAL, TenantClientAccount.ClientType.INDIVIDUAL),
+            (TenantClientAccount.ClientType.BUSINESS, TenantClientAccount.ClientType.BUSINESS),
+        ],
+        default=TenantClientAccount.ClientType.INDIVIDUAL,
+    )
+    default_preferred_currency = models.CharField(max_length=10, blank=True, default='')
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'tenant_client_account_settings'
+
+    def __str__(self):
+        return 'Client account settings'
+
+
+class TenantClientAttachment(models.Model):
+    """Tenant-scoped client attachment documents."""
+
+    class Status(models.TextChoices):
+        VALID = 'Valid', 'Valid'
+        EXPIRED = 'Expired', 'Expired'
+        DOES_NOT_EXPIRE = 'Does Not Expire', 'Does Not Expire'
+
+    attachment_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    attachment_no = models.CharField(max_length=64, unique=True)
+    attachment_sequence = models.PositiveIntegerField(default=0)
+    attachment_date = models.DateField(default=timezone.localdate)
+    is_expiry_applicable = models.BooleanField(default=False)
+    expiry_date = models.DateField(blank=True, null=True)
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.DOES_NOT_EXPIRE,
+    )
+    attachment_file = models.FileField(upload_to='tenant/client_attachments/')
+    file_notes = models.TextField(blank=True, default='')
+    created_by_label = models.CharField(max_length=200, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    client_account = models.ForeignKey(
+        TenantClientAccount,
+        on_delete=models.CASCADE,
+        related_name='attachments',
+        db_column='client_id',
+    )
+
+    class Meta:
+        db_table = 'tenant_client_attachments'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return self.attachment_no
+
+    @property
+    def file_name(self):
+        name = getattr(self.attachment_file, 'name', '') or ''
+        return os.path.basename(name) if name else ''
+
+    @property
+    def computed_status(self):
+        """Valid / Expired / Does Not Expire from expiry flags and dates (calendar-aware)."""
+        if not self.is_expiry_applicable:
+            return self.Status.DOES_NOT_EXPIRE
+        if self.expiry_date is None:
+            return self.Status.VALID
+        if self.expiry_date < timezone.localdate():
+            return self.Status.EXPIRED
+        return self.Status.VALID
+
+    def save(self, *args, **kwargs):
+        self.status = self.computed_status
+        super().save(*args, **kwargs)
+
+
+class TenantClientContact(models.Model):
+    """Tenant-scoped client contact person."""
+
+    contact_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=200)
+    email = models.EmailField(max_length=150, blank=True, default='')
+    mobile_number = models.CharField(max_length=30, blank=True, default='')
+    telephone_number = models.CharField(max_length=30, blank=True, default='')
+    extension = models.CharField(max_length=30, blank=True, default='')
+    position = models.CharField(max_length=120, blank=True, default='')
+    is_primary = models.BooleanField(default=False)
+    created_by_label = models.CharField(max_length=200, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    client_account = models.ForeignKey(
+        TenantClientAccount,
+        on_delete=models.CASCADE,
+        related_name='contacts',
+        db_column='client_id',
+    )
+
+    class Meta:
+        db_table = 'tenant_client_contacts'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return self.name
+
+
+class TenantClientContract(models.Model):
+    """Tenant-scoped single contract per client account."""
+
+    class Status(models.TextChoices):
+        UPCOMING = 'Upcoming', 'Upcoming'
+        ACTIVE = 'Active', 'Active'
+        EXPIRED = 'Expired', 'Expired'
+
+    contract_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    contract_no = models.CharField(max_length=64, unique=True)
+    contract_sequence = models.PositiveIntegerField(default=0)
+    start_date = models.DateField()
+    end_date = models.DateField()
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.UPCOMING,
+    )
+    notes = models.TextField(blank=True, default='')
+    contract_attachment = models.FileField(upload_to='tenant/client_contracts/')
+    created_by_label = models.CharField(max_length=200, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    client_account = models.OneToOneField(
+        TenantClientAccount,
+        on_delete=models.CASCADE,
+        related_name='contract',
+        db_column='client_id',
+    )
+
+    class Meta:
+        db_table = 'tenant_client_contracts'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return self.contract_no
+
+    @property
+    def contract_file_name(self):
+        name = getattr(self.contract_attachment, 'name', '') or ''
+        return os.path.basename(name) if name else ''
+
+    @property
+    def has_contract_file(self):
+        return bool(getattr(self.contract_attachment, 'name', None))
+
+
+class TenantClientContractSetting(models.Model):
+    """Singleton-style contract notification settings (one row per tenant schema)."""
+
+    class ExpiredHandling(models.TextChoices):
+        AUTO_DEACTIVATE = 'Auto-Deactivate', 'Auto-Deactivate'
+        DO_NOTHING = 'Do Nothing', 'Do Nothing'
+        DEACTIVATE_AFTER_GRACE = 'Deactivate After Grace', 'Deactivate After Grace'
+
+    class NotificationFrequency(models.TextChoices):
+        ONCE = 'Once', 'Once'
+        DAILY = 'Daily', 'Daily'
+        WEEKLY = 'Weekly', 'Weekly'
+
+    class NotificationAudience(models.TextChoices):
+        SYSTEM_ADMIN = 'System Admin', 'System Admin'
+        ADMIN_FINANCE = 'Admin+Finance', 'Admin+Finance'
+
+    setting_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    expired_contract_handling_mode = models.CharField(
+        max_length=30,
+        choices=ExpiredHandling.choices,
+        default=ExpiredHandling.DO_NOTHING,
+    )
+    grace_period_days = models.PositiveSmallIntegerField(default=30)
+    pre_expiry_notification_days = models.PositiveSmallIntegerField(default=30)
+    post_expiry_notification_days = models.PositiveSmallIntegerField(default=30)
+    notification_frequency = models.CharField(
+        max_length=10,
+        choices=NotificationFrequency.choices,
+        default=NotificationFrequency.DAILY,
+    )
+    notification_audience = models.CharField(
+        max_length=20,
+        choices=NotificationAudience.choices,
+        default=NotificationAudience.SYSTEM_ADMIN,
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'tenant_client_contract_settings'
+
+    def __str__(self):
+        return 'Client contract settings'
 
 
 class TenantAddressMaster(models.Model):
@@ -364,6 +619,323 @@ class TenantAddressMaster(models.Model):
         super().save(*args, **kwargs)
         self._enforce_default_uniqueness()
 
+
+class TenantCargoCategory(models.Model):
+    """Cargo category master (tenant schema). Referenced by TenantCargoMaster."""
+
+    class Status(models.TextChoices):
+        ACTIVE = 'Active', 'Active'
+        INACTIVE = 'Inactive', 'Inactive'
+
+    category_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    category_code = models.CharField(max_length=64, unique=True)
+    category_sequence = models.PositiveIntegerField(default=0)
+    name_english = models.CharField(max_length=200)
+    name_arabic = models.CharField(max_length=200, blank=True, default='')
+    status = models.CharField(
+        max_length=12,
+        choices=Status.choices,
+        default=Status.ACTIVE,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'tenant_cargo_category'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.category_code} — {self.name_english}'
+
+    def clean(self):
+        errors = {}
+        if not (self.name_english or '').strip():
+            errors['name_english'] = [_('English name is required.')]
+        if errors:
+            raise ValidationError(errors)
+
+
+class TenantCargoMaster(models.Model):
+    """CG-001 Cargo Master — client-scoped cargo catalog (tenant schema)."""
+
+    class Status(models.TextChoices):
+        ACTIVE = 'Active', 'Active'
+        INACTIVE = 'Inactive', 'Inactive'
+
+    objects = models.Manager()
+
+    class ActiveCargoManager(models.Manager):
+        """Active cargo with active category (for shipment/waybill selection lists)."""
+
+        def get_queryset(self):
+            return (
+                super()
+                .get_queryset()
+                .filter(
+                    status=TenantCargoMaster.Status.ACTIVE,
+                    cargo_category__status=TenantCargoCategory.Status.ACTIVE,
+                    client_account__status=TenantClientAccount.Status.ACTIVE,
+                )
+            )
+
+    active_objects = ActiveCargoManager()
+
+    cargo_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    cargo_code = models.CharField(max_length=64, unique=True)
+    cargo_sequence = models.PositiveIntegerField(default=0)
+    client_account = models.ForeignKey(
+        TenantClientAccount,
+        on_delete=models.PROTECT,
+        related_name='cargo_items',
+    )
+    display_name = models.CharField(max_length=200)
+    arabic_label = models.CharField(max_length=200, blank=True, default='')
+    english_label = models.CharField(max_length=200, blank=True, default='')
+    cargo_category = models.ForeignKey(
+        TenantCargoCategory,
+        on_delete=models.PROTECT,
+        related_name='cargo_items',
+    )
+    client_sku_external_ref = models.CharField(max_length=120, blank=True, default='')
+    uom = models.CharField(max_length=64, blank=True, default='')
+    weight_per_unit = models.DecimalField(max_digits=14, decimal_places=3, null=True, blank=True)
+    volume_per_unit = models.DecimalField(max_digits=14, decimal_places=3, null=True, blank=True)
+    length = models.DecimalField(max_digits=12, decimal_places=3, null=True, blank=True)
+    width = models.DecimalField(max_digits=12, decimal_places=3, null=True, blank=True)
+    height = models.DecimalField(max_digits=12, decimal_places=3, null=True, blank=True)
+    refrigerated_goods = models.BooleanField(default=False)
+    min_temp = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
+    max_temp = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
+    dangerous_goods = models.BooleanField(default=False)
+    notes = models.TextField(blank=True, default='')
+    status = models.CharField(
+        max_length=12,
+        choices=Status.choices,
+        default=Status.ACTIVE,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'tenant_cargo_master'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(
+                fields=['client_account', 'status'],
+                name='tenant_cargo_client_status_idx',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.cargo_code} — {self.display_name}'
+
+    def clean(self):
+        errors = {}
+
+        if not (self.display_name or '').strip():
+            errors['display_name'] = [_('Display name is required.')]
+
+        if self.refrigerated_goods:
+            if self.min_temp is None:
+                errors['min_temp'] = [
+                    _('Min temperature is required when refrigerated goods is enabled.'),
+                ]
+            if self.max_temp is None:
+                errors['max_temp'] = [
+                    _('Max temperature is required when refrigerated goods is enabled.'),
+                ]
+            if (
+                self.min_temp is not None
+                and self.max_temp is not None
+                and self.min_temp > self.max_temp
+            ):
+                errors['max_temp'] = [
+                    _('Max temperature must be greater than or equal to min temperature.'),
+                ]
+
+        for fname in (
+            'weight_per_unit',
+            'volume_per_unit',
+            'length',
+            'width',
+            'height',
+        ):
+            val = getattr(self, fname)
+            if val is not None and val < 0:
+                errors[fname] = [_('Must be zero or greater.')]
+
+        if errors:
+            raise ValidationError(errors)
+
+
+class TenantCargoMasterAttachment(models.Model):
+    """Optional file attachments on a cargo master row."""
+
+    attachment_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    cargo_master = models.ForeignKey(
+        TenantCargoMaster,
+        on_delete=models.CASCADE,
+        related_name='attachments',
+    )
+    file = models.FileField(upload_to='tenant/cargo_master_attachments/')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'tenant_cargo_master_attachment'
+        ordering = ['created_at']
+
+    def __str__(self):
+        return str(self.attachment_id)
+
+
+class TenantLocationMaster(models.Model):
+    """LC-001 Location Master (tenant schema)."""
+
+    class LocationType(models.TextChoices):
+        CITY = 'City', 'City'
+        AREA = 'Area', 'Area'
+        OTHER = 'Other', 'Other'
+
+    class Status(models.TextChoices):
+        ACTIVE = 'Active', 'Active'
+        INACTIVE = 'Inactive', 'Inactive'
+
+    class ActiveServiceableManager(models.Manager):
+        """Locations available for new operational use."""
+
+        def get_queryset(self):
+            return super().get_queryset().filter(
+                status=TenantLocationMaster.Status.ACTIVE,
+                is_serviceable=True,
+                country__is_active=True,
+            )
+
+    objects = models.Manager()
+    active_serviceable_objects = ActiveServiceableManager()
+
+    location_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    location_code = models.CharField(max_length=64, unique=True)
+    location_sequence = models.PositiveIntegerField(default=0)
+    country = models.ForeignKey(
+        'superadmin.Country',
+        on_delete=models.PROTECT,
+        related_name='tenant_locations',
+    )
+    province = models.CharField(max_length=120, blank=True, default='')
+    location_name_arabic = models.CharField(max_length=200, blank=True, default='')
+    location_name_english = models.CharField(max_length=200, blank=True, default='')
+    display_label = models.CharField(max_length=200)
+    location_type = models.CharField(
+        max_length=16,
+        choices=LocationType.choices,
+        default=LocationType.CITY,
+    )
+    status = models.CharField(
+        max_length=12,
+        choices=Status.choices,
+        default=Status.ACTIVE,
+    )
+    is_serviceable = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'tenant_location_master'
+        ordering = ['-created_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['country', 'province', 'display_label'],
+                name='tenant_location_country_province_label_uq',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.location_code} — {self.display_label}'
+
+    def clean(self):
+        errors = {}
+        if not (self.display_label or '').strip():
+            errors['display_label'] = [_('Display label is required.')]
+        if self.country_id and not getattr(self.country, 'is_active', True):
+            errors['country'] = [_('Select an active country.')]
+        if self.status == self.Status.INACTIVE and self._state.adding:
+            errors['status'] = [_('New locations must be created as Active.')]
+        if errors:
+            raise ValidationError(errors)
+
+
+class TenantRouteMaster(models.Model):
+    """RT-001 Route Master (tenant schema)."""
+
+    class RouteType(models.TextChoices):
+        DOMESTIC = 'Domestic', 'Domestic'
+        INTERNATIONAL = 'International', 'International'
+        REGIONAL = 'Regional', 'Regional'
+        OTHER = 'Other', 'Other'
+
+    class Status(models.TextChoices):
+        ACTIVE = 'Active', 'Active'
+        INACTIVE = 'Inactive', 'Inactive'
+
+    route_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    route_code = models.CharField(max_length=64, unique=True)
+    route_sequence = models.PositiveIntegerField(default=0)
+    route_label = models.CharField(max_length=200)
+    route_type = models.CharField(
+        max_length=24,
+        choices=RouteType.choices,
+        default=RouteType.DOMESTIC,
+    )
+    origin_point = models.ForeignKey(
+        TenantLocationMaster,
+        on_delete=models.PROTECT,
+        related_name='origin_routes',
+        db_column='origin_location_id',
+    )
+    destination_point = models.ForeignKey(
+        TenantLocationMaster,
+        on_delete=models.PROTECT,
+        related_name='destination_routes',
+        db_column='destination_location_id',
+    )
+    status = models.CharField(
+        max_length=12,
+        choices=Status.choices,
+        default=Status.ACTIVE,
+    )
+    distance_km = models.DecimalField(max_digits=10, decimal_places=1, default=0)
+    estimated_duration_h = models.DecimalField(max_digits=8, decimal_places=1, default=0)
+    has_customs = models.BooleanField(default=False)
+    has_toll_gates = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'tenant_route_master'
+        ordering = ['-created_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['route_type', 'origin_point', 'destination_point'],
+                name='tenant_route_type_origin_destination_uq',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.route_code} — {self.route_label}'
+
+    def clean(self):
+        errors = {}
+        if not (self.route_label or '').strip():
+            errors['route_label'] = [_('Route label is required.')]
+        if self.origin_point_id and self.destination_point_id:
+            if self.origin_point_id == self.destination_point_id:
+                errors['destination_point'] = [_('Origin and destination must be different.')]
+        if self.distance_km is not None and self.distance_km < 0:
+            errors['distance_km'] = [_('Distance cannot be negative.')]
+        if self.estimated_duration_h is not None and self.estimated_duration_h < 0:
+            errors['estimated_duration_h'] = [_('Estimated duration cannot be negative.')]
+        if errors:
+            raise ValidationError(errors)
 
 class TenantUser(models.Model):
     """Tenant-scoped internal users (stored per tenant schema)."""

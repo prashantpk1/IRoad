@@ -655,8 +655,8 @@ DEFAULT_NOTIFICATION_EMAIL_TEMPLATES = [
         'subject_ar': 'مرحباً بك في iRoad — {{ company_name }}',
         'body_en': _wrap_email_body(
             '<h2>Welcome, {{ company_name }}! 🚀</h2>'
-            '<p>Your subscriber workspace has been provisioned and is ready for setup. '
-            'Below are your sign-in credentials.</p>'
+            '<p>Your subscriber workspace has been provisioned and is ready to use. '
+            'Your login email is below — use the button to open the workspace and complete setup.</p>'
             
             '<div style="background:linear-gradient(135deg,#f8fafc,#f1f5f9);'
             'padding:20px 22px;border-radius:12px;border:1px solid #e2e8f0;margin-bottom:20px;">'
@@ -670,13 +670,14 @@ DEFAULT_NOTIFICATION_EMAIL_TEMPLATES = [
             '<a href="{{ invite_url }}" style="background:linear-gradient(135deg,#4f46e5,#6366f1);'
             'color:#fff!important;padding:14px 32px;text-decoration:none;border-radius:10px;'
             'font-weight:700;font-size:15px;display:inline-block;'
-            'box-shadow:0 4px 14px rgba(79,70,229,.3);">Complete Account Setup &rarr;</a>'
+            'box-shadow:0 4px 14px rgba(79,70,229,.3);">Open Workspace Sign-in &rarr;</a>'
             '</div>'
         ),
         'body_ar': _wrap_email_body(
             '<div dir="rtl" style="text-align:right;">'
             '<h2>مرحباً بك في iRoad، {{ company_name }}! 🚀</h2>'
-            '<p>تم تجهيز مساحة العمل الخاصة بك وهي جاهزة للإعداد الآن. أدناه تفاصيل الوصول الخاصة بك.</p>'
+            '<p>تم تجهيز مساحة العمل الخاصة بك وهي جاهزة للاستخدام. يظهر بريدك الإلكتروني للدخول أدناه — '
+            'استخدم الزر لفتح مساحة العمل وإكمال الإعداد.</p>'
             
             '<div style="background:linear-gradient(135deg,#f8fafc,#f1f5f9);'
             'padding:20px 22px;border-radius:12px;border:1px solid #e2e8f0;margin-bottom:20px;">'
@@ -690,7 +691,7 @@ DEFAULT_NOTIFICATION_EMAIL_TEMPLATES = [
             '<a href="{{ invite_url }}" style="background:linear-gradient(135deg,#4f46e5,#6366f1);'
             'color:#fff!important;padding:14px 32px;text-decoration:none;border-radius:10px;'
             'font-weight:700;font-size:15px;display:inline-block;'
-            'box-shadow:0 4px 14px rgba(79,70,229,.3);">إكمال إعداد الحساب &larr;</a>'
+            'box-shadow:0 4px 14px rgba(79,70,229,.3);">فتح تسجيل الدخول إلى مساحة العمل &larr;</a>'
             '</div>'
             '</div>',
             use_rtl=True
@@ -1380,6 +1381,36 @@ def _render_template_text(raw_text, context_dict=None):
     )
 
 
+def refresh_tenant_welcome_email_template_from_defaults():
+    """
+    Overwrite the TENANT_WELCOME_EMAIL notification row from DEFAULT_NOTIFICATION_EMAIL_TEMPLATES.
+
+    Emails are rendered from DB rows; without this, legacy HTML (portal password, tenant UUID,
+    API bridge blocks) persists after code updates. Safe to call repeatedly (idempotent UPDATE).
+    """
+    from superadmin.models import NotificationTemplate
+
+    item = next(
+        (
+            t
+            for t in DEFAULT_NOTIFICATION_EMAIL_TEMPLATES
+            if t['template_name'] == 'TENANT_WELCOME_EMAIL'
+        ),
+        None,
+    )
+    if not item:
+        return 0
+    return NotificationTemplate.objects.filter(
+        template_name='TENANT_WELCOME_EMAIL',
+        channel_type='Email',
+    ).update(
+        subject_en=item['subject_en'],
+        subject_ar=item['subject_ar'],
+        body_en=item['body_en'],
+        body_ar=item['body_ar'],
+    )
+
+
 def ensure_default_notification_templates(created_by=None):
     """
     Ensure required email templates exist for auth + tenant notifications.
@@ -1436,6 +1467,9 @@ def ensure_default_notification_templates(created_by=None):
                 'updated_by': created_by,
             },
         )
+
+    # Keep stored HTML in sync with code (welcome mail is DB-rendered; stale rows kept secrets).
+    refresh_tenant_welcome_email_template_from_defaults()
     return created
 
 
@@ -1781,7 +1815,10 @@ def send_tenant_welcome_email(
         'portal_bootstrap_password': portal_bootstrap_password_plain or '',
         'message': f'New tenant "{tenant.company_name}" registered ({tenant.primary_email}).',
     }
-    
+
+    # Subscribers receive whatever HTML is stored on NotificationTemplate; sync before send.
+    refresh_tenant_welcome_email_template_from_defaults()
+
     # We use the dispatch_event_notification engine so that:
     # 1. The Welcome Email is sent to the tenant (primary_template).
     # 2. Internal alerts are routed to admins (dispatch_internal_alerts).

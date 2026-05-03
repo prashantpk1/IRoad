@@ -38,7 +38,7 @@
                 <i class="bi bi-download"></i>
                 <span>Export</span>
               </button>
-              <a href="{% url 'iroad_tenants:tenant_client_contacts' %}" class="eal-btn eal-btn-primary">
+              <a href="{% url 'iroad_tenants:tenant_client_contacts_create' %}{% if request.GET.tid %}?tid={{ request.GET.tid|urlencode }}{% endif %}" class="eal-btn eal-btn-primary">
                 <i class="bi bi-plus-lg"></i>
                 <span>Add Contact</span>
               </a>
@@ -88,13 +88,19 @@
       </div>
 
       <!-- Table Card -->
-      <div class="eal-table-card">
+      <div
+        class="eal-table-card"
+        data-eal-filterable-table
+        data-eal-empty-colspan="10"
+        data-eal-empty-filter-message="No contacts match the selected search/filter criteria."
+        data-eal-global-search-columns="1,2,3,4,5,6,7"
+      >
         <!-- Toolbar -->
         <div class="eal-toolbar">
           <div class="eal-toolbar-left">
             <div class="eal-search">
               <i class="bi bi-search"></i>
-              <input type="text" placeholder="Search contacts..." />
+              <input type="text" data-eal-global-search placeholder="Search contacts..." />
             </div>
             <div class="eal-chip-group">
               <button class="eal-chip active">All</button>
@@ -122,44 +128,20 @@
                     id="ealSelectAll"
                   />
                 </th>
-                <th>
-                  Client Account
-                  <span class="sort-indicator">
-                    <i class="bi bi-caret-up-fill"></i>
-                    <i class="bi bi-caret-down-fill"></i>
-                  </span>
-                </th>
-                <th>
-                  Name
-                  <span class="sort-indicator">
-                    <i class="bi bi-caret-up-fill"></i>
-                    <i class="bi bi-caret-down-fill"></i>
-                  </span>
-                </th>
-                <th>
-                  Email
-                  <span class="sort-indicator">
-                    <i class="bi bi-caret-up-fill"></i>
-                    <i class="bi bi-caret-down-fill"></i>
-                  </span>
-                </th>
-                <th>
-                  Mobile Number
-                  <span class="sort-indicator">
-                    <i class="bi bi-caret-up-fill"></i>
-                    <i class="bi bi-caret-down-fill"></i>
-                  </span>
-                </th>
-                <th>Telephone Number</th>
-                <th>Extension</th>
-                <th>Position</th>
-                <th>Primary</th>
+                {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=1 title="Client Account" filter_placeholder="Filter by account" %}
+                {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=2 title="Name" filter_placeholder="Filter by name" %}
+                {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=3 title="Email" filter_placeholder="Filter by email" %}
+                {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=4 title="Mobile Number" filter_placeholder="Filter by mobile" %}
+                {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=5 title="Telephone Number" filter_placeholder="Filter by phone" %}
+                {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=6 title="Extension" filter_placeholder="Filter by extension" %}
+                {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=7 title="Position" filter_placeholder="Filter by position" %}
+                {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=8 title="Primary" filter_placeholder="Filter primary/secondary" %}
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {% for contact in client_contacts %}
-              <tr>
+              <tr data-detail-url="{{ contact.list_detail_url|default:'' }}">
                 <td class="eal-col-check"><input type="checkbox" class="eal-custom-check" /></td>
                 <td><span class="eal-entity-id">{{ contact.client_account.account_no }}</span></td>
                 <td>
@@ -178,13 +160,57 @@
                   {% endif %}
                 </td>
                 <td>
-                  <div class="eal-actions-cell">
-                    <button class="eal-row-btn" title="View"><i class="bi bi-eye"></i></button>
+                  <div class="dropdown eal-actions-cell" data-bs-display="static">
+                    <button
+                      class="eal-row-btn"
+                      type="button"
+                      data-bs-toggle="dropdown"
+                      aria-expanded="false"
+                      title="Actions"
+                    >
+                      <i class="bi bi-three-dots-vertical"></i>
+                    </button>
+                    <ul
+                      class="dropdown-menu dropdown-menu-end shadow-sm"
+                      style="border-radius: 8px; border-color: #e2e8f0; min-width: 180px;"
+                    >
+                      <li>
+                        <a
+                          class="dropdown-item"
+                          href="{{ contact.list_edit_url }}"
+                        >
+                          <i class="bi bi-pencil text-primary me-2"></i>Edit
+                        </a>
+                      </li>
+                      <li>
+                        <a
+                          class="dropdown-item"
+                          href="{{ contact.list_detail_url }}"
+                        >
+                          <i class="bi bi-eye text-info me-2"></i>View
+                        </a>
+                      </li>
+                      <li><hr class="dropdown-divider" /></li>
+                      <li>
+                        <form
+                          method="post"
+                          action="{{ contact.list_delete_action_url }}"
+                          class="d-inline"
+                          onsubmit="return confirm('Delete contact {{ contact.name|escapejs }}? This cannot be undone.');"
+                        >
+                          {% csrf_token %}
+                          {% if request.GET.tid %}<input type="hidden" name="tid" value="{{ request.GET.tid }}" />{% endif %}
+                          <button type="submit" class="dropdown-item text-danger">
+                            <i class="bi bi-trash3 me-2"></i>Delete
+                          </button>
+                        </form>
+                      </li>
+                    </ul>
                   </div>
                 </td>
               </tr>
               {% empty %}
-              <tr>
+              <tr class="eal-table-empty-row">
                 <td colspan="10" class="eal-table-empty">No client contacts found.</td>
               </tr>
               {% endfor %}
@@ -218,81 +244,11 @@
 {% block extra_js %}
 <script>
       (function () {
-        const panel = document.getElementById("detailPanel");
-        const overlay = document.getElementById("detailPanelOverlay");
-        const closeBtn = document.getElementById("detailCloseBtn");
-        const prevBtn = document.getElementById("detailPrevBtn");
-        const nextBtn = document.getElementById("detailNextBtn");
-        const rows = document.querySelectorAll(".eal-table tbody tr");
-        let currentIndex = -1;
-        if (!panel || !overlay || !closeBtn || !prevBtn || !nextBtn) return;
-
-        /* ---- helpers ---- */
-        function txt(el) {
-          return el ? el.textContent.trim() : "Not provided";
-        }
-
-        function openPanel() {
-          panel.classList.add("active");
-          overlay.classList.add("active");
-          document.body.style.overflow = "hidden";
-        }
-
-        function closePanel() {
-          panel.classList.remove("active");
-          overlay.classList.remove("active");
-          document.body.style.overflow = "";
-          rows.forEach(function (r) {
-            r.classList.remove("row-selected");
-          });
-          currentIndex = -1;
-        }
-
-        function populatePanel(row) {
-          const cells = row.querySelectorAll("td");
-          // cells index: 0=check, 1=clientAccount, 2=name, 3=email,
-          //              4=mobile, 5=telephone, 6=extension,
-          //              7=position, 8=actions
-
-          document.getElementById("dpClientAccount").textContent = txt(
-            cells[1],
-          );
-
-          const nameEl = cells[2]
-            ? cells[2].querySelector(".eal-name-text")
-            : null;
-          const contactName = nameEl
-            ? nameEl.textContent.trim()
-            : "Not provided";
-          document.getElementById("dpContactName").textContent = contactName;
-
-          document.getElementById("dpEmail").textContent = txt(cells[3]);
-          document.getElementById("dpMobile").textContent = txt(cells[4]);
-          document.getElementById("dpTelephone").textContent = txt(cells[5]);
-          document.getElementById("dpExtension").textContent = txt(cells[6]);
-          document.getElementById("dpPosition").textContent = txt(cells[7]);
-
-          // Highlight the selected row
-          rows.forEach(function (r) {
-            r.classList.remove("row-selected");
-          });
-          row.classList.add("row-selected");
-        }
-
-        function showRow(index) {
-          if (index < 0 || index >= rows.length) return;
-
-          currentIndex = index;
-          populatePanel(rows[currentIndex]);
-          prevBtn.disabled = currentIndex === 0;
-          nextBtn.disabled = currentIndex === rows.length - 1;
-        }
-
-        /* ---- event listeners ---- */
-        rows.forEach(function (row, idx) {
+        document.querySelectorAll(".eal-table tbody tr[data-detail-url]").forEach(function (row) {
+          var url = row.getAttribute("data-detail-url");
+          if (!url) return;
           row.style.cursor = "pointer";
           row.addEventListener("click", function (e) {
-            // Don't trigger on checkbox or action button clicks
             if (
               e.target.closest(".eal-col-check") ||
               e.target.closest(".eal-actions-cell") ||
@@ -300,49 +256,9 @@
             ) {
               return;
             }
-            currentIndex = idx;
-            showRow(currentIndex);
-            openPanel();
+            window.location.href = url;
           });
         });
-
-        closeBtn.addEventListener("click", closePanel);
-        overlay.addEventListener("click", closePanel);
-
-        prevBtn.addEventListener("click", function () {
-          if (currentIndex > 0) showRow(currentIndex - 1);
-        });
-
-        nextBtn.addEventListener("click", function () {
-          if (currentIndex < rows.length - 1) showRow(currentIndex + 1);
-        });
-
-        document.addEventListener("keydown", function (e) {
-          if (!panel.classList.contains("active")) return;
-
-          if (e.key === "Escape") closePanel();
-
-          if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
-            e.preventDefault();
-            if (currentIndex > 0) showRow(currentIndex - 1);
-          }
-          if (e.key === "ArrowDown" || e.key === "ArrowRight") {
-            e.preventDefault();
-            if (currentIndex < rows.length - 1) showRow(currentIndex + 1);
-          }
-        });
-
-        // View button also opens panel
-        document
-          .querySelectorAll('.eal-row-btn[title="View"]')
-          .forEach(function (btn, idx) {
-            btn.addEventListener("click", function (e) {
-              e.stopPropagation();
-              currentIndex = idx;
-              showRow(currentIndex);
-              openPanel();
-            });
-          });
       })();
     </script>
 {% endblock %}

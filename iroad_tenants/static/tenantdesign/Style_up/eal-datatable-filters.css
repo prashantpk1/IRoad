@@ -1,0 +1,88 @@
+/* Column header funnel menus + client-side filter row (tenant list tables) */
+
+.eal-th-filter {
+  position: relative;
+}
+
+.eal-th-filter-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.eal-th-filter-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.eal-filter-menu-btn {
+  border: 0;
+  background: transparent;
+  color: #667085;
+  padding: 0;
+  line-height: 1;
+}
+
+.eal-filter-menu-btn.active {
+  color: #3b82f6;
+}
+
+.eal-filter-menu {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  right: 0;
+  z-index: 30;
+  width: 220px;
+  background: #fff;
+  border: 1px solid #eaecf0;
+  border-radius: 12px;
+  box-shadow: 0 18px 40px rgba(16, 24, 40, 0.14);
+  padding: 0.8rem;
+  display: none;
+}
+
+.eal-filter-menu.open {
+  display: block;
+}
+
+.eal-filter-menu-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #344054;
+  margin-bottom: 0.6rem;
+}
+
+.eal-filter-menu .form-control,
+.eal-filter-menu .form-select {
+  min-height: 2.2rem;
+  font-size: 0.84rem;
+  margin-bottom: 0.55rem;
+}
+
+.eal-filter-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.eal-filter-action {
+  border: 1px solid #d0d5dd;
+  border-radius: 999px;
+  background: #fff;
+  color: #344054;
+  font-size: 0.78rem;
+  padding: 0.28rem 0.62rem;
+}
+
+.eal-filter-action:hover {
+  border-color: #3b82f6;
+  color: #3b82f6;
+}
+
+.eal-table-empty {
+  text-align: center;
+  color: #667085;
+  font-weight: 500;
+}

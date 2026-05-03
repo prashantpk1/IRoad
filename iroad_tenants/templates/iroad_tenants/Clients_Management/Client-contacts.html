@@ -2,7 +2,7 @@
 {% load static %}
 {% load i18n %}
 
-{% block title %}Client Contacts | iRoad Admin{% endblock %}
+{% block title %}{% if is_edit_mode %}Edit Client Contact{% else %}Client Contacts{% endif %} | iRoad Admin{% endblock %}
 
 {% block breadcrumb %}{% endblock %}
 
@@ -27,18 +27,23 @@
 
         <div class="page-header-row">
           <div class="page-header-left">
-            <h1 class="page-title">Create Client Contact</h1>
+            <h1 class="page-title">{% if is_edit_mode %}Edit Client Contact{% else %}Create Client Contact{% endif %}</h1>
             <p class="page-subtitle">
+              {% if is_edit_mode %}
+              Update the contact details below. Changes apply immediately after you save.
+              {% else %}
               Fill in the details below to register a client contact in the
               system.
+              {% endif %}
             </p>
           </div>
         </div>
       </div>
 
       <!-- Client Contacts Form -->
-      <form id="clientContactForm" method="post" action="{% url 'iroad_tenants:tenant_client_contacts' %}">
+      <form id="clientContactForm" method="post" action="{{ contact_form_action }}">
         {% csrf_token %}
+        {% if portal_tid %}<input type="hidden" name="tid" value="{{ portal_tid }}" />{% endif %}
         <!-- Section 1: Contact Details -->
         <div class="form-card" data-section="1">
           <div class="form-card-header">
@@ -62,7 +67,7 @@
                     <span class="required">*</span>
                   </label>
                   <select class="form-select {% if form_errors.client_account %}is-invalid{% endif %}" id="contactClientAccount" name="client_account" required>
-                    <option value="" selected disabled>
+                    <option value="" {% if not form_data.client_account %}selected{% endif %} disabled>
                       -Select client account-
                     </option>
                     {% for account in client_account_options %}
@@ -178,7 +183,7 @@
                       id="contactIsPrimary"
                       name="is_primary"
                       value="true"
-                      {% if form_data.is_primary == 'true' or form_data.is_primary == 'on' or form_data.is_primary == '1' %}checked{% endif %}
+                      {% if form_data.is_primary %}checked{% endif %}
                     />
                     <label class="form-check-label" for="contactIsPrimary"
                       >Is Primary</label
@@ -202,7 +207,7 @@
           <div class="form-actions-right">
             <button type="submit" class="btn btn-primary">
               <i class="bi bi-check-circle"></i>
-              Create Client Contact
+              {% if is_edit_mode %}Save Changes{% else %}Create Client Contact{% endif %}
             </button>
           </div>
         </div>

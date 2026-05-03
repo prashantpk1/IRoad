@@ -1,0 +1,182 @@
+{% extends 'iroad_tenants/base.html' %}
+{% load static %}
+
+{% block title %}View Client Contact | iRoad Admin{% endblock %}
+
+{% block extra_css %}
+<style>
+  #clientContactDetailView .field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  #clientContactDetailView .form-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 0;
+  }
+  .view-field-box {
+    display: block;
+    min-height: 44px;
+    padding: 10px 14px;
+    background: var(--bg-light);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    font-size: 14px;
+    color: var(--text-dark);
+    line-height: 1.5;
+  }
+  .view-field-box .view-value {
+    margin: 0;
+    font-size: inherit;
+    color: inherit;
+    min-height: auto;
+  }
+  .view-value.empty {
+    color: var(--text-light);
+  }
+</style>
+{% endblock %}
+
+{% block breadcrumb %}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item">
+        <a href="{% url 'iroad_tenants:tenant_dashboard' %}">Dashboard</a>
+      </li>
+      <li class="breadcrumb-item">CRM</li>
+      <li class="breadcrumb-item">Clients Management</li>
+      <li class="breadcrumb-item">
+        <a href="{{ back_to_list_url }}">Client Contacts</a>
+      </li>
+      <li class="breadcrumb-item active" aria-current="page">View Contact</li>
+    </ol>
+  </nav>
+
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">View Client Contact</h1>
+      <p class="page-subtitle">
+        Review contact details for this client account.
+      </p>
+    </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <a href="{{ back_to_list_url }}" class="eal-btn eal-btn-outline">
+          <i class="bi bi-arrow-left"></i>
+          <span>Back</span>
+        </a>
+        <a href="{{ edit_contact_url }}" class="eal-btn eal-btn-primary">
+          <i class="bi bi-pencil-square"></i>
+          <span>Edit</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="clientContactDetailView">
+  <div class="form-card" data-section="1">
+    <div class="form-card-header">
+      <div class="form-card-icon blue">
+        <i class="bi bi-person-rolodex"></i>
+      </div>
+      <div class="form-card-header-text">
+        <h2 class="form-card-title">Contact Details</h2>
+        <p class="form-card-desc">
+          Account link, identity, and primary flag for this contact.
+        </p>
+      </div>
+    </div>
+    <div class="form-card-body">
+      <div class="field-group">
+        <h3 class="field-group-title">
+          <i class="bi bi-building"></i>
+          Account &amp; identity
+        </h3>
+        <div class="fields-grid cols-2">
+          <div class="field">
+            <label class="form-label">Client Account</label>
+            <div class="view-field-box">
+              <p class="view-value">
+                {{ contact.client_account.account_no }}{% if contact.client_account.display_name or contact.client_account.name_english %}
+                — {{ contact.client_account.display_name|default:contact.client_account.name_english }}
+                {% endif %}
+              </p>
+            </div>
+          </div>
+          <div class="field">
+            <label class="form-label">Name</label>
+            <div class="view-field-box">
+              <p class="view-value">{{ contact.name }}</p>
+            </div>
+          </div>
+          <div class="field">
+            <label class="form-label">Primary</label>
+            <div class="view-field-box">
+              {% if contact.is_primary %}
+              <span class="status-badge active">Primary</span>
+              {% else %}
+              <span class="status-badge inactive">Secondary</span>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="field-group mt-4">
+        <h3 class="field-group-title">
+          <i class="bi bi-telephone"></i>
+          Contact information
+        </h3>
+        <div class="fields-grid cols-3">
+          <div class="field">
+            <label class="form-label">Email</label>
+            <div class="view-field-box">
+              <p class="view-value {% if not contact.email %}empty{% endif %}">
+                {{ contact.email|default:"—" }}
+              </p>
+            </div>
+          </div>
+          <div class="field">
+            <label class="form-label">Mobile Number</label>
+            <div class="view-field-box">
+              <p class="view-value {% if not contact.mobile_number %}empty{% endif %}">
+                {{ contact.mobile_number|default:"—" }}
+              </p>
+            </div>
+          </div>
+          <div class="field">
+            <label class="form-label">Telephone Number</label>
+            <div class="view-field-box">
+              <p class="view-value {% if not contact.telephone_number %}empty{% endif %}">
+                {{ contact.telephone_number|default:"—" }}
+              </p>
+            </div>
+          </div>
+          <div class="field">
+            <label class="form-label">Extension</label>
+            <div class="view-field-box">
+              <p class="view-value {% if not contact.extension %}empty{% endif %}">
+                {{ contact.extension|default:"—" }}
+              </p>
+            </div>
+          </div>
+          <div class="field">
+            <label class="form-label">Position</label>
+            <div class="view-field-box">
+              <p class="view-value {% if not contact.position %}empty{% endif %}">
+                {{ contact.position|default:"—" }}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

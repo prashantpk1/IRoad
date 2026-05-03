@@ -167,13 +167,20 @@
       </div>
 
       <!-- Table Card -->
-      <div class="eal-table-card">
+      <div
+        class="eal-table-card"
+        data-eal-filterable-table
+        data-eal-empty-colspan="6"
+        data-eal-empty-filter-message="No events match the selected search/filter criteria."
+        data-eal-global-search-columns="2,3,4,5"
+        data-eal-action-dropdowns="0"
+      >
         <!-- Toolbar -->
         <div class="eal-toolbar">
           <div class="eal-toolbar-left">
             <div class="eal-search">
               <i class="bi bi-search"></i>
-              <input type="text" placeholder="Search events&hellip;" />
+              <input type="text" data-eal-global-search placeholder="Search events&hellip;" />
             </div>
           </div>
         </div>
@@ -190,35 +197,11 @@
                     id="ealSelectAll"
                   />
                 </th>
-                <th>Sl No.</th>
-                <th>
-                  Timestamp
-                  <span class="sort-indicator">
-                    <i class="bi bi-caret-up-fill"></i>
-                    <i class="bi bi-caret-down-fill"></i>
-                  </span>
-                </th>
-                <th>
-                  Action
-                  <span class="sort-indicator">
-                    <i class="bi bi-caret-up-fill"></i>
-                    <i class="bi bi-caret-down-fill"></i>
-                  </span>
-                </th>
-                <th>
-                  Module
-                  <span class="sort-indicator">
-                    <i class="bi bi-caret-up-fill"></i>
-                    <i class="bi bi-caret-down-fill"></i>
-                  </span>
-                </th>
-                <th>
-                  Performed By
-                  <span class="sort-indicator">
-                    <i class="bi bi-caret-up-fill"></i>
-                    <i class="bi bi-caret-down-fill"></i>
-                  </span>
-                </th>
+                {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=1 title="Sl No." filter_placeholder="Filter by no." %}
+                {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=2 title="Timestamp" filter_placeholder="Filter by text" %}
+                {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=3 title="Action" filter_placeholder="Filter by action" %}
+                {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=4 title="Module" filter_placeholder="Filter by module" %}
+                {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=5 title="Performed By" filter_placeholder="Filter by user" %}
               </tr>
             </thead>
             <tbody>

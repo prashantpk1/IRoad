@@ -6,7 +6,11 @@ from django.utils.translation import gettext_lazy as _
 from django_tenants.utils import schema_context
 
 from superadmin.models import Country
-from tenant_workspace.models import TenantAddressMaster, TenantClientAccount
+from tenant_workspace.models import (
+    TenantAddressMaster,
+    TenantClientAccount,
+    TenantLocationMaster,
+)
 
 
 class PublicCountryChoiceField(forms.ChoiceField):
@@ -120,12 +124,8 @@ class TenantAddressMasterForm(forms.ModelForm):
             ),
             'status': forms.Select(attrs={'class': 'form-select'}),
             'country': forms.Select(attrs={'class': 'form-select'}),
-            'province': forms.TextInput(
-                attrs={'class': 'form-control', 'placeholder': _('Select province...')}
-            ),
-            'city': forms.TextInput(
-                attrs={'class': 'form-control', 'placeholder': _('Select city...')}
-            ),
+            'province': forms.Select(attrs={'class': 'form-select'}),
+            'city': forms.Select(attrs={'class': 'form-select'}),
             'district': forms.TextInput(
                 attrs={'class': 'form-control', 'placeholder': _('District')}
             ),
@@ -183,7 +183,7 @@ class TenantAddressMasterForm(forms.ModelForm):
             ),
         }
 
-    def __init__(self, *args, is_create=False, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         self.fields['address_category'].choices = [
@@ -201,9 +201,9 @@ class TenantAddressMasterForm(forms.ModelForm):
         else:
             self.fields['address_code_preview'].initial = self.instance.address_code
 
-        if is_create:
-            self.fields['status'].choices = [(TenantAddressMaster.Status.ACTIVE, 'Active')]
-            self.fields['status'].initial = TenantAddressMaster.Status.ACTIVE
+        self.fields['status'].choices = [
+            (TenantAddressMaster.Status.ACTIVE, TenantAddressMaster.Status.ACTIVE),
+        ]
 
         self.fields['client_account'].empty_label = _('- Select client -')
         self.fields['client_account'].queryset = TenantClientAccount.objects.all().order_by(
@@ -221,6 +221,19 @@ class TenantAddressMasterForm(forms.ModelForm):
         cid_val = getattr(self.instance, 'country_id', None)
         if self.instance.pk and cid_val:
             self.fields['country'].initial = cid_val
+        self.fields['province'] = forms.ChoiceField(
+            required=True,
+            label=_('Province'),
+            choices=[('', _('Select province...'))],
+            widget=forms.Select(attrs={'class': 'form-select'}),
+        )
+        self.fields['city'] = forms.ChoiceField(
+            required=True,
+            label=_('City'),
+            choices=[('', _('Select city...'))],
+            widget=forms.Select(attrs={'class': 'form-select'}),
+        )
+        self._populate_location_choices()
 
     def _build_country_choices(self):
         with schema_context('public'):
@@ -237,6 +250,55 @@ class TenantAddressMasterForm(forms.ModelForm):
         return [('', _('Select country...'))] + [
             (c.country_code, f'{c.country_code} — {c.name_en}') for c in rows
         ]
+
+    def _selected_country_code(self):
+        if self.is_bound:
+            return (self.data.get(self.add_prefix('country')) or '').strip()
+        return str(getattr(self.instance, 'country_id', '') or self.initial.get('country') or '').strip()
+
+    def _selected_province(self):
+        if self.is_bound:
+            return (self.data.get(self.add_prefix('province')) or '').strip()
+        return str(
+            getattr(self.instance, 'province', '') or self.initial.get('province') or ''
+        ).strip()
+
+    def _active_locations_for_country(self, country_code):
+        qs = TenantLocationMaster.active_serviceable_objects.all()
+        if country_code:
+            qs = qs.filter(country_id=country_code)
+        return qs
+
+    def _populate_location_choices(self):
+        country_code = self._selected_country_code()
+        province_value = self._selected_province()
+        location_qs = self._active_locations_for_country(country_code)
+        province_rows = (
+            location_qs.exclude(province='')
+            .values_list('province', flat=True)
+            .distinct()
+            .order_by('province')
+        )
+        province_choices = [('', _('Select province...'))] + [(p, p) for p in province_rows]
+        self.fields['province'].choices = province_choices
+        if province_value and province_value not in {p for p, _ in province_choices}:
+            self.fields['province'].choices.append((province_value, province_value))
+
+        city_rows = (
+            location_qs.filter(province=province_value)
+            .values_list('display_label', flat=True)
+            .distinct()
+            .order_by('display_label')
+        ) if province_value else []
+        city_choices = [('', _('Select city...'))] + [(c, c) for c in city_rows]
+        self.fields['city'].choices = city_choices
+        city_value = (
+            (self.data.get(self.add_prefix('city')) or '').strip()
+            if self.is_bound
+            else str(getattr(self.instance, 'city', '') or self.initial.get('city') or '').strip()
+        )
+        if city_value and city_value not in {c for c, _ in city_choices}:
+            self.fields['city'].choices.append((city_value, city_value))
 
     def clean_map_link(self):
         v = (self.cleaned_data.get('map_link') or '').strip()
@@ -273,3 +335,29 @@ class TenantAddressMasterForm(forms.ModelForm):
 
     def clean_email(self):
         return (self.cleaned_data.get('email') or '').strip()
+
+    def clean_status(self):
+        status = (self.cleaned_data.get('status') or '').strip()
+        if status != TenantAddressMaster.Status.ACTIVE:
+            raise ValidationError(_('Inactive status cannot be selected here.'))
+        return TenantAddressMaster.Status.ACTIVE
+
+    def clean(self):
+        cleaned = super().clean()
+        country = cleaned.get('country')
+        province = (cleaned.get('province') or '').strip()
+        city = (cleaned.get('city') or '').strip()
+        if not country or not province or not city:
+            return cleaned
+
+        exists = TenantLocationMaster.active_serviceable_objects.filter(
+            country_id=getattr(country, 'pk', country),
+            province=province,
+            display_label=city,
+        ).exists()
+        if not exists:
+            self.add_error(
+                'city',
+                _('Select a city from Location Master for the selected country/province.'),
+            )
+        return cleaned

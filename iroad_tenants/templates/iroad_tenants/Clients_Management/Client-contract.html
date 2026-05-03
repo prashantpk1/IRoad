@@ -2,7 +2,7 @@
 {% load static %}
 {% load i18n %}
 
-{% block title %}Client Contract | iRoad Admin{% endblock %}
+{% block title %}{% if is_edit_mode %}Edit Client Contract{% else %}Client Contract{% endif %} | iRoad Admin{% endblock %}
 
 {% block breadcrumb %}{% endblock %}
 
@@ -27,12 +27,26 @@
 
         <div class="page-header-row">
           <div class="page-header-left">
-            <h1 class="page-title">Create Client Contract</h1>
+            <h1 class="page-title">{% if is_edit_mode %}Edit Client Contract{% else %}Create Client Contract{% endif %}</h1>
             <p class="page-subtitle">
+              {% if is_edit_mode %}
+              Update dates, notes, or replace the contract document. Leave the file empty to keep the current upload.
+              {% else %}
               Fill in the details below to register a new client contract in the
               system.
+              {% endif %}
             </p>
           </div>
+          {% if is_edit_mode and back_to_list_url %}
+          <div class="page-header-right">
+            <div class="eal-header-actions">
+              <a href="{{ back_to_list_url }}" class="eal-btn eal-btn-outline">
+                <i class="bi bi-arrow-left"></i>
+                <span>Back</span>
+              </a>
+            </div>
+          </div>
+          {% endif %}
         </div>
       </div>
 
@@ -41,9 +55,21 @@
         id="clientContractForm"
         method="post"
         enctype="multipart/form-data"
-        action="{% url 'iroad_tenants:tenant_client_contract' %}"
+        action="{{ contract_form_action }}"
       >
         {% csrf_token %}
+        {% if portal_tid %}<input type="hidden" name="tid" value="{{ portal_tid }}" />{% endif %}
+        {% if contract_settings.pre_expiry_notification_days %}
+        <div class="alert alert-info d-flex align-items-start gap-2 py-2 px-3 mb-3" role="status" style="font-size: 0.9rem; border-radius: 8px;">
+          <i class="bi bi-info-circle flex-shrink-0 mt-1"></i>
+          <div>
+            The contract start and end dates must span at least
+            <strong>{{ contract_settings.pre_expiry_notification_days }}</strong> day(s) so pre-expiry notifications can run. This comes from
+            <a href="{% url 'iroad_tenants:tenant_client_contract_settings' %}{% if portal_tid %}?tid={{ portal_tid|urlencode }}{% endif %}">Client Contract Settings</a>
+            (pre-expiry notification days). Set that value to <strong>0</strong> there to disable this rule.
+          </div>
+        </div>
+        {% endif %}
         <!-- Section 1: Contract Details -->
         <div class="form-card" data-section="1">
           <div class="form-card-header">
@@ -90,8 +116,19 @@
                     >Client Account
                     <span class="required">*</span>
                   </label>
+                  {% if is_edit_mode %}
+                  <input type="hidden" name="client_account" value="{{ form_data.client_account }}" />
+                  <select class="form-select" id="clientAccount" disabled>
+                    {% for account in client_account_options %}
+                    <option value="{{ account.account_no }}" {% if form_data.client_account == account.account_no %}selected{% endif %}>
+                      {{ account.account_no }} - {{ account.display_name|default:account.name_english }}
+                    </option>
+                    {% endfor %}
+                  </select>
+                  <span class="field-hint">Client account cannot be changed after the contract is created.</span>
+                  {% else %}
                   <select class="form-select {% if form_errors.client_account %}is-invalid{% endif %}" id="clientAccount" name="client_account" required>
-                    <option value="" selected disabled>
+                    <option value="" {% if not form_data.client_account %}selected{% endif %} disabled>
                       -Select client account-
                     </option>
                     {% for account in client_account_options %}
@@ -104,6 +141,7 @@
                   <span class="field-hint">
                     The contract will be linked to this account
                   </span>
+                  {% endif %}
                 </div>
                 <div class="field">
                   <label for="contractStatus" class="form-label"
@@ -209,17 +247,27 @@
                   <label for="contractAttachment" class="form-label"
                     >Contract Attachment</label
                   >
+                  {% if is_edit_mode and editing_contract.has_contract_file %}
+                  <p class="small text-muted mb-2">
+                    Current file:
+                    <a href="{{ editing_contract.contract_attachment.url }}" target="_blank" rel="noopener">{{ editing_contract.contract_file_name }}</a>
+                  </p>
+                  {% endif %}
                   <input
                     type="file"
                     class="form-control {% if form_errors.contract_attachment %}is-invalid{% endif %}"
                     id="contractAttachment"
                     name="contract_attachment"
                     accept=".pdf,.doc,.docx,image/*"
-                    required
+                    {% if not is_edit_mode %}required{% endif %}
                   />
                   {% if form_errors.contract_attachment %}<div class="invalid-feedback d-block">{{ form_errors.contract_attachment }}</div>{% endif %}
                   <span class="field-hint">
+                    {% if is_edit_mode %}
+                    Optional: upload a new file to replace the current document (PDF, DOC, or image).
+                    {% else %}
                     Upload the signed contract document (PDF, DOC, or image).
+                    {% endif %}
                   </span>
                 </div>
               </div>
@@ -238,7 +286,7 @@
           <div class="form-actions-right">
             <button type="submit" class="btn btn-primary">
               <i class="bi bi-check-circle"></i>
-              Create Client Contract
+              {% if is_edit_mode %}Save Changes{% else %}Create Client Contract{% endif %}
             </button>
           </div>
         </div>

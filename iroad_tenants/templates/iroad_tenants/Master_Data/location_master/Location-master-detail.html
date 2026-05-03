@@ -1,0 +1,64 @@
+{% extends 'iroad_tenants/base.html' %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}{% translate "Location Detail" %} | iRoad{% endblock %}
+{% block breadcrumb %}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item">
+        <a href="{% url 'iroad_tenants:tenant_dashboard' %}{% if request.GET.tid %}?tid={{ request.GET.tid|urlencode }}{% endif %}">{% translate "Dashboard" %}</a>
+      </li>
+      <li class="breadcrumb-item">{% translate "Master Data" %}</li>
+      <li class="breadcrumb-item">{% translate "Route Management" %}</li>
+      <li class="breadcrumb-item active" aria-current="page">{% translate "Location Detail" %}</li>
+    </ol>
+  </nav>
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">{% translate "Location Detail" %}</h1>
+      <p class="page-subtitle">{{ location.location_code }} - {{ location.display_label }}</p>
+    </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <a href="{% url 'iroad_tenants:tenant_location_master_edit' location.location_id %}{% if request.GET.tid %}?tid={{ request.GET.tid|urlencode }}{% endif %}" class="eal-btn eal-btn-outline">
+          <i class="bi bi-pencil"></i><span>{% translate "Edit" %}</span>
+        </a>
+        <a href="{% url 'iroad_tenants:tenant_location_master_list' %}{% if request.GET.tid %}?tid={{ request.GET.tid|urlencode }}{% endif %}" class="eal-btn eal-btn-primary">
+          <i class="bi bi-arrow-left"></i><span>{% translate "Back to List" %}</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="form-card">
+  <div class="form-card-header">
+    <div class="form-card-icon blue"><i class="bi bi-pin-map"></i></div>
+    <div class="form-card-header-text">
+      <h2 class="form-card-title">{% translate "Location Information" %}</h2>
+      <p class="form-card-desc">{% translate "Read-only location master details." %}</p>
+    </div>
+  </div>
+  <div class="form-card-body">
+    <div class="fields-grid cols-3">
+      <div class="field"><label class="form-label">{% translate "Location Code" %}</label><div class="form-control">{{ location.location_code }}</div></div>
+      <div class="field"><label class="form-label">{% translate "Country" %}</label><div class="form-control">{{ location.country.name_en }}</div></div>
+      <div class="field"><label class="form-label">{% translate "Province" %}</label><div class="form-control">{{ location.province|default:"—" }}</div></div>
+    </div>
+    <div class="fields-grid cols-3 mt-3">
+      <div class="field"><label class="form-label">{% translate "Location Name (Arabic)" %}</label><div class="form-control">{{ location.location_name_arabic|default:"—" }}</div></div>
+      <div class="field"><label class="form-label">{% translate "Location Name (English)" %}</label><div class="form-control">{{ location.location_name_english|default:"—" }}</div></div>
+      <div class="field"><label class="form-label">{% translate "Display Label" %}</label><div class="form-control">{{ location.display_label }}</div></div>
+    </div>
+    <div class="fields-grid cols-3 mt-3">
+      <div class="field"><label class="form-label">{% translate "Location Type" %}</label><div class="form-control">{{ location.location_type }}</div></div>
+      <div class="field"><label class="form-label">{% translate "Status" %}</label><div class="form-control">{{ location.status }}</div></div>
+      <div class="field"><label class="form-label">{% translate "Is Serviceable" %}</label><div class="form-control">{% if location.is_serviceable %}{% translate "Yes" %}{% else %}{% translate "No" %}{% endif %}</div></div>
+    </div>
+  </div>
+</div>
+{% endblock %}

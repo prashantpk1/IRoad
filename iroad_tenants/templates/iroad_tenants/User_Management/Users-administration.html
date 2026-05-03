@@ -66,7 +66,12 @@
   </div>
 </div>
 
-<div class="eal-table-card">
+<div
+  class="eal-table-card"
+  data-eal-filterable-table
+  data-eal-empty-colspan="9"
+  data-eal-empty-filter-message="No users match the selected search/filter criteria."
+>
   <div class="eal-toolbar">
     <div class="eal-toolbar-left">
       <form method="get" action="{% url 'iroad_tenants:tenant_users_administration' %}">
@@ -88,13 +93,13 @@
       <thead>
         <tr>
           <th class="eal-col-check"><input type="checkbox" class="eal-custom-check" id="ealSelectAll" /></th>
-          <th>User ID</th>
-          <th>Full Name</th>
-          <th>Email</th>
-          <th>Username</th>
-          <th>Role</th>
-          <th>Last Login</th>
-          <th>Status</th>
+          {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=1 title="User ID" filter_placeholder="Filter by user ID" %}
+          {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=2 title="Full Name" filter_placeholder="Filter by name" %}
+          {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=3 title="Email" filter_placeholder="Filter by email" %}
+          {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=4 title="Username" filter_placeholder="Filter by username" %}
+          {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=5 title="Role" filter_placeholder="Filter by role" %}
+          {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=6 title="Last Login" filter_placeholder="Filter by date" %}
+          {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=7 title="Status" filter_placeholder="Filter by status" %}
           <th>Actions</th>
         </tr>
       </thead>

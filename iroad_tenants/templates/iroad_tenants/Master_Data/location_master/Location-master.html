@@ -1,0 +1,243 @@
+{% extends 'iroad_tenants/base.html' %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}{% if is_view %}Location Detail{% else %}Location Master{% endif %} | iRoad{% endblock %}
+{% block breadcrumb %}{% endblock %}
+
+{% block content %}
+
+      <!-- Page Header -->
+      <div class="page-header">
+        <nav aria-label="breadcrumb">
+          <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+              <a href="{% url 'iroad_tenants:tenant_dashboard' %}{% if request.GET.tid %}?tid={{ request.GET.tid|urlencode }}{% endif %}">Dashboard</a>
+            </li>
+            <li class="breadcrumb-item">Master Data</li>
+            <li class="breadcrumb-item">Route Management</li>
+            <li class="breadcrumb-item active" aria-current="page">
+              {% if is_view %}Location Detail{% elif is_edit %}Edit Location{% else %}Location Master{% endif %}
+            </li>
+          </ol>
+        </nav>
+        <div class="page-header-row">
+          <div class="page-header-left">
+            <h1 class="page-title">{% if is_view %}Location Detail{% elif is_edit %}Edit Location{% else %}Location Master{% endif %}</h1>
+          </div>
+        </div>
+      </div>
+
+      <!-- Location Master Form -->
+      <form
+        id="locationMasterForm"
+        method="post"
+        action="{% if is_edit %}{% url 'iroad_tenants:tenant_location_master_edit' location.location_id %}{% else %}{% url 'iroad_tenants:tenant_location_master_create' %}{% endif %}"
+      >
+        {% csrf_token %}
+        {% if request.GET.tid %}<input type="hidden" name="tid" value="{{ request.GET.tid|urlencode }}" />{% endif %}
+        <div class="form-card" data-section="1">
+          <div class="form-card-header">
+            <div class="form-card-icon blue">
+              <i class="bi bi-pin-map"></i>
+            </div>
+            <div class="form-card-header-text">
+              <h2 class="form-card-title">Location Details</h2>
+              <p class="form-card-desc">
+                Define the core details for this location, including names,
+                codes, and serviceability.
+              </p>
+            </div>
+          </div>
+
+          <div class="form-card-body">
+            <div class="field-group">
+              <h3 class="field-group-title">
+                <i class="bi bi-info-circle"></i>
+                Basic Information
+              </h3>
+
+              <div class="fields-grid cols-3">
+                <div class="field">
+                  <label for="locationCode" class="form-label"
+                    >Location Code</label
+                  >
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="locationCode"
+                    placeholder="LC-0001"
+                    value="{{ preview_location_code|default:'' }}"
+                    readonly
+                  />
+                  <span class="field-hint"
+                    >Unique code used to identify this location.</span
+                  >
+                </div>
+
+                <div class="field">
+                  <label for="country" class="form-label">Country</label>
+                  {{ form.country }}
+                  {% if form.country.errors %}<div class="text-danger small">{{ form.country.errors }}</div>{% endif %}
+                  <span class="field-hint"
+                    >Country where the location is situated.</span
+                  >
+                </div>
+
+                <div class="field">
+                  <label for="province" class="form-label">Province</label>
+                  {{ form.province }}
+                  {% if form.province.errors %}<div class="text-danger small">{{ form.province.errors }}</div>{% endif %}
+                  <span class="field-hint"
+                    >Province, state, or region for this location.</span
+                  >
+                </div>
+              </div>
+
+              <div class="fields-grid cols-3">
+                <div class="field">
+                  <label for="locationNameArabic" class="form-label"
+                    >Location Name (Arabic)</label
+                  >
+                  {{ form.location_name_arabic }}
+                  {% if form.location_name_arabic.errors %}<div class="text-danger small">{{ form.location_name_arabic.errors }}</div>{% endif %}
+                  <span class="field-hint"
+                    >Official location name in Arabic.</span
+                  >
+                </div>
+
+                <div class="field">
+                  <label for="locationNameEnglish" class="form-label"
+                    >Location Name (English)</label
+                  >
+                  {{ form.location_name_english }}
+                  {% if form.location_name_english.errors %}<div class="text-danger small">{{ form.location_name_english.errors }}</div>{% endif %}
+                  <span class="field-hint"
+                    >Official location name in English.</span
+                  >
+                </div>
+
+                <div class="field">
+                  <label for="displayLabel" class="form-label"
+                    >Display Label</label
+                  >
+                  {{ form.display_label }}
+                  {% if form.display_label.errors %}<div class="text-danger small">{{ form.display_label.errors }}</div>{% endif %}
+                  <span class="field-hint"
+                    >Short label used in lists and dropdowns.</span
+                  >
+                </div>
+              </div>
+            </div>
+
+            <div class="field-group">
+              <h3 class="field-group-title">
+                <i class="bi bi-gear"></i>
+                Classification & Status
+              </h3>
+
+              <div class="fields-grid cols-3">
+                <div class="field">
+                  <label for="locationType" class="form-label"
+                    >Location Type</label
+                  >
+                  {{ form.location_type }}
+                  {% if form.location_type.errors %}<div class="text-danger small">{{ form.location_type.errors }}</div>{% endif %}
+                  <span class="field-hint"
+                    >Category that best describes this location.</span
+                  >
+                </div>
+
+                <div class="field">
+                  <label for="status" class="form-label">Status</label>
+                  {% if is_edit %}
+                  {{ form.status }}
+                  {% if form.status.errors %}<div class="text-danger small">{{ form.status.errors }}</div>{% endif %}
+                  {% else %}
+                  <select class="form-select" id="status" disabled>
+                    <option selected>{% if is_edit %}{{ form.status.value|default:"Active" }}{% else %}Active{% endif %}</option>
+                  </select>
+                  <input type="hidden" name="status" value="{% if is_edit %}{{ form.status.value|default:'Active' }}{% else %}Active{% endif %}" />
+                  {% endif %}
+                  <span class="field-hint"
+                    >Controls whether this location is available for use.</span
+                  >
+                </div>
+              </div>
+
+              <div class="setting-row">
+                <div class="setting-row-info">
+                  <label class="form-label" for="isServiceable"
+                    >Is Serviceable</label
+                  >
+                  <p class="field-hint">
+                    When enabled, this location can be used for routing and
+                    service coverage.
+                  </p>
+                </div>
+                <label class="setting-toggle">
+                  {{ form.is_serviceable }}
+                  <span class="toggle-track"></span>
+                  <span class="toggle-label">Enabled</span>
+                </label>
+              </div>
+              {% if form.non_field_errors %}<div class="text-danger small mt-2">{{ form.non_field_errors }}</div>{% endif %}
+            </div>
+          </div>
+        </div>
+
+        <div class="form-actions-bar">
+          <div class="form-actions-left">
+            <button type="reset" class="btn btn-outline-secondary">
+              <i class="bi bi-arrow-counterclockwise"></i>
+              Reset Form
+            </button>
+          </div>
+          <div class="form-actions-right">
+            <a href="{% url 'iroad_tenants:tenant_location_master_list' %}{% if request.GET.tid %}?tid={{ request.GET.tid|urlencode }}{% endif %}" class="btn btn-outline-secondary me-2">
+              <i class="bi bi-arrow-left"></i>
+              Back
+            </a>
+            {% if is_view and location %}
+            <a href="{% url 'iroad_tenants:tenant_location_master_edit' location.location_id %}{% if request.GET.tid %}?tid={{ request.GET.tid|urlencode }}{% endif %}" class="btn btn-primary me-2">
+              <i class="bi bi-pencil"></i>
+              Edit
+            </a>
+            {% endif %}
+            {% if not is_view %}
+              <button type="submit" class="btn btn-primary">
+                <i class="bi bi-check-circle"></i>
+                {% if is_edit %}Update Location{% else %}Save Location{% endif %}
+              </button>
+            {% endif %}
+          </div>
+        </div>
+      </form>
+{% endblock %}
+
+{% block extra_js %}
+    <script>
+      // Update toggle labels dynamically (reuse from Client Account Setting)
+      document.querySelectorAll(".setting-toggle input").forEach((input) => {
+        const label = input
+          .closest(".setting-toggle")
+          .querySelector(".toggle-label");
+        function updateLabel() {
+          label.textContent = input.checked ? "Enabled" : "Disabled";
+        }
+        updateLabel();
+        input.addEventListener("change", updateLabel);
+      });
+      const isView = "{{ is_view|yesno:'1,0' }}" === "1";
+      if (isView) {
+        document.querySelectorAll("#locationMasterForm input, #locationMasterForm select, #locationMasterForm textarea").forEach((el) => {
+          if (el.type === "checkbox" || el.type === "radio") {
+            el.disabled = true;
+          } else {
+            el.readOnly = true;
+            el.disabled = true;
+          }
+        });
+      }
+    </script>
+{% endblock %}

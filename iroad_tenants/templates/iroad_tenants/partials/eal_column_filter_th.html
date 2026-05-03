@@ -1,0 +1,39 @@
+{% comment %}
+Reusable sortable column header with funnel filter popover.
+
+Variables:
+  col_index (required) — zero-based column index matching <tbody> cells
+  title (required) — header label (plain text; use {% translate %} in caller if needed)
+  filter_placeholder (optional) — input placeholder
+  filter_menu_title (optional) — uppercase title in popover; defaults to title
+  hide_sort (optional) — if true, hide caret sort icons
+{% endcomment %}
+<th class="eal-th-filter" data-column-index="{{ col_index }}" data-filter-type="text">
+  <div class="eal-th-filter-head">
+    <span class="eal-th-filter-label">
+      {{ title }}
+      {% if not hide_sort %}
+      <span class="sort-indicator">
+        <i class="bi bi-caret-up-fill"></i>
+        <i class="bi bi-caret-down-fill"></i>
+      </span>
+      {% endif %}
+    </span>
+    <button type="button" class="eal-filter-menu-btn" aria-label="Filter {{ title }}">
+      <i class="bi bi-funnel"></i>
+    </button>
+  </div>
+  <div class="eal-filter-menu">
+    <div class="eal-filter-menu-title">{{ filter_menu_title|default:title }}</div>
+    <input
+      type="text"
+      class="form-control eal-column-filter-input"
+      placeholder="{{ filter_placeholder|default:'Filter…' }}"
+    />
+    <div class="eal-filter-actions">
+      <button type="button" class="eal-filter-action" data-sort="asc">A to Z</button>
+      <button type="button" class="eal-filter-action" data-sort="desc">Z to A</button>
+      <button type="button" class="eal-filter-action" data-clear="true">Clear</button>
+    </div>
+  </div>
+</th>

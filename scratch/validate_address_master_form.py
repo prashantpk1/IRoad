@@ -94,7 +94,7 @@ def main():
         'country': country.country_code,
     }
 
-    form = TenantAddressMasterForm(data=base_post, is_create=True)
+    form = TenantAddressMasterForm(data=base_post)
     if form.is_valid():
         ok('Create-form: valid minimal POST')
         choices = getattr(form.fields['country'], 'choices', [])
@@ -111,14 +111,14 @@ def main():
         fail(f'Create-form should be valid: {form.errors.as_json()}')
 
     bad_mob = {**base_post, 'mobile_no_1': 'abc'}
-    f2 = TenantAddressMasterForm(data=bad_mob, is_create=True)
+    f2 = TenantAddressMasterForm(data=bad_mob)
     if not f2.is_valid() and 'mobile_no_1' in f2.errors:
         ok('Invalid mobile rejected')
     else:
         fail('Invalid mobile should fail mobile_no_1')
 
     bad_co = {**base_post, 'country': '^^INVALID^^'}
-    f3 = TenantAddressMasterForm(data=bad_co, is_create=True)
+    f3 = TenantAddressMasterForm(data=bad_co)
     if not f3.is_valid():
         ok('Invalid country PK rejected')
     else:
@@ -127,7 +127,7 @@ def main():
     miss = dict(base_post)
     miss['display_name'] = ''
     miss['country'] = ''
-    f4 = TenantAddressMasterForm(data=miss, is_create=True)
+    f4 = TenantAddressMasterForm(data=miss)
     if not f4.is_valid():
         ok('Missing required fields rejected')
     else:
@@ -165,7 +165,7 @@ def main():
         status=TenantAddressMaster.Status.ACTIVE,
     ).first()
     if addr_edit and addr_edit.country_id:
-        f5 = TenantAddressMasterForm(instance=addr_edit, is_create=False)
+        f5 = TenantAddressMasterForm(instance=addr_edit)
         fld = f5.fields['country']
         if fld.initial == addr_edit.country_id:
             ok(f'Edit form: country initial matches instance ({addr_edit.country_id})')

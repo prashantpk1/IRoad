@@ -18,6 +18,7 @@
     <link rel="stylesheet" href="{% static 'tenantdesign/Style_up/style.css' %}" />
     <link rel="stylesheet" href="{% static 'tenantdesign/Style_up/dashboard.css' %}" />
     <link rel="stylesheet" href="{% static 'tenantdesign/Style_up/responsive.css' %}" />
+    <link rel="stylesheet" href="{% static 'tenantdesign/Style_up/eal-datatable-filters.css' %}" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
     {% block extra_css %}{% endblock %}
   </head>
@@ -93,6 +94,7 @@
         });
       })();
     </script>
+    <script src="{% static 'tenantdesign/Javascript/eal-datatable-filters.js' %}"></script>
     {% block extra_js %}{% endblock %}
   </body>
 </html>

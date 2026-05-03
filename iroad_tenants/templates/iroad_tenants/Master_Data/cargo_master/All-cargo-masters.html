@@ -1,0 +1,222 @@
+{% extends 'iroad_tenants/base.html' %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}{% translate "Cargo Master List" %} | iRoad{% endblock %}
+{% block breadcrumb %}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item">
+        <a href="{% url 'iroad_tenants:tenant_dashboard' %}{% if request.GET.tid %}?tid={{ request.GET.tid }}{% endif %}">{% translate "Dashboard" %}</a>
+      </li>
+      <li class="breadcrumb-item">{% translate "Master Data" %}</li>
+      <li class="breadcrumb-item">{% translate "Cargo Management" %}</li>
+      <li class="breadcrumb-item active" aria-current="page">{% translate "Cargo Master List" %}</li>
+    </ol>
+  </nav>
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">{% translate "Cargo Master List" %}</h1>
+      <p class="page-subtitle">{% translate "Manage and view all registered cargo items." %}</p>
+    </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <button type="button" class="eal-btn eal-btn-outline" disabled title="{% translate 'Export (coming soon)' %}">
+          <i class="bi bi-download"></i>
+          <span>{% translate "Export" %}</span>
+        </button>
+        <a href="{% url 'iroad_tenants:tenant_cargo_master_create' %}{% if request.GET.tid %}?tid={{ request.GET.tid }}{% endif %}" class="eal-btn eal-btn-primary">
+          <i class="bi bi-plus-lg"></i>
+          <span>{% translate "Add Cargo Master" %}</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="eal-stats-row">
+  <div class="eal-stat-card">
+    <div class="eal-stat-icon purple"><i class="bi bi-boxes"></i></div>
+    <div>
+      <div class="eal-stat-value">{{ stats.total }}</div>
+      <div class="eal-stat-label">{% translate "Total (filtered)" %}</div>
+    </div>
+  </div>
+  <div class="eal-stat-card">
+    <div class="eal-stat-icon green"><i class="bi bi-check-circle"></i></div>
+    <div>
+      <div class="eal-stat-value">{{ stats.active }}</div>
+      <div class="eal-stat-label">{% translate "Active (filtered)" %}</div>
+    </div>
+  </div>
+  <div class="eal-stat-card">
+    <div class="eal-stat-icon blue"><i class="bi bi-thermometer-snow"></i></div>
+    <div>
+      <div class="eal-stat-value">{{ stats.refrigerated }}</div>
+      <div class="eal-stat-label">{% translate "Refrigerated" %}</div>
+    </div>
+  </div>
+  <div class="eal-stat-card">
+    <div class="eal-stat-icon amber"><i class="bi bi-exclamation-triangle"></i></div>
+    <div>
+      <div class="eal-stat-value">{{ stats.dangerous }}</div>
+      <div class="eal-stat-label">{% translate "Dangerous goods" %}</div>
+    </div>
+  </div>
+</div>
+
+<div
+  class="eal-table-card"
+  data-eal-filterable-table
+  data-eal-empty-colspan="9"
+  data-eal-empty-filter-message="{% translate 'No cargo records match the selected search/filter criteria.' %}"
+>
+  <form method="get" class="eal-toolbar">
+    {% if request.GET.tid %}<input type="hidden" name="tid" value="{{ request.GET.tid }}" />{% endif %}
+    <div class="eal-toolbar-left">
+      <div class="d-flex flex-wrap align-items-end gap-3 w-100">
+        <div class="eal-search flex-grow-1" style="min-width: 220px">
+          <i class="bi bi-search"></i>
+          <input type="text" name="q" value="{{ search_q }}" placeholder="{% translate 'Search cargo...' %}" />
+        </div>
+        <div class="d-flex flex-wrap align-items-end gap-2">
+          <div>
+            <label class="form-label small mb-0 text-muted" for="cargoListStatus">{% translate "Status" %}</label>
+            <select name="status" id="cargoListStatus" class="form-select form-select-sm" style="min-width: 10rem">
+              <option value="active" {% if filter_status == '' or filter_status == 'active' %}selected{% endif %}>{% translate "Active" %}</option>
+              <option value="all" {% if filter_status == 'all' %}selected{% endif %}>{% translate "All" %}</option>
+              <option value="inactive" {% if filter_status == 'inactive' %}selected{% endif %}>{% translate "Inactive" %}</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label small mb-0 text-muted" for="cargoListClient">{% translate "Client" %}</label>
+            <select name="client" id="cargoListClient" class="form-select form-select-sm" style="min-width: 12rem">
+              <option value="">{% translate "All clients" %}</option>
+              {% for ca in client_filter_choices %}
+              <option value="{{ ca.account_id }}" {% if filter_client_id and ca.account_id|stringformat:'s' == filter_client_id %}selected{% endif %}>
+                {{ ca.display_name }} ({{ ca.account_no }})
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <button type="submit" class="btn btn-sm btn-primary mb-1">{% translate "Apply" %}</button>
+        </div>
+      </div>
+    </div>
+  </form>
+
+  <div class="eal-table-wrap">
+    <table class="eal-table">
+      <thead>
+        <tr>
+          {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=0 title=_("Cargo Code") filter_placeholder=_("Filter by code") %}
+          {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=1 title=_("Client") filter_placeholder=_("Filter by client") %}
+          {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=2 title=_("Category") filter_placeholder=_("Filter by category") %}
+          {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=3 title=_("Display Name") filter_placeholder=_("Filter by display name") %}
+          {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=4 title=_("English Label") filter_placeholder=_("Filter by English label") %}
+          {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=5 title=_("Arabic Label") filter_placeholder=_("Filter by Arabic label") %}
+          {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=6 title=_("SKU / Ref") filter_placeholder=_("Filter by SKU or ref") %}
+          {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=7 title=_("Status") filter_placeholder=_("Filter by status") %}
+          <th>{% translate "Actions" %}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in cargos_page %}
+        <tr>
+          <td><span class="eal-entity-id">{{ c.cargo_code }}</span></td>
+          <td>{{ c.client_account.account_no }} — {{ c.client_account.display_name }}</td>
+          <td><span class="eal-type-badge org">{{ c.cargo_category.name_english }}</span></td>
+          <td><div class="eal-name-cell"><span class="eal-name-text">{{ c.display_name }}</span></div></td>
+          <td>{{ c.english_label|default:"—" }}</td>
+          <td class="eal-arabic" lang="ar" dir="rtl">{{ c.arabic_label|default:"—" }}</td>
+          <td><span class="eal-pi-number">{{ c.client_sku_external_ref|default:"—" }}</span></td>
+          <td>
+            {% if c.status == 'Active' %}
+            <span class="status-badge active">{% translate "Active" %}</span>
+            {% else %}
+            <span class="status-badge inactive">{% translate "Inactive" %}</span>
+            {% endif %}
+          </td>
+          <td>
+            <div class="dropdown eal-actions-cell" data-bs-display="static">
+              <button
+                class="eal-row-btn"
+                type="button"
+                data-bs-toggle="dropdown"
+                aria-expanded="false"
+                title="{% translate 'Actions' %}"
+              >
+                <i class="bi bi-three-dots-vertical"></i>
+              </button>
+              <ul
+                class="dropdown-menu dropdown-menu-end shadow-sm"
+                style="border-radius: 8px; border-color: #e2e8f0; min-width: 180px;"
+              >
+                <li>
+                  <a
+                    class="dropdown-item"
+                    href="{% url 'iroad_tenants:tenant_cargo_master_edit' c.cargo_id %}{% if request.GET.tid %}?tid={{ request.GET.tid|urlencode }}{% endif %}"
+                  >
+                    <i class="bi bi-pencil text-primary me-2"></i>{% translate "Edit" %}
+                  </a>
+                </li>
+                <li>
+                  <a
+                    class="dropdown-item"
+                    href="{% url 'iroad_tenants:tenant_cargo_master_detail' c.cargo_id %}{% if request.GET.tid %}?tid={{ request.GET.tid|urlencode }}{% endif %}"
+                  >
+                    <i class="bi bi-eye text-info me-2"></i>{% translate "View" %}
+                  </a>
+                </li>
+                <li><hr class="dropdown-divider" /></li>
+                <li>
+                  <form
+                    method="post"
+                    action="{% url 'iroad_tenants:tenant_cargo_master_delete' c.cargo_id %}"
+                    class="d-inline"
+                    onsubmit="return confirm('{% translate "Delete cargo" %} {{ c.cargo_code|escapejs }}? {% translate "This cannot be undone." %}');"
+                  >
+                    {% csrf_token %}
+                    {% if request.GET.tid %}<input type="hidden" name="tid" value="{{ request.GET.tid }}" />{% endif %}
+                    <button type="submit" class="dropdown-item text-danger">
+                      <i class="bi bi-trash3 me-2"></i>{% translate "Delete" %}
+                    </button>
+                  </form>
+                </li>
+              </ul>
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="9" class="text-center text-muted py-4">{% translate "No cargo records match your filters." %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if cargos_page.paginator.num_pages > 1 %}
+  <div class="eal-pagination">
+    <div class="eal-pagination-info">
+      {% translate "Showing" %} <strong>{{ pagination_start }}-{{ pagination_end }}</strong> {% translate "of" %}
+      <strong>{{ pagination_total }}</strong>
+    </div>
+    <div class="eal-pagination-controls">
+      {% if pagination_prev_url %}
+      <a class="eal-page-btn" href="{{ pagination_prev_url }}" title="{% translate 'Previous' %}"><i class="bi bi-chevron-left"></i></a>
+      {% endif %}
+      {% for n, href in pagination_page_links %}
+      <a class="eal-page-btn {% if n == cargos_page.number %}active{% endif %}" href="{{ href }}">{{ n }}</a>
+      {% endfor %}
+      {% if pagination_next_url %}
+      <a class="eal-page-btn" href="{{ pagination_next_url }}" title="{% translate 'Next' %}"><i class="bi bi-chevron-right"></i></a>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -2,7 +2,7 @@
 {% load static %}
 {% load i18n %}
 
-{% block title %}Client Attachments | iRoad Admin{% endblock %}
+{% block title %}{% if is_edit_mode %}Edit Attachment{% else %}Client Attachments{% endif %} | iRoad Admin{% endblock %}
 
 {% block breadcrumb %}{% endblock %}
 
@@ -27,10 +27,14 @@
 
         <div class="page-header-row">
           <div class="page-header-left">
-            <h1 class="page-title">Create Client Attachment</h1>
+            <h1 class="page-title">{% if is_edit_mode %}Edit Client Attachment{% else %}Create Client Attachment{% endif %}</h1>
             <p class="page-subtitle">
+              {% if is_edit_mode %}
+              Update attachment details or replace the file. Leave file empty to keep the current document.
+              {% else %}
               Fill in the details below to upload a new attachment for a client
               account.
+              {% endif %}
             </p>
           </div>
         </div>
@@ -41,9 +45,10 @@
         id="clientAttachmentForm"
         method="post"
         enctype="multipart/form-data"
-        action="{% url 'iroad_tenants:tenant_client_attachments_create' %}"
+        action="{{ attachment_form_action }}"
       >
         {% csrf_token %}
+        {% if portal_tid %}<input type="hidden" name="tid" value="{{ portal_tid }}" />{% endif %}
         <!-- Section 1: Attachment Details -->
         <div class="form-card" data-section="1">
           <div class="form-card-header">
@@ -68,7 +73,7 @@
                     <span class="required">*</span>
                   </label>
                   <select class="form-select {% if form_errors.client_account %}is-invalid{% endif %}" id="clientAccount" name="client_account" required>
-                    <option value="" selected disabled>
+                    <option value="" disabled {% if not form_data.client_account %}selected{% endif %}>
                       -Select client account-
                     </option>
                     {% for account in client_account_options %}
@@ -178,20 +183,26 @@
                 <div class="field">
                   <label for="attachmentFile" class="form-label"
                     >Attachment File
-                    <span class="required">*</span>
+                    {% if not is_edit_mode %}<span class="required">*</span>{% endif %}
                   </label>
+                  {% if is_edit_mode and editing_attachment %}
+                  <p class="mb-2 small">
+                    Current:
+                    <a href="{{ editing_attachment.attachment_file.url }}" target="_blank" rel="noopener">{{ editing_attachment.file_name }}</a>
+                  </p>
+                  {% endif %}
                   <input
                     type="file"
                     class="form-control {% if form_errors.attachment_file %}is-invalid{% endif %}"
                     id="attachmentFile"
                     name="attachment_file"
                     accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif"
-                    required
+                    {% if not is_edit_mode %}required{% endif %}
                   />
                   {% if form_errors.attachment_file %}<div class="invalid-feedback d-block">{{ form_errors.attachment_file }}</div>{% endif %}
                   <span class="field-hint"
                     >Supported formats: PDF, DOC, DOCX, XLS, XLSX, JPG, PNG, GIF
-                    (Max 10MB)</span
+                    (Max 10MB){% if is_edit_mode %} — optional when editing{% endif %}</span
                   >
                 </div>
               </div>
@@ -234,7 +245,7 @@
           <div class="form-actions-right">
             <button type="submit" class="btn btn-primary">
               <i class="bi bi-check-circle"></i>
-              Upload Attachment
+              {% if is_edit_mode %}Save changes{% else %}Upload Attachment{% endif %}
             </button>
           </div>
         </div>

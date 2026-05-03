@@ -1,0 +1,181 @@
+{% extends 'iroad_tenants/base.html' %}
+{% load static %}
+
+{% block title %}View Client Contract | iRoad Admin{% endblock %}
+
+{% block extra_css %}
+<style>
+  #clientContractDetailView .field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  #clientContractDetailView .form-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 0;
+  }
+  .view-field-box {
+    display: block;
+    min-height: 44px;
+    padding: 10px 14px;
+    background: var(--bg-light);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    font-size: 14px;
+    color: var(--text-dark);
+    line-height: 1.5;
+  }
+  .view-field-box .view-value {
+    margin: 0;
+    font-size: inherit;
+    color: inherit;
+    min-height: auto;
+  }
+  .view-value.empty {
+    color: var(--text-light);
+  }
+</style>
+{% endblock %}
+
+{% block breadcrumb %}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item">
+        <a href="{% url 'iroad_tenants:tenant_dashboard' %}">Dashboard</a>
+      </li>
+      <li class="breadcrumb-item">CRM</li>
+      <li class="breadcrumb-item">Clients Management</li>
+      <li class="breadcrumb-item">
+        <a href="{{ back_to_list_url }}">Client Contracts</a>
+      </li>
+      <li class="breadcrumb-item active" aria-current="page">View Contract</li>
+    </ol>
+  </nav>
+
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">View Client Contract</h1>
+      <p class="page-subtitle">
+        Review contract dates, notes, and the stored contract document.
+      </p>
+    </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <a href="{{ back_to_list_url }}" class="eal-btn eal-btn-outline">
+          <i class="bi bi-arrow-left"></i>
+          <span>Back</span>
+        </a>
+        {% if contract_file_url %}
+        <a href="{{ contract_file_url }}" class="eal-btn eal-btn-outline" target="_blank" rel="noopener">
+          <i class="bi bi-box-arrow-up-right"></i>
+          <span>Open file</span>
+        </a>
+        {% endif %}
+        <a href="{{ edit_contract_url }}" class="eal-btn eal-btn-primary">
+          <i class="bi bi-pencil-square"></i>
+          <span>Edit</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="clientContractDetailView">
+  <div class="form-card" data-section="1">
+    <div class="form-card-header">
+      <div class="form-card-icon blue">
+        <i class="bi bi-file-earmark-text"></i>
+      </div>
+      <div class="form-card-header-text">
+        <h2 class="form-card-title">Contract</h2>
+        <p class="form-card-desc">
+          Identification, client account, and validity.
+        </p>
+      </div>
+    </div>
+    <div class="form-card-body">
+      <div class="field-group">
+        <h3 class="field-group-title">
+          <i class="bi bi-fingerprint"></i>
+          Identity
+        </h3>
+        <div class="fields-grid cols-2">
+          <div class="field">
+            <label class="form-label">Contract No.</label>
+            <div class="view-field-box">
+              <p class="view-value">{{ contract.contract_no }}</p>
+            </div>
+          </div>
+          <div class="field">
+            <label class="form-label">Client Account</label>
+            <div class="view-field-box">
+              <p class="view-value">
+                {{ contract.client_account.account_no }} — {{ contract.client_account.display_name|default:contract.client_account.name_english }}
+              </p>
+            </div>
+          </div>
+          <div class="field">
+            <label class="form-label">Start date</label>
+            <div class="view-field-box">
+              <p class="view-value">{{ contract.start_date|date:"Y-m-d" }}</p>
+            </div>
+          </div>
+          <div class="field">
+            <label class="form-label">End date</label>
+            <div class="view-field-box">
+              <p class="view-value">{{ contract.end_date|date:"Y-m-d" }}</p>
+            </div>
+          </div>
+          <div class="field">
+            <label class="form-label">Status</label>
+            <div class="view-field-box">
+              <span class="status-badge {% if contract.status == 'Active' %}active{% elif contract.status == 'Upcoming' %}pending{% else %}inactive{% endif %}">
+                {{ contract.status }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="field-group mt-4">
+        <h3 class="field-group-title">
+          <i class="bi bi-card-text"></i>
+          Notes &amp; document
+        </h3>
+        <div class="fields-grid cols-1">
+          <div class="field">
+            <label class="form-label">Notes</label>
+            <div class="view-field-box">
+              <p class="view-value {% if not contract.notes %}empty{% endif %}">
+                {{ contract.notes|default:"—" }}
+              </p>
+            </div>
+          </div>
+          <div class="field">
+            <label class="form-label">Contract file</label>
+            <div class="view-field-box">
+              {% if contract.has_contract_file %}
+              <span class="eal-pi-number">
+                <i class="bi bi-file-earmark"></i>
+                {% if contract_file_url %}
+                <a href="{{ contract_file_url }}" target="_blank" rel="noopener">{{ contract.contract_file_name }}</a>
+                {% else %}
+                {{ contract.contract_file_name }}
+                {% endif %}
+              </span>
+              {% else %}
+              <p class="view-value empty">—</p>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

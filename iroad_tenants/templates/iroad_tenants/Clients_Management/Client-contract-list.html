@@ -38,7 +38,7 @@
                 <i class="bi bi-download"></i>
                 <span>Export</span>
               </button>
-              <a href="{% url 'iroad_tenants:tenant_client_contract' %}" class="eal-btn eal-btn-primary">
+              <a href="{% url 'iroad_tenants:tenant_client_contract_create' %}{% if request.GET.tid %}?tid={{ request.GET.tid|urlencode }}{% endif %}" class="eal-btn eal-btn-primary">
                 <i class="bi bi-plus-lg"></i>
                 <span>Add Client Contract</span>
               </a>
@@ -97,7 +97,13 @@
       </div>
 
       <!-- Table Card -->
-      <div class="eal-table-card">
+      <div
+        class="eal-table-card"
+        data-eal-filterable-table
+        data-eal-empty-colspan="9"
+        data-eal-empty-filter-message="No contracts match the selected search/filter criteria."
+        data-eal-global-search-columns="1,2,3,4,5,6,7"
+      >
         <!-- Toolbar -->
         <div class="eal-toolbar">
           <div class="eal-toolbar-left">
@@ -105,6 +111,7 @@
               <i class="bi bi-search"></i>
               <input
                 type="text"
+                data-eal-global-search
                 placeholder="Search client contracts&hellip;"
               />
             </div>
@@ -123,63 +130,23 @@
                     id="ealSelectAll"
                   />
                 </th>
-                <th>
-                  Contract No.
-                  <span class="sort-indicator">
-                    <i class="bi bi-caret-up-fill"></i>
-                    <i class="bi bi-caret-down-fill"></i>
-                  </span>
-                </th>
-                <th>
-                  Client Account
-                  <span class="sort-indicator">
-                    <i class="bi bi-caret-up-fill"></i>
-                    <i class="bi bi-caret-down-fill"></i>
-                  </span>
-                </th>
-                <th>
-                  Start Date
-                  <span class="sort-indicator">
-                    <i class="bi bi-caret-up-fill"></i>
-                    <i class="bi bi-caret-down-fill"></i>
-                  </span>
-                </th>
-                <th>
-                  End Date
-                  <span class="sort-indicator">
-                    <i class="bi bi-caret-up-fill"></i>
-                    <i class="bi bi-caret-down-fill"></i>
-                  </span>
-                </th>
-                <th>
-                  Notes
-                  <span class="sort-indicator">
-                    <i class="bi bi-caret-up-fill"></i>
-                    <i class="bi bi-caret-down-fill"></i>
-                  </span>
-                </th>
-                <th>
-                  Attachment
-                  <span class="sort-indicator">
-                    <i class="bi bi-caret-up-fill"></i>
-                    <i class="bi bi-caret-down-fill"></i>
-                  </span>
-                </th>
-                <th>
-                  Status
-                  <span class="sort-indicator">
-                    <i class="bi bi-caret-up-fill"></i>
-                    <i class="bi bi-caret-down-fill"></i>
-                  </span>
-                </th>
+                {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=1 title="Contract No." filter_placeholder="Filter by contract no." %}
+                {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=2 title="Client Account" filter_placeholder="Filter by client" %}
+                {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=3 title="Start Date" filter_placeholder="Filter by date" %}
+                {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=4 title="End Date" filter_placeholder="Filter by date" %}
+                {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=5 title="Notes" filter_placeholder="Filter notes" %}
+                {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=6 title="Attachment" filter_placeholder="Filter yes/no" %}
+                {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=7 title="Status" filter_placeholder="Filter by status" %}
                 <th>ACTIONS</th>
               </tr>
             </thead>
             <tbody>
               {% for contract in client_contracts %}
-              <tr>
+              <tr data-detail-url="{{ contract.list_detail_url|default:'' }}">
                 <td class="eal-col-check"><input type="checkbox" class="eal-custom-check" /></td>
-                <td><span class="eal-entity-id">{{ contract.contract_no }}</span></td>
+                <td>
+                  <a href="{{ contract.list_detail_url }}" class="eal-entity-id text-decoration-none">{{ contract.contract_no }}</a>
+                </td>
                 <td>
                   <div class="eal-name-cell">
                     <span class="eal-name-text">{{ contract.client_account.account_no }} - {{ contract.client_account.display_name|default:contract.client_account.name_english }}</span>
@@ -189,10 +156,14 @@
                 <td>{{ contract.end_date|date:"d M Y" }}</td>
                 <td>{{ contract.notes|default:"—" }}</td>
                 <td>
-                  <span class="status-badge {% if contract.contract_attachment %}in-transit{% else %}pending{% endif %}">
-                    <i class="bi bi-paperclip"></i>
-                    {% if contract.contract_attachment %}Yes{% else %}No{% endif %}
+                  {% if contract.contract_attachment %}
+                  <span class="eal-pi-number">
+                    <i class="bi bi-file-earmark"></i>
+                    <a href="{{ contract.contract_attachment.url }}" target="_blank" rel="noopener">{{ contract.contract_file_name }}</a>
                   </span>
+                  {% else %}
+                  <span class="eal-type-badge ind"><i class="bi bi-x-lg"></i> No file</span>
+                  {% endif %}
                 </td>
                 <td>
                   <span class="status-badge {% if contract.status == 'Active' %}active{% elif contract.status == 'Upcoming' %}pending{% else %}inactive{% endif %}">
@@ -200,15 +171,63 @@
                   </span>
                 </td>
                 <td>
-                  <div class="eal-actions-cell">
-                    {% if contract.contract_attachment %}
-                    <a class="eal-row-btn" title="View" href="{{ contract.contract_attachment.url }}" target="_blank" rel="noopener"><i class="bi bi-eye"></i></a>
-                    {% endif %}
+                  <div class="dropdown eal-actions-cell" data-bs-display="static">
+                    <button
+                      class="eal-row-btn"
+                      type="button"
+                      data-bs-toggle="dropdown"
+                      aria-expanded="false"
+                      title="Actions"
+                    >
+                      <i class="bi bi-three-dots-vertical"></i>
+                    </button>
+                    <ul
+                      class="dropdown-menu dropdown-menu-end shadow-sm"
+                      style="border-radius: 8px; border-color: #e2e8f0; min-width: 180px;"
+                    >
+                      <li>
+                        <a class="dropdown-item" href="{{ contract.list_edit_url }}">
+                          <i class="bi bi-pencil text-primary me-2"></i>Edit
+                        </a>
+                      </li>
+                      <li>
+                        <a class="dropdown-item" href="{{ contract.list_detail_url }}">
+                          <i class="bi bi-eye text-info me-2"></i>View
+                        </a>
+                      </li>
+                      {% if contract.contract_attachment %}
+                      <li>
+                        <a
+                          class="dropdown-item"
+                          href="{{ contract.contract_attachment.url }}"
+                          target="_blank"
+                          rel="noopener"
+                        >
+                          <i class="bi bi-box-arrow-up-right me-2"></i>Open file
+                        </a>
+                      </li>
+                      {% endif %}
+                      <li><hr class="dropdown-divider" /></li>
+                      <li>
+                        <form
+                          method="post"
+                          action="{{ contract.list_delete_action_url }}"
+                          class="d-inline"
+                          onsubmit="return confirm('Delete contract {{ contract.contract_no|escapejs }}? This cannot be undone.');"
+                        >
+                          {% csrf_token %}
+                          {% if request.GET.tid %}<input type="hidden" name="tid" value="{{ request.GET.tid }}" />{% endif %}
+                          <button type="submit" class="dropdown-item text-danger">
+                            <i class="bi bi-trash3 me-2"></i>Delete
+                          </button>
+                        </form>
+                      </li>
+                    </ul>
                   </div>
                 </td>
               </tr>
               {% empty %}
-              <tr>
+              <tr class="eal-table-empty-row">
                 <td colspan="9" class="eal-table-empty">No client contracts found.</td>
               </tr>
               {% endfor %}
@@ -242,163 +261,22 @@
 {% block extra_js %}
 <script>
       (function () {
-        const panel = document.getElementById("detailPanel");
-        const overlay = document.getElementById("detailPanelOverlay");
-        const closeBtn = document.getElementById("detailCloseBtn");
-        const prevBtn = document.getElementById("detailPrevBtn");
-        const nextBtn = document.getElementById("detailNextBtn");
-        const rows = document.querySelectorAll(".eal-table tbody tr");
-        let currentIndex = -1;
-        if (!panel || !overlay || !closeBtn || !prevBtn || !nextBtn) return;
-
-        /* ---- helpers ---- */
-        function txt(el) {
-          return el ? el.textContent.trim() : "\u2014";
-        }
-
-        function openPanel() {
-          panel.classList.add("active");
-          overlay.classList.add("active");
-          document.body.style.overflow = "hidden";
-        }
-
-        function closePanel() {
-          panel.classList.remove("active");
-          overlay.classList.remove("active");
-          document.body.style.overflow = "";
-          rows.forEach(function (r) {
-            r.classList.remove("row-selected");
-          });
-          currentIndex = -1;
-        }
-
-        function populatePanel(row) {
-          const cells = row.querySelectorAll("td");
-          // cells index: 0=check, 1=contractNo, 2=clientAccount,
-          //              3=startDate, 4=endDate, 5=notes,
-          //              6=attachment, 7=status, 8=actions
-
-          document.getElementById("dpContractNo").textContent = txt(cells[1]);
-
-          // Client Account: combine name + sub account id if available
-          let clientAccountText = "\u2014";
-          const nameCell = cells[2]
-            ? cells[2].querySelector(".eal-name-cell")
-            : null;
-          if (nameCell) {
-            const main = nameCell.querySelector(".eal-name-text");
-            const sub = nameCell.querySelector(".eal-name-sub");
-            clientAccountText = [
-              main ? main.textContent.trim() : "",
-              sub ? sub.textContent.trim() : "",
-            ]
-              .filter(Boolean)
-              .join(" \u2022 ");
-          } else {
-            clientAccountText = txt(cells[2]);
-          }
-          document.getElementById("dpClientAccount").textContent =
-            clientAccountText || "\u2014";
-
-          // Status badge
-          const statusBadge = cells[7]
-            ? cells[7].querySelector(".status-badge")
-            : null;
-          const statusEl = document.getElementById("dpStatus");
-          if (statusBadge) {
-            statusEl.innerHTML = "";
-            const clone = statusBadge.cloneNode(true);
-            statusEl.appendChild(clone);
-          } else {
-            statusEl.textContent = txt(cells[7]);
-          }
-
-          document.getElementById("dpStartDate").textContent = txt(cells[3]);
-          document.getElementById("dpEndDate").textContent = txt(cells[4]);
-          document.getElementById("dpNotes").textContent = txt(cells[5]);
-
-          const attachmentCell = cells[6];
-          let attachmentText = "\u2014";
-          if (attachmentCell) {
-            const hasBadge = attachmentCell.querySelector(".status-badge");
-            attachmentText = hasBadge
-              ? hasBadge.textContent.trim()
-              : txt(attachmentCell);
-          }
-          document.getElementById("dpAttachment").textContent =
-            attachmentText || "\u2014";
-
-          // Highlight the selected row
-          rows.forEach(function (r) {
-            r.classList.remove("row-selected");
-          });
-          row.classList.add("row-selected");
-        }
-
-        function showRow(index) {
-          if (index < 0 || index >= rows.length) return;
-
-          currentIndex = index;
-          populatePanel(rows[currentIndex]);
-          prevBtn.disabled = currentIndex === 0;
-          nextBtn.disabled = currentIndex === rows.length - 1;
-        }
-
-        /* ---- event listeners ---- */
-        rows.forEach(function (row, idx) {
+        document.querySelectorAll(".eal-table tbody tr[data-detail-url]").forEach(function (row) {
+          var url = row.getAttribute("data-detail-url");
+          if (!url) return;
           row.style.cursor = "pointer";
           row.addEventListener("click", function (e) {
-            // Don't trigger on checkbox or action button clicks
             if (
               e.target.closest(".eal-col-check") ||
               e.target.closest(".eal-actions-cell") ||
-              e.target.closest('input[type="checkbox"]')
+              e.target.closest('input[type="checkbox"]') ||
+              e.target.closest("a")
             ) {
               return;
             }
-            currentIndex = idx;
-            showRow(currentIndex);
-            openPanel();
+            window.location.href = url;
           });
         });
-
-        closeBtn.addEventListener("click", closePanel);
-        overlay.addEventListener("click", closePanel);
-
-        prevBtn.addEventListener("click", function () {
-          if (currentIndex > 0) showRow(currentIndex - 1);
-        });
-
-        nextBtn.addEventListener("click", function () {
-          if (currentIndex < rows.length - 1) showRow(currentIndex + 1);
-        });
-
-        document.addEventListener("keydown", function (e) {
-          if (!panel.classList.contains("active")) return;
-
-          if (e.key === "Escape") closePanel();
-
-          if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
-            e.preventDefault();
-            if (currentIndex > 0) showRow(currentIndex - 1);
-          }
-          if (e.key === "ArrowDown" || e.key === "ArrowRight") {
-            e.preventDefault();
-            if (currentIndex < rows.length - 1) showRow(currentIndex + 1);
-          }
-        });
-
-        // View button also opens panel
-        document
-          .querySelectorAll('.eal-row-btn[title="View"]')
-          .forEach(function (btn, idx) {
-            btn.addEventListener("click", function (e) {
-              e.stopPropagation();
-              currentIndex = idx;
-              showRow(currentIndex);
-              openPanel();
-            });
-          });
       })();
     </script>
 {% endblock %}

@@ -1,0 +1,29 @@
+{% extends 'iroad_tenants/base.html' %}
+{% load i18n %}
+
+{% block title %}Sales Report | iRoad Admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{% url 'iroad_tenants:tenant_dashboard' %}">Dashboard</a></li>
+      <li class="breadcrumb-item">CRM</li>
+      <li class="breadcrumb-item"><a href="{% url 'iroad_tenants:tenant_client_account' %}">Client Account</a></li>
+      <li class="breadcrumb-item active" aria-current="page">Sales report</li>
+    </ol>
+  </nav>
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">Sales report</h1>
+      <p class="page-subtitle">
+        {{ client_account.account_no }} — {{ client_account.display_name }}
+      </p>
+    </div>
+    <div class="page-header-right">
+      <a href="{% url 'iroad_tenants:tenant_client_account' %}" class="btn btn-outline-secondary">Back to list</a>
+    </div>
+  </div>
+</div>
+<p class="text-muted">Reporting for this account is not wired yet.</p>
+{% endblock %}

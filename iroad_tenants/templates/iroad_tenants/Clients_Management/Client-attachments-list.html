@@ -2,7 +2,7 @@
 {% load static %}
 {% load i18n %}
 
-{% block title %}Client Attachments List | iRoad Admin{% endblock %}
+{% block title %}Client Attachments | iRoad Admin{% endblock %}
 
 {% block breadcrumb %}{% endblock %}
 
@@ -20,14 +20,14 @@
             <li class="breadcrumb-item">CRM</li>
             <li class="breadcrumb-item">Clients Management</li>
             <li class="breadcrumb-item active" aria-current="page">
-              Client Attachments List
+              Client Attachments
             </li>
           </ol>
         </nav>
 
         <div class="page-header-row">
           <div class="page-header-left">
-            <h1 class="page-title">Client Attachments List</h1>
+            <h1 class="page-title">Client Attachments</h1>
             <p class="page-subtitle">
               Manage and view all client attachment records
             </p>
@@ -38,7 +38,7 @@
                 <i class="bi bi-download"></i>
                 <span>Export</span>
               </button>
-              <a href="{% url 'iroad_tenants:tenant_client_attachments_create' %}" class="eal-btn eal-btn-primary">
+              <a href="{% url 'iroad_tenants:tenant_client_attachments_create' %}{% if request.GET.tid %}?tid={{ request.GET.tid|urlencode }}{% endif %}" class="eal-btn eal-btn-primary">
                 <i class="bi bi-plus-lg"></i>
                 <span>Add Attachment</span>
               </a>
@@ -88,13 +88,19 @@
       </div>
 
       <!-- Table Card -->
-      <div class="eal-table-card">
+      <div
+        class="eal-table-card"
+        data-eal-filterable-table
+        data-eal-empty-colspan="9"
+        data-eal-empty-filter-message="No attachments match the selected search/filter criteria."
+        data-eal-global-search-columns="1,2,3,4,5,6,7"
+      >
         <!-- Toolbar -->
         <div class="eal-toolbar">
           <div class="eal-toolbar-left">
             <div class="eal-search">
               <i class="bi bi-search"></i>
-              <input type="text" placeholder="Search attachments..." />
+              <input type="text" data-eal-global-search placeholder="Search attachments..." />
             </div>
             <div class="eal-chip-group">
               <button class="eal-chip active">All</button>
@@ -126,59 +132,25 @@
                     id="ealSelectAll"
                   />
                 </th>
-                <th>
-                  Attachment ID
-                  <span class="sort-indicator">
-                    <i class="bi bi-caret-up-fill"></i>
-                    <i class="bi bi-caret-down-fill"></i>
-                  </span>
-                </th>
-                <th>
-                  Client Account
-                  <span class="sort-indicator">
-                    <i class="bi bi-caret-up-fill"></i>
-                    <i class="bi bi-caret-down-fill"></i>
-                  </span>
-                </th>
-                <th>
-                  Attachment Date
-                  <span class="sort-indicator">
-                    <i class="bi bi-caret-up-fill"></i>
-                    <i class="bi bi-caret-down-fill"></i>
-                  </span>
-                </th>
-                <th>
-                  Expiry Applicable
-                  <span class="sort-indicator">
-                    <i class="bi bi-caret-up-fill"></i>
-                    <i class="bi bi-caret-down-fill"></i>
-                  </span>
-                </th>
-                <th>
-                  Expiry Date
-                  <span class="sort-indicator">
-                    <i class="bi bi-caret-up-fill"></i>
-                    <i class="bi bi-caret-down-fill"></i>
-                  </span>
-                </th>
-                <th>File Name</th>
-                <th>
-                  Status
-                  <span class="sort-indicator">
-                    <i class="bi bi-caret-up-fill"></i>
-                    <i class="bi bi-caret-down-fill"></i>
-                  </span>
-                </th>
+                {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=1 title="Attachment ID" filter_placeholder="Filter by ID" %}
+                {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=2 title="Client Account" filter_placeholder="Filter by client" %}
+                {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=3 title="Attachment Date" filter_placeholder="Filter by date" %}
+                {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=4 title="Expiry Applicable" filter_placeholder="Filter yes/no" %}
+                {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=5 title="Expiry Date" filter_placeholder="Filter by date" %}
+                {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=6 title="File Name" filter_placeholder="Filter by file" %}
+                {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=7 title="Status" filter_placeholder="Filter by status" %}
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {% for attachment in client_attachments %}
-              <tr>
+              <tr data-detail-url="{{ attachment.list_detail_url|default:'' }}">
                 <td class="eal-col-check">
                   <input type="checkbox" class="eal-custom-check" />
                 </td>
-                <td><span class="eal-entity-id">{{ attachment.attachment_no }}</span></td>
+                <td>
+                  <a href="{{ attachment.list_detail_url }}" class="eal-entity-id text-decoration-none">{{ attachment.attachment_no }}</a>
+                </td>
                 <td>
                   <div class="eal-name-cell">
                     <span class="eal-name-text">
@@ -202,20 +174,71 @@
                   </span>
                 </td>
                 <td>
-                  <span class="status-badge {% if attachment.status == 'Expired' %}expired{% else %}active{% endif %}">
-                    {{ attachment.status }}
+                  <span class="status-badge {% if attachment.computed_status == 'Expired' %}expired{% else %}active{% endif %}">
+                    {{ attachment.computed_status }}
                   </span>
                 </td>
                 <td>
-                  <div class="eal-actions-cell">
-                    <a class="eal-row-btn" title="View" href="{{ attachment.attachment_file.url }}" target="_blank" rel="noopener">
-                      <i class="bi bi-eye"></i>
-                    </a>
+                  <div class="dropdown eal-actions-cell" data-bs-display="static">
+                    <button
+                      class="eal-row-btn"
+                      type="button"
+                      data-bs-toggle="dropdown"
+                      aria-expanded="false"
+                      title="Actions"
+                    >
+                      <i class="bi bi-three-dots-vertical"></i>
+                    </button>
+                    <ul
+                      class="dropdown-menu dropdown-menu-end shadow-sm"
+                      style="border-radius: 8px; border-color: #e2e8f0; min-width: 180px;"
+                    >
+                      <li>
+                        <a
+                          class="dropdown-item"
+                          href="{% url 'iroad_tenants:tenant_client_attachment_edit' attachment.attachment_id %}{% if request.GET.tid %}?tid={{ request.GET.tid|urlencode }}{% endif %}"
+                        >
+                          <i class="bi bi-pencil text-primary me-2"></i>Edit
+                        </a>
+                      </li>
+                      <li>
+                        <a class="dropdown-item" href="{{ attachment.list_detail_url }}">
+                          <i class="bi bi-eye text-info me-2"></i>View
+                        </a>
+                      </li>
+                      {% if attachment.attachment_file %}
+                      <li>
+                        <a
+                          class="dropdown-item"
+                          href="{{ attachment.attachment_file.url }}"
+                          target="_blank"
+                          rel="noopener"
+                        >
+                          <i class="bi bi-box-arrow-up-right me-2"></i>Open file
+                        </a>
+                      </li>
+                      {% endif %}
+                      <li><hr class="dropdown-divider" /></li>
+                      <li>
+                        <form
+                          method="post"
+                          action="{% url 'iroad_tenants:tenant_client_attachment_delete' attachment.attachment_id %}"
+                          class="d-inline"
+                          onsubmit="return confirm('Delete attachment {{ attachment.attachment_no|escapejs }}? This cannot be undone.');"
+                        >
+                          {% csrf_token %}
+                          {% if request.GET.tid %}<input type="hidden" name="tid" value="{{ request.GET.tid }}" />{% endif %}
+                          <button type="submit" class="dropdown-item text-danger">
+                            <i class="bi bi-trash3 me-2"></i>Delete
+                          </button>
+                        </form>
+                      </li>
+                    </ul>
                   </div>
                 </td>
               </tr>
               {% empty %}
-              <tr>
+              <tr class="eal-table-empty-row">
                 <td colspan="9" class="eal-table-empty">No client attachments found.</td>
               </tr>
               {% endfor %}
@@ -249,158 +272,22 @@
 {% block extra_js %}
 <script>
       (function () {
-        const panel = document.getElementById("detailPanel");
-        const overlay = document.getElementById("detailPanelOverlay");
-        const closeBtn = document.getElementById("detailCloseBtn");
-        const prevBtn = document.getElementById("detailPrevBtn");
-        const nextBtn = document.getElementById("detailNextBtn");
-        const rows = document.querySelectorAll(".eal-table tbody tr");
-        let currentIndex = -1;
-        if (!panel || !overlay || !closeBtn || !prevBtn || !nextBtn) return;
-
-        /* ---- helpers ---- */
-        function txt(el) {
-          return el ? el.textContent.trim() : "Not provided";
-        }
-
-        function openPanel() {
-          panel.classList.add("active");
-          overlay.classList.add("active");
-          document.body.style.overflow = "hidden";
-        }
-
-        function closePanel() {
-          panel.classList.remove("active");
-          overlay.classList.remove("active");
-          document.body.style.overflow = "";
-          rows.forEach(function (r) {
-            r.classList.remove("row-selected");
-          });
-          currentIndex = -1;
-        }
-
-        function populatePanel(row) {
-          const cells = row.querySelectorAll("td");
-          // cells index: 0=check, 1=attachmentId, 2=clientAccount,
-          //              3=attachmentDate, 4=expiryApplicable,
-          //              5=expiryDate, 6=fileName, 7=status, 8=actions
-
-          document.getElementById("dpAttachmentId").textContent = txt(cells[1]);
-
-          const nameEl = cells[2]
-            ? cells[2].querySelector(".eal-name-text")
-            : null;
-          document.getElementById("dpClientAccount").textContent = nameEl
-            ? nameEl.textContent.trim()
-            : "Not provided";
-
-          document.getElementById("dpAttachmentDate").textContent = txt(
-            cells[3],
-          );
-
-          const expiryBadge = cells[4]
-            ? cells[4].querySelector(".eal-type-badge")
-            : null;
-          document.getElementById("dpExpiryApplicable").textContent =
-            expiryBadge ? expiryBadge.textContent.trim() : "Not provided";
-
-          document.getElementById("dpExpiryDate").textContent = txt(cells[5]);
-
-          // File name - strip icon
-          const fileEl = cells[6]
-            ? cells[6].querySelector(".eal-pi-number")
-            : null;
-          document.getElementById("dpFileName").textContent = fileEl
-            ? fileEl.textContent.trim()
-            : "Not provided";
-
-          // File notes - placeholder
-          document.getElementById("dpFileNotes").textContent = "Not provided";
-
-          // Status badge
-          const statusBadge = cells[7]
-            ? cells[7].querySelector(".status-badge")
-            : null;
-          const statusEl = document.getElementById("dpStatus");
-          if (statusBadge) {
-            statusEl.innerHTML = "";
-            const clone = statusBadge.cloneNode(true);
-            statusEl.appendChild(clone);
-          } else {
-            statusEl.textContent = txt(cells[7]);
-          }
-
-          // Highlight the selected row
-          rows.forEach(function (r) {
-            r.classList.remove("row-selected");
-          });
-          row.classList.add("row-selected");
-        }
-
-        function showRow(index) {
-          if (index < 0 || index >= rows.length) return;
-
-          currentIndex = index;
-          populatePanel(rows[currentIndex]);
-          prevBtn.disabled = currentIndex === 0;
-          nextBtn.disabled = currentIndex === rows.length - 1;
-        }
-
-        /* ---- event listeners ---- */
-        rows.forEach(function (row, idx) {
+        document.querySelectorAll(".eal-table tbody tr[data-detail-url]").forEach(function (row) {
+          var url = row.getAttribute("data-detail-url");
+          if (!url) return;
           row.style.cursor = "pointer";
           row.addEventListener("click", function (e) {
-            // Don't trigger on checkbox or action button clicks
             if (
               e.target.closest(".eal-col-check") ||
               e.target.closest(".eal-actions-cell") ||
-              e.target.closest('input[type="checkbox"]')
+              e.target.closest('input[type="checkbox"]') ||
+              e.target.closest("a")
             ) {
               return;
             }
-            currentIndex = idx;
-            showRow(currentIndex);
-            openPanel();
+            window.location.href = url;
           });
         });
-
-        closeBtn.addEventListener("click", closePanel);
-        overlay.addEventListener("click", closePanel);
-
-        prevBtn.addEventListener("click", function () {
-          if (currentIndex > 0) showRow(currentIndex - 1);
-        });
-
-        nextBtn.addEventListener("click", function () {
-          if (currentIndex < rows.length - 1) showRow(currentIndex + 1);
-        });
-
-        document.addEventListener("keydown", function (e) {
-          if (!panel.classList.contains("active")) return;
-
-          if (e.key === "Escape") closePanel();
-
-          if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
-            e.preventDefault();
-            if (currentIndex > 0) showRow(currentIndex - 1);
-          }
-          if (e.key === "ArrowDown" || e.key === "ArrowRight") {
-            e.preventDefault();
-            if (currentIndex < rows.length - 1) showRow(currentIndex + 1);
-          }
-        });
-
-        // View button also opens panel
-        document
-          .querySelectorAll('.eal-row-btn[title="View"]')
-          .forEach(function (btn, idx) {
-            btn.addEventListener("click", function (e) {
-              e.stopPropagation();
-              currentIndex = idx;
-              showRow(currentIndex);
-              openPanel();
-            });
-          });
       })();
     </script>
 {% endblock %}

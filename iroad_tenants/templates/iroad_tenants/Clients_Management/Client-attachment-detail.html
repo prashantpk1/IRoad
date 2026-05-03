@@ -1,0 +1,199 @@
+{% extends 'iroad_tenants/base.html' %}
+{% load static %}
+
+{% block title %}View Client Attachment | iRoad Admin{% endblock %}
+
+{% block extra_css %}
+<style>
+  #clientAttachmentDetailView .field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  #clientAttachmentDetailView .form-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 0;
+  }
+  .view-field-box {
+    display: block;
+    min-height: 44px;
+    padding: 10px 14px;
+    background: var(--bg-light);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    font-size: 14px;
+    color: var(--text-dark);
+    line-height: 1.5;
+  }
+  .view-field-box .view-value {
+    margin: 0;
+    font-size: inherit;
+    color: inherit;
+    min-height: auto;
+  }
+  .view-value.empty {
+    color: var(--text-light);
+  }
+</style>
+{% endblock %}
+
+{% block breadcrumb %}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item">
+        <a href="{% url 'iroad_tenants:tenant_dashboard' %}">Dashboard</a>
+      </li>
+      <li class="breadcrumb-item">CRM</li>
+      <li class="breadcrumb-item">Clients Management</li>
+      <li class="breadcrumb-item">
+        <a href="{{ back_to_list_url }}">Client Attachments</a>
+      </li>
+      <li class="breadcrumb-item active" aria-current="page">View Attachment</li>
+    </ol>
+  </nav>
+
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">View Client Attachment</h1>
+      <p class="page-subtitle">
+        Review attachment metadata and open the stored file when needed.
+      </p>
+    </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <a href="{{ back_to_list_url }}" class="eal-btn eal-btn-outline">
+          <i class="bi bi-arrow-left"></i>
+          <span>Back</span>
+        </a>
+        {% if attachment_file_url %}
+        <a href="{{ attachment_file_url }}" class="eal-btn eal-btn-outline" target="_blank" rel="noopener">
+          <i class="bi bi-box-arrow-up-right"></i>
+          <span>Open file</span>
+        </a>
+        {% endif %}
+        <a href="{{ edit_attachment_url }}" class="eal-btn eal-btn-primary">
+          <i class="bi bi-pencil-square"></i>
+          <span>Edit</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="clientAttachmentDetailView">
+  <div class="form-card" data-section="1">
+    <div class="form-card-header">
+      <div class="form-card-icon blue">
+        <i class="bi bi-paperclip"></i>
+      </div>
+      <div class="form-card-header-text">
+        <h2 class="form-card-title">Attachment record</h2>
+        <p class="form-card-desc">
+          Identification, client account, dates, and document status.
+        </p>
+      </div>
+    </div>
+    <div class="form-card-body">
+      <div class="field-group">
+        <h3 class="field-group-title">
+          <i class="bi bi-fingerprint"></i>
+          Identity
+        </h3>
+        <div class="fields-grid cols-2">
+          <div class="field">
+            <label class="form-label">Attachment ID</label>
+            <div class="view-field-box">
+              <p class="view-value">{{ attachment.attachment_no }}</p>
+            </div>
+          </div>
+          <div class="field">
+            <label class="form-label">Client Account</label>
+            <div class="view-field-box">
+              <p class="view-value">
+                {{ attachment.client_account.account_no }} — {{ attachment.client_account.display_name|default:attachment.client_account.name_english }}
+              </p>
+            </div>
+          </div>
+          <div class="field">
+            <label class="form-label">Attachment date</label>
+            <div class="view-field-box">
+              <p class="view-value">{{ attachment.attachment_date|date:"Y-m-d" }}</p>
+            </div>
+          </div>
+          <div class="field">
+            <label class="form-label">Status</label>
+            <div class="view-field-box">
+              <span class="status-badge {% if attachment.computed_status == 'Expired' %}expired{% else %}active{% endif %}">
+                {{ attachment.computed_status }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="field-group mt-4">
+        <h3 class="field-group-title">
+          <i class="bi bi-calendar-event"></i>
+          Expiry
+        </h3>
+        <div class="fields-grid cols-2">
+          <div class="field">
+            <label class="form-label">Expiry applicable</label>
+            <div class="view-field-box">
+              <p class="view-value">
+                {% if attachment.is_expiry_applicable %}Yes{% else %}No{% endif %}
+              </p>
+            </div>
+          </div>
+          <div class="field">
+            <label class="form-label">Expiry date</label>
+            <div class="view-field-box">
+              <p class="view-value {% if not attachment.expiry_date %}empty{% endif %}">
+                {% if attachment.expiry_date %}{{ attachment.expiry_date|date:"Y-m-d" }}{% else %}—{% endif %}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="field-group mt-4">
+        <h3 class="field-group-title">
+          <i class="bi bi-file-earmark-text"></i>
+          Document
+        </h3>
+        <div class="fields-grid cols-2">
+          <div class="field">
+            <label class="form-label">File name</label>
+            <div class="view-field-box">
+              <p class="view-value {% if not attachment.file_name %}empty{% endif %}">
+                {{ attachment.file_name|default:"—" }}
+              </p>
+            </div>
+          </div>
+          <div class="field">
+            <label class="form-label">Notes</label>
+            <div class="view-field-box">
+              <p class="view-value {% if not attachment.file_notes %}empty{% endif %}">
+                {{ attachment.file_notes|default:"—" }}
+              </p>
+            </div>
+          </div>
+          {% if attachment.created_by_label %}
+          <div class="field">
+            <label class="form-label">Created by</label>
+            <div class="view-field-box">
+              <p class="view-value">{{ attachment.created_by_label }}</p>
+            </div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

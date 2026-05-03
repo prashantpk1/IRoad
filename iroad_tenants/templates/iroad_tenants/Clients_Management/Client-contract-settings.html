@@ -38,6 +38,7 @@
         action="{% url 'iroad_tenants:tenant_client_contract_settings' %}"
       >
         {% csrf_token %}
+        {% if request.GET.tid %}<input type="hidden" name="tid" value="{{ request.GET.tid }}" />{% elif request.POST.tid %}<input type="hidden" name="tid" value="{{ request.POST.tid }}" />{% endif %}
         <!-- Section 1: Tenant-Level Configuration -->
         <div class="form-card" data-section="1">
           <div class="form-card-header">

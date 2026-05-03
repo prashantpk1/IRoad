@@ -43,7 +43,7 @@
       </div>
 
       <!-- Client Account Form -->
-      <form id="clientAccountForm" method="post" novalidate {% if is_edit_mode %}action="{% url 'iroad_tenants:tenant_client_account_edit' editing_account_no %}"{% endif %}>
+      <form id="clientAccountForm" method="post" novalidate {% if is_edit_mode %}action="{% url 'iroad_tenants:tenant_client_account_edit' editing_account_no %}"{% else %}action="{% url 'iroad_tenants:tenant_client_account_create' %}"{% endif %}>
         {% csrf_token %}
         <!-- Section 1: Account & Status -->
         <div class="form-card" data-section="1">

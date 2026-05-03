@@ -38,7 +38,13 @@
   </div>
 </div>
 
-<form method="post" id="addressForm" class="needs-validation" novalidate>
+<form
+  method="post"
+  id="addressForm"
+  class="needs-validation"
+  novalidate
+  data-location-options-url="{% url 'iroad_tenants:tenant_address_location_options' %}"
+>
   {% csrf_token %}
   {% if request.GET.tid %}<input type="hidden" name="tid" value="{{ request.GET.tid }}" />{% endif %}
 
@@ -327,4 +333,96 @@
     </div>
   </div>
 </form>
+{% endblock %}
+
+{% block extra_js %}
+  <script>
+    (function () {
+      const form = document.getElementById("addressForm");
+      if (!form) return;
+
+      const categoryField = document.getElementById("{{ form.address_category.id_for_label }}");
+      const defaultPickupField = document.getElementById("{{ form.default_pickup_address.id_for_label }}");
+      const defaultDeliveryField = document.getElementById("{{ form.default_delivery_address.id_for_label }}");
+
+      // Keep this behavior independent from location dropdown wiring.
+      const PICKUP = "Pickup Address";
+      const DELIVERY = "Delivery Address";
+      const BOTH = "Both";
+      const normalizeCategoryFromDefaults = () => {
+        if (!categoryField) return;
+        if (defaultPickupField && defaultPickupField.checked && categoryField.value === DELIVERY) {
+          categoryField.value = BOTH;
+        }
+        if (defaultDeliveryField && defaultDeliveryField.checked && categoryField.value === PICKUP) {
+          categoryField.value = BOTH;
+        }
+      };
+      if (defaultPickupField) {
+        defaultPickupField.addEventListener("change", normalizeCategoryFromDefaults);
+        defaultPickupField.addEventListener("click", normalizeCategoryFromDefaults);
+      }
+      if (defaultDeliveryField) {
+        defaultDeliveryField.addEventListener("change", normalizeCategoryFromDefaults);
+        defaultDeliveryField.addEventListener("click", normalizeCategoryFromDefaults);
+      }
+      if (categoryField) {
+        categoryField.addEventListener("change", normalizeCategoryFromDefaults);
+      }
+      normalizeCategoryFromDefaults();
+
+      const countryField = document.getElementById("{{ form.country.id_for_label }}");
+      const provinceField = document.getElementById("{{ form.province.id_for_label }}");
+      const cityField = document.getElementById("{{ form.city.id_for_label }}");
+      const endpoint = form.dataset.locationOptionsUrl || "";
+      if (!countryField || !provinceField || !cityField || !endpoint) return;
+
+      const setChoices = (selectEl, values, placeholder, keepValue) => {
+        const wanted = keepValue || "";
+        selectEl.innerHTML = "";
+        selectEl.appendChild(new Option(placeholder, ""));
+        values.forEach((value) => {
+          const opt = new Option(value, value);
+          if (wanted && value === wanted) opt.selected = true;
+          selectEl.appendChild(opt);
+        });
+        if (wanted && !values.includes(wanted)) {
+          const opt = new Option(wanted, wanted);
+          opt.selected = true;
+          selectEl.appendChild(opt);
+        }
+      };
+
+      const loadLocationOptions = async ({ resetCity = false } = {}) => {
+        const params = new URLSearchParams();
+        if (countryField.value) params.set("country", countryField.value);
+        if (provinceField.value) params.set("province", provinceField.value);
+        if (!params.toString()) {
+          setChoices(provinceField, [], "Select province...", "");
+          setChoices(cityField, [], "Select city...", "");
+          return;
+        }
+        const response = await fetch(`${endpoint}?${params.toString()}`, {
+          headers: { "X-Requested-With": "XMLHttpRequest" },
+        });
+        if (!response.ok) return;
+        const payload = await response.json();
+        if (!payload.ok) return;
+        const provinceValue = provinceField.value;
+        setChoices(provinceField, payload.provinces || [], "Select province...", provinceValue);
+        const cityValue = resetCity ? "" : cityField.value;
+        setChoices(cityField, payload.cities || [], "Select city...", cityValue);
+      };
+
+      countryField.addEventListener("change", () => {
+        provinceField.value = "";
+        cityField.value = "";
+        loadLocationOptions({ resetCity: true });
+      });
+      provinceField.addEventListener("change", () => {
+        cityField.value = "";
+        loadLocationOptions({ resetCity: true });
+      });
+    })();
+  </script>
 {% endblock %}

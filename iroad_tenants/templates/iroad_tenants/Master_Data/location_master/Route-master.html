@@ -1,0 +1,258 @@
+{% extends 'iroad_tenants/base.html' %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}{% if is_view %}Route Detail{% else %}Route Master{% endif %} | iRoad{% endblock %}
+{% block breadcrumb %}{% endblock %}
+
+{% block content %}
+
+
+      <!-- Page Header -->
+      <div class="page-header">
+        <nav aria-label="breadcrumb">
+          <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+              <a href="index.html">Dashboard</a>
+            </li>
+            <li class="breadcrumb-item">Master Data</li>
+            <li class="breadcrumb-item">Route Management</li>
+            <li class="breadcrumb-item active" aria-current="page">{% if is_view %}Route Detail{% else %}Route Master{% endif %}</li>
+          </ol>
+        </nav>
+        <div class="page-header-row">
+          <div class="page-header-left">
+            <h1 class="page-title">{% if is_view %}Route Detail{% elif is_edit %}Edit Route{% else %}Route Master{% endif %}</h1>
+            <p class="page-subtitle">
+              Define routes between origin and destination locations for
+              planning and pricing.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Route Master Form -->
+      <form
+        id="routeMasterForm"
+        method="post"
+        action="{% if is_edit and route %}{% url 'iroad_tenants:tenant_route_master_edit' route.route_id %}{% else %}{% url 'iroad_tenants:tenant_route_master_create' %}{% endif %}{% if request.GET.tid %}?tid={{ request.GET.tid|urlencode }}{% endif %}"
+      >
+        {% csrf_token %}
+        {% if request.GET.tid %}<input type="hidden" name="tid" value="{{ request.GET.tid|urlencode }}" />{% endif %}
+        {% if form.non_field_errors %}
+          <div class="alert alert-danger" role="alert">{{ form.non_field_errors }}</div>
+        {% endif %}
+        <div class="form-card" data-section="1">
+          <div class="form-card-header">
+            <div class="form-card-icon blue">
+              <i class="bi bi-signpost-split"></i>
+            </div>
+            <div class="form-card-header-text">
+              <h2 class="form-card-title">Route Details</h2>
+              <p class="form-card-desc">
+                Define the route identity, type, and origin–destination points.
+              </p>
+            </div>
+          </div>
+
+          <div class="form-card-body">
+            <div class="field-group">
+              <h3 class="field-group-title">
+                <i class="bi bi-info-circle"></i>
+                Basic Information
+              </h3>
+
+              <div class="fields-grid cols-3">
+                <div class="field">
+                  <label for="routeCode" class="form-label">Route Code</label>
+                  <input type="text" class="form-control" id="routeCode" value="{{ preview_route_code|default:'' }}" readonly />
+                  <span class="field-hint"
+                    >Unique code used to identify this route.</span
+                  >
+                </div>
+
+                <div class="field">
+                  <label for="routeLabel" class="form-label">Route Label</label>
+                  {{ form.route_label }}
+                  {% if form.route_label.errors %}<div class="text-danger small">{{ form.route_label.errors }}</div>{% endif %}
+                  <span class="field-hint"
+                    >Short descriptive label for lists and dropdowns.</span
+                  >
+                </div>
+
+                <div class="field">
+                  <label for="routeType" class="form-label">Route Type</label>
+                  {{ form.route_type }}
+                  {% if form.route_type.errors %}<div class="text-danger small">{{ form.route_type.errors }}</div>{% endif %}
+                  <span class="field-hint"
+                    >Category that best describes this route.</span
+                  >
+                </div>
+              </div>
+
+              <div class="fields-grid cols-3">
+                <div class="field">
+                  <label for="originPoint" class="form-label"
+                    >Origin Point</label
+                  >
+                  {{ form.origin_point }}
+                  {% if form.origin_point.errors %}<div class="text-danger small">{{ form.origin_point.errors }}</div>{% endif %}
+                  <span class="field-hint">Starting point of this route.</span>
+                </div>
+
+                <div class="field">
+                  <label for="destinationPoint" class="form-label"
+                    >Destination Point</label
+                  >
+                  {{ form.destination_point }}
+                  {% if form.destination_point.errors %}<div class="text-danger small">{{ form.destination_point.errors }}</div>{% endif %}
+                  <span class="field-hint">Ending point of this route.</span>
+                </div>
+
+                <div class="field">
+                  <label for="status" class="form-label">Status</label>
+                  {{ form.status }}
+                  {% if form.status.errors %}<div class="text-danger small">{{ form.status.errors }}</div>{% endif %}
+                  <span class="field-hint"
+                    >Controls whether this route is available for booking.</span
+                  >
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-card" data-section="2">
+          <div class="form-card-header">
+            <div class="form-card-icon green">
+              <i class="bi bi-speedometer2"></i>
+            </div>
+            <div class="form-card-header-text">
+              <h2 class="form-card-title">Distance & Duration</h2>
+              <p class="form-card-desc">
+                Set distance, estimated trip duration, and route-specific
+                options.
+              </p>
+            </div>
+          </div>
+
+          <div class="form-card-body">
+            <div class="field-group">
+              <h3 class="field-group-title">
+                <i class="bi bi-gear"></i>
+                Metrics
+              </h3>
+
+              <div class="fields-grid cols-3">
+                <div class="field">
+                  <label for="distanceKm" class="form-label"
+                    >Distance (km)</label
+                  >
+                  {{ form.distance_km }}
+                  {% if form.distance_km.errors %}<div class="text-danger small">{{ form.distance_km.errors }}</div>{% endif %}
+                  <span class="field-hint">Total distance in kilometres.</span>
+                </div>
+
+                <div class="field">
+                  <label for="estimatedDurationH" class="form-label"
+                    >Estimated Trip Duration (h)</label
+                  >
+                  {{ form.estimated_duration_h }}
+                  {% if form.estimated_duration_h.errors %}<div class="text-danger small">{{ form.estimated_duration_h.errors }}</div>{% endif %}
+                  <span class="field-hint"
+                    >Estimated trip duration in hours.</span
+                  >
+                </div>
+              </div>
+            </div>
+
+            <div class="field-group">
+              <h3 class="field-group-title">
+                <i class="bi bi-sliders"></i>
+                Route Options
+              </h3>
+
+              <div class="setting-row">
+                <div class="setting-row-info">
+                  <label class="form-label" for="hasCustoms">Has Customs</label>
+                  <p class="field-hint">
+                    When enabled, this route involves customs clearance (e.g.
+                    international borders).
+                  </p>
+                </div>
+                <label class="setting-toggle">
+                  {{ form.has_customs }}
+                  <span class="toggle-track"></span>
+                  <span class="toggle-label">Disabled</span>
+                </label>
+              </div>
+
+              <div class="setting-row">
+                <div class="setting-row-info">
+                  <label class="form-label" for="hasTollGates"
+                    >Has Toll Gates</label
+                  >
+                  <p class="field-hint">
+                    When enabled, this route includes toll gates that may affect
+                    pricing.
+                  </p>
+                </div>
+                <label class="setting-toggle">
+                  {{ form.has_toll_gates }}
+                  <span class="toggle-track"></span>
+                  <span class="toggle-label">Disabled</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-actions-bar">
+          <div class="form-actions-left">
+            <button type="reset" class="btn btn-outline-secondary">
+              <i class="bi bi-arrow-counterclockwise"></i>
+              Reset Form
+            </button>
+          </div>
+          <div class="form-actions-right">
+            <a href="{% url 'iroad_tenants:tenant_route_master_list' %}{% if request.GET.tid %}?tid={{ request.GET.tid|urlencode }}{% endif %}" class="btn btn-outline-secondary me-2">
+              <i class="bi bi-arrow-left"></i>
+              Back
+            </a>
+            {% if not is_view %}
+              <button type="submit" class="btn btn-primary">
+                <i class="bi bi-check-circle"></i>
+                {% if is_edit %}Update Route{% else %}Save Route{% endif %}
+              </button>
+            {% endif %}
+          </div>
+        </div>
+      </form>
+{% endblock %}
+
+{% block extra_js %}
+    <script>
+      // Update toggle labels dynamically (reuse from Client Account Setting)
+      document.querySelectorAll(".setting-toggle input").forEach((input) => {
+        const label = input
+          .closest(".setting-toggle")
+          .querySelector(".toggle-label");
+        function updateLabel() {
+          label.textContent = input.checked ? "Enabled" : "Disabled";
+        }
+        updateLabel();
+        input.addEventListener("change", updateLabel);
+      });
+      const isView = "{{ is_view|yesno:'1,0' }}" === "1";
+      if (isView) {
+        document.querySelectorAll("#routeMasterForm input, #routeMasterForm select, #routeMasterForm textarea").forEach((el) => {
+          if (el.type === "checkbox" || el.type === "radio") {
+            el.disabled = true;
+          } else {
+            el.readOnly = true;
+            el.disabled = true;
+          }
+        });
+      }
+    </script>
+{% endblock %}
