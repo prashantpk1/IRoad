@@ -87,7 +87,6 @@ def main():
         'mobile_no_2': '',
         'whatsapp_no': '',
         'phone_no': '',
-        'extension': '',
         'email': '',
         'arabic_label': '',
         'english_label': '',

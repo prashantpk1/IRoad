@@ -97,7 +97,6 @@ class TenantAddressMasterForm(forms.ModelForm):
             'mobile_no_2',
             'whatsapp_no',
             'phone_no',
-            'extension',
             'email',
         )
         labels = {
@@ -173,10 +172,12 @@ class TenantAddressMasterForm(forms.ModelForm):
                 attrs={'class': 'form-control phone-number', 'placeholder': _('WhatsApp number')}
             ),
             'phone_no': forms.TextInput(
-                attrs={'class': 'form-control', 'placeholder': _('Landline')}
-            ),
-            'extension': forms.TextInput(
-                attrs={'class': 'form-control', 'placeholder': _('Ext.')}
+                attrs={
+                    'class': 'form-control phone-number',
+                    'placeholder': _('Landline'),
+                    'autocomplete': 'tel',
+                    'inputmode': 'numeric',
+                }
             ),
             'email': forms.EmailInput(
                 attrs={'class': 'form-control', 'placeholder': 'email@example.com'}
@@ -335,9 +336,6 @@ class TenantAddressMasterForm(forms.ModelForm):
 
     def clean_phone_no(self):
         return _digits_only(self.cleaned_data.get('phone_no'), required=False)
-
-    def clean_extension(self):
-        return _digits_only(self.cleaned_data.get('extension'), required=False)
 
     def clean_email(self):
         return (self.cleaned_data.get('email') or '').strip()
