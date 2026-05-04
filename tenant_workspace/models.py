@@ -947,12 +947,12 @@ class TenantRouteMaster(models.Model):
     @staticmethod
     def derive_has_customs(origin, destination):
         """
-        PCS RT-001: Has Customs is True when origin and destination are in **different**
-        countries (cross-border). Same country → False. Missing country id → False.
+        Has Customs is True when origin and destination are in the same country.
+        Missing country id -> False.
         """
         oc = getattr(origin, 'country_id', None)
         dc = getattr(destination, 'country_id', None)
-        return bool(oc and dc and oc != dc)
+        return bool(oc and dc and oc == dc)
 
     def clean(self):
         errors = {}
@@ -987,6 +987,306 @@ class TenantRouteMaster(models.Model):
             errors['distance_km'] = [_('Distance cannot be negative.')]
         if self.estimated_duration_h is not None and self.estimated_duration_h < 0:
             errors['estimated_duration_h'] = [_('Estimated duration cannot be negative.')]
+        if errors:
+            raise ValidationError(errors)
+
+
+class TenantServiceItemMaster(models.Model):
+    """SV-001 Service item master (service/trip pricing item)."""
+
+    class ServiceType(models.TextChoices):
+        SERVICE = 'Service', 'Service'
+        TRIP = 'Trip', 'Trip'
+
+    class Status(models.TextChoices):
+        ACTIVE = 'Active', 'Active'
+        INACTIVE = 'Inactive', 'Inactive'
+
+    service_item_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    service_code = models.CharField(max_length=64, unique=True)
+    service_sequence = models.PositiveIntegerField(default=0)
+    service_type = models.CharField(max_length=12, choices=ServiceType.choices)
+    status = models.CharField(max_length=12, choices=Status.choices, default=Status.ACTIVE)
+    english_name = models.CharField(max_length=200)
+    arabic_name = models.CharField(max_length=200, blank=True, default='')
+    category_name = models.CharField(max_length=200)
+    route = models.ForeignKey(
+        TenantRouteMaster,
+        on_delete=models.PROTECT,
+        related_name='service_items',
+        null=True,
+        blank=True,
+    )
+    sell_price = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    outbound_sell_price = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    inbound_sell_price = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'tenant_service_item_master'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['service_type', 'status'], name='svc_item_type_status_idx'),
+        ]
+
+    def __str__(self):
+        return f'{self.service_code} — {self.english_name}'
+
+    def clean(self):
+        errors = {}
+        if not (self.english_name or '').strip():
+            errors['english_name'] = [_('English name is required.')]
+        if not (self.category_name or '').strip():
+            errors['category_name'] = [_('Category is required.')]
+
+        if self.sell_price is not None and self.sell_price < 0:
+            errors['sell_price'] = [_('Sell price must be zero or greater.')]
+
+        if self.service_type == self.ServiceType.TRIP:
+            if not self.route_id:
+                errors['route'] = [_('Route is required for Trip service type.')]
+            if self.outbound_sell_price is None:
+                errors['outbound_sell_price'] = [_('Outbound sell price is required for Trip.')]
+            elif self.outbound_sell_price < 0:
+                errors['outbound_sell_price'] = [_('Outbound sell price must be zero or greater.')]
+            if self.inbound_sell_price is None:
+                errors['inbound_sell_price'] = [_('Inbound sell price is required for Trip.')]
+            elif self.inbound_sell_price < 0:
+                errors['inbound_sell_price'] = [_('Inbound sell price must be zero or greater.')]
+        else:
+            self.route = None
+            self.outbound_sell_price = None
+            self.inbound_sell_price = None
+
+        if errors:
+            raise ValidationError(errors)
+
+
+class TenantPriceList(models.Model):
+    """PL-001 client-specific price list header."""
+
+    class Status(models.TextChoices):
+        DRAFT = 'Draft', 'Draft'
+        ACTIVE = 'Active', 'Active'
+        INACTIVE = 'Inactive', 'Inactive'
+
+    price_list_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    price_list_code = models.CharField(max_length=64, unique=True)
+    price_list_sequence = models.PositiveIntegerField(default=0)
+    price_list_name = models.CharField(max_length=200)
+    client_account = models.ForeignKey(
+        TenantClientAccount,
+        on_delete=models.PROTECT,
+        related_name='price_lists',
+    )
+    status = models.CharField(max_length=12, choices=Status.choices, default=Status.DRAFT)
+    effective_from = models.DateField(null=True, blank=True)
+    effective_to = models.DateField(null=True, blank=True)
+    base_currency = models.CharField(max_length=10, blank=True, default='')
+    notes = models.TextField(blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'tenant_price_list'
+        ordering = ['-created_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['client_account'],
+                condition=Q(status='Active'),
+                name='tenant_price_list_one_active_per_client_uq',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['client_account', 'status'], name='price_list_client_status_idx'),
+        ]
+
+    def __str__(self):
+        return f'{self.price_list_code} — {self.price_list_name}'
+
+    def clean(self):
+        errors = {}
+        if not (self.price_list_name or '').strip():
+            errors['price_list_name'] = [_('Price list name is required.')]
+        if self.client_account_id:
+            if self.client_account.status != TenantClientAccount.Status.ACTIVE:
+                errors['client_account'] = [_('Client account must be Active.')]
+        else:
+            errors['client_account'] = [_('Client account is required.')]
+        if self.effective_from and self.effective_to and self.effective_from > self.effective_to:
+            errors['effective_to'] = [_('Effective To must be on or after Effective From.')]
+        if errors:
+            raise ValidationError(errors)
+
+    @classmethod
+    def resolve_price_override(cls, *, client_account_id, service_item, trip_type=None, on_date=None):
+        """
+        Price precedence:
+        1) Active client-specific price-list line override (if effective window matches)
+        2) Fallback to service item base price
+
+        Returns dict:
+        {
+          "source": "price_list_override" | "service_item_base",
+          "sell_price": Decimal,
+          "buy_price": Decimal | None,
+          "price_list_id": UUID | None,
+          "price_list_code": str | None,
+        }
+        """
+        check_date = on_date or timezone.localdate()
+        active_lists = (
+            cls.objects.filter(
+                client_account_id=client_account_id,
+                status=cls.Status.ACTIVE,
+            )
+            .filter(
+                Q(effective_from__isnull=True) | Q(effective_from__lte=check_date),
+                Q(effective_to__isnull=True) | Q(effective_to__gte=check_date),
+            )
+            .order_by('-effective_from', '-created_at')
+        )
+        active_price_list = active_lists.first()
+        if active_price_list:
+            if service_item.service_type == TenantServiceItemMaster.ServiceType.TRIP and trip_type:
+                trip_line = TenantPriceListTripLine.objects.filter(
+                    price_list=active_price_list,
+                    trip_service=service_item,
+                    trip_type=trip_type,
+                ).first()
+                if trip_line:
+                    return {
+                        'source': 'price_list_override',
+                        'sell_price': trip_line.sell_price_override,
+                        'buy_price': trip_line.buy_price_override,
+                        'price_list_id': active_price_list.price_list_id,
+                        'price_list_code': active_price_list.price_list_code,
+                    }
+            elif service_item.service_type == TenantServiceItemMaster.ServiceType.SERVICE:
+                service_line = TenantPriceListServiceLine.objects.filter(
+                    price_list=active_price_list,
+                    service_item=service_item,
+                ).first()
+                if service_line:
+                    return {
+                        'source': 'price_list_override',
+                        'sell_price': service_line.sell_price_override,
+                        'buy_price': service_line.buy_price_override,
+                        'price_list_id': active_price_list.price_list_id,
+                        'price_list_code': active_price_list.price_list_code,
+                    }
+
+        return {
+            'source': 'service_item_base',
+            'sell_price': service_item.sell_price,
+            'buy_price': None,
+            'price_list_id': None,
+            'price_list_code': None,
+        }
+
+
+class TenantPriceListTripLine(models.Model):
+    """Trip service override lines for a client price list."""
+
+    class TripType(models.TextChoices):
+        ONE_WAY = 'One-Way', 'One-Way'
+        ROUND = 'Round', 'Round'
+
+    line_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    price_list = models.ForeignKey(
+        TenantPriceList,
+        on_delete=models.CASCADE,
+        related_name='trip_lines',
+    )
+    trip_service = models.ForeignKey(
+        TenantServiceItemMaster,
+        on_delete=models.PROTECT,
+        related_name='price_list_trip_lines',
+    )
+    trip_type = models.CharField(max_length=12, choices=TripType.choices)
+    sell_price_override = models.DecimalField(max_digits=14, decimal_places=2)
+    buy_price_override = models.DecimalField(max_digits=14, decimal_places=2)
+    notes = models.TextField(blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'tenant_price_list_trip_line'
+        ordering = ['created_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['price_list', 'trip_service', 'trip_type'],
+                name='tenant_price_list_trip_line_uq',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.price_list.price_list_code} / {self.trip_service.service_code} / {self.trip_type}'
+
+    def clean(self):
+        errors = {}
+        if self.sell_price_override is None or self.sell_price_override < 0:
+            errors['sell_price_override'] = [_('Sell price override must be zero or greater.')]
+        if self.buy_price_override is None or self.buy_price_override < 0:
+            errors['buy_price_override'] = [_('Buy price override must be zero or greater.')]
+        if self.trip_service_id:
+            if self.trip_service.service_type != TenantServiceItemMaster.ServiceType.TRIP:
+                errors['trip_service'] = [_('Trip service must have Service Type = Trip.')]
+            if self.trip_service.status != TenantServiceItemMaster.Status.ACTIVE:
+                errors['trip_service'] = [_('Trip service must be Active.')]
+        else:
+            errors['trip_service'] = [_('Trip service is required.')]
+        if errors:
+            raise ValidationError(errors)
+
+
+class TenantPriceListServiceLine(models.Model):
+    """Service/charge override lines for a client price list."""
+
+    line_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    price_list = models.ForeignKey(
+        TenantPriceList,
+        on_delete=models.CASCADE,
+        related_name='service_lines',
+    )
+    service_item = models.ForeignKey(
+        TenantServiceItemMaster,
+        on_delete=models.PROTECT,
+        related_name='price_list_service_lines',
+    )
+    sell_price_override = models.DecimalField(max_digits=14, decimal_places=2)
+    buy_price_override = models.DecimalField(max_digits=14, decimal_places=2)
+    notes = models.TextField(blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'tenant_price_list_service_line'
+        ordering = ['created_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['price_list', 'service_item'],
+                name='tenant_price_list_service_line_uq',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.price_list.price_list_code} / {self.service_item.service_code}'
+
+    def clean(self):
+        errors = {}
+        if self.sell_price_override is None or self.sell_price_override < 0:
+            errors['sell_price_override'] = [_('Sell price override must be zero or greater.')]
+        if self.buy_price_override is None or self.buy_price_override < 0:
+            errors['buy_price_override'] = [_('Buy price override must be zero or greater.')]
+        if self.service_item_id:
+            if self.service_item.service_type != TenantServiceItemMaster.ServiceType.SERVICE:
+                errors['service_item'] = [_('Service item must have Service Type = Service.')]
+            if self.service_item.status != TenantServiceItemMaster.Status.ACTIVE:
+                errors['service_item'] = [_('Service item must be Active.')]
+        else:
+            errors['service_item'] = [_('Service item is required.')]
         if errors:
             raise ValidationError(errors)
 

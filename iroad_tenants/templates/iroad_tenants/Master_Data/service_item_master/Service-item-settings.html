@@ -1,0 +1,294 @@
+{% extends 'iroad_tenants/base.html' %}
+{% load static %}
+
+{% block title %}Service Item Settings | iRoad Admin{% endblock %}
+{% block breadcrumb %}{% endblock %}
+
+{% block extra_css %}
+<style>
+      /* Settings Page — Toggle Row Layout */
+      .setting-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 24px;
+        padding: 16px 0;
+        border-bottom: 1px solid var(--border-light, #e5e7eb);
+      }
+
+      .setting-row:last-child {
+        border-bottom: none;
+      }
+
+      .setting-row-info {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .setting-row-info .form-label {
+        margin-bottom: 2px;
+        font-weight: 500;
+      }
+
+      .setting-row-info .field-hint {
+        margin-top: 0;
+      }
+
+      /* Settings Page — Proper Sliding Toggle Switch */
+      .setting-toggle {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        cursor: pointer;
+        user-select: none;
+        flex-shrink: 0;
+      }
+
+      .setting-toggle input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+        position: absolute;
+      }
+
+      .setting-toggle .toggle-track {
+        position: relative;
+        width: 52px;
+        height: 28px;
+        background: #d1d5db;
+        border-radius: 14px;
+        transition: background 0.3s ease;
+        flex-shrink: 0;
+      }
+
+      .setting-toggle .toggle-track::after {
+        content: "";
+        position: absolute;
+        top: 3px;
+        left: 3px;
+        width: 22px;
+        height: 22px;
+        background: #ffffff;
+        border-radius: 50%;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+        transition: transform 0.3s ease;
+      }
+
+      .setting-toggle input:checked + .toggle-track {
+        background: var(--primary-color, #3b82f6);
+      }
+
+      .setting-toggle input:checked + .toggle-track::after {
+        transform: translateX(24px);
+      }
+
+      .setting-toggle .toggle-label {
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--text-muted, #6b7280);
+        transition: color 0.3s ease;
+        min-width: 55px;
+      }
+
+      .setting-toggle input:checked ~ .toggle-label {
+        color: var(--primary-color, #3b82f6);
+      }
+
+      .setting-toggle:hover .toggle-track {
+        background: #b0b5bf;
+      }
+
+      .setting-toggle:hover input:checked + .toggle-track {
+        background: #4040e0;
+      }
+    </style>
+{% endblock %}
+
+{% block content %}
+
+      <!-- Page Header -->
+      <div class="page-header">
+        <nav aria-label="breadcrumb">
+          <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+              <a href="{% url 'iroad_tenants:tenant_dashboard' %}">Dashboard</a>
+            </li>
+            <li class="breadcrumb-item">Master Data</li>
+            <li class="breadcrumb-item">Services Management</li>
+            <li class="breadcrumb-item active" aria-current="page">
+              Service Item Settings
+            </li>
+          </ol>
+        </nav>
+        <div class="page-header-row">
+          <div class="page-header-left">
+            <h1 class="page-title">Service Item Settings</h1>
+            <p class="page-subtitle">
+              Configure margin requirements and formatting rules for service
+              items.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Service Item Setting Form -->
+      <form id="serviceItemSettingForm">
+        <!-- Section 1: Margin Settings -->
+        <div class="form-card" data-section="1">
+          <div class="form-card-header">
+            <div class="form-card-icon blue">
+              <i class="bi bi-percent"></i>
+            </div>
+            <div class="form-card-header-text">
+              <h2 class="form-card-title">Margin Settings</h2>
+              <p class="form-card-desc">
+                Configure minimum margin constraints and override policies.
+              </p>
+            </div>
+          </div>
+          <div class="form-card-body">
+            <!-- Margin Rules -->
+            <div class="field-group">
+              <h3 class="field-group-title">
+                <i class="bi bi-shield-check"></i>
+                Margin Rules
+              </h3>
+
+              <div class="setting-row">
+                <div class="setting-row-info">
+                  <label class="form-label">Enforce Min Margin</label>
+                  <span class="field-hint"
+                    >When enabled, selling prices must meet or exceed the
+                    predefined minimum margin percentage.</span
+                  >
+                </div>
+                <label class="setting-toggle">
+                  <input type="checkbox" id="enforceMinMargin" checked />
+                  <span class="toggle-track"></span>
+                  <span class="toggle-label">Enabled</span>
+                </label>
+              </div>
+
+              <div class="setting-row">
+                <div class="setting-row-info">
+                  <label class="form-label">Allow Margin Override</label>
+                  <span class="field-hint"
+                    >When enabled, authorized users can accept margins below the
+                    minimum requirement.</span
+                  >
+                </div>
+                <label class="setting-toggle">
+                  <input type="checkbox" id="allowMarginOverride" checked />
+                  <span class="toggle-track"></span>
+                  <span class="toggle-label">Enabled</span>
+                </label>
+              </div>
+
+              <div class="setting-row">
+                <div class="setting-row-info">
+                  <label class="form-label">Override Requires Reason</label>
+                  <span class="field-hint"
+                    >When enabled, overriding the minimum margin requires
+                    providing a justification.</span
+                  >
+                </div>
+                <label class="setting-toggle">
+                  <input type="checkbox" id="overrideRequiresReason" checked />
+                  <span class="toggle-track"></span>
+                  <span class="toggle-label">Enabled</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Default Values -->
+            <div class="field-group">
+              <h3 class="field-group-title">
+                <i class="bi bi-sliders"></i>
+                Default Values
+              </h3>
+              <div class="fields-grid cols-3">
+                <div class="field">
+                  <label for="defaultMarginType" class="form-label"
+                    >Default Margin Type</label
+                  >
+                  <select class="form-select" id="defaultMarginType">
+                    <option value="percentage" selected>Percentage (%)</option>
+                    <option value="fixed">Fixed Amount</option>
+                  </select>
+                  <span class="field-hint"
+                    >Choose whether the default margin is a percentage or a
+                    fixed amount.</span
+                  >
+                </div>
+                <div class="field">
+                  <label for="defaultMarginValue" class="form-label"
+                    >Default Margin Value</label
+                  >
+                  <input
+                    type="number"
+                    class="form-control"
+                    id="defaultMarginValue"
+                    min="0"
+                    step="0.01"
+                    placeholder="Enter default margin value"
+                    value="15"
+                  />
+                  <span class="field-hint"
+                    >If Margin Type is Percentage, value is in %; if Fixed
+                    Amount, value is in base currency.</span
+                  >
+                </div>
+                <div class="field">
+                  <label for="defaultMarginCalcMethod" class="form-label"
+                    >Default Calculation Method</label
+                  >
+                  <select class="form-select" id="defaultMarginCalcMethod">
+                    <option value="sell" selected>Based on Sell Price</option>
+                    <option value="cost">Based on Cost Price</option>
+                  </select>
+                  <span class="field-hint"
+                    >Defines whether the margin is calculated from the sell
+                    price or the cost price.</span
+                  >
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Form Actions -->
+        <div class="form-actions-bar">
+          <div class="form-actions-left">
+            <button type="reset" class="btn btn-outline-secondary">
+              <i class="bi bi-arrow-counterclockwise"></i>
+              Reset Form
+            </button>
+          </div>
+          <div class="form-actions-right">
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-check-circle"></i>
+              Save Settings
+            </button>
+          </div>
+        </div>
+      </form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+      // Update toggle labels dynamically
+      document.querySelectorAll(".setting-toggle input").forEach((input) => {
+        const label = input
+          .closest(".setting-toggle")
+          .querySelector(".toggle-label");
+        function updateLabel() {
+          label.textContent = input.checked ? "Enabled" : "Disabled";
+        }
+        if (label) {
+          updateLabel();
+          input.addEventListener("change", updateLabel);
+        }
+      });
+    </script>
+{% endblock %}

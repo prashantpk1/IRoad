@@ -65,6 +65,12 @@
       >
         Route code
       </li>
+      <li class="form-list-item {% if auto_number_form_code == 'service-item-master' %}active{% endif %}" data-form="service-item-master">
+        Service Item Master
+      </li>
+      <li class="form-list-item {% if auto_number_form_code == 'price-list-master' %}active{% endif %}" data-form="price-list-master">
+        Price List Master
+      </li>
 
       <li class="form-list-section">Sales</li>
       <li class="form-list-item" data-form="sales-invoice">Sales Invoice</li>
@@ -145,9 +151,7 @@
       <li class="form-list-item" data-form="auto-number-configuration">
         Auto Number Configuration
       </li>
-      <li class="form-list-item" data-form="service-item-master">
-        Service Item Master
-      </li>
+      
       <li class="form-list-item" data-form="adjustment-types-master">
         Adjustment Types Master
       </li>
@@ -344,6 +348,8 @@
       "cargo-category",
       "location-master",
       "route-master",
+      "service-item-master",
+      "price-list-master",
     ]);
 
     function toAlpha(num) {

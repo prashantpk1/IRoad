@@ -177,7 +177,7 @@
                 <div class="setting-row-info">
                   <label class="form-label" for="hasCustomsDerived">{% translate "Has Customs" %}</label>
                   <p class="field-hint">
-                    {% translate "When enabled, this route involves customs clearance (e.g. international borders)." %}
+                    {% translate "When enabled, origin and destination are in the same country." %}
                   </p>
                   <p class="field-hint small text-muted mb-0">
                     {% translate "Derived automatically from origin and destination countries (read-only)." %}
@@ -278,7 +278,7 @@
           if (!cb || !oe || !de) return;
           const oc = countryIdFromSelect(oe);
           const dc = countryIdFromSelect(de);
-          cb.checked = Boolean(oc && dc && oc !== dc);
+          cb.checked = Boolean(oc && dc && oc === dc);
           const label = cb.closest(".setting-toggle")?.querySelector(".toggle-label");
           if (label) label.textContent = cb.checked ? "Enabled" : "Disabled";
         }

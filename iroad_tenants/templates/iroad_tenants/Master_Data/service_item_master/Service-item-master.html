@@ -1,0 +1,405 @@
+{% extends 'iroad_tenants/base.html' %}
+{% load static %}
+
+{% block title %}Service Item Master | iRoad Admin{% endblock %}
+{% block breadcrumb %}{% endblock %}
+
+{% block content %}
+
+      <!-- Page Header -->
+      <div class="page-header">
+        <nav aria-label="breadcrumb">
+          <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+              <a href="{% url 'iroad_tenants:tenant_dashboard' %}">Dashboard</a>
+            </li>
+            <li class="breadcrumb-item">Master Data</li>
+            <li class="breadcrumb-item">Services Management</li>
+            <li class="breadcrumb-item active" aria-current="page">
+              Service Item Master
+            </li>
+          </ol>
+        </nav>
+        <div class="page-header-row">
+          <div class="page-header-left">
+            <h1 class="page-title">{{ page_title|default:'Create Service Item' }}</h1>
+            <p class="page-subtitle">
+              Define service or trip items with identity, category, pricing, and
+              status (SV-001).
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Service Item Master Form -->
+      <form id="serviceItemMasterForm" method="post" action="{{ form_action_url|default:'' }}">
+        {% csrf_token %}
+        <!-- Section 1: Basic Information -->
+        <div class="form-card" data-section="1">
+          <div class="form-card-header">
+            <div class="form-card-icon blue">
+              <i class="bi bi-info-circle"></i>
+            </div>
+            <div class="form-card-header-text">
+              <h2 class="form-card-title">Basic Information</h2>
+              <p class="form-card-desc">
+                Primary details, identity, and classification of the service
+                item.
+              </p>
+            </div>
+          </div>
+          <div class="form-card-body">
+            <!-- Identity -->
+            <div class="field-group">
+              <h3 class="field-group-title">
+                <i class="bi bi-fingerprint"></i>
+                Identity
+              </h3>
+              <div class="fields-grid cols-3">
+                <div class="field">
+                  <label for="serviceCode" class="form-label"
+                    >Service Code
+                    <span class="required">*</span>
+                  </label>
+                  <div class="input-icon-wrapper">
+                    <i class="bi bi-hash"></i>
+                    <input
+                      type="text"
+                      class="form-control has-icon"
+                      id="serviceCode"
+                      value="{{ preview_service_item_code|default:'' }}"
+                      placeholder="Auto (e.g. SV-001)"
+                      readonly
+                    />
+                  </div>
+                  <span class="field-hint"
+                    >Auto-generated, tenant-unique. Read-only.</span
+                  >
+                </div>
+                <div class="field">
+                  <label for="serviceType" class="form-label"
+                    >Service Type
+                    <span class="required">*</span>
+                  </label>
+                  <select class="form-select" id="serviceType" name="service_type" required {% if is_view_mode or is_edit_mode %}disabled{% endif %}>
+                    <option value="" selected disabled>-Select type-</option>
+                    <option value="Service" {% if form_data.service_type == 'Service' %}selected{% endif %}>Service</option>
+                    <option value="Trip" {% if form_data.service_type == 'Trip' %}selected{% endif %}>Trip</option>
+                  </select>
+                  {% if field_errors.service_type %}<span class="text-danger small">{{ field_errors.service_type }}</span>{% endif %}
+                  <span class="field-hint"
+                    >Service or Trip. Cannot be changed after save.</span
+                  >
+                </div>
+                <div class="field">
+                  <label for="status" class="form-label"
+                    >Status
+                    <span class="required">*</span>
+                  </label>
+                  <select class="form-select" id="status" name="status" {% if is_view_mode %}disabled{% endif %}>
+                    <option value="Active" {% if form_data.status|default:'Active' == 'Active' %}selected{% endif %}>Active</option>
+                    <option value="Inactive" {% if form_data.status == 'Inactive' %}selected{% endif %}>Inactive</option>
+                  </select>
+                  {% if field_errors.status %}<span class="text-danger small">{{ field_errors.status }}</span>{% endif %}
+                  <span class="field-hint"
+                    >Inactive blocks new selection in transactions.</span
+                  >
+                </div>
+              </div>
+            </div>
+
+            <!-- Naming -->
+            <div class="field-group">
+              <h3 class="field-group-title">
+                <i class="bi bi-type"></i>
+                Naming
+              </h3>
+              <div class="fields-grid cols-3">
+                <div class="field">
+                  <label for="englishName" class="form-label"
+                    >English Name
+                    <span class="required">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="englishName"
+                    name="english_name"
+                    value="{{ form_data.english_name|default:'' }}"
+                    placeholder="Enter English name"
+                    maxlength="200"
+                    required {% if is_view_mode %}readonly{% endif %}
+                  />
+                  {% if field_errors.english_name %}<span class="text-danger small">{{ field_errors.english_name }}</span>{% endif %}
+                  <span class="field-hint">Shown in lists and reports.</span>
+                </div>
+                <div class="field">
+                  <label for="arabicName" class="form-label">Arabic Name</label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="arabicName"
+                    name="arabic_name"
+                    value="{{ form_data.arabic_name|default:'' }}"
+                    placeholder="الاسم العربي"
+                    maxlength="200"
+                    dir="rtl" {% if is_view_mode %}readonly{% endif %}
+                  />
+                </div>
+                <div class="field">
+                  <label for="category" class="form-label"
+                    >Category
+                    <span class="required">*</span>
+                  </label>
+                  <select class="form-select" id="category" name="category_name" required {% if is_view_mode %}disabled{% endif %}>
+                    <option value="" selected disabled>
+                      -Select category-
+                    </option>
+                    {% for category in service_item_category_options %}
+                    <option value="{{ category }}" {% if form_data.category_name == category %}selected{% endif %}>{{ category }}</option>
+                    {% endfor %}
+                  </select>
+                  {% if field_errors.category_name %}<span class="text-danger small">{{ field_errors.category_name }}</span>{% endif %}
+                  <span class="field-hint"
+                    >Must reference an active service category.</span
+                  >
+                </div>
+              </div>
+            </div>
+
+           
+          </div>
+        </div>
+
+        <!-- Section 2: Pricing & Route (conditional on Service Type) -->
+        <div class="form-card" data-section="2">
+          <div class="form-card-header">
+            <div class="form-card-icon amber">
+              <i class="bi bi-tags"></i>
+            </div>
+            <div class="form-card-header-text">
+              <h2 class="form-card-title">Pricing & Route</h2>
+              <p class="form-card-desc">
+                Pricing details based on service type. All amounts in tenant
+                base currency.
+              </p>
+            </div>
+          </div>
+          <div class="form-card-body">
+            <!-- Route (Trip only) -->
+            <div
+              class="field-group trip-only"
+              id="routeFieldGroup"
+              style="display: none"
+            >
+              <h3 class="field-group-title">
+                <i class="bi bi-signpost-split"></i>
+                Route
+              </h3>
+              <div class="fields-grid cols-3">
+                <div class="field">
+                  <label for="route" class="form-label"
+                    >Route
+                    <span class="required">*</span>
+                  </label>
+                  <select class="form-select" id="route" name="route_id" {% if is_view_mode %}disabled{% endif %}>
+                    <option value="" selected disabled>-Select route-</option>
+                    {% for route in route_options %}
+                    <option value="{{ route.route_id }}" {% if form_data.route_id == route.route_id|stringformat:'s' %}selected{% endif %}>
+                      {{ route.route_code }} — {{ route.route_label }}
+                    </option>
+                    {% endfor %}
+                  </select>
+                  {% if field_errors.route_id %}<span class="text-danger small">{{ field_errors.route_id }}</span>{% endif %}
+                  <span class="field-hint"
+                    >Required for Trip. Must be active. Names may auto-fill from
+                    route.</span
+                  >
+                </div>
+              </div>
+            </div>
+
+            <!-- Pricing -->
+            <div class="field-group">
+              <h3 class="field-group-title">
+                <i class="bi bi-cash-stack"></i>
+                Pricing
+              </h3>
+              <div class="fields-grid cols-3">
+                <div class="field">
+                  <label for="sellPrice" class="form-label" id="sellPriceLabel"
+                    >Sell Price
+                    <span class="required">*</span>
+                  </label>
+                  <div class="input-icon-wrapper">
+                    <i class="bi bi-currency-dollar"></i>
+                    <input
+                      type="number"
+                      class="form-control has-icon"
+                      id="sellPrice"
+                      name="sell_price"
+                      value="{{ form_data.sell_price|default:'' }}"
+                      placeholder="0.00"
+                      min="0"
+                      step="0.01"
+                      required {% if is_view_mode %}readonly{% endif %}
+                    />
+                  </div>
+                  {% if field_errors.sell_price %}<span class="text-danger small">{{ field_errors.sell_price }}</span>{% endif %}
+                  <span class="field-hint"
+                    >Must be ≥ 0.</span
+                  >
+                </div>
+              </div>
+              <div
+                class="fields-grid cols-3 trip-only"
+                id="roundTripPricesRow"
+                style="display: none"
+              >
+                  <div class="field" id="outboundSellPriceField">
+                    <label for="outboundSellPrice" class="form-label">
+                      Outbound Sell Price <span class="required">*</span>
+                    </label>
+                    <div class="input-icon-wrapper">
+                      <i class="bi bi-currency-dollar"></i>
+                      <input
+                        type="number"
+                        class="form-control has-icon"
+                        id="outboundSellPrice"
+                        name="outbound_sell_price"
+                        value="{{ form_data.outbound_sell_price|default:'' }}"
+                        placeholder="0.00"
+                        min="0"
+                        step="0.01"
+                      {% if is_view_mode %}readonly{% endif %} />
+                    </div>
+                    {% if field_errors.outbound_sell_price %}<span class="text-danger small">{{ field_errors.outbound_sell_price }}</span>{% endif %}
+                    <span class="field-hint"
+                      >Outbound sell price. Required for Trip.</span
+                    >
+                  </div>
+
+                  <div class="field" id="roundSellPriceField">
+                    <label for="roundSellPrice" class="form-label"
+                      >Inbound Sell Price <span class="required">*</span>
+                    </label>
+                    <div class="input-icon-wrapper">
+                      <i class="bi bi-currency-dollar"></i>
+                      <input
+                        type="number"
+                        class="form-control has-icon"
+                        id="roundSellPrice"
+                        name="inbound_sell_price"
+                        value="{{ form_data.inbound_sell_price|default:'' }}"
+                        placeholder="0.00"
+                        min="0"
+                        step="0.01"
+                      {% if is_view_mode %}readonly{% endif %} />
+                    </div>
+                    {% if field_errors.inbound_sell_price %}<span class="text-danger small">{{ field_errors.inbound_sell_price }}</span>{% endif %}
+                    <span class="field-hint"
+                      >Inbound sell price (was Round Trip Price).</span
+                    >
+                  </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-actions-bar">
+          <div class="form-actions-left">
+            <button type="reset" class="btn btn-outline-secondary" {% if is_view_mode %}disabled{% endif %}>
+              <i class="bi bi-arrow-counterclockwise"></i>
+              Reset Form
+            </button>
+          </div>
+          <div class="form-actions-right">
+            {% if not is_view_mode %}
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-check-circle"></i>
+              {{ submit_label|default:'Save Service Item' }}
+            </button>
+            {% endif %}
+          </div>
+        </div>
+      </form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+      (function () {
+        var serviceType = document.getElementById("serviceType");
+        var routeFieldGroup = document.getElementById("routeFieldGroup");
+        var roundTripPricesRow = document.getElementById("roundTripPricesRow");
+        var routeSelect = document.getElementById("route");
+        var englishName = document.getElementById("englishName");
+        var arabicName = document.getElementById("arabicName");
+        var outboundSellPriceInput = document.getElementById(
+          "outboundSellPrice",
+        );
+        var roundSellPriceInput = document.getElementById("roundSellPrice");
+
+        // Route options with labels for trip name auto-fill (example data)
+        var routeLabels = {
+          "RTE-001": {
+            en: "JED to YAN",
+            ar: "جدة إلى ينبع",
+          },
+          "RTE-002": {
+            en: "RUH to JED",
+            ar: "الرياض إلى جدة",
+          },
+          "RTE-003": {
+            en: "DMM to RUH",
+            ar: "الدمام إلى الرياض",
+          },
+        };
+
+        function toggleTripFields() {
+          var isTrip = serviceType.value === "Trip";
+          routeFieldGroup.style.display = isTrip ? "" : "none";
+          if (roundTripPricesRow)
+            roundTripPricesRow.style.display = isTrip ? "" : "none";
+          // Sell Price / Buy Price are common fields for both Service & Trip
+          // (only outbound/inbound specific fields are controlled here).
+          if (outboundSellPriceInput) outboundSellPriceInput.required = isTrip;
+          if (roundSellPriceInput) roundSellPriceInput.required = isTrip;
+
+          if (routeSelect && !isTrip) routeSelect.value = "";
+
+          if (!isTrip) {
+            if (outboundSellPriceInput) outboundSellPriceInput.value = "";
+            if (roundSellPriceInput) roundSellPriceInput.value = "";
+          }
+        }
+
+        function onRouteChange() {
+          if (serviceType.value !== "Trip") return;
+
+          var val = routeSelect.value;
+          var labels = routeLabels[val];
+          if (!labels && routeSelect && routeSelect.selectedIndex > -1) {
+            var selectedText = routeSelect.options[routeSelect.selectedIndex].text || "";
+            labels = { en: selectedText.trim(), ar: "" };
+          }
+          if (labels) {
+            if (!englishName.value || englishName.dataset.autoFilled)
+              englishName.value = labels.en;
+
+            if (!arabicName.value || arabicName.dataset.autoFilled)
+              arabicName.value = labels.ar;
+
+            englishName.dataset.autoFilled = "1";
+            arabicName.dataset.autoFilled = "1";
+          }
+        }
+
+        if (serviceType)
+          serviceType.addEventListener("change", toggleTripFields);
+
+        if (routeSelect) routeSelect.addEventListener("change", onRouteChange);
+
+        toggleTripFields();
+      })();
+    </script>
+{% endblock %}

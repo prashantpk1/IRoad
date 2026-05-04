@@ -1,0 +1,205 @@
+{% extends 'iroad_tenants/base.html' %}
+{% load static %}
+
+{% block title %}Price List Master List | iRoad Admin{% endblock %}
+{% block breadcrumb %}{% endblock %}
+
+{% block content %}
+      <div class="page-header">
+        <nav aria-label="breadcrumb">
+          <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+              <a href="{% url 'iroad_tenants:tenant_dashboard' %}">Dashboard</a>
+            </li>
+            <li class="breadcrumb-item">Master Data</li>
+            <li class="breadcrumb-item">Services Management</li>
+            <li class="breadcrumb-item active" aria-current="page">
+              Price List Master List
+            </li>
+          </ol>
+        </nav>
+
+        <div class="page-header-row">
+          <div class="page-header-left">
+            <h1 class="page-title">Price List Master List</h1>
+            <p class="page-subtitle">
+              Manage and view all registered price lists.
+            </p>
+          </div>
+          <div class="page-header-right">
+            <div class="eal-header-actions">
+              <button class="eal-btn eal-btn-outline">
+                <i class="bi bi-download"></i>
+                <span>Export</span>
+              </button>
+              <a href="{% url 'iroad_tenants:tenant_price_list_master_create' %}" class="eal-btn eal-btn-primary">
+                <i class="bi bi-plus-lg"></i>
+                <span>Add Price List</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="eal-stats-row">
+        <div class="eal-stat-card">
+          <div class="eal-stat-icon purple">
+            <i class="bi bi-tags"></i>
+          </div>
+          <div>
+            <div class="eal-stat-value">{{ price_list_stats.total|default:0 }}</div>
+            <div class="eal-stat-label">Total Lists</div>
+          </div>
+        </div>
+        <div class="eal-stat-card">
+          <div class="eal-stat-icon green">
+            <i class="bi bi-check-circle"></i>
+          </div>
+          <div>
+            <div class="eal-stat-value">{{ price_list_stats.active|default:0 }}</div>
+            <div class="eal-stat-label">Active</div>
+          </div>
+        </div>
+        <div class="eal-stat-card">
+          <div class="eal-stat-icon amber">
+            <i class="bi bi-hourglass-split"></i>
+          </div>
+          <div>
+            <div class="eal-stat-value">{{ price_list_stats.expiring_soon|default:0 }}</div>
+            <div class="eal-stat-label">Expiring Soon</div>
+          </div>
+        </div>
+        <div class="eal-stat-card">
+          <div class="eal-stat-icon blue">
+            <i class="bi bi-x-octagon"></i>
+          </div>
+          <div>
+            <div class="eal-stat-value">{{ price_list_stats.inactive|default:0 }}</div>
+            <div class="eal-stat-label">Inactive</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="eal-table-card">
+        <div class="eal-toolbar">
+          <div class="eal-toolbar-left">
+            <div class="eal-search">
+              <i class="bi bi-search"></i>
+              <input type="text" placeholder="Search price lists&hellip;" />
+            </div>
+          </div>
+        </div>
+
+        <div class="eal-table-wrap">
+          <table class="eal-table">
+            <thead>
+              <tr>
+                <th>SN</th>
+                <th>Code</th>
+                <th>PL Name</th>
+                <th>Client</th>
+                <th>Item Count</th>
+                <th>Effective From</th>
+                <th>Effective To</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in price_lists %}
+              <tr>
+                <td class="text-muted">{{ forloop.counter }}</td>
+                <td><span class="eal-entity-id">{{ item.price_list_code }}</span></td>
+                <td><span class="eal-name-text">{{ item.price_list_name }}</span></td>
+                <td>{{ item.client_account.account_no }} - {{ item.client_account.display_name }}</td>
+                <td>{{ item.line_count }}</td>
+                <td>{% if item.effective_from %}{{ item.effective_from|date:'d M Y' }}{% else %}&mdash;{% endif %}</td>
+                <td>{% if item.effective_to %}{{ item.effective_to|date:'d M Y' }}{% else %}&mdash;{% endif %}</td>
+                <td><span class="status-badge {% if item.status == 'Active' %}active{% elif item.status == 'Inactive' %}inactive{% endif %}">{{ item.status }}</span></td>
+                <td>
+                  <div class="dropdown eal-actions-cell">
+                    <button class="eal-row-btn" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Actions">
+                      <i class="bi bi-three-dots-vertical"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow-sm" style="border-radius: 8px; border-color: #e2e8f0">
+                      <li><a class="dropdown-item" href="#"><i class="bi bi-pencil text-primary me-2"></i>Edit</a></li>
+                      <li><a class="dropdown-item" href="#"><i class="bi bi-eye text-info me-2"></i>View</a></li>
+                    </ul>
+                  </div>
+                </td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="9" class="text-center py-4 text-muted">No price lists found.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="eal-pagination">
+          <div class="eal-pagination-info">
+            Showing <strong>{% if price_lists %}1&ndash;{{ price_lists|length }}{% else %}0&ndash;0{% endif %}</strong> of <strong>{{ price_lists|length }}</strong> price lists
+          </div>
+          <div class="eal-pagination-controls">
+            <button class="eal-page-btn" title="Previous">
+              <i class="bi bi-chevron-left"></i>
+            </button>
+            <button class="eal-page-btn active">1</button>
+            <button class="eal-page-btn" title="Next">
+              <i class="bi bi-chevron-right"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="detail-panel-overlay" id="detailPanelOverlay"></div>
+      <aside class="detail-panel" id="detailPanel">
+        <div class="detail-panel-header">
+          <div class="detail-panel-nav">
+            <button class="detail-nav-btn" id="detailPrevBtn" title="Previous">
+              <i class="bi bi-chevron-left"></i>
+            </button>
+            <button class="detail-nav-btn" id="detailNextBtn" title="Next">
+              <i class="bi bi-chevron-right"></i>
+            </button>
+          </div>
+          <div class="detail-panel-actions">
+            <button class="detail-action-btn edit" title="Edit">
+              <i class="bi bi-pencil-square"></i><span>Edit</span>
+            </button>
+            <button class="detail-action-btn duplicate" title="Duplicate">
+              <i class="bi bi-copy"></i><span>Duplicate</span>
+            </button>
+            <button class="detail-action-btn delete" title="Delete">
+              <i class="bi bi-trash3"></i><span>Delete</span>
+            </button>
+          </div>
+          <button class="detail-close-btn" id="detailCloseBtn" title="Close">
+            <i class="bi bi-x-lg"></i>
+          </button>
+        </div>
+      </aside>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  (function () {
+    const panel = document.getElementById("detailPanel");
+    const overlay = document.getElementById("detailPanelOverlay");
+    const closeBtn = document.getElementById("detailCloseBtn");
+    if (!panel || !overlay || !closeBtn) return;
+
+    closeBtn.addEventListener("click", function () {
+      panel.classList.remove("active");
+      overlay.classList.remove("active");
+      document.body.style.overflow = "";
+    });
+    overlay.addEventListener("click", function () {
+      panel.classList.remove("active");
+      overlay.classList.remove("active");
+      document.body.style.overflow = "";
+    });
+  })();
+</script>
+{% endblock %}

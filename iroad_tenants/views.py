@@ -1,4 +1,5 @@
 import csv
+import json
 from decimal import Decimal
 from urllib.parse import urlencode
 
@@ -70,6 +71,10 @@ from tenant_workspace.models import (
     TenantCargoMasterAttachment,
     TenantLocationMaster,
     TenantRouteMaster,
+    TenantServiceItemMaster,
+    TenantPriceList,
+    TenantPriceListTripLine,
+    TenantPriceListServiceLine,
     TenantClientAccount,
     TenantClientAccountSetting,
     TenantClientAttachment,
@@ -107,6 +112,18 @@ LOCATION_MASTER_REF_PREFIX = 'LC'
 ROUTE_MASTER_AUTO_FORM_CODE = 'route-master'
 ROUTE_MASTER_AUTO_FORM_LABEL = 'Route Master'
 ROUTE_MASTER_REF_PREFIX = 'RT'
+
+SERVICE_ITEM_MASTER_AUTO_FORM_CODE = 'service-item-master'
+SERVICE_ITEM_MASTER_AUTO_FORM_LABEL = 'Service Item Master'
+SERVICE_ITEM_MASTER_REF_PREFIX = 'SV'
+PRICE_LIST_MASTER_AUTO_FORM_CODE = 'price-list-master'
+PRICE_LIST_MASTER_AUTO_FORM_LABEL = 'Price List Master'
+PRICE_LIST_MASTER_REF_PREFIX = 'PL'
+SERVICE_ITEM_CATEGORY_OPTIONS = (
+    'Service Category 1',
+    'Service Category 2',
+    'Service Category 3',
+)
 
 MAX_CARGO_ATTACHMENT_BYTES = 10 * 1024 * 1024
 
@@ -2309,6 +2326,985 @@ class TenantSimplePageView(View):
             clear_tenant_portal_cookie(response, request=request)
             return response
         return render(request, self.template_name, context)
+
+
+class TenantServiceItemMasterListView(TenantSimplePageView):
+    """Render service item master list page."""
+
+    template_name = 'iroad_tenants/Master_Data/service_item_master/All-service-item-masters.html'
+
+    def get(self, request):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        if not context.get('is_tenant_admin'):
+            messages.error(request, 'You do not have permission to view Services Management.', extra_tags='tenant')
+            return _tenant_redirect(request, 'iroad_tenants:tenant_dashboard')
+
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        if tenant_registry is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        try:
+            service_items = list(
+                TenantServiceItemMaster.objects.order_by('-created_at')
+            )
+            service_count = sum(
+                1
+                for item in service_items
+                if item.service_type == TenantServiceItemMaster.ServiceType.SERVICE
+            )
+            trip_count = sum(
+                1
+                for item in service_items
+                if item.service_type == TenantServiceItemMaster.ServiceType.TRIP
+            )
+            active_count = sum(
+                1
+                for item in service_items
+                if item.status == TenantServiceItemMaster.Status.ACTIVE
+            )
+            context.update(
+                {
+                    'service_items': service_items,
+                    'service_item_stats': {
+                        'total': len(service_items),
+                        'service_type': service_count,
+                        'trip_type': trip_count,
+                        'active': active_count,
+                    },
+                    'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                }
+            )
+            return render(request, self.template_name, context)
+        finally:
+            connection.set_schema_to_public()
+
+
+class TenantServiceItemMasterCreateView(TenantSimplePageView):
+    """Render service item master create page."""
+
+    template_name = 'iroad_tenants/Master_Data/service_item_master/Service-item-master.html'
+
+    def get(self, request):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        if not context.get('is_tenant_admin'):
+            messages.error(request, 'You do not have permission to view Services Management.', extra_tags='tenant')
+            return _tenant_redirect(request, 'iroad_tenants:tenant_dashboard')
+
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        if tenant_registry is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        try:
+            active_routes = list(
+                TenantRouteMaster.objects.filter(
+                    status=TenantRouteMaster.Status.ACTIVE,
+                )
+                .select_related('origin_point', 'destination_point')
+                .order_by('route_code')
+            )
+            context.update(
+                {
+                    'preview_service_item_code': _preview_next_service_item_code(),
+                    'route_options': active_routes,
+                    'service_item_category_options': SERVICE_ITEM_CATEGORY_OPTIONS,
+                    'form_action_url': reverse('iroad_tenants:tenant_service_item_master_create'),
+                    'page_title': 'Create Service Item',
+                    'submit_label': 'Save Service Item',
+                    'is_view_mode': False,
+                    'is_edit_mode': False,
+                    'form_data': {},
+                    'field_errors': {},
+                    'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                }
+            )
+            return render(request, self.template_name, context)
+        finally:
+            connection.set_schema_to_public()
+
+    def post(self, request):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        if not context.get('is_tenant_admin'):
+            messages.error(request, 'You do not have permission to manage Services.', extra_tags='tenant')
+            return _tenant_redirect(request, 'iroad_tenants:tenant_dashboard')
+
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        if tenant_registry is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        try:
+            form_data = {
+                'service_type': (request.POST.get('service_type') or '').strip(),
+                'status': (request.POST.get('status') or '').strip() or TenantServiceItemMaster.Status.ACTIVE,
+                'english_name': (request.POST.get('english_name') or '').strip(),
+                'arabic_name': (request.POST.get('arabic_name') or '').strip(),
+                'category_name': (request.POST.get('category_name') or '').strip(),
+                'route_id': (request.POST.get('route_id') or '').strip(),
+                'sell_price': (request.POST.get('sell_price') or '').strip(),
+                'outbound_sell_price': (request.POST.get('outbound_sell_price') or '').strip(),
+                'inbound_sell_price': (request.POST.get('inbound_sell_price') or '').strip(),
+            }
+            field_errors = {}
+
+            if form_data['service_type'] not in {
+                TenantServiceItemMaster.ServiceType.SERVICE,
+                TenantServiceItemMaster.ServiceType.TRIP,
+            }:
+                field_errors['service_type'] = 'Please select a valid service type.'
+            if form_data['status'] not in {
+                TenantServiceItemMaster.Status.ACTIVE,
+                TenantServiceItemMaster.Status.INACTIVE,
+            }:
+                field_errors['status'] = 'Please select a valid status.'
+            if not form_data['english_name']:
+                field_errors['english_name'] = 'English name is required.'
+            if not form_data['category_name']:
+                field_errors['category_name'] = 'Category is required.'
+            if (
+                form_data['category_name']
+                and form_data['category_name'] not in SERVICE_ITEM_CATEGORY_OPTIONS
+            ):
+                field_errors['category_name'] = 'Please select a valid category.'
+
+            def _parse_decimal(raw_value, field_name, required=True):
+                value = (raw_value or '').strip()
+                if not value:
+                    if required:
+                        field_errors[field_name] = 'This field is required.'
+                    return None
+                try:
+                    dec_value = Decimal(value)
+                except Exception:
+                    field_errors[field_name] = 'Enter a valid number.'
+                    return None
+                if dec_value < 0:
+                    field_errors[field_name] = 'Must be 0 or greater.'
+                    return None
+                return dec_value
+
+            sell_price_value = _parse_decimal(form_data['sell_price'], 'sell_price', required=True)
+            outbound_value = None
+            inbound_value = None
+            route_obj = None
+
+            if form_data['service_type'] == TenantServiceItemMaster.ServiceType.TRIP:
+                if not form_data['route_id']:
+                    field_errors['route_id'] = 'Route is required for Trip.'
+                else:
+                    route_obj = (
+                        TenantRouteMaster.objects.filter(
+                            route_id=form_data['route_id'],
+                            status=TenantRouteMaster.Status.ACTIVE,
+                        )
+                        .select_related('origin_point', 'destination_point')
+                        .first()
+                    )
+                    if route_obj is None:
+                        field_errors['route_id'] = 'Please select an active route.'
+                outbound_value = _parse_decimal(
+                    form_data['outbound_sell_price'],
+                    'outbound_sell_price',
+                    required=True,
+                )
+                inbound_value = _parse_decimal(
+                    form_data['inbound_sell_price'],
+                    'inbound_sell_price',
+                    required=True,
+                )
+
+            if field_errors:
+                context.update(
+                    {
+                        'preview_service_item_code': _preview_next_service_item_code(),
+                        'route_options': list(
+                            TenantRouteMaster.objects.filter(
+                                status=TenantRouteMaster.Status.ACTIVE,
+                            )
+                            .select_related('origin_point', 'destination_point')
+                            .order_by('route_code')
+                        ),
+                        'service_item_category_options': SERVICE_ITEM_CATEGORY_OPTIONS,
+                        'form_action_url': reverse('iroad_tenants:tenant_service_item_master_create'),
+                        'page_title': 'Create Service Item',
+                        'submit_label': 'Save Service Item',
+                        'is_view_mode': False,
+                        'is_edit_mode': False,
+                        'form_data': form_data,
+                        'field_errors': field_errors,
+                        'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                    }
+                )
+                messages.error(request, 'Please fix the highlighted errors.', extra_tags='tenant')
+                return render(request, self.template_name, context)
+
+            service_code, service_seq = _next_auto_number_for_form(
+                SERVICE_ITEM_MASTER_AUTO_FORM_CODE,
+                SERVICE_ITEM_MASTER_AUTO_FORM_LABEL,
+                SERVICE_ITEM_MASTER_REF_PREFIX,
+            )
+            item = TenantServiceItemMaster(
+                service_code=service_code,
+                service_sequence=service_seq,
+                service_type=form_data['service_type'],
+                status=form_data['status'],
+                english_name=form_data['english_name'],
+                arabic_name=form_data['arabic_name'],
+                category_name=form_data['category_name'],
+                route=route_obj,
+                sell_price=sell_price_value or Decimal('0'),
+                outbound_sell_price=outbound_value,
+                inbound_sell_price=inbound_value,
+            )
+            item.full_clean()
+            item.save()
+            messages.success(request, f'{item.service_code} created successfully.', extra_tags='tenant')
+            return _tenant_redirect(request, 'iroad_tenants:tenant_service_item_master_list')
+        except ValidationError as exc:
+            if hasattr(exc, 'message_dict'):
+                mapped = {
+                    'route': 'route_id',
+                }
+                for field, msgs in exc.message_dict.items():
+                    key = mapped.get(field, field)
+                    if msgs:
+                        field_errors[key] = str(msgs[0])
+            else:
+                field_errors['non_field_errors'] = '; '.join(exc.messages) if exc.messages else str(exc)
+            context.update(
+                {
+                    'preview_service_item_code': _preview_next_service_item_code(),
+                    'route_options': list(
+                        TenantRouteMaster.objects.filter(
+                            status=TenantRouteMaster.Status.ACTIVE,
+                        )
+                        .select_related('origin_point', 'destination_point')
+                        .order_by('route_code')
+                    ),
+                    'service_item_category_options': SERVICE_ITEM_CATEGORY_OPTIONS,
+                    'form_action_url': reverse('iroad_tenants:tenant_service_item_master_create'),
+                    'page_title': 'Create Service Item',
+                    'submit_label': 'Save Service Item',
+                    'is_view_mode': False,
+                    'is_edit_mode': False,
+                    'form_data': form_data,
+                    'field_errors': field_errors,
+                    'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                }
+            )
+            messages.error(request, 'Please fix the highlighted errors.', extra_tags='tenant')
+            return render(request, self.template_name, context)
+        finally:
+            connection.set_schema_to_public()
+
+
+class TenantServiceItemMasterEditView(TenantSimplePageView):
+    """Edit existing service item using the create-page layout."""
+
+    template_name = 'iroad_tenants/Master_Data/service_item_master/Service-item-master.html'
+
+    def get(self, request, service_item_id):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        if not context.get('is_tenant_admin'):
+            messages.error(request, 'You do not have permission to manage Services Management.', extra_tags='tenant')
+            return _tenant_redirect(request, 'iroad_tenants:tenant_dashboard')
+
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        if tenant_registry is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        try:
+            item = TenantServiceItemMaster.objects.filter(service_item_id=service_item_id).first()
+            if item is None:
+                messages.error(request, 'Service item not found.', extra_tags='tenant')
+                return _tenant_redirect(request, 'iroad_tenants:tenant_service_item_master_list')
+            active_routes = list(
+                TenantRouteMaster.objects.filter(
+                    status=TenantRouteMaster.Status.ACTIVE,
+                )
+                .select_related('origin_point', 'destination_point')
+                .order_by('route_code')
+            )
+            form_data = {
+                'service_type': item.service_type,
+                'status': item.status,
+                'english_name': item.english_name,
+                'arabic_name': item.arabic_name,
+                'category_name': item.category_name,
+                'route_id': str(item.route_id or ''),
+                'sell_price': str(item.sell_price),
+                'outbound_sell_price': '' if item.outbound_sell_price is None else str(item.outbound_sell_price),
+                'inbound_sell_price': '' if item.inbound_sell_price is None else str(item.inbound_sell_price),
+            }
+            context.update(
+                {
+                    'preview_service_item_code': item.service_code,
+                    'route_options': active_routes,
+                    'service_item_category_options': SERVICE_ITEM_CATEGORY_OPTIONS,
+                    'form_action_url': reverse('iroad_tenants:tenant_service_item_master_edit', kwargs={'service_item_id': item.service_item_id}),
+                    'page_title': 'Edit Service Item',
+                    'submit_label': 'Update Service Item',
+                    'is_view_mode': False,
+                    'is_edit_mode': True,
+                    'form_data': form_data,
+                    'field_errors': {},
+                    'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                }
+            )
+            return render(request, self.template_name, context)
+        finally:
+            connection.set_schema_to_public()
+
+    def post(self, request, service_item_id):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        if not context.get('is_tenant_admin'):
+            messages.error(request, 'You do not have permission to manage Services.', extra_tags='tenant')
+            return _tenant_redirect(request, 'iroad_tenants:tenant_dashboard')
+
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        if tenant_registry is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        try:
+            item = TenantServiceItemMaster.objects.filter(service_item_id=service_item_id).first()
+            if item is None:
+                messages.error(request, 'Service item not found.', extra_tags='tenant')
+                return _tenant_redirect(request, 'iroad_tenants:tenant_service_item_master_list')
+
+            form_data = {
+                'service_type': item.service_type,
+                'status': (request.POST.get('status') or '').strip() or item.status,
+                'english_name': (request.POST.get('english_name') or '').strip(),
+                'arabic_name': (request.POST.get('arabic_name') or '').strip(),
+                'category_name': (request.POST.get('category_name') or '').strip(),
+                'route_id': (request.POST.get('route_id') or '').strip(),
+                'sell_price': (request.POST.get('sell_price') or '').strip(),
+                'outbound_sell_price': (request.POST.get('outbound_sell_price') or '').strip(),
+                'inbound_sell_price': (request.POST.get('inbound_sell_price') or '').strip(),
+            }
+            field_errors = {}
+
+            if form_data['status'] not in {
+                TenantServiceItemMaster.Status.ACTIVE,
+                TenantServiceItemMaster.Status.INACTIVE,
+            }:
+                field_errors['status'] = 'Please select a valid status.'
+            if not form_data['english_name']:
+                field_errors['english_name'] = 'English name is required.'
+            if not form_data['category_name']:
+                field_errors['category_name'] = 'Category is required.'
+            if form_data['category_name'] and form_data['category_name'] not in SERVICE_ITEM_CATEGORY_OPTIONS:
+                field_errors['category_name'] = 'Please select a valid category.'
+
+            def _parse_decimal(raw_value, field_name, required=True):
+                value = (raw_value or '').strip()
+                if not value:
+                    if required:
+                        field_errors[field_name] = 'This field is required.'
+                    return None
+                try:
+                    dec_value = Decimal(value)
+                except Exception:
+                    field_errors[field_name] = 'Enter a valid number.'
+                    return None
+                if dec_value < 0:
+                    field_errors[field_name] = 'Must be 0 or greater.'
+                    return None
+                return dec_value
+
+            sell_price_value = _parse_decimal(form_data['sell_price'], 'sell_price', required=True)
+            outbound_value = None
+            inbound_value = None
+            route_obj = None
+            if form_data['service_type'] == TenantServiceItemMaster.ServiceType.TRIP:
+                if not form_data['route_id']:
+                    field_errors['route_id'] = 'Route is required for Trip.'
+                else:
+                    route_obj = (
+                        TenantRouteMaster.objects.filter(
+                            route_id=form_data['route_id'],
+                            status=TenantRouteMaster.Status.ACTIVE,
+                        )
+                        .select_related('origin_point', 'destination_point')
+                        .first()
+                    )
+                    if route_obj is None:
+                        field_errors['route_id'] = 'Please select an active route.'
+                outbound_value = _parse_decimal(form_data['outbound_sell_price'], 'outbound_sell_price', required=True)
+                inbound_value = _parse_decimal(form_data['inbound_sell_price'], 'inbound_sell_price', required=True)
+
+            if field_errors:
+                context.update(
+                    {
+                        'preview_service_item_code': item.service_code,
+                        'route_options': list(
+                            TenantRouteMaster.objects.filter(
+                                status=TenantRouteMaster.Status.ACTIVE,
+                            )
+                            .select_related('origin_point', 'destination_point')
+                            .order_by('route_code')
+                        ),
+                        'service_item_category_options': SERVICE_ITEM_CATEGORY_OPTIONS,
+                        'form_action_url': reverse('iroad_tenants:tenant_service_item_master_edit', kwargs={'service_item_id': item.service_item_id}),
+                        'page_title': 'Edit Service Item',
+                        'submit_label': 'Update Service Item',
+                        'is_view_mode': False,
+                        'is_edit_mode': True,
+                        'form_data': form_data,
+                        'field_errors': field_errors,
+                        'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                    }
+                )
+                messages.error(request, 'Please fix the highlighted errors.', extra_tags='tenant')
+                return render(request, self.template_name, context)
+
+            item.status = form_data['status']
+            item.english_name = form_data['english_name']
+            item.arabic_name = form_data['arabic_name']
+            item.category_name = form_data['category_name']
+            item.route = route_obj
+            item.sell_price = sell_price_value or Decimal('0')
+            item.outbound_sell_price = outbound_value
+            item.inbound_sell_price = inbound_value
+            item.full_clean()
+            item.save()
+            messages.success(request, f'{item.service_code} updated successfully.', extra_tags='tenant')
+            return _tenant_redirect(request, 'iroad_tenants:tenant_service_item_master_list')
+        except ValidationError as exc:
+            if hasattr(exc, 'message_dict'):
+                mapped = {'route': 'route_id'}
+                for field, msgs in exc.message_dict.items():
+                    key = mapped.get(field, field)
+                    if msgs:
+                        field_errors[key] = str(msgs[0])
+            else:
+                field_errors['non_field_errors'] = '; '.join(exc.messages) if exc.messages else str(exc)
+            context.update(
+                {
+                    'preview_service_item_code': item.service_code if 'item' in locals() and item else '',
+                    'route_options': list(
+                        TenantRouteMaster.objects.filter(
+                            status=TenantRouteMaster.Status.ACTIVE,
+                        )
+                        .select_related('origin_point', 'destination_point')
+                        .order_by('route_code')
+                    ),
+                    'service_item_category_options': SERVICE_ITEM_CATEGORY_OPTIONS,
+                    'form_action_url': reverse('iroad_tenants:tenant_service_item_master_edit', kwargs={'service_item_id': service_item_id}),
+                    'page_title': 'Edit Service Item',
+                    'submit_label': 'Update Service Item',
+                    'is_view_mode': False,
+                    'is_edit_mode': True,
+                    'form_data': form_data if 'form_data' in locals() else {},
+                    'field_errors': field_errors if 'field_errors' in locals() else {},
+                    'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                }
+            )
+            messages.error(request, 'Please fix the highlighted errors.', extra_tags='tenant')
+            return render(request, self.template_name, context)
+        finally:
+            connection.set_schema_to_public()
+
+
+class TenantServiceItemMasterDetailView(TenantSimplePageView):
+    """View-only service item detail using the create-page layout."""
+
+    template_name = 'iroad_tenants/Master_Data/service_item_master/Service-item-master.html'
+
+    def get(self, request, service_item_id):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        if not context.get('is_tenant_admin'):
+            messages.error(request, 'You do not have permission to view Services Management.', extra_tags='tenant')
+            return _tenant_redirect(request, 'iroad_tenants:tenant_dashboard')
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        if tenant_registry is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        try:
+            item = TenantServiceItemMaster.objects.filter(service_item_id=service_item_id).first()
+            if item is None:
+                messages.error(request, 'Service item not found.', extra_tags='tenant')
+                return _tenant_redirect(request, 'iroad_tenants:tenant_service_item_master_list')
+            context.update(
+                {
+                    'preview_service_item_code': item.service_code,
+                    'route_options': list(
+                        TenantRouteMaster.objects.filter(
+                            status=TenantRouteMaster.Status.ACTIVE,
+                        )
+                        .select_related('origin_point', 'destination_point')
+                        .order_by('route_code')
+                    ),
+                    'service_item_category_options': SERVICE_ITEM_CATEGORY_OPTIONS,
+                    'form_action_url': '#',
+                    'page_title': 'View Service Item',
+                    'submit_label': '',
+                    'is_view_mode': True,
+                    'is_edit_mode': False,
+                    'form_data': {
+                        'service_type': item.service_type,
+                        'status': item.status,
+                        'english_name': item.english_name,
+                        'arabic_name': item.arabic_name,
+                        'category_name': item.category_name,
+                        'route_id': str(item.route_id or ''),
+                        'sell_price': str(item.sell_price),
+                        'outbound_sell_price': '' if item.outbound_sell_price is None else str(item.outbound_sell_price),
+                        'inbound_sell_price': '' if item.inbound_sell_price is None else str(item.inbound_sell_price),
+                    },
+                    'field_errors': {},
+                    'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                }
+            )
+            return render(request, self.template_name, context)
+        finally:
+            connection.set_schema_to_public()
+
+
+class TenantServiceItemMasterDeleteView(View):
+    """Delete service item record."""
+
+    def post(self, request, service_item_id):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        if not context.get('is_tenant_admin'):
+            messages.error(request, 'You do not have permission to manage Services.', extra_tags='tenant')
+            return _tenant_redirect(request, 'iroad_tenants:tenant_dashboard')
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        if tenant_registry is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        try:
+            item = TenantServiceItemMaster.objects.filter(service_item_id=service_item_id).first()
+            if item is None:
+                messages.error(request, 'Service item not found.', extra_tags='tenant')
+            else:
+                code = item.service_code
+                item.delete()
+                messages.success(request, f'{code} deleted successfully.', extra_tags='tenant')
+            return _tenant_redirect(request, 'iroad_tenants:tenant_service_item_master_list')
+        except ProtectedError:
+            messages.error(request, 'Cannot delete this service item because it is referenced by other records.', extra_tags='tenant')
+            return _tenant_redirect(request, 'iroad_tenants:tenant_service_item_master_list')
+        finally:
+            connection.set_schema_to_public()
+
+
+class TenantServiceItemSettingsView(TenantSimplePageView):
+    """Render service item settings page."""
+
+    template_name = 'iroad_tenants/Master_Data/service_item_master/Service-item-settings.html'
+
+
+class TenantPriceListMasterListView(TenantSimplePageView):
+    """Render price list master list page."""
+
+    template_name = 'iroad_tenants/Master_Data/service_item_master/All-price-lists.html'
+
+    def get(self, request):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        if not context.get('is_tenant_admin'):
+            messages.error(request, 'You do not have permission to view Services Management.', extra_tags='tenant')
+            return _tenant_redirect(request, 'iroad_tenants:tenant_dashboard')
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        if tenant_registry is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        try:
+            today = timezone.localdate()
+            expiring_threshold = today + timezone.timedelta(days=30)
+            price_lists = list(
+                TenantPriceList.objects.select_related('client_account')
+                .prefetch_related('trip_lines', 'service_lines')
+                .order_by('-created_at')
+            )
+            for item in price_lists:
+                item.line_count = len(item.trip_lines.all()) + len(item.service_lines.all())
+            context.update(
+                {
+                    'price_lists': price_lists,
+                    'price_list_stats': {
+                        'total': len(price_lists),
+                        'active': sum(1 for item in price_lists if item.status == TenantPriceList.Status.ACTIVE),
+                        'expiring_soon': sum(
+                            1
+                            for item in price_lists
+                            if item.status == TenantPriceList.Status.ACTIVE
+                            and item.effective_to
+                            and today <= item.effective_to <= expiring_threshold
+                        ),
+                        'inactive': sum(1 for item in price_lists if item.status == TenantPriceList.Status.INACTIVE),
+                    },
+                    'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                }
+            )
+            return render(request, self.template_name, context)
+        finally:
+            connection.set_schema_to_public()
+
+
+class TenantPriceListMasterCreateView(TenantSimplePageView):
+    """Render price list master create page."""
+
+    template_name = 'iroad_tenants/Master_Data/service_item_master/Price-list.html'
+
+    def get(self, request):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        if not context.get('is_tenant_admin'):
+            messages.error(request, 'You do not have permission to manage Services Management.', extra_tags='tenant')
+            return _tenant_redirect(request, 'iroad_tenants:tenant_dashboard')
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        if tenant_registry is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        try:
+            org = OrganizationProfile.objects.order_by('-updated_at').first()
+            context.update(
+                {
+                    'preview_price_list_code': _preview_next_price_list_code(),
+                    'active_clients': list(
+                        TenantClientAccount.objects.filter(
+                            status=TenantClientAccount.Status.ACTIVE,
+                        ).order_by('account_no')
+                    ),
+                    'tenant_base_currency': (getattr(org, 'base_currency_code', '') or 'SAR'),
+                    'active_trip_services': list(
+                        TenantServiceItemMaster.objects.filter(
+                            status=TenantServiceItemMaster.Status.ACTIVE,
+                            service_type=TenantServiceItemMaster.ServiceType.TRIP,
+                        ).order_by('service_code')
+                    ),
+                    'active_service_items': list(
+                        TenantServiceItemMaster.objects.filter(
+                            status=TenantServiceItemMaster.Status.ACTIVE,
+                            service_type=TenantServiceItemMaster.ServiceType.SERVICE,
+                        ).order_by('service_code')
+                    ),
+                    'form_data': {},
+                    'field_errors': {},
+                    'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                }
+            )
+            return render(request, self.template_name, context)
+        finally:
+            connection.set_schema_to_public()
+
+    def post(self, request):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        if not context.get('is_tenant_admin'):
+            messages.error(request, 'You do not have permission to manage Services Management.', extra_tags='tenant')
+            return _tenant_redirect(request, 'iroad_tenants:tenant_dashboard')
+
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        if tenant_registry is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        try:
+            form_data = {
+                'price_list_name': (request.POST.get('price_list_name') or '').strip(),
+                'client_account_id': (request.POST.get('client_account_id') or '').strip(),
+                'status': (request.POST.get('status') or '').strip() or TenantPriceList.Status.DRAFT,
+                'effective_from': (request.POST.get('effective_from') or '').strip(),
+                'effective_to': (request.POST.get('effective_to') or '').strip(),
+                'notes': (request.POST.get('notes') or '').strip(),
+                'line_payload': (request.POST.get('line_payload') or '').strip(),
+            }
+            field_errors = {}
+            if not form_data['price_list_name']:
+                field_errors['price_list_name'] = 'Price list name is required.'
+            if form_data['status'] not in {
+                TenantPriceList.Status.DRAFT,
+                TenantPriceList.Status.ACTIVE,
+                TenantPriceList.Status.INACTIVE,
+            }:
+                field_errors['status'] = 'Please select a valid status.'
+
+            client_obj = None
+            if not form_data['client_account_id']:
+                field_errors['client_account_id'] = 'Client account is required.'
+            else:
+                client_obj = TenantClientAccount.objects.filter(
+                    account_id=form_data['client_account_id'],
+                    status=TenantClientAccount.Status.ACTIVE,
+                ).first()
+                if client_obj is None:
+                    field_errors['client_account_id'] = 'Please select an active client account.'
+
+            effective_from = parse_date(form_data['effective_from']) if form_data['effective_from'] else None
+            effective_to = parse_date(form_data['effective_to']) if form_data['effective_to'] else None
+            if form_data['effective_from'] and effective_from is None:
+                field_errors['effective_from'] = 'Enter a valid date.'
+            if form_data['effective_to'] and effective_to is None:
+                field_errors['effective_to'] = 'Enter a valid date.'
+            if effective_from and effective_to and effective_from > effective_to:
+                field_errors['effective_to'] = 'Effective To must be on or after Effective From.'
+
+            org = OrganizationProfile.objects.order_by('-updated_at').first()
+            tenant_base_currency = (getattr(org, 'base_currency_code', '') or 'SAR')
+
+            if field_errors:
+                context.update(
+                    {
+                        'preview_price_list_code': _preview_next_price_list_code(),
+                        'active_clients': list(
+                            TenantClientAccount.objects.filter(
+                                status=TenantClientAccount.Status.ACTIVE,
+                            ).order_by('account_no')
+                        ),
+                        'tenant_base_currency': tenant_base_currency,
+                        'active_trip_services': list(
+                            TenantServiceItemMaster.objects.filter(
+                                status=TenantServiceItemMaster.Status.ACTIVE,
+                                service_type=TenantServiceItemMaster.ServiceType.TRIP,
+                            ).order_by('service_code')
+                        ),
+                        'active_service_items': list(
+                            TenantServiceItemMaster.objects.filter(
+                                status=TenantServiceItemMaster.Status.ACTIVE,
+                                service_type=TenantServiceItemMaster.ServiceType.SERVICE,
+                            ).order_by('service_code')
+                        ),
+                        'form_data': form_data,
+                        'field_errors': field_errors,
+                        'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                    }
+                )
+                messages.error(request, 'Please fix the highlighted errors.', extra_tags='tenant')
+                return render(request, self.template_name, context)
+
+            with db_transaction.atomic():
+                parsed_lines = []
+                if form_data['line_payload']:
+                    try:
+                        parsed_lines = json.loads(form_data['line_payload'])
+                        if not isinstance(parsed_lines, list):
+                            raise ValueError('Invalid line payload format.')
+                    except Exception:
+                        raise ValidationError({'line_payload': ['Invalid line data submitted.']})
+                if not parsed_lines:
+                    raise ValidationError({'line_payload': ['At least one price list line is required.']})
+
+                price_list_code, price_list_sequence = _next_auto_number_for_form(
+                    PRICE_LIST_MASTER_AUTO_FORM_CODE,
+                    PRICE_LIST_MASTER_AUTO_FORM_LABEL,
+                    PRICE_LIST_MASTER_REF_PREFIX,
+                )
+                price_list = TenantPriceList(
+                    price_list_code=price_list_code,
+                    price_list_sequence=price_list_sequence,
+                    price_list_name=form_data['price_list_name'],
+                    client_account=client_obj,
+                    status=form_data['status'],
+                    effective_from=effective_from,
+                    effective_to=effective_to,
+                    base_currency=tenant_base_currency,
+                    notes=form_data['notes'],
+                )
+                price_list.full_clean()
+                price_list.save()
+
+                for idx, line in enumerate(parsed_lines, start=1):
+                    line_type = (line.get('line_type') or '').strip()
+                    notes = (line.get('notes') or '').strip()
+                    if line_type == 'Trip':
+                        trip_service_id = (line.get('service_item_id') or '').strip()
+                        outbound_raw = str(line.get('outbound_sell_price') or '').strip()
+                        inbound_raw = str(line.get('inbound_sell_price') or '').strip()
+                        if not trip_service_id:
+                            raise ValidationError({'line_payload': [f'Trip line {idx}: Trip service is required.']})
+                        trip_service = TenantServiceItemMaster.objects.filter(
+                            service_item_id=trip_service_id,
+                            status=TenantServiceItemMaster.Status.ACTIVE,
+                            service_type=TenantServiceItemMaster.ServiceType.TRIP,
+                        ).first()
+                        if trip_service is None:
+                            raise ValidationError({'line_payload': [f'Trip line {idx}: Select an active Trip service item.']})
+                        if outbound_raw == '' or inbound_raw == '':
+                            raise ValidationError({'line_payload': [f'Trip line {idx}: Outbound and inbound sell prices are required.']})
+                        try:
+                            outbound_sell = Decimal(outbound_raw)
+                            inbound_sell = Decimal(inbound_raw)
+                        except Exception:
+                            raise ValidationError({'line_payload': [f'Trip line {idx}: Enter valid numeric prices.']})
+                        if outbound_sell < 0 or inbound_sell < 0:
+                            raise ValidationError({'line_payload': [f'Trip line {idx}: Prices must be 0 or greater.']})
+
+                        one_way = TenantPriceListTripLine(
+                            price_list=price_list,
+                            trip_service=trip_service,
+                            trip_type=TenantPriceListTripLine.TripType.ONE_WAY,
+                            sell_price_override=outbound_sell,
+                            buy_price_override=outbound_sell,
+                            notes=notes,
+                        )
+                        # TODO SS-001: enforce min margin / override reason policy here.
+                        one_way.full_clean()
+                        one_way.save()
+
+                        round_line = TenantPriceListTripLine(
+                            price_list=price_list,
+                            trip_service=trip_service,
+                            trip_type=TenantPriceListTripLine.TripType.ROUND,
+                            sell_price_override=inbound_sell,
+                            buy_price_override=inbound_sell,
+                            notes=notes,
+                        )
+                        # TODO SS-001: enforce min margin / override reason policy here.
+                        round_line.full_clean()
+                        round_line.save()
+                    elif line_type == 'Service':
+                        service_item_id = (line.get('service_item_id') or '').strip()
+                        sell_raw = str(line.get('sell_price') or '').strip()
+                        if not service_item_id:
+                            raise ValidationError({'line_payload': [f'Service line {idx}: Service item is required.']})
+                        service_item = TenantServiceItemMaster.objects.filter(
+                            service_item_id=service_item_id,
+                            status=TenantServiceItemMaster.Status.ACTIVE,
+                            service_type=TenantServiceItemMaster.ServiceType.SERVICE,
+                        ).first()
+                        if service_item is None:
+                            raise ValidationError({'line_payload': [f'Service line {idx}: Select an active Service item.']})
+                        if sell_raw == '':
+                            raise ValidationError({'line_payload': [f'Service line {idx}: Sell price is required.']})
+                        try:
+                            sell_price = Decimal(sell_raw)
+                        except Exception:
+                            raise ValidationError({'line_payload': [f'Service line {idx}: Enter a valid sell price.']})
+                        if sell_price < 0:
+                            raise ValidationError({'line_payload': [f'Service line {idx}: Sell price must be 0 or greater.']})
+
+                        service_line = TenantPriceListServiceLine(
+                            price_list=price_list,
+                            service_item=service_item,
+                            sell_price_override=sell_price,
+                            buy_price_override=sell_price,
+                            notes=notes,
+                        )
+                        # TODO SS-001: enforce min margin / override reason policy here.
+                        service_line.full_clean()
+                        service_line.save()
+                    else:
+                        raise ValidationError({'line_payload': [f'Line {idx}: Invalid service type.']})
+
+            messages.success(request, f'{price_list.price_list_code} created successfully.', extra_tags='tenant')
+            return _tenant_redirect(request, 'iroad_tenants:tenant_price_list_master_list')
+        except ValidationError as exc:
+            if hasattr(exc, 'message_dict'):
+                for field, msgs in exc.message_dict.items():
+                    if msgs:
+                        field_errors[field] = str(msgs[0])
+            else:
+                field_errors['non_field_errors'] = '; '.join(exc.messages) if exc.messages else str(exc)
+            context.update(
+                {
+                    'preview_price_list_code': _preview_next_price_list_code(),
+                    'active_clients': list(
+                        TenantClientAccount.objects.filter(
+                            status=TenantClientAccount.Status.ACTIVE,
+                        ).order_by('account_no')
+                    ),
+                    'tenant_base_currency': (getattr(org, 'base_currency_code', '') or 'SAR') if 'org' in locals() else 'SAR',
+                    'active_trip_services': list(
+                        TenantServiceItemMaster.objects.filter(
+                            status=TenantServiceItemMaster.Status.ACTIVE,
+                            service_type=TenantServiceItemMaster.ServiceType.TRIP,
+                        ).order_by('service_code')
+                    ),
+                    'active_service_items': list(
+                        TenantServiceItemMaster.objects.filter(
+                            status=TenantServiceItemMaster.Status.ACTIVE,
+                            service_type=TenantServiceItemMaster.ServiceType.SERVICE,
+                        ).order_by('service_code')
+                    ),
+                    'form_data': form_data if 'form_data' in locals() else {},
+                    'field_errors': field_errors,
+                    'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                }
+            )
+            messages.error(request, 'Please fix the highlighted errors.', extra_tags='tenant')
+            return render(request, self.template_name, context)
+        except IntegrityError:
+            context.update(
+                {
+                    'preview_price_list_code': _preview_next_price_list_code(),
+                    'active_clients': list(
+                        TenantClientAccount.objects.filter(
+                            status=TenantClientAccount.Status.ACTIVE,
+                        ).order_by('account_no')
+                    ),
+                    'tenant_base_currency': (getattr(org, 'base_currency_code', '') or 'SAR') if 'org' in locals() else 'SAR',
+                    'active_trip_services': list(
+                        TenantServiceItemMaster.objects.filter(
+                            status=TenantServiceItemMaster.Status.ACTIVE,
+                            service_type=TenantServiceItemMaster.ServiceType.TRIP,
+                        ).order_by('service_code')
+                    ),
+                    'active_service_items': list(
+                        TenantServiceItemMaster.objects.filter(
+                            status=TenantServiceItemMaster.Status.ACTIVE,
+                            service_type=TenantServiceItemMaster.ServiceType.SERVICE,
+                        ).order_by('service_code')
+                    ),
+                    'form_data': form_data if 'form_data' in locals() else {},
+                    'field_errors': field_errors if 'field_errors' in locals() else {},
+                    'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                }
+            )
+            messages.error(
+                request,
+                'Unable to save due to duplicate/constraint rules (for example: only one Active price list per client, or duplicate line combination).',
+                extra_tags='tenant',
+            )
+            return render(request, self.template_name, context)
+        finally:
+            connection.set_schema_to_public()
 
 
 def _get_singleton_client_account_settings():
@@ -5503,6 +6499,8 @@ class TenantAutoNumberConfigurationView(View):
         CARGO_CATEGORY_AUTO_FORM_CODE: CARGO_CATEGORY_AUTO_FORM_LABEL,
         LOCATION_MASTER_AUTO_FORM_CODE: LOCATION_MASTER_AUTO_FORM_LABEL,
         ROUTE_MASTER_AUTO_FORM_CODE: ROUTE_MASTER_AUTO_FORM_LABEL,
+        SERVICE_ITEM_MASTER_AUTO_FORM_CODE: SERVICE_ITEM_MASTER_AUTO_FORM_LABEL,
+        PRICE_LIST_MASTER_AUTO_FORM_CODE: PRICE_LIST_MASTER_AUTO_FORM_LABEL,
     }
 
     @staticmethod
@@ -7691,6 +8689,36 @@ def _preview_next_route_master_code():
     sequence = AutoNumberSequence.objects.filter(form_code=ROUTE_MASTER_AUTO_FORM_CODE).first()
     next_seq = sequence.next_number if sequence else 1
     return _render_tenant_ref_no(next_seq, config, prefix=ROUTE_MASTER_REF_PREFIX)
+
+
+def _preview_next_service_item_code():
+    config, _ = AutoNumberConfiguration.objects.get_or_create(
+        form_code=SERVICE_ITEM_MASTER_AUTO_FORM_CODE,
+        defaults={
+            'form_label': SERVICE_ITEM_MASTER_AUTO_FORM_LABEL,
+            'number_of_digits': 4,
+            'sequence_format': AutoNumberConfiguration.SequenceFormat.NUMERIC,
+            'is_unique': True,
+        },
+    )
+    sequence = AutoNumberSequence.objects.filter(form_code=SERVICE_ITEM_MASTER_AUTO_FORM_CODE).first()
+    next_seq = sequence.next_number if sequence else 1
+    return _render_tenant_ref_no(next_seq, config, prefix=SERVICE_ITEM_MASTER_REF_PREFIX)
+
+
+def _preview_next_price_list_code():
+    config, _ = AutoNumberConfiguration.objects.get_or_create(
+        form_code=PRICE_LIST_MASTER_AUTO_FORM_CODE,
+        defaults={
+            'form_label': PRICE_LIST_MASTER_AUTO_FORM_LABEL,
+            'number_of_digits': 4,
+            'sequence_format': AutoNumberConfiguration.SequenceFormat.NUMERIC,
+            'is_unique': True,
+        },
+    )
+    sequence = AutoNumberSequence.objects.filter(form_code=PRICE_LIST_MASTER_AUTO_FORM_CODE).first()
+    next_seq = sequence.next_number if sequence else 1
+    return _render_tenant_ref_no(next_seq, config, prefix=PRICE_LIST_MASTER_REF_PREFIX)
 
 
 def _validate_cargo_attachment_upload(upload):

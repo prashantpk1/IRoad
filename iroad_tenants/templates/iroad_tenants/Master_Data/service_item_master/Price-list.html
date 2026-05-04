@@ -1,0 +1,396 @@
+{% extends 'iroad_tenants/base.html' %}
+{% load static %}
+
+{% block title %}Price List Master | iRoad Admin{% endblock %}
+{% block breadcrumb %}{% endblock %}
+
+{% block extra_css %}
+<style>
+  .pl-lines-toolbar { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; flex-wrap:wrap; }
+  .pl-lines-title { font-weight:600; color:var(--text-dark,#111827); margin:0; font-size:1rem; }
+  .pl-route-chip { display:inline-flex; align-items:center; gap:10px; padding:6px 12px; border-radius:10px; border:1px solid var(--border-light,#e5e7eb); background:#fff; font-weight:600; color:#111827; white-space:nowrap; }
+  .pl-route-chip .pl-route-arrow { width:26px; height:26px; border-radius:999px; background:#e8f0fe; color:#2563eb; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .pl-totals { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin-top:14px; }
+  .pl-total-card { border:1px solid var(--border-light,#e5e7eb); border-radius:12px; background:#fff; padding:12px 14px; display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .pl-total-label { color:var(--text-muted,#6b7280); font-weight:600; font-size:.85rem; }
+  .pl-total-value { font-size:1.1rem; font-weight:700; color:var(--text-dark,#111827); }
+  @media (max-width:992px){ .pl-totals { grid-template-columns:1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+      <div class="page-header">
+        <nav aria-label="breadcrumb">
+          <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'iroad_tenants:tenant_dashboard' %}">Dashboard</a></li>
+            <li class="breadcrumb-item">Master Data</li>
+            <li class="breadcrumb-item">Services Management</li>
+            <li class="breadcrumb-item active" aria-current="page">Price List Master</li>
+          </ol>
+        </nav>
+        <div class="page-header-row">
+          <div class="page-header-left">
+            <h1 class="page-title">Create Price List</h1>
+            <p class="page-subtitle">Fill in the details below to register a new price list in the system.</p>
+          </div>
+        </div>
+      </div>
+
+      <form id="priceListForm" method="post" action="{% url 'iroad_tenants:tenant_price_list_master_create' %}">
+        {% csrf_token %}
+        <input type="hidden" id="linePayload" name="line_payload" value="{{ form_data.line_payload|default:'' }}" />
+        <div class="form-card" data-section="1">
+          <div class="form-card-header">
+            <div class="form-card-icon blue"><i class="bi bi-info-circle"></i></div>
+            <div class="form-card-header-text">
+              <h2 class="form-card-title">Header</h2>
+              <p class="form-card-desc">Price list identity, target, status, currency, and validity.</p>
+            </div>
+          </div>
+          <div class="form-card-body">
+            <div class="field-group">
+              <h3 class="field-group-title"><i class="bi bi-fingerprint"></i>Identity</h3>
+              <div class="fields-grid cols-3">
+                <div class="field">
+                  <label for="priceListCode" class="form-label">Price List Code <span class="required">*</span></label>
+                  <div class="input-icon-wrapper">
+                    <i class="bi bi-hash"></i>
+                    <input type="text" class="form-control has-icon" id="priceListCode" value="{{ preview_price_list_code|default:'' }}" readonly />
+                  </div>
+                  <span class="field-hint">Unique price list identifier</span>
+                </div>
+                <div class="field">
+                  <label for="priceListNameEn" class="form-label">Price List Name (English) <span class="required">*</span></label>
+                  <input type="text" class="form-control" id="priceListNameEn" name="price_list_name" value="{{ form_data.price_list_name|default:'' }}" placeholder="Enter English name" />
+                  {% if field_errors.price_list_name %}<span class="text-danger small">{{ field_errors.price_list_name }}</span>{% endif %}
+                  <span class="field-hint">Shown in lists and reports</span>
+                </div>
+                <div class="field">
+                  <label for="priceListNameAr" class="form-label">Price List Name (Arabic)</label>
+                  <input type="text" class="form-control" id="priceListNameAr" placeholder="الاسم العربي" dir="rtl" />
+                </div>
+              </div>
+            </div>
+
+            <div class="field-group">
+              <h3 class="field-group-title"><i class="bi bi-bullseye"></i>Target &amp; Currency</h3>
+              <div class="fields-grid cols-3">
+                <div class="field">
+                  <label for="targetClient" class="form-label">Client <span class="required">*</span></label>
+                  <select class="form-select" id="targetClient" name="client_account_id">
+                    <option value="" selected disabled>-Select client-</option>
+                    {% for client in active_clients %}
+                    <option value="{{ client.account_id }}" {% if form_data.client_account_id == client.account_id|stringformat:'s' %}selected{% endif %}>
+                      {{ client.account_no }} - {{ client.display_name }}
+                    </option>
+                    {% endfor %}
+                  </select>
+                  {% if field_errors.client_account_id %}<span class="text-danger small">{{ field_errors.client_account_id }}</span>{% endif %}
+                  <span class="field-hint">Client this price list applies to.</span>
+                </div>
+                <div class="field">
+                  <label class="form-label">Base Currency (Locked)</label>
+                  <input type="text" class="form-control" value="{{ tenant_base_currency|default:'SAR' }}" readonly />
+                </div>
+              </div>
+            </div>
+
+            <div class="field-group">
+              <h3 class="field-group-title"><i class="bi bi-toggles"></i>Status &amp; Validity</h3>
+              <div class="fields-grid cols-3">
+                <div class="field">
+                  <label for="status" class="form-label">Status <span class="required">*</span></label>
+                  <select class="form-select" id="status" name="status">
+                    <option value="Draft" {% if form_data.status|default:'Draft' == 'Draft' %}selected{% endif %}>Draft</option>
+                    <option value="Active" {% if form_data.status == 'Active' %}selected{% endif %}>Active</option>
+                    <option value="Inactive" {% if form_data.status == 'Inactive' %}selected{% endif %}>Inactive</option>
+                  </select>
+                  {% if field_errors.status %}<span class="text-danger small">{{ field_errors.status }}</span>{% endif %}
+                  <span class="field-hint">Inactive price lists are not available for selection.</span>
+                </div>
+                <div class="field">
+                  <label for="effectiveFrom" class="form-label">Effective From</label>
+                  <div class="input-icon-wrapper">
+                    <i class="bi bi-calendar"></i>
+                    <input type="date" class="form-control has-icon" id="effectiveFrom" name="effective_from" value="{{ form_data.effective_from|default:'' }}" />
+                  </div>
+                  {% if field_errors.effective_from %}<span class="text-danger small">{{ field_errors.effective_from }}</span>{% endif %}
+                  <span class="field-hint">Start date for this price list.</span>
+                </div>
+                <div class="field">
+                  <label for="effectiveTo" class="form-label">Effective To</label>
+                  <div class="input-icon-wrapper">
+                    <i class="bi bi-calendar"></i>
+                    <input type="date" class="form-control has-icon" id="effectiveTo" name="effective_to" value="{{ form_data.effective_to|default:'' }}" />
+                  </div>
+                  {% if field_errors.effective_to %}<span class="text-danger small">{{ field_errors.effective_to }}</span>{% endif %}
+                  <span class="field-hint">End date (leave empty for no end).</span>
+                </div>
+              </div>
+            </div>
+            <div class="field-group">
+              <h3 class="field-group-title"><i class="bi bi-card-text"></i>Notes</h3>
+              <div class="fields-grid cols-1">
+                <div class="field">
+                  <textarea class="form-control" name="notes" rows="3" placeholder="Add notes...">{{ form_data.notes|default:'' }}</textarea>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-card" data-section="2">
+          <div class="form-card-header">
+            <div class="form-card-icon amber"><i class="bi bi-list-ul"></i></div>
+            <div class="form-card-header-text">
+              <h2 class="form-card-title">Item Lines</h2>
+              <p class="form-card-desc">The price list consists of a header and multiple item lines. Trip lines display route and inbound/outbound prices.</p>
+            </div>
+          </div>
+          <div class="form-card-body">
+            <div class="pl-lines-toolbar">
+              <h3 class="pl-lines-title">Lines</h3>
+              <button type="button" class="eal-btn eal-btn-outline" id="addLineBtn">
+                <i class="bi bi-plus-lg"></i><span>Add Line</span>
+              </button>
+            </div>
+
+            <div class="eal-table-wrap" style="box-shadow: none; border-radius: 0">
+              <table class="eal-table mb-0" id="priceListLinesTable">
+                <thead>
+                  <tr>
+                    <th style="width: 60px">SN</th><th>Service Type</th><th>Service Item</th><th>Route</th><th>Unit</th><th>Sell Price</th><th>Outbound Sell Price</th><th>Inbound Sell Price</th><th style="width: 120px">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="plLinesTbody">
+                  <tr class="pl-line" data-line>
+                    <td class="text-muted">1</td>
+                    <td><select class="form-select form-select-sm pl-service-type" aria-label="Service Type"><option value="Service" selected>Service</option><option value="Trip">Trip</option></select></td>
+                    <td>
+                      <select class="form-select form-select-sm" aria-label="Service Item">
+                        <option value="" selected disabled>-Select-</option>
+                      </select>
+                    </td>
+                    <td><div class="pl-route-wrap" data-route-wrap style="display: none"><div class="pl-route-chip" title=""><span data-route-origin>&mdash;</span><span class="pl-route-arrow" aria-hidden="true"><i class="bi bi-arrow-left-right"></i></span><span data-route-destination>&mdash;</span></div></div><span class="text-muted" data-route-na>&mdash;</span></td>
+                    <td><select class="form-select form-select-sm" aria-label="Unit"><option value="Service" selected>Service</option><option value="Trip">Trip</option><option value="Kg">Kg</option></select></td>
+                    <td><input type="number" class="form-control form-control-sm pl-sell" placeholder="0.00" min="0" step="0.01" /></td>
+                    <td><input type="number" class="form-control form-control-sm pl-out-sell" placeholder="0.00" min="0" step="0.01" disabled /></td>
+                    <td><input type="number" class="form-control form-control-sm pl-in-sell" placeholder="0.00" min="0" step="0.01" disabled /></td>
+                    <td><div class="eal-actions-cell"><button type="button" class="eal-row-btn danger pl-del" title="Delete row"><i class="bi bi-trash3"></i></button><button type="button" class="eal-row-btn pl-dup" title="Duplicate line"><i class="bi bi-files"></i></button></div></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="pl-totals">
+              <div class="pl-total-card"><div class="pl-total-label">Total Items</div><div class="pl-total-value" id="totalItems">1</div></div>
+              <div class="pl-total-card"><div class="pl-total-label">Total Service Items</div><div class="pl-total-value" id="totalServiceItems">1</div></div>
+              <div class="pl-total-card"><div class="pl-total-label">Total Trip Item</div><div class="pl-total-value" id="totalTripItems">0</div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-actions-bar">
+          <div class="form-actions-left">
+            <button type="reset" class="btn btn-outline-secondary">
+              <i class="bi bi-arrow-counterclockwise"></i> Reset Form
+            </button>
+          </div>
+          <div class="form-actions-right">
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-check-circle"></i> Save Price List
+            </button>
+          </div>
+        </div>
+      </form>
+      {% if field_errors.line_payload %}<div class="text-danger small mt-2">{{ field_errors.line_payload }}</div>{% endif %}
+      {% if field_errors.non_field_errors %}<div class="text-danger small mt-2">{{ field_errors.non_field_errors }}</div>{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  (function () {
+    const serviceItems = [
+      {% for si in active_service_items %}
+      { id: "{{ si.service_item_id }}", label: "{{ si.service_code|escapejs }} - {{ si.english_name|escapejs }}" },
+      {% endfor %}
+    ];
+    const tripItems = [
+      {% for ti in active_trip_services %}
+      {
+        id: "{{ ti.service_item_id }}",
+        label: "{{ ti.service_code|escapejs }} - {{ ti.english_name|escapejs }}",
+        origin: "{% if ti.route and ti.route.origin_point %}{{ ti.route.origin_point.display_label|escapejs }}{% endif %}",
+        destination: "{% if ti.route and ti.route.destination_point %}{{ ti.route.destination_point.display_label|escapejs }}{% endif %}"
+      },
+      {% endfor %}
+    ];
+
+    const tbody = document.getElementById("plLinesTbody");
+    const addBtn = document.getElementById("addLineBtn");
+    const totalItemsEl = document.getElementById("totalItems");
+    const totalServiceEl = document.getElementById("totalServiceItems");
+    const totalTripEl = document.getElementById("totalTripItems");
+    const linePayloadEl = document.getElementById("linePayload");
+    const formEl = document.getElementById("priceListForm");
+    if (!tbody) return;
+
+    function renumber() {
+      const rows = Array.from(tbody.querySelectorAll("tr[data-line]"));
+      rows.forEach((r, idx) => {
+        const snCell = r.querySelector("td");
+        if (snCell) snCell.textContent = String(idx + 1);
+      });
+    }
+
+    function updateTotals() {
+      const rows = Array.from(tbody.querySelectorAll("tr[data-line]"));
+      let serviceCount = 0, tripCount = 0;
+      rows.forEach((r) => {
+        const typeSel = r.querySelector(".pl-service-type");
+        const type = typeSel ? typeSel.value : "Service";
+        if (type === "Trip") tripCount += 1; else serviceCount += 1;
+      });
+      if (totalItemsEl) totalItemsEl.textContent = String(rows.length);
+      if (totalServiceEl) totalServiceEl.textContent = String(serviceCount);
+      if (totalTripEl) totalTripEl.textContent = String(tripCount);
+    }
+
+    function applyTripVisibility(row) {
+      const typeSel = row.querySelector(".pl-service-type");
+      const isTrip = typeSel && typeSel.value === "Trip";
+      const routeWrap = row.querySelector("[data-route-wrap]");
+      const routeNa = row.querySelector("[data-route-na]");
+      const outSell = row.querySelector(".pl-out-sell");
+      const inSell = row.querySelector(".pl-in-sell");
+      if (routeWrap) routeWrap.style.display = isTrip ? "" : "none";
+      if (routeNa) routeNa.style.display = isTrip ? "none" : "";
+      if (outSell) { outSell.disabled = !isTrip; if (!isTrip) outSell.value = ""; }
+      if (inSell) { inSell.disabled = !isTrip; if (!isTrip) inSell.value = ""; }
+    }
+
+    function populateServiceItems(row, keepValue) {
+      const typeSel = row.querySelector(".pl-service-type");
+      const svcSel = row.querySelector('select[aria-label="Service Item"]');
+      if (!typeSel || !svcSel) return;
+      const selectedBefore = keepValue ? svcSel.value : "";
+      const items = typeSel.value === "Trip" ? tripItems : serviceItems;
+
+      svcSel.innerHTML = "";
+      const placeholder = document.createElement("option");
+      placeholder.value = "";
+      placeholder.textContent = "-Sele-";
+      placeholder.disabled = true;
+      placeholder.selected = true;
+      svcSel.appendChild(placeholder);
+
+      items.forEach((item) => {
+        const opt = document.createElement("option");
+        opt.value = item.id;
+        opt.textContent = item.label;
+        if (item.origin || item.destination) {
+          opt.dataset.origin = item.origin || "";
+          opt.dataset.destination = item.destination || "";
+        }
+        if (selectedBefore && selectedBefore === item.id) {
+          opt.selected = true;
+          placeholder.selected = false;
+        }
+        svcSel.appendChild(opt);
+      });
+    }
+
+    function updateTripRouteFromService(row) {
+      const typeSel = row.querySelector(".pl-service-type");
+      const svcSel = row.querySelector('select[aria-label="Service Item"]');
+      const routeWrap = row.querySelector("[data-route-wrap]");
+      const routeChip = routeWrap ? routeWrap.querySelector(".pl-route-chip") : null;
+      const originEl = routeWrap ? routeWrap.querySelector("[data-route-origin]") : null;
+      const destinationEl = routeWrap ? routeWrap.querySelector("[data-route-destination]") : null;
+      if (!typeSel || !svcSel || typeSel.value !== "Trip") return;
+      const selectedOpt = svcSel.options[svcSel.selectedIndex];
+      const origin = (selectedOpt && selectedOpt.dataset && selectedOpt.dataset.origin) || "—";
+      const destination = (selectedOpt && selectedOpt.dataset && selectedOpt.dataset.destination) || "—";
+      if (originEl) originEl.textContent = origin;
+      if (destinationEl) destinationEl.textContent = destination;
+      if (routeChip) routeChip.title = origin + " ↔ " + destination;
+    }
+
+    function wireRow(row) {
+      const typeSel = row.querySelector(".pl-service-type");
+      const svcSel = row.querySelector('select[aria-label="Service Item"]');
+      const delBtn = row.querySelector(".pl-del");
+      const dupBtn = row.querySelector(".pl-dup");
+      if (typeSel) typeSel.addEventListener("change", function () {
+        populateServiceItems(row, false);
+        applyTripVisibility(row);
+        updateTripRouteFromService(row);
+        updateTotals();
+      });
+      if (svcSel) svcSel.addEventListener("change", function () {
+        updateTripRouteFromService(row);
+      });
+      if (delBtn) delBtn.addEventListener("click", function () { row.remove(); renumber(); updateTotals(); });
+      if (dupBtn) dupBtn.addEventListener("click", function () {
+        const clone = row.cloneNode(true);
+        tbody.insertBefore(clone, row.nextSibling);
+        wireRow(clone);
+        applyTripVisibility(clone);
+        renumber();
+        updateTotals();
+      });
+      populateServiceItems(row, true);
+      applyTripVisibility(row);
+      updateTripRouteFromService(row);
+    }
+
+    Array.from(tbody.querySelectorAll("tr[data-line]")).forEach(wireRow);
+    renumber();
+    updateTotals();
+
+    if (addBtn) {
+      addBtn.addEventListener("click", function () {
+        const first = tbody.querySelector("tr[data-line]");
+        if (!first) return;
+        const clone = first.cloneNode(true);
+        clone.querySelectorAll("input").forEach((i) => (i.value = ""));
+        clone.querySelectorAll("select").forEach((s) => {
+          if (s.classList.contains("pl-service-type")) s.value = "Service";
+          else s.selectedIndex = 0;
+        });
+        tbody.appendChild(clone);
+        wireRow(clone);
+        renumber();
+        updateTotals();
+      });
+    }
+
+    if (formEl && linePayloadEl) {
+      formEl.addEventListener("submit", function () {
+        const rows = Array.from(tbody.querySelectorAll("tr[data-line]"));
+        const payload = [];
+        rows.forEach((row) => {
+          const typeSel = row.querySelector(".pl-service-type");
+          const svcSel = row.querySelector('select[aria-label="Service Item"]');
+          const sell = row.querySelector(".pl-sell");
+          const outSell = row.querySelector(".pl-out-sell");
+          const inSell = row.querySelector(".pl-in-sell");
+          const lineType = typeSel ? typeSel.value : "Service";
+          const serviceItemId = svcSel ? (svcSel.value || "") : "";
+          const hasAnyValue = serviceItemId || (sell && sell.value) || (outSell && outSell.value) || (inSell && inSell.value);
+          if (!hasAnyValue) return;
+          payload.push({
+            line_type: lineType,
+            service_item_id: serviceItemId,
+            sell_price: sell ? (sell.value || "") : "",
+            outbound_sell_price: outSell ? (outSell.value || "") : "",
+            inbound_sell_price: inSell ? (inSell.value || "") : "",
+            notes: "",
+          });
+        });
+        linePayloadEl.value = JSON.stringify(payload);
+      });
+    }
+  })();
+</script>
+{% endblock %}

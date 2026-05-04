@@ -44,10 +44,15 @@ class TenantRouteMasterForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         allow_inactive_status = bool(kwargs.pop('allow_inactive_status', False))
         super().__init__(*args, **kwargs)
+        # PCS gate for new route endpoints: Location must be Active + Serviceable.
+        base_operational_qs = TenantLocationMaster.objects.filter(
+            status=TenantLocationMaster.Status.ACTIVE,
+            is_serviceable=True,
+        )
         # Avoid QuerySet.union() here: it often drops select_related / breaks choice rendering for ModelChoiceField.
         if self.instance.pk:
             pk_set = set(
-                TenantLocationMaster.active_serviceable_objects.values_list('pk', flat=True)
+                base_operational_qs.values_list('pk', flat=True)
             )
             for loc_pk in (self.instance.origin_point_id, self.instance.destination_point_id):
                 if loc_pk:
@@ -58,7 +63,7 @@ class TenantRouteMasterForm(forms.ModelForm):
                 .order_by('display_label')
             )
         else:
-            location_qs = TenantLocationMaster.active_serviceable_objects.select_related(
+            location_qs = base_operational_qs.select_related(
                 'country'
             ).order_by('display_label')
 
@@ -79,10 +84,12 @@ class TenantRouteMasterForm(forms.ModelForm):
             attrs={'class': 'form-select', 'id': 'originPoint'},
             country_id_by_value=country_id_by_value,
         )
+        self.fields['origin_point'].widget.choices = self.fields['origin_point'].choices
         self.fields['destination_point'].widget = LocationPointSelect(
             attrs={'class': 'form-select', 'id': 'destinationPoint'},
             country_id_by_value=country_id_by_value,
         )
+        self.fields['destination_point'].widget.choices = self.fields['destination_point'].choices
 
         if self.instance.pk and self.instance.route_type not in self._PHASE1_ROUTE_TYPES:
             self.fields['route_type'].choices = list(TenantRouteMaster.RouteType.choices)
