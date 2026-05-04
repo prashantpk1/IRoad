@@ -9,7 +9,7 @@
       <div class="page-header">
         <nav aria-label="breadcrumb">
           <ol class="breadcrumb">
-      <li class="breadcrumb-item"><a href="{% url 'iroad_tenants:tenant_dashboard' %}{% if request.GET.tid %}?tid={{ request.GET.tid|urlencode }}{% endif %}">Dashboard</a></li>
+      <li class="breadcrumb-item"><a href="{% url 'iroad_tenants:tenant_dashboard' %}">Dashboard</a></li>
             <li class="breadcrumb-item">Master Data</li>
             <li class="breadcrumb-item">Route Management</li>
       <li class="breadcrumb-item active" aria-current="page">Location Master List</li>
@@ -23,7 +23,7 @@
           <div class="page-header-right">
             <div class="eal-header-actions">
         <button class="eal-btn eal-btn-outline"><i class="bi bi-download"></i><span>Export</span></button>
-        <a href="{% url 'iroad_tenants:tenant_location_master_create' %}{% if request.GET.tid %}?tid={{ request.GET.tid|urlencode }}{% endif %}" class="eal-btn eal-btn-primary"><i class="bi bi-plus-lg"></i><span>Add Location</span></a>
+        <a href="{% url 'iroad_tenants:tenant_location_master_create' %}" class="eal-btn eal-btn-primary"><i class="bi bi-plus-lg"></i><span>{% translate "Add Location" %}</span></a>
             </div>
           </div>
         </div>
@@ -43,7 +43,7 @@
   data-eal-empty-filter-message="{% translate 'No locations match the selected search/filter criteria.' %}"
 >
   <form method="get" class="eal-toolbar">
-    {% if request.GET.tid %}<input type="hidden" name="tid" value="{{ request.GET.tid|urlencode }}" />{% endif %}
+    
     <div class="eal-toolbar-left">
       <div class="d-flex flex-wrap align-items-end gap-3 w-100">
         <div class="eal-search flex-grow-1" style="min-width: 220px">
@@ -121,8 +121,8 @@
                       <i class="bi bi-three-dots-vertical"></i>
                     </button>
               <ul class="dropdown-menu dropdown-menu-end shadow-sm" style="border-radius: 8px; border-color: #e2e8f0">
-                <li><a class="dropdown-item" href="{% url 'iroad_tenants:tenant_location_master_edit' loc.location_id %}{% if request.GET.tid %}?tid={{ request.GET.tid|urlencode }}{% endif %}"><i class="bi bi-pencil text-primary me-2"></i> Edit</a></li>
-                <li><a class="dropdown-item" href="{% url 'iroad_tenants:tenant_location_master_detail' loc.location_id %}{% if request.GET.tid %}?tid={{ request.GET.tid|urlencode }}{% endif %}"><i class="bi bi-eye text-info me-2"></i> View</a></li>
+                <li><a class="dropdown-item" href="{% url 'iroad_tenants:tenant_location_master_edit' loc.location_id %}"><i class="bi bi-pencil text-primary me-2"></i> Edit</a></li>
+                <li><a class="dropdown-item" href="{% url 'iroad_tenants:tenant_location_master_detail' loc.location_id %}"><i class="bi bi-eye text-info me-2"></i> View</a></li>
                       <li><hr class="dropdown-divider" /></li>
                       <li>
                   <form
@@ -131,7 +131,7 @@
                     onsubmit="return confirm('Delete {{ loc.location_code|escapejs }}? This cannot be undone.');"
                   >
                     {% csrf_token %}
-                    {% if request.GET.tid %}<input type="hidden" name="tid" value="{{ request.GET.tid|urlencode }}" />{% endif %}
+                    
                     <button type="submit" class="dropdown-item text-danger"><i class="bi bi-trash3 me-2"></i> Delete</button>
                   </form>
                       </li>
@@ -151,10 +151,10 @@
     <div class="eal-pagination-info">{% translate "Page" %} {{ locations_page.number }} / {{ locations_page.paginator.num_pages }}</div>
           <div class="eal-pagination-controls">
       {% if locations_page.has_previous %}
-      <a class="eal-page-btn" href="?page={{ locations_page.previous_page_number }}{% if search_q %}&q={{ search_q|urlencode }}{% endif %}&status={{ filter_status|urlencode }}&serviceable={{ filter_serviceable|urlencode }}{% if request.GET.tid %}&tid={{ request.GET.tid|urlencode }}{% endif %}"><i class="bi bi-chevron-left"></i></a>
+      <a class="eal-page-btn" href="?page={{ locations_page.previous_page_number }}{% if search_q %}&q={{ search_q|urlencode }}{% endif %}&status={{ filter_status|urlencode }}&serviceable={{ filter_serviceable|urlencode }}"><i class="bi bi-chevron-left"></i></a>
       {% endif %}
       {% if locations_page.has_next %}
-      <a class="eal-page-btn" href="?page={{ locations_page.next_page_number }}{% if search_q %}&q={{ search_q|urlencode }}{% endif %}&status={{ filter_status|urlencode }}&serviceable={{ filter_serviceable|urlencode }}{% if request.GET.tid %}&tid={{ request.GET.tid|urlencode }}{% endif %}"><i class="bi bi-chevron-right"></i></a>
+      <a class="eal-page-btn" href="?page={{ locations_page.next_page_number }}{% if search_q %}&q={{ search_q|urlencode }}{% endif %}&status={{ filter_status|urlencode }}&serviceable={{ filter_serviceable|urlencode }}"><i class="bi bi-chevron-right"></i></a>
       {% endif %}
           </div>
         </div>
@@ -179,9 +179,10 @@
         const panel = document.getElementById("locationDetailPanel");
         const overlay = document.getElementById("locationDetailOverlay");
         const closeBtn = document.getElementById("locDetailCloseBtn");
-    if (!panel || !overlay || !closeBtn) return;
-    closeBtn.addEventListener("click", function () { panel.classList.remove("active"); overlay.classList.remove("active"); });
-    overlay.addEventListener("click", function () { panel.classList.remove("active"); overlay.classList.remove("active"); });
+        if (panel && overlay && closeBtn) {
+          closeBtn.addEventListener("click", function () { panel.classList.remove("active"); overlay.classList.remove("active"); });
+          overlay.addEventListener("click", function () { panel.classList.remove("active"); overlay.classList.remove("active"); });
+        }
       })();
     </script>
 {% endblock %}

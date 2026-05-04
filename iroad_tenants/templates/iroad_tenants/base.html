@@ -44,56 +44,6 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script src="{% static 'tenantdesign/Javascript/main.js' %}"></script>
     <script src="{% static 'tenantdesign/Javascript/dashboard.js' %}"></script>
-    <script>
-      (function () {
-        var params = new URLSearchParams(window.location.search || "");
-        var tid = params.get("tid") || sessionStorage.getItem("iroad_tenant_tid") || "";
-        if (tid) {
-          sessionStorage.setItem("iroad_tenant_tid", tid);
-          if (!params.get("tid")) {
-            params.set("tid", tid);
-            var q = params.toString();
-            var nextUrl = window.location.pathname + (q ? ("?" + q) : "") + window.location.hash;
-            window.history.replaceState({}, "", nextUrl);
-          }
-        }
-
-        function appendTidToUrl(href) {
-          try {
-            var url = new URL(href, window.location.origin);
-            if (!url.pathname.startsWith("/tenant/")) return href;
-            if (tid && !url.searchParams.get("tid")) {
-              url.searchParams.set("tid", tid);
-            }
-            return url.pathname + (url.search ? url.search : "") + (url.hash || "");
-          } catch (e) {
-            return href;
-          }
-        }
-
-        document.querySelectorAll("a[href]").forEach(function (a) {
-          var href = a.getAttribute("href") || "";
-          if (!href || href.startsWith("#") || href.startsWith("javascript:")) return;
-          if (href.startsWith("/tenant/")) {
-            a.setAttribute("href", appendTidToUrl(href));
-          }
-        });
-
-        document.querySelectorAll("form[action]").forEach(function (form) {
-          var action = form.getAttribute("action") || "";
-          if (action.startsWith("/tenant/")) {
-            var hidden = form.querySelector("input[name='tid']");
-            if (!hidden) {
-              hidden = document.createElement("input");
-              hidden.type = "hidden";
-              hidden.name = "tid";
-              form.appendChild(hidden);
-            }
-            hidden.value = tid;
-          }
-        });
-      })();
-    </script>
     <script src="{% static 'tenantdesign/Javascript/eal-datatable-filters.js' %}"></script>
     {% block extra_js %}{% endblock %}
   </body>

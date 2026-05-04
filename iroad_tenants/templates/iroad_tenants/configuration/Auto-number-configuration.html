@@ -59,6 +59,12 @@
       >
         Location code
       </li>
+      <li
+        class="form-list-item {% if auto_number_form_code == 'route-master' %}active{% endif %}"
+        data-form="route-master"
+      >
+        Route code
+      </li>
 
       <li class="form-list-section">Sales</li>
       <li class="form-list-item" data-form="sales-invoice">Sales Invoice</li>
@@ -337,6 +343,7 @@
       "cargo-master",
       "cargo-category",
       "location-master",
+      "route-master",
     ]);
 
     function toAlpha(num) {

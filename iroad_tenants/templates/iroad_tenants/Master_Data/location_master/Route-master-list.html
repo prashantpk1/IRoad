@@ -23,7 +23,7 @@
           <div class="page-header-right">
             <div class="eal-header-actions">
         <button class="eal-btn eal-btn-outline" type="button"><i class="bi bi-download"></i><span>Export</span></button>
-        <a href="{% url 'iroad_tenants:tenant_route_master_create' %}{% if request.GET.tid %}?tid={{ request.GET.tid|urlencode }}{% endif %}" class="eal-btn eal-btn-primary"><i class="bi bi-plus-lg"></i><span>Add Route</span></a>
+        <a href="{% url 'iroad_tenants:tenant_route_master_create' %}" class="eal-btn eal-btn-primary"><i class="bi bi-plus-lg"></i><span>{% translate "Add Route" %}</span></a>
             </div>
           </div>
         </div>
@@ -42,12 +42,12 @@
       <form method="get" class="eal-search">
         <i class="bi bi-search"></i>
         <input type="text" name="q" value="{{ search_q|default:'' }}" placeholder="Search routes..." />
-        {% if request.GET.tid %}<input type="hidden" name="tid" value="{{ request.GET.tid|urlencode }}" />{% endif %}
+        
       </form>
             <div class="eal-chip-group">
-              <a class="eal-chip {% if route_scope == 'all' %}active{% endif %}" href="{% url 'iroad_tenants:tenant_route_master_list' %}?scope=all{% if search_q %}&q={{ search_q|urlencode }}{% endif %}{% if request.GET.tid %}&tid={{ request.GET.tid|urlencode }}{% endif %}">All</a>
-        <a class="eal-chip {% if route_scope == 'domestic' %}active{% endif %}" href="{% url 'iroad_tenants:tenant_route_master_list' %}?scope=domestic{% if search_q %}&q={{ search_q|urlencode }}{% endif %}{% if request.GET.tid %}&tid={{ request.GET.tid|urlencode }}{% endif %}"><i class="bi bi-geo-alt"></i> Domestic</a>
-        <a class="eal-chip {% if route_scope == 'international' %}active{% endif %}" href="{% url 'iroad_tenants:tenant_route_master_list' %}?scope=international{% if search_q %}&q={{ search_q|urlencode }}{% endif %}{% if request.GET.tid %}&tid={{ request.GET.tid|urlencode }}{% endif %}"><i class="bi bi-globe"></i> International</a>
+              <a class="eal-chip {% if route_scope == 'all' %}active{% endif %}" href="{% url 'iroad_tenants:tenant_route_master_list' %}?scope=all{% if search_q %}&q={{ search_q|urlencode }}{% endif %}">All</a>
+        <a class="eal-chip {% if route_scope == 'domestic' %}active{% endif %}" href="{% url 'iroad_tenants:tenant_route_master_list' %}?scope=domestic{% if search_q %}&q={{ search_q|urlencode }}{% endif %}"><i class="bi bi-geo-alt"></i> Domestic</a>
+        <a class="eal-chip {% if route_scope == 'international' %}active{% endif %}" href="{% url 'iroad_tenants:tenant_route_master_list' %}?scope=international{% if search_q %}&q={{ search_q|urlencode }}{% endif %}"><i class="bi bi-globe"></i> International</a>
             </div>
           </div>
         </div>
@@ -75,13 +75,13 @@
                     <div class="dropdown eal-actions-cell">
                       <button class="eal-row-btn" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Actions"><i class="bi bi-three-dots-vertical"></i></button>
                       <ul class="dropdown-menu dropdown-menu-end shadow-sm" style="border-radius: 8px; border-color: #e2e8f0">
-                        <li><a class="dropdown-item" href="{% url 'iroad_tenants:tenant_route_master_edit' route.route_id %}{% if request.GET.tid %}?tid={{ request.GET.tid|urlencode }}{% endif %}"><i class="bi bi-pencil text-primary me-2"></i> Edit</a></li>
-                        <li><a class="dropdown-item" href="{% url 'iroad_tenants:tenant_route_master_detail' route.route_id %}{% if request.GET.tid %}?tid={{ request.GET.tid|urlencode }}{% endif %}"><i class="bi bi-eye text-info me-2"></i> View</a></li>
+                        <li><a class="dropdown-item" href="{% url 'iroad_tenants:tenant_route_master_edit' route.route_id %}"><i class="bi bi-pencil text-primary me-2"></i> Edit</a></li>
+                        <li><a class="dropdown-item" href="{% url 'iroad_tenants:tenant_route_master_detail' route.route_id %}"><i class="bi bi-eye text-info me-2"></i> View</a></li>
                         <li><hr class="dropdown-divider" /></li>
                         <li>
                           <form method="post" action="{% url 'iroad_tenants:tenant_route_master_delete' route.route_id %}" onsubmit="return confirm('Delete {{ route.route_code|escapejs }}? This cannot be undone.');">
                             {% csrf_token %}
-                            {% if request.GET.tid %}<input type="hidden" name="tid" value="{{ request.GET.tid|urlencode }}" />{% endif %}
+                            
                             <button class="dropdown-item text-danger" type="submit"><i class="bi bi-trash3 me-2"></i> Delete</button>
                           </form>
                         </li>
@@ -99,11 +99,11 @@
     <div class="eal-pagination-info">Showing <strong>{{ routes_page.start_index|default:0 }}-{{ routes_page.end_index|default:0 }}</strong> of <strong>{{ routes_page.paginator.count|default:0 }}</strong> routes</div>
     <div class="eal-pagination-controls">
       {% if routes_page.has_previous %}
-      <a class="eal-page-btn" href="{% url 'iroad_tenants:tenant_route_master_list' %}?page={{ routes_page.previous_page_number }}{% if route_scope %}&scope={{ route_scope|urlencode }}{% endif %}{% if search_q %}&q={{ search_q|urlencode }}{% endif %}{% if request.GET.tid %}&tid={{ request.GET.tid|urlencode }}{% endif %}"><i class="bi bi-chevron-left"></i></a>
+      <a class="eal-page-btn" href="{% url 'iroad_tenants:tenant_route_master_list' %}?page={{ routes_page.previous_page_number }}{% if route_scope %}&scope={{ route_scope|urlencode }}{% endif %}{% if search_q %}&q={{ search_q|urlencode }}{% endif %}"><i class="bi bi-chevron-left"></i></a>
       {% endif %}
       <span class="eal-page-btn active">{{ routes_page.number|default:1 }}</span>
       {% if routes_page.has_next %}
-      <a class="eal-page-btn" href="{% url 'iroad_tenants:tenant_route_master_list' %}?page={{ routes_page.next_page_number }}{% if route_scope %}&scope={{ route_scope|urlencode }}{% endif %}{% if search_q %}&q={{ search_q|urlencode }}{% endif %}{% if request.GET.tid %}&tid={{ request.GET.tid|urlencode }}{% endif %}"><i class="bi bi-chevron-right"></i></a>
+      <a class="eal-page-btn" href="{% url 'iroad_tenants:tenant_route_master_list' %}?page={{ routes_page.next_page_number }}{% if route_scope %}&scope={{ route_scope|urlencode }}{% endif %}{% if search_q %}&q={{ search_q|urlencode }}{% endif %}"><i class="bi bi-chevron-right"></i></a>
       {% endif %}
     </div>
           </div>
@@ -127,9 +127,10 @@
         const panel = document.getElementById("routeDetailPanel");
         const overlay = document.getElementById("routeDetailOverlay");
         const closeBtn = document.getElementById("routeDetailCloseBtn");
-    if (!panel || !overlay || !closeBtn) return;
-    closeBtn.addEventListener("click", function () { panel.classList.remove("active"); overlay.classList.remove("active"); });
-    overlay.addEventListener("click", function () { panel.classList.remove("active"); overlay.classList.remove("active"); });
+        if (panel && overlay && closeBtn) {
+          closeBtn.addEventListener("click", function () { panel.classList.remove("active"); overlay.classList.remove("active"); });
+          overlay.addEventListener("click", function () { panel.classList.remove("active"); overlay.classList.remove("active"); });
+        }
       })();
     </script>
 {% endblock %}

@@ -10,7 +10,7 @@
   <nav aria-label="breadcrumb">
     <ol class="breadcrumb">
       <li class="breadcrumb-item">
-        <a href="{% url 'iroad_tenants:tenant_dashboard' %}{% if request.GET.tid %}?tid={{ request.GET.tid }}{% endif %}">{% translate "Dashboard" %}</a>
+        <a href="{% url 'iroad_tenants:tenant_dashboard' %}">{% translate "Dashboard" %}</a>
       </li>
       <li class="breadcrumb-item">{% translate "Master Data" %}</li>
       <li class="breadcrumb-item">{% translate "Cargo Management" %}</li>
@@ -28,7 +28,7 @@
           <i class="bi bi-download"></i>
           <span>{% translate "Export" %}</span>
         </button>
-        <a href="{% url 'iroad_tenants:tenant_cargo_category_create' %}{% if request.GET.tid %}?tid={{ request.GET.tid }}{% endif %}" class="eal-btn eal-btn-primary">
+        <a href="{% url 'iroad_tenants:tenant_cargo_category_create' %}" class="eal-btn eal-btn-primary">
           <i class="bi bi-plus-lg"></i>
           <span>{% translate "New Category" %}</span>
         </a>
@@ -74,7 +74,7 @@
   data-eal-empty-filter-message="{% translate 'No categories match the selected search/filter criteria.' %}"
 >
   <form method="get" class="eal-toolbar">
-    {% if request.GET.tid %}<input type="hidden" name="tid" value="{{ request.GET.tid }}" />{% endif %}
+    
     <input type="hidden" name="scope" value="{{ category_scope }}" />
     <div class="eal-toolbar-left">
       <div class="eal-search" style="min-width: 220px">
@@ -83,15 +83,15 @@
       </div>
       <div class="eal-chip-group">
         <a
-          href="{% url 'iroad_tenants:tenant_cargo_category_list' %}?scope=all{% if search_q %}&q={{ search_q|urlencode }}{% endif %}{% if request.GET.tid %}&tid={{ request.GET.tid|urlencode }}{% endif %}"
+          href="{% url 'iroad_tenants:tenant_cargo_category_list' %}?scope=all{% if search_q %}&q={{ search_q|urlencode }}{% endif %}"
           class="eal-chip text-decoration-none{% if category_scope == 'all' %} active{% endif %}"
         >{% translate "All" %}</a>
         <a
-          href="{% url 'iroad_tenants:tenant_cargo_category_list' %}?scope=active{% if search_q %}&q={{ search_q|urlencode }}{% endif %}{% if request.GET.tid %}&tid={{ request.GET.tid|urlencode }}{% endif %}"
+          href="{% url 'iroad_tenants:tenant_cargo_category_list' %}?scope=active{% if search_q %}&q={{ search_q|urlencode }}{% endif %}"
           class="eal-chip text-decoration-none{% if category_scope == 'active' %} active{% endif %}"
         >{% translate "Active" %}</a>
         <a
-          href="{% url 'iroad_tenants:tenant_cargo_category_list' %}?scope=inactive{% if search_q %}&q={{ search_q|urlencode }}{% endif %}{% if request.GET.tid %}&tid={{ request.GET.tid|urlencode }}{% endif %}"
+          href="{% url 'iroad_tenants:tenant_cargo_category_list' %}?scope=inactive{% if search_q %}&q={{ search_q|urlencode }}{% endif %}"
           class="eal-chip text-decoration-none{% if category_scope == 'inactive' %} active{% endif %}"
         >{% translate "Inactive" %}</a>
       </div>
@@ -144,7 +144,7 @@
             <input type="checkbox" class="eal-custom-check" disabled aria-hidden="true" />
           </td>
           <td>
-            <a class="eal-entity-id text-decoration-none" href="{% url 'iroad_tenants:tenant_cargo_category_detail' cat.category_id %}{% if request.GET.tid %}?tid={{ request.GET.tid|urlencode }}{% endif %}">{{ cat.category_code }}</a>
+            <a class="eal-entity-id text-decoration-none" href="{% url 'iroad_tenants:tenant_cargo_category_detail' cat.category_id %}">{{ cat.category_code }}</a>
           </td>
           <td><div class="eal-name-cell"><span class="eal-name-text">{{ cat.name_english }}</span></div></td>
           <td class="eal-arabic" lang="ar" dir="rtl">{{ cat.name_arabic|default:"—" }}</td>
@@ -173,7 +173,7 @@
                 <li>
                   <a
                     class="dropdown-item"
-                    href="{% url 'iroad_tenants:tenant_cargo_category_edit' cat.category_id %}{% if request.GET.tid %}?tid={{ request.GET.tid|urlencode }}{% endif %}"
+                    href="{% url 'iroad_tenants:tenant_cargo_category_edit' cat.category_id %}"
                   >
                     <i class="bi bi-pencil text-primary me-2"></i>{% translate "Edit" %}
                   </a>
@@ -181,7 +181,7 @@
                 <li>
                   <a
                     class="dropdown-item"
-                    href="{% url 'iroad_tenants:tenant_cargo_category_detail' cat.category_id %}{% if request.GET.tid %}?tid={{ request.GET.tid|urlencode }}{% endif %}"
+                    href="{% url 'iroad_tenants:tenant_cargo_category_detail' cat.category_id %}"
                   >
                     <i class="bi bi-eye text-info me-2"></i>{% translate "View" %}
                   </a>
@@ -195,7 +195,7 @@
                     onsubmit="return confirm('{% translate "Delete category" %} {{ cat.category_code|escapejs }}? {% translate "This cannot be undone." %}');"
                   >
                     {% csrf_token %}
-                    {% if request.GET.tid %}<input type="hidden" name="tid" value="{{ request.GET.tid }}" />{% endif %}
+                    
                     <button type="submit" class="dropdown-item text-danger">
                       <i class="bi bi-trash3 me-2"></i>{% translate "Delete" %}
                     </button>
@@ -221,10 +221,10 @@
     </div>
     <div class="eal-pagination-controls">
       {% if categories_page.has_previous %}
-      <a class="eal-page-btn" href="?page={{ categories_page.previous_page_number }}{% if search_q %}&q={{ search_q|urlencode }}{% endif %}&scope={{ category_scope|urlencode }}{% if request.GET.tid %}&tid={{ request.GET.tid|urlencode }}{% endif %}"><i class="bi bi-chevron-left"></i></a>
+      <a class="eal-page-btn" href="?page={{ categories_page.previous_page_number }}{% if search_q %}&q={{ search_q|urlencode }}{% endif %}&scope={{ category_scope|urlencode }}"><i class="bi bi-chevron-left"></i></a>
       {% endif %}
       {% if categories_page.has_next %}
-      <a class="eal-page-btn" href="?page={{ categories_page.next_page_number }}{% if search_q %}&q={{ search_q|urlencode }}{% endif %}&scope={{ category_scope|urlencode }}{% if request.GET.tid %}&tid={{ request.GET.tid|urlencode }}{% endif %}"><i class="bi bi-chevron-right"></i></a>
+      <a class="eal-page-btn" href="?page={{ categories_page.next_page_number }}{% if search_q %}&q={{ search_q|urlencode }}{% endif %}&scope={{ category_scope|urlencode }}"><i class="bi bi-chevron-right"></i></a>
       {% endif %}
     </div>
   </div>

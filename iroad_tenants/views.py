@@ -185,9 +185,6 @@ def _contract_status_for_dates(start_date, end_date):
 
 def _redirect_client_contract_list(request):
     url = reverse('iroad_tenants:tenant_client_contract_list')
-    tid = (request.POST.get('tid') or request.GET.get('tid') or '').strip()
-    if tid:
-        url = f'{url}?{urlencode({"tid": tid})}'
     return redirect(url)
 
 
@@ -288,6 +285,7 @@ def _resolve_tenant_favicon_url(request, tenant):
 
 def _tenant_context_from_session(request):
     auth_payload = get_tenant_portal_cookie_payload(request) or {}
+    jwt_claims = auth_payload.get('jwt_claims') or {}
     tenant_id = auth_payload.get('tenant_id')
     tenant_jti = auth_payload.get('jti')
     tenant = None
@@ -361,14 +359,12 @@ def _tenant_context_from_session(request):
         'can_view_booking': 'Booking' in permission_forms,
         'can_view_shipment': 'Shipment' in permission_forms,
         'can_view_sales_invoicing': 'Sales Invoicing' in permission_forms,
+        'jwt_claims': jwt_claims,
     }
 
 
 def _tenant_redirect(request, route_name):
-    tid = str(request.GET.get('tid') or request.POST.get('tid') or '').strip()
     base = reverse(route_name)
-    if tid:
-        return redirect(f'{base}?tid={tid}')
     return redirect(base)
 
 
@@ -825,16 +821,11 @@ class TenantCargoMasterDetailView(View):
                 messages.error(request, 'Cargo record not found.', extra_tags='tenant')
                 return _tenant_redirect(request, 'iroad_tenants:tenant_cargo_master_list')
 
-            tid = (request.GET.get('tid') or '').strip()
             list_url = reverse('iroad_tenants:tenant_cargo_master_list')
-            if tid:
-                list_url = f'{list_url}?{urlencode({"tid": tid})}'
             edit_url = reverse(
                 'iroad_tenants:tenant_cargo_master_edit',
                 kwargs={'cargo_id': cargo.cargo_id},
             )
-            if tid:
-                edit_url = f'{edit_url}?{urlencode({"tid": tid})}'
 
             context.update(
                 {
@@ -844,7 +835,6 @@ class TenantCargoMasterDetailView(View):
                     'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
                     'back_to_list_url': list_url,
                     'edit_cargo_url': edit_url,
-                    'portal_tid': tid,
                     'is_edit': True,
                     'is_view': True,
                 }
@@ -1070,16 +1060,11 @@ class TenantCargoCategoryDetailView(View):
                 messages.error(request, 'Category not found.', extra_tags='tenant')
                 return _redirect_cargo_category_list(request)
 
-            tid = (request.GET.get('tid') or '').strip()
             list_url = reverse('iroad_tenants:tenant_cargo_category_list')
-            if tid:
-                list_url = f'{list_url}?{urlencode({"tid": tid})}'
             edit_url = reverse(
                 'iroad_tenants:tenant_cargo_category_edit',
                 kwargs={'category_id': category.category_id},
             )
-            if tid:
-                edit_url = f'{edit_url}?{urlencode({"tid": tid})}'
 
             context.update(
                 {
@@ -1088,7 +1073,6 @@ class TenantCargoCategoryDetailView(View):
                     'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
                     'back_to_list_url': list_url,
                     'edit_category_url': edit_url,
-                    'portal_tid': tid,
                     'is_edit': True,
                     'is_view': True,
                 }
@@ -2972,9 +2956,6 @@ class TenantClientAccountToggleStatusView(View):
             messages.success(request, f'Status changed to {account.status}.', extra_tags='tenant')
             if (request.POST.get('return_to') or '').strip() == 'details':
                 q = {'id': account.account_no}
-                tid = (request.POST.get('tid') or request.GET.get('tid') or '').strip()
-                if tid:
-                    q['tid'] = tid
                 return redirect(
                     f"{reverse('iroad_tenants:tenant_client_details')}?{urlencode(q)}"
                 )
@@ -3090,9 +3071,6 @@ class TenantClientAttachmentsView(View):
                 and not pre
             ):
                 list_url = reverse('iroad_tenants:tenant_client_attachments_list')
-                tid = (request.GET.get('tid') or '').strip()
-                if tid:
-                    list_url = f'{list_url}?{urlencode({"tid": tid})}'
                 return redirect(list_url)
             if pre:
                 form_data['client_account'] = pre
@@ -3107,7 +3085,6 @@ class TenantClientAttachmentsView(View):
                     ),
                     'is_edit_mode': False,
                     'editing_attachment': None,
-                    'portal_tid': (request.GET.get('tid') or '').strip(),
                 }
             )
             return render(request, self.template_name, context)
@@ -3174,7 +3151,6 @@ class TenantClientAttachmentsView(View):
                     ),
                     'is_edit_mode': False,
                     'editing_attachment': None,
-                    'portal_tid': (request.POST.get('tid') or request.GET.get('tid') or '').strip(),
                 }
             )
             messages.error(request, 'Please fix the highlighted errors.', extra_tags='tenant')
@@ -3214,7 +3190,6 @@ class TenantClientAttachmentsView(View):
                     ),
                     'is_edit_mode': False,
                     'editing_attachment': None,
-                    'portal_tid': (request.POST.get('tid') or request.GET.get('tid') or '').strip(),
                 }
             )
             messages.error(request, 'Upload failed.', extra_tags='tenant')
@@ -3230,17 +3205,11 @@ class TenantClientAttachmentsView(View):
         )
         connection.set_schema_to_public()
         list_url = reverse('iroad_tenants:tenant_client_attachments_list')
-        tid = (request.POST.get('tid') or request.GET.get('tid') or '').strip()
-        if tid:
-            list_url = f'{list_url}?{urlencode({"tid": tid})}'
         return redirect(list_url)
 
 
 def _redirect_client_attachment_list(request):
     url = reverse('iroad_tenants:tenant_client_attachments_list')
-    tid = (request.POST.get('tid') or request.GET.get('tid') or '').strip()
-    if tid:
-        url = f'{url}?{urlencode({"tid": tid})}'
     return redirect(url)
 
 
@@ -3256,9 +3225,6 @@ def _tenant_client_attachment_detail_path(attachment_id):
 
 def _redirect_client_contact_list(request):
     url = reverse('iroad_tenants:tenant_client_contacts_list')
-    tid = (request.POST.get('tid') or request.GET.get('tid') or '').strip()
-    if tid:
-        url = f'{url}?{urlencode({"tid": tid})}'
     return redirect(url)
 
 
@@ -3335,7 +3301,6 @@ class TenantClientAttachmentEditView(View):
                     ),
                     'is_edit_mode': True,
                     'editing_attachment': att,
-                    'portal_tid': (request.GET.get('tid') or '').strip(),
                 }
             )
             return render(request, self.template_name, context)
@@ -3412,7 +3377,6 @@ class TenantClientAttachmentEditView(View):
                 ),
                 'is_edit_mode': True,
                 'editing_attachment': att,
-                'portal_tid': (request.POST.get('tid') or request.GET.get('tid') or '').strip(),
             }
 
             if form_errors:
@@ -3507,10 +3471,7 @@ class TenantClientAttachmentDetailView(View):
             if attachment is None:
                 messages.error(request, 'Attachment not found.', extra_tags='tenant')
                 return _redirect_client_attachment_list(request)
-            tid = (request.GET.get('tid') or '').strip()
             list_url = reverse('iroad_tenants:tenant_client_attachments_list')
-            if tid:
-                list_url = f'{list_url}?{urlencode({"tid": tid})}'
             try:
                 edit_url = reverse(
                     'iroad_tenants:tenant_client_attachment_edit',
@@ -3518,8 +3479,6 @@ class TenantClientAttachmentDetailView(View):
                 )
             except NoReverseMatch:
                 edit_url = f'{_tenant_client_attachments_base_path()}{attachment.attachment_id}/edit/'
-            if tid:
-                edit_url = f'{edit_url}?{urlencode({"tid": tid})}'
             file_url = ''
             try:
                 if attachment.attachment_file:
@@ -3533,7 +3492,6 @@ class TenantClientAttachmentDetailView(View):
                     'back_to_list_url': list_url,
                     'edit_attachment_url': edit_url,
                     'attachment_file_url': file_url,
-                    'portal_tid': tid,
                 }
             )
             return render(request, self.template_name, context)
@@ -3565,7 +3523,6 @@ class TenantClientAttachmentsListView(View):
                 .all()
             )
             rows = list(qs)
-            tid = (request.GET.get('tid') or '').strip()
             base = _tenant_client_attachments_base_path()
             for row in rows:
                 try:
@@ -3575,8 +3532,6 @@ class TenantClientAttachmentsListView(View):
                     )
                 except NoReverseMatch:
                     detail_u = _tenant_client_attachment_detail_path(row.attachment_id)
-                if tid:
-                    detail_u = f'{detail_u}?{urlencode({"tid": tid})}'
                 row.list_detail_url = detail_u
             attachment_stats = {
                 'total': len(rows),
@@ -3619,8 +3574,6 @@ class TenantClientContactsView(View):
             'is_primary': '',
         }
 
-    def _tid_for_redirect(self, request):
-        return (request.GET.get('tid') or request.POST.get('tid') or '').strip()
 
     def get(self, request):
         context = _tenant_context_from_session(request)
@@ -3647,9 +3600,6 @@ class TenantClientContactsView(View):
                 and not pre
             ):
                 list_url = reverse('iroad_tenants:tenant_client_contacts_list')
-                tid = (request.GET.get('tid') or '').strip()
-                if tid:
-                    list_url = f'{list_url}?{urlencode({"tid": tid})}'
                 return redirect(list_url)
             if pre:
                 form_data['client_account'] = pre
@@ -3659,7 +3609,6 @@ class TenantClientContactsView(View):
                     'form_errors': {},
                     'client_account_options': list(self._account_queryset()),
                     'tenant_schema_name': tenant_registry.schema_name,
-                    'portal_tid': self._tid_for_redirect(request),
                     'contact_form_action': reverse(
                         'iroad_tenants:tenant_client_contacts_create',
                     ),
@@ -3720,7 +3669,6 @@ class TenantClientContactsView(View):
                     'form_errors': form_errors,
                     'client_account_options': list(self._account_queryset()),
                     'tenant_schema_name': tenant_registry.schema_name,
-                    'portal_tid': self._tid_for_redirect(request),
                     'contact_form_action': reverse(
                         'iroad_tenants:tenant_client_contacts_create',
                     ),
@@ -3759,7 +3707,6 @@ class TenantClientContactsView(View):
                     'form_errors': {'__all__': 'Could not save the contact. Try again.'},
                     'client_account_options': list(self._account_queryset()),
                     'tenant_schema_name': tenant_registry.schema_name,
-                    'portal_tid': self._tid_for_redirect(request),
                     'contact_form_action': reverse(
                         'iroad_tenants:tenant_client_contacts_create',
                     ),
@@ -3778,9 +3725,6 @@ class TenantClientContactsView(View):
         )
         connection.set_schema_to_public()
         list_url = reverse('iroad_tenants:tenant_client_contacts_list')
-        tid = self._tid_for_redirect(request)
-        if tid:
-            list_url = f'{list_url}?{urlencode({"tid": tid})}'
         return redirect(list_url)
 
 
@@ -3804,8 +3748,6 @@ class TenantClientContactEditView(View):
             'is_primary': '',
         }
 
-    def _tid(self, request):
-        return (request.GET.get('tid') or request.POST.get('tid') or '').strip()
 
     def get(self, request, contact_id):
         context = _tenant_context_from_session(request)
@@ -3842,7 +3784,6 @@ class TenantClientContactEditView(View):
                     'form_errors': {},
                     'client_account_options': list(self._account_queryset()),
                     'tenant_schema_name': tenant_registry.schema_name,
-                    'portal_tid': self._tid(request),
                     'contact_form_action': _tenant_client_contact_edit_path(
                         contact.contact_id,
                     ),
@@ -3916,7 +3857,6 @@ class TenantClientContactEditView(View):
                 ),
                 'is_edit_mode': True,
                 'editing_contact': contact,
-                'portal_tid': self._tid(request),
             }
 
             if form_errors:
@@ -4012,10 +3952,7 @@ class TenantClientContactDetailView(View):
             if contact is None:
                 messages.error(request, 'Contact not found.', extra_tags='tenant')
                 return _redirect_client_contact_list(request)
-            tid = (request.GET.get('tid') or '').strip()
             list_url = reverse('iroad_tenants:tenant_client_contacts_list')
-            if tid:
-                list_url = f'{list_url}?{urlencode({"tid": tid})}'
             try:
                 edit_url = reverse(
                     'iroad_tenants:tenant_client_contact_edit',
@@ -4023,15 +3960,12 @@ class TenantClientContactDetailView(View):
                 )
             except NoReverseMatch:
                 edit_url = _tenant_client_contact_edit_path(contact.contact_id)
-            if tid:
-                edit_url = f'{edit_url}?{urlencode({"tid": tid})}'
             context.update(
                 {
                     'contact': contact,
                     'tenant_schema_name': tenant_registry.schema_name,
                     'back_to_list_url': list_url,
                     'edit_contact_url': edit_url,
-                    'portal_tid': tid,
                 }
             )
             return render(request, self.template_name, context)
@@ -4065,7 +3999,6 @@ class TenantClientContactsListView(View):
                 'secondary': sum(1 for c in contacts if not c.is_primary),
                 'client_accounts': TenantClientAccount.objects.count(),
             }
-            tid = (request.GET.get('tid') or '').strip()
             base = _tenant_client_contacts_base_path()
             for contact in contacts:
                 try:
@@ -4075,8 +4008,6 @@ class TenantClientContactsListView(View):
                     )
                 except NoReverseMatch:
                     edit_u = f'{base}{contact.contact_id}/edit/'
-                if tid:
-                    edit_u = f'{edit_u}?{urlencode({"tid": tid})}'
                 contact.list_edit_url = edit_u
                 try:
                     del_u = reverse(
@@ -4093,8 +4024,6 @@ class TenantClientContactsListView(View):
                     )
                 except NoReverseMatch:
                     detail_u = _tenant_client_contact_detail_path(contact.contact_id)
-                if tid:
-                    detail_u = f'{detail_u}?{urlencode({"tid": tid})}'
                 contact.list_detail_url = detail_u
             context.update(
                 {
@@ -4134,7 +4063,6 @@ class TenantClientContractView(View):
             'form_errors': form_errors,
             'client_account_options': list(self._account_queryset()),
             'tenant_schema_name': tenant_registry.schema_name,
-            'portal_tid': (request.GET.get('tid') or request.POST.get('tid') or '').strip(),
             'contract_form_action': reverse(
                 'iroad_tenants:tenant_client_contract_create',
             ),
@@ -4166,9 +4094,6 @@ class TenantClientContractView(View):
                 and not pre
             ):
                 list_url = reverse('iroad_tenants:tenant_client_contract_list')
-                tid = (request.GET.get('tid') or '').strip()
-                if tid:
-                    list_url = f'{list_url}?{urlencode({"tid": tid})}'
                 return redirect(list_url)
             if pre:
                 form_data['client_account'] = pre
@@ -4259,9 +4184,6 @@ class TenantClientContractView(View):
                 extra_tags='tenant',
             )
             list_url = reverse('iroad_tenants:tenant_client_contract_list')
-            tid = (request.POST.get('tid') or request.GET.get('tid') or '').strip()
-            if tid:
-                list_url = f'{list_url}?{urlencode({"tid": tid})}'
             return redirect(list_url)
         except Exception:
             logger.exception('Tenant client contract create failed')
@@ -4304,10 +4226,7 @@ class TenantClientContractDetailView(View):
             if contract is None:
                 messages.error(request, 'Contract not found.', extra_tags='tenant')
                 return _redirect_client_contract_list(request)
-            tid = (request.GET.get('tid') or '').strip()
             list_url = reverse('iroad_tenants:tenant_client_contract_list')
-            if tid:
-                list_url = f'{list_url}?{urlencode({"tid": tid})}'
             try:
                 edit_url = reverse(
                     'iroad_tenants:tenant_client_contract_edit',
@@ -4315,8 +4234,6 @@ class TenantClientContractDetailView(View):
                 )
             except NoReverseMatch:
                 edit_url = _tenant_client_contract_edit_path(contract.contract_id)
-            if tid:
-                edit_url = f'{edit_url}?{urlencode({"tid": tid})}'
             file_url = ''
             try:
                 if contract.contract_attachment:
@@ -4330,7 +4247,6 @@ class TenantClientContractDetailView(View):
                     'back_to_list_url': list_url,
                     'edit_contract_url': edit_url,
                     'contract_file_url': file_url,
-                    'portal_tid': tid,
                 }
             )
             return render(request, self.template_name, context)
@@ -4354,17 +4270,13 @@ class TenantClientContractEditView(View):
         form_data,
         form_errors,
     ):
-        tid = (request.GET.get('tid') or request.POST.get('tid') or '').strip()
         list_url = reverse('iroad_tenants:tenant_client_contract_list')
-        if tid:
-            list_url = f'{list_url}?{urlencode({"tid": tid})}'
         settings_row = _get_singleton_client_contract_settings()
         return {
             'form_data': form_data,
             'form_errors': form_errors,
             'client_account_options': list(self._account_queryset()),
             'tenant_schema_name': tenant_registry.schema_name,
-            'portal_tid': tid,
             'back_to_list_url': list_url,
             'contract_form_action': reverse(
                 'iroad_tenants:tenant_client_contract_edit',
@@ -4550,7 +4462,6 @@ class TenantClientContractListView(View):
                     '-created_at'
                 )
             )
-            tid = (request.GET.get('tid') or '').strip()
             base = _tenant_client_contracts_base_path()
             for row in rows:
                 cid = row.contract_id
@@ -4561,8 +4472,6 @@ class TenantClientContractListView(View):
                     )
                 except NoReverseMatch:
                     detail_u = _tenant_client_contract_detail_path(cid)
-                if tid:
-                    detail_u = f'{detail_u}?{urlencode({"tid": tid})}'
                 row.list_detail_url = detail_u
                 try:
                     edit_u = reverse(
@@ -4571,8 +4480,6 @@ class TenantClientContractListView(View):
                     )
                 except NoReverseMatch:
                     edit_u = _tenant_client_contract_edit_path(cid)
-                if tid:
-                    edit_u = f'{edit_u}?{urlencode({"tid": tid})}'
                 row.list_edit_url = edit_u
                 try:
                     del_u = reverse(
@@ -4816,7 +4723,6 @@ class TenantClientDetailsView(View):
                         .select_related('country', 'client_account')
                         .order_by('-created_at')
                     )
-                    tid_addr = (request.GET.get('tid') or '').strip()
                     for addr in client_addresses:
                         try:
                             edit_u = reverse(
@@ -4827,8 +4733,6 @@ class TenantClientDetailsView(View):
                             edit_u = (
                                 f'/master-data/addresses/{addr.address_id}/edit/'
                             )
-                        if tid_addr:
-                            edit_u = f'{edit_u}?{urlencode({"tid": tid_addr})}'
                         addr.list_edit_url = edit_u
             client_cargo_masters = []
             client_contract = None
@@ -4838,7 +4742,6 @@ class TenantClientDetailsView(View):
                     .select_related('cargo_category')
                     .order_by('-created_at')
                 )
-                tid_cargo = (request.GET.get('tid') or '').strip()
                 for c in client_cargo_masters:
                     try:
                         edit_u = reverse(
@@ -4847,8 +4750,6 @@ class TenantClientDetailsView(View):
                         )
                     except NoReverseMatch:
                         edit_u = f'/master-data/cargo/{c.cargo_id}/edit/'
-                    if tid_cargo:
-                        edit_u = f'{edit_u}?{urlencode({"tid": tid_cargo})}'
                     c.list_edit_url = edit_u
                     try:
                         detail_u = reverse(
@@ -4857,8 +4758,6 @@ class TenantClientDetailsView(View):
                         )
                     except NoReverseMatch:
                         detail_u = f'/master-data/cargo/{c.cargo_id}/'
-                    if tid_cargo:
-                        detail_u = f'{detail_u}?{urlencode({"tid": tid_cargo})}'
                     c.list_detail_url = detail_u
                     try:
                         del_u = reverse(
@@ -4874,7 +4773,6 @@ class TenantClientDetailsView(View):
                     .first()
                 )
                 if client_contract:
-                    tid = (request.GET.get('tid') or '').strip()
                     cid = client_contract.contract_id
                     try:
                         detail_u = reverse(
@@ -4883,8 +4781,6 @@ class TenantClientDetailsView(View):
                         )
                     except NoReverseMatch:
                         detail_u = _tenant_client_contract_detail_path(cid)
-                    if tid:
-                        detail_u = f'{detail_u}?{urlencode({"tid": tid})}'
                     client_contract.list_detail_url = detail_u
                     try:
                         edit_u = reverse(
@@ -4893,8 +4789,6 @@ class TenantClientDetailsView(View):
                         )
                     except NoReverseMatch:
                         edit_u = _tenant_client_contract_edit_path(cid)
-                    if tid:
-                        edit_u = f'{edit_u}?{urlencode({"tid": tid})}'
                     client_contract.list_edit_url = edit_u
                     try:
                         del_u = reverse(
@@ -5505,9 +5399,9 @@ class TenantAddressLocationOptionsView(View):
         country_id = (request.GET.get('country') or '').strip()
         province = (request.GET.get('province') or '').strip()
         try:
-            qs = TenantLocationMaster.active_serviceable_objects.all()
-            if country_id:
-                qs = qs.filter(country_id=country_id)
+            if not country_id:
+                return JsonResponse({'ok': True, 'provinces': [], 'cities': []})
+            qs = TenantLocationMaster.active_serviceable_objects.filter(country_id=country_id)
             provinces = list(
                 qs.exclude(province='')
                 .values_list('province', flat=True)
@@ -5623,9 +5517,6 @@ class TenantAutoNumberConfigurationView(View):
 
     def _auto_number_list_url(self, request, form_code):
         q = {'form_code': form_code}
-        tid = (request.POST.get('tid') or request.GET.get('tid') or '').strip()
-        if tid:
-            q['tid'] = tid
         return f"{reverse('iroad_tenants:tenant_auto_number_configuration')}?{urlencode(q)}"
 
     def _load_config(self, form_code):
@@ -6366,7 +6257,10 @@ class TenantRouteMasterCreateView(View):
                 route.full_clean()
                 route.save()
             except IntegrityError:
-                form.add_error('route_label', 'A route with this type/origin/destination already exists.')
+                form.add_error(
+                    'destination_point',
+                    'A route with this type and ordered origin/destination already exists.',
+                )
                 context.update(
                     {
                         'form': form,
@@ -6496,9 +6390,26 @@ class TenantRouteMasterEditView(View):
                     }
                 )
                 return render(request, self.template_name, context)
-            route = form.save(commit=False)
-            route.full_clean()
-            route.save()
+            try:
+                route = form.save(commit=False)
+                route.full_clean()
+                route.save()
+            except IntegrityError:
+                form.add_error(
+                    'destination_point',
+                    'A route with this type and ordered origin/destination already exists.',
+                )
+                context.update(
+                    {
+                        'form': form,
+                        'route': route,
+                        'preview_route_code': route.route_code,
+                        'is_edit': True,
+                        'is_view': False,
+                        'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                    }
+                )
+                return render(request, self.template_name, context)
             messages.success(request, f'{route.route_code} updated successfully.', extra_tags='tenant')
             return _tenant_redirect(request, 'iroad_tenants:tenant_route_master_list')
         finally:

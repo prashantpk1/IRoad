@@ -45,6 +45,37 @@ def sign_tenant_access_jwt(
     return jwt.encode(payload, _signing_key(), algorithm='HS256'), token_id
 
 
+def verify_tenant_access_jwt(token):
+    """
+    Decode and validate an HS256 tenant portal / access JWT.
+
+    Returns the claims dict, or None if the token is missing, invalid, or expired.
+    Accepts ``typ`` values used for interactive tenant portal sessions and legacy
+    bootstrap tokens.
+    """
+    if not token or not str(token).strip():
+        return None
+    try:
+        payload = jwt.decode(
+            str(token).strip(),
+            _signing_key(),
+            algorithms=['HS256'],
+            options={'require': ['exp', 'jti', 'tenant_id']},
+        )
+    except jwt.PyJWTError:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    typ = str(payload.get('typ') or '')
+    if typ not in ('tenant_access', 'tenant_bootstrap'):
+        return None
+    if not str(payload.get('tenant_id') or '').strip():
+        return None
+    if not str(payload.get('jti') or '').strip():
+        return None
+    return payload
+
+
 def sign_cp_impersonation_jwt(tenant, admin_user, ttl_minutes=15):
     """Short-lived token for CP root 'Login As' handoff to tenant portal."""
     now = datetime.now(timezone.utc)

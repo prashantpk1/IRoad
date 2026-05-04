@@ -10,7 +10,7 @@
   <nav aria-label="breadcrumb">
     <ol class="breadcrumb">
       <li class="breadcrumb-item">
-        <a href="{% url 'iroad_tenants:tenant_dashboard' %}{% if request.GET.tid %}?tid={{ request.GET.tid|urlencode }}{% endif %}">{% translate "Dashboard" %}</a>
+        <a href="{% url 'iroad_tenants:tenant_dashboard' %}">{% translate "Dashboard" %}</a>
       </li>
       <li class="breadcrumb-item">{% translate "Master Data" %}</li>
       <li class="breadcrumb-item">{% translate "Route Management" %}</li>
@@ -24,10 +24,10 @@
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
-        <a href="{% url 'iroad_tenants:tenant_location_master_edit' location.location_id %}{% if request.GET.tid %}?tid={{ request.GET.tid|urlencode }}{% endif %}" class="eal-btn eal-btn-outline">
+        <a href="{% url 'iroad_tenants:tenant_location_master_edit' location.location_id %}" class="eal-btn eal-btn-outline">
           <i class="bi bi-pencil"></i><span>{% translate "Edit" %}</span>
         </a>
-        <a href="{% url 'iroad_tenants:tenant_location_master_list' %}{% if request.GET.tid %}?tid={{ request.GET.tid|urlencode }}{% endif %}" class="eal-btn eal-btn-primary">
+        <a href="{% url 'iroad_tenants:tenant_location_master_list' %}" class="eal-btn eal-btn-primary">
           <i class="bi bi-arrow-left"></i><span>{% translate "Back to List" %}</span>
         </a>
       </div>

@@ -47,9 +47,7 @@
         enctype="multipart/form-data"
         action="{{ attachment_form_action }}"
       >
-        {% csrf_token %}
-        {% if portal_tid %}<input type="hidden" name="tid" value="{{ portal_tid }}" />{% endif %}
-        <!-- Section 1: Attachment Details -->
+        {% csrf_token %}        <!-- Section 1: Attachment Details -->
         <div class="form-card" data-section="1">
           <div class="form-card-header">
             <div class="form-card-icon blue">

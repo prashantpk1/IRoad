@@ -959,9 +959,7 @@ class OTPVerificationView(View):
                 return redirect('dashboard')
             tenant_auth = get_tenant_portal_cookie_payload(request)
             if tenant_auth:
-                return redirect(
-                    f"{reverse('iroad_tenants:tenant_dashboard')}?tid={tenant_auth.get('tenant_id')}"
-                )
+                return redirect(reverse('iroad_tenants:tenant_dashboard'))
             messages.error(request, 'Your verification session has expired. Please sign in again.')
             return redirect('login')
         otp_payload = pending['otp_payload']
@@ -998,9 +996,7 @@ class OTPVerificationView(View):
                 return redirect('dashboard')
             tenant_auth = get_tenant_portal_cookie_payload(request)
             if tenant_auth:
-                return redirect(
-                    f"{reverse('iroad_tenants:tenant_dashboard')}?tid={tenant_auth.get('tenant_id')}"
-                )
+                return redirect(reverse('iroad_tenants:tenant_dashboard'))
             messages.error(request, 'Your verification session has expired. Please sign in again.')
             return redirect('login')
         otp_payload = pending['otp_payload']
@@ -1175,21 +1171,39 @@ class OTPVerificationView(View):
         from .redis_helpers import create_tenant_session, revoke_tenant_session_key
         from .models import TenantSecuritySettings
 
-        ttl = max(60, int(getattr(settings, 'TENANT_BOOTSTRAP_JWT_TTL_SECONDS', 3600)))
-        token_str, jti = sign_tenant_access_jwt(
-            tenant_id=tenant.tenant_id,
-            subject=tenant.primary_email,
-            token_type='tenant_bootstrap',
-            ttl_seconds=ttl,
-        )
-        # Keep existing tenant sessions for other tabs/profiles.
-        # We only add/refresh the current tenant session cookie entry below.
-
         sec = TenantSecuritySettings.objects.first()
         tenant_timeout_min = max(
             60,
             int(getattr(sec, 'tenant_web_timeout_hours', 12)) * 60,
         )
+        ttl_seconds = max(300, int(tenant_timeout_min) * 60)
+        subject_email = (
+            (tenant_user.email or '').strip()
+            if tenant_user
+            else (tenant.primary_email or '').strip()
+        )
+        extra_claims = {
+            'portal_actor': 'tenant_user' if tenant_user else 'tenant_admin',
+            'email': subject_email,
+            'tenant_user_id': str(tenant_user.user_id) if tenant_user else '',
+            'sid': str(tenant_user.user_id) if tenant_user else '',
+            'role_name': (tenant_user.role_name or '').strip() if tenant_user else 'Tenant Admin',
+            'display_name': (
+                (tenant_user.full_name or tenant_user.email or '').strip()
+                if tenant_user
+                else (tenant.company_name or tenant.primary_email or '').strip()
+            ),
+        }
+        token_str, jti = sign_tenant_access_jwt(
+            tenant_id=tenant.tenant_id,
+            subject=subject_email or str(tenant.tenant_id),
+            token_type='tenant_access',
+            ttl_seconds=ttl_seconds,
+            extra_claims=extra_claims,
+        )
+        # Keep existing tenant sessions for other tabs/profiles.
+        # We only add/refresh the current tenant session cookie entry below.
+
         create_tenant_session(
             tenant_id=str(tenant.tenant_id),
             user_domain='Tenant_User',
@@ -1232,8 +1246,14 @@ class OTPVerificationView(View):
         log_access('Login', 'Success', email, ip)
         self._clear_tenant_pending(request)
         messages.success(request, 'OTP verified successfully.')
-        response = redirect(f"{reverse('iroad_tenants:tenant_dashboard')}?tid={tenant.tenant_id}")
-        set_tenant_portal_cookie(response, tenant.tenant_id, jti, request=request)
+        response = redirect(reverse('iroad_tenants:tenant_dashboard'))
+        set_tenant_portal_cookie(
+            response,
+            tenant.tenant_id,
+            jti,
+            request=request,
+            access_jwt=token_str,
+        )
         return response
 
 

@@ -363,23 +363,23 @@
         <!-- Action Buttons Row -->
         <div class="ch-actions">
           {% if client_account %}
-          <a href="{% url 'iroad_tenants:tenant_client_account_edit' client_account.account_no %}{% if request.GET.tid %}?tid={{ request.GET.tid|urlencode }}{% endif %}" class="ch-action-btn">
+          <a href="{% url 'iroad_tenants:tenant_client_account_edit' client_account.account_no %}" class="ch-action-btn">
             <i class="bi bi-pencil"></i> Edit
           </a>
-          <a href="{% url 'iroad_tenants:tenant_client_sales_report' client_account.account_no %}{% if request.GET.tid %}?tid={{ request.GET.tid|urlencode }}{% endif %}" class="ch-action-btn">
+          <a href="{% url 'iroad_tenants:tenant_client_sales_report' client_account.account_no %}" class="ch-action-btn">
             <i class="bi bi-file-earmark-text"></i> Create Sales Report
           </a>
-          <a href="{% url 'iroad_tenants:tenant_client_contacts_create' %}?account={{ client_account.account_no|urlencode }}{% if request.GET.tid %}&tid={{ request.GET.tid|urlencode }}{% endif %}" class="ch-action-btn">
+          <a href="{% url 'iroad_tenants:tenant_client_contacts_create' %}?account={{ client_account.account_no|urlencode }}" class="ch-action-btn">
             <i class="bi bi-person-plus"></i> Add Contact
           </a>
-          <a href="{% url 'iroad_tenants:tenant_client_attachments' %}?account={{ client_account.account_no|urlencode }}{% if request.GET.tid %}&tid={{ request.GET.tid|urlencode }}{% endif %}" class="ch-action-btn">
+          <a href="{% url 'iroad_tenants:tenant_client_attachments' %}?account={{ client_account.account_no|urlencode }}" class="ch-action-btn">
             <i class="bi bi-paperclip"></i> Add Attachment
           </a>
           {% if client_account.status == 'Active' %}
           <form method="post" action="{% url 'iroad_tenants:tenant_client_account_toggle_status' client_account.account_no %}" class="d-inline">
             {% csrf_token %}
             <input type="hidden" name="return_to" value="details" />
-            {% if request.GET.tid %}<input type="hidden" name="tid" value="{{ request.GET.tid }}" />{% endif %}
+            
             <button type="submit" class="ch-action-btn text-danger" onclick="return confirm('Suspend this client account?');">
               <i class="bi bi-pause-circle"></i> Suspend Account
             </button>
@@ -388,7 +388,7 @@
           <form method="post" action="{% url 'iroad_tenants:tenant_client_account_toggle_status' client_account.account_no %}" class="d-inline">
             {% csrf_token %}
             <input type="hidden" name="return_to" value="details" />
-            {% if request.GET.tid %}<input type="hidden" name="tid" value="{{ request.GET.tid }}" />{% endif %}
+            
             <button type="submit" class="ch-action-btn text-success" onclick="return confirm('Activate this client account?');">
               <i class="bi bi-play-circle"></i> Activate Account
             </button>
@@ -604,7 +604,7 @@
               {% if client_account %}
               <div class="d-flex justify-content-between align-items-center mb-3">
                 <h4 class="m-0" style="font-size: 1.1rem; font-weight: 600; color: #1a1a1a">Client Addresses</h4>
-                <a href="{% url 'iroad_tenants:tenant_address_master_create' %}?client={{ client_account.account_id }}{% if request.GET.tid %}&tid={{ request.GET.tid|urlencode }}{% endif %}" class="btn btn-primary btn-sm">
+                <a href="{% url 'iroad_tenants:tenant_address_master_create' %}?client={{ client_account.account_id }}" class="btn btn-primary btn-sm">
                   <i class="bi bi-plus-lg"></i> Add Address
                 </a>
               </div>
@@ -742,7 +742,7 @@
                 >
                   Client Contracts
                 </h4>
-                <a href="{% url 'iroad_tenants:tenant_client_contract_create' %}?account={{ client_account.account_no|urlencode }}{% if request.GET.tid %}&tid={{ request.GET.tid|urlencode }}{% endif %}" class="btn btn-primary btn-sm">
+                <a href="{% url 'iroad_tenants:tenant_client_contract_create' %}?account={{ client_account.account_no|urlencode }}" class="btn btn-primary btn-sm">
                   <i class="bi bi-plus-lg"></i> Add Contract
                 </a>
               </div>
@@ -788,7 +788,7 @@
                         <li>
                           <form method="post" action="{{ client_contract.list_delete_action_url }}" class="d-inline" onsubmit="return confirm('Delete contract {{ client_contract.contract_no|escapejs }}? This cannot be undone.');">
                             {% csrf_token %}
-                            {% if request.GET.tid %}<input type="hidden" name="tid" value="{{ request.GET.tid }}" />{% endif %}
+                            
                             <button type="submit" class="dropdown-item text-danger">
                               <i class="bi bi-trash3 me-2"></i>Delete
                             </button>
@@ -865,9 +865,9 @@
               <div class="d-flex justify-content-between align-items-center mb-3">
                 <h4 class="m-0" style="font-size: 1.1rem; font-weight: 600; color: #1a1a1a">Client Contacts</h4>
                 {% if client_account %}
-                <a href="{% url 'iroad_tenants:tenant_client_contacts_create' %}?account={{ client_account.account_no|urlencode }}{% if request.GET.tid %}&tid={{ request.GET.tid|urlencode }}{% endif %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Add Contact</a>
+                <a href="{% url 'iroad_tenants:tenant_client_contacts_create' %}?account={{ client_account.account_no|urlencode }}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Add Contact</a>
                 {% else %}
-                <a href="{% url 'iroad_tenants:tenant_client_contacts_create' %}{% if request.GET.tid %}?tid={{ request.GET.tid|urlencode }}{% endif %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Add Contact</a>
+                <a href="{% url 'iroad_tenants:tenant_client_contacts_create' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Add Contact</a>
                 {% endif %}
               </div>
               {% if client_account %}
@@ -1201,7 +1201,7 @@
               <div class="d-flex justify-content-between align-items-center mb-3">
                 <h4 class="m-0" style="font-size: 1.1rem; font-weight: 600; color: #1a1a1a">Assigned Cargo Typologies</h4>
                 {% if client_account %}
-                <a href="{% url 'iroad_tenants:tenant_cargo_master_create' %}?client={{ client_account.account_id }}{% if request.GET.tid %}&tid={{ request.GET.tid|urlencode }}{% endif %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Register Cargo</a>
+                <a href="{% url 'iroad_tenants:tenant_cargo_master_create' %}?client={{ client_account.account_id }}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Register Cargo</a>
                 {% endif %}
               </div>
               <div
@@ -1258,7 +1258,7 @@
                               <li>
                                 <form method="post" action="{{ cargo.list_delete_action_url }}" class="d-inline" onsubmit="return confirm('Delete cargo {{ cargo.cargo_code|escapejs }}? This cannot be undone.');">
                                   {% csrf_token %}
-                                  {% if request.GET.tid %}<input type="hidden" name="tid" value="{{ request.GET.tid }}" />{% endif %}
+                                  
                                   <button type="submit" class="dropdown-item text-danger">
                                     <i class="bi bi-trash3 me-2"></i>Delete
                                   </button>

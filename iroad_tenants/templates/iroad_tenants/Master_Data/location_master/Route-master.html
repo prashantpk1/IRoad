@@ -13,7 +13,7 @@
         <nav aria-label="breadcrumb">
           <ol class="breadcrumb">
             <li class="breadcrumb-item">
-              <a href="index.html">Dashboard</a>
+              <a href="{% url 'iroad_tenants:tenant_dashboard' %}">Dashboard</a>
             </li>
             <li class="breadcrumb-item">Master Data</li>
             <li class="breadcrumb-item">Route Management</li>
@@ -35,10 +35,10 @@
       <form
         id="routeMasterForm"
         method="post"
-        action="{% if is_edit and route %}{% url 'iroad_tenants:tenant_route_master_edit' route.route_id %}{% else %}{% url 'iroad_tenants:tenant_route_master_create' %}{% endif %}{% if request.GET.tid %}?tid={{ request.GET.tid|urlencode }}{% endif %}"
+        action="{% if is_edit and route %}{% url 'iroad_tenants:tenant_route_master_edit' route.route_id %}{% else %}{% url 'iroad_tenants:tenant_route_master_create' %}{% endif %}"
       >
         {% csrf_token %}
-        {% if request.GET.tid %}<input type="hidden" name="tid" value="{{ request.GET.tid|urlencode }}" />{% endif %}
+        
         {% if form.non_field_errors %}
           <div class="alert alert-danger" role="alert">{{ form.non_field_errors }}</div>
         {% endif %}
@@ -62,7 +62,7 @@
                 Basic Information
               </h3>
 
-              <div class="fields-grid cols-3">
+              <div class="fields-grid {% if is_view %}cols-3{% else %}cols-2{% endif %}">
                 <div class="field">
                   <label for="routeCode" class="form-label">Route Code</label>
                   <input type="text" class="form-control" id="routeCode" value="{{ preview_route_code|default:'' }}" readonly />
@@ -71,14 +71,15 @@
                   >
                 </div>
 
+                {% if is_view %}
                 <div class="field">
-                  <label for="routeLabel" class="form-label">Route Label</label>
-                  {{ form.route_label }}
-                  {% if form.route_label.errors %}<div class="text-danger small">{{ form.route_label.errors }}</div>{% endif %}
-                  <span class="field-hint"
-                    >Short descriptive label for lists and dropdowns.</span
-                  >
+                  <label class="form-label" id="routeLabelHeading">{% translate "Route Label" %}</label>
+                  <div class="form-control bg-light text-body" id="routeLabelDisplay" aria-readonly="true">
+                    {{ route.route_label }}
+                  </div>
+                  <span class="field-hint">{% translate "Derived from origin and destination display names (read-only)." %}</span>
                 </div>
+                {% endif %}
 
                 <div class="field">
                   <label for="routeType" class="form-label">Route Type</label>
@@ -174,16 +175,33 @@
 
               <div class="setting-row">
                 <div class="setting-row-info">
-                  <label class="form-label" for="hasCustoms">Has Customs</label>
+                  <label class="form-label" for="hasCustomsDerived">{% translate "Has Customs" %}</label>
                   <p class="field-hint">
-                    When enabled, this route involves customs clearance (e.g.
-                    international borders).
+                    {% translate "When enabled, this route involves customs clearance (e.g. international borders)." %}
+                  </p>
+                  <p class="field-hint small text-muted mb-0">
+                    {% translate "Derived automatically from origin and destination countries (read-only)." %}
                   </p>
                 </div>
                 <label class="setting-toggle">
-                  {{ form.has_customs }}
+                  <input
+                    type="checkbox"
+                    id="hasCustomsDerived"
+                    disabled
+                    autocomplete="off"
+                    aria-readonly="true"
+                    {% if is_view and route.has_customs %}checked{% elif not is_view and form.computed_has_customs == True %}checked{% endif %}
+                  />
                   <span class="toggle-track"></span>
-                  <span class="toggle-label">Disabled</span>
+                  <span class="toggle-label">
+                    {% if is_view %}
+                      {% if route.has_customs %}{% translate "Enabled" %}{% else %}{% translate "Disabled" %}{% endif %}
+                    {% elif form.computed_has_customs == True %}
+                      {% translate "Enabled" %}
+                    {% else %}
+                      {% translate "Disabled" %}
+                    {% endif %}
+                  </span>
                 </label>
               </div>
 
@@ -215,7 +233,7 @@
             </button>
           </div>
           <div class="form-actions-right">
-            <a href="{% url 'iroad_tenants:tenant_route_master_list' %}{% if request.GET.tid %}?tid={{ request.GET.tid|urlencode }}{% endif %}" class="btn btn-outline-secondary me-2">
+            <a href="{% url 'iroad_tenants:tenant_route_master_list' %}" class="btn btn-outline-secondary me-2">
               <i class="bi bi-arrow-left"></i>
               Back
             </a>
@@ -232,27 +250,54 @@
 
 {% block extra_js %}
     <script>
-      // Update toggle labels dynamically (reuse from Client Account Setting)
+      (function () {
+        const isView = "{{ is_view|yesno:'1,0' }}" === "1";
+        if (isView) {
+          document.querySelectorAll("#routeMasterForm input, #routeMasterForm select, #routeMasterForm textarea").forEach((el) => {
+            if (el.type === "checkbox" || el.type === "radio") {
+              el.disabled = true;
+            } else {
+              el.readOnly = true;
+              el.disabled = true;
+            }
+          });
+          return;
+        }
+
+        function countryIdFromSelect(sel) {
+          if (!sel || sel.selectedIndex < 0) return "";
+          const opt = sel.options[sel.selectedIndex];
+          if (!opt || !opt.value) return "";
+          return (opt.getAttribute("data-country-id") || "").trim();
+        }
+
+        function syncHasCustomsDerived() {
+          const cb = document.getElementById("hasCustomsDerived");
+          const oe = document.getElementById("originPoint");
+          const de = document.getElementById("destinationPoint");
+          if (!cb || !oe || !de) return;
+          const oc = countryIdFromSelect(oe);
+          const dc = countryIdFromSelect(de);
+          cb.checked = Boolean(oc && dc && oc !== dc);
+          const label = cb.closest(".setting-toggle")?.querySelector(".toggle-label");
+          if (label) label.textContent = cb.checked ? "Enabled" : "Disabled";
+        }
+
+        const oe = document.getElementById("originPoint");
+        const de = document.getElementById("destinationPoint");
+        if (oe) oe.addEventListener("change", syncHasCustomsDerived);
+        if (de) de.addEventListener("change", syncHasCustomsDerived);
+        syncHasCustomsDerived();
+      })();
       document.querySelectorAll(".setting-toggle input").forEach((input) => {
-        const label = input
-          .closest(".setting-toggle")
-          .querySelector(".toggle-label");
+        const label = input.closest(".setting-toggle")?.querySelector(".toggle-label");
+        if (!label) return;
         function updateLabel() {
           label.textContent = input.checked ? "Enabled" : "Disabled";
         }
         updateLabel();
+        if (input.id === "hasCustomsDerived") return;
         input.addEventListener("change", updateLabel);
       });
-      const isView = "{{ is_view|yesno:'1,0' }}" === "1";
-      if (isView) {
-        document.querySelectorAll("#routeMasterForm input, #routeMasterForm select, #routeMasterForm textarea").forEach((el) => {
-          if (el.type === "checkbox" || el.type === "radio") {
-            el.disabled = true;
-          } else {
-            el.readOnly = true;
-            el.disabled = true;
-          }
-        });
-      }
     </script>
 {% endblock %}

@@ -29,7 +29,7 @@
     </div>
     <div class="page-header-right ms-auto">
       <a
-        href="{% url 'iroad_tenants:tenant_address_master' %}{% if request.GET.tid %}?tid={{ request.GET.tid }}{% endif %}"
+        href="{% url 'iroad_tenants:tenant_address_master' %}"
         class="btn btn-outline-secondary"
       >
         <i class="bi bi-arrow-left me-1"></i>{% translate "Back" %}
@@ -44,9 +44,11 @@
   class="needs-validation"
   novalidate
   data-location-options-url="{% url 'iroad_tenants:tenant_address_location_options' %}"
+  data-placeholder-province="{% translate 'Select province...' %}"
+  data-placeholder-city="{% translate 'Select city...' %}"
 >
   {% csrf_token %}
-  {% if request.GET.tid %}<input type="hidden" name="tid" value="{{ request.GET.tid }}" />{% endif %}
+  
 
   {% if form.non_field_errors %}
   <div class="alert alert-danger" role="alert">{{ form.non_field_errors }}</div>
@@ -375,6 +377,8 @@
       const provinceField = document.getElementById("{{ form.province.id_for_label }}");
       const cityField = document.getElementById("{{ form.city.id_for_label }}");
       const endpoint = form.dataset.locationOptionsUrl || "";
+      const phProvince = form.dataset.placeholderProvince || "Select province...";
+      const phCity = form.dataset.placeholderCity || "Select city...";
       if (!countryField || !provinceField || !cityField || !endpoint) return;
 
       const setChoices = (selectEl, values, placeholder, keepValue) => {
@@ -393,15 +397,23 @@
         }
       };
 
+      const syncDependentEnabled = () => {
+        const hasCountry = !!countryField.value;
+        const hasProvince = !!provinceField.value;
+        provinceField.disabled = !hasCountry;
+        cityField.disabled = !hasProvince;
+      };
+
       const loadLocationOptions = async ({ resetCity = false } = {}) => {
-        const params = new URLSearchParams();
-        if (countryField.value) params.set("country", countryField.value);
-        if (provinceField.value) params.set("province", provinceField.value);
-        if (!params.toString()) {
-          setChoices(provinceField, [], "Select province...", "");
-          setChoices(cityField, [], "Select city...", "");
+        if (!countryField.value) {
+          setChoices(provinceField, [], phProvince, "");
+          setChoices(cityField, [], phCity, "");
+          syncDependentEnabled();
           return;
         }
+        const params = new URLSearchParams();
+        params.set("country", countryField.value);
+        if (provinceField.value) params.set("province", provinceField.value);
         const response = await fetch(`${endpoint}?${params.toString()}`, {
           headers: { "X-Requested-With": "XMLHttpRequest" },
         });
@@ -409,9 +421,10 @@
         const payload = await response.json();
         if (!payload.ok) return;
         const provinceValue = provinceField.value;
-        setChoices(provinceField, payload.provinces || [], "Select province...", provinceValue);
+        setChoices(provinceField, payload.provinces || [], phProvince, provinceValue);
         const cityValue = resetCity ? "" : cityField.value;
-        setChoices(cityField, payload.cities || [], "Select city...", cityValue);
+        setChoices(cityField, payload.cities || [], phCity, cityValue);
+        syncDependentEnabled();
       };
 
       countryField.addEventListener("change", () => {
@@ -423,6 +436,13 @@
         cityField.value = "";
         loadLocationOptions({ resetCity: true });
       });
+
+      form.addEventListener("submit", () => {
+        provinceField.disabled = false;
+        cityField.disabled = false;
+      });
+
+      loadLocationOptions({ resetCity: false });
     })();
   </script>
 {% endblock %}

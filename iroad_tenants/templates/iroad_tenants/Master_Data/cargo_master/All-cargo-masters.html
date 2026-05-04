@@ -10,7 +10,7 @@
   <nav aria-label="breadcrumb">
     <ol class="breadcrumb">
       <li class="breadcrumb-item">
-        <a href="{% url 'iroad_tenants:tenant_dashboard' %}{% if request.GET.tid %}?tid={{ request.GET.tid }}{% endif %}">{% translate "Dashboard" %}</a>
+        <a href="{% url 'iroad_tenants:tenant_dashboard' %}">{% translate "Dashboard" %}</a>
       </li>
       <li class="breadcrumb-item">{% translate "Master Data" %}</li>
       <li class="breadcrumb-item">{% translate "Cargo Management" %}</li>
@@ -28,7 +28,7 @@
           <i class="bi bi-download"></i>
           <span>{% translate "Export" %}</span>
         </button>
-        <a href="{% url 'iroad_tenants:tenant_cargo_master_create' %}{% if request.GET.tid %}?tid={{ request.GET.tid }}{% endif %}" class="eal-btn eal-btn-primary">
+        <a href="{% url 'iroad_tenants:tenant_cargo_master_create' %}" class="eal-btn eal-btn-primary">
           <i class="bi bi-plus-lg"></i>
           <span>{% translate "Add Cargo Master" %}</span>
         </a>
@@ -75,7 +75,7 @@
   data-eal-empty-filter-message="{% translate 'No cargo records match the selected search/filter criteria.' %}"
 >
   <form method="get" class="eal-toolbar">
-    {% if request.GET.tid %}<input type="hidden" name="tid" value="{{ request.GET.tid }}" />{% endif %}
+    
     <div class="eal-toolbar-left">
       <div class="d-flex flex-wrap align-items-end gap-3 w-100">
         <div class="eal-search flex-grow-1" style="min-width: 220px">
@@ -158,7 +158,7 @@
                 <li>
                   <a
                     class="dropdown-item"
-                    href="{% url 'iroad_tenants:tenant_cargo_master_edit' c.cargo_id %}{% if request.GET.tid %}?tid={{ request.GET.tid|urlencode }}{% endif %}"
+                    href="{% url 'iroad_tenants:tenant_cargo_master_edit' c.cargo_id %}"
                   >
                     <i class="bi bi-pencil text-primary me-2"></i>{% translate "Edit" %}
                   </a>
@@ -166,7 +166,7 @@
                 <li>
                   <a
                     class="dropdown-item"
-                    href="{% url 'iroad_tenants:tenant_cargo_master_detail' c.cargo_id %}{% if request.GET.tid %}?tid={{ request.GET.tid|urlencode }}{% endif %}"
+                    href="{% url 'iroad_tenants:tenant_cargo_master_detail' c.cargo_id %}"
                   >
                     <i class="bi bi-eye text-info me-2"></i>{% translate "View" %}
                   </a>
@@ -180,7 +180,7 @@
                     onsubmit="return confirm('{% translate "Delete cargo" %} {{ c.cargo_code|escapejs }}? {% translate "This cannot be undone." %}');"
                   >
                     {% csrf_token %}
-                    {% if request.GET.tid %}<input type="hidden" name="tid" value="{{ request.GET.tid }}" />{% endif %}
+                    
                     <button type="submit" class="dropdown-item text-danger">
                       <i class="bi bi-trash3 me-2"></i>{% translate "Delete" %}
                     </button>

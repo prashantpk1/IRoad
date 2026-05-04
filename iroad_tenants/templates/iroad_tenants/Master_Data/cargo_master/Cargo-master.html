@@ -81,7 +81,7 @@
   <nav aria-label="breadcrumb">
     <ol class="breadcrumb">
       <li class="breadcrumb-item">
-        <a href="{% url 'iroad_tenants:tenant_dashboard' %}{% if request.GET.tid %}?tid={{ request.GET.tid }}{% endif %}">{% translate "Dashboard" %}</a>
+        <a href="{% url 'iroad_tenants:tenant_dashboard' %}">{% translate "Dashboard" %}</a>
       </li>
       <li class="breadcrumb-item">{% translate "Master Data" %}</li>
       <li class="breadcrumb-item">{% translate "Cargo Management" %}</li>
@@ -96,7 +96,7 @@
       <p class="page-subtitle">{% translate "Manage physical specifications, handling requirements, and essential details of the cargo." %}</p>
     </div>
     <div class="page-header-right ms-auto">
-      <a href="{{ back_to_list_url|default_if_none:'' }}{% if not back_to_list_url %}{% url 'iroad_tenants:tenant_cargo_master_list' %}{% if request.GET.tid %}?tid={{ request.GET.tid }}{% endif %}{% endif %}" class="btn btn-outline-secondary">
+      <a href="{{ back_to_list_url|default_if_none:'' }}{% if not back_to_list_url %}{% url 'iroad_tenants:tenant_cargo_master_list' %}{% endif %}" class="btn btn-outline-secondary">
         <i class="bi bi-arrow-left me-1"></i>{% translate "Back to list" %}
       </a>
       {% if is_view and edit_cargo_url %}
@@ -110,7 +110,7 @@
 
 <form method="post" enctype="multipart/form-data" id="cargoMasterForm" class="needs-validation" novalidate>
   {% csrf_token %}
-  {% if request.GET.tid %}<input type="hidden" name="tid" value="{{ request.GET.tid }}" />{% endif %}
+  
 
   {% if form.non_field_errors %}
   <div class="alert alert-danger" role="alert">{{ form.non_field_errors }}</div>

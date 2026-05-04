@@ -29,7 +29,7 @@
           <span>{% translate "Export" %}</span>
         </button>
         <a
-          href="{% url 'iroad_tenants:tenant_address_master_create' %}{% if request.GET.tid %}?tid={{ request.GET.tid }}{% endif %}"
+          href="{% url 'iroad_tenants:tenant_address_master_create' %}"
           class="eal-btn eal-btn-primary"
         >
           <i class="bi bi-plus-lg"></i>
@@ -86,9 +86,7 @@
   data-eal-empty-filter-message="{% translate 'No addresses match the selected search/filter criteria.' %}"
 >
   <form method="get" class="eal-toolbar">
-    {% if request.GET.tid %}
-    <input type="hidden" name="tid" value="{{ request.GET.tid }}" />
-    {% endif %}
+    
     <div class="eal-toolbar-left">
       <div class="d-flex flex-wrap align-items-end gap-3 w-100">
         <div class="eal-search flex-grow-1" style="min-width: 220px">
@@ -144,7 +142,7 @@
         {% for row in addresses_page %}
         <tr
           class="address-master-row"
-          data-edit-url="{% url 'iroad_tenants:tenant_address_master_edit' row.address_id %}{% if request.GET.tid %}?tid={{ request.GET.tid }}{% endif %}"
+          data-edit-url="{% url 'iroad_tenants:tenant_address_master_edit' row.address_id %}"
           data-address-code="{{ row.address_code|escape }}"
           data-client-account="{{ row.client_account.account_no|escape }}"
           data-display-name="{{ row.display_name|escape }}"
@@ -200,7 +198,7 @@
                 <i class="bi bi-eye"></i>
               </button>
               <a
-                href="{% url 'iroad_tenants:tenant_address_master_edit' row.address_id %}{% if request.GET.tid %}?tid={{ request.GET.tid }}{% endif %}"
+                href="{% url 'iroad_tenants:tenant_address_master_edit' row.address_id %}"
                 class="eal-row-btn"
                 title="{% translate 'Edit' %}"
                 onclick="event.stopPropagation();"

@@ -9,6 +9,7 @@ import uuid
 
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
+from django.db.models import Q
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
@@ -865,7 +866,7 @@ class TenantLocationMaster(models.Model):
 
 
 class TenantRouteMaster(models.Model):
-    """RT-001 Route Master (tenant schema)."""
+    """RT-001 Route Master (tenant schema): two-point bi-directional route master."""
 
     class RouteType(models.TextChoices):
         DOMESTIC = 'Domestic', 'Domestic'
@@ -876,6 +877,24 @@ class TenantRouteMaster(models.Model):
     class Status(models.TextChoices):
         ACTIVE = 'Active', 'Active'
         INACTIVE = 'Inactive', 'Inactive'
+
+    class EligibleForOperationalManager(models.Manager):
+        """Routes selectable for new operational use (active route + eligible endpoints)."""
+
+        def get_queryset(self):
+            return (
+                super()
+                .get_queryset()
+                .filter(
+                    status=TenantRouteMaster.Status.ACTIVE,
+                    origin_point__status=TenantLocationMaster.Status.ACTIVE,
+                    destination_point__status=TenantLocationMaster.Status.ACTIVE,
+                    origin_point__is_serviceable=True,
+                    destination_point__is_serviceable=True,
+                    origin_point__country__is_active=True,
+                    destination_point__country__is_active=True,
+                )
+            )
 
     route_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     route_code = models.CharField(max_length=64, unique=True)
@@ -910,6 +929,9 @@ class TenantRouteMaster(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    objects = models.Manager()
+    eligible_for_operational_use = EligibleForOperationalManager()
+
     class Meta:
         db_table = 'tenant_route_master'
         ordering = ['-created_at']
@@ -923,13 +945,45 @@ class TenantRouteMaster(models.Model):
     def __str__(self):
         return f'{self.route_code} — {self.route_label}'
 
+    @staticmethod
+    def derive_has_customs(origin, destination):
+        """
+        PCS RT-001: Has Customs is True when origin and destination are in **different**
+        countries (cross-border). Same country → False. Missing country id → False.
+        """
+        oc = getattr(origin, 'country_id', None)
+        dc = getattr(destination, 'country_id', None)
+        return bool(oc and dc and oc != dc)
+
     def clean(self):
         errors = {}
-        if not (self.route_label or '').strip():
-            errors['route_label'] = [_('Route label is required.')]
         if self.origin_point_id and self.destination_point_id:
             if self.origin_point_id == self.destination_point_id:
                 errors['destination_point'] = [_('Origin and destination must be different.')]
+            else:
+                o = self.origin_point
+                d = self.destination_point
+                label = f'{o.display_label} — {d.display_label}'.strip()
+                if label:
+                    self.route_label = label[: self._meta.get_field('route_label').max_length]
+
+                self.has_customs = TenantRouteMaster.derive_has_customs(o, d)
+
+                dup_qs = TenantRouteMaster.objects.filter(
+                    route_type=self.route_type,
+                ).filter(
+                    Q(origin_point_id=o.location_id, destination_point_id=d.location_id)
+                    | Q(origin_point_id=d.location_id, destination_point_id=o.location_id)
+                )
+                if self.pk:
+                    dup_qs = dup_qs.exclude(pk=self.pk)
+                if dup_qs.exists():
+                    errors['destination_point'] = [
+                        _(
+                            'A route for this type and location pair already exists '
+                            '(including the reverse direction).'
+                        )
+                    ]
         if self.distance_km is not None and self.distance_km < 0:
             errors['distance_km'] = [_('Distance cannot be negative.')]
         if self.estimated_duration_h is not None and self.estimated_duration_h < 0:

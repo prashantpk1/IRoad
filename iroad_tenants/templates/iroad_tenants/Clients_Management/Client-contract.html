@@ -57,15 +57,13 @@
         enctype="multipart/form-data"
         action="{{ contract_form_action }}"
       >
-        {% csrf_token %}
-        {% if portal_tid %}<input type="hidden" name="tid" value="{{ portal_tid }}" />{% endif %}
-        {% if contract_settings.pre_expiry_notification_days %}
+        {% csrf_token %}        {% if contract_settings.pre_expiry_notification_days %}
         <div class="alert alert-info d-flex align-items-start gap-2 py-2 px-3 mb-3" role="status" style="font-size: 0.9rem; border-radius: 8px;">
           <i class="bi bi-info-circle flex-shrink-0 mt-1"></i>
           <div>
             The contract start and end dates must span at least
             <strong>{{ contract_settings.pre_expiry_notification_days }}</strong> day(s) so pre-expiry notifications can run. This comes from
-            <a href="{% url 'iroad_tenants:tenant_client_contract_settings' %}{% if portal_tid %}?tid={{ portal_tid|urlencode }}{% endif %}">Client Contract Settings</a>
+            <a href="{% url 'iroad_tenants:tenant_client_contract_settings' %}">Client Contract Settings</a>
             (pre-expiry notification days). Set that value to <strong>0</strong> there to disable this rule.
           </div>
         </div>

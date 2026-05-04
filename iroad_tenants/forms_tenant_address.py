@@ -281,8 +281,12 @@ class TenantAddressMasterForm(forms.ModelForm):
         )
         province_choices = [('', _('Select province...'))] + [(p, p) for p in province_rows]
         self.fields['province'].choices = province_choices
-        if province_value and province_value not in {p for p, _ in province_choices}:
-            self.fields['province'].choices.append((province_value, province_value))
+        valid_province_keys = {p for p, _ in province_choices[1:]}
+        if province_value and province_value not in valid_province_keys:
+            # Allow orphan values on initial GET (e.g. edit legacy row); never on POST — tampered
+            # submissions must fail ChoiceField / clean() instead of being whitelisted.
+            if not self.is_bound:
+                self.fields['province'].choices.append((province_value, province_value))
 
         city_rows = (
             location_qs.filter(province=province_value)
@@ -297,8 +301,10 @@ class TenantAddressMasterForm(forms.ModelForm):
             if self.is_bound
             else str(getattr(self.instance, 'city', '') or self.initial.get('city') or '').strip()
         )
-        if city_value and city_value not in {c for c, _ in city_choices}:
-            self.fields['city'].choices.append((city_value, city_value))
+        valid_city_keys = {c for c, _ in city_choices[1:]}
+        if city_value and city_value not in valid_city_keys:
+            if not self.is_bound:
+                self.fields['city'].choices.append((city_value, city_value))
 
     def clean_map_link(self):
         v = (self.cleaned_data.get('map_link') or '').strip()
@@ -347,17 +353,28 @@ class TenantAddressMasterForm(forms.ModelForm):
         country = cleaned.get('country')
         province = (cleaned.get('province') or '').strip()
         city = (cleaned.get('city') or '').strip()
-        if not country or not province or not city:
-            return cleaned
 
-        exists = TenantLocationMaster.active_serviceable_objects.filter(
-            country_id=getattr(country, 'pk', country),
-            province=province,
-            display_label=city,
-        ).exists()
-        if not exists:
-            self.add_error(
-                'city',
-                _('Select a city from Location Master for the selected country/province.'),
-            )
+        province_ok = False
+        if country and province:
+            province_ok = TenantLocationMaster.active_serviceable_objects.filter(
+                country_id=getattr(country, 'pk', country),
+                province=province,
+            ).exclude(province='').exists()
+            if not province_ok:
+                self.add_error(
+                    'province',
+                    _('Select a province from Location/Province master for the selected country.'),
+                )
+
+        if country and province and city and province_ok:
+            exists = TenantLocationMaster.active_serviceable_objects.filter(
+                country_id=getattr(country, 'pk', country),
+                province=province,
+                display_label=city,
+            ).exists()
+            if not exists:
+                self.add_error(
+                    'city',
+                    _('Select a city from Location Master for the selected country and province.'),
+                )
         return cleaned
