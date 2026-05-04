@@ -785,6 +785,35 @@
     padding: 7px 12px;
   }
 
+  /* Address Master (and similar): stack filter row on narrow phones */
+  .eal-toolbar--inline-filters .eal-toolbar-filters-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .eal-toolbar--inline-filters .eal-toolbar-filters-row > .eal-search.eal-search--toolbar-grow {
+    flex: 0 0 auto;
+    width: 100%;
+  }
+
+  .eal-toolbar--inline-filters .eal-toolbar-filter-pair {
+    width: 100%;
+    justify-content: flex-start;
+    gap: 0.75rem;
+  }
+
+  .eal-toolbar--inline-filters .eal-toolbar-filter-pair .form-select-sm {
+    flex: 1 1 auto;
+    min-width: 0;
+    width: 100%;
+    max-width: none;
+  }
+
+  .eal-toolbar--inline-filters .eal-toolbar-filters-row .eal-toolbar-apply {
+    width: 100%;
+  }
+
   .eal-icon-btn {
     width: 34px;
     height: 34px;

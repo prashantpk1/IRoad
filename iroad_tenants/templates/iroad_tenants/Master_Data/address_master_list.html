@@ -85,38 +85,35 @@
   data-eal-empty-colspan="9"
   data-eal-empty-filter-message="{% translate 'No addresses match the selected search/filter criteria.' %}"
 >
-  <form method="get" class="eal-toolbar">
-    
-    <div class="eal-toolbar-left">
-      <div class="d-flex flex-wrap align-items-end gap-3 w-100">
-        <div class="eal-search flex-grow-1" style="min-width: 220px">
+  <form method="get" class="eal-toolbar eal-toolbar--inline-filters">
+    <div class="eal-toolbar-left w-100">
+      <div class="eal-toolbar-filters-row">
+        <div class="eal-search eal-search--toolbar-grow">
           <i class="bi bi-search"></i>
           <input type="text" name="q" value="{{ search_q }}" placeholder="{% translate 'Search addresses...' %}" />
         </div>
-        <div class="d-flex flex-wrap align-items-end gap-2">
-          <div>
-            <label class="form-label small mb-0 text-muted" for="addrListStatus">{% translate "Status" %}</label>
-            <select name="status" id="addrListStatus" class="form-select form-select-sm" style="min-width: 10rem">
-              <option value="active" {% if filter_status == '' or filter_status == 'active' %}selected{% endif %}>
-                {% translate "Active" %}
-              </option>
-              <option value="all" {% if filter_status == 'all' %}selected{% endif %}>{% translate "All" %}</option>
-              <option value="inactive" {% if filter_status == 'inactive' %}selected{% endif %}>{% translate "Inactive" %}</option>
-            </select>
-          </div>
-          <div>
-            <label class="form-label small mb-0 text-muted" for="addrListClient">{% translate "Client" %}</label>
-            <select name="client" id="addrListClient" class="form-select form-select-sm" style="min-width: 12rem">
-              <option value="">{% translate "All clients" %}</option>
-              {% for ca in client_filter_choices %}
-              <option value="{{ ca.account_id }}" {% if filter_client_id and ca.account_id|stringformat:'s' == filter_client_id %}selected{% endif %}>
-                {{ ca.display_name }} ({{ ca.account_no }})
-              </option>
-              {% endfor %}
-            </select>
-          </div>
-          <button type="submit" class="btn btn-sm btn-primary mb-1">{% translate "Apply" %}</button>
+        <div class="eal-toolbar-filter-pair">
+          <label class="form-label mb-0 small text-nowrap text-muted" for="addrListStatus">{% translate "Status" %}</label>
+          <select name="status" id="addrListStatus" class="form-select form-select-sm">
+            <option value="active" {% if filter_status == '' or filter_status == 'active' %}selected{% endif %}>
+              {% translate "Active" %}
+            </option>
+            <option value="all" {% if filter_status == 'all' %}selected{% endif %}>{% translate "All" %}</option>
+            <option value="inactive" {% if filter_status == 'inactive' %}selected{% endif %}>{% translate "Inactive" %}</option>
+          </select>
         </div>
+        <div class="eal-toolbar-filter-pair">
+          <label class="form-label mb-0 small text-nowrap text-muted" for="addrListClient">{% translate "Client" %}</label>
+          <select name="client" id="addrListClient" class="form-select form-select-sm">
+            <option value="">{% translate "All clients" %}</option>
+            {% for ca in client_filter_choices %}
+            <option value="{{ ca.account_id }}" {% if filter_client_id and ca.account_id|stringformat:'s' == filter_client_id %}selected{% endif %}>
+              {{ ca.display_name }} ({{ ca.account_no }})
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <button type="submit" class="btn btn-sm btn-primary eal-toolbar-apply">{% translate "Apply" %}</button>
       </div>
     </div>
   </form>
