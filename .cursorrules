@@ -1127,3 +1127,21 @@
 - Namespace: iroad_tenants
 - URL prefix: fleet/driver-treasury/
 
+## Mobile API Localization Rules
+
+Official architecture for the **`mobile_api`** Django app: multilingual **response** payloads only. DB models may keep `english_*` / `arabic_*` columns; **API consumers never see those keys** in JSON.
+
+### Mandatory standards (responses)
+
+- **Never expose** these keys in `mobile_api` responses: `english_name`, `arabic_name`, `english_label`, `arabic_label`. Do not add parallel bilingual fields for the same concept (e.g. no paired `*_en` / `*_ar` in mobile JSON for display names or labels).
+- **Always return** a **single localized field** per concept, chosen from the request language. Examples: `name` (person/entity display), `label` (master-data label), `title` (when using a generic helper with an explicit field name).
+- **Language source:** resolve locale **only** from the **`Accept-Language`** header (see `mobile_api.helpers.i18n` — first supported tag). Do **not** use `X-Language` or ad-hoc headers for mobile API language selection.
+- **Fallback:** if the header is missing or unsupported, treat as **English (`en`)** for both gettext `message` strings and localized payload fields.
+- **No duplicate multilingual payload fields:** one JSON key per concept in `data` (and nested objects); never ship both languages for the same field in one response.
+
+### Serializer and implementation guidance
+
+- **Reuse** shared helpers in `mobile_api.serializers.localized` (`serialize_localized_name`, `serialize_localized_label`, `serialize_localized_field`, `LocalizedSerializerMixin`) and pass **`request`** in serializer context where localization is needed.
+- **No duplicated serializer logic:** do not reimplement per-view or per-serializer `if language == …` branches for the same name/label rules; extend the shared helpers or mixin.
+- **No middleware JSON mutation:** do not rewrite response bodies in middleware. Localization belongs in serializers/services using `request` (and existing i18n helpers), not post-processing layers.
+

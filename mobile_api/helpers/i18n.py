@@ -4,11 +4,10 @@ mobile_api/helpers/i18n.py
 Language activation helper for Mobile API.
 
 Mobile clients send language preference via:
-  X-Language: ar       (preferred — explicit)
-  Accept-Language: ar  (fallback — standard HTTP)
 
-If neither is provided or language is unsupported,
-defaults to English (en).
+  Accept-Language: ar, en;q=0.9
+
+If missing or unsupported, defaults to English (``en``).
 
 Supported languages: en, ar
 
@@ -20,6 +19,10 @@ Usage in a view:
     message = _('mobile.truck.list.success')
     return api_success(message, data=...)
 """
+from __future__ import annotations
+
+from typing import Any
+
 from django.utils import translation
 
 
@@ -29,36 +32,26 @@ DEFAULT_LANGUAGE = 'en'
 
 def get_request_language(request) -> str:
     """
-    Determine language from request headers.
+    Determine language from ``Accept-Language`` only.
 
     Priority:
-      1. X-Language header (explicit mobile preference)
-      2. Accept-Language header (standard HTTP)
-      3. Default: 'en'
+      1. Accept-Language header (first tag, e.g. ``ar,en;q=0.9`` → ``ar``)
+      2. Default: ``en``
 
     Returns:
-      Language code string: 'en' or 'ar'
+        Language code string: ``en`` or ``ar``
     """
-    # Priority 1: explicit X-Language header
-    x_lang = request.headers.get('X-Language', '').strip().lower()
-    if x_lang:
-        # Accept 'ar', 'ar-SA', 'ar_SA' etc — take first 2 chars
-        lang_code = x_lang[:2]
-        if lang_code in SUPPORTED_LANGUAGES:
-            return lang_code
-
-    # Priority 2: Accept-Language header
-    accept_lang = request.headers.get(
-        'Accept-Language', ''
-    ).strip().lower()
+    accept_lang = (
+        request.headers.get('Accept-Language', '').strip().lower()
+        if request is not None
+        else ''
+    )
     if accept_lang:
-        # Accept-Language can be 'ar,en;q=0.9' — take first entry
         first = accept_lang.split(',')[0].strip()
         lang_code = first[:2]
         if lang_code in SUPPORTED_LANGUAGES:
             return lang_code
 
-    # Fallback
     return DEFAULT_LANGUAGE
 
 
@@ -85,3 +78,43 @@ def deactivate_language():
     """
     translation.deactivate()
 
+
+def get_localized_value(
+    request,
+    english_value: Any,
+    arabic_value: Any,
+) -> str:
+    """
+    Pick a single display string for bilingual model fields.
+
+    - When resolved language is ``ar``, prefers Arabic; falls back to English if empty.
+    - Otherwise prefers English; falls back to Arabic if empty.
+
+    ``request`` may be ``None`` (defaults to English selection behavior).
+    """
+    lang = get_request_language(request) if request is not None else DEFAULT_LANGUAGE
+    en_s = '' if english_value is None else str(english_value)
+    ar_s = '' if arabic_value is None else str(arabic_value)
+    en_s = en_s.strip()
+    ar_s = ar_s.strip()
+    if lang == 'ar':
+        return ar_s if ar_s else en_s
+    return en_s if en_s else ar_s
+
+
+def localized_pair_to_single(
+    request,
+    *,
+    english_value: Any,
+    arabic_value: Any,
+    field_name: str = 'name',
+) -> dict[str, str]:
+    """
+    Build a one-key dict for API responses (e.g. ``{"name": "..."}``).
+
+    DB / model field names stay ``english_*`` / ``arabic_*``; only the JSON
+    output shape uses ``field_name``.
+    """
+    return {
+        field_name: get_localized_value(request, english_value, arabic_value),
+    }

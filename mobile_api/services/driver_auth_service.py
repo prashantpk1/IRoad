@@ -19,6 +19,7 @@ from django.utils.translation import gettext as _
 from django_tenants.utils import schema_context
 
 from mobile_api.helpers.auth import generate_token_pair
+from mobile_api.serializers.localized import serialize_localized_name
 from mobile_api.models import DriverPasswordResetOTP
 
 logger = logging.getLogger('mobile_api')
@@ -287,6 +288,8 @@ def driver_login(
     email: str,
     password: str,
     tenant_schema: str,
+    *,
+    request=None,
 ) -> dict:
     """
     Authenticate driver by email + password.
@@ -375,8 +378,11 @@ def driver_login(
     driver_data = {
         'driver_id': str(driver.driver_id),
         'driver_code': driver.driver_code,
-        'english_name': driver.english_name,
-        'arabic_name': driver.arabic_name,
+        **serialize_localized_name(
+            request,
+            english_value=driver.english_name or '',
+            arabic_value=driver.arabic_name,
+        ),
         'mobile_number': driver.mobile_number,
         'driver_status': driver.driver_status,
         'driver_type': str(driver.driver_type),

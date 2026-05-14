@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
     "name": "IRoad Mobile Delete Account API",
-    "description": "Dedicated collection for the authenticated driver **Delete Account** endpoint.\n\nUses `TenantUser.soft_delete()` on the backend. Set `base_url`, `access_token`, and `password` in the environment before sending.",
+    "description": "Dedicated collection for the authenticated driver **Delete Account** endpoint.\n\nUses `TenantUser.soft_delete()` on the backend. Set `base_url`, `access_token`, `password`, and `accept_language` (`en` or `ar`) in the environment before sending.\n\n### Language\nSend **Accept-Language** (`en` or `ar`) for localized success and error messages. The request uses `{{accept_language}}` by default (`en`).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -70,6 +70,11 @@
             "key": "Content-Type",
             "value": "application/json",
             "type": "text"
+          },
+          {
+            "key": "Accept-Language",
+            "value": "{{accept_language}}",
+            "description": "Primary tag: en or ar (e.g. Accept-Language: ar). Controls translated message strings and localized name/label in data. Use environment variable accept_language (default en)."
           }
         ],
         "body": {
@@ -94,6 +99,11 @@
               {
                 "key": "Content-Type",
                 "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "en",
+                "description": "Primary tag: en or ar (e.g. Accept-Language: ar). Controls translated message strings and localized name/label in data. Use environment variable accept_language (default en)."
               }
             ],
             "body": {
@@ -116,6 +126,44 @@
           "body": "{\n  \"status\": 1,\n  \"message\": \"Your account has been deleted successfully.\",\n  \"data\": {}\n}"
         },
         {
+          "name": "Success (Accept-Language: ar)",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "ar",
+                "description": "Primary tag: en or ar (e.g. Accept-Language: ar). Controls translated message strings and localized name/label in data. Use environment variable accept_language (default en)."
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"password\": \"Password@123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/mobile/driver/auth/delete-account/"
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"status\": 1,\n  \"message\": \"تم حذف حسابك بنجاح.\",\n  \"data\": {}\n}"
+        },
+        {
           "name": "Wrong password",
           "originalRequest": {
             "method": "POST",
@@ -127,6 +175,11 @@
               {
                 "key": "Content-Type",
                 "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "en",
+                "description": "Primary tag: en or ar (e.g. Accept-Language: ar). Controls translated message strings and localized name/label in data. Use environment variable accept_language (default en)."
               }
             ],
             "body": {
@@ -160,6 +213,11 @@
               {
                 "key": "Content-Type",
                 "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "en",
+                "description": "Primary tag: en or ar (e.g. Accept-Language: ar). Controls translated message strings and localized name/label in data. Use environment variable accept_language (default en)."
               }
             ],
             "body": {
@@ -193,6 +251,11 @@
               {
                 "key": "Content-Type",
                 "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "en",
+                "description": "Primary tag: en or ar (e.g. Accept-Language: ar). Controls translated message strings and localized name/label in data. Use environment variable accept_language (default en)."
               }
             ],
             "body": {

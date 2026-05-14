@@ -2,7 +2,7 @@
 	"info": {
 		"_postman_id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
 		"name": "IRoad Mobile Driver APIs",
-		"description": "## IRoad Mobile Driver APIs\n\n### Base URL\nUse environment variable `{{base_url}}` (no trailing slash). Full paths begin with `/api/v1/mobile/`.\n\nExample: `http://127.0.0.1:8000/api/v1/mobile/driver/auth/login/`\n\n### Standard JSON envelope\n```json\n{\n  \"status\": 1,\n  \"message\": \"…\",\n  \"data\": { }\n}\n```\n- **status `1`**: Success (`data` may be empty `{}`).\n- **status `0`**: Validation or business error; `data` often includes `errors` (DRF serializer shape) or extra fields such as `attempts_remaining`.\n- **status `2`**: Authentication failure (e.g. missing/invalid/expired JWT) — HTTP **401**; used by the mobile API exception handler for auth failures.\n\n### Headers\n| Header | When |\n|--------|------|\n| **X-Tenant-ID** | Send tenant profile UUID or schema name when tenant middleware cannot resolve the host; required for correct tenant DB in many deployments. |\n| **X-Language** | Optional: `en` or `ar` for translated `message` strings. |\n| **Authorization** | `Bearer {{access_token}}` on all **authenticated** routes. |\n| **Content-Type** | `application/json` for JSON bodies. For profile photo, use **multipart/form-data** (field `profile_photo`); Postman sets the boundary automatically. |\n\n### Login and tokens\n1. Set `base_url`, `email`, `password`, and `tenant_id` (if needed) in the **IRoad Mobile Driver — Local** environment.\n2. Run **Login**. The **Tests** script saves `access_token` and `refresh_token` into the active environment.\n3. Call protected endpoints with **Bearer** `access_token`.\n\n> Refresh-token exchange is not part of this collection unless you add it separately; tokens are issued by the mobile auth service.\n\n### Forgot password / reset (unauthenticated)\n1. **Forgot Password** — `POST` with `email`.\n2. **Verify OTP** — `POST` with `email` and `otp_code` from email/SMS.\n3. **Reset Password** — `POST` with `email`, `otp_code`, `new_password`, `confirm_password`.\n\n### Change password while logged in (OTP)\n1. **Request OTP** — `POST` with `send_via`: `email` or `mobile` (SMS requires a phone number on the driver profile).\n2. **Verify Change Password OTP** — `POST` with `otp_code`.\n3. **Change Password** — `POST` with `current_password`, `new_password`, `confirm_password`, `otp_code`.\n\n### Profile\n- **Get Profile** — `GET` returns driver/profile payload in `data`.\n- **Update Profile Photo** — `POST` or `PATCH` same URL; **form-data** key **`profile_photo`** (image file: jpg, jpeg, png, webp; max 10 MB).\n\n### Logout\n`POST` with **Bearer** access token; empty body. Invalidates the current access token server-side where implemented.",
+		"description": "## IRoad Mobile Driver APIs\n\n### Base URL\nUse environment variable `{{base_url}}` (no trailing slash). Full paths begin with `/api/v1/mobile/`.\n\nExample: `http://127.0.0.1:8000/api/v1/mobile/driver/auth/login/`\n\n### Standard JSON envelope\n```json\n{\n  \"status\": 1,\n  \"message\": \"…\",\n  \"data\": { }\n}\n```\n- **status `1`**: Success (`data` may be empty `{}`).\n- **status `0`**: Validation or business error; `data` often includes `errors` (DRF serializer shape) or extra fields such as `attempts_remaining`.\n- **status `2`**: Authentication failure (e.g. missing/invalid/expired JWT) — HTTP **401**; used by the mobile API exception handler for auth failures.\n\n### Headers\n| Header | When |\n|--------|------|\n| **X-Tenant-ID** | Send tenant profile UUID or schema name when tenant middleware cannot resolve the host; required for correct tenant DB in many deployments. |\n| **Accept-Language** | Optional `en` or `ar` (first tag) for translated `message` strings and localized `name` / `label` in `data`. Use environment variable `accept_language` (default `en`). |\n| **Authorization** | `Bearer {{access_token}}` on all **authenticated** routes. |\n| **Content-Type** | `application/json` for JSON bodies. For profile photo, use **multipart/form-data** (field `profile_photo`); Postman sets the boundary automatically. |\n\n### Login and tokens\n1. Set `base_url`, `email`, `password`, `accept_language` (`en` or `ar`), and `tenant_id` (if needed) in the **IRoad Mobile Driver — Local** environment.\n2. Run **Login**. The **Tests** script saves `access_token` and `refresh_token` into the active environment.\n3. Call protected endpoints with **Bearer** `access_token`.\n\n> Refresh-token exchange is not part of this collection unless you add it separately; tokens are issued by the mobile auth service.\n\n### Forgot password / reset (unauthenticated)\n1. **Forgot Password** — `POST` with `email`.\n2. **Verify OTP** — `POST` with `email` and `otp_code` from email/SMS.\n3. **Reset Password** — `POST` with `email`, `otp_code`, `new_password`, `confirm_password`.\n\n### Change password while logged in (OTP)\n1. **Request OTP** — `POST` with `send_via`: `email` or `mobile` (SMS requires a phone number on the driver profile).\n2. **Verify Change Password OTP** — `POST` with `otp_code`.\n3. **Change Password** — `POST` with `current_password`, `new_password`, `confirm_password`, `otp_code`.\n\n### Profile\n- **Get Profile** — `GET` returns driver/profile payload in `data`.\n- **Update Profile Photo** — `POST` or `PATCH` same URL; **form-data** key **`profile_photo`** (image file: jpg, jpeg, png, webp; max 10 MB).\n\n### Logout\n`POST` with **Bearer** access token; empty body. Invalidates the current access token server-side where implemented.",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"item": [
@@ -47,9 +47,9 @@
 								"description": "Tenant UUID or schema name when needed"
 							},
 							{
-								"key": "X-Language",
-								"value": "en",
-								"description": "Optional: en | ar"
+								"key": "Accept-Language",
+								"value": "{{accept_language}}",
+								"description": "Primary tag: en or ar (e.g. Accept-Language: ar). Controls translated message strings and localized name/label in data. Use environment variable accept_language (default en)."
 							}
 						],
 						"body": {
@@ -69,7 +69,22 @@
 							"name": "Login success",
 							"originalRequest": {
 								"method": "POST",
-								"header": [],
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "X-Tenant-ID",
+										"value": "{{tenant_id}}",
+										"description": "Tenant UUID or schema name when needed"
+									},
+									{
+										"key": "Accept-Language",
+										"value": "en",
+										"description": "Primary tag: en or ar (e.g. Accept-Language: ar). Controls translated message strings and localized name/label in data. Use environment variable accept_language (default en)."
+									}
+								],
 								"body": {
 									"mode": "raw",
 									"raw": "{\n  \"email\": \"driver@example.com\",\n  \"password\": \"Password@123\"\n}"
@@ -80,13 +95,51 @@
 							"code": 200,
 							"_postman_previewlanguage": "json",
 							"header": [],
-							"body": "{\n  \"status\": 1,\n  \"message\": \"Login successful.\",\n  \"data\": {\n    \"access_token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\",\n    \"refresh_token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\",\n    \"driver\": {\n      \"driver_id\": \"uuid\",\n      \"driver_code\": \"DRV001\",\n      \"english_name\": \"John Driver\",\n      \"arabic_name\": null,\n      \"driver_status\": \"active\"\n    }\n  }\n}"
+							"body": "{\n  \"status\": 1,\n  \"message\": \"Login successful.\",\n  \"data\": {\n    \"access_token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\",\n    \"refresh_token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\",\n    \"driver\": {\n      \"driver_id\": \"uuid\",\n      \"driver_code\": \"DRV001\",\n      \"name\": \"John Driver\",\n      \"mobile_number\": \"+966500000000\",\n      \"driver_status\": \"Active\",\n      \"driver_type\": \"company\"\n    }\n  }\n}"
+						},
+						{
+							"name": "Login success (Accept-Language: ar)",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "X-Tenant-ID",
+										"value": "{{tenant_id}}",
+										"description": "Tenant UUID or schema name when needed"
+									},
+									{
+										"key": "Accept-Language",
+										"value": "ar",
+										"description": "Primary tag: en or ar (e.g. Accept-Language: ar). Controls translated message strings and localized name/label in data. Use environment variable accept_language (default en)."
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"email\": \"driver@example.com\",\n  \"password\": \"Password@123\"\n}"
+								},
+								"url": "{{base_url}}/api/v1/mobile/driver/auth/login/"
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [],
+							"body": "{\n  \"status\": 1,\n  \"message\": \"تم تسجيل الدخول بنجاح.\",\n  \"data\": {\n    \"access_token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\",\n    \"refresh_token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\",\n    \"driver\": {\n      \"driver_id\": \"uuid\",\n      \"driver_code\": \"DRV001\",\n      \"name\": \"جون السائق\",\n      \"mobile_number\": \"+966500000000\",\n      \"driver_status\": \"Active\",\n      \"driver_type\": \"company\"\n    }\n  }\n}"
 						},
 						{
 							"name": "Invalid credentials",
 							"originalRequest": {
 								"method": "POST",
-								"header": [],
+								"header": [
+									{
+										"key": "Accept-Language",
+										"value": "{{accept_language}}",
+										"description": "Primary tag: en or ar (e.g. Accept-Language: ar). Controls translated message strings and localized name/label in data. Use environment variable accept_language (default en)."
+									}
+								],
 								"body": {
 									"mode": "raw",
 									"raw": "{\n  \"email\": \"driver@example.com\",\n  \"password\": \"WrongPassword\"\n}"
@@ -115,8 +168,9 @@
 								"value": "{{tenant_id}}"
 							},
 							{
-								"key": "X-Language",
-								"value": "en"
+								"key": "Accept-Language",
+								"value": "{{accept_language}}",
+								"description": "Primary tag: en or ar (e.g. Accept-Language: ar). Controls translated message strings and localized name/label in data. Use environment variable accept_language (default en)."
 							}
 						],
 						"body": {
@@ -156,8 +210,9 @@
 								"value": "{{tenant_id}}"
 							},
 							{
-								"key": "X-Language",
-								"value": "en"
+								"key": "Accept-Language",
+								"value": "{{accept_language}}",
+								"description": "Primary tag: en or ar (e.g. Accept-Language: ar). Controls translated message strings and localized name/label in data. Use environment variable accept_language (default en)."
 							}
 						],
 						"body": {
@@ -205,8 +260,9 @@
 								"value": "{{tenant_id}}"
 							},
 							{
-								"key": "X-Language",
-								"value": "en"
+								"key": "Accept-Language",
+								"value": "{{accept_language}}",
+								"description": "Primary tag: en or ar (e.g. Accept-Language: ar). Controls translated message strings and localized name/label in data. Use environment variable accept_language (default en)."
 							}
 						],
 						"body": {
@@ -246,8 +302,9 @@
 								"value": "{{tenant_id}}"
 							},
 							{
-								"key": "X-Language",
-								"value": "en"
+								"key": "Accept-Language",
+								"value": "{{accept_language}}",
+								"description": "Primary tag: en or ar (e.g. Accept-Language: ar). Controls translated message strings and localized name/label in data. Use environment variable accept_language (default en)."
 							}
 						],
 						"url": "{{base_url}}/api/v1/mobile/driver/auth/logout/",
@@ -295,8 +352,9 @@
 								"value": "{{tenant_id}}"
 							},
 							{
-								"key": "X-Language",
-								"value": "en"
+								"key": "Accept-Language",
+								"value": "{{accept_language}}",
+								"description": "Primary tag: en or ar (e.g. Accept-Language: ar). Controls translated message strings and localized name/label in data. Use environment variable accept_language (default en)."
 							}
 						],
 						"body": {
@@ -340,8 +398,9 @@
 								"value": "{{tenant_id}}"
 							},
 							{
-								"key": "X-Language",
-								"value": "en"
+								"key": "Accept-Language",
+								"value": "{{accept_language}}",
+								"description": "Primary tag: en or ar (e.g. Accept-Language: ar). Controls translated message strings and localized name/label in data. Use environment variable accept_language (default en)."
 							}
 						],
 						"body": {
@@ -393,8 +452,9 @@
 								"value": "{{tenant_id}}"
 							},
 							{
-								"key": "X-Language",
-								"value": "en"
+								"key": "Accept-Language",
+								"value": "{{accept_language}}",
+								"description": "Primary tag: en or ar (e.g. Accept-Language: ar). Controls translated message strings and localized name/label in data. Use environment variable accept_language (default en)."
 							}
 						],
 						"body": {
@@ -447,8 +507,9 @@
 								"value": "{{tenant_id}}"
 							},
 							{
-								"key": "X-Language",
-								"value": "en"
+								"key": "Accept-Language",
+								"value": "{{accept_language}}",
+								"description": "Primary tag: en or ar (e.g. Accept-Language: ar). Controls translated message strings and localized name/label in data. Use environment variable accept_language (default en)."
 							}
 						],
 						"url": "{{base_url}}/api/v1/mobile/driver/profile/",
@@ -461,7 +522,53 @@
 							"code": 200,
 							"_postman_previewlanguage": "json",
 							"header": [],
-							"body": "{\n  \"status\": 1,\n  \"message\": \"Profile loaded successfully.\",\n  \"data\": {\n    \"driver\": {\n      \"driver_id\": \"uuid\",\n      \"driver_code\": \"DRV001\",\n      \"arabic_name\": null,\n      \"english_name\": \"John Driver\",\n      \"driver_status\": \"active\"\n    },\n    \"user\": {},\n    \"vehicle\": null,\n    \"attachments\": []\n  }\n}"
+							"body": "{\n  \"status\": 1,\n  \"message\": \"Profile loaded successfully.\",\n  \"data\": {\n    \"driver\": {\n      \"driver_id\": \"uuid\",\n      \"driver_code\": \"DRV001\",\n      \"name\": \"John Driver\",\n      \"driver_status\": \"active\",\n      \"driver_source\": \"internal\",\n      \"driver_type\": \"\",\n      \"nationality\": \"SA\",\n      \"birth_date\": \"1990-01-01\",\n      \"mobile_number\": \"+966500000000\",\n      \"whatsapp_number\": \"\"\n    },\n    \"tenant_user\": {\n      \"username\": \"driver1\",\n      \"full_name\": \"John Driver\",\n      \"email\": \"driver@example.com\",\n      \"mobile_country_code\": \"+966\",\n      \"mobile_no\": \"500000000\",\n      \"role_name\": \"DRIVER\"\n    },\n    \"current_truck\": {\n      \"truck_id\": \"uuid\",\n      \"truck_code\": \"TRK001\",\n      \"plate_number\": \"ABC 1234\",\n      \"truck_status\": \"active\",\n      \"sourcing_mode\": \"owned\"\n    },\n    \"truck_type\": {\n      \"truck_type_id\": \"uuid\",\n      \"truck_type_code\": \"FLATBED\",\n      \"label\": \"Flatbed\"\n    },\n    \"licence\": {\n      \"dl_number\": \"DL-0001\",\n      \"dl_expiry_date\": \"2030-12-31\",\n      \"dl_status\": \"valid\",\n      \"dl_image_url\": null\n    },\n    \"assignment\": {\n      \"assigned_from\": \"2025-01-01\",\n      \"assignment_status\": \"active\"\n    },\n    \"profile_photo_url\": null\n  }\n}",
+							"originalRequest": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{access_token}}"
+									},
+									{
+										"key": "X-Tenant-ID",
+										"value": "{{tenant_id}}"
+									},
+									{
+										"key": "Accept-Language",
+										"value": "en",
+										"description": "Primary tag: en or ar (e.g. Accept-Language: ar). Controls translated message strings and localized name/label in data. Use environment variable accept_language (default en)."
+									}
+								],
+								"url": "{{base_url}}/api/v1/mobile/driver/profile/"
+							}
+						},
+						{
+							"name": "Profile fetch success (Accept-Language: ar)",
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [],
+							"body": "{\n  \"status\": 1,\n  \"message\": \"تم تحميل الملف الشخصي بنجاح.\",\n  \"data\": {\n    \"driver\": {\n      \"driver_id\": \"uuid\",\n      \"driver_code\": \"DRV001\",\n      \"name\": \"جون السائق\",\n      \"driver_status\": \"active\",\n      \"driver_source\": \"internal\",\n      \"driver_type\": \"\",\n      \"nationality\": \"SA\",\n      \"birth_date\": \"1990-01-01\",\n      \"mobile_number\": \"+966500000000\",\n      \"whatsapp_number\": \"\"\n    },\n    \"tenant_user\": {\n      \"username\": \"driver1\",\n      \"full_name\": \"John Driver\",\n      \"email\": \"driver@example.com\",\n      \"mobile_country_code\": \"+966\",\n      \"mobile_no\": \"500000000\",\n      \"role_name\": \"DRIVER\"\n    },\n    \"current_truck\": {\n      \"truck_id\": \"uuid\",\n      \"truck_code\": \"TRK001\",\n      \"plate_number\": \"ABC 1234\",\n      \"truck_status\": \"active\",\n      \"sourcing_mode\": \"owned\"\n    },\n    \"truck_type\": {\n      \"truck_type_id\": \"uuid\",\n      \"truck_type_code\": \"FLATBED\",\n      \"label\": \"شاحنة مسطحة\"\n    },\n    \"licence\": {\n      \"dl_number\": \"DL-0001\",\n      \"dl_expiry_date\": \"2030-12-31\",\n      \"dl_status\": \"valid\",\n      \"dl_image_url\": null\n    },\n    \"assignment\": {\n      \"assigned_from\": \"2025-01-01\",\n      \"assignment_status\": \"active\"\n    },\n    \"profile_photo_url\": null\n  }\n}",
+							"originalRequest": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{access_token}}"
+									},
+									{
+										"key": "X-Tenant-ID",
+										"value": "{{tenant_id}}"
+									},
+									{
+										"key": "Accept-Language",
+										"value": "ar",
+										"description": "Primary tag: en or ar (e.g. Accept-Language: ar). Controls translated message strings and localized name/label in data. Use environment variable accept_language (default en)."
+									}
+								],
+								"url": "{{base_url}}/api/v1/mobile/driver/profile/"
+							}
 						},
 						{
 							"name": "Unauthorized (JWT)",
@@ -487,8 +594,9 @@
 								"value": "{{tenant_id}}"
 							},
 							{
-								"key": "X-Language",
-								"value": "en"
+								"key": "Accept-Language",
+								"value": "{{accept_language}}",
+								"description": "Primary tag: en or ar (e.g. Accept-Language: ar). Controls translated message strings and localized name/label in data. Use environment variable accept_language (default en)."
 							}
 						],
 						"body": {

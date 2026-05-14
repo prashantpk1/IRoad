@@ -113,6 +113,7 @@ class DriverLoginView(MobileAPIView):
             email=email,
             password=password,
             tenant_schema=tenant_schema,
+            request=request,
         )
 
         if not result['success']:

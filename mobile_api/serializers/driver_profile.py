@@ -18,6 +18,12 @@ from rest_framework import serializers
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import gettext
 
+from mobile_api.serializers.localized import (
+    LocalizedSerializerMixin,
+    serialize_localized_label,
+    serialize_localized_name,
+)
+
 # Max upload size aligned with DriverAttachment.ATTACHMENT_MAX_SIZE_MB (10 MB).
 PROFILE_PHOTO_MAX_SIZE_BYTES = 10 * 1024 * 1024
 
@@ -264,8 +270,7 @@ def _serialize_driver_section(driver, request) -> dict[str, Any]:
         return {
             'driver_id': None,
             'driver_code': None,
-            'arabic_name': None,
-            'english_name': None,
+            **serialize_localized_name(request, None, None),
             'driver_status': None,
             'driver_source': None,
             'driver_type': None,
@@ -277,8 +282,11 @@ def _serialize_driver_section(driver, request) -> dict[str, Any]:
     return {
         'driver_id': str(driver.driver_id),
         'driver_code': driver.driver_code,
-        'arabic_name': driver.arabic_name,
-        'english_name': driver.english_name or '',
+        **serialize_localized_name(
+            request,
+            english_value=driver.english_name or '',
+            arabic_value=driver.arabic_name,
+        ),
         'driver_status': driver.driver_status,
         'driver_source': driver.driver_source,
         'driver_type': driver.driver_type or '',
@@ -333,14 +341,16 @@ def _serialize_truck_type_section(truck_type, request) -> dict[str, Any]:
         return {
             'truck_type_id': None,
             'truck_type_code': None,
-            'english_label': None,
-            'arabic_label': None,
+            **serialize_localized_label(request, None, None),
         }
     return {
         'truck_type_id': str(truck_type.truck_type_id),
         'truck_type_code': truck_type.truck_type_code,
-        'english_label': truck_type.english_label,
-        'arabic_label': truck_type.arabic_label,
+        **serialize_localized_label(
+            request,
+            english_value=truck_type.english_label,
+            arabic_value=truck_type.arabic_label,
+        ),
     }
 
 
@@ -378,7 +388,7 @@ def _serialize_assignment_section(assignment, request) -> dict[str, Any]:
     }
 
 
-class DriverProfileSerializer(serializers.Serializer):
+class DriverProfileSerializer(LocalizedSerializerMixin, serializers.Serializer):
     """
     Read-only aggregate driver profile for mobile clients.
 
@@ -388,6 +398,10 @@ class DriverProfileSerializer(serializers.Serializer):
       - current_truck: TruckMaster | None
       - truck_type: TruckTypeMaster | None (defaults to current_truck.truck_type)
       - assignment: TruckDriverAssignmentHistory | None
+
+    Localized display (``Accept-Language`` via ``serialize_localized_*``):
+      - ``driver`` includes ``name`` (not ``english_name`` / ``arabic_name``).
+      - ``truck_type`` includes ``label`` (not ``english_label`` / ``arabic_label``).
 
     Phase 1: ``profile_photo_url`` mirrors ``licence.dl_image_url`` (dl_image fallback).
     When a dedicated avatar field exists later, build its URL here without changing
