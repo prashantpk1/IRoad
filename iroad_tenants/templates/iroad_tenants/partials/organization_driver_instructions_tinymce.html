@@ -1,0 +1,34 @@
+{# TinyMCE for Organization Profile driver_instructions — same CDN/toolbar as legal_page_tinymce.html #}
+<script src="https://cdn.jsdelivr.net/npm/tinymce@6.8.3/tinymce.min.js" referrerpolicy="origin"></script>
+<script>
+  (function () {
+    const editorConfig = {
+      menubar: false,
+      plugins: 'lists link image code table wordcount',
+      toolbar:
+        'undo redo | blocks | bold italic | alignleft aligncenter alignright | bullist numlist | table link | code',
+      height: 350,
+      skin: 'oxide',
+      content_css: 'default',
+      branding: false,
+      promotion: false,
+    };
+
+    tinymce.init({
+      ...editorConfig,
+      selector: '#driverInstructions',
+      placeholder: 'Enter detailed instructions for drivers...',
+    });
+
+    const form = document.getElementById('organizationProfileForm');
+    if (form) {
+      form.addEventListener('submit', function () {
+        try {
+          if (window.tinymce && typeof window.tinymce.triggerSave === 'function') {
+            window.tinymce.triggerSave();
+          }
+        } catch (e) {}
+      });
+    }
+  })();
+</script>

@@ -212,6 +212,7 @@ from .views import (
     PricingInteractiveStepListView,
     PricingInteractiveStepUpdateView,
     PricingPageCMSView,
+    MobileAboutUsCMSView,
     PrivacyPolicyCMSView,
     TermsConditionsCMSView,
 )
@@ -1195,6 +1196,11 @@ urlpatterns = [
         'cms/terms-and-conditions/',
         TermsConditionsCMSView.as_view(),
         name='terms_conditions_cms',
+    ),
+    path(
+        'cms/mobile-about-us/',
+        MobileAboutUsCMSView.as_view(),
+        name='mobile_about_us_cms',
     ),
     path(
         'search/',

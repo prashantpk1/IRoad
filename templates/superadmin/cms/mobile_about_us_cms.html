@@ -1,0 +1,196 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block breadcrumb_items %}
+  <li class="breadcrumb-item active" aria-current="page">{{ page_title }}</li>
+{% endblock %}
+
+{% block content %}
+<form
+  method="post"
+  action=""
+  enctype="multipart/form-data"
+  id="mobileAboutUsCmsForm"
+>
+  {% csrf_token %}
+
+  <div class="page-header">
+    <div class="page-header-row d-flex flex-wrap align-items-center justify-content-between gap-3">
+      <div class="page-header-left">
+        <h1 class="page-title">{{ page_title }}</h1>
+        <p class="page-subtitle text-muted mb-0">
+          {% translate "Edit bilingual mobile About Us copy, SEO, and page header." %}
+        </p>
+      </div>
+      <div class="page-header-right d-flex flex-wrap gap-2">
+        <button type="submit" class="btn btn-primary btn-lg">
+          <i class="bi bi-check2-circle"></i> {% translate "Save Changes" %}
+        </button>
+        <a
+          href="/mobile-about-us/"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="btn btn-outline-primary btn-lg"
+        >
+          <i class="bi bi-box-arrow-up-right"></i> {% translate "View Live Page" %}
+        </a>
+      </div>
+    </div>
+  </div>
+
+  {% if form.non_field_errors %}
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+      {{ form.non_field_errors }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+  {% endif %}
+  {% if form.errors and not form.non_field_errors %}
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+      {% translate "Please correct the errors below." %}
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+  {% endif %}
+
+  <ul class="nav nav-tabs flex-wrap" id="mobileAboutUsCmsTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button
+        class="nav-link active"
+        id="tab-mobile-about-en-btn"
+        data-bs-toggle="tab"
+        data-bs-target="#tab-mobile-about-en"
+        type="button"
+        role="tab"
+      >
+        {% translate "English Content" %}
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button
+        class="nav-link"
+        id="tab-mobile-about-ar-btn"
+        data-bs-toggle="tab"
+        data-bs-target="#tab-mobile-about-ar"
+        type="button"
+        role="tab"
+      >
+        {% translate "Arabic Content" %}
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button
+        class="nav-link"
+        id="tab-mobile-about-seo-btn"
+        data-bs-toggle="tab"
+        data-bs-target="#tab-mobile-about-seo"
+        type="button"
+        role="tab"
+      >
+        {% translate "SEO" %}
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button
+        class="nav-link"
+        id="tab-mobile-about-header-btn"
+        data-bs-toggle="tab"
+        data-bs-target="#tab-mobile-about-header"
+        type="button"
+        role="tab"
+      >
+        {% translate "Page Header" %}
+      </button>
+    </li>
+  </ul>
+
+  <div class="tab-content border border-top-0 rounded-bottom bg-white p-3 p-md-4 mb-3">
+    <div class="tab-pane fade show active" id="tab-mobile-about-en" role="tabpanel">
+      <div class="row g-3">
+        <div class="col-12">
+          <label class="form-label" for="{{ form.content_en.id_for_label }}">{{ form.content_en.label }}</label>
+          {{ form.content_en }}{{ form.content_en.errors }}
+          <p class="form-text text-muted mb-0">{% translate "Rich text editor (TinyMCE) is enabled for this field." %}</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-pane fade" id="tab-mobile-about-ar" role="tabpanel">
+      <div class="row g-3">
+        <div class="col-12">
+          <label class="form-label" for="{{ form.content_ar.id_for_label }}">{{ form.content_ar.label }}</label>
+          {{ form.content_ar }}{{ form.content_ar.errors }}
+          <p class="form-text text-muted mb-0">{% translate "Rich text editor (TinyMCE, RTL) is enabled for this field." %}</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-pane fade" id="tab-mobile-about-seo" role="tabpanel">
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label" for="{{ form.page_title_en.id_for_label }}">{{ form.page_title_en.label }}</label>
+          {{ form.page_title_en }}{{ form.page_title_en.errors }}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label" for="{{ form.page_title_ar.id_for_label }}">{{ form.page_title_ar.label }}</label>
+          {{ form.page_title_ar }}{{ form.page_title_ar.errors }}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label" for="{{ form.meta_description_en.id_for_label }}">{{ form.meta_description_en.label }}</label>
+          {{ form.meta_description_en }}{{ form.meta_description_en.errors }}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label" for="{{ form.meta_description_ar.id_for_label }}">{{ form.meta_description_ar.label }}</label>
+          {{ form.meta_description_ar }}{{ form.meta_description_ar.errors }}
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-pane fade" id="tab-mobile-about-header" role="tabpanel">
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label" for="{{ form.page_header_h1_en.id_for_label }}">{{ form.page_header_h1_en.label }}</label>
+          {{ form.page_header_h1_en }}{{ form.page_header_h1_en.errors }}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label" for="{{ form.page_header_h1_ar.id_for_label }}">{{ form.page_header_h1_ar.label }}</label>
+          {{ form.page_header_h1_ar }}{{ form.page_header_h1_ar.errors }}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label" for="{{ form.breadcrumb_current_en.id_for_label }}">{{ form.breadcrumb_current_en.label }}</label>
+          {{ form.breadcrumb_current_en }}{{ form.breadcrumb_current_en.errors }}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label" for="{{ form.breadcrumb_current_ar.id_for_label }}">{{ form.breadcrumb_current_ar.label }}</label>
+          {{ form.breadcrumb_current_ar }}{{ form.breadcrumb_current_ar.errors }}
+        </div>
+        <div class="col-12">
+          <label class="form-label" for="{{ form.page_header_background.id_for_label }}">{{ form.page_header_background.label }}</label>
+          {% if page.page_header_background %}
+            <div class="mb-3">
+              <p class="small text-muted mb-1">{% translate "Current header background" %}</p>
+              <img
+                src="{{ page.page_header_background.url }}"
+                alt=""
+                class="img-fluid img-thumbnail rounded d-block"
+                style="max-height: 160px;"
+              />
+              <div class="mt-2">
+                <a href="{{ page.page_header_background.url }}" target="_blank" rel="noopener noreferrer" class="small">
+                  {% translate "Open file" %}
+                </a>
+              </div>
+            </div>
+          {% endif %}
+          {{ form.page_header_background }}{{ form.page_header_background.errors }}
+        </div>
+      </div>
+    </div>
+  </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+  {% include 'superadmin/cms/partials/legal_page_tinymce.html' with legal_cms_form_id='mobileAboutUsCmsForm' %}
+{% endblock %}

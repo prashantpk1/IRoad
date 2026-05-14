@@ -2,7 +2,7 @@
 	"info": {
 		"_postman_id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
 		"name": "IRoad Mobile Driver APIs",
-		"description": "## IRoad Mobile Driver APIs\n\n### Base URL\nUse environment variable `{{base_url}}` (no trailing slash). Full paths begin with `/api/v1/mobile/`.\n\nExample: `http://127.0.0.1:8000/api/v1/mobile/driver/auth/login/`\n\n### Standard JSON envelope\n```json\n{\n  \"status\": 1,\n  \"message\": \"…\",\n  \"data\": { }\n}\n```\n- **status `1`**: Success (`data` may be empty `{}`).\n- **status `0`**: Validation or business error; `data` often includes `errors` (DRF serializer shape) or extra fields such as `attempts_remaining`.\n- **status `2`**: Authentication failure (e.g. missing/invalid/expired JWT) — HTTP **401**; used by the mobile API exception handler for auth failures.\n\n### Headers\n| Header | When |\n|--------|------|\n| **X-Tenant-ID** | Send tenant profile UUID or schema name when tenant middleware cannot resolve the host; required for correct tenant DB in many deployments. |\n| **Accept-Language** | Optional `en` or `ar` (first tag) for translated `message` strings and localized `name` / `label` in `data`. Use environment variable `accept_language` (default `en`). |\n| **Authorization** | `Bearer {{access_token}}` on all **authenticated** routes. |\n| **Content-Type** | `application/json` for JSON bodies. For profile photo, use **multipart/form-data** (field `profile_photo`); Postman sets the boundary automatically. |\n\n### Login and tokens\n1. Set `base_url`, `email`, `password`, `accept_language` (`en` or `ar`), and `tenant_id` (if needed) in the **IRoad Mobile Driver — Local** environment.\n2. Run **Login**. The **Tests** script saves `access_token` and `refresh_token` into the active environment.\n3. Call protected endpoints with **Bearer** `access_token`.\n\n> Refresh-token exchange is not part of this collection unless you add it separately; tokens are issued by the mobile auth service.\n\n### Forgot password / reset (unauthenticated)\n1. **Forgot Password** — `POST` with `email`.\n2. **Verify OTP** — `POST` with `email` and `otp_code` from email/SMS.\n3. **Reset Password** — `POST` with `email`, `otp_code`, `new_password`, `confirm_password`.\n\n### Change password while logged in (OTP)\n1. **Request OTP** — `POST` with `send_via`: `email` or `mobile` (SMS requires a phone number on the driver profile).\n2. **Verify Change Password OTP** — `POST` with `otp_code`.\n3. **Change Password** — `POST` with `current_password`, `new_password`, `confirm_password`, `otp_code`.\n\n### Profile\n- **Get Profile** — `GET` returns driver/profile payload in `data`.\n- **Update Profile Photo** — `POST` or `PATCH` same URL; **form-data** key **`profile_photo`** (image file: jpg, jpeg, png, webp; max 10 MB).\n\n### Logout\n`POST` with **Bearer** access token; empty body. Invalidates the current access token server-side where implemented.",
+		"description": "## IRoad Mobile Driver APIs\n\n### Base URL\nUse environment variable `{{base_url}}` (no trailing slash). Full paths begin with `/api/v1/mobile/`.\n\nExample: `http://127.0.0.1:8000/api/v1/mobile/driver/auth/login/`\n\n### Standard JSON envelope\n```json\n{\n  \"status\": 1,\n  \"message\": \"…\",\n  \"data\": { }\n}\n```\n- **status `1`**: Success (`data` may be empty `{}`).\n- **status `0`**: Validation or business error; `data` often includes `errors` (DRF serializer shape) or extra fields such as `attempts_remaining`.\n- **status `2`**: Authentication failure (e.g. missing/invalid/expired JWT) — HTTP **401**; used by the mobile API exception handler for auth failures.\n\n### Headers\n| Header | When |\n|--------|------|\n| **X-Tenant-ID** | Send tenant profile UUID or schema name when tenant middleware cannot resolve the host; required for correct tenant DB in many deployments. |\n| **Accept-Language** | Optional `en` or `ar` (first tag) for translated `message` strings, localized `name` / `label` in `data`, and **`organization_name`** on **Get Organization Profile** (`driver_instructions` is not split by language). Use environment variable `accept_language` (default `en`). |\n| **Authorization** | `Bearer {{access_token}}` on all **authenticated** routes. |\n| **Content-Type** | `application/json` for JSON bodies. For profile photo, use **multipart/form-data** (field `profile_photo`); Postman sets the boundary automatically. |\n\n### Login and tokens\n1. Set `base_url`, `email`, `password`, `accept_language` (`en` or `ar`), and `tenant_id` (if needed) in the **IRoad Mobile Driver — Local** environment.\n2. Run **Login**. The **Tests** script saves `access_token` and `refresh_token` into the active environment.\n3. Call protected endpoints with **Bearer** `access_token`.\n\n> Refresh-token exchange is not part of this collection unless you add it separately; tokens are issued by the mobile auth service.\n\n### Forgot password / reset (unauthenticated)\n1. **Forgot Password** — `POST` with `email`.\n2. **Verify OTP** — `POST` with `email` and `otp_code` from email/SMS.\n3. **Reset Password** — `POST` with `email`, `otp_code`, `new_password`, `confirm_password`.\n\n### Change password while logged in (OTP)\n1. **Request OTP** — `POST` with `send_via`: `email` or `mobile` (SMS requires a phone number on the driver profile).\n2. **Verify Change Password OTP** — `POST` with `otp_code`.\n3. **Change Password** — `POST` with `current_password`, `new_password`, `confirm_password`, `otp_code`.\n\n### Profile\n- **Get Profile** — `GET` returns driver/profile payload in `data`.\n- **Get Organization Profile** — `GET` returns tenant organization support fields (`organization_name`, support contacts, `driver_instructions`, `logo_url`) in `data`.\n- **Update Profile Photo** — `POST` or `PATCH` same URL; **form-data** key **`profile_photo`** (image file: jpg, jpeg, png, webp; max 10 MB).\n\n### Logout\n`POST` with **Bearer** access token; empty body. Invalidates the current access token server-side where implemented.",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"item": [
@@ -569,6 +569,101 @@
 								],
 								"url": "{{base_url}}/api/v1/mobile/driver/profile/"
 							}
+						},
+						{
+							"name": "Unauthorized (JWT)",
+							"status": "Unauthorized",
+							"code": 401,
+							"_postman_previewlanguage": "json",
+							"header": [],
+							"body": "{\n  \"status\": 2,\n  \"message\": \"Unauthorized access. Please login to continue.\",\n  \"data\": {}\n}"
+						}
+					]
+				},
+				{
+					"name": "Get Organization Profile",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}",
+								"description": "Primary tag: en or ar. Localizes `organization_name` from `name_en` / `name_ar`. Set environment `accept_language` to `en` or `ar` (default en)."
+							}
+						],
+						"url": "{{base_url}}/api/v1/mobile/driver/organization-profile/",
+						"description": "## GET Organization Profile\n\n**Auth:** `Authorization: Bearer {{access_token}}` is **required**.\n\n**Tenant:** Send `X-Tenant-ID` when your environment needs it (same as Get Profile).\n\n**Localization:** `Accept-Language` (`en` or `ar`, first tag) affects **`data.organization_name`** only (from `name_en` / `name_ar` with fallback). **`driver_instructions`** is a **single** DB field — the API returns the **same** value for both languages (may contain HTML).\n\n**Media:** `logo_url` is an absolute URL when a logo exists; otherwise an empty string.\n\n**Envelope:** `status: 1` on success; `data` holds the flat organization fields."
+					},
+					"response": [
+						{
+							"name": "Organization profile success (en)",
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [],
+							"body": "{\n  \"status\": 1,\n  \"message\": \"Data retrieved successfully.\",\n  \"data\": {\n    \"organization_name\": \"IRoad Logistics\",\n    \"support_email\": \"support@iroad.com\",\n    \"support_mobile_number_1\": \"+966500000001\",\n    \"support_mobile_number_2\": \"+966500000002\",\n    \"driver_instructions\": \"<p>Always update POD after delivery.</p>\",\n    \"logo_url\": \"https://example.com/media/tenant/organization_logos/ORG_abc123.png\"\n  }\n}",
+							"originalRequest": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{access_token}}"
+									},
+									{
+										"key": "X-Tenant-ID",
+										"value": "{{tenant_id}}"
+									},
+									{
+										"key": "Accept-Language",
+										"value": "en",
+										"description": "Primary tag: en or ar."
+									}
+								],
+								"url": "{{base_url}}/api/v1/mobile/driver/organization-profile/"
+							}
+						},
+						{
+							"name": "Organization profile success (Accept-Language: ar)",
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [],
+							"body": "{\n  \"status\": 1,\n  \"message\": \"تم استرجاع البيانات بنجاح\",\n  \"data\": {\n    \"organization_name\": \"آيرواد للوجستيات\",\n    \"support_email\": \"support@iroad.com\",\n    \"support_mobile_number_1\": \"+966500000001\",\n    \"support_mobile_number_2\": \"+966500000002\",\n    \"driver_instructions\": \"<p>Always update POD after delivery.</p>\",\n    \"logo_url\": \"https://example.com/media/tenant/organization_logos/ORG_abc123.png\"\n  }\n}",
+							"originalRequest": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{access_token}}"
+									},
+									{
+										"key": "X-Tenant-ID",
+										"value": "{{tenant_id}}"
+									},
+									{
+										"key": "Accept-Language",
+										"value": "ar",
+										"description": "Primary tag: en or ar."
+									}
+								],
+								"url": "{{base_url}}/api/v1/mobile/driver/organization-profile/"
+							}
+						},
+						{
+							"name": "Organization profile not found",
+							"status": "Bad Request",
+							"code": 400,
+							"_postman_previewlanguage": "json",
+							"header": [],
+							"body": "{\n  \"status\": 0,\n  \"message\": \"Requested resource not found.\",\n  \"data\": {}\n}"
 						},
 						{
 							"name": "Unauthorized (JWT)",

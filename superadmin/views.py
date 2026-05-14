@@ -11003,6 +11003,7 @@ from iroad_frontend.models import (
     PricingFaqItem,
     PricingInteractiveStep,
     PricingPageContent,
+    MobileAboutUsPageContent,
     PrivacyPolicyPageContent,
     TermsConditionsPageContent,
 )
@@ -11021,6 +11022,7 @@ from iroad_frontend.cms_forms import (
     PricingFaqItemForm,
     PricingInteractiveStepForm,
     PricingPageContentForm,
+    MobileAboutUsPageContentForm,
     PrivacyPolicyPageContentForm,
     TermsConditionsPageContentForm,
 )
@@ -12343,6 +12345,49 @@ class TermsConditionsCMSView(LoginRequiredMixin, View):
             'form': form,
             'page': page,
             'page_title': 'Terms & Conditions CMS',
+        })
+
+
+class MobileAboutUsCMSView(LoginRequiredMixin, View):
+    """Singleton edit view for Mobile About Us (Website CMS → Legal Pages)."""
+
+    template_name = 'superadmin/cms/mobile_about_us_cms.html'
+
+    def _get_page(self):
+        return MobileAboutUsPageContent.get_singleton()
+
+    def get(self, request):
+        page = self._get_page()
+        form = MobileAboutUsPageContentForm(instance=page)
+        return render(request, self.template_name, {
+            'form': form,
+            'page': page,
+            'page_title': 'Mobile About Us CMS',
+        })
+
+    def post(self, request):
+        page = self._get_page()
+        form = MobileAboutUsPageContentForm(
+            request.POST,
+            request.FILES,
+            instance=page,
+        )
+        if form.is_valid():
+            obj = form.save(commit=False)
+            obj.updated_by = (
+                f'{request.user.first_name} '
+                f'{request.user.last_name}'
+            )
+            obj.save()
+            messages.success(
+                request,
+                'Mobile About Us content updated successfully.',
+            )
+            return redirect('mobile_about_us_cms')
+        return render(request, self.template_name, {
+            'form': form,
+            'page': page,
+            'page_title': 'Mobile About Us CMS',
         })
 
 

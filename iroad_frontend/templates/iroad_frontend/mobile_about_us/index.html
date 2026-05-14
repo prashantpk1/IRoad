@@ -1,0 +1,46 @@
+{% extends 'iroad_frontend/base.html' %}
+{% load static cms_locale %}
+
+{# Page-local SEO only: blocks replace base defaults — no homepage title/description. #}
+{% block title %}{% cms_txt mobile_about_us 'page_title' %}{% endblock %}
+
+{% block meta_description %}
+  <meta name="description" content="{% cms_txt mobile_about_us 'meta_description' %}" />
+{% endblock %}
+
+{% block extra_head %}
+  <meta property="og:title" content="{% cms_txt mobile_about_us 'page_title' %}" />
+  <meta property="og:description" content="{% cms_txt mobile_about_us 'meta_description' %}" />
+  <meta property="og:type" content="article" />
+  <style>
+    .legal-page-body {
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+    }
+    .legal-page-body img {
+      max-width: 100%;
+      height: auto;
+    }
+    .legal-page-body table {
+      max-width: 100%;
+      display: block;
+      overflow-x: auto;
+    }
+  </style>
+{% endblock %}
+
+{% block content %}
+  {% if not remove_header_footer|default:False %}
+    {% include 'iroad_frontend/partials/components/page_header.html' with page_header_kind='mobile-about' page_header_background=mobile_about_us.page_header_background %}
+  {% endif %}
+
+  <div class="container py-5">
+    <div class="row justify-content-center">
+      <div class="col-lg-10 col-xl-9">
+        <article class="legal-page-body wow fadeInUp" data-wow-delay="0.1s" lang="{{ lang|default:'en' }}">
+          {% cms_richtext mobile_about_us 'content' %}
+        </article>
+      </div>
+    </div>
+  </div>
+{% endblock %}
