@@ -380,23 +380,6 @@
           nextBtn.disabled = currentIndex === rows.length - 1;
         }
 
-        /* ---- event listeners ---- */
-        rows.forEach(function (row, idx) {
-          row.style.cursor = "pointer";
-          row.addEventListener("click", function (e) {
-            if (
-              e.target.closest(".eal-col-check") ||
-              e.target.closest(".eal-actions-cell") ||
-              e.target.closest('input[type="checkbox"]')
-            ) {
-              return;
-            }
-            currentIndex = idx;
-            showRow(currentIndex);
-            openPanel();
-          });
-        });
-
         closeBtn.addEventListener("click", closePanel);
         overlay.addEventListener("click", closePanel);
 

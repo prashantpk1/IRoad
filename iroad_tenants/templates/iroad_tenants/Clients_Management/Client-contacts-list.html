@@ -150,7 +150,7 @@
             </thead>
             <tbody>
               {% for contact in client_contacts %}
-              <tr data-detail-url="{{ contact.list_detail_url|default:'' }}" data-eal-row-primary="{% if contact.is_primary %}1{% else %}0{% endif %}">
+              <tr data-eal-row-primary="{% if contact.is_primary %}1{% else %}0{% endif %}">
                 <td class="eal-col-check"><input type="checkbox" class="eal-custom-check" /></td>
                 <td><span class="eal-entity-id">{{ contact.client_account.account_no }}</span></td>
                 <td>
@@ -250,24 +250,3 @@
       <!-- ========== END NEW TABLE UI DESIGN ========== -->
 {% endblock %}
 
-{% block extra_js %}
-<script>
-      (function () {
-        document.querySelectorAll(".eal-table tbody tr[data-detail-url]").forEach(function (row) {
-          var url = row.getAttribute("data-detail-url");
-          if (!url) return;
-          row.style.cursor = "pointer";
-          row.addEventListener("click", function (e) {
-            if (
-              e.target.closest(".eal-col-check") ||
-              e.target.closest(".eal-actions-cell") ||
-              e.target.closest('input[type="checkbox"]')
-            ) {
-              return;
-            }
-            window.location.href = url;
-          });
-        });
-      })();
-    </script>
-{% endblock %}

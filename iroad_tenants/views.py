@@ -206,17 +206,111 @@ def _render_pdf_from_html_bytes(
     if process.returncode != 0:
         err = (error or b'').decode('utf-8', errors='ignore').strip()
         raise RuntimeError(err or 'wkhtmltopdf failed')
-    return pdf_content
+    return _inject_pdf_auto_print_action(pdf_content)
 
 
-def _load_printing_template_html(filename):
+def _pdf_literal_string(value):
     """
-    Load canonical print design HTML from project Printing-Templates folder.
-    Keeps visual design identical to the approved templates.
+    Escape a JavaScript snippet as a PDF literal string.
     """
-    path = os.path.join(settings.BASE_DIR, 'Printing-Templates', filename)
-    with open(path, 'r', encoding='utf-8') as f:
-        return f.read()
+    return (
+        value.replace('\\', '\\\\')
+        .replace('(', '\\(')
+        .replace(')', '\\)')
+        .replace('\r', '\\r')
+        .replace('\n', '\\n')
+    )
+
+
+def _inject_pdf_auto_print_action(pdf_content):
+    """
+    Add a PDF OpenAction that asks compatible PDF viewers to open the print dialog.
+
+    The PDF is still generated and returned entirely as bytes; no temporary files,
+    cache files, or object storage writes are used.
+    """
+    root_matches = list(re.finditer(br'/Root\s+(\d+)\s+(\d+)\s+R', pdf_content))
+    size_matches = list(re.finditer(br'/Size\s+(\d+)', pdf_content))
+    startxref_match = re.search(br'startxref\s+(\d+)', pdf_content[pdf_content.rfind(b'startxref'):])
+    if not root_matches or not size_matches or not startxref_match:
+        raise RuntimeError('Unable to locate PDF catalog for auto-print action')
+
+    root_obj = int(root_matches[-1].group(1))
+    root_gen = int(root_matches[-1].group(2))
+    trailer_size = int(size_matches[-1].group(1))
+    previous_xref = int(startxref_match.group(1))
+
+    catalog_pattern = re.compile(
+        rb'%d\s+%d\s+obj\s*(.*?)\s*endobj' % (root_obj, root_gen),
+        re.DOTALL,
+    )
+    catalog_matches = list(catalog_pattern.finditer(pdf_content))
+    if not catalog_matches:
+        raise RuntimeError('Unable to locate PDF catalog object for auto-print action')
+
+    catalog_body = catalog_matches[-1].group(1).strip()
+    if not catalog_body.startswith(b'<<') or not catalog_body.endswith(b'>>'):
+        raise RuntimeError('Unsupported PDF catalog format for auto-print action')
+
+    print_js = 'this.print({bUI: true, bSilent: false, bShrinkToFit: true});'
+    open_action = (
+        b'\n/OpenAction << /S /JavaScript /JS ('
+        + _pdf_literal_string(print_js).encode('ascii')
+        + b') >>\n'
+    )
+    insert_at = catalog_body.rfind(b'>>')
+    updated_catalog = catalog_body[:insert_at] + open_action + catalog_body[insert_at:]
+
+    prefix = b'' if pdf_content.endswith(b'\n') else b'\n'
+    new_object_offset = len(pdf_content) + len(prefix)
+    new_object = (
+        b'%d %d obj\n' % (root_obj, root_gen)
+        + updated_catalog
+        + b'\nendobj\n'
+    )
+    xref_offset = new_object_offset + len(new_object)
+    incremental_update = (
+        prefix
+        + new_object
+        + b'xref\n'
+        + b'%d 1\n' % root_obj
+        + b'%010d %05d n \n' % (new_object_offset, root_gen)
+        + b'trailer\n'
+        + b'<< /Size %d /Root %d %d R /Prev %d >>\n'
+        % (trailer_size, root_obj, root_gen, previous_xref)
+        + b'startxref\n'
+        + str(xref_offset).encode('ascii')
+        + b'\n%%EOF\n'
+    )
+    return pdf_content + incremental_update
+
+
+def _render_printing_template_html(filename, context=None):
+    """
+    Render canonical tenant print templates from the app template directory.
+    """
+    return render_to_string(
+        f'iroad_tenants/Printing-Templates/{filename}',
+        context or {},
+    )
+
+
+def _safe_pdf_filename(value, fallback):
+    filename = re.sub(r'[\r\n"\\/]+', '-', str(value or '').strip())
+    if not filename:
+        filename = fallback
+    if not filename.lower().endswith('.pdf'):
+        filename = f'{filename}.pdf'
+    return filename
+
+
+def _inline_pdf_response(pdf_content, filename):
+    response = HttpResponse(pdf_content, content_type='application/pdf')
+    response['Content-Disposition'] = f'inline; filename="{filename}"'
+    response['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response['Pragma'] = 'no-cache'
+    response['Expires'] = '0'
+    return response
 
 ADDRESS_MASTER_AUTO_FORM_CODE = 'address-master'
 ADDRESS_MASTER_AUTO_FORM_LABEL = 'Address Code'
@@ -4750,17 +4844,27 @@ class TenantSalesInvoiceReportPrintView(View):
                 report.total_surcharge_amount or Decimal('0')
             )
 
-            html_content = _load_printing_template_html('sales_invoice_print.html')
+            html_content = _render_printing_template_html(
+                'sales_invoice_print.html',
+                {
+                    'report': report,
+                    'booking_lines': booking_lines,
+                    'surcharge_lines': surcharge_lines,
+                    'shipment_lines': shipment_lines,
+                    'bookings_count': len(booking_lines),
+                    'surcharges_count': len(surcharge_lines),
+                    'shipments_count': len(shipment_lines),
+                    'total_amount': total_amount,
+                },
+            )
 
             pdf_content = _render_pdf_from_html_bytes(
                 html_content,
                 page_size='A4',
                 margin_cm='0.2',
             )
-            filename = f'{(report.report_no or "SIR").strip()}.pdf'
-            response = HttpResponse(pdf_content, content_type='application/pdf')
-            response['Content-Disposition'] = f'inline; filename="{filename}"'
-            return response
+            filename = _safe_pdf_filename(report.report_no, 'SIR.pdf')
+            return _inline_pdf_response(pdf_content, filename)
         except Exception:
             logger.exception('Tenant sales invoice print stream failed')
             return JsonResponse({'error': 'Failed to render print PDF'}, status=500)
@@ -4779,18 +4883,22 @@ class TenantBookingSnapshotPrintView(View):
         if tenant_registry is None:
             return JsonResponse({'error': 'Tenant session is not active'}, status=401)
         try:
-            report = SalesInvoiceReport.objects.select_related('client').filter(pk=report_id).first()
+            report = SalesInvoiceReport.objects.filter(pk=report_id).first()
             if not report:
                 return JsonResponse({'error': 'Sales Invoice Report not found'}, status=404)
             booking_line = report.booking_lines.filter(line_no=line_no).first()
             if not booking_line:
                 return JsonResponse({'error': 'Booking snapshot line not found'}, status=404)
-            html_content = _load_printing_template_html('booking_print_v3.html')
+            html_content = _render_printing_template_html(
+                'booking_print_v3.html',
+                {
+                    'report': report,
+                    'booking_line': booking_line,
+                },
+            )
             pdf_content = _render_pdf_from_html_bytes(html_content, page_size='A4', margin_cm='0.2')
-            filename = f'{(report.report_no or "BK").strip()}-B{line_no}.pdf'
-            response = HttpResponse(pdf_content, content_type='application/pdf')
-            response['Content-Disposition'] = f'inline; filename="{filename}"'
-            return response
+            filename = _safe_pdf_filename(f'{report.report_no or "BK"}-B{line_no}', 'BK.pdf')
+            return _inline_pdf_response(pdf_content, filename)
         except Exception:
             logger.exception('Tenant booking snapshot print stream failed')
             return JsonResponse({'error': 'Failed to render print PDF'}, status=500)
@@ -4812,12 +4920,21 @@ class TenantShipmentPrintView(View):
             shipment = TenantShipment.objects.select_related('truck').filter(pk=shipment_id).first()
             if not shipment:
                 return JsonResponse({'error': 'Shipment not found'}, status=404)
-            html_content = _load_printing_template_html('shipment_print.html')
+            html_content = _render_printing_template_html(
+                'shipment_print.html',
+                {
+                    'shipment': shipment,
+                    'cod_payment_status': (
+                        shipment.collection_status
+                        if shipment.cod_amount and shipment.cod_amount > 0
+                        else 'Not Applicable'
+                    ),
+                    'additional_charges': shipment.total_additional_charges,
+                },
+            )
             pdf_content = _render_pdf_from_html_bytes(html_content, page_size='A4', margin_cm='0.2')
-            filename = f'{(shipment.shipment_no or "SH").strip()}.pdf'
-            response = HttpResponse(pdf_content, content_type='application/pdf')
-            response['Content-Disposition'] = f'inline; filename="{filename}"'
-            return response
+            filename = _safe_pdf_filename(shipment.shipment_no, 'SH.pdf')
+            return _inline_pdf_response(pdf_content, filename)
         except Exception:
             logger.exception('Tenant shipment print stream failed')
             return JsonResponse({'error': 'Failed to render print PDF'}, status=500)
@@ -4839,12 +4956,20 @@ class TenantSurchargePrintView(View):
             surcharge = TenantShipmentSurcharge.objects.select_related('shipment').filter(pk=surcharge_id).first()
             if not surcharge:
                 return JsonResponse({'error': 'Surcharge not found'}, status=404)
-            html_content = _load_printing_template_html('surcharge_print.html')
+            html_content = _render_printing_template_html(
+                'surcharge_print.html',
+                {
+                    'surcharge': surcharge,
+                    'shipment': surcharge.shipment,
+                },
+            )
             pdf_content = _render_pdf_from_html_bytes(html_content, page_size='A4', margin_cm='0.2')
-            filename = f'SST-{str(surcharge.surcharge_id)[:8]}.pdf'
-            response = HttpResponse(pdf_content, content_type='application/pdf')
-            response['Content-Disposition'] = f'inline; filename="{filename}"'
-            return response
+            surcharge_ref = (
+                surcharge.transaction_no
+                or f'SST-{str(surcharge.surcharge_id)[:8]}'
+            )
+            filename = _safe_pdf_filename(surcharge_ref, 'SST.pdf')
+            return _inline_pdf_response(pdf_content, filename)
         except Exception:
             logger.exception('Tenant surcharge print stream failed')
             return JsonResponse({'error': 'Failed to render print PDF'}, status=500)
@@ -4866,12 +4991,13 @@ class TenantDriverPrintView(View):
             driver = DriverMaster.objects.filter(pk=driver_id).first()
             if not driver:
                 return JsonResponse({'error': 'Driver not found'}, status=404)
-            html_content = _load_printing_template_html('driver_print.html')
+            html_content = _render_printing_template_html(
+                'driver_print.html',
+                {'driver': driver},
+            )
             pdf_content = _render_pdf_from_html_bytes(html_content, page_size='A4', margin_cm='0.2')
-            filename = f'{(driver.driver_code or "DR").strip()}.pdf'
-            response = HttpResponse(pdf_content, content_type='application/pdf')
-            response['Content-Disposition'] = f'inline; filename="{filename}"'
-            return response
+            filename = _safe_pdf_filename(driver.driver_code, 'DR.pdf')
+            return _inline_pdf_response(pdf_content, filename)
         except Exception:
             logger.exception('Tenant driver print stream failed')
             return JsonResponse({'error': 'Failed to render print PDF'}, status=500)
@@ -4893,12 +5019,13 @@ class TenantTruckPrintView(View):
             truck = TruckMaster.objects.select_related('truck_type', 'default_driver_id').filter(pk=truck_id).first()
             if not truck:
                 return JsonResponse({'error': 'Truck not found'}, status=404)
-            html_content = _load_printing_template_html('truck_print.html')
+            html_content = _render_printing_template_html(
+                'truck_print.html',
+                {'truck': truck},
+            )
             pdf_content = _render_pdf_from_html_bytes(html_content, page_size='A4', margin_cm='0.2')
-            filename = f'{(truck.truck_code or "TR").strip()}.pdf'
-            response = HttpResponse(pdf_content, content_type='application/pdf')
-            response['Content-Disposition'] = f'inline; filename="{filename}"'
-            return response
+            filename = _safe_pdf_filename(truck.truck_code, 'TR.pdf')
+            return _inline_pdf_response(pdf_content, filename)
         except Exception:
             logger.exception('Tenant truck print stream failed')
             return JsonResponse({'error': 'Failed to render print PDF'}, status=500)
@@ -4923,12 +5050,16 @@ class TenantTreasuryPrintView(View):
             transactions = list(
                 treasury.transactions.order_by('-transaction_date', '-created_at')[:20]
             )
-            html_content = _load_printing_template_html('treasury_print.html')
+            html_content = _render_printing_template_html(
+                'treasury_print.html',
+                {
+                    'treasury': treasury,
+                    'transactions': transactions,
+                },
+            )
             pdf_content = _render_pdf_from_html_bytes(html_content, page_size='A4', margin_cm='0.2')
-            filename = f'{(treasury.treasury_code or "TRS").strip()}.pdf'
-            response = HttpResponse(pdf_content, content_type='application/pdf')
-            response['Content-Disposition'] = f'inline; filename="{filename}"'
-            return response
+            filename = _safe_pdf_filename(treasury.treasury_code, 'TRS.pdf')
+            return _inline_pdf_response(pdf_content, filename)
         except Exception:
             logger.exception('Tenant treasury print stream failed')
             return JsonResponse({'error': 'Failed to render print PDF'}, status=500)
@@ -7030,13 +7161,9 @@ class TenantShipmentPrintView(View):
             shipment = TenantShipment.objects.select_related('truck').filter(pk=shipment_id).first()
             if not shipment:
                 return JsonResponse({'error': 'Shipment not found'}, status=404)
-            booking = (
-                TenantBooking.objects.select_related('cargo')
-                .filter(booking_no=shipment.booking_no)
-                .first()
-            )
-            html_content = render_to_string(
-                self.template_name,
+            booking = TenantBooking.objects.filter(booking_no=shipment.booking_no).first()
+            html_content = _render_printing_template_html(
+                'shipment_print_dynamic.html',
                 {
                     'shipment': shipment,
                     'booking': booking,
@@ -7049,10 +7176,8 @@ class TenantShipmentPrintView(View):
                 },
             )
             pdf_content = _render_pdf_from_html_bytes(html_content, page_size='A4', margin_cm='0.2')
-            filename = f'{(shipment.shipment_no or "SH").strip()}.pdf'
-            response = HttpResponse(pdf_content, content_type='application/pdf')
-            response['Content-Disposition'] = f'inline; filename="{filename}"'
-            return response
+            filename = _safe_pdf_filename(shipment.shipment_no, 'SH.pdf')
+            return _inline_pdf_response(pdf_content, filename)
         except Exception:
             logger.exception('Tenant shipment print stream failed')
             return JsonResponse({'error': 'Failed to render print PDF'}, status=500)
@@ -7112,7 +7237,11 @@ def _tenant_booking_form_options_context(tenant_registry, booking=None):
         cargo_items = list(
             TenantCargoMaster.active_objects.select_related('client_account').order_by('cargo_code')
         )
-    trucks = list(TruckMaster.active_objects.order_by('truck_code')) if has_table('tenant_truck_master') else []
+    trucks = (
+        list(TruckMaster.active_objects.select_related('default_driver_id').order_by('truck_code'))
+        if has_table('tenant_truck_master')
+        else []
+    )
     drivers = list(DriverMaster.active_objects.order_by('driver_code'))
 
     price_list_service_map = {}
@@ -7153,6 +7282,7 @@ def _tenant_booking_form_options_context(tenant_registry, booking=None):
             pl_map = trip_sell_overrides.setdefault(str(line.price_list_id), {})
             pl_map.setdefault(str(line.trip_service_id), {})[str(line.trip_type)] = str(line.sell_price_override)
 
+    booking_line_status_values = _tenant_booking_line_status_map(booking)
     form_data = {}
     if booking is not None:
         form_data = {
@@ -7172,6 +7302,14 @@ def _tenant_booking_form_options_context(tenant_registry, booking=None):
             'booking_line_driver_1': str(booking.assigned_driver_id or ''),
             'booking_line_cod_amount_1': str(booking.booking_line_cod_amount or ''),
             'booking_line_pod_doc_count_1': str(booking.booking_line_pod_doc_count or ''),
+            'booking_line_truck_2': str(booking.booking_line_backload_truck_id or ''),
+            'booking_line_driver_2': str(booking.booking_line_backload_driver_id or ''),
+            'booking_line_cod_amount_2': str(booking.booking_line_backload_cod_amount or ''),
+            'booking_line_pod_doc_count_2': str(booking.booking_line_backload_pod_doc_count or ''),
+            'loading_booking_item_1': booking.loading_booking_item,
+            'loading_address_1': str(booking.loading_address_id or ''),
+            'delivery_booking_item_1': booking.delivery_booking_item,
+            'delivery_address_1': str(booking.delivery_address_id or ''),
             'cargo_booking_item_1': booking.cargo_booking_item,
             'cargo_id_1': str(booking.cargo_id or ''),
             'cargo_weight_1': str(booking.cargo_weight or ''),
@@ -7196,6 +7334,7 @@ def _tenant_booking_form_options_context(tenant_registry, booking=None):
         'booking_drivers': drivers,
         'booking_service_sell_overrides': service_sell_overrides,
         'booking_trip_sell_overrides': trip_sell_overrides,
+        'booking_line_status_values': booking_line_status_values,
         'booking_line_type_options': ('Outbound', 'Backload'),
         'booking_order_type_options': ('Credit', 'COD'),
         'booking_trip_type_options': ('One-Way', 'Round'),
@@ -7204,6 +7343,43 @@ def _tenant_booking_form_options_context(tenant_registry, booking=None):
         'booking_form_data': form_data,
         'tenant_schema_name': tenant_registry.schema_name,
     }
+
+
+def _tenant_booking_shipment_line_key(booking, booking_item_type):
+    line_type = (booking_item_type or '').strip().lower()
+    if booking is not None and booking.trip_type == 'Round' and line_type in {'backload', 'inbound'}:
+        return 'Backload'
+    return 'Outbound'
+
+
+def _tenant_booking_line_status_from_shipment(shipment):
+    if shipment.shipment_status == TenantShipment.ShipmentStatus.CREATED:
+        return 'Shipment Created'
+    if shipment.shipment_status == TenantShipment.ShipmentStatus.IN_TRANSIT:
+        return 'In Transit'
+    if shipment.shipment_status == TenantShipment.ShipmentStatus.DELIVERED:
+        if shipment.pod_status == TenantShipment.PodStatus.COMPLIANT:
+            return 'POD Complete'
+        return 'Delivered'
+    if shipment.shipment_status == TenantShipment.ShipmentStatus.CLOSED:
+        return 'Closed'
+    if shipment.shipment_status == TenantShipment.ShipmentStatus.CANCELLED:
+        return 'Cancelled'
+    return shipment.shipment_status or 'Shipment Created'
+
+
+def _tenant_booking_line_status_map(booking):
+    status_map = {'Outbound': 'Draft', 'Backload': 'Draft'}
+    if booking is None or not (booking.booking_no or '').strip():
+        return status_map
+    shipments = (
+        TenantShipment.objects.filter(booking_no=booking.booking_no)
+        .order_by('created_at', 'updated_at')
+    )
+    for shipment in shipments:
+        line_key = _tenant_booking_shipment_line_key(booking, shipment.booking_item_type)
+        status_map[line_key] = _tenant_booking_line_status_from_shipment(shipment)
+    return status_map
 
 
 def _tenant_booking_route_from_lookup(route_lookup):
@@ -7221,8 +7397,12 @@ def _tenant_booking_route_from_lookup(route_lookup):
     return route, route_direction, route_display
 
 
-def _decimal_from_request(request, field_name, default='0'):
-    raw_value = (request.POST.get(field_name) or '').strip()
+def _decimal_from_request(request, *field_names, default='0'):
+    raw_value = ''
+    for field_name in field_names:
+        raw_value = (request.POST.get(field_name) or '').strip()
+        if raw_value:
+            break
     if not raw_value:
         raw_value = default
     try:
@@ -7231,8 +7411,12 @@ def _decimal_from_request(request, field_name, default='0'):
         return Decimal(default)
 
 
-def _int_from_request(request, field_name, default=0):
-    raw_value = (request.POST.get(field_name) or '').strip()
+def _int_from_request(request, *field_names, default=0):
+    raw_value = ''
+    for field_name in field_names:
+        raw_value = (request.POST.get(field_name) or '').strip()
+        if raw_value:
+            break
     try:
         return int(raw_value)
     except Exception:
@@ -7247,23 +7431,51 @@ def _first_post_value(request, *field_names):
     return ''
 
 
-def _tenant_booking_extra_payload(request):
-    available_tables = set(connection.introspection.table_names())
-    has_table = available_tables.__contains__
+def _tenant_booking_line_assignment(request, line_no, has_table):
     truck = None
-    truck_id = _first_post_value(request, 'booking_line_truck_1', 'assigned_truck_id', 'assigned_truck')
+    truck_id = _first_post_value(request, f'booking_line_truck_{line_no}')
+    if line_no == 1 and not truck_id:
+        truck_id = _first_post_value(request, 'assigned_truck_id', 'assigned_truck')
     if truck_id and has_table('tenant_truck_master'):
-        truck = TruckMaster.objects.filter(
+        truck = TruckMaster.objects.select_related('default_driver_id').filter(
             pk=truck_id
         ).first()
+
     driver = None
-    driver_id = _first_post_value(request, 'booking_line_driver_1', 'assigned_driver_id', 'assigned_driver')
+    driver_id = _first_post_value(request, f'booking_line_driver_{line_no}')
+    if line_no == 1 and not driver_id:
+        driver_id = _first_post_value(request, 'assigned_driver_id', 'assigned_driver')
     if driver_id and has_table('tenant_driver_master'):
         driver = DriverMaster.objects.filter(
             pk=driver_id
         ).first()
     if driver is None and truck and truck.default_driver_id:
         driver = truck.default_driver_id
+    if truck is None and driver and has_table('tenant_truck_master'):
+        truck = TruckMaster.active_objects.select_related('default_driver_id').filter(
+            default_driver_id=driver,
+        ).order_by('truck_code').first()
+
+    return truck, driver
+
+
+def _tenant_booking_extra_payload(request):
+    available_tables = set(connection.introspection.table_names())
+    has_table = available_tables.__contains__
+    truck, driver = _tenant_booking_line_assignment(request, 1, has_table)
+    backload_truck, backload_driver = _tenant_booking_line_assignment(request, 2, has_table)
+    loading_address = None
+    loading_address_id = _first_post_value(request, 'loading_address_1')
+    if loading_address_id and has_table('tenant_address_master'):
+        loading_address = TenantAddressMaster.active_objects.filter(
+            pk=loading_address_id,
+        ).first()
+    delivery_address = None
+    delivery_address_id = _first_post_value(request, 'delivery_address_1')
+    if delivery_address_id and has_table('tenant_address_master'):
+        delivery_address = TenantAddressMaster.active_objects.filter(
+            pk=delivery_address_id,
+        ).first()
     cargo = None
     cargo_id = _first_post_value(request, 'cargo_id_1', 'cargo_id', 'cargo')
     if cargo_id and has_table('tenant_cargo_master'):
@@ -7284,8 +7496,28 @@ def _tenant_booking_extra_payload(request):
     return {
         'assigned_truck': truck,
         'assigned_driver': driver,
-        'booking_line_cod_amount': _decimal_from_request(request, 'booking_line_cod_amount_1'),
-        'booking_line_pod_doc_count': _int_from_request(request, 'booking_line_pod_doc_count_1'),
+        'booking_line_cod_amount': _decimal_from_request(
+            request,
+            'booking_line_cod_amount_1',
+        ),
+        'booking_line_pod_doc_count': _int_from_request(
+            request,
+            'booking_line_pod_doc_count_1',
+        ),
+        'booking_line_backload_truck': backload_truck,
+        'booking_line_backload_driver': backload_driver,
+        'booking_line_backload_cod_amount': _decimal_from_request(
+            request,
+            'booking_line_cod_amount_2',
+        ),
+        'booking_line_backload_pod_doc_count': _int_from_request(
+            request,
+            'booking_line_pod_doc_count_2',
+        ),
+        'loading_booking_item': (request.POST.get('loading_booking_item_1') or '').strip(),
+        'loading_address': loading_address,
+        'delivery_booking_item': (request.POST.get('delivery_booking_item_1') or '').strip(),
+        'delivery_address': delivery_address,
         'cargo_booking_item': cargo_booking_item,
         'cargo': cargo,
         'cargo_weight': cargo_weight,
@@ -7374,7 +7606,9 @@ class TenantOperationBookingCreateView(View):
 
             trucks = []
             if has_table('tenant_truck_master'):
-                trucks = list(TruckMaster.active_objects.order_by('truck_code'))
+                trucks = list(
+                    TruckMaster.active_objects.select_related('default_driver_id').order_by('truck_code')
+                )
             driver_ids = sorted(
                 {
                     str(truck.default_driver_id).strip()
@@ -7458,6 +7692,7 @@ class TenantOperationBookingCreateView(View):
                     'booking_drivers': list(DriverMaster.active_objects.order_by('driver_code')),
                     'booking_service_sell_overrides': service_sell_overrides,
                     'booking_trip_sell_overrides': trip_sell_overrides,
+                    'booking_line_status_values': {'Outbound': 'Draft', 'Backload': 'Draft'},
                     'booking_line_type_options': ('Outbound', 'Backload'),
                     'booking_order_type_options': ('Credit', 'COD'),
                     'booking_trip_type_options': ('One-Way', 'Round'),
@@ -7794,6 +8029,8 @@ class TenantOperationBookingDetailView(View):
                     'route__destination_point',
                     'assigned_truck',
                     'assigned_driver',
+                    'booking_line_backload_truck',
+                    'booking_line_backload_driver',
                     'cargo',
                 )
                 .filter(pk=booking_id)
@@ -7803,6 +8040,7 @@ class TenantOperationBookingDetailView(View):
                 messages.error(request, 'Booking not found.', extra_tags='tenant')
                 return _tenant_redirect(request, 'iroad_tenants:tenant_operation_booking_list')
 
+            line_status_values = _tenant_booking_line_status_map(booking)
             booking_lines = []
             if booking.trip_type:
                 line_types = ['Outbound', 'Backload'] if booking.trip_type == 'Round' else ['Outbound']
@@ -7820,17 +8058,28 @@ class TenantOperationBookingDetailView(View):
                 selected_route = booking.route_display or forward_route
                 opposite_route = reverse_route if selected_route == forward_route else forward_route
                 for idx, line_type in enumerate(line_types, start=1):
+                    is_backload = line_type == 'Backload'
+                    line_truck = booking.booking_line_backload_truck if is_backload else booking.assigned_truck
+                    line_driver = booking.booking_line_backload_driver if is_backload else booking.assigned_driver
                     booking_lines.append(
                         {
                             'sn': idx,
                             'code': f'{line_type[:2].upper()}-{idx:03d}',
                             'type': line_type,
-                            'status': 'Draft',
-                            'route': opposite_route if line_type == 'Backload' else selected_route,
-                            'truck': booking.assigned_truck.truck_code if booking.assigned_truck else '-',
-                            'driver': str(booking.assigned_driver) if booking.assigned_driver else '-',
-                            'cod_amount': booking.booking_line_cod_amount,
-                            'pod_doc_count': booking.booking_line_pod_doc_count,
+                            'status': line_status_values.get(line_type, 'Draft'),
+                            'route': opposite_route if is_backload else selected_route,
+                            'truck': line_truck.truck_code if line_truck else '-',
+                            'driver': str(line_driver) if line_driver else '-',
+                            'cod_amount': (
+                                booking.booking_line_backload_cod_amount
+                                if is_backload
+                                else booking.booking_line_cod_amount
+                            ),
+                            'pod_doc_count': (
+                                booking.booking_line_backload_pod_doc_count
+                                if is_backload
+                                else booking.booking_line_pod_doc_count
+                            ),
                         }
                     )
 
@@ -8000,6 +8249,15 @@ def _tenant_shipment_form_options_context(tenant_registry):
             'client_account',
             'service_item',
             'route',
+            'route__origin_point',
+            'route__destination_point',
+            'assigned_truck',
+            'assigned_driver',
+            'booking_line_backload_truck',
+            'booking_line_backload_driver',
+            'loading_address',
+            'delivery_address',
+            'cargo',
         )
         .exclude(booking_status=TenantBooking.Status.CANCELLED)
         .order_by('-created_at')[:500]
@@ -8029,8 +8287,18 @@ def _tenant_shipment_form_options_context(tenant_registry):
             TenantCargoMaster.active_objects.select_related('client_account').order_by('cargo_code')
         )
     shipment_pod_type_values = {choice[0] for choice in TenantShipment.PodType.choices}
+    booking_no_rows = []
+    seen_booking_nos = set()
     booking_rows = []
     for booking in booking_options:
+        if booking.booking_no not in seen_booking_nos:
+            seen_booking_nos.add(booking.booking_no)
+            booking_no_rows.append(
+                {
+                    'booking_no': booking.booking_no,
+                    'client_account_id': str(booking.client_account_id),
+                }
+            )
         service_label = ''
         if booking.service_item_id and booking.service_item:
             service_label = f'{booking.service_item.service_code} - {booking.service_item.english_name}'
@@ -8043,29 +8311,58 @@ def _tenant_shipment_form_options_context(tenant_registry):
             else TenantShipment.SourcingMode.IN_SOURCE
         )
         pod_type = booking.pod_type if booking.pod_type in shipment_pod_type_values else ''
-        booking_rows.append(
-            {
-                'booking_no': booking.booking_no,
-                'client_account_id': str(booking.client_account_id),
-                'booking_item': service_label,
-                'booking_item_type': 'Inbound' if booking.route_direction == 'reverse' else 'Outbound',
-                'route_display': booking.route_display or '',
-                'order_type': booking.order_type or '',
-                'sourcing_mode': shipment_sourcing_mode,
-                'pod_type': pod_type,
-                'pod_doc_count': booking.booking_line_pod_doc_count or 0,
-                'pod_status': booking.pod_status or '',
-                'cod_amount': booking.booking_line_cod_amount or 0,
-                'cargo_id': str(booking.cargo_id or ''),
-                'cargo_weight': booking.cargo_weight or 0,
-                'cargo_unit': booking.cargo_unit or '',
-                'cargo_qty': booking.cargo_qty or 0,
-                'total_cargo_qty': booking.total_cargo_qty or 0,
-                'total_cargo_weight': booking.total_cargo_weight or 0,
-            }
-        )
+        forward_route = ''
+        reverse_route = ''
+        if booking.route:
+            forward_route = (
+                f'{booking.route.origin_point.display_label} '
+                f'To {booking.route.destination_point.display_label}'
+            )
+            reverse_route = (
+                f'{booking.route.destination_point.display_label} '
+                f'To {booking.route.origin_point.display_label}'
+            )
+        selected_route = booking.route_display or forward_route
+        opposite_route = reverse_route if selected_route == forward_route else forward_route
+        line_types = ['Outbound', 'Backload'] if booking.trip_type == 'Round' else [
+            'Inbound' if booking.route_direction == 'reverse' else 'Outbound'
+        ]
+        for line_type in line_types:
+            is_backload = line_type == 'Backload'
+            booking_rows.append(
+                {
+                    'booking_no': booking.booking_no,
+                    'client_account_id': str(booking.client_account_id),
+                    'booking_item': service_label,
+                    'booking_item_type': line_type,
+                    'route_display': opposite_route if is_backload else selected_route,
+                    'order_type': booking.order_type or '',
+                    'sourcing_mode': shipment_sourcing_mode,
+                    'pod_type': pod_type,
+                    'pod_doc_count': (
+                        booking.booking_line_backload_pod_doc_count
+                        if is_backload
+                        else booking.booking_line_pod_doc_count
+                    ) or 0,
+                    'pod_status': booking.pod_status or '',
+                    'cod_amount': (
+                        booking.booking_line_backload_cod_amount
+                        if is_backload
+                        else booking.booking_line_cod_amount
+                    ) or 0,
+                    'loading_address_id': str(booking.loading_address_id or ''),
+                    'delivery_address_id': str(booking.delivery_address_id or ''),
+                    'cargo_id': str(booking.cargo_id or ''),
+                    'cargo_weight': booking.cargo_weight or 0,
+                    'cargo_unit': booking.cargo_unit or '',
+                    'cargo_qty': booking.cargo_qty or 0,
+                    'total_cargo_qty': booking.total_cargo_qty or 0,
+                    'total_cargo_weight': booking.total_cargo_weight or 0,
+                }
+            )
     return {
         'shipment_client_accounts': client_accounts,
+        'shipment_booking_no_options': booking_no_rows,
         'shipment_booking_options': booking_rows,
         'shipment_loading_addresses': loading_addresses,
         'shipment_delivery_addresses': delivery_addresses,
@@ -8074,8 +8371,32 @@ def _tenant_shipment_form_options_context(tenant_registry):
     }
 
 
+def _tenant_shipment_is_backload_line(booking, booking_item_type):
+    line_type = (booking_item_type or '').strip().lower()
+    return booking is not None and booking.trip_type == 'Round' and line_type in {'backload', 'inbound'}
+
+
+def _tenant_shipment_line_truck_driver(booking, booking_item_type):
+    if booking is None:
+        return None, None
+    if _tenant_shipment_is_backload_line(booking, booking_item_type):
+        return booking.booking_line_backload_truck, booking.booking_line_backload_driver
+    return booking.assigned_truck, booking.assigned_driver
+
+
+def _tenant_driver_ref(driver):
+    if driver is None:
+        return ''
+    return f'{driver.driver_code} - {driver.arabic_name}'
+
+
 def _tenant_shipment_form_data_from_instance(shipment):
-    booking = TenantBooking.objects.select_related('client_account', 'cargo').filter(
+    booking = TenantBooking.objects.select_related(
+        'client_account',
+        'cargo',
+        'loading_address',
+        'delivery_address',
+    ).filter(
         booking_no=shipment.booking_no,
     ).first()
     client_account_id = str(booking.client_account_id or '') if booking else ''
@@ -8092,6 +8413,8 @@ def _tenant_shipment_form_data_from_instance(shipment):
         'pod_doc_count': str(shipment.pod_doc_count or 0),
         'pod_status': shipment.pod_status,
         'cod_amount': str(shipment.cod_amount or ''),
+        'loading_address': str(booking.loading_address_id or '') if booking else '',
+        'delivery_address': str(booking.delivery_address_id or '') if booking else '',
         'cargo_booking_item': booking.cargo_booking_item if booking else '',
         'cargo_id': str(booking.cargo_id or '') if booking else '',
         'cargo_weight': str(booking.cargo_weight or '0') if booking else '0',
@@ -8188,6 +8511,8 @@ class TenantOperationShipmentCreateView(View):
                         'service_item',
                         'assigned_truck',
                         'assigned_driver',
+                        'booking_line_backload_truck',
+                        'booking_line_backload_driver',
                     )
                     .filter(
                         booking_no=shipment_form_data['booking_no'],
@@ -8291,12 +8616,11 @@ class TenantOperationShipmentCreateView(View):
             trip_type = ''
             if selected_booking is not None:
                 trip_type = selected_booking.trip_type or ''
-                truck = selected_booking.assigned_truck
-                if selected_booking.assigned_driver:
-                    driver_ref = (
-                        f'{selected_booking.assigned_driver.driver_code} - '
-                        f'{selected_booking.assigned_driver.arabic_name}'
-                    )
+                truck, selected_driver = _tenant_shipment_line_truck_driver(
+                    selected_booking,
+                    shipment_form_data['booking_item_type'],
+                )
+                driver_ref = _tenant_driver_ref(selected_driver)
                 if selected_booking.price_list:
                     sales_order_ref = selected_booking.price_list.price_list_code or ''
                 if selected_booking.service_item:
@@ -8510,6 +8834,8 @@ class TenantOperationShipmentEditView(View):
                         'service_item',
                         'assigned_truck',
                         'assigned_driver',
+                        'booking_line_backload_truck',
+                        'booking_line_backload_driver',
                     )
                     .filter(
                         booking_no=shipment_form_data['booking_no'],
@@ -8588,12 +8914,11 @@ class TenantOperationShipmentEditView(View):
             trip_type = ''
             if selected_booking is not None:
                 trip_type = selected_booking.trip_type or ''
-                truck = selected_booking.assigned_truck
-                if selected_booking.assigned_driver:
-                    driver_ref = (
-                        f'{selected_booking.assigned_driver.driver_code} - '
-                        f'{selected_booking.assigned_driver.arabic_name}'
-                    )
+                truck, selected_driver = _tenant_shipment_line_truck_driver(
+                    selected_booking,
+                    shipment_form_data['booking_item_type'],
+                )
+                driver_ref = _tenant_driver_ref(selected_driver)
                 if selected_booking.price_list:
                     sales_order_ref = selected_booking.price_list.price_list_code or ''
                 if selected_booking.service_item:
@@ -8793,8 +9118,10 @@ class TenantOperationShipmentDocumentsListView(View):
 
 class TenantOperationShipmentDocumentsCreateView(View):
     template_name = 'iroad_tenants/Operation_management/Shipment_Document/Shipment-documents.html'
+    line_completion_statuses = {'Completed', 'Not Completed'}
+    line_signer_locations = {'With Driver', 'In Company', 'With Client'}
 
-    def _form_context(self, tenant_registry, form_data=None, form_errors=None, document=None):
+    def _form_context(self, tenant_registry, form_data=None, form_errors=None, document=None, line_rows=None):
         shipments = list(TenantShipment.objects.order_by('-created_at')[:500])
         booking_options = []
         seen_booking_nos = set()
@@ -8809,10 +9136,11 @@ class TenantOperationShipmentDocumentsCreateView(View):
                     'booking_item': shipment.booking_item_ref or '',
                 }
             )
-        line_rows = []
-        if document is not None:
+        if line_rows is None:
+            line_rows = []
+        if not line_rows and document is not None:
             for line in document.pod_pages.all():
-                status = line.soft_copy_status or 'pending'
+                status = line.soft_copy_status or 'Not Completed'
                 has_meaningful_value = any([
                     line.source,
                     line.action_log,
@@ -8844,7 +9172,7 @@ class TenantOperationShipmentDocumentsCreateView(View):
                 'record_date': timezone.localdate().isoformat(),
                 'document_date': timezone.localdate().isoformat(),
                 'page_count': '1',
-                'status': TenantShipmentDocument.Status.DRAFT,
+                'status': TenantShipmentDocument.Status.PENDING,
             },
             'shipment_document_form_errors': form_errors or {},
             'shipment_document_booking_options': booking_options,
@@ -8854,6 +9182,78 @@ class TenantOperationShipmentDocumentsCreateView(View):
             'shipment_document_line_rows': line_rows,
             'tenant_schema_name': tenant_registry.schema_name,
         }
+
+    def _line_rows_from_request(self, request, form_data):
+        line_extra_refs = request.POST.getlist('line_extra_ref[]')
+        line_page_nos = request.POST.getlist('line_page_no[]')
+        line_statuses = request.POST.getlist('line_status[]')
+        line_locations = request.POST.getlist('line_physical_location[]')
+        line_attachments = request.FILES.getlist('line_attachment[]')
+        line_existing_attachment_labels = request.POST.getlist('line_existing_attachment_label[]')
+        max_lines = max(
+            len(request.POST.getlist('line_doc_ref_no[]')),
+            len(line_extra_refs),
+            len(line_page_nos),
+            len(line_statuses),
+            len(line_locations),
+            len(line_attachments),
+            len(line_existing_attachment_labels),
+            1,
+        )
+        is_delivery_note = bool(form_data.get('is_delivery_note'))
+        rows = []
+        errors = []
+        for idx in range(max_lines):
+            extra_ref = line_extra_refs[idx].strip() if idx < len(line_extra_refs) else ''
+            page_no = line_page_nos[idx].strip() if idx < len(line_page_nos) else ''
+            line_status = line_statuses[idx].strip() if idx < len(line_statuses) else ''
+            line_location = line_locations[idx].strip() if idx < len(line_locations) else ''
+            existing_attachment_label = (
+                line_existing_attachment_labels[idx].strip()
+                if idx < len(line_existing_attachment_labels)
+                else ''
+            )
+            attachment = request.FILES.get(f'line_attachment_{idx}')
+            if attachment is None and idx < len(line_attachments):
+                attachment = line_attachments[idx]
+            attachment_label = attachment.name if attachment is not None else existing_attachment_label
+            if not any([extra_ref, page_no, line_status, line_location, attachment_label]) and idx > 0:
+                continue
+            if not page_no:
+                page_no = str(len(rows) + 1)
+            if is_delivery_note:
+                line_status = line_status or 'Not Completed'
+            else:
+                line_status = ''
+            row = {
+                'doc_ref_no': form_data.get('document_ref_no', ''),
+                'extra_ref': extra_ref,
+                'page_no': page_no,
+                'status': line_status,
+                'physical_location': line_location,
+                'attachment_label': attachment_label,
+            }
+            row_no = len(rows) + 1
+            if not page_no.isdigit() or int(page_no) < 1:
+                errors.append(f'Line {row_no}: Page No must be a positive number.')
+            if is_delivery_note and line_status not in self.line_completion_statuses:
+                errors.append(f'Line {row_no}: Status must be Completed or Not Completed.')
+            if line_location not in self.line_signer_locations:
+                errors.append(f'Line {row_no}: Signer Location is required.')
+            if not attachment_label:
+                errors.append(f'Line {row_no}: Attachment is required.')
+            rows.append(row)
+        if not rows:
+            rows.append({
+                'doc_ref_no': form_data.get('document_ref_no', ''),
+                'extra_ref': '',
+                'page_no': '1',
+                'status': 'Not Completed' if is_delivery_note else '',
+                'physical_location': '',
+                'attachment_label': '',
+            })
+            errors.append('At least one document page line is required.')
+        return rows, errors
 
     def _form_data_from_document(self, document):
         return {
@@ -8917,9 +9317,11 @@ class TenantOperationShipmentDocumentsCreateView(View):
                 'is_delivery_note': request.POST.get('is_delivery_note') == 'on',
                 'physical_location': (request.POST.get('physical_location') or '').strip(),
                 'page_count': (request.POST.get('page_count') or '').strip(),
-                'status': (request.POST.get('status') or TenantShipmentDocument.Status.DRAFT).strip(),
+                'status': (request.POST.get('status') or TenantShipmentDocument.Status.PENDING).strip(),
                 'notes': (request.POST.get('notes') or '').strip(),
             }
+            if form_data['document_type'] == 'Delivery Note':
+                form_data['is_delivery_note'] = True
             form_errors = {}
             required_fields = {
                 'booking_no': 'Booking No is required.',
@@ -8940,10 +9342,11 @@ class TenantOperationShipmentDocumentsCreateView(View):
             if document_date is None:
                 form_errors['document_date'] = 'Document Date must be a valid date.'
                 document_date = timezone.localdate()
-            page_count = _int_from_request(request, 'page_count', default=1)
-            if page_count < 1:
-                form_errors['page_count'] = 'Page Count must be at least 1.'
-                page_count = 1
+            line_rows, line_errors = self._line_rows_from_request(request, form_data)
+            page_count = max(len(line_rows), 1)
+            form_data['page_count'] = str(page_count)
+            if line_errors:
+                form_errors['page_count'] = 'Please fix the subform line fields.'
             valid_statuses = {value for value, _ in TenantShipmentDocument.Status.choices}
             if form_data['status'] not in valid_statuses:
                 form_errors['status'] = 'Invalid status selected.'
@@ -8960,8 +9363,14 @@ class TenantOperationShipmentDocumentsCreateView(View):
                         form_errors['booking_item'] = 'Booking Item must match the selected shipment.'
 
             if form_errors:
-                context.update(self._form_context(tenant_registry, form_data=form_data, form_errors=form_errors))
-                messages.error(request, 'Please fix the highlighted errors.', extra_tags='tenant')
+                context.update(self._form_context(
+                    tenant_registry,
+                    form_data=form_data,
+                    form_errors=form_errors,
+                    line_rows=line_rows,
+                ))
+                detail = ' '.join(line_errors) if line_errors else 'Please fix the highlighted errors.'
+                messages.error(request, detail, extra_tags='tenant')
                 return render(request, self.template_name, context)
 
             record_no = ''
@@ -9000,45 +9409,16 @@ class TenantOperationShipmentDocumentsCreateView(View):
                 created_by_label=(context.get('display_name') or '').strip(),
             )
 
-            line_doc_refs = request.POST.getlist('line_doc_ref_no[]')
-            line_extra_refs = request.POST.getlist('line_extra_ref[]')
-            line_page_nos = request.POST.getlist('line_page_no[]')
-            line_statuses = request.POST.getlist('line_status[]')
-            line_locations = request.POST.getlist('line_physical_location[]')
-            line_attachments = request.FILES.getlist('line_attachment[]')
-            line_existing_attachment_labels = request.POST.getlist('line_existing_attachment_label[]')
-            max_lines = max(
-                len(line_doc_refs),
-                len(line_extra_refs),
-                len(line_page_nos),
-                len(line_statuses),
-                len(line_locations),
-                len(line_attachments),
-                len(line_existing_attachment_labels),
-            )
-            for idx in range(max_lines):
-                doc_ref = line_doc_refs[idx].strip() if idx < len(line_doc_refs) else ''
-                extra_ref = line_extra_refs[idx].strip() if idx < len(line_extra_refs) else ''
-                page_no = line_page_nos[idx].strip() if idx < len(line_page_nos) else ''
-                line_status = line_statuses[idx].strip() if idx < len(line_statuses) else ''
-                line_location = line_locations[idx].strip() if idx < len(line_locations) else ''
-                existing_attachment_label = (
-                    line_existing_attachment_labels[idx].strip()
-                    if idx < len(line_existing_attachment_labels)
-                    else ''
-                )
-                attachment_label = line_attachments[idx].name if idx < len(line_attachments) else existing_attachment_label
-                if not any([doc_ref, extra_ref, page_no, line_location, attachment_label]):
-                    continue
+            for idx, line in enumerate(line_rows):
                 TenantShipmentPodPage.objects.create(
                     document=document,
                     line_no=idx + 1,
-                    doc_page=page_no,
-                    source=doc_ref,
-                    action_log=extra_ref,
-                    physical_location=line_location,
-                    soft_copy_status=line_status,
-                    attachment_label=attachment_label,
+                    doc_page=line['page_no'],
+                    source=form_data['document_ref_no'],
+                    action_log=line['extra_ref'],
+                    physical_location=line['physical_location'],
+                    soft_copy_status=line['status'],
+                    attachment_label=line['attachment_label'],
                 )
 
             messages.success(request, f'Shipment document {document.record_no} created successfully.', extra_tags='tenant')
@@ -9109,9 +9489,11 @@ class TenantOperationShipmentDocumentsEditView(TenantOperationShipmentDocumentsC
                 'is_delivery_note': request.POST.get('is_delivery_note') == 'on',
                 'physical_location': (request.POST.get('physical_location') or '').strip(),
                 'page_count': (request.POST.get('page_count') or '').strip(),
-                'status': (request.POST.get('status') or TenantShipmentDocument.Status.DRAFT).strip(),
+                'status': (request.POST.get('status') or TenantShipmentDocument.Status.PENDING).strip(),
                 'notes': (request.POST.get('notes') or '').strip(),
             }
+            if form_data['document_type'] == 'Delivery Note':
+                form_data['is_delivery_note'] = True
             form_errors = {}
             for field_name, message in {
                 'booking_no': 'Booking No is required.',
@@ -9131,10 +9513,11 @@ class TenantOperationShipmentDocumentsEditView(TenantOperationShipmentDocumentsC
             if document_date is None:
                 form_errors['document_date'] = 'Document Date must be a valid date.'
                 document_date = timezone.localdate()
-            page_count = _int_from_request(request, 'page_count', default=1)
-            if page_count < 1:
-                form_errors['page_count'] = 'Page Count must be at least 1.'
-                page_count = 1
+            line_rows, line_errors = self._line_rows_from_request(request, form_data)
+            page_count = max(len(line_rows), 1)
+            form_data['page_count'] = str(page_count)
+            if line_errors:
+                form_errors['page_count'] = 'Please fix the subform line fields.'
             valid_statuses = {value for value, _ in TenantShipmentDocument.Status.choices}
             if form_data['status'] not in valid_statuses:
                 form_errors['status'] = 'Invalid status selected.'
@@ -9149,8 +9532,15 @@ class TenantOperationShipmentDocumentsEditView(TenantOperationShipmentDocumentsC
                     form_errors['booking_item'] = 'Booking Item must match the selected shipment.'
 
             if form_errors:
-                context.update(self._form_context(tenant_registry, form_data=form_data, form_errors=form_errors, document=document))
-                messages.error(request, 'Please fix the highlighted errors.', extra_tags='tenant')
+                context.update(self._form_context(
+                    tenant_registry,
+                    form_data=form_data,
+                    form_errors=form_errors,
+                    document=document,
+                    line_rows=line_rows,
+                ))
+                detail = ' '.join(line_errors) if line_errors else 'Please fix the highlighted errors.'
+                messages.error(request, detail, extra_tags='tenant')
                 return render(request, self.template_name, context)
 
             document.record_date = record_date
@@ -9182,45 +9572,16 @@ class TenantOperationShipmentDocumentsEditView(TenantOperationShipmentDocumentsC
             ])
 
             TenantShipmentPodPage.objects.filter(document=document).delete()
-            line_doc_refs = request.POST.getlist('line_doc_ref_no[]')
-            line_extra_refs = request.POST.getlist('line_extra_ref[]')
-            line_page_nos = request.POST.getlist('line_page_no[]')
-            line_statuses = request.POST.getlist('line_status[]')
-            line_locations = request.POST.getlist('line_physical_location[]')
-            line_attachments = request.FILES.getlist('line_attachment[]')
-            line_existing_attachment_labels = request.POST.getlist('line_existing_attachment_label[]')
-            max_lines = max(
-                len(line_doc_refs),
-                len(line_extra_refs),
-                len(line_page_nos),
-                len(line_statuses),
-                len(line_locations),
-                len(line_attachments),
-                len(line_existing_attachment_labels),
-            )
-            for idx in range(max_lines):
-                doc_ref = line_doc_refs[idx].strip() if idx < len(line_doc_refs) else ''
-                extra_ref = line_extra_refs[idx].strip() if idx < len(line_extra_refs) else ''
-                page_no = line_page_nos[idx].strip() if idx < len(line_page_nos) else ''
-                line_status = line_statuses[idx].strip() if idx < len(line_statuses) else ''
-                line_location = line_locations[idx].strip() if idx < len(line_locations) else ''
-                existing_attachment_label = (
-                    line_existing_attachment_labels[idx].strip()
-                    if idx < len(line_existing_attachment_labels)
-                    else ''
-                )
-                attachment_label = line_attachments[idx].name if idx < len(line_attachments) else existing_attachment_label
-                if not any([doc_ref, extra_ref, page_no, line_location, attachment_label]):
-                    continue
+            for idx, line in enumerate(line_rows):
                 TenantShipmentPodPage.objects.create(
                     document=document,
                     line_no=idx + 1,
-                    doc_page=page_no,
-                    source=doc_ref,
-                    action_log=extra_ref,
-                    physical_location=line_location,
-                    soft_copy_status=line_status,
-                    attachment_label=attachment_label,
+                    doc_page=line['page_no'],
+                    source=form_data['document_ref_no'],
+                    action_log=line['extra_ref'],
+                    physical_location=line['physical_location'],
+                    soft_copy_status=line['status'],
+                    attachment_label=line['attachment_label'],
                 )
 
             messages.success(request, f'Shipment document {document.record_no} updated successfully.', extra_tags='tenant')
@@ -9417,6 +9778,39 @@ class TenantOperationShipmentPodCreateView(View):
         'digital': TenantShipment.PodType.DIGITAL,
     }
 
+    @staticmethod
+    def _tenant_user_display_label(user):
+        label = (getattr(user, 'full_name', '') or getattr(user, 'username', '') or '').strip()
+        username = (getattr(user, 'username', '') or '').strip()
+        if username and username not in label:
+            label = f'{label} ({username})' if label else username
+        return label
+
+    @classmethod
+    def _user_holder_value_from_label(cls, user_label):
+        normalized_label = (user_label or '').strip()
+        if not normalized_label:
+            return ''
+        for user in TenantUser.objects.filter(status=TenantUser.Status.ACTIVE).only('user_id', 'full_name', 'username'):
+            if cls._tenant_user_display_label(user) == normalized_label:
+                return str(user.user_id)
+        return ''
+
+    @classmethod
+    def _user_holder_label_from_value(cls, user_holder_value):
+        user_holder_value = (user_holder_value or '').strip()
+        if not user_holder_value:
+            return ''
+        try:
+            user_id = uuid.UUID(user_holder_value)
+        except ValueError:
+            return ''
+        user = TenantUser.objects.filter(
+            user_id=user_id,
+            status=TenantUser.Status.ACTIVE,
+        ).only('full_name', 'username').first()
+        return cls._tenant_user_display_label(user) if user is not None else ''
+
     def _document_form_data(self, document=None, shipment=None):
         if document is None:
             return {
@@ -9433,6 +9827,7 @@ class TenantOperationShipmentPodCreateView(View):
                 'shipment_ref': '',
                 'pod_type': '',
                 'physical_location': '',
+                'user_holder': '',
             }
         pod_type = (getattr(shipment, 'pod_type', '') or '').strip().lower()
         return {
@@ -9449,10 +9844,48 @@ class TenantOperationShipmentPodCreateView(View):
             'shipment_ref': document.shipment_ref,
             'pod_type': pod_type,
             'physical_location': document.physical_location,
+            'user_holder': self._user_holder_value_from_label(document.created_by_label),
         }
 
     def _form_context(self, tenant_registry, form_data=None, form_errors=None, document=None):
         shipments = list(TenantShipment.objects.order_by('-created_at')[:500])
+        document_ref_options = []
+        seen_document_refs = set()
+        for row in TenantShipmentDocument.objects.order_by('-created_at')[:500]:
+            document_ref_no = (row.document_ref_no or '').strip()
+            if not document_ref_no:
+                continue
+            option_key = (row.shipment_ref or '', document_ref_no)
+            if option_key in seen_document_refs:
+                continue
+            seen_document_refs.add(option_key)
+            document_ref_options.append(
+                {
+                    'document_ref_no': document_ref_no,
+                    'shipment_ref': row.shipment_ref or '',
+                    'document_type': row.document_type or '',
+                    'document_date': row.document_date.isoformat() if row.document_date else '',
+                    'page_count': row.page_count or 1,
+                }
+            )
+        user_options = list(
+            TenantUser.objects.filter(status=TenantUser.Status.ACTIVE)
+            .order_by('full_name', 'username')
+            .values('user_id', 'full_name', 'username')
+        )
+        booking_no_options = []
+        booking_item_options = []
+        seen_booking_nos = set()
+        seen_booking_items = set()
+        for row in shipments:
+            booking_no = (row.booking_no or '').strip()
+            if booking_no and booking_no not in seen_booking_nos:
+                booking_no_options.append(booking_no)
+                seen_booking_nos.add(booking_no)
+            booking_item = (row.booking_item_ref or '').strip()
+            if booking_item and booking_item not in seen_booking_items:
+                booking_item_options.append(booking_item)
+                seen_booking_items.add(booking_item)
         shipment = None
         if document is not None and document.shipment_ref:
             shipment = TenantShipment.objects.filter(shipment_no=document.shipment_ref).first()
@@ -9478,6 +9911,10 @@ class TenantOperationShipmentPodCreateView(View):
             'pod_form_data': pod_form_data,
             'form_errors': form_errors or {},
             'shipment_options': shipments,
+            'document_ref_options': document_ref_options,
+            'booking_no_options': booking_no_options,
+            'booking_item_options': booking_item_options,
+            'user_options': user_options,
             'pod_page_rows': list(document.pod_pages.all()) if document is not None else [],
             'tenant_schema_name': tenant_registry.schema_name,
         }
@@ -9532,8 +9969,14 @@ class TenantOperationShipmentPodCreateView(View):
                 'shipment_ref': (request.POST.get('shipment_ref') or '').strip(),
                 'pod_type': (request.POST.get('pod_type') or '').strip(),
                 'physical_location': (request.POST.get('document_location') or '').strip(),
+                'user_holder': (request.POST.get('user_holder') or '').strip(),
             }
+            if form_data['physical_location'] == 'out_of_company':
+                form_data['user_holder'] = ''
             form_errors = {}
+            user_holder_label = self._user_holder_label_from_value(form_data['user_holder'])
+            if form_data['user_holder'] and not user_holder_label:
+                form_errors['user_holder'] = 'Select a valid user.'
             record_date = parse_date(form_data['record_date']) if form_data['record_date'] else timezone.localdate()
             if record_date is None:
                 form_errors['record_date'] = 'Record Date must be a valid date.'
@@ -9609,7 +10052,7 @@ class TenantOperationShipmentPodCreateView(View):
                     physical_location=form_data['physical_location'],
                     page_count=page_count,
                     status=TenantShipmentDocument.Status.DRAFT,
-                    created_by_label=(context.get('display_name') or '').strip(),
+                    created_by_label=user_holder_label,
                 )
                 form_data['record_no'] = document.record_no
             else:
@@ -9624,6 +10067,7 @@ class TenantOperationShipmentPodCreateView(View):
                 document.document_date = document_date
                 document.physical_location = form_data['physical_location']
                 document.page_count = page_count
+                document.created_by_label = user_holder_label
                 document.save(update_fields=[
                     'record_date',
                     'booking_no',
@@ -9634,6 +10078,7 @@ class TenantOperationShipmentPodCreateView(View):
                     'document_date',
                     'physical_location',
                     'page_count',
+                    'created_by_label',
                     'updated_at',
                 ])
 
@@ -9804,7 +10249,27 @@ class TenantOperationDocumentHandoverCreateView(View):
                     'booking_item': booking_item,
                 }
             )
+        booking_item_options = []
+        seen_booking_items = set()
+        for shipment in shipments:
+            booking_item = (shipment.booking_item_ref or '').strip()
+            if not booking_item or booking_item in seen_booking_items:
+                continue
+            seen_booking_items.add(booking_item)
+            booking_item_options.append(
+                {
+                    'booking_item': booking_item,
+                    'booking_no': shipment.booking_no or '',
+                }
+            )
         pod_record_options = list(TenantShipmentDocument.objects.order_by('-created_at')[:500])
+        received_user_options = []
+        for user in TenantUser.objects.filter(status=TenantUser.Status.ACTIVE).order_by('full_name', 'username'):
+            label = (user.full_name or user.username or '').strip()
+            if user.username and user.username not in label:
+                label = f'{label} ({user.username})' if label else user.username
+            if label:
+                received_user_options.append({'value': label, 'label': label})
         return {
             'preview_handover_no': _preview_next_auto_number_for_form(
                 form_code=DOCUMENT_HANDOVER_AUTO_FORM_CODE,
@@ -9819,8 +10284,10 @@ class TenantOperationDocumentHandoverCreateView(View):
             'handover_form_errors': form_errors or {},
             'handover_line_rows': line_rows or [],
             'booking_options': booking_options,
+            'booking_item_options': booking_item_options,
             'shipment_options': shipments,
             'pod_record_options': pod_record_options,
+            'received_user_options': received_user_options,
             'tenant_schema_name': tenant_registry.schema_name,
         }
 
@@ -10478,7 +10945,8 @@ class TenantOperationSurchargeSalesListView(View):
             surcharge_qs = TenantShipmentSurcharge.objects.select_related('shipment').order_by('-created_at')
             if search_q:
                 surcharge_qs = surcharge_qs.filter(
-                    Q(item_label__icontains=search_q)
+                    Q(transaction_no__icontains=search_q)
+                    | Q(item_label__icontains=search_q)
                     | Q(shipment__shipment_no__icontains=search_q)
                     | Q(shipment__booking_no__icontains=search_q)
                     | Q(shipment__client_account_ref__icontains=search_q)
@@ -10492,7 +10960,10 @@ class TenantOperationSurchargeSalesListView(View):
                 surcharge_rows.append(
                     {
                         'surcharge_id': surcharge.surcharge_id,
-                        'transaction_no': f'SST-{str(surcharge.surcharge_id)[:8].upper()}',
+                        'transaction_no': (
+                            surcharge.transaction_no
+                            or f'SST-{str(surcharge.surcharge_id)[:8].upper()}'
+                        ),
                         'shipment_ref': shipment.shipment_no,
                         'booking_ref': shipment.booking_no,
                         'client': shipment.client_account_ref,
@@ -10555,11 +11026,17 @@ def _tenant_surcharge_sales_options_context(tenant_registry):
     ).order_by('-created_at')[:500]:
         client_ref = (shipment.client_account_ref or '').strip()
         client_code = client_ref.split(' - ', 1)[0].strip()
+        booking_no = (shipment.booking_no or '').strip()
+        booking_item_ref = (shipment.booking_item_ref or '').strip()
+        shipment_label_parts = [part for part in [shipment.shipment_no, booking_no, client_ref] if part]
+        booking_label_parts = [part for part in [booking_no, booking_item_ref] if part]
         shipment_options.append(
             {
                 'shipment_id': str(shipment.shipment_id),
                 'shipment_no': shipment.shipment_no,
-                'booking_no': shipment.booking_no,
+                'shipment_label': ' - '.join(shipment_label_parts) or shipment.shipment_no,
+                'booking_no': booking_no,
+                'booking_label': ' - '.join(booking_label_parts) or booking_no,
                 'client_account_ref': client_ref,
                 'currency': client_currency_by_code.get(client_code) or 'SAR',
             }
@@ -10675,6 +11152,8 @@ class TenantOperationSurchargeSalesCreateView(View):
                 form_errors['notes'] = 'Reason is required.'
 
             upload = request.FILES.get('attachment_file')
+            if upload is None:
+                form_errors['attachment_file'] = 'Attachment is required.'
 
             if form_errors:
                 context.update(
@@ -10694,24 +11173,32 @@ class TenantOperationSurchargeSalesCreateView(View):
                 return render(request, self.template_name, context)
 
             total_amount = (quantity * unit_price).quantize(Decimal('0.01'))
-            last_line_no = (
-                TenantShipmentSurcharge.objects.filter(shipment=shipment)
-                .order_by('-line_no')
-                .values_list('line_no', flat=True)
-                .first()
-                or 0
-            )
-            item_label = service_item.english_name
-            if form_data['description']:
-                item_label = f'{item_label} - {form_data["description"]}'
-            TenantShipmentSurcharge.objects.create(
-                shipment=shipment,
-                line_no=int(last_line_no) + 1,
-                item_label=item_label[:120],
-                qty=quantity,
-                subtotal=total_amount,
-                attachment_file=upload,
-            )
+            with db_transaction.atomic():
+                transaction_no, transaction_sequence = _next_auto_number_for_form(
+                    form_code=SURCHARGE_SALES_AUTO_FORM_CODE,
+                    form_label=SURCHARGE_SALES_AUTO_FORM_LABEL,
+                    prefix=SURCHARGE_SALES_REF_PREFIX,
+                )
+                last_line_no = (
+                    TenantShipmentSurcharge.objects.filter(shipment=shipment)
+                    .order_by('-line_no')
+                    .values_list('line_no', flat=True)
+                    .first()
+                    or 0
+                )
+                item_label = service_item.english_name
+                if form_data['description']:
+                    item_label = f'{item_label} - {form_data["description"]}'
+                TenantShipmentSurcharge.objects.create(
+                    transaction_no=transaction_no,
+                    transaction_sequence=transaction_sequence,
+                    shipment=shipment,
+                    line_no=int(last_line_no) + 1,
+                    item_label=item_label[:120],
+                    qty=quantity,
+                    subtotal=total_amount,
+                    attachment_file=upload,
+                )
             messages.success(request, 'Surcharge transaction saved for the selected shipment and service.', extra_tags='tenant')
             return _tenant_redirect(request, 'iroad_tenants:tenant_operation_surcharge_sales_list')
         finally:

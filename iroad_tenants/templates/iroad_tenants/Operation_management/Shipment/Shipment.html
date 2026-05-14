@@ -114,25 +114,10 @@
                   <option value="" {% if not shipment_form_data.booking_no %}selected{% endif %} disabled>
                     -Select booking no-
                   </option>
-                  {% for booking in shipment_booking_options %}
+                  {% for booking in shipment_booking_no_options %}
                   <option
                     value="{{ booking.booking_no }}"
                     data-client-account-id="{{ booking.client_account_id }}"
-                    data-booking-item="{{ booking.booking_item }}"
-                    data-booking-item-type="{{ booking.booking_item_type }}"
-                    data-route-display="{{ booking.route_display }}"
-                    data-order-type="{{ booking.order_type }}"
-                    data-sourcing-mode="{{ booking.sourcing_mode }}"
-                    data-pod-type="{{ booking.pod_type }}"
-                    data-pod-doc-count="{{ booking.pod_doc_count }}"
-                    data-pod-status="{{ booking.pod_status }}"
-                    data-cod-amount="{{ booking.cod_amount }}"
-                    data-cargo-id="{{ booking.cargo_id }}"
-                    data-cargo-weight="{{ booking.cargo_weight }}"
-                    data-cargo-unit="{{ booking.cargo_unit }}"
-                    data-cargo-qty="{{ booking.cargo_qty }}"
-                    data-total-cargo-qty="{{ booking.total_cargo_qty }}"
-                    data-total-cargo-weight="{{ booking.total_cargo_weight }}"
                     {% if shipment_form_data.booking_no == booking.booking_no %}selected{% endif %}
                   >
                     {{ booking.booking_no }}
@@ -173,6 +158,20 @@
                     value="{{ booking.booking_item }}"
                     data-client-account-id="{{ booking.client_account_id }}"
                     data-booking-no="{{ booking.booking_no }}"
+                    data-booking-item-type="{{ booking.booking_item_type }}"
+                    data-route-display="{{ booking.route_display }}"
+                    data-order-type="{{ booking.order_type }}"
+                    data-sourcing-mode="{{ booking.sourcing_mode }}"
+                    data-pod-type="{{ booking.pod_type }}"
+                    data-pod-doc-count="{{ booking.pod_doc_count }}"
+                    data-pod-status="{{ booking.pod_status }}"
+                    data-cod-amount="{{ booking.cod_amount }}"
+                    data-loading-address-id="{{ booking.loading_address_id }}"
+                    data-delivery-address-id="{{ booking.delivery_address_id }}"
+                    data-cargo-id="{{ booking.cargo_id }}"
+                    data-cargo-weight="{{ booking.cargo_weight }}"
+                    data-cargo-unit="{{ booking.cargo_unit }}"
+                    data-cargo-qty="{{ booking.cargo_qty }}"
                     {% if shipment_form_data.booking_item == booking.booking_item %}selected{% endif %}
                   >
                     {{ booking.booking_item }}
@@ -190,8 +189,17 @@
                   id="bookingItemType"
                   name="booking_item_type"
                 >
-                  <option value="Outbound" {% if shipment_form_data.booking_item_type|default:'Outbound' == 'Outbound' %}selected{% endif %}>Outbound</option>
-                  <option value="Inbound" {% if shipment_form_data.booking_item_type == 'Inbound' %}selected{% endif %}>Inbound</option>
+                  <option value="" {% if not shipment_form_data.booking_item_type %}selected{% endif %} disabled>-Select item type-</option>
+                  {% for booking in shipment_booking_options %}
+                  <option
+                    value="{{ booking.booking_item_type }}"
+                    data-client-account-id="{{ booking.client_account_id }}"
+                    data-booking-no="{{ booking.booking_no }}"
+                    {% if shipment_form_data.booking_item_type == booking.booking_item_type %}selected{% endif %}
+                  >
+                    {{ booking.booking_item_type }}
+                  </option>
+                  {% endfor %}
                 </select>
               </div>
               <div class="field">
@@ -210,6 +218,7 @@
                     value="{{ booking.route_display }}"
                     data-client-account-id="{{ booking.client_account_id }}"
                     data-booking-no="{{ booking.booking_no }}"
+                    data-booking-item-type="{{ booking.booking_item_type }}"
                     {% if shipment_form_data.booking_item_route == booking.route_display %}selected{% endif %}
                   >
                     {{ booking.route_display }}
@@ -664,7 +673,7 @@
         }
 
         function clearBookingDerivedFields() {
-          [bookingItemSelect, bookingItemRouteSelect].forEach(function (selectEl) {
+          [bookingItemSelect, bookingItemTypeSelect, bookingItemRouteSelect].forEach(function (selectEl) {
             if (!selectEl) return;
             resetSelectToPlaceholder(selectEl);
             selectEl.disabled = true;
@@ -682,10 +691,11 @@
           updateShipmentCargoTotals();
         }
 
-        function filterBookingDependentSelect(selectEl, selectedClientId, selectedBookingNo) {
-          if (!selectEl) return 0;
+        function filterBookingItemTypeSelect(selectedClientId, selectedBookingNo) {
+          if (!bookingItemTypeSelect) return;
+          var previousValue = bookingItemTypeSelect.value || "";
           var visibleCount = 0;
-          Array.prototype.forEach.call(selectEl.options, function (opt, idx) {
+          Array.prototype.forEach.call(bookingItemTypeSelect.options, function (opt, idx) {
             if (idx === 0) {
               opt.hidden = false;
               return;
@@ -696,8 +706,50 @@
             opt.hidden = !isVisible;
             if (isVisible) visibleCount += 1;
           });
+          bookingItemTypeSelect.disabled = visibleCount === 0;
+          if (bookingItemTypeSelect.disabled) {
+            resetSelectToPlaceholder(bookingItemTypeSelect);
+            return;
+          }
+          var restored = previousValue && selectMatchingOption(bookingItemTypeSelect, function (opt) {
+            return !opt.hidden && opt.value === previousValue;
+          });
+          if (!restored) {
+            var firstVisible = getVisibleOptions(bookingItemTypeSelect)[0];
+            if (firstVisible) bookingItemTypeSelect.value = firstVisible.value;
+          }
+        }
+
+        function filterBookingDependentSelect(selectEl, selectedClientId, selectedBookingNo, selectedItemType) {
+          if (!selectEl) return 0;
+          var visibleCount = 0;
+          Array.prototype.forEach.call(selectEl.options, function (opt, idx) {
+            if (idx === 0) {
+              opt.hidden = false;
+              return;
+            }
+            var matchesClient = opt.getAttribute("data-client-account-id") === selectedClientId;
+            var matchesBooking = opt.getAttribute("data-booking-no") === selectedBookingNo;
+            var matchesItemType = !selectedItemType || opt.getAttribute("data-booking-item-type") === selectedItemType;
+            var isVisible = Boolean(selectedClientId && selectedBookingNo && matchesClient && matchesBooking && matchesItemType);
+            opt.hidden = !isVisible;
+            if (isVisible) visibleCount += 1;
+          });
           selectEl.disabled = visibleCount === 0;
           return visibleCount;
+        }
+
+        function getSelectedBookingLineOption() {
+          if (!bookingItemSelect || !clientAccountSelect || !bookingNoSelect || !bookingItemTypeSelect) return null;
+          var selectedClientId = clientAccountSelect.value || "";
+          var selectedBookingNo = bookingNoSelect.value || "";
+          var selectedItemType = bookingItemTypeSelect.value || "";
+          return Array.prototype.find.call(bookingItemSelect.options, function (opt, idx) {
+            return idx > 0
+              && opt.getAttribute("data-client-account-id") === selectedClientId
+              && opt.getAttribute("data-booking-no") === selectedBookingNo
+              && opt.getAttribute("data-booking-item-type") === selectedItemType;
+          }) || null;
         }
 
         function applyClientBookingFilter() {
@@ -737,37 +789,45 @@
           }
           var selectedClientId = clientAccountSelect ? clientAccountSelect.value || "" : "";
           var selectedBookingNo = selectedBooking.value || "";
-          var bookingItem = selectedBooking.getAttribute("data-booking-item") || "";
-          var routeDisplay = selectedBooking.getAttribute("data-route-display") || "";
-          var orderType = selectedBooking.getAttribute("data-order-type") || "";
-          var sourcingMode = selectedBooking.getAttribute("data-sourcing-mode") || "In-Source";
-          var podType = selectedBooking.getAttribute("data-pod-type") || "";
-          var podDocCount = selectedBooking.getAttribute("data-pod-doc-count") || "";
-          var podStatus = selectedBooking.getAttribute("data-pod-status") || "";
-          var codAmount = selectedBooking.getAttribute("data-cod-amount") || "";
-          var cargoId = selectedBooking.getAttribute("data-cargo-id") || "";
-          var cargoWeight = selectedBooking.getAttribute("data-cargo-weight") || "";
-          var cargoUnit = selectedBooking.getAttribute("data-cargo-unit") || "";
-          var cargoQty = selectedBooking.getAttribute("data-cargo-qty") || "";
+          filterBookingItemTypeSelect(selectedClientId, selectedBookingNo);
+          var selectedItemType = bookingItemTypeSelect ? (bookingItemTypeSelect.value || "") : "";
+          filterBookingDependentSelect(bookingItemSelect, selectedClientId, selectedBookingNo, selectedItemType);
+          filterBookingDependentSelect(bookingItemRouteSelect, selectedClientId, selectedBookingNo, selectedItemType);
+          var selectedLine = getSelectedBookingLineOption();
+          if (!selectedLine) {
+            clearBookingDerivedFields();
+            return;
+          }
+          var bookingItem = selectedLine.value || "";
+          var routeDisplay = selectedLine.getAttribute("data-route-display") || "";
+          var orderType = selectedLine.getAttribute("data-order-type") || "";
+          var sourcingMode = selectedLine.getAttribute("data-sourcing-mode") || "In-Source";
+          var podType = selectedLine.getAttribute("data-pod-type") || "";
+          var podDocCount = selectedLine.getAttribute("data-pod-doc-count") || "";
+          var podStatus = selectedLine.getAttribute("data-pod-status") || "";
+          var codAmount = selectedLine.getAttribute("data-cod-amount") || "";
+          var loadingAddressId = selectedLine.getAttribute("data-loading-address-id") || "";
+          var deliveryAddressId = selectedLine.getAttribute("data-delivery-address-id") || "";
+          var cargoId = selectedLine.getAttribute("data-cargo-id") || "";
+          var cargoWeight = selectedLine.getAttribute("data-cargo-weight") || "";
+          var cargoUnit = selectedLine.getAttribute("data-cargo-unit") || "";
+          var cargoQty = selectedLine.getAttribute("data-cargo-qty") || "";
 
-          filterBookingDependentSelect(bookingItemSelect, selectedClientId, selectedBookingNo);
-          filterBookingDependentSelect(bookingItemRouteSelect, selectedClientId, selectedBookingNo);
           selectMatchingOption(bookingItemSelect, function (opt) {
-            return !opt.hidden && opt.value === bookingItem;
+            return !opt.hidden && opt === selectedLine;
           });
           selectMatchingOption(bookingItemRouteSelect, function (opt) {
             return !opt.hidden && opt.value === routeDisplay;
           });
 
-          if (bookingItemTypeSelect) {
-            bookingItemTypeSelect.value = selectedBooking.getAttribute("data-booking-item-type") || "Outbound";
-          }
           if (bookingOrderTypeInput) bookingOrderTypeInput.value = orderType;
           if (sourcingModeInput) sourcingModeInput.value = sourcingMode;
           setSelectValueIfExists(podTypeSelect, podType);
           if (podDocCountInput) podDocCountInput.value = podDocCount;
           if (podStatusInput) podStatusInput.value = podStatus;
           if (codAmountInput) codAmountInput.value = codAmount;
+          setSelectValueIfExists(loadingAddressSelect, loadingAddressId);
+          setSelectValueIfExists(deliveryAddressSelect, deliveryAddressId);
           if (cargoBookingItemInput) cargoBookingItemInput.value = bookingItem;
           setSelectValueIfExists(cargoSelect, cargoId);
           if (cargoWeightInput) cargoWeightInput.value = cargoWeight || cargoWeightInput.value || "0";
@@ -780,6 +840,9 @@
         if (clientAccountSelect && bookingNoSelect) {
           clientAccountSelect.addEventListener("change", applyClientBookingFilter);
           bookingNoSelect.addEventListener("change", populateBookingInfo);
+          if (bookingItemTypeSelect) {
+            bookingItemTypeSelect.addEventListener("change", populateBookingInfo);
+          }
           applyClientBookingFilter();
         }
 

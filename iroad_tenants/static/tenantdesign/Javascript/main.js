@@ -490,6 +490,10 @@ function initPurchaseOrderLines() {
 function initShipmentDocumentLines() {
   const tbody = document.getElementById("sdLinesTbody");
   const addBtn = document.getElementById("addSdLineBtn");
+  const docRefInput = document.getElementById("documentRefNo");
+  const pageCountInput = document.getElementById("pageCount");
+  const isDeliveryNoteInput = document.getElementById("isDeliveryNote");
+  const documentTypeInput = document.getElementById("documentType");
 
   // Only run on Shipment-documents.html (or pages with same markup)
   if (!tbody || !addBtn) return;
@@ -502,7 +506,53 @@ function initShipmentDocumentLines() {
     getRows().forEach((tr, idx) => {
       const snEl = tr.querySelector("[data-sn]");
       if (snEl) snEl.textContent = String(idx + 1);
+      const pageNoInput = tr.querySelector('[data-field="pageNo"]');
+      if (pageNoInput && pageNoInput.getAttribute("data-auto-page") !== "false") {
+        pageNoInput.value = String(idx + 1);
+        pageNoInput.setAttribute("data-auto-page", "true");
+      }
+      const attachmentInput = tr.querySelector('[data-field="attachment"]');
+      if (attachmentInput) attachmentInput.name = "line_attachment_" + idx;
     });
+    if (pageCountInput) {
+      pageCountInput.value = String(Math.max(getRows().length, 1));
+    }
+    syncDerivedFields();
+  }
+
+  function getHeaderDocRefNo() {
+    return docRefInput ? String(docRefInput.value || "").trim() : "";
+  }
+
+  function isDeliveryNoteEnabled() {
+    return !!(isDeliveryNoteInput && isDeliveryNoteInput.checked);
+  }
+
+  function syncToggleLabel() {
+    if (!isDeliveryNoteInput) return;
+    const toggle = isDeliveryNoteInput.closest(".setting-toggle");
+    const label = toggle ? toggle.querySelector(".toggle-label") : null;
+    if (label) label.textContent = isDeliveryNoteInput.checked ? "Yes" : "No";
+  }
+
+  function syncDerivedFields() {
+    const docRefNo = getHeaderDocRefNo();
+    const deliveryNoteEnabled = isDeliveryNoteEnabled();
+    tbody.querySelectorAll('[data-field="docRefNo"]').forEach((field) => {
+      field.value = docRefNo;
+    });
+    tbody.querySelectorAll("[data-status-cell]").forEach((cell) => {
+      cell.hidden = !deliveryNoteEnabled;
+    });
+    tbody.querySelectorAll('[data-field="status"]').forEach((field) => {
+      field.disabled = !deliveryNoteEnabled;
+      if (deliveryNoteEnabled && !field.value) {
+        field.value = "Not Completed";
+      }
+    });
+    const statusHeader = document.querySelector("[data-sd-status-header]");
+    if (statusHeader) statusHeader.hidden = !deliveryNoteEnabled;
+    syncToggleLabel();
   }
 
   function attachRowEvents(tr) {
@@ -511,6 +561,12 @@ function initShipmentDocumentLines() {
       delBtn.addEventListener("click", function () {
         tr.remove();
         updateSN();
+      });
+    }
+    const pageNoInput = tr.querySelector('[data-field="pageNo"]');
+    if (pageNoInput) {
+      pageNoInput.addEventListener("input", function () {
+        pageNoInput.setAttribute("data-auto-page", "false");
       });
     }
   }
@@ -538,29 +594,26 @@ function initShipmentDocumentLines() {
     tr.innerHTML = `
       <td data-label="SN"><span data-sn></span></td>
       <td data-label="Doc Ref No">
-        <input type="text" class="form-control form-control-sm" name="line_doc_ref_no[]" data-field="docRefNo" placeholder="Ref No..." />
+        <input type="text" class="form-control form-control-sm" name="line_doc_ref_no[]" data-field="docRefNo" placeholder="Auto from header" readonly />
       </td>
       <td data-label="Extra Ref">
         <input type="text" class="form-control form-control-sm" name="line_extra_ref[]" data-field="extraRef" placeholder="Extra Ref..." />
       </td>
       <td data-label="Page No">
-        <input type="number" class="form-control form-control-sm" name="line_page_no[]" data-field="pageNo" min="1" placeholder="Page No" />
+        <input type="number" class="form-control form-control-sm" name="line_page_no[]" data-field="pageNo" min="1" placeholder="Page No" required />
       </td>
-      <td data-label="Status">
+      <td data-label="Status" data-status-cell>
         <select class="form-select form-select-sm" name="line_status[]" data-field="status">
-          <option value="pending" selected>Pending</option>
-          <option value="uploaded">Uploaded</option>
-          <option value="approved">Approved</option>
+          <option value="Not Completed" selected>Not Completed</option>
+          <option value="Completed">Completed</option>
         </select>
       </td>
-      <td data-label="Physical Location">
-        <select class="form-select form-select-sm" name="line_physical_location[]" data-field="physicalLocation">
+      <td data-label="Signer Location">
+        <select class="form-select form-select-sm" name="line_physical_location[]" data-field="physicalLocation" required>
           <option value="" selected disabled>-Select location-</option>
-          <option value="not_collected">Not Collected</option>
-          <option value="submitted_to_receiver">Submitted to Receiver</option>
-          <option value="with_driver">With Driver</option>
-          <option value="submitted_to_office">Submitted to Office</option>
-          <option value="submitted_to_client">Submitted to Client</option>
+          <option value="With Driver">With Driver</option>
+          <option value="In Company">In Company</option>
+          <option value="With Client">With Client</option>
         </select>
       </td>
       <td data-label="Attachment">
@@ -576,15 +629,23 @@ function initShipmentDocumentLines() {
     `;
 
     tbody.appendChild(tr);
-    setFieldValue(tr, '[name="line_doc_ref_no[]"]', data.doc_ref_no);
+    setFieldValue(tr, '[name="line_doc_ref_no[]"]', data.doc_ref_no || getHeaderDocRefNo());
     setFieldValue(tr, '[name="line_extra_ref[]"]', data.extra_ref);
     setFieldValue(tr, '[name="line_page_no[]"]', data.page_no);
-    setFieldValue(tr, '[name="line_status[]"]', data.status || "pending");
+    const pageNoInput = tr.querySelector('[data-field="pageNo"]');
+    if (pageNoInput) {
+      pageNoInput.setAttribute("data-auto-page", data.page_no ? "false" : "true");
+    }
+    setFieldValue(tr, '[name="line_status[]"]', data.status || "Not Completed");
     setFieldValue(tr, '[name="line_physical_location[]"]', data.physical_location);
     setFieldValue(tr, '[name="line_existing_attachment_label[]"]', data.attachment_label);
     const attachmentLabel = tr.querySelector("[data-existing-attachment]");
     if (attachmentLabel && data.attachment_label) {
       attachmentLabel.textContent = "Current: " + data.attachment_label;
+    }
+    const attachmentInput = tr.querySelector('[data-field="attachment"]');
+    if (attachmentInput && !data.attachment_label) {
+      attachmentInput.required = true;
     }
     attachRowEvents(tr);
     updateSN();
@@ -611,6 +672,28 @@ function initShipmentDocumentLines() {
   } else {
     createLineRow();
   }
+
+  if (docRefInput) {
+    docRefInput.addEventListener("input", syncDerivedFields);
+  }
+
+  if (isDeliveryNoteInput) {
+    isDeliveryNoteInput.addEventListener("change", syncDerivedFields);
+  }
+
+  if (documentTypeInput && isDeliveryNoteInput) {
+    if (documentTypeInput.value === "Delivery Note") {
+      isDeliveryNoteInput.checked = true;
+    }
+    documentTypeInput.addEventListener("change", function () {
+      if (documentTypeInput.value === "Delivery Note") {
+        isDeliveryNoteInput.checked = true;
+      }
+      syncDerivedFields();
+    });
+  }
+
+  syncDerivedFields();
 }
 
 /* ============================================

@@ -408,7 +408,7 @@
                               -Select booking line-
                             </option>
                             {% for line_type in booking_line_type_options %}
-                            <option value="{{ line_type }}">{{ line_type }}</option>
+                            <option value="{{ line_type }}" {% if booking_form_data.loading_booking_item_1 == line_type %}selected{% endif %}>{{ line_type }}</option>
                             {% endfor %}
                           </select>
                         </td>
@@ -421,6 +421,7 @@
                             <option
                               value="{{ address.address_id }}"
                               data-client-account-id="{{ address.client_account_id }}"
+                              {% if booking_form_data.loading_address_1 == address.address_id|stringformat:'s' %}selected{% endif %}
                             >
                               {{ address.address_code }} - {{ address.display_name }}
                             </option>
@@ -461,7 +462,7 @@
                               -Select booking line-
                             </option>
                             {% for line_type in booking_line_type_options %}
-                            <option value="{{ line_type }}">{{ line_type }}</option>
+                            <option value="{{ line_type }}" {% if booking_form_data.delivery_booking_item_1 == line_type %}selected{% endif %}>{{ line_type }}</option>
                             {% endfor %}
                           </select>
                         </td>
@@ -474,6 +475,7 @@
                             <option
                               value="{{ address.address_id }}"
                               data-client-account-id="{{ address.client_account_id }}"
+                              {% if booking_form_data.delivery_address_1 == address.address_id|stringformat:'s' %}selected{% endif %}
                             >
                               {{ address.address_code }} - {{ address.display_name }}
                             </option>
@@ -735,6 +737,7 @@
 {% block extra_js %}
 {{ booking_service_sell_overrides|json_script:"booking-service-sell-overrides" }}
 {{ booking_trip_sell_overrides|json_script:"booking-trip-sell-overrides" }}
+{{ booking_line_status_values|json_script:"booking-line-status-values" }}
 <script>
       (function () {
         var section = document.getElementById("purchaseOrderSection");
@@ -843,7 +846,11 @@
         var bookingLinesTable = document.getElementById("bookingLinesTable");
         var truckOptions = [
           {% for truck in booking_trucks %}
-          { value: "{{ truck.truck_id }}", label: "{{ truck.truck_code|escapejs }}" },
+          {
+            value: "{{ truck.truck_id }}",
+            label: "{{ truck.truck_code|escapejs }}",
+            defaultDriverId: "{{ truck.default_driver_id_id|default:'' }}",
+          },
           {% endfor %}
         ];
         var driverOptions = [
@@ -855,14 +862,32 @@
         var selectedBookingLineDriver = "{{ booking_form_data.booking_line_driver_1|default:''|escapejs }}";
         var selectedBookingLineCod = "{{ booking_form_data.booking_line_cod_amount_1|default:''|escapejs }}";
         var selectedBookingLinePodDocs = "{{ booking_form_data.booking_line_pod_doc_count_1|default:''|escapejs }}";
+        var selectedBookingLineValues = {
+          "1": {
+            truck: selectedBookingLineTruck,
+            driver: selectedBookingLineDriver,
+            cod: selectedBookingLineCod,
+            podDocs: selectedBookingLinePodDocs,
+          },
+          "2": {
+            truck: "{{ booking_form_data.booking_line_truck_2|default:''|escapejs }}",
+            driver: "{{ booking_form_data.booking_line_driver_2|default:''|escapejs }}",
+            cod: "{{ booking_form_data.booking_line_cod_amount_2|default:''|escapejs }}",
+            podDocs: "{{ booking_form_data.booking_line_pod_doc_count_2|default:''|escapejs }}",
+          },
+        };
         var serviceSellOverrides = {};
         var tripSellOverrides = {};
+        var bookingLineStatusValues = {};
         try {
           serviceSellOverrides = JSON.parse(
             document.getElementById("booking-service-sell-overrides").textContent || "{}",
           );
           tripSellOverrides = JSON.parse(
             document.getElementById("booking-trip-sell-overrides").textContent || "{}",
+          );
+          bookingLineStatusValues = JSON.parse(
+            document.getElementById("booking-line-status-values").textContent || "{}",
           );
         } catch (e) {}
         var currentBookingLineTypes = [];
@@ -989,6 +1014,7 @@
           ].forEach(function (selector) {
             var selectEl = document.querySelector(selector);
             if (!selectEl) return;
+            var previousAddress = selectEl.value || "";
             var visibleCount = 0;
             Array.prototype.forEach.call(selectEl.options, function (opt, idx) {
               if (idx === 0) {
@@ -1000,10 +1026,19 @@
               opt.hidden = !isVisible;
               if (isVisible) visibleCount += 1;
             });
-            resetSelectToPlaceholder(selectEl);
             selectEl.disabled = !selectedClientId || visibleCount === 0;
             if (!selectEl.disabled) {
-              autoSelectSingleVisibleOption(selectEl);
+              var previousAddressOption = previousAddress
+                ? selectEl.querySelector("option[value='" + previousAddress + "']")
+                : null;
+              if (previousAddressOption && !previousAddressOption.hidden) {
+                selectEl.value = previousAddress;
+              } else {
+                resetSelectToPlaceholder(selectEl);
+                autoSelectSingleVisibleOption(selectEl);
+              }
+            } else {
+              resetSelectToPlaceholder(selectEl);
             }
           });
 
@@ -1079,6 +1114,24 @@
           return html;
         }
 
+        function getBookingLineIndex(fieldEl) {
+          if (!fieldEl || !fieldEl.name) return "";
+          var match = fieldEl.name.match(/_(\d+)$/);
+          return match ? match[1] : "";
+        }
+
+        function findTruckOption(truckId) {
+          return truckOptions.find(function (truck) {
+            return String(truck.value) === String(truckId || "");
+          });
+        }
+
+        function findDefaultTruckForDriver(driverId) {
+          return truckOptions.find(function (truck) {
+            return String(truck.defaultDriverId || "") === String(driverId || "");
+          });
+        }
+
         function syncBookingForeignKeyFields() {
           var truckSelect = document.querySelector("select[name='booking_line_truck_1']");
           var driverSelect = document.querySelector("select[name='booking_line_driver_1']");
@@ -1086,14 +1139,71 @@
           var assignedTruckInput = document.getElementById("assignedTruckId");
           var assignedDriverInput = document.getElementById("assignedDriverId");
           var selectedCargoInput = document.getElementById("selectedCargoId");
-          if (assignedTruckInput && truckSelect) {
-            assignedTruckInput.value = truckSelect.value || "";
+          if (assignedTruckInput) {
+            assignedTruckInput.value = truckSelect ? (truckSelect.value || "") : "";
           }
-          if (assignedDriverInput && driverSelect) {
-            assignedDriverInput.value = driverSelect.value || "";
+          if (assignedDriverInput) {
+            assignedDriverInput.value = driverSelect ? (driverSelect.value || "") : "";
           }
           if (selectedCargoInput && cargoSelect) {
             selectedCargoInput.value = cargoSelect.value || "";
+          }
+        }
+
+        function collectBookingLineValues(tbody) {
+          var valuesByIndex = {};
+          if (!tbody) return valuesByIndex;
+          tbody.querySelectorAll(".booking-line-truck-select, .booking-line-driver-select, .booking-line-cod-input, .booking-line-pod-doc-input").forEach(function (fieldEl) {
+            var index = getBookingLineIndex(fieldEl);
+            if (!index) return;
+            var values = valuesByIndex[index] || {};
+            if (fieldEl.classList.contains("booking-line-truck-select")) values.truck = fieldEl.value || "";
+            if (fieldEl.classList.contains("booking-line-driver-select")) values.driver = fieldEl.value || "";
+            if (fieldEl.classList.contains("booking-line-cod-input")) values.cod = fieldEl.value || "";
+            if (fieldEl.classList.contains("booking-line-pod-doc-input")) values.podDocs = fieldEl.value || "";
+            valuesByIndex[index] = values;
+          });
+          return valuesByIndex;
+        }
+
+        function applyBookingLineValues(tbody, valuesByIndex) {
+          if (!tbody) return;
+          currentBookingLineTypes.forEach(function (_lineType, idx) {
+            var index = String(idx + 1);
+            var values = valuesByIndex[index] || {};
+            var selectedValues = selectedBookingLineValues[index] || {};
+            values.truck = values.truck || selectedValues.truck;
+            values.driver = values.driver || selectedValues.driver;
+            values.cod = values.cod || selectedValues.cod;
+            values.podDocs = values.podDocs || selectedValues.podDocs;
+            var truckSelect = tbody.querySelector("select[name='booking_line_truck_" + index + "']");
+            var driverSelect = tbody.querySelector("select[name='booking_line_driver_" + index + "']");
+            var codInput = tbody.querySelector("input[name='booking_line_cod_amount_" + index + "']");
+            var podDocsInput = tbody.querySelector("input[name='booking_line_pod_doc_count_" + index + "']");
+            if (truckSelect && values.truck) truckSelect.value = values.truck;
+            if (driverSelect && values.driver) driverSelect.value = values.driver;
+            if (codInput && values.cod) codInput.value = values.cod;
+            if (podDocsInput && values.podDocs) podDocsInput.value = values.podDocs;
+          });
+        }
+
+        function syncDriverFromTruckSelect(truckSelect) {
+          var index = getBookingLineIndex(truckSelect);
+          var truck = findTruckOption(truckSelect ? truckSelect.value : "");
+          if (!index || !truck || !truck.defaultDriverId) return;
+          var driverSelect = document.querySelector("select[name='booking_line_driver_" + index + "']");
+          if (driverSelect && driverSelect.querySelector("option[value='" + truck.defaultDriverId + "']")) {
+            driverSelect.value = truck.defaultDriverId;
+          }
+        }
+
+        function syncTruckFromDriverSelect(driverSelect) {
+          var index = getBookingLineIndex(driverSelect);
+          var truck = findDefaultTruckForDriver(driverSelect ? driverSelect.value : "");
+          if (!index || !truck) return;
+          var truckSelect = document.querySelector("select[name='booking_line_truck_" + index + "']");
+          if (truckSelect && truckSelect.querySelector("option[value='" + truck.value + "']")) {
+            truckSelect.value = truck.value;
           }
         }
 
@@ -1101,6 +1211,7 @@
           if (!bookingLinesTable) return;
           var tbody = bookingLinesTable.querySelector("tbody");
           if (!tbody) return;
+          var previousLineValues = collectBookingLineValues(tbody);
           var tripType = tripTypeSelect ? (tripTypeSelect.value || "") : "";
           var selectedRouteText = "";
           var reverseRouteText = "";
@@ -1126,6 +1237,7 @@
           var rowsHtml = "";
           currentBookingLineTypes.forEach(function (lineType, idx) {
             var routeLabelForLine = selectedRouteText || "-";
+            var statusLabelForLine = bookingLineStatusValues[lineType] || "Draft";
             if (tripType === "Round" && lineType === "Backload") {
               routeLabelForLine = reverseRouteText || selectedRouteText || "-";
             }
@@ -1133,7 +1245,7 @@
               + "<td>" + (idx + 1) + "</td>"
               + "<td>" + lineType.substring(0, 2).toUpperCase() + "-" + String(idx + 1).padStart(3, "0") + "</td>"
               + "<td>" + lineType + "</td>"
-              + "<td><span class='status-badge status-active'>Draft</span></td>"
+              + "<td><span class='status-badge status-active'>" + statusLabelForLine + "</span></td>"
               + "<td>" + routeLabelForLine + "</td>"
               + "<td><select class='form-select form-select-sm booking-line-truck-select' name='booking_line_truck_" + (idx + 1) + "'>" + buildOptionsHtml(truckOptions, "-Select truck-") + "</select></td>"
               + "<td><select class='form-select form-select-sm booking-line-driver-select' name='booking_line_driver_" + (idx + 1) + "'>" + buildOptionsHtml(driverOptions, "-Select driver-") + "</select></td>"
@@ -1142,14 +1254,7 @@
               + "</tr>";
           });
           tbody.innerHTML = rowsHtml;
-          var truckSelect = tbody.querySelector("select[name='booking_line_truck_1']");
-          if (truckSelect && selectedBookingLineTruck) truckSelect.value = selectedBookingLineTruck;
-          var driverSelect = tbody.querySelector("select[name='booking_line_driver_1']");
-          if (driverSelect && selectedBookingLineDriver) driverSelect.value = selectedBookingLineDriver;
-          var codInput = tbody.querySelector("input[name='booking_line_cod_amount_1']");
-          if (codInput && selectedBookingLineCod) codInput.value = selectedBookingLineCod;
-          var podDocsInput = tbody.querySelector("input[name='booking_line_pod_doc_count_1']");
-          if (podDocsInput && selectedBookingLinePodDocs) podDocsInput.value = selectedBookingLinePodDocs;
+          applyBookingLineValues(tbody, previousLineValues);
           syncBookingForeignKeyFields();
         }
 
@@ -1234,14 +1339,18 @@
           bookingForm.addEventListener("submit", syncBookingForeignKeyFields);
         }
         document.addEventListener("change", function (event) {
-          if (
-            event.target &&
-            (
-              event.target.matches("select[name='booking_line_truck_1']") ||
-              event.target.matches("select[name='booking_line_driver_1']") ||
-              event.target.matches("select[name='cargo_id_1']")
-            )
-          ) {
+          if (!event.target) return;
+          if (event.target.matches(".booking-line-truck-select")) {
+            syncDriverFromTruckSelect(event.target);
+            syncBookingForeignKeyFields();
+            return;
+          }
+          if (event.target.matches(".booking-line-driver-select")) {
+            syncTruckFromDriverSelect(event.target);
+            syncBookingForeignKeyFields();
+            return;
+          }
+          if (event.target.matches("select[name='cargo_id_1']")) {
             syncBookingForeignKeyFields();
           }
         });

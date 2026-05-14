@@ -3192,6 +3192,22 @@ class TenantBooking(models.Model):
     )
     route_direction = models.CharField(max_length=12, blank=True, default='forward')
     route_display = models.CharField(max_length=255, blank=True, default='')
+    loading_booking_item = models.CharField(max_length=20, blank=True, default='')
+    loading_address = models.ForeignKey(
+        TenantAddressMaster,
+        on_delete=models.SET_NULL,
+        related_name='loading_bookings',
+        null=True,
+        blank=True,
+    )
+    delivery_booking_item = models.CharField(max_length=20, blank=True, default='')
+    delivery_address = models.ForeignKey(
+        TenantAddressMaster,
+        on_delete=models.SET_NULL,
+        related_name='delivery_bookings',
+        null=True,
+        blank=True,
+    )
     order_type = models.CharField(max_length=20, blank=True, default='')
     trip_type = models.CharField(max_length=20, blank=True, default='')
     sell_price = models.DecimalField(max_digits=14, decimal_places=2, default=0)
@@ -3212,8 +3228,24 @@ class TenantBooking(models.Model):
         null=True,
         blank=True,
     )
+    booking_line_backload_truck = models.ForeignKey(
+        TruckMaster,
+        on_delete=models.SET_NULL,
+        related_name='backload_assigned_bookings',
+        null=True,
+        blank=True,
+    )
+    booking_line_backload_driver = models.ForeignKey(
+        DriverMaster,
+        on_delete=models.SET_NULL,
+        related_name='backload_assigned_bookings',
+        null=True,
+        blank=True,
+    )
     booking_line_cod_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     booking_line_pod_doc_count = models.PositiveIntegerField(default=0)
+    booking_line_backload_cod_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    booking_line_backload_pod_doc_count = models.PositiveIntegerField(default=0)
     cargo_booking_item = models.CharField(max_length=20, blank=True, default='')
     cargo = models.ForeignKey(
         TenantCargoMaster,
@@ -3392,6 +3424,8 @@ class TenantShipmentSurcharge(models.Model):
     """Derived surcharge rows linked to shipment."""
 
     surcharge_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    transaction_no = models.CharField(max_length=64, unique=True, null=True, blank=True)
+    transaction_sequence = models.PositiveIntegerField(default=0)
     shipment = models.ForeignKey(
         TenantShipment,
         on_delete=models.CASCADE,
@@ -3422,8 +3456,9 @@ class TenantShipmentDocument(models.Model):
     """Shipment document header record."""
 
     class Status(models.TextChoices):
-        DRAFT = 'Draft', 'Draft'
+        PENDING = 'Pending', 'Pending'
         VERIFIED = 'Verified', 'Verified'
+        DRAFT = 'Draft', 'Draft'
         REJECTED = 'Rejected', 'Rejected'
 
     document_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -3439,7 +3474,7 @@ class TenantShipmentDocument(models.Model):
     is_delivery_note = models.BooleanField(default=False)
     physical_location = models.CharField(max_length=255, blank=True, default='')
     page_count = models.PositiveIntegerField(default=1)
-    status = models.CharField(max_length=16, choices=Status.choices, default=Status.DRAFT)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.PENDING)
     notes = models.TextField(blank=True, default='')
     created_by_label = models.CharField(max_length=200, blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)

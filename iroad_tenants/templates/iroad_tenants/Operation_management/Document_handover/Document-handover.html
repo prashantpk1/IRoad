@@ -159,7 +159,18 @@
         <div class="fields-grid cols-3">
           <div class="field">
             <label for="bookingItem" class="form-label">Booking Item <span class="required">*</span></label>
-            <input type="text" class="form-control {% if handover_form_errors.booking_item %}is-invalid{% endif %}" id="bookingItem" name="booking_item" value="{{ handover_form_data.booking_item }}" readonly />
+            <select class="form-select {% if handover_form_errors.booking_item %}is-invalid{% endif %}" id="bookingItem" name="booking_item">
+              <option value="" {% if not handover_form_data.booking_item %}selected{% endif %} disabled>-Select booking item-</option>
+              {% for item in booking_item_options %}
+              <option
+                value="{{ item.booking_item }}"
+                data-booking-no="{{ item.booking_no }}"
+                {% if handover_form_data.booking_item == item.booking_item %}selected{% endif %}
+              >
+                {{ item.booking_item }}
+              </option>
+              {% endfor %}
+            </select>
             {% if handover_form_errors.booking_item %}<div class="invalid-feedback d-block">{{ handover_form_errors.booking_item }}</div>{% endif %}
           </div>
           <div class="field">
@@ -173,17 +184,43 @@
             {% if handover_form_errors.shipment_ref %}<div class="invalid-feedback d-block">{{ handover_form_errors.shipment_ref }}</div>{% endif %}
           </div>
           <div class="field">
-            <label for="documentRef" class="form-label">Doc Record (list)</label>
-            <input type="text" class="form-control" id="documentRef" name="document_ref" value="{{ handover_form_data.document_ref }}" />
+            <label for="documentRef" class="form-label">Doc Record</label>
+            <select class="form-select" id="documentRef" name="document_ref">
+              <option value="" {% if not handover_form_data.document_ref %}selected{% endif %} disabled>-Select doc record-</option>
+              {% for doc in pod_record_options %}
+              <option
+                value="{{ doc.record_no }}"
+                data-shipment-ref="{{ doc.shipment_ref }}"
+                data-booking-no="{{ doc.booking_no }}"
+                data-booking-item="{{ doc.booking_item }}"
+                data-document-ref-no="{{ doc.document_ref_no }}"
+                data-physical-location="{{ doc.physical_location }}"
+                data-received-user="{{ doc.created_by_label }}"
+                {% if handover_form_data.document_ref == doc.record_no %}selected{% endif %}
+              >
+                {{ doc.record_no }}{% if doc.document_ref_no %} - {{ doc.document_ref_no }}{% endif %}
+              </option>
+              {% endfor %}
+            </select>
           </div>
         </div>
         <div class="fields-grid cols-3" style="margin-top: 20px">
           <div class="field">
-            <label for="podRecord" class="form-label">POD Record (list)</label>
+            <label for="podRecord" class="form-label">POD Record</label>
             <select class="form-select" id="podRecord" name="pod_record_ref">
               <option value="" {% if not handover_form_data.pod_record_ref %}selected{% endif %} disabled>-Select POD record-</option>
               {% for pod in pod_record_options %}
-              <option value="{{ pod.record_no }}" {% if handover_form_data.pod_record_ref == pod.record_no %}selected{% endif %}>{{ pod.record_no }}</option>
+              <option
+                value="{{ pod.record_no }}"
+                data-shipment-ref="{{ pod.shipment_ref }}"
+                data-booking-no="{{ pod.booking_no }}"
+                data-booking-item="{{ pod.booking_item }}"
+                data-physical-location="{{ pod.physical_location }}"
+                data-received-user="{{ pod.created_by_label }}"
+                {% if handover_form_data.pod_record_ref == pod.record_no %}selected{% endif %}
+              >
+                {{ pod.record_no }}{% if pod.document_ref_no %} - {{ pod.document_ref_no }}{% endif %}
+              </option>
               {% endfor %}
             </select>
           </div>
@@ -194,11 +231,17 @@
               <option value="With Driver" {% if handover_form_data.physical_location == 'With Driver' %}selected{% endif %}>With Driver</option>
               <option value="With Admin" {% if handover_form_data.physical_location == 'With Admin' %}selected{% endif %}>With Admin</option>
               <option value="With Client" {% if handover_form_data.physical_location == 'With Client' %}selected{% endif %}>With Client</option>
+              <option value="Out of Company" {% if handover_form_data.physical_location == 'Out of Company' %}selected{% endif %}>Out of Company</option>
             </select>
           </div>
           <div class="field">
-            <label for="receivedUser" class="form-label">Received User (list)</label>
-            <input type="text" class="form-control" id="receivedUser" name="received_user" value="{{ handover_form_data.received_user }}" />
+            <label for="receivedUser" class="form-label">Received User</label>
+            <select class="form-select" id="receivedUser" name="received_user">
+              <option value="" {% if not handover_form_data.received_user %}selected{% endif %}>-Select received user-</option>
+              {% for user in received_user_options %}
+              <option value="{{ user.value }}" {% if handover_form_data.received_user == user.value %}selected{% endif %}>{{ user.label }}</option>
+              {% endfor %}
+            </select>
           </div>
         </div>
       </div>
@@ -286,6 +329,10 @@
     const bookingNoMenu = document.getElementById("bookingNoOptions");
     const bookingNoToggle = document.getElementById("bookingNoToggle");
     const bookingItem = document.getElementById("bookingItem");
+    const documentRef = document.getElementById("documentRef");
+    const podRecord = document.getElementById("podRecord");
+    const physicalLocation = document.getElementById("physicalLocation");
+    const receivedUser = document.getElementById("receivedUser");
     const tbody = document.getElementById("dhLinesTbody");
     const addBtn = document.getElementById("addDhLineBtn");
     const linesJson = document.getElementById("handoverLinesJson");
@@ -305,6 +352,125 @@
         }
       }
       return null;
+    }
+
+    function ensureSelectOption(select, value, label) {
+      if (!select || !value) return;
+      const exists = Array.prototype.some.call(select.options, function (option) {
+        return option.value === value;
+      });
+      if (!exists) {
+        select.add(new Option(label || value, value));
+      }
+    }
+
+    function normalizeLocation(value) {
+      const rawValue = String(value || "").trim();
+      const key = rawValue.toLowerCase().replace(/_/g, " ");
+      if (key === "with driver") return "With Driver";
+      if (key === "with admin" || key === "in company") return "With Admin";
+      if (key === "with client") return "With Client";
+      if (key === "out of company") return "Out of Company";
+      return rawValue;
+    }
+
+    function syncLineLocations(locationValue) {
+      if (!tbody || !locationValue) return;
+      tbody.querySelectorAll(".dh-line-location").forEach(function (input) {
+        input.value = locationValue;
+      });
+    }
+
+    function setPhysicalLocation(value) {
+      const normalizedLocation = normalizeLocation(value);
+      if (!physicalLocation || !normalizedLocation) return;
+      ensureSelectOption(physicalLocation, normalizedLocation);
+      physicalLocation.value = normalizedLocation;
+      syncLineLocations(normalizedLocation);
+    }
+
+    function setReceivedUser(value) {
+      const userValue = String(value || "").trim();
+      if (!receivedUser || !userValue) return;
+      ensureSelectOption(receivedUser, userValue);
+      receivedUser.value = userValue;
+    }
+
+    function filterBookingItemsForBooking(bookingNoValue) {
+      if (!bookingItem) return;
+      let matchedCount = 0;
+      Array.prototype.forEach.call(bookingItem.options, function (option, index) {
+        if (index === 0) {
+          option.hidden = false;
+          option.disabled = false;
+          return;
+        }
+        const optionBookingNo = option.getAttribute("data-booking-no") || "";
+        const isMatch = !bookingNoValue || !optionBookingNo || optionBookingNo === bookingNoValue;
+        option.hidden = !isMatch;
+        option.disabled = !isMatch;
+        if (isMatch) matchedCount += 1;
+      });
+      const selectedItem = selectedOption(bookingItem);
+      if (selectedItem && selectedItem.disabled) {
+        bookingItem.value = "";
+      }
+      if (!bookingItem.value && matchedCount === 1) {
+        Array.prototype.some.call(bookingItem.options, function (option) {
+          if (option.value && !option.disabled) {
+            bookingItem.value = option.value;
+            return true;
+          }
+          return false;
+        });
+      }
+    }
+
+    function filterDocumentRecordsForShipment(shipmentRefValue) {
+      [documentRef, podRecord].forEach(function (select) {
+        if (!select) return;
+        let firstMatchValue = "";
+        Array.prototype.forEach.call(select.options, function (option, index) {
+          if (index === 0) {
+            option.hidden = false;
+            option.disabled = false;
+            return;
+          }
+          const optionShipmentRef = option.getAttribute("data-shipment-ref") || "";
+          const isMatch = !shipmentRefValue || !optionShipmentRef || optionShipmentRef === shipmentRefValue;
+          option.hidden = !isMatch;
+          option.disabled = !isMatch;
+          if (isMatch && !firstMatchValue) firstMatchValue = option.value;
+        });
+        const selectedRecord = selectedOption(select);
+        if (selectedRecord && selectedRecord.disabled) {
+          select.value = "";
+        }
+        if (!select.value && firstMatchValue) {
+          select.value = firstMatchValue;
+        }
+      });
+    }
+
+    function syncMatchingRecordSelect(sourceSelect) {
+      if (!sourceSelect || !sourceSelect.value) return;
+      const targetSelect = sourceSelect === documentRef ? podRecord : documentRef;
+      if (!targetSelect) return;
+      Array.prototype.some.call(targetSelect.options, function (option) {
+        if (option.value === sourceSelect.value && !option.disabled) {
+          targetSelect.value = sourceSelect.value;
+          return true;
+        }
+        return false;
+      });
+    }
+
+    function syncFromSelectedRecord() {
+      if (documentRef && documentRef.value) {
+        syncFromDocumentOption(documentRef);
+      } else if (podRecord && podRecord.value) {
+        syncFromDocumentOption(podRecord);
+      }
     }
 
     function hideBookingMenu() {
@@ -334,8 +500,11 @@
       const typedBookingNo = String(bookingNo.value || "").trim();
       const bookingOpt = findBookingOption(typedBookingNo);
       const resolvedBookingNo = bookingOpt ? (bookingOpt.getAttribute("data-booking-no") || "") : typedBookingNo;
+      filterBookingItemsForBooking(resolvedBookingNo);
       if (bookingItem) {
-        bookingItem.value = bookingOpt ? (bookingOpt.getAttribute("data-booking-item") || "") : "";
+        const resolvedBookingItem = bookingOpt ? (bookingOpt.getAttribute("data-booking-item") || "") : "";
+        ensureSelectOption(bookingItem, resolvedBookingItem);
+        if (resolvedBookingItem) bookingItem.value = resolvedBookingItem;
       }
       if (!shipmentRef) return;
 
@@ -354,11 +523,15 @@
 
       const selectedShipment = selectedOption(shipmentRef);
       if (!selectedShipment || selectedShipment.hidden || selectedShipment.disabled) {
-        shipmentRef.value = matched.length === 1 ? matched[0].value : "";
+        shipmentRef.value = matched.length ? matched[0].value : "";
       }
       const currentShipment = selectedOption(shipmentRef);
       if (currentShipment && currentShipment.value && bookingItem) {
-        bookingItem.value = currentShipment.getAttribute("data-booking-item") || bookingItem.value;
+        const shipmentBookingItem = currentShipment.getAttribute("data-booking-item") || "";
+        ensureSelectOption(bookingItem, shipmentBookingItem);
+        if (shipmentBookingItem) bookingItem.value = shipmentBookingItem;
+        filterDocumentRecordsForShipment(currentShipment.value);
+        syncFromSelectedRecord();
       }
     }
 
@@ -366,9 +539,16 @@
       const option = selectedOption(shipmentRef);
       if (!option || !option.value) return;
       if (bookingNo) bookingNo.value = option.getAttribute("data-booking-no") || "";
-      if (bookingItem) bookingItem.value = option.getAttribute("data-booking-item") || "";
+      if (bookingItem) {
+        const shipmentBookingItem = option.getAttribute("data-booking-item") || "";
+        ensureSelectOption(bookingItem, shipmentBookingItem);
+        filterBookingItemsForBooking(option.getAttribute("data-booking-no") || "");
+        if (shipmentBookingItem) bookingItem.value = shipmentBookingItem;
+      }
       applyBookingLookup();
       shipmentRef.value = option.value;
+      filterDocumentRecordsForShipment(option.value);
+      syncFromSelectedRecord();
     }
 
     if (bookingNo) {
@@ -397,7 +577,11 @@
         if (!option) return;
         event.preventDefault();
         bookingNo.value = option.getAttribute("data-booking-no") || "";
-        if (bookingItem) bookingItem.value = option.getAttribute("data-booking-item") || "";
+        if (bookingItem) {
+          const selectedBookingItem = option.getAttribute("data-booking-item") || "";
+          ensureSelectOption(bookingItem, selectedBookingItem);
+          if (selectedBookingItem) bookingItem.value = selectedBookingItem;
+        }
         applyBookingLookup();
         hideBookingMenu();
       });
@@ -416,6 +600,45 @@
     if (shipmentRef) {
       shipmentRef.addEventListener("change", syncBookingFromShipment);
       syncBookingFromShipment();
+    }
+    function syncFromDocumentOption(select) {
+      const option = selectedOption(select);
+      if (!option || !option.value) return;
+      const optionShipment = option.getAttribute("data-shipment-ref") || "";
+      const optionBookingNo = option.getAttribute("data-booking-no") || "";
+      const optionBookingItem = option.getAttribute("data-booking-item") || "";
+      const optionLocation = option.getAttribute("data-physical-location") || "";
+      const optionReceivedUser = option.getAttribute("data-received-user") || "";
+      if (optionShipment && shipmentRef) {
+        shipmentRef.value = optionShipment;
+      }
+      if (optionBookingNo && bookingNo) {
+        bookingNo.value = optionBookingNo;
+        filterBookingItemsForBooking(optionBookingNo);
+      }
+      if (optionBookingItem && bookingItem) {
+        ensureSelectOption(bookingItem, optionBookingItem);
+        bookingItem.value = optionBookingItem;
+      }
+      setPhysicalLocation(optionLocation);
+      setReceivedUser(optionReceivedUser);
+      filterDocumentRecordsForShipment(optionShipment);
+      syncMatchingRecordSelect(select);
+    }
+    if (documentRef) {
+      documentRef.addEventListener("change", function () {
+        syncFromDocumentOption(documentRef);
+      });
+    }
+    if (podRecord) {
+      podRecord.addEventListener("change", function () {
+        syncFromDocumentOption(podRecord);
+      });
+    }
+    if (physicalLocation) {
+      physicalLocation.addEventListener("change", function () {
+        syncLineLocations(physicalLocation.value);
+      });
     }
     function renumber() {
       if (!tbody) return;
@@ -438,6 +661,10 @@
         const tr = document.createElement("tr");
         tr.innerHTML = '<td data-label="SN">0</td><td data-label="Doc Page (list)"><input type="text" class="form-control form-control-sm dh-line-doc-page" placeholder="Page-1"/></td><td data-label="Page Status (list)"><select class="form-select form-select-sm dh-line-page-status"><option value="Pending">Pending</option><option value="Collected">Collected</option><option value="Missing">Missing</option></select></td><td data-label="Physical Location"><input type="text" class="form-control form-control-sm dh-line-location" placeholder="With Admin"/></td><td data-label="Note"><input type="text" class="form-control form-control-sm dh-line-note" placeholder="Note"/></td><td data-label="Actions" data-col="actions"><button type="button" class="btn btn-sm btn-outline-danger dh-remove-line"><i class="bi bi-trash3"></i></button></td>';
         tbody.appendChild(tr);
+        if (physicalLocation && physicalLocation.value) {
+          const locationInput = tr.querySelector(".dh-line-location");
+          if (locationInput) locationInput.value = physicalLocation.value;
+        }
         renumber();
       });
       if (!tbody.querySelector("tr")) addBtn.click();

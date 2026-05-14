@@ -350,11 +350,10 @@
                     <option value="" {% if not shipment_document_form_data.document_type %}selected{% endif %} disabled>
                       -Select Document Type-
                     </option>
-                    <option value="Bill of Lading" {% if shipment_document_form_data.document_type == 'Bill of Lading' %}selected{% endif %}>Bill of Lading (BOL)</option>
-                    <option value="Commercial Invoice" {% if shipment_document_form_data.document_type == 'Commercial Invoice' %}selected{% endif %}>Commercial Invoice</option>
-                    <option value="Packing List" {% if shipment_document_form_data.document_type == 'Packing List' %}selected{% endif %}>Packing List</option>
-                    <option value="Certificate of Origin" {% if shipment_document_form_data.document_type == 'Certificate of Origin' %}selected{% endif %}>Certificate of Origin</option>
-                    <option value="Other" {% if shipment_document_form_data.document_type == 'Other' %}selected{% endif %}>Other</option>
+                    <option value="Delivery Note" {% if shipment_document_form_data.document_type == 'Delivery Note' %}selected{% endif %}>Delivery Note</option>
+                    <option value="Waybill" {% if shipment_document_form_data.document_type == 'Waybill' %}selected{% endif %}>Waybill</option>
+                    <option value="Manifest" {% if shipment_document_form_data.document_type == 'Manifest' %}selected{% endif %}>Manifest</option>
+                    <option value="Custom Dec." {% if shipment_document_form_data.document_type == 'Custom Dec.' %}selected{% endif %}>Custom Dec.</option>
                   </select>
                   {% if shipment_document_form_errors.document_type %}<div class="invalid-feedback d-block">{{ shipment_document_form_errors.document_type }}</div>{% endif %}
                 </div>
@@ -442,21 +441,23 @@
                     <i class="bi bi-files"></i>
                     <input
                       type="number"
-                      class="form-control has-icon"
+                      class="form-control has-icon {% if shipment_document_form_errors.page_count %}is-invalid{% endif %}"
                       id="pageCount"
                       name="page_count"
                       value="{{ shipment_document_form_data.page_count|default:'' }}"
                       placeholder="e.g. 1"
                       min="1"
+                      readonly
                     />
                   </div>
+                  {% if shipment_document_form_errors.page_count %}<div class="invalid-feedback d-block">{{ shipment_document_form_errors.page_count }}</div>{% endif %}
+                  <span class="field-hint">Auto-calculated from subform line rows</span>
                 </div>
                 <div class="field">
                   <label for="status" class="form-label">Status</label>
                   <select class="form-select" id="status" name="status">
-                    <option value="Draft" {% if shipment_document_form_data.status|default:'Draft' == 'Draft' %}selected{% endif %}>Draft</option>
+                    <option value="Pending" {% if shipment_document_form_data.status|default:'Pending' == 'Pending' %}selected{% endif %}>Pending</option>
                     <option value="Verified" {% if shipment_document_form_data.status == 'Verified' %}selected{% endif %}>Verified</option>
-                    <option value="Rejected" {% if shipment_document_form_data.status == 'Rejected' %}selected{% endif %}>Rejected</option>
                   </select>
                 </div>
               </div>
@@ -500,8 +501,8 @@
                     <th>Doc Ref No</th>
                     <th>Extra Ref</th>
                     <th>Page No</th>
-                    <th>Status</th>
-                    <th>Physical Location</th>
+                    <th data-sd-status-header>Status</th>
+                    <th>Signer Location</th>
                     <th>Attachment</th>
                     <th style="width: 90px">Actions</th>
                   </tr>
@@ -628,8 +629,19 @@
             });
 
             var selectedShipment = selectedOption(shipmentSelect);
-            if (!selectedShipment || selectedShipment.hidden || selectedShipment.disabled) {
-              shipmentSelect.value = matched.length === 1 ? matched[0].value : "";
+            var needsAutoSelect = (
+              !selectedShipment ||
+              !selectedShipment.value ||
+              selectedShipment.hidden ||
+              selectedShipment.disabled ||
+              selectedShipment.getAttribute("data-booking-no") !== bookingNo
+            );
+            if (needsAutoSelect) {
+              shipmentSelect.value = matched.length ? matched[0].value : "";
+              selectedShipment = selectedOption(shipmentSelect);
+            }
+            if (bookingItemInput && selectedShipment && selectedShipment.value) {
+              bookingItemInput.value = selectedShipment.getAttribute("data-booking-item") || bookingItem;
             }
           }
 

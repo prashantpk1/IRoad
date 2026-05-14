@@ -141,7 +141,7 @@
                   <select class="form-select {% if form_errors.shipment_id %}is-invalid{% endif %}" id="shipmentId" name="shipment_id" required>
                     <option value="" {% if not surcharge_form_data.shipment_id %}selected{% endif %} disabled>-Select shipment-</option>
                     {% for shipment in shipment_options %}
-                    <option value="{{ shipment.shipment_id }}" data-booking="{{ shipment.booking_no|default:'' }}" data-client="{{ shipment.client_account_ref|default:'' }}" data-currency="{{ shipment.currency|default:'SAR' }}" {% if surcharge_form_data.shipment_id == shipment.shipment_id|stringformat:'s' %}selected{% endif %}>{{ shipment.shipment_no }}</option>
+                    <option value="{{ shipment.shipment_id }}" data-booking="{{ shipment.booking_label|default:shipment.booking_no }}" data-client="{{ shipment.client_account_ref|default:'' }}" data-currency="{{ shipment.currency|default:'SAR' }}" {% if surcharge_form_data.shipment_id == shipment.shipment_id|stringformat:'s' %}selected{% endif %}>{{ shipment.shipment_label|default:shipment.shipment_no }}</option>
                     {% endfor %}
                   </select>
                   {% if form_errors.shipment_id %}<div class="invalid-feedback d-block">{{ form_errors.shipment_id }}</div>{% endif %}
@@ -438,23 +438,6 @@
 
         quantityInput.addEventListener("input", updateTotal);
         unitPriceInput.addEventListener("input", updateTotal);
-
-        form.addEventListener("submit", function (event) {
-          var status = document.getElementById("status").value;
-          if (status === "confirmed") {
-            if (!shipmentSelect.value || !serviceSelect.value || !document.getElementById("notes").value.trim() || !document.getElementById("attachmentFile").value) {
-              event.preventDefault();
-              alert("Before confirming, complete Shipment, Service, Reason, and Attachment.");
-            }
-          }
-          if (status === "invoiced") {
-            Array.prototype.forEach.call(form.elements, function (el) {
-              if (el.id !== "status" && el.type !== "submit" && el.type !== "reset") {
-                el.disabled = true;
-              }
-            });
-          }
-        });
 
         updateTotal();
 

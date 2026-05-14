@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8">
-  <title>Surcharge {{ surcharge.surcharge_id }}</title>
+  <title>Surcharge {{ surcharge.transaction_no|default:surcharge.surcharge_id }}</title>
   <style>
     @page { size: A4; margin: 0.2cm; }
     body { font-family: Tahoma, Arial, sans-serif; direction: rtl; font-size: 11px; color: #111; }
@@ -16,7 +16,7 @@
   <h2>رسوم إضافية / Surcharge</h2>
   <table>
     <tbody>
-      <tr><th>Surcharge Ref</th><td>{{ surcharge.surcharge_id }}</td><th>Shipment</th><td>{{ shipment.shipment_no|default:'-' }}</td></tr>
+      <tr><th>Surcharge Ref</th><td>{{ surcharge.transaction_no|default:surcharge.surcharge_id }}</td><th>Shipment</th><td>{{ shipment.shipment_no|default:'-' }}</td></tr>
       <tr><th>Item Label</th><td>{{ surcharge.item_label }}</td><th>Line No</th><td>{{ surcharge.line_no }}</td></tr>
       <tr><th>Quantity</th><td class="num">{{ surcharge.qty }}</td><th>Subtotal</th><td class="num">{{ surcharge.subtotal }}</td></tr>
       <tr><th>Created</th><td>{{ surcharge.created_at|date:'Y-m-d H:i' }}</td><th>Updated</th><td>{{ surcharge.updated_at|date:'Y-m-d H:i' }}</td></tr>

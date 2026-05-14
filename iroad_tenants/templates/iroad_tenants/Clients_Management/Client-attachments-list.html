@@ -144,7 +144,7 @@
             </thead>
             <tbody>
               {% for attachment in client_attachments %}
-              <tr data-detail-url="{{ attachment.list_detail_url|default:'' }}">
+              <tr>
                 <td class="eal-col-check">
                   <input type="checkbox" class="eal-custom-check" />
                 </td>
@@ -269,25 +269,3 @@
       <!-- ========== END NEW TABLE UI DESIGN ========== -->
 {% endblock %}
 
-{% block extra_js %}
-<script>
-      (function () {
-        document.querySelectorAll(".eal-table tbody tr[data-detail-url]").forEach(function (row) {
-          var url = row.getAttribute("data-detail-url");
-          if (!url) return;
-          row.style.cursor = "pointer";
-          row.addEventListener("click", function (e) {
-            if (
-              e.target.closest(".eal-col-check") ||
-              e.target.closest(".eal-actions-cell") ||
-              e.target.closest('input[type="checkbox"]') ||
-              e.target.closest("a")
-            ) {
-              return;
-            }
-            window.location.href = url;
-          });
-        });
-      })();
-    </script>
-{% endblock %}

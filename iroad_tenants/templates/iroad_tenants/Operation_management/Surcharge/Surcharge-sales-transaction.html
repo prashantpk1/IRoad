@@ -259,14 +259,6 @@
           nextBtn.disabled = currentIndex === rows.length - 1;
         }
 
-        rows.forEach((row, idx) => {
-         
-          row.addEventListener("click", function (e) {
-            if (e.target.closest(".eal-col-check") || e.target.closest(".eal-actions-cell") || e.target.closest('input[type="checkbox"]')) return;
-            showRow(idx); openPanel();
-          });
-        });
-
         document.querySelectorAll(".js-view-detail").forEach((btn) => {
           btn.addEventListener("click", function (e) {
             e.preventDefault();
