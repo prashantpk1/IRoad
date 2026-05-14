@@ -14,6 +14,9 @@ from mobile_api.views.driver_auth import (
     DriverResetPasswordView,
     DriverVerifyOtpView,
 )
+from mobile_api.views.driver_organization_profile import (
+    DriverOrganizationProfileView,
+)
 from mobile_api.views.driver_profile import (
     DriverChangePasswordView,
     DriverProfilePhotoUpdateView,
@@ -74,6 +77,13 @@ urlpatterns = [
         'driver/profile/',
         DriverProfileView.as_view(),
         name='driver_profile',
+    ),
+    # GET — tenant org support snapshot (auth + X-Tenant-ID). See
+    # mobile_api/docs/driver_organization_profile.md and Postman "Get Organization Profile".
+    path(
+        'driver/organization-profile/',
+        DriverOrganizationProfileView.as_view(),
+        name='driver_organization_profile',
     ),
     path(
         'driver/profile/photo/',
