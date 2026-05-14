@@ -37,6 +37,19 @@
   .view-value.empty {
     color: var(--text-light);
   }
+  .org-driver-instructions-html {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+  .org-driver-instructions-html img {
+    max-width: 100%;
+    height: auto;
+  }
+  .org-driver-instructions-html table {
+    max-width: 100%;
+    display: block;
+    overflow-x: auto;
+  }
 </style>
 {% endblock %}
 
@@ -421,8 +434,12 @@
         <div class="fields-grid cols-1">
           <div class="field">
             <label class="form-label">Driver Instructions (Rich Text)</label>
-            <div class="view-field-box" style="min-height: 120px;">
-              <p class="view-value">{{ org.driver_instructions|default:"-" }}</p>
+            <div class="view-field-box org-driver-instructions-html" style="min-height: 120px;">
+              {% if org.driver_instructions %}
+                {{ org.driver_instructions|safe }}
+              {% else %}
+                <p class="view-value">-</p>
+              {% endif %}
             </div>
           </div>
         </div>

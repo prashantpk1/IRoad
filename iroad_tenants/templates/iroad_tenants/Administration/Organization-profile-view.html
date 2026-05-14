@@ -533,9 +533,12 @@
               class="form-control"
               id="driverInstructions"
               name="driver_instructions"
-              rows="4"
+              rows="16"
               placeholder="Enter detailed instructions for drivers..."
             >{{ org.driver_instructions }}</textarea>
+            <p class="form-text text-muted small mb-0 mt-1">
+              Rich text editor (TinyMCE) is enabled for this field.
+            </p>
           </div>
         </div>
       </div>
@@ -561,6 +564,7 @@
 {% endblock %}
 
 {% block extra_js %}
+  {% include 'iroad_tenants/partials/organization_driver_instructions_tinymce.html' %}
 <script>
   // Simple format validation for website
   const websiteInput = document.getElementById("website");
