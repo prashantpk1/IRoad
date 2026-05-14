@@ -5,6 +5,7 @@ from iroad_frontend.views import (
     ContactFormSubmitView,
     ContactPageView,
     HomePageView,
+    MobileAboutUsView,
     PricingPageView,
     PrivacyPolicyView,
     TermsConditionsView,
@@ -30,6 +31,11 @@ urlpatterns = [
         'terms-and-conditions/',
         TermsConditionsView.as_view(),
         name='terms_conditions',
+    ),
+    path(
+        'mobile-about-us/',
+        MobileAboutUsView.as_view(),
+        name='mobile_about_us',
     ),
     path('', HomePageView.as_view(), name='home'),
 ]

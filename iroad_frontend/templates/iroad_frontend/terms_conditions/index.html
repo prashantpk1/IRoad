@@ -26,7 +26,9 @@
 {% endblock %}
 
 {% block content %}
-  {% include 'iroad_frontend/partials/components/page_header.html' with page_header_kind='terms' page_header_background=terms_conditions.page_header_background %}
+  {% if not remove_header_footer|default:False %}
+    {% include 'iroad_frontend/partials/components/page_header.html' with page_header_kind='terms' page_header_background=terms_conditions.page_header_background %}
+  {% endif %}
 
   <div class="container py-5">
     <div class="row justify-content-center">

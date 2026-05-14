@@ -11,6 +11,7 @@ from iroad_frontend.models import (
     ContactPageContent,
     ContactSubmission,
     HomePageContent,
+    MobileAboutUsPageContent,
     PricingPageContent,
     PrivacyPolicyPageContent,
     TermsConditionsPageContent,
@@ -138,7 +139,11 @@ class ContactPageView(View):
 
 
 class PrivacyPolicyView(View):
-    """Public privacy policy page (CMS singleton). Not linked from site nav."""
+    """Public privacy policy page (CMS singleton). Not linked from site nav.
+
+    Pass ``?remove_header_footer=true`` to hide site header/footer and the
+    page hero (WebView / embedded use), same as terms and mobile about us.
+    """
 
     def get(self, request):
         privacy = PrivacyPolicyPageContent.get_singleton()
@@ -154,6 +159,9 @@ class PrivacyPolicyView(View):
             privacy, 'page_header_h1', lang)
         context['breadcrumb_current'] = localized_cms_field(
             privacy, 'breadcrumb_current', lang)
+        context['remove_header_footer'] = (
+            request.GET.get('remove_header_footer') == 'true'
+        )
         return render(
             request,
             'iroad_frontend/privacy_policy/index.html',
@@ -162,7 +170,11 @@ class PrivacyPolicyView(View):
 
 
 class TermsConditionsView(View):
-    """Public terms & conditions page (CMS singleton). Not linked from site nav."""
+    """Public terms & conditions page (CMS singleton). Not linked from site nav.
+
+    Pass ``?remove_header_footer=true`` to hide site header/footer and the
+    page hero (WebView / embedded use), same as privacy and mobile about us.
+    """
 
     def get(self, request):
         terms_conditions = TermsConditionsPageContent.get_singleton()
@@ -178,9 +190,39 @@ class TermsConditionsView(View):
             terms_conditions, 'page_header_h1', lang)
         context['breadcrumb_current'] = localized_cms_field(
             terms_conditions, 'breadcrumb_current', lang)
+        context['remove_header_footer'] = (
+            request.GET.get('remove_header_footer') == 'true'
+        )
         return render(
             request,
             'iroad_frontend/terms_conditions/index.html',
+            context,
+        )
+
+
+class MobileAboutUsView(View):
+    """Public mobile About Us page (CMS singleton). URL-only; not linked from nav."""
+
+    def get(self, request):
+        mobile_about_us = MobileAboutUsPageContent.get_singleton()
+        home = HomePageContent.get_singleton()
+        context = {
+            'mobile_about_us': mobile_about_us,
+            'home': home,
+        }
+        context.update(get_lang_context(request))
+        lang = context['lang']
+        context['page_header_use_generic'] = True
+        context['page_h1'] = localized_cms_field(
+            mobile_about_us, 'page_header_h1', lang)
+        context['breadcrumb_current'] = localized_cms_field(
+            mobile_about_us, 'breadcrumb_current', lang)
+        context['remove_header_footer'] = (
+            request.GET.get('remove_header_footer') == 'true'
+        )
+        return render(
+            request,
+            'iroad_frontend/mobile_about_us/index.html',
             context,
         )
 

@@ -1509,6 +1509,10 @@ def terms_conditions_upload_path(instance, filename):
     return f'marketing/legal/terms/{filename}'
 
 
+def mobile_about_us_upload_path(instance, filename):
+    return f'marketing/legal/mobile-about-us/{filename}'
+
+
 class PrivacyPolicyPageContent(models.Model):
     """
     Singleton CMS for the public Privacy Policy page.
@@ -1662,6 +1666,88 @@ class TermsConditionsPageContent(models.Model):
 
     def __str__(self):
         return 'Terms & Conditions Page Content'
+
+    @classmethod
+    def get_singleton(cls):
+        obj, _created = cls.objects.get_or_create(pk=1)
+        return obj
+
+
+class MobileAboutUsPageContent(models.Model):
+    """
+    Singleton CMS for the mobile app About Us page (not the marketing About page).
+
+    Same field layout as Privacy / Terms legal singletons; managed under
+    Website CMS → Legal Pages in superadmin.
+    """
+
+    # ── SEO ──────────────────────────────────────────────────────
+    page_title_en = models.CharField(
+        max_length=200,
+        blank=True,
+        default='About Us - IRoad',
+    )
+    page_title_ar = models.CharField(
+        max_length=200,
+        blank=True,
+        default='من نحن - آيروود',
+    )
+    meta_description_en = models.TextField(blank=True, default='')
+    meta_description_ar = models.TextField(blank=True, default='')
+
+    # ── Page Header / Breadcrumb ──────────────────────────────────
+    page_header_h1_en = models.CharField(
+        max_length=300,
+        blank=True,
+        default='About Us',
+    )
+    page_header_h1_ar = models.CharField(
+        max_length=300,
+        blank=True,
+        default='من نحن',
+    )
+    breadcrumb_current_en = models.CharField(
+        max_length=100,
+        blank=True,
+        default='About Us',
+    )
+    breadcrumb_current_ar = models.CharField(
+        max_length=100,
+        blank=True,
+        default='من نحن',
+    )
+    page_header_background = models.FileField(
+        upload_to=mobile_about_us_upload_path,
+        blank=True,
+        null=True,
+        validators=_CMS_UPLOAD_VALIDATORS,
+        verbose_name='Page header background image',
+        help_text=(
+            'Optional hero background for the mobile About Us page header. '
+            'If empty, a solid theme fallback is used.'
+        ),
+    )
+
+    # ── Main body (rich text; TinyMCE in superadmin CMS template) ─
+    content_en = models.TextField(blank=True, default='')
+    content_ar = models.TextField(blank=True, default='')
+
+    # ── Audit ─────────────────────────────────────────────────────
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.CharField(
+        max_length=200,
+        blank=True,
+        default='',
+    )
+
+    class Meta:
+        db_table = 'iroad_frontend_mobile_about_us_content'
+        verbose_name = 'Mobile About Us Page Content'
+        verbose_name_plural = 'Mobile About Us Page Content'
+
+    def __str__(self):
+        return 'Mobile About Us Page Content'
 
     @classmethod
     def get_singleton(cls):

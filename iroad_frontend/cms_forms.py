@@ -23,6 +23,7 @@ from iroad_frontend.models import (
     PricingFaqItem,
     PricingInteractiveStep,
     PricingPageContent,
+    MobileAboutUsPageContent,
     PrivacyPolicyPageContent,
     TermsConditionsPageContent,
 )
@@ -344,3 +345,15 @@ class TermsConditionsPageContentForm(LegalPageSingletonFormMixin, ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         _apply_legal_page_widgets(self, TermsConditionsPageContent)
+
+
+class MobileAboutUsPageContentForm(LegalPageSingletonFormMixin, ModelForm):
+    """Singleton mobile app About Us — bilingual body + SEO (TinyMCE in admin template)."""
+
+    class Meta:
+        model = MobileAboutUsPageContent
+        exclude = ('id', 'created_at', 'updated_at', 'updated_by')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        _apply_legal_page_widgets(self, MobileAboutUsPageContent)
