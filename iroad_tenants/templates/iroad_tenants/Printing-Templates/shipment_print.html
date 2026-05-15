@@ -20,9 +20,9 @@
       <tbody>
         <tr><th>Shipment No</th><td>{{ shipment.shipment_no }}</td><th>Status</th><td>{{ shipment.shipment_status }}</td></tr>
         <tr><th>Date</th><td>{{ shipment.shipment_date|date:'Y-m-d' }}</td><th>Order Type</th><td>{{ shipment.order_type|default:'-' }}</td></tr>
-        <tr><th>Booking Ref</th><td>{{ shipment.booking_no }}</td><th>Booking Item</th><td>{{ shipment.booking_item_ref }}</td></tr>
+        <tr><th>Booking Ref</th><td>{% if shipment.booking %}{{ shipment.booking.booking_no }}{% endif %}</td><th>Booking Item</th><td>{{ shipment.booking_item_ref }}</td></tr>
         <tr><th>Route</th><td>{{ shipment.route_display|default:'-' }}</td><th>Trip Type</th><td>{{ shipment.trip_type|default:'-' }}</td></tr>
-        <tr><th>Client Snapshot</th><td>{{ shipment.client_account_ref|default:'-' }}</td><th>COD Amount</th><td class="num">{{ shipment.cod_amount }}</td></tr>
+        <tr><th>Client Snapshot</th><td>{% if shipment.client_account %}{{ shipment.client_account.account_no }} - {{ shipment.client_account.display_name }}{% else %}-{% endif %}</td><th>COD Amount</th><td class="num">{{ shipment.cod_amount }}</td></tr>
       </tbody>
     </table>
   </div>

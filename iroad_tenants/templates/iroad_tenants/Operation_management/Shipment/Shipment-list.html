@@ -211,13 +211,13 @@
                   data-booking-item-type="{{ shipment.booking_item_type|default:'' }}"
                   data-sourcing-mode="{{ shipment.sourcing_mode|default:'' }}"
                   data-trip-type="{{ shipment.trip_type|default:'' }}"
-                  data-from-location="{{ shipment.from_location|default:'' }}"
-                  data-to-location="{{ shipment.to_location|default:'' }}"
+                  data-from-location="{% if shipment.loading_address %}{{ shipment.loading_address.address_code }} - {{ shipment.loading_address.display_name }}{% endif %}"
+                  data-to-location="{% if shipment.delivery_address %}{{ shipment.delivery_address.address_code }} - {{ shipment.delivery_address.display_name }}{% endif %}"
                   data-pod-type="{{ shipment.pod_type|default:'' }}"
                   data-pod-status="{{ shipment.pod_status|default:'' }}"
                   data-pod-doc-count="{{ shipment.pod_doc_count|default:0 }}"
                   data-truck="{{ shipment.truck.truck_code|default:'' }}"
-                  data-driver="{{ shipment.driver_ref|default:'' }}"
+                  data-driver="{% if shipment.driver %}{{ shipment.driver.driver_code }}{% endif %}"
                   data-detail-url="{% url 'iroad_tenants:tenant_operation_shipment_detail' shipment.shipment_id %}"
                 >
                   <td class="eal-col-check">
@@ -236,7 +236,7 @@
                     </div>
                   </td>
                   <td>
-                    <span>{{ shipment.booking_no }}</span>
+                    <span>{% if shipment.booking %}{{ shipment.booking.booking_no }}{% else %}-{% endif %}</span>
                   </td>
                   <td>{{ shipment.order_type|default:"-" }}</td>
                   <td>{{ shipment.route_display|default:"-" }}</td>

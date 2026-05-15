@@ -272,11 +272,11 @@
                   </label>
                   <div class="input-icon-wrapper shipment-doc-lookup">
                     <i class="bi bi-search"></i>
+                    <input type="hidden" id="bookingId" name="booking_id" value="{{ shipment_document_form_data.booking_id|default:'' }}" />
                     <input
                       type="text"
-                      class="form-control has-icon {% if shipment_document_form_errors.booking_no %}is-invalid{% endif %}"
+                      class="form-control has-icon {% if shipment_document_form_errors.booking_id %}is-invalid{% endif %}"
                       id="bookingNo"
-                      name="booking_no"
                       value="{{ shipment_document_form_data.booking_no|default:'' }}"
                       placeholder="Search or type booking no..."
                       autocomplete="off"
@@ -286,6 +286,7 @@
                       <button
                         type="button"
                         class="shipment-doc-lookup-option"
+                        data-booking-id="{{ booking.booking_id }}"
                         data-booking-no="{{ booking.booking_no }}"
                         data-booking-item="{{ booking.booking_item }}"
                       >
@@ -296,7 +297,7 @@
                       <div class="shipment-doc-lookup-empty">No shipment bookings available.</div>
                       {% endfor %}
                     </div>
-                    {% if shipment_document_form_errors.booking_no %}<div class="invalid-feedback d-block">{{ shipment_document_form_errors.booking_no }}</div>{% endif %}
+                    {% if shipment_document_form_errors.booking_id %}<div class="invalid-feedback d-block">{{ shipment_document_form_errors.booking_id }}</div>{% endif %}
                   </div>
                 </div>
               </div>
@@ -310,11 +311,10 @@
                     <i class="bi bi-search"></i>
                     <input
                       type="text"
-                      class="form-control has-icon {% if shipment_document_form_errors.booking_item %}is-invalid{% endif %}"
+                      class="form-control has-icon"
                       id="bookingItem"
-                      name="booking_item"
                       value="{{ shipment_document_form_data.booking_item|default:'' }}"
-                      placeholder="booking item..."
+                      placeholder="Select shipment to load booking item"
                       readonly
                     />
                     {% if shipment_document_form_errors.booking_item %}<div class="invalid-feedback d-block">{{ shipment_document_form_errors.booking_item }}</div>{% endif %}
@@ -325,21 +325,22 @@
                     >Shipment
                     <span class="required">*</span>
                   </label>
-                  <select class="form-select {% if shipment_document_form_errors.shipment_ref %}is-invalid{% endif %}" id="shipmentRef" name="shipment_ref">
-                    <option value="" {% if not shipment_document_form_data.shipment_ref %}selected{% endif %} disabled>-Select shipment-</option>
+                  <select class="form-select {% if shipment_document_form_errors.shipment_id %}is-invalid{% endif %}" id="shipmentRef" name="shipment_id">
+                    <option value="" {% if not shipment_document_form_data.shipment_id %}selected{% endif %} disabled>-Select shipment-</option>
                     {% for shipment in shipment_document_shipments %}
                     <option
-                      value="{{ shipment.shipment_no }}"
+                      value="{{ shipment.shipment_id }}"
+                      data-shipment-no="{{ shipment.shipment_no }}"
+                      data-booking-id="{{ shipment.booking_id|default:'' }}"
                       data-booking-no="{{ shipment.booking_no }}"
-                      data-booking-item="{{ shipment.booking_item_ref }}"
-                      hidden
-                      {% if shipment_document_form_data.shipment_ref == shipment.shipment_no %}selected{% endif %}
+                      data-booking-item="{{ shipment.booking_item }}"
+                      {% if shipment_document_form_data.shipment_id == shipment.shipment_id %}selected{% endif %}
                     >
                       {{ shipment.shipment_no }} - {{ shipment.booking_no }}
                     </option>
                     {% endfor %}
                   </select>
-                  {% if shipment_document_form_errors.shipment_ref %}<div class="invalid-feedback d-block">{{ shipment_document_form_errors.shipment_ref }}</div>{% endif %}
+                  {% if shipment_document_form_errors.shipment_id %}<div class="invalid-feedback d-block">{{ shipment_document_form_errors.shipment_id }}</div>{% endif %}
                 </div>
                 <div class="field">
                   <label for="documentType" class="form-label"
@@ -553,6 +554,7 @@
       <script>
         (function () {
           var shipmentSelect = document.getElementById("shipmentRef");
+          var bookingIdInput = document.getElementById("bookingId");
           var bookingNoInput = document.getElementById("bookingNo");
           var bookingNoMenu = document.getElementById("bookingNoOptions");
           var bookingItemInput = document.getElementById("bookingItem");
@@ -593,7 +595,7 @@
             bookingNoMenu.classList.toggle("show", visibleCount > 0);
           }
 
-          function resetShipmentSelection() {
+          function showAllShipments() {
             if (!shipmentSelect) return;
             Array.prototype.forEach.call(shipmentSelect.options, function (opt, index) {
               if (index === 0) {
@@ -601,10 +603,9 @@
                 opt.disabled = false;
                 return;
               }
-              opt.hidden = true;
-              opt.disabled = true;
+              opt.hidden = false;
+              opt.disabled = false;
             });
-            shipmentSelect.value = "";
           }
 
           function applyBookingLookup() {
@@ -612,6 +613,9 @@
             var bookingOpt = findBookingOption(typedBookingNo);
             var bookingNo = bookingOpt ? bookingOpt.getAttribute("data-booking-no") || "" : typedBookingNo;
             var bookingItem = bookingOpt ? bookingOpt.getAttribute("data-booking-item") || "" : "";
+            if (bookingIdInput) {
+              bookingIdInput.value = bookingOpt ? bookingOpt.getAttribute("data-booking-id") || "" : "";
+            }
             if (bookingItemInput) bookingItemInput.value = bookingItem;
             if (!shipmentSelect) return;
 
@@ -652,6 +656,9 @@
             if (bookingNoInput && bookingNoInput.value !== bookingNo) {
               bookingNoInput.value = bookingNo;
             }
+            if (bookingIdInput) {
+              bookingIdInput.value = shipmentOpt.getAttribute("data-booking-id") || "";
+            }
             if (bookingItemInput) {
               bookingItemInput.value = shipmentOpt.getAttribute("data-booking-item") || "";
             }
@@ -669,9 +676,15 @@
               applyBookingLookup();
               hideBookingMenu();
             });
-            applyBookingLookup();
+            if (bookingIdInput && bookingIdInput.value) {
+              applyBookingLookup();
+            } else if (shipmentSelect && shipmentSelect.value) {
+              syncBookingFromShipment();
+            } else {
+              showAllShipments();
+            }
           } else {
-            resetShipmentSelection();
+            showAllShipments();
           }
 
           if (bookingNoMenu && bookingNoInput) {
@@ -680,6 +693,9 @@
               if (!option) return;
               event.preventDefault();
               bookingNoInput.value = option.getAttribute("data-booking-no") || "";
+              if (bookingIdInput) {
+                bookingIdInput.value = option.getAttribute("data-booking-id") || "";
+              }
               if (bookingItemInput) {
                 bookingItemInput.value = option.getAttribute("data-booking-item") || "";
               }
@@ -699,7 +715,9 @@
 
           if (shipmentSelect) {
             shipmentSelect.addEventListener("change", syncBookingFromShipment);
-            syncBookingFromShipment();
+            if (shipmentSelect.value) {
+              syncBookingFromShipment();
+            }
           }
 
         })();

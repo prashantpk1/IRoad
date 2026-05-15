@@ -153,6 +153,9 @@ from .views import (
     TenantOperationDocumentHandoverCreateView,
     TenantOperationTruckMovementLogListView,
     TenantOperationTruckMovementLogCreateView,
+    TenantOperationTruckMovementLogDetailView,
+    TenantOperationTruckMovementLogEditView,
+    TenantOperationTruckMovementLogDeleteView,
     TenantOperationActionsListView,
     TenantOperationActionsCreateView,
     TenantOperationActionsDetailView,
@@ -1022,6 +1025,21 @@ urlpatterns = [
         'operations/truck-movement-log/create/',
         TenantOperationTruckMovementLogCreateView.as_view(),
         name='tenant_operation_truck_movement_log_create',
+    ),
+    path(
+        'operations/truck-movement-log/<uuid:movement_id>/',
+        TenantOperationTruckMovementLogDetailView.as_view(),
+        name='tenant_operation_truck_movement_log_detail',
+    ),
+    path(
+        'operations/truck-movement-log/<uuid:movement_id>/edit/',
+        TenantOperationTruckMovementLogEditView.as_view(),
+        name='tenant_operation_truck_movement_log_edit',
+    ),
+    path(
+        'operations/truck-movement-log/<uuid:movement_id>/delete/',
+        TenantOperationTruckMovementLogDeleteView.as_view(),
+        name='tenant_operation_truck_movement_log_delete',
     ),
     path(
         'operations/operation-actions/list/',

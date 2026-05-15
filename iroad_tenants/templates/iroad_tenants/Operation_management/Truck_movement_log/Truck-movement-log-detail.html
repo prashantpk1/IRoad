@@ -1,0 +1,223 @@
+{% extends 'iroad_tenants/base.html' %}
+
+{% block title %}Truck Movement Log Details | iRoad Admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{% url 'iroad_tenants:tenant_dashboard' %}">Dashboard</a></li>
+      <li class="breadcrumb-item">Operations</li>
+      <li class="breadcrumb-item">Operations Management</li>
+      <li class="breadcrumb-item"><a href="{% url 'iroad_tenants:tenant_operation_truck_movement_log_list' %}">Truck Movement Log List</a></li>
+      <li class="breadcrumb-item active" aria-current="page">Movement Details</li>
+    </ol>
+  </nav>
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">
+        Truck Movement Log &mdash;
+        <span style="color: var(--primary-color)">{{ movement.movement_no }}</span>
+      </h1>
+      <p class="page-subtitle">Full details for this truck movement log entry.</p>
+    </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <a href="{% url 'iroad_tenants:tenant_operation_truck_movement_log_list' %}" class="eal-btn eal-btn-outline">
+          <i class="bi bi-arrow-left"></i>
+          <span>Back to List</span>
+        </a>
+        <a href="{% url 'iroad_tenants:tenant_operation_truck_movement_log_edit' movement.movement_id %}" class="eal-btn eal-btn-primary">
+          <i class="bi bi-pencil-square"></i>
+          <span>Edit Record</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-lg-8">
+    <div class="form-card" data-section="1">
+      <div class="form-card-header">
+        <div class="form-card-icon blue"><i class="bi bi-truck"></i></div>
+        <div class="form-card-header-text">
+          <h2 class="form-card-title">Header</h2>
+          <p class="form-card-desc">Core movement header information.</p>
+        </div>
+      </div>
+      <div class="form-card-body">
+        <div class="fields-grid cols-3">
+          <div class="field">
+            <label class="form-label">Movement No</label>
+            <p class="detail-view-value">{{ movement.movement_no }}</p>
+          </div>
+          <div class="field">
+            <label class="form-label">Movement Date</label>
+            <p class="detail-view-value">{{ movement.movement_date|date:"d M Y" }}</p>
+          </div>
+          <div class="field">
+            <label class="form-label">Movement Source</label>
+            <p class="detail-view-value">{{ movement.movement_source|default:"-"|title }}</p>
+          </div>
+          <div class="field">
+            <label class="form-label">Status</label>
+            <p class="detail-view-value">
+              <span class="status-badge {% if movement.status == 'Completed' %}active{% elif movement.status == 'In Progress' %}in-transit{% elif movement.status == 'Cancelled' %}inactive{% else %}pending{% endif %}">
+                {{ movement.status|default:"-" }}
+              </span>
+            </p>
+          </div>
+          <div class="field">
+            <label class="form-label">Empty Move Reason</label>
+            <p class="detail-view-value">{{ movement.empty_move_reason|default:"-"|title }}</p>
+          </div>
+          <div class="field">
+            <label class="form-label">Created By</label>
+            <p class="detail-view-value">{{ movement.created_by_label|default:"-" }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-card" data-section="2">
+      <div class="form-card-header">
+        <div class="form-card-icon amber"><i class="bi bi-link-45deg"></i></div>
+        <div class="form-card-header-text">
+          <h2 class="form-card-title">Shipment Linkage</h2>
+          <p class="form-card-desc">Linked booking, shipment, truck, and driver.</p>
+        </div>
+      </div>
+      <div class="form-card-body">
+        <div class="fields-grid cols-3">
+          <div class="field">
+            <label class="form-label">Booking</label>
+            <p class="detail-view-value">{{ movement.booking_ref|default:"-" }}</p>
+          </div>
+          <div class="field">
+            <label class="form-label">Booking Item</label>
+            <p class="detail-view-value">
+              {% if movement_shipment %}{{ movement_shipment.booking_item_ref|default:"-" }}{% elif movement_booking %}{{ movement_booking.cargo_booking_item|default:"-" }}{% else %}-{% endif %}
+            </p>
+          </div>
+          <div class="field">
+            <label class="form-label">Shipment</label>
+            <p class="detail-view-value">{{ movement.shipment_ref|default:"-" }}</p>
+          </div>
+          <div class="field">
+            <label class="form-label">Truck</label>
+            <p class="detail-view-value">{{ movement.truck_ref|default:"-" }}</p>
+          </div>
+          <div class="field">
+            <label class="form-label">Driver</label>
+            <p class="detail-view-value">{% if movement.driver %}{{ movement.driver.driver_code }}{% else %}-{% endif %}</p>
+          </div>
+          <div class="field">
+            <label class="form-label">Client</label>
+            <p class="detail-view-value">
+              {% if movement_booking and movement_booking.client_account %}{{ movement_booking.client_account.account_no }} - {{ movement_booking.client_account.display_name }}{% else %}-{% endif %}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-card" data-section="3">
+      <div class="form-card-header">
+        <div class="form-card-icon green"><i class="bi bi-geo-alt"></i></div>
+        <div class="form-card-header-text">
+          <h2 class="form-card-title">Movement Details</h2>
+          <p class="form-card-desc">Route, time, and distance for this movement.</p>
+        </div>
+      </div>
+      <div class="form-card-body">
+        <div class="fields-grid cols-3">
+          <div class="field">
+            <label class="form-label">From Location</label>
+            <p class="detail-view-value">{% if movement.from_location_point %}{{ movement.from_location_point.display_label }}{% else %}-{% endif %}</p>
+          </div>
+          <div class="field">
+            <label class="form-label">To Location</label>
+            <p class="detail-view-value">{{ movement.to_location|default:"-" }}</p>
+          </div>
+          <div class="field">
+            <label class="form-label">Distance (km)</label>
+            <p class="detail-view-value">{{ movement.distance_km|default:"0" }}</p>
+          </div>
+          <div class="field">
+            <label class="form-label">Start Time</label>
+            <p class="detail-view-value">{% if movement.start_time %}{{ movement.start_time|date:"d M Y, h:i A" }}{% else %}-{% endif %}</p>
+          </div>
+          <div class="field">
+            <label class="form-label">End Time</label>
+            <p class="detail-view-value">{% if movement.end_time %}{{ movement.end_time|date:"d M Y, h:i A" }}{% else %}-{% endif %}</p>
+          </div>
+          <div class="field">
+            <label class="form-label">Updated At</label>
+            <p class="detail-view-value">{{ movement.updated_at|date:"d M Y, h:i A" }}</p>
+          </div>
+        </div>
+        <div class="fields-grid cols-2" style="margin-top: 20px">
+          <div class="field">
+            <label class="form-label">From Location Map Link</label>
+            <p class="detail-view-value">
+              {% if movement.from_location_map_link %}
+              <a href="{{ movement.from_location_map_link }}" target="_blank" rel="noopener" style="color: var(--primary-color)">{{ movement.from_location_map_link }}</a>
+              {% else %}-{% endif %}
+            </p>
+          </div>
+          <div class="field">
+            <label class="form-label">To Location Map Link</label>
+            <p class="detail-view-value">
+              {% if movement.to_location_map_link %}
+              <a href="{{ movement.to_location_map_link }}" target="_blank" rel="noopener" style="color: var(--primary-color)">{{ movement.to_location_map_link }}</a>
+              {% else %}-{% endif %}
+            </p>
+          </div>
+        </div>
+        <div class="fields-grid cols-1" style="margin-top: 20px">
+          <div class="field">
+            <label class="form-label">Notes</label>
+            <p class="detail-view-value">{{ movement.notes|default:"-" }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="form-card">
+      <div class="form-card-header">
+        <div class="form-card-icon blue"><i class="bi bi-info-circle"></i></div>
+        <div class="form-card-header-text">
+          <h2 class="form-card-title">Quick Summary</h2>
+        </div>
+      </div>
+      <div class="form-card-body">
+        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
+          <span class="detail-field-label">Movement No</span>
+          <span class="detail-field-value" style="font-weight: 600; color: var(--primary-color)">{{ movement.movement_no }}</span>
+        </div>
+        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
+          <span class="detail-field-label">Truck</span>
+          <span class="detail-field-value">{{ movement.truck_ref|default:"-" }}</span>
+        </div>
+        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
+          <span class="detail-field-label">Driver</span>
+          <span class="detail-field-value">{% if movement.driver %}{{ movement.driver.driver_code }}{% else %}-{% endif %}</span>
+        </div>
+        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
+          <span class="detail-field-label">Route</span>
+          <span class="detail-field-value">{% if movement.from_location_point %}{{ movement.from_location_point.display_label }}{% else %}-{% endif %} to {% if movement.to_location_point %}{{ movement.to_location_point.display_label }}{% else %}-{% endif %}</span>
+        </div>
+        <div class="detail-field" style="padding: 10px 0">
+          <span class="detail-field-label">Status</span>
+          <span class="detail-field-value">
+            <span class="status-badge {% if movement.status == 'Completed' %}active{% elif movement.status == 'In Progress' %}in-transit{% elif movement.status == 'Cancelled' %}inactive{% else %}pending{% endif %}">{{ movement.status|default:"-" }}</span>
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

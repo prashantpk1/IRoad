@@ -162,7 +162,6 @@
                     <i class="bi bi-caret-down-fill"></i>
                   </span>
                 </th>
-                <th>ACTIONS</th>
               </tr>
             </thead>
             <tbody>
@@ -170,18 +169,17 @@
               <tr>
                 <td class="eal-col-check"><input type="checkbox" class="eal-custom-check" /></td>
                 <td><span class="eal-entity-id">{{ row.movement_no }}</span></td>
-                <td><div class="eal-name-cell"><span class="eal-name-text">{{ row.truck_ref|default:'-' }}</span></div></td>
-                <td>{{ row.driver_ref|default:'-' }}</td>
+                <td><div class="eal-name-cell"><span class="eal-name-text">{% if row.truck %}{{ row.truck.truck_code }}{% else %}-{% endif %}</span></div></td>
+                <td>{% if row.driver %}{{ row.driver.driver_code }}{% else %}-{% endif %}</td>
                 <td><span class="status-badge {% if row.empty_move_reason %}in-transit{% else %}active{% endif %}">{% if row.empty_move_reason %}Empty{% else %}Loaded{% endif %}</span></td>
-                <td>{{ row.from_location|default:'-' }}</td>
-                <td>{{ row.to_location|default:'-' }}</td>
+                <td>{% if row.from_location_point %}{{ row.from_location_point.display_label }}{% else %}-{% endif %}</td>
+                <td>{% if row.to_location_point %}{{ row.to_location_point.display_label }}{% else %}-{% endif %}</td>
                 <td>{% if row.start_time %}{{ row.start_time|date:"d M Y, H:i" }}{% else %}-{% endif %}</td>
                 <td>{% if row.end_time %}{{ row.end_time|date:"d M Y, H:i" }}{% else %}-{% endif %}</td>
                 <td><span class="status-badge {% if row.status == 'Completed' %}active{% elif row.status == 'In Progress' %}in-transit{% elif row.status == 'Cancelled' %}inactive{% else %}pending{% endif %}">{{ row.status }}</span></td>
-                <td><div class="eal-actions-cell"><a href="{% url 'iroad_tenants:tenant_operation_truck_movement_log_create' %}" class="eal-row-btn" title="Create New"><i class="bi bi-plus-lg"></i></a></div></td>
               </tr>
               {% empty %}
-              <tr><td colspan="11" class="text-center text-muted py-4">No truck movement logs found.</td></tr>
+              <tr><td colspan="10" class="text-center text-muted py-4">No truck movement logs found.</td></tr>
               {% endfor %}
             </tbody>
           </table>

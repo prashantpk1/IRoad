@@ -40,7 +40,7 @@
         </div>
         <div class="field">
           <label class="form-label">Booking No.</label>
-          <input class="form-control" value="{{ shipment.booking_no }}" readonly />
+          <input class="form-control" value="{% if shipment.booking %}{{ shipment.booking.booking_no }}{% endif %}" readonly />
         </div>
         <div class="field">
           <label class="form-label">COD Amount</label>

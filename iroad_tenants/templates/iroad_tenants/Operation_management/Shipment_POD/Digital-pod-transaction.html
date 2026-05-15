@@ -205,8 +205,6 @@
                   {% if form_errors.shipment_ref %}<div class="invalid-feedback d-block">{{ form_errors.shipment_ref }}</div>{% endif %}
                 </div>
               </div>
-            </div>
-
             <div class="field-group" id="locationHandoverGroup">
               <h3 class="field-group-title">
                 <i class="bi bi-shield-check"></i> POD Status Info
@@ -590,7 +588,6 @@
         const pageCountInput = document.getElementById("pageCount");
         const bookingNoSelect = document.getElementById("bookingNo");
         const bookingItemSelect = document.getElementById("bookingItem");
-
         function ensureSelectOption(select, value) {
           if (!select || !value) return;
           const exists = Array.prototype.some.call(select.options, function (option) {

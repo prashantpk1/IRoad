@@ -65,8 +65,8 @@
   <div class="section">
     <div class="section-title">Booking Information</div>
     <div class="grid">
-      <div class="field"><div class="label">Client Account</div><div class="value">{{ shipment.client_account_ref|default:'-' }}</div></div>
-      <div class="field"><div class="label">Booking No.</div><div class="value">{{ shipment.booking_no|default:'-' }}</div></div>
+      <div class="field"><div class="label">Client Account</div><div class="value">{% if shipment.client_account %}{{ shipment.client_account.account_no }} - {{ shipment.client_account.display_name }}{% else %}-{% endif %}</div></div>
+      <div class="field"><div class="label">Booking No.</div><div class="value">{% if shipment.booking %}{{ shipment.booking.booking_no }}{% else %}-{% endif %}</div></div>
       <div class="field"><div class="label">Booking Item</div><div class="value">{{ shipment.booking_item_ref|default:'-' }}</div></div>
       <div class="field"><div class="label">Booking Item Type</div><div class="value">{{ shipment.booking_item_type|default:'-' }}</div></div>
       <div class="field"><div class="label">Sourcing Mode</div><div class="value">{{ shipment.sourcing_mode|default:'-' }}</div></div>
@@ -78,8 +78,8 @@
     <div class="section-title">Route & Addresses</div>
     <div class="grid">
       <div class="field"><div class="label">Route</div><div class="value">{{ shipment.route_display|default:'-' }}</div></div>
-      <div class="field"><div class="label">Loading Address</div><div class="value">{{ shipment.from_location|default:'-' }}</div></div>
-      <div class="field"><div class="label">Delivery Address</div><div class="value">{{ shipment.to_location|default:'-' }}</div></div>
+      <div class="field"><div class="label">Loading Address</div><div class="value">{% if shipment.loading_address %}{{ shipment.loading_address.address_code }} - {{ shipment.loading_address.display_name }}{% else %}-{% endif %}</div></div>
+      <div class="field"><div class="label">Delivery Address</div><div class="value">{% if shipment.delivery_address %}{{ shipment.delivery_address.address_code }} - {{ shipment.delivery_address.display_name }}{% else %}-{% endif %}</div></div>
     </div>
   </div>
 
@@ -102,7 +102,7 @@
     <div class="section-title">Truck & Driver</div>
     <div class="grid two">
       <div class="field"><div class="label">Truck</div><div class="value">{% if shipment.truck %}{{ shipment.truck.truck_code }}{% else %}-{% endif %}</div></div>
-      <div class="field"><div class="label">Driver</div><div class="value">{{ shipment.driver_ref|default:'-' }}</div></div>
+      <div class="field"><div class="label">Driver</div><div class="value">{% if shipment.driver %}{{ shipment.driver.driver_code }}{% else %}-{% endif %}</div></div>
     </div>
   </div>
 

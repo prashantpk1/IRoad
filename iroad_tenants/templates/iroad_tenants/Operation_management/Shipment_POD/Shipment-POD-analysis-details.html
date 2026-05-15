@@ -317,86 +317,30 @@
             </div>
             <div class="form-card-body">
               <div style="display: flex; flex-direction: column; gap: 16px">
+                {% for item in pod_detail.activity_log %}
                 <div style="display: flex; gap: 12px; align-items: flex-start">
                   <div
                     style="
                       width: 8px;
                       height: 8px;
                       border-radius: 50%;
-                      background: #28a745;
+                      background: {{ item.color }};
                       margin-top: 6px;
                       flex-shrink: 0;
                     "
                   ></div>
                   <div>
                     <div style="font-size: 13px; font-weight: 600; color: #333">
-                      Finalized
+                      {{ item.title }}
                     </div>
                     <div style="font-size: 12px; color: #888">
-                      01 Mar 2026, 4:30 PM &mdash; Ahmed Al-Rashid
+                      {{ item.timestamp|date:"d M Y, g:i A" }} &mdash; {{ item.actor|default:"System" }}
                     </div>
                   </div>
                 </div>
-                <div style="display: flex; gap: 12px; align-items: flex-start">
-                  <div
-                    style="
-                      width: 8px;
-                      height: 8px;
-                      border-radius: 50%;
-                      background: var(--primary-color);
-                      margin-top: 6px;
-                      flex-shrink: 0;
-                    "
-                  ></div>
-                  <div>
-                    <div style="font-size: 13px; font-weight: 600; color: #333">
-                      Verified
-                    </div>
-                    <div style="font-size: 12px; color: #888">
-                      01 Mar 2026, 3:15 PM &mdash; Sara Mohammed
-                    </div>
-                  </div>
-                </div>
-                <div style="display: flex; gap: 12px; align-items: flex-start">
-                  <div
-                    style="
-                      width: 8px;
-                      height: 8px;
-                      border-radius: 50%;
-                      background: #ffc107;
-                      margin-top: 6px;
-                      flex-shrink: 0;
-                    "
-                  ></div>
-                  <div>
-                    <div style="font-size: 13px; font-weight: 600; color: #333">
-                      Collected
-                    </div>
-                    <div style="font-size: 12px; color: #888">
-                      01 Mar 2026, 1:00 PM &mdash; Driver: Faisal Nasser
-                    </div>
-                  </div>
-                </div>
-                <div style="display: flex; gap: 12px; align-items: flex-start">
-                  <div
-                    style="
-                      width: 8px;
-                      height: 8px;
-                      border-radius: 50%;
-                      background: #dc3545;
-                      margin-top: 6px;
-                      flex-shrink: 0;
-                    "
-                  ></div>
-                  <div>
-                    <div style="font-size: 13px; font-weight: 600; color: #333">
-                      Created (Pending)
-                    </div>
-                    <div style="font-size: 12px; color: #888">
-                      01 Mar 2026, 10:00 AM &mdash; System Auto
-                    </div>
-                  </div>
-                </div>
+                {% empty %}
+                <div class="text-muted">No activity available.</div>
+                {% endfor %}
               </div>
             </div>
           </div>
@@ -431,7 +375,7 @@
                 </tr>
               </thead>
               <tbody>
-                {% for row in pod_page_rows %}
+                {% for row in pod_detail.pod_pages %}
                 <tr>
                   <td>{{ row.line_no }}</td>
                   <td>{{ row.doc_page|default:"-" }}</td>

@@ -147,7 +147,7 @@
           <label class="setting-toggle">
             <input type="checkbox" id="autoMovementPost" name="auto_movement_post" {% if operation_action_form_data.auto_movement_post %}checked{% endif %}{% if operation_action_is_view %} disabled{% endif %} />
             <span class="toggle-track"></span>
-            <span class="toggle-label">Enabled</span>
+            <span class="toggle-label">{% if operation_action_form_data.auto_movement_post %}Enabled{% else %}Disabled{% endif %}</span>
           </label>
         </div>
         <div class="setting-row">
@@ -158,7 +158,7 @@
           <label class="setting-toggle">
             <input type="checkbox" id="autoShipmentPost" name="auto_shipment_post" {% if operation_action_form_data.auto_shipment_post %}checked{% endif %}{% if operation_action_is_view %} disabled{% endif %} />
             <span class="toggle-track"></span>
-            <span class="toggle-label">Enabled</span>
+            <span class="toggle-label">{% if operation_action_form_data.auto_shipment_post %}Enabled{% else %}Disabled{% endif %}</span>
           </label>
         </div>
         <div class="setting-row">
@@ -169,7 +169,7 @@
           <label class="setting-toggle">
             <input type="checkbox" id="autoPodPost" name="auto_pod_post" {% if operation_action_form_data.auto_pod_post %}checked{% endif %}{% if operation_action_is_view %} disabled{% endif %} />
             <span class="toggle-track"></span>
-            <span class="toggle-label">Enabled</span>
+            <span class="toggle-label">{% if operation_action_form_data.auto_pod_post %}Enabled{% else %}Disabled{% endif %}</span>
           </label>
         </div>
         <div class="setting-row">
@@ -180,7 +180,7 @@
           <label class="setting-toggle">
             <input type="checkbox" id="hardCopyCollection" name="hard_copy_collection" {% if operation_action_form_data.hard_copy_collection %}checked{% endif %}{% if operation_action_is_view %} disabled{% endif %} />
             <span class="toggle-track"></span>
-            <span class="toggle-label">Enabled</span>
+            <span class="toggle-label">{% if operation_action_form_data.hard_copy_collection %}Enabled{% else %}Disabled{% endif %}</span>
           </label>
         </div>
       </div>
@@ -245,4 +245,16 @@
     {% endif %}
   </div>
 </form>
+<script>
+  (function () {
+    document.querySelectorAll("#operationActionsForm .setting-toggle input").forEach(function (input) {
+      var label = input.closest(".setting-toggle").querySelector(".toggle-label");
+      function syncLabel() {
+        label.textContent = input.checked ? "Enabled" : "Disabled";
+      }
+      input.addEventListener("change", syncLabel);
+      syncLabel();
+    });
+  })();
+</script>
 {% endblock %}

@@ -218,8 +218,8 @@
                 <td class="eal-col-check"><input type="checkbox" class="eal-custom-check" /></td>
                 <td><span class="eal-entity-id">{{ item.record_no }}</span></td>
                 <td>{{ item.record_date|date:"d M Y" }}</td>
-                <td>{{ item.shipment_ref }}</td>
-                <td>{{ item.booking_no }}</td>
+                <td>{% if item.shipment %}{{ item.shipment.shipment_no }}{% else %}-{% endif %}</td>
+                <td>{% if item.booking %}{{ item.booking.booking_no }}{% else %}-{% endif %}</td>
                 <td>{{ item.document_type }}</td>
                 <td>{{ item.document_ref_no }}</td>
                 <td><span class="status-badge {% if item.is_delivery_note %}active{% else %}pending{% endif %}">{% if item.is_delivery_note %}Yes{% else %}No{% endif %}</span></td>
@@ -237,7 +237,7 @@
                           type="button"
                           class="dropdown-item js-shipment-doc-view"
                           data-record-no="{{ item.record_no }}"
-                          data-shipment-ref="{{ item.shipment_ref }}"
+                          data-shipment-ref="{% if item.shipment %}{{ item.shipment.shipment_no }}{% endif %}"
                           data-document-type="{{ item.document_type }}"
                           data-status="{{ item.status }}"
                           data-is-delivery-note="{% if item.is_delivery_note %}Yes{% else %}No{% endif %}"

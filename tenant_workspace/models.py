@@ -3320,17 +3320,52 @@ class TenantShipment(models.Model):
         choices=ShipmentStatus.choices,
         default=ShipmentStatus.CREATED,
     )
-    booking_no = models.CharField(max_length=64)
+    booking = models.ForeignKey(
+        'TenantBooking',
+        on_delete=models.PROTECT,
+        related_name='shipments',
+        null=True,
+        blank=True,
+    )
+    client_account = models.ForeignKey(
+        'TenantClientAccount',
+        on_delete=models.PROTECT,
+        related_name='shipments',
+        null=True,
+        blank=True,
+    )
     booking_item_ref = models.CharField(max_length=64)
     booking_item_type = models.CharField(max_length=20, blank=True, default='')
     sourcing_mode = models.CharField(max_length=20, choices=SourcingMode.choices)
     trip_type = models.CharField(max_length=20, blank=True, default='')
     route_display = models.CharField(max_length=120, blank=True, default='')
     order_type = models.CharField(max_length=20, blank=True, default='')
-    from_location = models.CharField(max_length=120, blank=True, default='')
-    to_location = models.CharField(max_length=120, blank=True, default='')
+    loading_address = models.ForeignKey(
+        'TenantAddressMaster',
+        on_delete=models.SET_NULL,
+        related_name='shipments_as_loading',
+        null=True,
+        blank=True,
+    )
+    delivery_address = models.ForeignKey(
+        'TenantAddressMaster',
+        on_delete=models.SET_NULL,
+        related_name='shipments_as_delivery',
+        null=True,
+        blank=True,
+    )
+    cargo_booking_item = models.CharField(max_length=20, blank=True, default='')
+    cargo = models.ForeignKey(
+        'TenantCargoMaster',
+        on_delete=models.SET_NULL,
+        related_name='shipments',
+        null=True,
+        blank=True,
+    )
+    cargo_weight = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    cargo_unit = models.CharField(max_length=50, blank=True, default='')
+    cargo_qty = models.DecimalField(max_digits=12, decimal_places=2, default=0)
 
-    client_account_ref = models.CharField(max_length=64, blank=True, default='')
     sales_order_ref = models.CharField(max_length=64, blank=True, default='')
     sales_order_item_ref = models.CharField(max_length=64, blank=True, default='')
     vendor_account_ref = models.CharField(max_length=64, blank=True, default='')
@@ -3344,7 +3379,13 @@ class TenantShipment(models.Model):
         null=True,
         blank=True,
     )
-    driver_ref = models.CharField(max_length=64, blank=True, default='')
+    driver = models.ForeignKey(
+        'DriverMaster',
+        on_delete=models.PROTECT,
+        related_name='shipments',
+        null=True,
+        blank=True,
+    )
     pod_type = models.CharField(max_length=12, choices=PodType.choices, default=PodType.DIGITAL)
     pod_status = models.CharField(
         max_length=20,
@@ -3372,9 +3413,20 @@ class TenantShipment(models.Model):
         db_table = 'tenant_shipments'
         ordering = ['-created_at']
         indexes = [
-            models.Index(fields=['booking_no', 'booking_item_ref'], name='tenant_shipment_booking_idx'),
+            models.Index(fields=['booking', 'booking_item_ref'], name='tenant_shipment_booking_idx'),
             models.Index(fields=['shipment_status'], name='tenant_shipment_status_idx'),
+            models.Index(fields=['booking'], name='tenant_shipment_booking_fk_idx'),
+            models.Index(fields=['client_account'], name='tenant_shipment_client_fk_idx'),
+            models.Index(fields=['driver'], name='tenant_shipment_driver_fk_idx'),
         ]
+
+    def apply_truck_default_driver(self):
+        if self.truck_id and self.truck and not self.driver_id and self.truck.default_driver_id_id:
+            self.driver = self.truck.default_driver_id
+
+    def save(self, *args, **kwargs):
+        self.apply_truck_default_driver()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.shipment_no
@@ -3382,8 +3434,8 @@ class TenantShipment(models.Model):
     def clean(self):
         errors = {}
 
-        if not (self.booking_no or '').strip():
-            errors['booking_no'] = [_('Booking is required.')]
+        if not self.booking_id:
+            errors['booking'] = [_('Booking is required.')]
         if not (self.booking_item_ref or '').strip():
             errors['booking_item_ref'] = [_('Booking item is required.')]
 
@@ -3423,18 +3475,51 @@ class TenantShipment(models.Model):
 class TenantShipmentSurcharge(models.Model):
     """Derived surcharge rows linked to shipment."""
 
+    class Status(models.TextChoices):
+        DRAFT = 'draft', 'Draft'
+        CONFIRMED = 'confirmed', 'Confirmed'
+        INVOICED = 'invoiced', 'Invoiced'
+        CANCELLED = 'cancelled', 'Cancelled'
+
     surcharge_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     transaction_no = models.CharField(max_length=64, unique=True, null=True, blank=True)
     transaction_sequence = models.PositiveIntegerField(default=0)
+    transaction_date = models.DateField(default=date.today)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.DRAFT)
     shipment = models.ForeignKey(
         TenantShipment,
         on_delete=models.CASCADE,
         related_name='surcharges',
     )
+    booking = models.ForeignKey(
+        'TenantBooking',
+        on_delete=models.PROTECT,
+        related_name='shipment_surcharges',
+        null=True,
+        blank=True,
+    )
+    client_account = models.ForeignKey(
+        'TenantClientAccount',
+        on_delete=models.PROTECT,
+        related_name='shipment_surcharges',
+        null=True,
+        blank=True,
+    )
+    service_item = models.ForeignKey(
+        'TenantServiceItemMaster',
+        on_delete=models.PROTECT,
+        related_name='shipment_surcharges',
+        null=True,
+        blank=True,
+    )
     line_no = models.PositiveIntegerField(default=1)
     item_label = models.CharField(max_length=120)
+    description = models.CharField(max_length=255, blank=True, default='')
     qty = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    unit_price = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    currency = models.CharField(max_length=8, blank=True, default='SAR')
+    reason = models.TextField(blank=True, default='')
     attachment_file = models.FileField(
         upload_to=surcharge_attachment_upload_to,
         max_length=500,
@@ -3447,6 +3532,32 @@ class TenantShipmentSurcharge(models.Model):
     class Meta:
         db_table = 'tenant_shipment_surcharges'
         ordering = ['line_no', 'created_at']
+        indexes = [
+            models.Index(fields=['shipment'], name='tenant_surcharge_shipment_idx'),
+            models.Index(fields=['service_item'], name='tenant_surcharge_service_idx'),
+            models.Index(fields=['booking'], name='tenant_surcharge_booking_idx'),
+            models.Index(fields=['client_account'], name='tenant_surcharge_client_idx'),
+            models.Index(fields=['status'], name='tenant_surcharge_status_idx'),
+        ]
+
+    def sync_denormalized_refs(self):
+        if self.service_item_id:
+            label = self.service_item.english_name
+            if self.description:
+                label = f'{label} - {self.description}'
+            self.item_label = label[:120]
+        if self.shipment_id:
+            shipment = self.shipment
+            if shipment.booking_id and not self.booking_id:
+                self.booking = shipment.booking
+            if shipment.client_account_id and not self.client_account_id:
+                self.client_account = shipment.client_account
+        if self.client_account_id and not (self.currency or '').strip():
+            self.currency = (self.client_account.preferred_currency or 'SAR')[:8]
+
+    def save(self, *args, **kwargs):
+        self.sync_denormalized_refs()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f'{self.shipment.shipment_no} / {self.item_label}'
@@ -3465,9 +3576,20 @@ class TenantShipmentDocument(models.Model):
     record_no = models.CharField(max_length=64, unique=True)
     record_sequence = models.PositiveIntegerField(default=0)
     record_date = models.DateField(default=date.today)
-    booking_no = models.CharField(max_length=64)
-    booking_item = models.CharField(max_length=64)
-    shipment_ref = models.CharField(max_length=64)
+    booking = models.ForeignKey(
+        'TenantBooking',
+        on_delete=models.PROTECT,
+        related_name='shipment_documents',
+        null=True,
+        blank=True,
+    )
+    shipment = models.ForeignKey(
+        'TenantShipment',
+        on_delete=models.PROTECT,
+        related_name='documents',
+        null=True,
+        blank=True,
+    )
     document_type = models.CharField(max_length=64)
     document_ref_no = models.CharField(max_length=120)
     document_date = models.DateField(default=date.today)
@@ -3485,9 +3607,18 @@ class TenantShipmentDocument(models.Model):
         ordering = ['-created_at']
         indexes = [
             models.Index(fields=['record_no'], name='tenant_shipdoc_record_idx'),
-            models.Index(fields=['shipment_ref'], name='tenant_shipdoc_shipref_idx'),
             models.Index(fields=['status'], name='tenant_shipdoc_status_idx'),
+            models.Index(fields=['booking'], name='tenant_shipdoc_booking_idx'),
+            models.Index(fields=['shipment'], name='tenant_shipdoc_shipment_idx'),
         ]
+
+    def sync_booking_from_shipment(self):
+        if self.shipment_id and self.shipment.booking_id and not self.booking_id:
+            self.booking = self.shipment.booking
+
+    def save(self, *args, **kwargs):
+        self.sync_booking_from_shipment()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.record_no
@@ -3539,11 +3670,34 @@ class TenantDocumentHandover(models.Model):
     handover_no = models.CharField(max_length=64, unique=True)
     handover_sequence = models.PositiveIntegerField(default=0)
     handover_date = models.DateField(default=date.today)
-    booking_no = models.CharField(max_length=64)
-    booking_item = models.CharField(max_length=64, blank=True, default='')
-    shipment_ref = models.CharField(max_length=64)
-    document_ref = models.CharField(max_length=120, blank=True, default='')
-    pod_record_ref = models.CharField(max_length=120, blank=True, default='')
+    booking = models.ForeignKey(
+        'TenantBooking',
+        on_delete=models.PROTECT,
+        related_name='document_handovers',
+        null=True,
+        blank=True,
+    )
+    shipment = models.ForeignKey(
+        'TenantShipment',
+        on_delete=models.PROTECT,
+        related_name='document_handovers',
+        null=True,
+        blank=True,
+    )
+    document = models.ForeignKey(
+        'TenantShipmentDocument',
+        on_delete=models.SET_NULL,
+        related_name='handovers',
+        null=True,
+        blank=True,
+    )
+    pod_document = models.ForeignKey(
+        'TenantShipmentDocument',
+        on_delete=models.SET_NULL,
+        related_name='pod_handovers',
+        null=True,
+        blank=True,
+    )
     physical_location = models.CharField(max_length=120, blank=True, default='')
     received_user = models.CharField(max_length=120, blank=True, default='')
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT)
@@ -3557,9 +3711,18 @@ class TenantDocumentHandover(models.Model):
         ordering = ['-created_at']
         indexes = [
             models.Index(fields=['handover_no'], name='tenant_doc_ho_no_idx'),
-            models.Index(fields=['shipment_ref'], name='tenant_doc_ho_ship_idx'),
+            models.Index(fields=['shipment'], name='tenant_doc_ho_ship_idx'),
             models.Index(fields=['status'], name='tenant_doc_ho_status_idx'),
+            models.Index(fields=['booking'], name='tenant_doc_ho_booking_idx'),
         ]
+
+    def sync_booking_from_shipment(self):
+        if self.shipment_id and self.shipment.booking_id and not self.booking_id:
+            self.booking = self.shipment.booking
+
+    def save(self, *args, **kwargs):
+        self.sync_booking_from_shipment()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.handover_no
@@ -3610,13 +3773,49 @@ class TenantTruckMovementLog(models.Model):
     empty_move_reason = models.CharField(max_length=64, blank=True, default='')
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.SCHEDULED)
     notes = models.TextField(blank=True, default='')
-    booking_ref = models.CharField(max_length=64, blank=True, default='')
-    shipment_ref = models.CharField(max_length=64, blank=True, default='')
-    truck_ref = models.CharField(max_length=120, blank=True, default='')
-    driver_ref = models.CharField(max_length=120, blank=True, default='')
-    from_location = models.CharField(max_length=120, blank=True, default='')
+    booking = models.ForeignKey(
+        'TenantBooking',
+        on_delete=models.SET_NULL,
+        related_name='truck_movements',
+        null=True,
+        blank=True,
+    )
+    shipment = models.ForeignKey(
+        'TenantShipment',
+        on_delete=models.PROTECT,
+        related_name='truck_movements',
+        null=True,
+        blank=True,
+    )
+    truck = models.ForeignKey(
+        'TruckMaster',
+        on_delete=models.PROTECT,
+        related_name='truck_movements',
+        null=True,
+        blank=True,
+    )
+    driver = models.ForeignKey(
+        'DriverMaster',
+        on_delete=models.PROTECT,
+        related_name='truck_movements',
+        null=True,
+        blank=True,
+    )
+    from_location_point = models.ForeignKey(
+        'TenantLocationMaster',
+        on_delete=models.SET_NULL,
+        related_name='movements_from',
+        null=True,
+        blank=True,
+    )
+    to_location_point = models.ForeignKey(
+        'TenantLocationMaster',
+        on_delete=models.SET_NULL,
+        related_name='movements_to',
+        null=True,
+        blank=True,
+    )
     from_location_map_link = models.URLField(blank=True, default='')
-    to_location = models.CharField(max_length=120, blank=True, default='')
     to_location_map_link = models.URLField(blank=True, default='')
     start_time = models.DateTimeField(null=True, blank=True)
     end_time = models.DateTimeField(null=True, blank=True)
@@ -3631,6 +3830,10 @@ class TenantTruckMovementLog(models.Model):
         indexes = [
             models.Index(fields=['movement_no'], name='tenant_tml_no_idx'),
             models.Index(fields=['status'], name='tenant_tml_status_idx'),
+            models.Index(fields=['booking'], name='tenant_tml_booking_idx'),
+            models.Index(fields=['shipment'], name='tenant_tml_shipment_idx'),
+            models.Index(fields=['truck'], name='tenant_tml_truck_idx'),
+            models.Index(fields=['driver'], name='tenant_tml_driver_idx'),
         ]
 
     def __str__(self):

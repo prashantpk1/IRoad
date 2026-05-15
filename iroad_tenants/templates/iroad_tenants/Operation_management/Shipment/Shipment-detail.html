@@ -89,11 +89,11 @@
     <div class="fields-grid cols-3">
       <div class="field">
         <label class="form-label">Client Account</label>
-        <input class="form-control" value="{{ shipment.client_account_ref|default:'-' }}" readonly />
+        <input class="form-control" value="{% if shipment.client_account %}{{ shipment.client_account.account_no }} - {{ shipment.client_account.display_name }}{% else %}-{% endif %}" readonly />
       </div>
       <div class="field">
         <label class="form-label">Booking No.</label>
-        <input class="form-control" value="{{ shipment.booking_no|default:'-' }}" readonly />
+        <input class="form-control" value="{% if shipment.booking %}{{ shipment.booking.booking_no }}{% else %}-{% endif %}" readonly />
       </div>
       <div class="field">
         <label class="form-label">Booking Item</label>
@@ -227,7 +227,7 @@
       </div>
       <div class="field">
         <label class="form-label">Driver</label>
-        <input class="form-control" value="{{ shipment.driver_ref|default:'-' }}" readonly />
+        <input class="form-control" value="{% if shipment.driver %}{{ shipment.driver.driver_code }}{% else %}-{% endif %}" readonly />
       </div>
     </div>
   </div>

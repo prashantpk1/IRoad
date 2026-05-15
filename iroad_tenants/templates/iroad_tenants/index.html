@@ -92,7 +92,7 @@
           <div class="db-card-header">
             <div class="db-card-title">Quota Analytics</div>
             <span class="quota-analytics-badge">
-              <i class="bi bi-graph-up-arrow"></i> Last 4 Months
+              <i class="bi bi-graph-up-arrow"></i> {{ tenant_dashboard.month_range_label }}
             </span>
           </div>
 
@@ -106,34 +106,25 @@
               </div>
               <div class="quota-chart-area">
                 <div class="quota-y-axis">
-                  <span>160</span>
-                  <span>120</span>
-                  <span>80</span>
-                  <span>40</span>
-                  <span>0</span>
+                  {% for tick in tenant_dashboard.chart_y_ticks %}
+                    <span>{{ tick }}</span>
+                  {% endfor %}
                 </div>
                 <div class="quota-bars-wrap">
                   <div class="quota-grid-lines"></div>
-                  <div class="quota-month-group">
-                    <div class="quota-bar truck" style="height: 50%"></div>
-                    <div class="quota-bar driver" style="height: 70%"></div>
-                    <span class="quota-month-label">Jan</span>
-                  </div>
-                  <div class="quota-month-group">
-                    <div class="quota-bar truck" style="height: 56%"></div>
-                    <div class="quota-bar driver" style="height: 78%"></div>
-                    <span class="quota-month-label">Feb</span>
-                  </div>
-                  <div class="quota-month-group">
-                    <div class="quota-bar truck" style="height: 62%"></div>
-                    <div class="quota-bar driver" style="height: 88%"></div>
-                    <span class="quota-month-label">Mar</span>
-                  </div>
-                  <div class="quota-month-group">
-                    <div class="quota-bar truck" style="height: 60%"></div>
-                    <div class="quota-bar driver" style="height: 90%"></div>
-                    <span class="quota-month-label">Apr</span>
-                  </div>
+                  {% for m in tenant_dashboard.chart_months %}
+                    <div class="quota-month-group">
+                      <div
+                        class="quota-bar truck"
+                        style="height: {{ m.truck_pct }}%"
+                      ></div>
+                      <div
+                        class="quota-bar driver"
+                        style="height: {{ m.driver_pct }}%"
+                      ></div>
+                      <span class="quota-month-label">{{ m.label }}</span>
+                    </div>
+                  {% endfor %}
                 </div>
               </div>
               <div class="quota-legend">
@@ -149,7 +140,10 @@
                 </div>
               </div>
               <div class="quota-donut-wrap">
-                <div class="quota-donut"></div>
+                <div
+                  class="quota-donut"
+                  style="{{ tenant_dashboard.donut_style }}"
+                ></div>
               </div>
               <div class="quota-legend multi">
                 <span><i class="dot purple"></i> Users</span>
@@ -173,23 +167,24 @@
             <div class="plan-panel">
               <div class="plan-tier-card">
                 <div class="plan-tier-label">Active Subscriber Tier</div>
-                <div class="plan-tier-name">Professional Plan</div>
+                <div class="plan-tier-name">{{ tenant_dashboard.plan_name }}</div>
                 <div class="plan-tier-price">
-                  SAR 4,500.00 <span>/ month</span>
+                  {{ tenant_dashboard.plan_price_line }}
+                  <span>{{ tenant_dashboard.plan_cycle_label }}</span>
                 </div>
                 <div class="plan-renewal-label">Next Renewal Date</div>
-                <div class="plan-renewal-date">12 May 2026</div>
+                <div class="plan-renewal-date">{{ tenant_dashboard.plan_renewal_display }}</div>
                 <i class="bi bi-crown-fill"></i>
               </div>
 
               <div class="plan-attributes-title">Package Attributes</div>
               <div class="plan-attribute good">
                 <i class="bi bi-check2-square"></i>
-                <span>Driver App: Active</span>
+                <span>{{ tenant_dashboard.plan_driver_attr }}</span>
               </div>
               <div class="plan-attribute good">
                 <i class="bi bi-cloud-check"></i>
-                <span>Backup Restore Level: Premium</span>
+                <span>{{ tenant_dashboard.plan_backup_attr }}</span>
               </div>
             </div>
 
@@ -203,66 +198,23 @@
               </div>
 
               <div class="resource-grid">
-                <div class="resource-item">
-                  <div class="resource-top">
-                    <span>Internal Users</span>
-                    <strong>80%</strong>
+                {% for r in tenant_dashboard.resource_rows %}
+                  <div class="resource-item">
+                    <div class="resource-top">
+                      <span>{{ r.label }}</span>
+                      <strong>{{ r.pct_label }}</strong>
+                    </div>
+                    <div class="resource-value">
+                      {{ r.current_display }} <span>/ {{ r.total_display }}</span>
+                    </div>
+                    <div class="resource-progress">
+                      <span
+                        class="bar {{ r.bar_class }}"
+                        style="width: {{ r.bar_width }}%"
+                      ></span>
+                    </div>
                   </div>
-                  <div class="resource-value">12 <span>/ 15</span></div>
-                  <div class="resource-progress">
-                    <span class="bar indigo" style="width: 80%"></span>
-                  </div>
-                </div>
-                <div class="resource-item">
-                  <div class="resource-top">
-                    <span>Internal Trucks</span>
-                    <strong>82%</strong>
-                  </div>
-                  <div class="resource-value">82 <span>/ 100</span></div>
-                  <div class="resource-progress">
-                    <span class="bar purple" style="width: 82%"></span>
-                  </div>
-                </div>
-                <!-- <div class="resource-item">
-                  <div class="resource-top">
-                    <span>External Trucks</span>
-                    <strong>40%</strong>
-                  </div>
-                  <div class="resource-value">4 <span>/ 10</span></div>
-                  <div class="resource-progress">
-                    <span class="bar blue" style="width: 40%"></span>
-                  </div>
-                </div> -->
-                <div class="resource-item">
-                  <div class="resource-top">
-                    <span>Active Drivers</span>
-                    <strong>96%</strong>
-                  </div>
-                  <div class="resource-value">145 <span>/ 150</span></div>
-                  <div class="resource-progress">
-                    <span class="bar green" style="width: 96%"></span>
-                  </div>
-                </div>
-                <div class="resource-item">
-                  <div class="resource-top">
-                    <span>Monthly Shipments</span>
-                    <strong>69%</strong>
-                  </div>
-                  <div class="resource-value">3,450 <span>/ 5,000</span></div>
-                  <div class="resource-progress">
-                    <span class="bar cyan" style="width: 69%"></span>
-                  </div>
-                </div>
-                <div class="resource-item">
-                  <div class="resource-top">
-                    <span>Storage GB</span>
-                    <strong>75%</strong>
-                  </div>
-                  <div class="resource-value">188 <span>/ 250</span></div>
-                  <div class="resource-progress">
-                    <span class="bar amber" style="width: 75%"></span>
-                  </div>
-                </div>
+                {% endfor %}
               </div>
             </div>
           </div>

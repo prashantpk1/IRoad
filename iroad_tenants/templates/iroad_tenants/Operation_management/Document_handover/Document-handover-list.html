@@ -150,8 +150,8 @@
               <tr>
                 <td><span class="eal-entity-id">{{ row.handover_no }}</span></td>
                 <td>{{ row.handover_date|date:"d M Y" }}</td>
-                <td>{{ row.booking_no }}</td>
-                <td><div class="eal-name-cell"><span class="eal-name-text">{{ row.shipment_ref }}</span></div></td>
+                <td>{% if row.booking %}{{ row.booking.booking_no }}{% else %}-{% endif %}</td>
+                <td><div class="eal-name-cell"><span class="eal-name-text">{% if row.shipment %}{{ row.shipment.shipment_no }}{% else %}-{% endif %}</span></div></td>
                 <td>{{ row.received_user|default:"-" }}</td>
                 <td>
                   <span class="status-badge {% if row.status == 'Posted' or row.status == 'Client Received' %}active{% elif row.status == 'Draft' %}pending{% elif row.status == 'Rejected' %}inactive{% else %}in-transit{% endif %}">{{ row.status }}</span>
