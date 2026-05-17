@@ -1,0 +1,175 @@
+================================================================================
+SUR-SAL-001 / Surcharges Management — Implementation Analysis
+================================================================================
+Date: 2026-05-16
+Scope: Surcharge SALES only (SUR-SAL-001) — matched fields on create/edit form
+       + backend (views.py) + model (TenantShipmentSurcharge)
+       + integration rules (Section 4 of spec)
+Files reviewed:
+  - Surcharge-sales-transaction-create.html
+  - Surcharge-sales-transaction.html (list)
+  - iroad_tenants/views.py (_tenant_surcharge_sales_* , invoicing helpers)
+  - tenant_workspace/models.py (TenantShipment, TenantShipmentSurcharge)
+
+Note: SUR-PUR-001 (Purchase) is listed in spec but has NO form/module in codebase yet.
+      Scores below separate Sales form vs full Surcharges Management addendum.
+
+================================================================================
+OVERALL SCORES (Surcharge Sales — SUR-SAL-001)
+================================================================================
+
+  Category                    Score    Grade
+  --------------------------  -------  -----
+  1. Overview & Strategy      78/100   C+
+  2. Type (FK + datatypes)    93/100   A
+  3. Logic (field rules)      87/100   B+
+  4. Integration Rules        42/100   F
+  --------------------------  -------  -----
+  OVERALL (Sales module)      75/100   C
+
+================================================================================
+1. OVERVIEW & STRATEGY — 78/100
+================================================================================
+
+What the spec says:
+  - Use transactional surcharge records (not a simple extra-charges table).
+  - Split Sales (revenue) and Purchase (cost).
+  - Shipment is the ONLY reference; client/currency come from shipment.
+  - One service per transaction (no sub-lines).
+
+What we have:
+  [OK]  Sales transactions stored as TenantShipmentSurcharge (one service row).
+  [OK]  Create/edit/list UI for Surcharge Sales Transaction exists.
+  [OK]  Shipment dropdown is source of truth; booking/client/currency derived.
+  [OK]  No line subform — single header transaction per save.
+  [GAP] Purchase module (SUR-PUR-001) not built — no purchase form, no vendor flow.
+  [GAP] Entity name in code is TenantShipmentSurcharge, not SurchargeSalesTransaction
+        (same role, different name).
+
+Simple verdict:
+  Sales side matches the strategy well. Full addendum is incomplete because
+  Purchase (cost) side is missing.
+
+================================================================================
+2. TYPE (FK + DATATYPES) — 93/100  [14 matched fields on form]
+================================================================================
+
+Field          Spec Type        Implementation                         Status
+-------------  ---------------  -------------------------------------  ------
+trx_no         Text (auto)      readonly text, server auto-number      OK
+shipment_id    STORED FK        <select name="shipment_id"> UUID       OK
+booking_id     DERIVED FK       hidden booking_id + locked select      OK
+client_id      DERIVED FK       hidden client_account_id + locked sel. OK
+trx_date       Date             type="date"                            OK
+currency_code  DERIVED FK       hidden currency_code + locked select   OK*
+service_item_id STORED FK       <select> active SERVICE items only     OK
+description    Text             text input (no maxlength in HTML)      Minor
+quantity       Decimal          number step 0.01, default 1            OK
+unit_price     Decimal          number step 0.01                       OK
+total_amount   Derived Decimal  readonly, JS + server calc             OK
+status         Enum             draft/confirmed/invoiced/cancelled     OK
+notes          Text (Reason)    textarea name="notes" -> reason        OK
+attachment     Attachment       file input                             OK
+
+* currency_code: validated against Currency master by code; stored as CharField
+  on TenantShipmentSurcharge (not a DB FK column) — behaviour matches "locked
+  derived" but not a literal FK field on the surcharge row.
+
+Minor gaps (-7):
+  - description missing maxlength="255" in HTML
+  - trx_no still has name="trx_no" (readonly; server ignores on create)
+
+================================================================================
+3. LOGIC (FIELD RULES PER SPEC) — 87/100
+================================================================================
+
+Rule (spec)                          Implementation                    Status
+-----------------------------------  --------------------------------  ------
+Auto-number trx_no                   _next_auto_number_for_form SST-*  OK
+Select shipment (required)           required + valid non-cancelled   OK
+Auto-fetch booking from shipment     JS sync + hidden FK + server     OK
+Auto-fetch client from shipment      JS sync + hidden FK + server     OK
+Auto-fetch currency (locked)         from client preferred_currency   OK
+Currency must match shipment         server validates currency_code   OK
+Default date = today                 JS sets today if empty           OK
+Service = Service type only          server filter SERVICE + ACTIVE   OK
+Default qty = 1                      template default value 1         OK
+Default unit price from master       JS on service change             OK
+Total = qty × unit price             JS + server recalc subtotal      OK
+Status Draft/Confirmed/...           all 4 values in select           OK
+Reason mandatory                     required HTML + server           OK
+Attachment mandatory                 server on CREATE only            Partial
+Confirmed => unit price > 0          server only                      Partial
+No sub-lines                         single row per save              OK
+
+Gaps (-13):
+  - Attachment not required in HTML; not re-required when editing to Confirmed
+  - No client-side check before submit for Confirmed + unit price
+  - Reason required even for Draft (spec says Yes — acceptable)
+  - Status transitions (e.g. cannot cancel invoiced) not enforced
+
+================================================================================
+4. INTEGRATION RULES (SECTION 4) — 42/100
+================================================================================
+
+4.1 Shipment Financials (spec)
+--------------------------------
+  Spec wants ON Shipment:
+    surcharges_revenue = Sum(confirmed SALES total_amount)
+    surcharges_cost    = Sum(confirmed PURCHASE total_amount)
+    gross_profit       = (Freight Revenue + Surcharges Revenue)
+                         - (Freight Cost + Surcharges Cost)
+
+  Code today:
+    [PARTIAL] TenantShipment.total_additional_charges property sums ALL
+              surcharge subtotals (any status), not only Confirmed sales.
+    [MISSING] No surcharges_revenue field on shipment.
+    [MISSING] No surcharges_cost field on shipment.
+    [MISSING] No gross_profit field on shipment.
+    [MISSING] No auto-update when surcharge status changes to Confirmed.
+
+4.2 Invoicing Hook — Sales (spec)
+---------------------------------
+  Spec: When creating Sales Invoice for a Shipment, pull all CONFIRMED
+        Surcharge Sales transactions as invoice lines.
+
+  Code today:
+    [PARTIAL] Sales Invoice Report (_eligible_confirmed_surcharges_for_report)
+              pulls TenantShipmentSurcharge rows into report surcharge lines.
+    [GAP]     Fallback query does NOT filter status='confirmed' — includes
+              Draft and other statuses too.
+    [GAP]     Pull is by booking/date range, not strictly "per shipment invoice".
+    [OK]      Confirmed surcharge subtotal used as amount in report rows.
+
+4.3 Invoicing Hook — Purchase (spec)
+------------------------------------
+  [MISSING] SUR-PUR-001 not implemented — no purchase surcharge module.
+
+================================================================================
+SUR-PUR-001 (PURCHASE) — NOT ON FORM (reference only)
+================================================================================
+
+  Entire Module 2 (vendor, unit_cost, vendor_ref_no, Billed status) = NOT BUILT.
+  Do not score against create.html; noted for full addendum completeness.
+
+================================================================================
+FIELD COVERAGE (template only)
+================================================================================
+
+  Spec fields on form:     14 / 14 present
+  Fully aligned:           ~12 / 14
+  Partial:                  2 / 14 (attachment, description hints)
+
+================================================================================
+TOP FIXES (priority order)
+================================================================================
+
+  1. Integration: Filter confirmed-only in _eligible_confirmed_surcharges_for_report
+  2. Integration: Add shipment rollup (surcharges_revenue) on Confirmed save/update
+  3. Logic: Require attachment when status = Confirmed (create + edit)
+  4. Build SUR-PUR-001 purchase transaction module (separate form)
+  5. Type: Add maxlength="255" on description
+
+================================================================================
+END OF ANALYSIS
+================================================================================

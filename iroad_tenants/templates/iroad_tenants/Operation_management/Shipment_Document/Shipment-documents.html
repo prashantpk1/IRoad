@@ -258,12 +258,14 @@
                     <i class="bi bi-calendar3"></i>
                     <input
                       type="date"
-                      class="form-control has-icon"
+                      class="form-control has-icon {% if shipment_document_form_errors.record_date %}is-invalid{% endif %}"
                       id="recordDate"
                       name="record_date"
                       value="{{ shipment_document_form_data.record_date|default:'' }}"
+                      required
                     />
                   </div>
+                  {% if shipment_document_form_errors.record_date %}<div class="invalid-feedback d-block">{{ shipment_document_form_errors.record_date }}</div>{% endif %}
                 </div>
                 <div class="field">
                   <label for="bookingNo" class="form-label"
@@ -325,7 +327,7 @@
                     >Shipment
                     <span class="required">*</span>
                   </label>
-                  <select class="form-select {% if shipment_document_form_errors.shipment_id %}is-invalid{% endif %}" id="shipmentRef" name="shipment_id">
+                  <select class="form-select {% if shipment_document_form_errors.shipment_id %}is-invalid{% endif %}" id="shipmentRef" name="shipment_id" required>
                     <option value="" {% if not shipment_document_form_data.shipment_id %}selected{% endif %} disabled>-Select shipment-</option>
                     {% for shipment in shipment_document_shipments %}
                     <option
@@ -341,13 +343,14 @@
                     {% endfor %}
                   </select>
                   {% if shipment_document_form_errors.shipment_id %}<div class="invalid-feedback d-block">{{ shipment_document_form_errors.shipment_id }}</div>{% endif %}
+                  <span class="field-hint">Parent shipment for this document (FK)</span>
                 </div>
                 <div class="field">
                   <label for="documentType" class="form-label"
                     >Document Type
                     <span class="required">*</span>
                   </label>
-                  <select class="form-select {% if shipment_document_form_errors.document_type %}is-invalid{% endif %}" id="documentType" name="document_type">
+                  <select class="form-select {% if shipment_document_form_errors.document_type %}is-invalid{% endif %}" id="documentType" name="document_type" required>
                     <option value="" {% if not shipment_document_form_data.document_type %}selected{% endif %} disabled>
                       -Select Document Type-
                     </option>
@@ -379,8 +382,10 @@
                     id="documentRefNo"
                     name="document_ref_no"
                     value="{{ shipment_document_form_data.document_ref_no|default:'' }}"
-                    placeholder="Enter reference number"
+                    placeholder="e.g. DN-1020"
+                    required
                   />
+                  <span class="field-hint">Physical paper reference number</span>
                   {% if shipment_document_form_errors.document_ref_no %}<div class="invalid-feedback d-block">{{ shipment_document_form_errors.document_ref_no }}</div>{% endif %}
                 </div>
                 <div class="field">
@@ -392,17 +397,20 @@
                     <i class="bi bi-calendar3"></i>
                     <input
                       type="date"
-                      class="form-control has-icon"
+                      class="form-control has-icon {% if shipment_document_form_errors.document_date %}is-invalid{% endif %}"
                       id="documentDate"
                       name="document_date"
                       value="{{ shipment_document_form_data.document_date|default:'' }}"
+                      required
                     />
                   </div>
+                  {% if shipment_document_form_errors.document_date %}<div class="invalid-feedback d-block">{{ shipment_document_form_errors.document_date }}</div>{% endif %}
                 </div>
                 <div class="field">
                   <div class="setting-row" style="padding-top: 2rem">
                     <div class="setting-row-info">
                       <label class="form-label mb-0">Is Delivery Note?</label>
+                      <span class="field-hint d-block">If Yes, page count sets mandatory POD proof on shipment</span>
                     </div>
                     <label class="setting-toggle">
                       <input type="checkbox" id="isDeliveryNote" name="is_delivery_note" {% if shipment_document_form_data.is_delivery_note %}checked{% endif %} />
@@ -452,14 +460,18 @@
                     />
                   </div>
                   {% if shipment_document_form_errors.page_count %}<div class="invalid-feedback d-block">{{ shipment_document_form_errors.page_count }}</div>{% endif %}
-                  <span class="field-hint">Auto-calculated from subform line rows</span>
+                  <span class="field-hint">Auto-calculated from subform line rows (OP-DOC total_pages)</span>
                 </div>
                 <div class="field">
                   <label for="status" class="form-label">Status</label>
-                  <select class="form-select" id="status" name="status">
+                  <select class="form-select {% if shipment_document_form_errors.status %}is-invalid{% endif %}" id="status" name="status" required>
                     <option value="Pending" {% if shipment_document_form_data.status|default:'Pending' == 'Pending' %}selected{% endif %}>Pending</option>
+                    <option value="Uploaded" {% if shipment_document_form_data.status == 'Uploaded' %}selected{% endif %}>Uploaded</option>
                     <option value="Verified" {% if shipment_document_form_data.status == 'Verified' %}selected{% endif %}>Verified</option>
+                    <option value="Rejected" {% if shipment_document_form_data.status == 'Rejected' %}selected{% endif %}>Rejected</option>
                   </select>
+                  {% if shipment_document_form_errors.status %}<div class="invalid-feedback d-block">{{ shipment_document_form_errors.status }}</div>{% endif %}
+                  <span class="field-hint">Verified sets shipment POD Compliant when all DN docs are verified</span>
                 </div>
               </div>
               <div class="fields-grid cols-1">
@@ -470,7 +482,7 @@
                     id="notes"
                     name="notes"
                     rows="3"
-                    placeholder="Enter any additional notes..."
+                    placeholder="Instructions for driver (optional)"
                   >{{ shipment_document_form_data.notes|default:'' }}</textarea>
                 </div>
               </div>
@@ -522,8 +534,7 @@
                 Add Line
               </button>
               <span class="text-muted small"
-                >Lines are shown as a sub-table (no horizontal scroll on smaller
-                screens).</span
+                >One row per physical page. Upload reference copy and signer location per page.</span
               >
             </div>
           </div>
@@ -722,7 +733,65 @@
 
         })();
       </script>
+{% endblock %}
 
-</body>
-</html>
+{% block extra_js %}
+<script>
+  (function () {
+    var form = document.getElementById("shipmentDocumentForm");
+    if (!form) return;
+    var recordDate = document.getElementById("recordDate");
+    var documentDate = document.getElementById("documentDate");
+    if (recordDate && !recordDate.value) {
+      recordDate.value = new Date().toISOString().slice(0, 10);
+    }
+    if (documentDate && !documentDate.value) {
+      documentDate.value = new Date().toISOString().slice(0, 10);
+    }
+    form.addEventListener("submit", function (event) {
+      var tbody = document.getElementById("sdLinesTbody");
+      if (!tbody) return;
+      var rows = tbody.querySelectorAll("tr[data-sd-line]");
+      if (!rows.length) {
+        event.preventDefault();
+        alert("Add at least one document page line.");
+        return;
+      }
+      var isDn = document.getElementById("isDeliveryNote");
+      var deliveryNote = isDn && isDn.checked;
+      for (var i = 0; i < rows.length; i += 1) {
+        var row = rows[i];
+        var pageNo = row.querySelector('[data-field="pageNo"]');
+        var location = row.querySelector('[data-field="physicalLocation"]');
+        var attachment = row.querySelector('[data-field="attachment"]');
+        var existing = row.querySelector('[data-field="existingAttachment"]');
+        if (!pageNo || Number(pageNo.value || "0") < 1) {
+          event.preventDefault();
+          alert("Line " + (i + 1) + ": Page No must be a positive number.");
+          return;
+        }
+        if (!location || !location.value) {
+          event.preventDefault();
+          alert("Line " + (i + 1) + ": Signer location is required.");
+          return;
+        }
+        var hasFile = attachment && attachment.files && attachment.files.length;
+        var hasExisting = existing && String(existing.value || "").trim();
+        if (!hasFile && !hasExisting) {
+          event.preventDefault();
+          alert("Line " + (i + 1) + ": Attachment is required.");
+          return;
+        }
+        if (deliveryNote) {
+          var status = row.querySelector('[data-field="status"]');
+          if (!status || !status.value) {
+            event.preventDefault();
+            alert("Line " + (i + 1) + ": Completion status is required for delivery notes.");
+            return;
+          }
+        }
+      }
+    });
+  })();
+</script>
 {% endblock %}

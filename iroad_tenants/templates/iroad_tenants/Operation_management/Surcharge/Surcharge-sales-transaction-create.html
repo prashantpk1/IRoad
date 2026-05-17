@@ -109,6 +109,7 @@
                     <option value="cancelled" {% if surcharge_form_data.status == 'cancelled' %}selected{% endif %}>Cancelled</option>
                   </select>
                   {% if form_errors.status %}<div class="invalid-feedback d-block">{{ form_errors.status }}</div>{% endif %}
+                  <span class="field-hint">Draft, Confirmed, Invoiced, or Cancelled</span>
                 </div>
               </div>
             </div>
@@ -123,7 +124,7 @@
             <div class="form-card-header-text">
               <h2 class="form-card-title">Shipment Details</h2>
               <p class="form-card-desc">
-                Shipment is the source of truth for booking, client, and currency.
+                Select shipment first; booking, client, and currency default from it and can be changed.
               </p>
             </div>
           </div>
@@ -141,48 +142,55 @@
                   <select class="form-select {% if form_errors.shipment_id %}is-invalid{% endif %}" id="shipmentId" name="shipment_id" required>
                     <option value="" {% if not surcharge_form_data.shipment_id %}selected{% endif %} disabled>-Select shipment-</option>
                     {% for shipment in shipment_options %}
-                    <option value="{{ shipment.shipment_id }}" data-booking="{{ shipment.booking_label|default:shipment.booking_no }}" data-client="{{ shipment.client_account_ref|default:'' }}" data-currency="{{ shipment.currency|default:'SAR' }}" {% if surcharge_form_data.shipment_id == shipment.shipment_id|stringformat:'s' %}selected{% endif %}>{{ shipment.shipment_label|default:shipment.shipment_no }}</option>
+                    <option
+                      value="{{ shipment.shipment_id }}"
+                      data-booking-id="{{ shipment.booking_id|default:'' }}"
+                      data-booking="{{ shipment.booking_label|default:shipment.booking_no }}"
+                      data-client-account-id="{{ shipment.client_account_id|default:'' }}"
+                      data-client="{{ shipment.client_account_ref|default:'' }}"
+                      data-currency-code="{{ shipment.currency_code|default:'SAR' }}"
+                      data-currency-label="{{ shipment.currency_label|default:shipment.currency_code|default:'SAR' }}"
+                      {% if surcharge_form_data.shipment_id == shipment.shipment_id|stringformat:'s' %}selected{% endif %}
+                    >{{ shipment.shipment_label|default:shipment.shipment_no }}</option>
                     {% endfor %}
                   </select>
                   {% if form_errors.shipment_id %}<div class="invalid-feedback d-block">{{ form_errors.shipment_id }}</div>{% endif %}
+                  <span class="field-hint">Select shipment — auto-fills booking, client, and currency below</span>
                 </div>
                 <div class="field">
                   <label for="bookingId" class="form-label">Booking Ref</label>
-                  <input
-                    type="text"
-                    class="form-control"
-                    id="bookingId"
-                    name="booking_ref"
-                    value="{{ surcharge_form_data.booking_ref|default:'' }}"
-                    placeholder="Auto-fetched from shipment"
-                    readonly
-                  />
+                  <select class="form-select {% if form_errors.booking_id %}is-invalid{% endif %}" id="bookingId" name="booking_id">
+                    <option value="" {% if not surcharge_form_data.booking_id %}selected{% endif %}>-Select booking-</option>
+                    {% for booking in booking_options %}
+                    <option value="{{ booking.booking_id }}" {% if surcharge_form_data.booking_id == booking.booking_id|stringformat:'s' %}selected{% endif %}>{{ booking.label }}</option>
+                    {% endfor %}
+                  </select>
+                  {% if form_errors.booking_id %}<div class="invalid-feedback d-block">{{ form_errors.booking_id }}</div>{% endif %}
+                  <span class="field-hint">Defaults from shipment; you can pick another booking</span>
                 </div>
               </div>
               <div class="fields-grid cols-2">
                 <div class="field">
                   <label for="clientId" class="form-label">Client</label>
-                  <input
-                    type="text"
-                    class="form-control"
-                    id="clientId"
-                    name="client"
-                    value="{{ surcharge_form_data.client|default:'' }}"
-                    placeholder="Auto-fetched from shipment"
-                    readonly
-                  />
+                  <select class="form-select {% if form_errors.client_account_id %}is-invalid{% endif %}" id="clientId" name="client_account_id">
+                    <option value="" {% if not surcharge_form_data.client_account_id %}selected{% endif %}>-Select client-</option>
+                    {% for client in client_options %}
+                    <option value="{{ client.client_account_id }}" data-preferred-currency="{{ client.preferred_currency }}" {% if surcharge_form_data.client_account_id == client.client_account_id|stringformat:'s' %}selected{% endif %}>{{ client.label }}</option>
+                    {% endfor %}
+                  </select>
+                  <span class="field-hint">Defaults from shipment; you can pick another client</span>
+                  {% if form_errors.client_account_id %}<div class="invalid-feedback d-block">{{ form_errors.client_account_id }}</div>{% endif %}
                 </div>
                 <div class="field">
                   <label for="currencyCode" class="form-label">Currency</label>
-                  <input
-                    type="text"
-                    class="form-control"
-                    id="currencyCode"
-                    name="currency"
-                    value="{{ surcharge_form_data.currency|default:'' }}"
-                    placeholder="Auto-fetched and locked"
-                    readonly
-                  />
+                  <select class="form-select {% if form_errors.currency_code %}is-invalid{% endif %}" id="currencyCode" name="currency_code">
+                    <option value="" {% if not surcharge_form_data.currency_code %}selected{% endif %}>-Select currency-</option>
+                    {% for currency in currency_options %}
+                    <option value="{{ currency.currency_code }}" {% if surcharge_form_data.currency_code == currency.currency_code %}selected{% endif %}>{{ currency.label }}</option>
+                    {% endfor %}
+                  </select>
+                  {% if form_errors.currency_code %}<div class="invalid-feedback d-block">{{ form_errors.currency_code }}</div>{% endif %}
+                  <span class="field-hint">Defaults from shipment client; you can change currency</span>
                 </div>
               </div>
             </div>
@@ -252,6 +260,7 @@
                     />
                   </div>
                   {% if form_errors.quantity %}<div class="invalid-feedback d-block">{{ form_errors.quantity }}</div>{% endif %}
+                  <span class="field-hint">Must be greater than zero (decimal)</span>
                 </div>
                 <div class="field">
                   <label for="unitPrice" class="form-label"
@@ -272,6 +281,7 @@
                     />
                   </div>
                   {% if form_errors.unit_price %}<div class="invalid-feedback d-block">{{ form_errors.unit_price }}</div>{% endif %}
+                  <span class="field-hint">Defaults from service master; required &gt; 0 when Confirmed</span>
                 </div>
                 <div class="field">
                   <label for="totalAmount" class="form-label"
@@ -378,9 +388,9 @@
 <script>
       (function () {
         var shipmentSelect = document.getElementById("shipmentId");
-        var bookingInput = document.getElementById("bookingId");
-        var clientInput = document.getElementById("clientId");
-        var currencyInput = document.getElementById("currencyCode");
+        var bookingSelect = document.getElementById("bookingId");
+        var clientSelect = document.getElementById("clientId");
+        var currencySelect = document.getElementById("currencyCode");
         var serviceSelect = document.getElementById("serviceItemId");
         var quantityInput = document.getElementById("quantity");
         var unitPriceInput = document.getElementById("unitPrice");
@@ -400,20 +410,48 @@
           totalAmountInput.value = (qty * price).toFixed(2);
         }
 
+        function setSelectValue(selectEl, value) {
+          if (!selectEl || !value) {
+            return;
+          }
+          selectEl.value = value;
+        }
+
         function syncShipmentDetails() {
           var option = shipmentSelect.options[shipmentSelect.selectedIndex];
           if (!option || !shipmentSelect.value) {
-            bookingInput.value = "";
-            clientInput.value = "";
-            currencyInput.value = "";
             return;
           }
-          bookingInput.value = option.getAttribute("data-booking") || "";
-          clientInput.value = option.getAttribute("data-client") || "";
-          currencyInput.value = option.getAttribute("data-currency") || "SAR";
+          var bookingId = option.getAttribute("data-booking-id") || "";
+          var clientId = option.getAttribute("data-client-account-id") || "";
+          var currencyCode = option.getAttribute("data-currency-code") || "SAR";
+          if (bookingId) {
+            setSelectValue(bookingSelect, bookingId);
+          }
+          if (clientId) {
+            setSelectValue(clientSelect, clientId);
+          }
+          if (currencyCode) {
+            setSelectValue(currencySelect, currencyCode);
+          }
         }
         shipmentSelect.addEventListener("change", syncShipmentDetails);
-        syncShipmentDetails();
+        if (shipmentSelect.value) {
+          syncShipmentDetails();
+        }
+
+        if (clientSelect) {
+          clientSelect.addEventListener("change", function () {
+            var clientOption = clientSelect.options[clientSelect.selectedIndex];
+            if (!clientOption || !clientSelect.value) {
+              return;
+            }
+            var preferred = clientOption.getAttribute("data-preferred-currency");
+            if (preferred && currencySelect) {
+              setSelectValue(currencySelect, preferred);
+            }
+          });
+        }
 
         function syncServicePrice() {
           var option = serviceSelect.options[serviceSelect.selectedIndex];

@@ -617,7 +617,7 @@ function initShipmentDocumentLines() {
         </select>
       </td>
       <td data-label="Attachment">
-        <input type="file" class="form-control form-control-sm" name="line_attachment[]" data-field="attachment" />
+        <input type="file" class="form-control form-control-sm" name="line_attachment[]" data-field="attachment" accept="image/*,.pdf" />
         <input type="hidden" name="line_existing_attachment_label[]" data-field="existingAttachment" />
         <div class="text-muted small mt-1" data-existing-attachment></div>
       </td>
@@ -638,10 +638,23 @@ function initShipmentDocumentLines() {
     }
     setFieldValue(tr, '[name="line_status[]"]', data.status || "Not Completed");
     setFieldValue(tr, '[name="line_physical_location[]"]', data.physical_location);
-    setFieldValue(tr, '[name="line_existing_attachment_label[]"]', data.attachment_label);
+    setFieldValue(
+      tr,
+      '[name="line_existing_attachment_label[]"]',
+      data.attachment_storage_path || data.attachment_label || ""
+    );
     const attachmentLabel = tr.querySelector("[data-existing-attachment]");
-    if (attachmentLabel && data.attachment_label) {
-      attachmentLabel.textContent = "Current: " + data.attachment_label;
+    if (attachmentLabel) {
+      if (data.attachment_url) {
+        attachmentLabel.innerHTML =
+          '<a href="' +
+          data.attachment_url +
+          '" target="_blank" rel="noopener">Reference: ' +
+          (data.attachment_label || "file") +
+          "</a>";
+      } else if (data.attachment_label) {
+        attachmentLabel.textContent = "Current: " + data.attachment_label;
+      }
     }
     const attachmentInput = tr.querySelector('[data-field="attachment"]');
     if (attachmentInput && !data.attachment_label) {

@@ -107,7 +107,6 @@
                     id="executionDate"
                     name="execution_date"
                     value="{{ booking_form_data.execution_date|default:'' }}"
-                    required
                   />
                   <span class="field-hint"
                     >Planned execution date; required before Confirm</span
@@ -163,17 +162,15 @@
                 </div>
               </div>
               <div style="display: none">
-                <label for="sourcingMode" class="form-label"
-                  >Sourcing Mode</label
-                >
+                <label for="sourcingMode" class="form-label">Sourcing Mode</label>
                 <select
                   class="form-select"
                   id="sourcingMode"
                   name="sourcing_mode"
                   required
                 >
-                  <option value="Internal" selected>Internal</option>
-                  <option value="External">External</option>
+                  <option value="Internal" {% if booking_form_data.sourcing_mode == 'Internal' or not booking_form_data.sourcing_mode %}selected{% endif %}>Internal</option>
+                  <option value="External" {% if booking_form_data.sourcing_mode == 'External' %}selected{% endif %}>External</option>
                 </select>
               </div>
             </div>
@@ -611,7 +608,8 @@
                           type="number"
                           class="form-control cargo-qty-input"
                           name="cargo_qty_1"
-                          min="0"
+                          min="0.01"
+                          step="0.01"
                           value="{{ booking_form_data.cargo_qty_1|default:'' }}"
                         />
                       </td>
@@ -740,23 +738,10 @@
 {{ booking_line_status_values|json_script:"booking-line-status-values" }}
 <script>
       (function () {
-        var section = document.getElementById("purchaseOrderSection");
         var sourcing = document.getElementById("sourcingMode");
-        var vendorAccount = document.getElementById("vendorAccount");
-        var purchaseOrderNo = document.getElementById("purchaseOrderNo");
-        var purchaseOrderLine = document.getElementById("purchaseOrderLine");
-        var requiredExternalFields = [
-          vendorAccount,
-          purchaseOrderNo,
-          purchaseOrderLine,
-        ];
-        if (section) {
-          section.setAttribute("aria-hidden", "false");
-        }
-        requiredExternalFields.forEach(function (field) {
-          if (!field) return;
-          field.setAttribute("required", "required");
-        });
+        var bookingStatus = document.getElementById("bookingStatus");
+        var executionDate = document.getElementById("executionDate");
+        var orderTypeSelect = document.getElementById("orderType");
 
         var bookingDate = document.getElementById("bookingDate");
         if (bookingDate && !bookingDate.value) {
@@ -823,7 +808,7 @@
             var qty = qtyInput ? Number(qtyInput.value || "0") : 0;
             var wt = wtInput ? Number(wtInput.value || "0") : 0;
             grandQty += qty;
-            grandWeight += qty * wt;
+            grandWeight += wt;
           });
 
           totalCargoQty.value = grandQty;
@@ -850,6 +835,7 @@
             value: "{{ truck.truck_id }}",
             label: "{{ truck.truck_code|escapejs }}",
             defaultDriverId: "{{ truck.default_driver_id_id|default:'' }}",
+            sourcingMode: "{{ truck.sourcing_mode|escapejs }}",
           },
           {% endfor %}
         ];
@@ -1114,6 +1100,90 @@
           return html;
         }
 
+        function getBookingSourcingMode() {
+          if (!sourcing) return "Internal";
+          return sourcing.value === "External" ? "External" : "Internal";
+        }
+
+        function truckMatchesBookingSourcing(truck) {
+          var mode = getBookingSourcingMode();
+          var truckMode = (truck.sourcingMode || "").trim();
+          if (mode === "External") {
+            return truckMode === "Out-Source";
+          }
+          return truckMode === "In-Source";
+        }
+
+        function filteredTruckOptions() {
+          return truckOptions.filter(truckMatchesBookingSourcing);
+        }
+
+        function syncExecutionDateRequired() {
+          if (!executionDate || !bookingStatus) return;
+          var isConfirm = bookingStatus.value === "Confirmed";
+          if (isConfirm) {
+            executionDate.setAttribute("required", "required");
+          } else {
+            executionDate.removeAttribute("required");
+          }
+        }
+
+        function validateBookingBeforeSubmit() {
+          if (!bookingForm) return true;
+          var isConfirm = bookingStatus && bookingStatus.value === "Confirmed";
+          var errors = [];
+          if (isConfirm) {
+            if (executionDate && !executionDate.value) {
+              errors.push("Execution date is required before confirming.");
+            }
+            if (orderTypeSelect && sourcing && orderTypeSelect.value === "COD" && sourcing.value === "External") {
+              errors.push("COD with external sourcing is blocked until purchase order fields are available.");
+            }
+            var lineTrucks = bookingForm.querySelectorAll(".booking-line-truck-select");
+            var lineDrivers = bookingForm.querySelectorAll(".booking-line-driver-select");
+            lineTrucks.forEach(function (truckSelect, idx) {
+              if (!truckSelect.value) {
+                errors.push("Truck is required on booking line " + (idx + 1) + " before confirm.");
+              }
+            });
+            lineDrivers.forEach(function (driverSelect, idx) {
+              if (!driverSelect.value) {
+                errors.push("Driver is required on booking line " + (idx + 1) + " before confirm.");
+              }
+            });
+            var loadingAddress = document.querySelector("select[name='loading_address_1']");
+            var deliveryAddress = document.querySelector("select[name='delivery_address_1']");
+            if (loadingAddress && !loadingAddress.value) {
+              errors.push("Loading address is required before confirm.");
+            }
+            if (deliveryAddress && !deliveryAddress.value) {
+              errors.push("Delivery address is required before confirm.");
+            }
+            var cargoSelect = document.querySelector("select[name='cargo_id_1']");
+            var cargoQty = document.querySelector("input[name='cargo_qty_1']");
+            var cargoWeight = document.querySelector("input[name='cargo_weight_1']");
+            if (cargoSelect && !cargoSelect.value) {
+              errors.push("Cargo item is required before confirm.");
+            }
+            if (cargoQty && Number(cargoQty.value || "0") <= 0) {
+              errors.push("Cargo quantity must be greater than zero.");
+            }
+            if (cargoWeight && Number(cargoWeight.value || "0") < 0) {
+              errors.push("Cargo weight cannot be negative.");
+            }
+          }
+          if (codValidationMsg) {
+            if (errors.length) {
+              codValidationMsg.textContent = errors.join(" ");
+              codValidationMsg.classList.remove("d-none");
+            } else {
+              codValidationMsg.classList.add("d-none");
+              codValidationMsg.textContent = "";
+            }
+          }
+          return errors.length === 0;
+        }
+
         function getBookingLineIndex(fieldEl) {
           if (!fieldEl || !fieldEl.name) return "";
           var match = fieldEl.name.match(/_(\d+)$/);
@@ -1247,7 +1317,7 @@
               + "<td>" + lineType + "</td>"
               + "<td><span class='status-badge status-active'>" + statusLabelForLine + "</span></td>"
               + "<td>" + routeLabelForLine + "</td>"
-              + "<td><select class='form-select form-select-sm booking-line-truck-select' name='booking_line_truck_" + (idx + 1) + "'>" + buildOptionsHtml(truckOptions, "-Select truck-") + "</select></td>"
+              + "<td><select class='form-select form-select-sm booking-line-truck-select' name='booking_line_truck_" + (idx + 1) + "'>" + buildOptionsHtml(filteredTruckOptions(), "-Select truck-") + "</select></td>"
               + "<td><select class='form-select form-select-sm booking-line-driver-select' name='booking_line_driver_" + (idx + 1) + "'>" + buildOptionsHtml(driverOptions, "-Select driver-") + "</select></td>"
               + "<td class='cod-col'><input type='number' min='0' step='0.01' name='booking_line_cod_amount_" + (idx + 1) + "' class='form-control form-control-sm booking-line-cod-input' value='' /></td>"
               + "<td><input type='number' min='0' name='booking_line_pod_doc_count_" + (idx + 1) + "' class='form-control form-control-sm booking-line-pod-doc-input' value='' /></td>"
@@ -1335,8 +1405,21 @@
           }
         }
         var bookingForm = document.getElementById("bookingForm");
+        if (bookingStatus) {
+          bookingStatus.addEventListener("change", syncExecutionDateRequired);
+          syncExecutionDateRequired();
+        }
+        if (sourcing) {
+          sourcing.addEventListener("change", rebuildBookingLines);
+        }
         if (bookingForm) {
-          bookingForm.addEventListener("submit", syncBookingForeignKeyFields);
+          bookingForm.addEventListener("submit", function (event) {
+            syncBookingForeignKeyFields();
+            syncExecutionDateRequired();
+            if (!validateBookingBeforeSubmit()) {
+              event.preventDefault();
+            }
+          });
         }
         document.addEventListener("change", function (event) {
           if (!event.target) return;

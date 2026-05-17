@@ -3442,6 +3442,9 @@ class TenantShipment(models.Model):
         if self.truck_id and self.truck and self.truck.status != TruckMaster.Status.ACTIVE:
             errors['truck'] = [_('Truck must be Active.')]
 
+        if self.driver_id and self.driver and self.driver.driver_status != DriverMaster.Status.ACTIVE:
+            errors['driver'] = [_('Driver must be Active.')]
+
         if self.truck_id and self.sourcing_mode and self.truck:
             if self.sourcing_mode == self.SourcingMode.IN_SOURCE and self.truck.sourcing_mode != TruckMaster.SourcingMode.IN_SOURCE:
                 errors['truck'] = [_('In-Source shipment requires an In-Source truck.')]
@@ -3568,6 +3571,7 @@ class TenantShipmentDocument(models.Model):
 
     class Status(models.TextChoices):
         PENDING = 'Pending', 'Pending'
+        UPLOADED = 'Uploaded', 'Uploaded'
         VERIFIED = 'Verified', 'Verified'
         DRAFT = 'Draft', 'Draft'
         REJECTED = 'Rejected', 'Rejected'

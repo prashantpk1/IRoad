@@ -1,0 +1,152 @@
+BK-001 Booking — Validation implementation log
+================================================
+Date: 2026-05-16
+Scope: Matched fields only (no new form fields). Priority A + B implemented.
+Priority C (real Sales Order / pickup modes) deferred — no SO model on form yet.
+
+FILES CHANGED
+-------------
+1. iroad_tenants/views.py
+2. iroad_tenants/templates/iroad_tenants/Operation_management/Booking/Booking.html
+
+================================================================================
+A. MUST IMPLEMENT (done)
+================================================================================
+
+#1 Server confirm (booking_status = Confirmed)
+   - Added _tenant_booking_validate_submission() in views.py
+   - On Confirm requires: execution_date, client, price list, service, trip type,
+     route, truck, driver (and backload truck/driver for Round), loading address,
+     delivery address, cargo, cargo qty > 0, cargo weight >= 0
+   - Sell price is derived server-side (not taken from POST)
+   - Used on create (TenantOperationBookingCreateView.post) and edit post
+
+#2 Scheduling constraint
+   - Added _tenant_booking_scheduling_conflict()
+   - Blocks Confirm if another Confirmed booking has same execution_date +
+     assigned_truck + assigned_driver (line 1 truck/driver)
+
+#3 Execution date
+   - Removed HTML required on execution_date (Draft can save without it)
+   - Server requires execution_date only when status = Confirmed
+   - JS: sets required on execution_date only when status dropdown = Confirmed
+
+#4 Cargo qty > 0
+   - HTML: cargo_qty min changed to 0.01
+   - Server: rejects cargo_qty <= 0 on Confirm
+
+#5 Total cargo weight
+   - JS: totals sum weight column (not qty * weight)
+   - Server _tenant_booking_extra_payload: total_cargo_weight = cargo_weight
+
+#6 Sell price
+   - Added _tenant_booking_derive_sell_price() (price list + service + trip)
+   - Create/edit save uses derived value; POST sell_price ignored for persistence
+
+#7 Addresses + cargo on Confirm
+   - Server validation (see #1)
+   - Client-side confirm checks in validateBookingBeforeSubmit()
+
+#8 Truck / driver on Confirm
+   - Server validation + truck must match sourcing mode (In-Source / Out-Source)
+   - JS: truck/driver selects required on generated booking lines
+   - Driver still defaults from truck (existing JS)
+
+================================================================================
+B. SHOULD IMPLEMENT (done / partial)
+================================================================================
+
+#9 sourcing_mode
+   - Field remains hidden (existing control; no new fields added)
+   - JS filters truck dropdown: Internal -> In-Source trucks, External -> Out-Source
+   - On Confirm + External: server blocks until PO fields exist on form (message)
+
+#10 COD rule
+   - On Confirm + External + order_type COD: server blocks with clear message
+   - JS shows same message in #codValidationMsg and prevents submit
+
+================================================================================
+C. NOT IMPLEMENTED (needs SO / new subform fields)
+================================================================================
+#11 Sales Order / SO line (form still uses price list + service)
+#12 Booking lines From/To columns + full read-only lock
+#13 pickup_mode / delivery_mode / sequence / multi-stop rows
+
+================================================================================
+MANUAL TEST CHECKLIST
+================================================================================
+Use Operations > Booking > Create. Have at least: 1 client, 1 price list linked to
+a service, routes, addresses for client, cargo for client, 1 In-Source truck with
+default driver, 1 Out-Source truck (for external tests).
+
+--- Test 1: Draft without execution date (should PASS) ---
+1. Open new Booking.
+2. Set Booking Status = Draft.
+3. Leave Execution Date empty.
+4. Select Client Account only (minimum).
+5. Save Booking.
+Expected: Saves (or only client validation). No execution date error.
+
+--- Test 2: Confirm without execution date (should FAIL) ---
+1. Fill client, price list, service, route, trip type, addresses, cargo, truck.
+2. Status = Confirmed, Execution Date empty.
+3. Save.
+Expected: Error "Execution date is required before confirming a booking."
+
+--- Test 3: Confirm with full data (should PASS) ---
+1. Status = Confirmed, Execution Date = future date.
+2. Complete all required dropdowns + cargo qty e.g. 10, weight e.g. 2.5.
+3. Select truck (In-Source if Internal sourcing).
+4. Save.
+Expected: Success message; booking list shows Confirmed.
+
+--- Test 4: Cargo qty zero on Confirm (should FAIL) ---
+1. Same as Test 3 but cargo qty = 0.
+Expected: "Cargo quantity must be greater than zero."
+
+--- Test 5: Total cargo weight display ---
+1. Cargo weight = 3.5, qty = 10 (qty should NOT multiply into total weight).
+2. Watch "Total Cargo Weight" field while typing weight.
+Expected: Total Cargo Weight shows 3.50 (sum of weights), not 35.
+
+--- Test 6: Scheduling conflict ---
+1. Create Booking A: Confirmed, date D, truck T1, driver Dr1.
+2. Create Booking B: same date D, truck T1, driver Dr1, Confirmed.
+Expected: Error about another confirmed booking with same date/truck/driver.
+
+--- Test 7: Sourcing truck filter ---
+1. Sourcing Mode = Internal -> booking line truck list shows In-Source only.
+2. Change to External -> list shows Out-Source trucks only.
+3. Re-select valid truck for that mode before save.
+
+--- Test 8: External + Confirm without PO (should FAIL) ---
+1. Sourcing Mode = External, Status = Confirmed, fill other fields.
+2. Save.
+Expected: Error that PO/vendor fields are not on the form yet.
+
+--- Test 9: External + COD (should FAIL) ---
+1. Order Type = COD, Sourcing = External, Status = Confirmed.
+2. Save (or submit in browser).
+Expected: COD + external sourcing blocked (client alert area + server message).
+
+--- Test 10: Sell price tamper ---
+1. Open browser devtools, remove readonly from Sell Price, set to 99999.
+2. Save as Confirmed with valid data.
+3. Open booking detail / DB: sell_price should match price list rules, not 99999.
+
+--- Test 11: Edit existing booking ---
+1. Open booking from list -> Edit.
+2. Change status Draft -> Confirmed with valid data -> Update.
+Expected: Same rules as create; scheduling excludes current booking id.
+
+================================================================================
+QUICK CURL / DEVTOOLS (optional)
+================================================================================
+If testing POST without UI, include csrfmiddlewaretoken and session cookie.
+Confirm payload must include: booking_status=Confirmed, execution_date, client_account,
+sales_order_no (price list id), service_lookup, route_lookup, trip_type, order_type,
+sourcing_mode, loading_address_1, delivery_address_1, cargo_id_1, cargo_qty_1,
+cargo_weight_1, booking_line_truck_1, booking_line_driver_1
+
+================================================================================
+END

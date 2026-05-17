@@ -53,6 +53,7 @@
                   value="{{ preview_shipment_no|default:'Auto' }}"
                   readonly
                 />
+                <span class="field-hint">Auto-generated when shipment is executed</span>
               </div>
               <div class="field">
                 <label for="orderType" class="form-label">Order Type</label>
@@ -67,15 +68,18 @@
               </div>
               <div class="field">
                 <label for="shipmentDate" class="form-label"
-                  >Shipment Date</label
+                  >Shipment Date <span class="required">*</span></label
                 >
                 <input
                   type="date"
-                  class="form-control"
+                  class="form-control {% if form_errors.shipment_date %}is-invalid{% endif %}"
                   id="shipmentDate"
                   name="shipment_date"
                   value="{{ shipment_form_data.shipment_date|default:shipment_creation_date|date:'Y-m-d' }}"
+                  required
                 />
+                <span class="field-hint">Execution date (defaults to today)</span>
+                {% if form_errors.shipment_date %}<div class="invalid-feedback d-block">{{ form_errors.shipment_date }}</div>{% endif %}
               </div>
             </div>
           </div>
@@ -97,7 +101,7 @@
           <div class="form-card-body">
             <div class="fields-grid cols-3">
               <div class="field">
-                <label for="clientAccount" class="form-label">Client Account</label>
+                <label for="clientAccount" class="form-label">Client Account <span class="required">*</span></label>
                 <select class="form-select {% if form_errors.client_account %}is-invalid{% endif %}" id="clientAccount" name="client_account" required>
                   <option value="" {% if not shipment_form_data.client_account %}selected{% endif %} disabled>-Select Client Account-</option>
                   {% for account in shipment_client_accounts %}
@@ -107,9 +111,10 @@
                   {% endfor %}
                 </select>
                 {% if form_errors.client_account %}<div class="invalid-feedback d-block">{{ form_errors.client_account }}</div>{% endif %}
+                <span class="field-hint">Filters confirmed bookings only</span>
               </div>
               <div class="field">
-                <label for="bookingNo" class="form-label">Booking No </label>
+                <label for="bookingNo" class="form-label">Booking No <span class="required">*</span></label>
                 <select class="form-select {% if form_errors.booking_no %}is-invalid{% endif %}" id="bookingNo" name="booking_id" required>
                   <option value="" {% if not shipment_form_data.booking_id and not shipment_form_data.booking_no %}selected{% endif %} disabled>
                     -Select booking no-
@@ -126,6 +131,7 @@
                   {% endfor %}
                 </select>
                 {% if form_errors.booking_no %}<div class="invalid-feedback d-block">{{ form_errors.booking_no }}</div>{% endif %}
+                <span class="field-hint">Confirmed bookings only; one shipment per line</span>
               </div>
               <div class="field">
                 <label for="bookingOrderType" class="form-label"
@@ -144,12 +150,13 @@
             <div class="fields-grid cols-3">
               <div class="field">
                 <label for="bookingItem" class="form-label"
-                  >Booking Item (list)</label
+                  >Booking Item <span class="required">*</span></label
                 >
                 <select
-                  class="form-select"
+                  class="form-select {% if form_errors.booking_item %}is-invalid{% endif %}"
                   id="bookingItem"
                   name="booking_item"
+                  required
                 >
                   <option value="" {% if not shipment_form_data.booking_item %}selected{% endif %} disabled>
                     -Select booking item-
@@ -165,6 +172,7 @@
                     data-route-id="{{ booking.route_id|default:'' }}"
                     data-route-display="{{ booking.route_display }}"
                     data-order-type="{{ booking.order_type }}"
+                    data-trip-type="{{ booking.trip_type }}"
                     data-sourcing-mode="{{ booking.sourcing_mode }}"
                     data-pod-type="{{ booking.pod_type }}"
                     data-pod-doc-count="{{ booking.pod_doc_count }}"
@@ -258,8 +266,9 @@
                   name="pod_doc_count"
                   min="0"
                   value="{{ shipment_form_data.pod_doc_count|default:'' }}"
-                  readonly  
+                  readonly
                 />
+                <span class="field-hint">Read-only; derived from POD docs</span>
               </div>
               <div class="field">
                 <label for="podStatus" class="form-label">POD Status</label>
@@ -278,12 +287,15 @@
                 <label for="codAmount" class="form-label">COD Amount</label>
                 <input
                   type="number"
-                  class="form-control"
+                  class="form-control {% if form_errors.cod_amount %}is-invalid{% endif %}"
                   id="codAmount"
                   name="cod_amount"
                   step="0.01"
+                  min="0"
                   value="{{ shipment_form_data.cod_amount|default:'' }}"
                 />
+                {% if form_errors.cod_amount %}<div class="invalid-feedback d-block">{{ form_errors.cod_amount }}</div>{% endif %}
+                <span class="field-hint">Required when order type is COD</span>
               </div>
               <div class="field">
                 <label for="shipmentTruckDisplay" class="form-label">Truck</label>
@@ -296,6 +308,7 @@
                   readonly
                   autocomplete="off"
                 />
+                <span class="field-hint">From booking line (read-only)</span>
               </div>
               <div class="field">
                 <label for="shipmentDriverDisplay" class="form-label">Driver</label>
@@ -313,8 +326,6 @@
             <input type="hidden" id="sourcingMode" name="sourcing_mode" value="{{ shipment_form_data.sourcing_mode|default:'In-Source' }}" />
           </div>
         </div>
-
-     
 
         <!-- Section 5: Loading Address Lines -->
         <div class="form-card" id="shipment-address-section" data-section="5">
@@ -490,7 +501,7 @@
                           class="form-control shipment-cargo-qty"
                           id="cargoQty"
                           name="cargo_qty_1"
-                          min="0"
+                          min="0.01"
                           step="0.01"
                           value="{{ shipment_form_data.cargo_qty|default:'0' }}"
                         />
@@ -584,8 +595,10 @@
         var bookingItemTypeSelect = document.getElementById("bookingItemType");
         var bookingItemRouteSelect = document.getElementById("bookingItemRoute");
         var bookingOrderTypeInput = document.getElementById("bookingOrderType");
+        var orderTypeInput = document.getElementById("orderType");
         var sourcingModeInput = document.getElementById("sourcingMode");
         var podTypeSelect = document.getElementById("podType");
+        var shipmentForm = document.getElementById("shipmentForm");
         var podDocCountInput = document.getElementById("podDocCount");
         var podStatusInput = document.getElementById("podStatus");
         var codAmountInput = document.getElementById("codAmount");
@@ -824,6 +837,7 @@
           if (bookingOrderTypeInput) bookingOrderTypeInput.value = orderType;
           if (sourcingModeInput) sourcingModeInput.value = sourcingMode;
           setSelectValueIfExists(podTypeSelect, lineOpt.getAttribute("data-pod-type") || "");
+          syncCodAmountField();
           if (podDocCountInput) podDocCountInput.value = lineOpt.getAttribute("data-pod-doc-count") || "";
           if (podStatusInput) podStatusInput.value = lineOpt.getAttribute("data-pod-status") || "";
           if (codAmountInput) codAmountInput.value = lineOpt.getAttribute("data-cod-amount") || "";
@@ -911,6 +925,62 @@
           applyClientBookingFilter();
         }
 
+        function syncCodAmountField() {
+          if (!codAmountInput || !bookingOrderTypeInput) return;
+          var isCod = (bookingOrderTypeInput.value || "").toUpperCase() === "COD";
+          codAmountInput.readOnly = !isCod;
+          if (!isCod) {
+            codAmountInput.removeAttribute("required");
+            codAmountInput.value = "0";
+          } else {
+            codAmountInput.setAttribute("min", "0.01");
+          }
+        }
+
+        function validateShipmentBeforeSubmit() {
+          var errors = [];
+          if (!clientAccountSelect || !clientAccountSelect.value) {
+            errors.push("Client account is required.");
+          }
+          if (!bookingNoSelect || !bookingNoSelect.value) {
+            errors.push("Booking is required.");
+          }
+          if (!bookingItemSelect || !bookingItemSelect.value) {
+            errors.push("Booking item is required.");
+          }
+          if (!shipmentDate || !shipmentDate.value) {
+            errors.push("Shipment date is required.");
+          }
+          if (loadingAddressSelect && !loadingAddressSelect.value) {
+            errors.push("Loading address is required.");
+          }
+          if (deliveryAddressSelect && !deliveryAddressSelect.value) {
+            errors.push("Delivery address is required.");
+          }
+          if (cargoSelect && !cargoSelect.value) {
+            errors.push("Cargo is required.");
+          }
+          if (cargoQtyInput && Number(cargoQtyInput.value || "0") <= 0) {
+            errors.push("Cargo quantity must be greater than zero.");
+          }
+          if (bookingOrderTypeInput && (bookingOrderTypeInput.value || "").toUpperCase() === "COD") {
+            if (!codAmountInput || Number(codAmountInput.value || "0") <= 0) {
+              errors.push("COD amount is required for COD orders.");
+            }
+          }
+          return errors;
+        }
+
+        if (shipmentForm) {
+          shipmentForm.addEventListener("submit", function (event) {
+            var errors = validateShipmentBeforeSubmit();
+            if (errors.length) {
+              event.preventDefault();
+              alert("Please fix the following before saving:\n\n" + errors.join("\n"));
+            }
+          });
+        }
+
         var cargoBody = document.querySelector("#cargoTable tbody");
 
         function updateShipmentCargoTotals() {
@@ -941,3 +1011,5 @@
       })();
     </script>
 {% endblock %}
+
+

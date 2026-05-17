@@ -1,0 +1,264 @@
+SH-001 Shipment — Validation implementation log (UPDATED)
+============================================================
+Date: 2026-05-16
+Scope: Matched fields only in Shipment.html (no PO, billing, or surcharges sections).
+
+FILES CHANGED
+-------------
+1. tenant_workspace/models.py
+2. iroad_tenants/views.py
+3. iroad_tenants/templates/iroad_tenants/Operation_management/Shipment/Shipment.html
+
+================================================================================
+SUMMARY — MATCHED FIELDS vs SPEC
+================================================================================
+
+| Spec field           | Form control              | Validation / notes status      |
+|----------------------|---------------------------|----------------------------------|
+| shipment_no          | Readonly auto             | DONE                             |
+| order_type           | Existing header select    | DONE (server from booking line)  |
+| cod_amount           | Number, COD rules         | DONE (server + JS)               |
+| collection_status    | Not on form               | DONE (server default Pending)    |
+| shipment_date        | Date required             | DONE                             |
+| shipment_status      | Not on create form        | Model default Created            |
+| pod_type             | Existing select (filled from booking) | DONE (server)        |
+| pod_status           | Readonly                  | DONE                             |
+| pod_doc_count        | Readonly from booking     | DONE                             |
+| booking_id           | Required select           | DONE (Confirmed only)            |
+| booking_item         | Required select           | DONE                             |
+| booking_item_type    | Existing select           | DONE (server + JS populate)      |
+| sourcing_mode        | Existing hidden input     | DONE (server)                    |
+| trip_type            | Not on form               | DONE (server from booking)       |
+| route (from/to)      | Existing route select     | DONE (route_display)             |
+| client_account       | Required select           | DONE                             |
+| truck / driver       | Readonly from booking     | DONE (server requires assigned)  |
+| loading/delivery addr| Required selects          | DONE                             |
+| cargo + qty + weight | Required, qty>0           | DONE                             |
+
+NOT on form (deferred): so_id, po_id, billing, surcharges, shipment_status UI.
+
+================================================================================
+DETAILED CHANGES
+================================================================================
+
+--- 1. tenant_workspace/models.py ---
+
+TenantShipment.clean()
+  + Driver must be Active (driver_status = Active)
+  (Existing: truck active, sourcing/truck match, COD close needs Collected)
+
+--- 2. iroad_tenants/views.py ---
+
+New functions:
+  _tenant_shipment_normalize_order_type()   -> Credit | COD
+  _tenant_shipment_has_active_duplicate()   -> block second shipment per line
+  _tenant_shipment_validate_submission()    -> all matched-field rules
+
+Booking options:
+  - Dropdown lists only booking_status = Confirmed (not Draft/Cancelled)
+
+Create & Edit POST:
+  - Full validation before save; errors shown via form_errors + messages
+  - order_type, pod_type, pod_doc_count from matched booking line (not tampered)
+  - collection_status = Pending on create
+  - trip_type saved from booking
+
+Server validation rules:
+  - Client account required and active
+  - Booking required, Confirmed, belongs to client
+  - Booking item + type required; must match booking line
+  - No duplicate active shipment (same booking + booking_item_type)
+  - Shipment date required
+  - Loading + delivery address required; must belong to client
+  - Cargo required; qty > 0; weight >= 0
+  - COD: cod_amount > 0
+  - Truck + driver on booking line; both Active
+  - Sourcing/truck integrity via model clean()
+
+--- 3. Shipment.html ---
+
+UI policy: NO NEW FORM FIELDS. Only attribute/hint/JS updates on existing controls.
+
+Shipment Info:
+  + shipment_date: required (*), hint, error display (existing field)
+  + field hints on existing controls
+
+Booking info:
+  + client_account / booking_no / booking_item: required (*) where applicable
+  + booking_order_type: existing readonly input (populated from booking line)
+  + booking_item_type, booking_item_route, pod_type: existing selects (JS populate)
+  + sourcing_mode: existing hidden input only
+  + cod_amount: min 0; readonly when not COD (JS uses bookingOrderType)
+  + truck / driver: existing readonly displays
+  + submit-time checks via alert() (no new alert div)
+
+REMOVED (reverted — were extra fields):
+  - tripTypeDisplay, sourcingModeDisplay, bookingItemTypeDisplay,
+    bookingItemRouteDisplay, podTypeDisplay, collection_status hidden,
+    #shipmentValidationMsg
+
+Cargo:
+  + cargo_qty min="0.01"
+  + totalCargoWeight JS: sums weights (not qty × weight)
+
+JavaScript:
+  + populateBookingInfo derives all read-only fields from booking line
+  + syncCodAmountField() — COD amount editable only for COD orders
+  + validateShipmentBeforeSubmit() — client-side checks before POST
+
+================================================================================
+MANUAL TEST CHECKLIST
+================================================================================
+
+Prerequisites
+-------------
+- Tenant admin login
+- One Confirmed booking with truck, driver, addresses, cargo, order type Credit
+- Optional: second Confirmed booking with order type COD and cod amount on line
+
+--- Test 1: Confirmed bookings only ---
+
+Steps:
+  1. Operations > Shipment > Create
+  2. Select client
+  3. Open Booking No dropdown
+
+Expected:
+  - Only Confirmed bookings listed
+  - Draft bookings NOT shown
+
+--- Test 2: Successful create (Credit) ---
+
+Example:
+  | Field             | Value                    |
+  |-------------------|--------------------------|
+  | Client Account    | Your client              |
+  | Booking No        | BK-xxx (Confirmed)       |
+  | Booking Item      | Service line (auto OK)   |
+  | Shipment Date     | Today                    |
+  | Loading Address   | Client pickup address    |
+  | Delivery Address  | Client delivery address  |
+  | Cargo             | Client cargo             |
+  | Cargo QTY         | 5                        |
+  | Cargo Weight (Ton)| 2.0                      |
+
+Steps:
+  1. Select booking — fields auto-fill (order type, trip type, route, truck, POD…)
+  2. Save Shipment
+
+Expected:
+  - Success; shipment no generated (e.g. SH-00001)
+  - Order Type shows Credit (readonly)
+  - Total Cargo Weight = 2.00 (not 10.00)
+
+--- Test 3: Duplicate booking line (FAIL) ---
+
+Steps:
+  1. Create shipment for BK-xxx / Outbound (from Test 2)
+  2. Create another shipment for same booking + same line
+
+Expected:
+  - Error: "An active shipment already exists for this booking line."
+
+--- Test 4: COD amount required (FAIL) ---
+
+Setup: Confirmed booking with Order Type = COD
+
+Steps:
+  1. Select booking line (COD amount may auto-fill)
+  2. Clear COD Amount to 0
+  3. Save
+
+Expected:
+  - Server error: COD amount required and must be greater than zero
+  - Or JS blocks submit with message in yellow alert box
+
+--- Test 5: Credit order — COD amount read-only (PASS) ---
+
+Steps:
+  1. Select Credit booking line
+  2. Try to edit COD Amount field
+
+Expected:
+  - Field is read-only (or 0); not required
+
+--- Test 6: Missing addresses (FAIL) ---
+
+Steps:
+  1. Clear loading or delivery address
+  2. Save
+
+Expected:
+  - "Loading address is required" or "Delivery address is required"
+
+--- Test 7: Cargo qty zero (FAIL) ---
+
+Steps:
+  1. Set Cargo QTY = 0
+  2. Save
+
+Expected:
+  - "Cargo quantity must be greater than zero"
+
+--- Test 8: Booking without truck (FAIL) ---
+
+Setup: Confirmed booking with no truck on selected line
+
+Expected:
+  - Error about truck/driver must be assigned on booking line
+
+--- Test 9: Derived fields read-only (PASS) ---
+
+After selecting booking line, verify these cannot be edited:
+  - Order Type, Trip Type, Booking Item Type, Route
+  - Sourcing Mode, POD Type, POD Status, POD Doc Count
+  - Truck, Driver
+
+--- Test 10: Edit shipment ---
+
+Steps:
+  1. Open existing shipment > Edit
+  2. Change cargo qty; save
+
+Expected:
+  - Saves if valid
+  - Duplicate-line check ignores current shipment id
+
+================================================================================
+END-TO-END EXAMPLE
+================================================================================
+
+Step A — Create Confirmed booking
+  1. Operations > Booking > Create
+  2. Fill client, price list, service, trip type, route
+  3. Assign truck + driver on booking line
+  4. Set loading/delivery address + cargo
+  5. Status = Confirmed → Save (note Booking No: e.g. BK-00010)
+
+Step B — Create shipment
+  1. Operations > Shipment > Create
+  2. Client = same as booking
+  3. Booking No = BK-00010
+  4. Booking Item = pick line (Outbound)
+  5. Verify auto-filled fields
+  6. Save → SH-00005
+
+Step C — Verify duplicate block
+  1. Repeat Step B with same line → must fail Test 3
+
+================================================================================
+TROUBLESHOOTING
+================================================================================
+
+| Issue                         | Action                                      |
+|-------------------------------|---------------------------------------------|
+| No bookings in dropdown       | Confirm at least one booking (status Confirmed) |
+| Truck/driver error            | Edit booking; assign truck + driver per line |
+| Errors not under field        | Check red Django messages at top of page    |
+| Form looks broken             | Hard refresh (Ctrl+F5) after code update    |
+
+Restart server after pull:
+  python manage.py runserver
+
+================================================================================
+END
