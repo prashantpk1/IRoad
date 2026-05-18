@@ -43,6 +43,66 @@
         min-width: 86px;
       }
 
+      .oal-booking-lookup { position: relative; }
+      .oal-booking-lookup .form-control { padding-right: 38px; }
+      .oal-booking-dropdown-toggle {
+        position: absolute;
+        top: 50%;
+        right: 8px;
+        transform: translateY(-50%);
+        z-index: 2;
+        width: 28px;
+        height: 28px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 0;
+        border-radius: 8px;
+        background: transparent;
+        color: #64748b;
+        cursor: pointer;
+      }
+      .oal-booking-lookup-menu {
+        position: absolute;
+        top: calc(100% + 6px);
+        left: 0;
+        right: 0;
+        z-index: 30;
+        display: none;
+        max-height: 240px;
+        overflow-y: auto;
+        background: #fff;
+        border: 1px solid #dbe4f0;
+        border-radius: 12px;
+        box-shadow: 0 16px 32px rgba(15, 23, 42, 0.14);
+        padding: 6px;
+      }
+      .oal-booking-lookup-menu.show { display: block; }
+      .oal-booking-lookup-option {
+        display: block;
+        width: 100%;
+        border: 0;
+        background: transparent;
+        border-radius: 9px;
+        padding: 9px 10px;
+        text-align: left;
+        color: #0f172a;
+        cursor: pointer;
+      }
+      .oal-booking-lookup-option:hover,
+      .oal-booking-lookup-option:focus { background: #eff6ff; }
+      .oal-booking-lookup-code {
+        display: block;
+        font-size: 13px;
+        font-weight: 700;
+      }
+      .oal-booking-lookup-meta {
+        display: block;
+        margin-top: 3px;
+        font-size: 12px;
+        color: #64748b;
+      }
+
       @media (max-width: 1200px) {
         .oal-media-table thead {
           display: none;
@@ -89,61 +149,6 @@
           grid-template-columns: 1fr;
         }
       }
-
-      /* Summary View section */
-      .oal-summary-section {
-        margin-top: 22px;
-        border: 1px solid #ecedf3;
-        border-radius: 16px;
-        background: #fff;
-        overflow: hidden;
-      }
-      .oal-summary-head {
-        padding: 16px 18px;
-        border-bottom: 1px solid #eef0f6;
-        display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
-        gap: 12px;
-        flex-wrap: wrap;
-      }
-      .oal-summary-title {
-        margin: 0;
-        font-size: 17px;
-        font-weight: 700;
-        color: #1f2432;
-      }
-      .oal-summary-subtitle {
-        margin: 4px 0 0;
-        font-size: 12.5px;
-        color: #7a8197;
-      }
-      .oal-summary-badges {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        flex-wrap: wrap;
-      }
-      .oal-summary-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        font-size: 12px;
-        color: #4f556a;
-        background: #f6f7fd;
-        border: 1px solid #e5e7f1;
-        border-radius: 999px;
-        padding: 5px 10px;
-      }
-      .oal-summary-table {
-        padding: 10px 14px 14px;
-      }
-      .oal-summary-table .eal-table th {
-        white-space: nowrap;
-      }
-      .oal-summary-table .btn {
-        min-width: 72px;
-      }
     </style>
 {% endblock %}
 
@@ -176,6 +181,10 @@
                 <span>Back to Details</span>
               </a>
               {% else %}
+              <a href="{% url 'iroad_tenants:tenant_operation_action_log_list' %}" class="eal-btn eal-btn-outline">
+                <i class="bi bi-list-ul"></i>
+                <span>Action Log List</span>
+              </a>
               <a href="{% url 'iroad_tenants:tenant_operation_actions_list' %}" class="eal-btn eal-btn-outline">
                 <i class="bi bi-gear"></i>
                 <span>Go to Action Master</span>
@@ -207,7 +216,7 @@
                   class="form-control"
                   id="logNo"
                   name="log_no"
-                  value="{{ action_log_form.log_no|default:'' }}"
+                  value="{{ action_log_form.log_no|default:'Auto-generated' }}"
                   placeholder="Auto-generated"
                   readonly
                 />
@@ -227,12 +236,13 @@
               </div>
               <div class="field">
                 <label for="actionLookup" class="form-label">Action</label>
-                <select class="form-select" id="actionLookup" name="action">
-                  <option value="" {% if not action_log_form.action %}selected{% endif %} disabled>-Select action-</option>
-                  {% for status_choice in action_log_status_choices %}
-                  <option value="{{ status_choice }}" {% if action_log_form.action == status_choice %}selected{% endif %}>{{ status_choice }}</option>
+                <select class="form-select{% if action_log_form_errors.operation_action_id %} is-invalid{% endif %}" id="actionLookup" name="operation_action_id" required>
+                  <option value="" disabled {% if not action_log_form.operation_action_id %}selected{% endif %}>-Select action-</option>
+                  {% for action in action_options %}
+                  <option value="{{ action.action_id }}" {% if action_log_form.operation_action_id == action.action_id %}selected{% endif %}>{{ action.label }} ({{ action.action_code }})</option>
                   {% endfor %}
                 </select>
+                {% if action_log_form_errors.operation_action_id %}<div class="invalid-feedback d-block">{{ action_log_form_errors.operation_action_id }}</div>{% endif %}
               </div>
             </div>
             <div class="fields-grid cols-3">
@@ -246,14 +256,13 @@
               </div>
               <div class="field">
                 <label for="userLookup" class="form-label">User</label>
-                <input
-                  type="text"
-                  class="form-control"
-                  id="userLookup"
-                  name="user"
-                  value="{{ action_log_form.user|default:'' }}"
-                  placeholder="Enter user"
-                />
+                <select class="form-select{% if action_log_form_errors.created_by_id %} is-invalid{% endif %}" id="userLookup" name="created_by_id">
+                  <option value="">-Select user-</option>
+                  {% for user in user_options %}
+                  <option value="{{ user.user_id }}" {% if action_log_form.created_by_id == user.user_id %}selected{% endif %}>{{ user.label }}</option>
+                  {% endfor %}
+                </select>
+                {% if action_log_form_errors.created_by_id %}<div class="invalid-feedback d-block">{{ action_log_form_errors.created_by_id }}</div>{% endif %}
               </div>
               <div class="field">
                 <label for="notes" class="form-label">Notes</label>
@@ -283,75 +292,117 @@
             <div class="fields-grid cols-3">
               <div class="field">
                 <label for="bookingLookup" class="form-label">Booking</label>
-                <input
-                  type="text"
-                  class="form-control"
-                  id="bookingLookup"
-                  name="booking_no"
-                  value="{{ action_log_form.booking_no|default:'' }}"
-                  placeholder="Enter booking"
-                />
+                <div class="input-icon-wrapper oal-booking-lookup">
+                  <i class="bi bi-search"></i>
+                  <input type="hidden" id="bookingId" name="booking_id" value="{{ action_log_form.booking_id|default:'' }}" />
+                  <input
+                    type="text"
+                    class="form-control has-icon"
+                    id="bookingLookup"
+                    value="{{ action_log_form.booking_no|default:'' }}"
+                    placeholder="Search booking no..."
+                    autocomplete="off"
+                  />
+                  <button type="button" class="oal-booking-dropdown-toggle" id="bookingToggle" aria-label="Show booking list">
+                    <i class="bi bi-chevron-down"></i>
+                  </button>
+                  <div class="oal-booking-lookup-menu" id="bookingOptions">
+                    {% for booking in booking_options %}
+                    <button
+                      type="button"
+                      class="oal-booking-lookup-option"
+                      data-booking-id="{{ booking.booking_id }}"
+                      data-booking-no="{{ booking.booking_no }}"
+                      data-shipment-id="{{ booking.shipment_id }}"
+                      data-truck-id="{{ booking.truck_id }}"
+                      data-driver-id="{{ booking.driver_id }}"
+                    >
+                      <span class="oal-booking-lookup-code">{{ booking.booking_no }}</span>
+                    </button>
+                    {% empty %}
+                    <div class="oal-booking-lookup-meta px-2 py-1">No bookings available.</div>
+                    {% endfor %}
+                  </div>
+                </div>
               </div>
               <div class="field">
-                <label for="bookingItemLookup" class="form-label"
-                  >Booking Item</label
-                >
-                <input
-                  type="text"
-                  class="form-control"
-                  id="bookingItemLookup"
-                  name="booking_item"
-                  value="{{ action_log_form.booking_item|default:'' }}"
-                  placeholder="Enter booking item"
-                  readonly
-                />
+                <label for="bookingItemLookup" class="form-label">Booking Item</label>
+                <select class="form-select{% if action_log_form_errors.shipment_id %} is-invalid{% endif %}" id="bookingItemLookup">
+                  <option value="">-Select booking item-</option>
+                  {% for shipment in shipment_options %}
+                  <option
+                    value="{{ shipment.shipment_id }}"
+                    data-booking-id="{{ shipment.booking_id }}"
+                    data-booking-no="{{ shipment.booking_no }}"
+                    data-booking-item="{{ shipment.booking_item }}"
+                    data-truck-id="{{ shipment.truck_id }}"
+                    data-driver-id="{{ shipment.driver_id }}"
+                    {% if action_log_form.shipment_id == shipment.shipment_id %}selected{% endif %}
+                  >{{ shipment.booking_item_label }}</option>
+                  {% endfor %}
+                </select>
               </div>
               <div class="field">
                 <label for="movementLookup" class="form-label">Movement</label>
-                <input
-                  type="text"
-                  class="form-control"
-                  id="movementLookup"
-                  name="movement"
-                  value="{{ action_log_form.movement|default:'' }}"
-                  placeholder="Movement"
-                  readonly
-                />
+                <select class="form-select{% if action_log_form_errors.movement_id %} is-invalid{% endif %}" id="movementLookup" name="movement_id">
+                  <option value="">-Select movement-</option>
+                  {% for movement in movement_options %}
+                  <option
+                    value="{{ movement.movement_id }}"
+                    data-booking-id="{{ movement.booking_id }}"
+                    data-booking-no="{{ movement.booking_no }}"
+                    data-shipment-id="{{ movement.shipment_id }}"
+                    data-booking-item="{{ movement.booking_item }}"
+                    data-truck-id="{{ movement.truck_id }}"
+                    data-driver-id="{{ movement.driver_id }}"
+                    {% if action_log_form.movement_id == movement.movement_id %}selected{% endif %}
+                  >{{ movement.movement_no }}</option>
+                  {% endfor %}
+                </select>
+                {% if action_log_form_errors.movement_id %}<div class="invalid-feedback d-block">{{ action_log_form_errors.movement_id }}</div>{% endif %}
               </div>
             </div>
             <div class="fields-grid cols-3">
               <div class="field">
                 <label for="shipmentLookup" class="form-label">Shipment</label>
-                <input
-                  type="text"
-                  class="form-control"
-                  id="shipmentLookup"
-                  name="shipment"
-                  value="{{ action_log_form.shipment|default:'' }}"
-                  placeholder="Enter shipment"
-                />
+                <select class="form-select{% if action_log_form_errors.shipment_id %} is-invalid{% endif %}" id="shipmentLookup" name="shipment_id">
+                  <option value="">-Select shipment-</option>
+                  {% for shipment in shipment_options %}
+                  <option
+                    value="{{ shipment.shipment_id }}"
+                    data-booking-id="{{ shipment.booking_id }}"
+                    data-booking-no="{{ shipment.booking_no }}"
+                    data-booking-item="{{ shipment.booking_item }}"
+                    data-truck-id="{{ shipment.truck_id }}"
+                    data-driver-id="{{ shipment.driver_id }}"
+                    {% if action_log_form.shipment_id == shipment.shipment_id %}selected{% endif %}
+                  >{{ shipment.shipment_no }}{% if shipment.booking_no %} - {{ shipment.booking_no }}{% endif %}</option>
+                  {% endfor %}
+                </select>
               </div>
               <div class="field">
                 <label for="truckLookup" class="form-label">Truck</label>
-                <input
-                  type="text"
-                  class="form-control"
-                  id="truckLookup"
-                  name="truck"
-                  value="{{ action_log_form.truck|default:'' }}"
-                  placeholder="Enter truck"
-                />
+                <select class="form-select{% if action_log_form_errors.truck_id %} is-invalid{% endif %}" id="truckLookup" name="truck_id">
+                  <option value="">-Select truck-</option>
+                  {% for truck in truck_options %}
+                  <option
+                    value="{{ truck.truck_id }}"
+                    data-default-driver-id="{{ truck.default_driver_id }}"
+                    {% if action_log_form.truck_id == truck.truck_id %}selected{% endif %}
+                  >{{ truck.label }}</option>
+                  {% endfor %}
+                </select>
+                {% if action_log_form_errors.truck_id %}<div class="invalid-feedback d-block">{{ action_log_form_errors.truck_id }}</div>{% endif %}
               </div>
               <div class="field">
                 <label for="driverLookup" class="form-label">Driver</label>
-                <input
-                  type="text"
-                  class="form-control"
-                  id="driverLookup"
-                  name="driver"
-                  value="{{ action_log_form.driver|default:'' }}"
-                  placeholder="Enter driver"
-                />
+                <select class="form-select{% if action_log_form_errors.driver_id %} is-invalid{% endif %}" id="driverLookup" name="driver_id">
+                  <option value="">-Select driver-</option>
+                  {% for driver in driver_options %}
+                  <option value="{{ driver.driver_id }}" {% if action_log_form.driver_id == driver.driver_id %}selected{% endif %}>{{ driver.label }}</option>
+                  {% endfor %}
+                </select>
+                {% if action_log_form_errors.driver_id %}<div class="invalid-feedback d-block">{{ action_log_form_errors.driver_id }}</div>{% endif %}
               </div>
             </div>
           </div>
@@ -486,60 +537,6 @@
         </div>
       </form>
 
-      <section class="oal-summary-section" aria-label="Summary view section">
-        <div class="oal-summary-head">
-          <div>
-            <h2 class="oal-summary-title">Summary View</h2>
-            <p class="oal-summary-subtitle">
-              Quick list of action logs with linked booking and fleet references.
-            </p>
-          </div>
-          <div class="oal-summary-badges">
-            <span class="oal-summary-badge"
-              ><i class="bi bi-list-check"></i> Log Overview</span
-            >
-            <span class="oal-summary-badge"
-              ><i class="bi bi-eye"></i> View Details</span
-            >
-          </div>
-        </div>
-        <div class="oal-summary-table">
-          <div class="eal-table-wrap">
-            <table class="eal-table">
-              <thead>
-                <tr>
-                  <th>Log No</th>
-                  <th>Log Date</th>
-                  <th>Booking No</th>
-                  <th>Booking Item</th>
-                  <th>Movement</th>
-                  <th>Shipment</th>
-                  <th>Truck</th>
-                  <th>Driver</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>LOG-0001</td>
-                  <td>2026-04-15 10:30</td>
-                  <td>BKG-2001</td>
-                  <td>ITEM-01</td>
-                  <td>MOV-1301</td>
-                  <td>SHP-10045</td>
-                  <td>TRK-901</td>
-                  <td>DRV-001</td>
-                  <td>
-                    <button type="button" class="btn btn-sm btn-outline-primary">
-                      View
-                    </button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </section>
 
 <!-- Bootstrap 5 JS -->
 {% endblock %}
@@ -552,6 +549,212 @@
           var now = new Date();
           now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
           logDateEl.value = now.toISOString().slice(0, 16);
+        }
+
+        var bookingInput = document.getElementById("bookingLookup");
+        var bookingIdInput = document.getElementById("bookingId");
+        var bookingMenu = document.getElementById("bookingOptions");
+        var bookingToggle = document.getElementById("bookingToggle");
+        var shipmentSelect = document.getElementById("shipmentLookup");
+        var movementSelect = document.getElementById("movementLookup");
+        var truckSelect = document.getElementById("truckLookup");
+        var driverSelect = document.getElementById("driverLookup");
+        var bookingItemSelect = document.getElementById("bookingItemLookup");
+
+        function selectedOption(selectEl) {
+          if (!selectEl || selectEl.selectedIndex < 0) return null;
+          return selectEl.options[selectEl.selectedIndex];
+        }
+
+        function setSelectValue(selectEl, value) {
+          if (!selectEl || !value) return;
+          var normalizedValue = String(value || "").trim();
+          for (var i = 0; i < selectEl.options.length; i += 1) {
+            if (String(selectEl.options[i].value || "").trim() === normalizedValue) {
+              selectEl.value = normalizedValue;
+              return;
+            }
+          }
+        }
+
+        function findBookingOption(bookingNo) {
+          var normalized = String(bookingNo || "").trim().toLowerCase();
+          if (!bookingMenu || !normalized) return null;
+          var options = bookingMenu.querySelectorAll("[data-booking-no]");
+          for (var i = 0; i < options.length; i += 1) {
+            if (String(options[i].getAttribute("data-booking-no") || "").trim().toLowerCase() === normalized) {
+              return options[i];
+            }
+          }
+          return null;
+        }
+
+        function hideBookingMenu() {
+          if (bookingMenu) bookingMenu.classList.remove("show");
+        }
+
+        function filterBookingMenu() {
+          if (!bookingMenu || !bookingInput) return;
+          var term = String(bookingInput.value || "").trim().toLowerCase();
+          var options = bookingMenu.querySelectorAll(".oal-booking-lookup-option");
+          var visibleCount = 0;
+          options.forEach(function (option) {
+            var bookingNo = String(option.getAttribute("data-booking-no") || "").toLowerCase();
+            var isVisible = !term || bookingNo.indexOf(term) !== -1;
+            option.hidden = !isVisible;
+            if (isVisible) visibleCount += 1;
+          });
+          bookingMenu.classList.toggle("show", visibleCount > 0 || !!bookingMenu.querySelector(".oal-booking-lookup-meta"));
+        }
+
+        function filterLinkedShipmentOptions(selectEl, resolvedBookingNo) {
+          if (!selectEl) return;
+          Array.prototype.forEach.call(selectEl.options, function (option, index) {
+            if (index === 0) {
+              option.hidden = false;
+              option.disabled = false;
+              return;
+            }
+            var isMatch = !resolvedBookingNo || option.getAttribute("data-booking-no") === resolvedBookingNo;
+            option.hidden = !isMatch;
+            option.disabled = !isMatch;
+          });
+        }
+
+        function syncBookingItemFromShipment() {
+          if (!bookingItemSelect || !shipmentSelect) return;
+          setSelectValue(bookingItemSelect, shipmentSelect.value || "");
+        }
+
+        function syncTruckAndDriverFromShipment(fallbackBookingOption) {
+          var shipmentOption = selectedOption(shipmentSelect);
+          var hasShipment = shipmentOption && shipmentOption.value;
+          var truckId = (hasShipment ? shipmentOption.getAttribute("data-truck-id") : "") ||
+            (fallbackBookingOption ? fallbackBookingOption.getAttribute("data-truck-id") : "");
+          var driverId = (hasShipment ? shipmentOption.getAttribute("data-driver-id") : "") ||
+            (fallbackBookingOption ? fallbackBookingOption.getAttribute("data-driver-id") : "");
+          setSelectValue(truckSelect, truckId || "");
+          setSelectValue(driverSelect, driverId || "");
+          if (!driverId && truckSelect) {
+            var truckOption = selectedOption(truckSelect);
+            setSelectValue(driverSelect, truckOption ? truckOption.getAttribute("data-default-driver-id") : "");
+          }
+        }
+
+        function applyBookingLookup() {
+          if (!bookingInput || !shipmentSelect) return;
+          var typedBookingNo = String(bookingInput.value || "").trim();
+          var bookingOption = findBookingOption(typedBookingNo);
+          var resolvedBookingNo = bookingOption
+            ? (bookingOption.getAttribute("data-booking-no") || "")
+            : typedBookingNo;
+          if (bookingIdInput) {
+            bookingIdInput.value = bookingOption ? (bookingOption.getAttribute("data-booking-id") || "") : "";
+          }
+
+          filterLinkedShipmentOptions(shipmentSelect, resolvedBookingNo);
+          filterLinkedShipmentOptions(bookingItemSelect, resolvedBookingNo);
+
+          var currentShipment = selectedOption(shipmentSelect);
+          if (!currentShipment || !currentShipment.value || currentShipment.hidden || currentShipment.disabled) {
+            var preferredShipmentId = bookingOption ? (bookingOption.getAttribute("data-shipment-id") || "") : "";
+            if (preferredShipmentId) {
+              setSelectValue(shipmentSelect, preferredShipmentId);
+            }
+          }
+          syncTruckAndDriverFromShipment(bookingOption);
+          syncBookingItemFromShipment();
+        }
+
+        function syncShipmentFromBookingItem() {
+          if (!bookingItemSelect || !shipmentSelect) return;
+          var itemOption = selectedOption(bookingItemSelect);
+          if (!itemOption || !itemOption.value) return;
+          setSelectValue(shipmentSelect, itemOption.value);
+          syncBookingFromShipment();
+        }
+
+        function syncBookingFromShipment() {
+          var shipmentOption = selectedOption(shipmentSelect);
+          if (!shipmentOption || !shipmentOption.value) return;
+          if (bookingInput) {
+            bookingInput.value = shipmentOption.getAttribute("data-booking-no") || "";
+          }
+          if (bookingIdInput) {
+            bookingIdInput.value = shipmentOption.getAttribute("data-booking-id") || "";
+          }
+          applyBookingLookup();
+          shipmentSelect.value = shipmentOption.value;
+          syncBookingItemFromShipment();
+        }
+
+        function applyMovementSelection() {
+          var movementOption = selectedOption(movementSelect);
+          if (!movementOption || !movementOption.value) return;
+          if (bookingInput) bookingInput.value = movementOption.getAttribute("data-booking-no") || "";
+          if (bookingIdInput) bookingIdInput.value = movementOption.getAttribute("data-booking-id") || "";
+          setSelectValue(shipmentSelect, movementOption.getAttribute("data-shipment-id") || "");
+          setSelectValue(truckSelect, movementOption.getAttribute("data-truck-id") || "");
+          setSelectValue(driverSelect, movementOption.getAttribute("data-driver-id") || "");
+          setSelectValue(bookingItemSelect, movementOption.getAttribute("data-shipment-id") || "");
+          applyBookingLookup();
+        }
+
+        if (bookingInput) {
+          bookingInput.addEventListener("input", function () {
+            filterBookingMenu();
+            applyBookingLookup();
+          });
+          bookingInput.addEventListener("focus", filterBookingMenu);
+          bookingInput.addEventListener("change", function () {
+            applyBookingLookup();
+            hideBookingMenu();
+          });
+          applyBookingLookup();
+        }
+        if (bookingMenu && bookingInput) {
+          if (bookingToggle) {
+            bookingToggle.addEventListener("mousedown", function (event) {
+              event.preventDefault();
+              bookingInput.focus();
+              filterBookingMenu();
+            });
+          }
+          bookingMenu.addEventListener("mousedown", function (event) {
+            var option = event.target.closest(".oal-booking-lookup-option");
+            if (!option) return;
+            event.preventDefault();
+            bookingInput.value = option.getAttribute("data-booking-no") || "";
+            applyBookingLookup();
+            hideBookingMenu();
+          });
+          document.addEventListener("mousedown", function (event) {
+            if (
+              bookingMenu.contains(event.target) ||
+              (bookingToggle && bookingToggle.contains(event.target)) ||
+              bookingInput.contains(event.target)
+            ) {
+              return;
+            }
+            hideBookingMenu();
+          });
+        }
+        if (shipmentSelect) {
+          shipmentSelect.addEventListener("change", syncBookingFromShipment);
+        }
+        if (bookingItemSelect) {
+          bookingItemSelect.addEventListener("change", syncShipmentFromBookingItem);
+        }
+        if (movementSelect) {
+          movementSelect.addEventListener("change", applyMovementSelection);
+        }
+        if (truckSelect) {
+          truckSelect.addEventListener("change", function () {
+            var truckOption = selectedOption(truckSelect);
+            if (truckOption && truckOption.value) {
+              setSelectValue(driverSelect, truckOption.getAttribute("data-default-driver-id") || "");
+            }
+          });
         }
 
         var tbody = document.getElementById("oalMediaTbody");

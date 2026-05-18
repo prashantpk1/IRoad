@@ -471,7 +471,7 @@
                     <option value="Rejected" {% if shipment_document_form_data.status == 'Rejected' %}selected{% endif %}>Rejected</option>
                   </select>
                   {% if shipment_document_form_errors.status %}<div class="invalid-feedback d-block">{{ shipment_document_form_errors.status }}</div>{% endif %}
-                  <span class="field-hint">Verified sets shipment POD Compliant when all DN docs are verified</span>
+                  <span class="field-hint">Verified sets shipment POD to Hard Copy Received when all DN docs are verified; Rejected requires notes</span>
                 </div>
               </div>
               <div class="fields-grid cols-1">

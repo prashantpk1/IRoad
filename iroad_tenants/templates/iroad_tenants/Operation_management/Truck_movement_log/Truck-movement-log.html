@@ -182,15 +182,14 @@
               </h3>
               <div class="fields-grid cols-3">
                 <div class="field">
-                  <label for="emptyMoveReason" class="form-label"
-                    >Empty Move Reason</label
-                  >
-                  <select class="form-select" id="emptyMoveReason" name="empty_move_reason">
+                  <label for="emptyMoveReason" class="form-label">Empty Move Reason</label>
+                  <select class="form-select{% if movement_form_errors.empty_move_reason %} is-invalid{% endif %}" id="emptyMoveReason" name="empty_move_reason">
                     <option value="">-Select reason-</option>
                     <option value="reposition" {% if movement_form_data.empty_move_reason == 'reposition' %}selected{% endif %}>Repositioning</option>
                     <option value="maintenance" {% if movement_form_data.empty_move_reason == 'maintenance' %}selected{% endif %}>Maintenance</option>
                     <option value="noLoad" {% if movement_form_data.empty_move_reason == 'noLoad' %}selected{% endif %}>No Load Available</option>
                   </select>
+                  {% if movement_form_errors.empty_move_reason %}<div class="invalid-feedback d-block">{{ movement_form_errors.empty_move_reason }}</div>{% endif %}
                 </div>
                 <div class="field">
                   <label for="status" class="form-label"
@@ -222,7 +221,7 @@
         </div>
 
         <!-- Section 2: Shipment Info -->
-        <div class="form-card" data-section="2">
+        <div class="form-card" data-section="2" id="tmlShipmentLinkageSection">
           <div class="form-card-header">
             <div class="form-card-icon amber">
               <i class="bi bi-box-seam"></i>
@@ -242,10 +241,7 @@
               </h3>
               <div class="fields-grid cols-2">
                 <div class="field">
-                  <label for="booking" class="form-label"
-                    >Booking
-                    <span class="required">*</span>
-                  </label>
+                  <label for="booking" class="form-label">Booking</label>
                   <div class="input-icon-wrapper tml-booking-lookup">
                     <i class="bi bi-search"></i>
                     <input type="hidden" id="bookingId" name="booking_id" value="{{ movement_form_data.booking_id|default:'' }}" />
@@ -256,6 +252,7 @@
                       value="{{ movement_form_data.booking_no|default:'' }}"
                       placeholder="Search or type booking no..."
                       autocomplete="off"
+                      {% if movement_lock_shipment_linkage %}readonly{% endif %}
                     />
                     <button type="button" class="tml-booking-dropdown-toggle" id="bookingToggle" aria-label="Show booking list">
                       <i class="bi bi-chevron-down"></i>
@@ -281,11 +278,11 @@
                   </div>
                 </div>
                 <div class="field">
-                  <label for="shipment" class="form-label"
-                    >Shipment
-                    <span class="required">*</span>
-                  </label>
-                  <select class="form-select{% if movement_form_errors.shipment_id %} is-invalid{% endif %}" id="shipment" name="shipment_id">
+                  <label for="shipment" class="form-label">Shipment</label>
+                  {% if movement_lock_shipment_linkage %}
+                  <input type="hidden" name="shipment_id" value="{{ movement_form_data.shipment_id|default:'' }}" />
+                  {% endif %}
+                  <select class="form-select{% if movement_form_errors.shipment_id %} is-invalid{% endif %}" id="shipment" name="{% if movement_lock_shipment_linkage %}shipment_id_display{% else %}shipment_id{% endif %}" {% if movement_lock_shipment_linkage %}disabled{% endif %}>
                     <option value="">-Select shipment-</option>
                     {% for shipment in shipment_options %}
                     <option
@@ -449,7 +446,7 @@
                   {% if movement_form_errors.start_time %}<div class="invalid-feedback d-block">{{ movement_form_errors.start_time }}</div>{% endif %}
                 </div>
                 <div class="field">
-                  <label for="endTime" class="form-label">End Time</label>
+                  <label for="endTime" class="form-label">End Time <span class="required tml-end-required" style="display:none;">*</span></label>
                   <input
                     type="datetime-local"
                     class="form-control{% if movement_form_errors.end_time %} is-invalid{% endif %}"
@@ -460,7 +457,7 @@
                   {% if movement_form_errors.end_time %}<div class="invalid-feedback d-block">{{ movement_form_errors.end_time }}</div>{% endif %}
                 </div>
                 <div class="field">
-                  <label for="distance" class="form-label">Distance (km)</label>
+                  <label for="distance" class="form-label">Distance (km) <span class="required">*</span></label>
                   <input
                     type="number"
                     class="form-control{% if movement_form_errors.distance_km %} is-invalid{% endif %}"
@@ -502,7 +499,10 @@
 {{ movement_route_pair_options|json_script:"movement-route-pairs" }}
 <script>
   (function () {
+    const statusSelect = document.getElementById("status");
+    const endTimeInput = document.getElementById("endTime");
     const bookingInput = document.getElementById("booking");
+    const bookingIdInput = document.getElementById("bookingId");
     const bookingMenu = document.getElementById("bookingOptions");
     const bookingToggle = document.getElementById("bookingToggle");
     const shipmentSelect = document.getElementById("shipment");
@@ -517,6 +517,13 @@
     function selectedOption(selectEl) {
       if (!selectEl || selectEl.selectedIndex < 0) return null;
       return selectEl.options[selectEl.selectedIndex];
+    }
+
+    function syncStatusUi() {
+      const isCompleted = statusSelect && statusSelect.value === "Completed";
+      document.querySelectorAll(".tml-end-required").forEach(function (el) {
+        el.style.display = isCompleted ? "" : "none";
+      });
     }
 
     function setSelectValue(selectEl, value) {
@@ -671,6 +678,11 @@
         toLocationSelect.value = "";
       }
       syncDistanceFromRouteMaster();
+    }
+
+    if (statusSelect) {
+      statusSelect.addEventListener("change", syncStatusUi);
+      syncStatusUi();
     }
 
     if (bookingInput) {

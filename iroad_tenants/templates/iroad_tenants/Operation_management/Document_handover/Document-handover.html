@@ -179,24 +179,20 @@
             <select class="form-select {% if handover_form_errors.shipment_id %}is-invalid{% endif %}" id="shipmentRef" name="shipment_id">
               <option value="" {% if not handover_form_data.shipment_id %}selected{% endif %} disabled>-Select shipment-</option>
               {% for shipment in shipment_options %}
-              <option value="{{ shipment.shipment_id }}" data-booking-id="{{ shipment.booking_id }}" data-booking-no="{% if shipment.booking %}{{ shipment.booking.booking_no }}{% endif %}" data-booking-item="{{ shipment.booking_item_ref }}" {% if handover_form_data.shipment_id == shipment.shipment_id|stringformat:'s' %}selected{% endif %}>{{ shipment.shipment_no }} - {% if shipment.booking %}{{ shipment.booking.booking_no }}{% endif %}</option>
+              <option value="{{ shipment.shipment_id }}" data-booking-id="{{ shipment.booking_id }}" data-booking-no="{{ shipment.booking_no }}" data-booking-item="{{ shipment.booking_item }}" {% if handover_form_data.shipment_id == shipment.shipment_id|stringformat:'s' %}selected{% endif %}>{{ shipment.shipment_no }} - {{ shipment.booking_no }}</option>
               {% endfor %}
             </select>
-            {% if handover_form_errors.shipment_ref %}<div class="invalid-feedback d-block">{{ handover_form_errors.shipment_ref }}</div>{% endif %}
+            {% if handover_form_errors.shipment_id %}<div class="invalid-feedback d-block">{{ handover_form_errors.shipment_id }}</div>{% endif %}
           </div>
           <div class="field">
-            <label for="documentRef" class="form-label">Doc Record</label>
-            <select class="form-select" id="documentRef" name="document_id">
+            <label for="documentRef" class="form-label">Doc Record <span class="required">*</span></label>
+            <select class="form-select {% if handover_form_errors.document_id %}is-invalid{% endif %}" id="documentRef" name="document_id">
               <option value="" {% if not handover_form_data.document_id %}selected{% endif %} disabled>-Select doc record-</option>
-              {% for doc in pod_record_options %}
+              {% for doc in delivery_note_options %}
               <option
                 value="{{ doc.document_id }}"
-                data-shipment-id="{% if doc.shipment_id %}{{ doc.shipment_id }}{% endif %}"
-                data-booking-no="{% if doc.booking %}{{ doc.booking.booking_no }}{% endif %}"
-                data-booking-item="{{ doc.booking_item }}"
+                data-shipment-id="{{ doc.shipment_id }}"
                 data-document-ref-no="{{ doc.document_ref_no }}"
-                data-physical-location="{{ doc.physical_location }}"
-                data-received-user="{{ doc.created_by_label }}"
                 data-page-count="{{ doc.page_count|default:1 }}"
                 {% if handover_form_data.document_id == doc.document_id|stringformat:'s' %}selected{% endif %}
               >
@@ -204,6 +200,7 @@
               </option>
               {% endfor %}
             </select>
+            {% if handover_form_errors.document_id %}<div class="invalid-feedback d-block">{{ handover_form_errors.document_id }}</div>{% endif %}
           </div>
         </div>
         <div class="fields-grid cols-3" style="margin-top: 20px">
@@ -238,13 +235,14 @@
             </select>
           </div>
           <div class="field">
-            <label for="receivedUser" class="form-label">Received User</label>
-            <select class="form-select" id="receivedUser" name="received_user">
-              <option value="" {% if not handover_form_data.received_user %}selected{% endif %}>-Select received user-</option>
+            <label for="receivedUser" class="form-label">Received User <span class="required">*</span></label>
+            <select class="form-select {% if handover_form_errors.receiver_user_id %}is-invalid{% endif %}" id="receivedUser" name="receiver_user_id">
+              <option value="" disabled {% if not handover_form_data.receiver_user_id %}selected{% endif %}>-Select received user-</option>
               {% for user in received_user_options %}
-              <option value="{{ user.value }}" {% if handover_form_data.received_user == user.value %}selected{% endif %}>{{ user.label }}</option>
+              <option value="{{ user.user_id }}" {% if handover_form_data.receiver_user_id == user.user_id|stringformat:'s' %}selected{% endif %}>{{ user.label }}</option>
               {% endfor %}
             </select>
+            {% if handover_form_errors.receiver_user_id %}<div class="invalid-feedback d-block">{{ handover_form_errors.receiver_user_id }}</div>{% endif %}
           </div>
         </div>
       </div>
@@ -258,9 +256,6 @@
               <option value="" {% if not handover_form_data.status %}selected{% endif %} disabled>-Select status-</option>
               <option value="Draft" {% if handover_form_data.status == 'Draft' %}selected{% endif %}>Draft</option>
               <option value="Posted" {% if handover_form_data.status == 'Posted' %}selected{% endif %}>Posted</option>
-              <option value="Client Received" {% if handover_form_data.status == 'Client Received' %}selected{% endif %}>Client Received</option>
-              <option value="Rejected" {% if handover_form_data.status == 'Rejected' %}selected{% endif %}>Rejected</option>
-              <option value="Missing" {% if handover_form_data.status == 'Missing' %}selected{% endif %}>Missing</option>
             </select>
             {% if handover_form_errors.status %}<div class="invalid-feedback d-block">{{ handover_form_errors.status }}</div>{% endif %}
           </div>
@@ -292,16 +287,21 @@
             <tr>
               <td data-label="SN">{{ forloop.counter }}</td>
               <td data-label="Doc Page (list)">
-                <select class="form-select form-select-sm dh-line-doc-page" data-current-value="{{ line.doc_page }}">
-                  <option value="" disabled {% if not line.doc_page %}selected{% endif %}>-Select doc page-</option>
-                  {% if line.doc_page %}<option value="{{ line.doc_page }}" selected>{{ line.doc_page }}</option>{% endif %}
+                <select class="form-select form-select-sm dh-line-doc-page" data-current-value="{{ line.source_page_id|default:line.doc_page }}">
+                  <option value="" disabled {% if not line.source_page_id and not line.doc_page %}selected{% endif %}>-Select doc page-</option>
+                  {% for page in handover_line_page_options %}
+                  <option value="{{ page.page_id }}" {% if line.source_page_id == page.page_id or line.doc_page == page.page_id %}selected{% endif %}>{{ page.label }}</option>
+                  {% empty %}
+                  {% if line.source_page_id %}<option value="{{ line.source_page_id }}" selected>{{ line.doc_page }}</option>{% elif line.doc_page %}<option value="{{ line.doc_page }}" selected>{{ line.doc_page }}</option>{% endif %}
+                  {% endfor %}
                 </select>
               </td>
               <td data-label="Page Status (list)">
                 <select class="form-select form-select-sm dh-line-page-status">
-                  <option value="Pending" {% if line.page_status == 'Pending' %}selected{% endif %}>Pending</option>
-                  <option value="Collected" {% if line.page_status == 'Collected' %}selected{% endif %}>Collected</option>
+                  <option value="" disabled {% if not line.page_status %}selected{% endif %}>-Select action-</option>
+                  <option value="ReceivedOK" {% if line.page_status == 'ReceivedOK' or line.page_status == 'Collected' %}selected{% endif %}>Received OK</option>
                   <option value="Missing" {% if line.page_status == 'Missing' %}selected{% endif %}>Missing</option>
+                  <option value="Rejected" {% if line.page_status == 'Rejected' %}selected{% endif %}>Rejected</option>
                 </select>
               </td>
               <td data-label="Physical Location"><input type="text" class="form-control form-control-sm dh-line-location" value="{{ line.physical_location }}" /></td>
@@ -344,6 +344,8 @@
     const tbody = document.getElementById("dhLinesTbody");
     const addBtn = document.getElementById("addDhLineBtn");
     const linesJson = document.getElementById("handoverLinesJson");
+    const deliveryNotePages = {{ delivery_note_pages_json|safe }};
+    const defaultReceiverUserId = "{{ default_receiver_user_id|default:''|escapejs }}";
 
     function selectedOption(selectEl) {
       if (!selectEl || selectEl.selectedIndex < 0) return null;
@@ -373,10 +375,10 @@
     }
 
     function getSelectedRecordOption() {
-      const podOption = selectedOption(podRecord);
-      if (podOption && podOption.value) return podOption;
       const docOption = selectedOption(documentRef);
       if (docOption && docOption.value) return docOption;
+      const podOption = selectedOption(podRecord);
+      if (podOption && podOption.value) return podOption;
       return null;
     }
 
@@ -386,29 +388,35 @@
       return rawCount > 0 ? rawCount : 1;
     }
 
-    function syncDocPageOptions(select, rowIndex) {
+    function getPagesForSelectedDocument() {
+      const docId = documentRef && documentRef.value ? documentRef.value : "";
+      if (!docId || !deliveryNotePages || !deliveryNotePages[docId]) return [];
+      return deliveryNotePages[docId];
+    }
+
+    function fillDocPageSelect(select, preferredValue) {
       if (!select) return;
-      const pageCount = getSelectedRecordPageCount();
-      const currentValue = select.getAttribute("data-current-value") || select.value || "";
-      const fallbackValue = rowIndex + 1 <= pageCount ? "Page-" + (rowIndex + 1) : "";
+      const pages = getPagesForSelectedDocument();
+      const currentValue = preferredValue || select.getAttribute("data-current-value") || select.value || "";
       select.innerHTML = "";
       select.add(new Option("-Select doc page-", ""));
       select.options[0].disabled = true;
-      for (let pageNo = 1; pageNo <= pageCount; pageNo += 1) {
-        select.add(new Option("Page-" + pageNo, "Page-" + pageNo));
+      if (pages.length) {
+        pages.forEach(function (page) {
+          select.add(new Option(page.label, page.page_id));
+        });
+      } else {
+        const pageCount = getSelectedRecordPageCount();
+        for (let pageNo = 1; pageNo <= pageCount; pageNo += 1) {
+          select.add(new Option("Page-" + pageNo, "Page-" + pageNo));
+        }
       }
-      const wantedValue = /^Page-\d+$/.test(currentValue) ? currentValue : fallbackValue;
-      select.value = Array.prototype.some.call(select.options, function (option) {
-        return option.value === wantedValue;
-      }) ? wantedValue : "";
+      if (currentValue && Array.prototype.some.call(select.options, function (option) {
+        return option.value === currentValue;
+      })) {
+        select.value = currentValue;
+      }
       select.setAttribute("data-current-value", select.value);
-    }
-
-    function syncAllDocPageOptions() {
-      if (!tbody) return;
-      tbody.querySelectorAll("tr").forEach(function (tr, idx) {
-        syncDocPageOptions(tr.querySelector(".dh-line-doc-page"), idx);
-      });
     }
 
     function normalizeLocation(value) {
@@ -483,8 +491,8 @@
             option.disabled = false;
             return;
           }
-          const optionShipmentRef = option.getAttribute("data-shipment-ref") || "";
-          const isMatch = !shipmentRefValue || !optionShipmentRef || optionShipmentRef === shipmentRefValue;
+          const optionShipmentId = option.getAttribute("data-shipment-id") || "";
+          const isMatch = !shipmentRefValue || !optionShipmentId || optionShipmentId === shipmentRefValue;
           option.hidden = !isMatch;
           option.disabled = !isMatch;
           if (isMatch && !firstMatchValue) firstMatchValue = option.value;
@@ -523,7 +531,7 @@
     function createVerificationRow(syncAfterCreate) {
       if (!tbody) return null;
       const tr = document.createElement("tr");
-      tr.innerHTML = '<td data-label="SN">0</td><td data-label="Doc Page (list)"><select class="form-select form-select-sm dh-line-doc-page" data-current-value=""><option value="" disabled selected>-Select doc page-</option></select></td><td data-label="Page Status (list)"><select class="form-select form-select-sm dh-line-page-status"><option value="Pending">Pending</option><option value="Collected">Collected</option><option value="Missing">Missing</option><option value="Mismatch">Mismatch</option></select></td><td data-label="Physical Location"><select class="form-select form-select-sm dh-line-location"><option value="" disabled selected>-Select location-</option><option value="With Driver">With Driver</option><option value="With Admin">With Admin</option><option value="With Client">With Client</option><option value="Out of Company">Out of Company</option></select></td><td data-label="Note"><input type="text" class="form-control form-control-sm dh-line-note" placeholder="Enter note"/></td><td data-label="Actions" data-col="actions"><button type="button" class="btn btn-sm btn-outline-danger dh-remove-line"><i class="bi bi-trash3"></i></button></td>';
+      tr.innerHTML = '<td data-label="SN">0</td><td data-label="Doc Page (list)"><select class="form-select form-select-sm dh-line-doc-page" data-current-value=""><option value="" disabled selected>-Select doc page-</option></select></td><td data-label="Page Status (list)"><select class="form-select form-select-sm dh-line-page-status"><option value="" disabled selected>-Select action-</option><option value="ReceivedOK">Received OK</option><option value="Missing">Missing</option><option value="Rejected">Rejected</option></select></td><td data-label="Physical Location"><input type="text" class="form-control form-control-sm dh-line-location" placeholder="Location"/></td><td data-label="Note"><input type="text" class="form-control form-control-sm dh-line-note" placeholder="Enter note"/></td><td data-label="Actions" data-col="actions"><button type="button" class="btn btn-sm btn-outline-danger dh-remove-line"><i class="bi bi-trash3"></i></button></td>';
       tbody.appendChild(tr);
       if (physicalLocation && physicalLocation.value) {
         const locationInput = tr.querySelector(".dh-line-location");
@@ -533,26 +541,30 @@
       if (syncAfterCreate !== false) {
         syncVerificationRowsToPageCount();
       } else {
-        syncAllDocPageOptions();
+        fillDocPageSelect(tr.querySelector(".dh-line-doc-page"), "");
       }
       return tr;
     }
 
     function syncVerificationRowsToPageCount() {
       if (!tbody) return;
-      const pageCount = getSelectedRecordPageCount();
+      const pages = getPagesForSelectedDocument();
+      const targetCount = pages.length ? pages.length : getSelectedRecordPageCount();
       let rows = Array.prototype.slice.call(tbody.querySelectorAll("tr"));
-      while (rows.length > pageCount) {
-        const row = rows.pop();
-        row.remove();
+      while (rows.length > targetCount) {
+        rows.pop().remove();
       }
-      if (!rows.length) {
+      while (rows.length < targetCount) {
         createVerificationRow(false);
+        rows = Array.prototype.slice.call(tbody.querySelectorAll("tr"));
       }
-      syncAllDocPageOptions();
+      tbody.querySelectorAll("tr").forEach(function (tr, idx) {
+        const preferred = pages[idx] ? pages[idx].page_id : "";
+        fillDocPageSelect(tr.querySelector(".dh-line-doc-page"), preferred);
+      });
       renumber();
       if (addBtn) {
-        addBtn.disabled = tbody.querySelectorAll("tr").length >= pageCount;
+        addBtn.disabled = tbody.querySelectorAll("tr").length >= targetCount;
       }
     }
 
@@ -687,11 +699,10 @@
     function syncFromDocumentOption(select) {
       const option = selectedOption(select);
       if (!option || !option.value) return;
-      const optionShipment = option.getAttribute("data-shipment-ref") || "";
+      const optionShipment = option.getAttribute("data-shipment-id") || "";
       const optionBookingNo = option.getAttribute("data-booking-no") || "";
       const optionBookingItem = option.getAttribute("data-booking-item") || "";
       const optionLocation = option.getAttribute("data-physical-location") || "";
-      const optionReceivedUser = option.getAttribute("data-received-user") || "";
       if (optionShipment && shipmentRef) {
         shipmentRef.value = optionShipment;
       }
@@ -704,10 +715,15 @@
         bookingItem.value = optionBookingItem;
       }
       setPhysicalLocation(optionLocation);
-      setReceivedUser(optionReceivedUser);
       filterDocumentRecordsForShipment(optionShipment);
-      syncMatchingRecordSelect(select);
-      syncVerificationRowsToPageCount();
+      if (select === documentRef) {
+        syncVerificationRowsToPageCount();
+      } else {
+        syncMatchingRecordSelect(select);
+      }
+    }
+    if (receivedUser && defaultReceiverUserId && !receivedUser.value) {
+      receivedUser.value = defaultReceiverUserId;
     }
     if (documentRef) {
       documentRef.addEventListener("change", function () {

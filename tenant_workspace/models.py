@@ -3300,6 +3300,8 @@ class TenantShipment(models.Model):
         HARD = 'Hard', 'Hard'
 
     class PodStatus(models.TextChoices):
+        PENDING = 'Pending', 'Pending'
+        HARD_COPY_RECEIVED = 'Hard Copy Received', 'Hard Copy Received'
         COMPLIANT = 'Compliant', 'Compliant'
         NOT_COMPLIANT = 'Not Compliant', 'Not Compliant'
 
@@ -3390,7 +3392,7 @@ class TenantShipment(models.Model):
     pod_status = models.CharField(
         max_length=20,
         choices=PodStatus.choices,
-        default=PodStatus.NOT_COMPLIANT,
+        default=PodStatus.PENDING,
     )
     pod_doc_count = models.PositiveIntegerField(default=0)
     cod_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
@@ -3594,6 +3596,20 @@ class TenantShipmentDocument(models.Model):
         null=True,
         blank=True,
     )
+    source_document = models.ForeignKey(
+        'self',
+        on_delete=models.PROTECT,
+        related_name='pod_source_children',
+        null=True,
+        blank=True,
+    )
+    receiver_user = models.ForeignKey(
+        'TenantUser',
+        on_delete=models.SET_NULL,
+        related_name='received_shipment_documents',
+        null=True,
+        blank=True,
+    )
     document_type = models.CharField(max_length=64)
     document_ref_no = models.CharField(max_length=120)
     document_date = models.DateField(default=date.today)
@@ -3614,18 +3630,111 @@ class TenantShipmentDocument(models.Model):
             models.Index(fields=['status'], name='tenant_shipdoc_status_idx'),
             models.Index(fields=['booking'], name='tenant_shipdoc_booking_idx'),
             models.Index(fields=['shipment'], name='tenant_shipdoc_shipment_idx'),
+            models.Index(fields=['source_document'], name='tenant_shipdoc_source_idx'),
+            models.Index(fields=['receiver_user'], name='tenant_shipdoc_receiver_idx'),
         ]
 
     def sync_booking_from_shipment(self):
         if self.shipment_id and self.shipment.booking_id and not self.booking_id:
             self.booking = self.shipment.booking
 
+    def sync_from_source_document(self):
+        if not self.source_document_id:
+            return
+        source = self.source_document
+        if not source:
+            return
+        self.document_ref_no = source.document_ref_no
+        if source.document_date:
+            self.document_date = source.document_date
+        if source.page_count:
+            self.page_count = source.page_count
+
+    def sync_pod_pages_from_document_pages(self):
+        """Mirror OP-DOC document pages to pod_pages for handover/POD integrations."""
+        from django.apps import apps
+
+        document_page_model = apps.get_model('tenant_workspace', 'TenantShipmentDocumentPage')
+        pod_page_model = apps.get_model('tenant_workspace', 'TenantShipmentPodPage')
+        pod_page_model.objects.filter(document=self).delete()
+        for page in document_page_model.objects.filter(document=self).order_by('line_no'):
+            pod_page_model.objects.create(
+                document=self,
+                line_no=page.line_no,
+                doc_page=str(page.physical_page_no),
+                source=page.doc_ref_no,
+                action_log=page.extra_ref,
+                physical_location=page.signer_location,
+                soft_copy_status=page.completion_status,
+                attachment_label=page.attachment_label,
+                map_url=page.attachment_storage_path,
+            )
+
     def save(self, *args, **kwargs):
         self.sync_booking_from_shipment()
+        self.sync_from_source_document()
         super().save(*args, **kwargs)
 
     def __str__(self):
         return self.record_no
+
+
+class TenantShipmentDocumentPage(models.Model):
+    """Shipment document page lines (OP-DOC ShipmentDocumentPage)."""
+
+    class CompletionStatus(models.TextChoices):
+        COMPLETED = 'Completed', 'Completed'
+        NOT_COMPLETED = 'Not Completed', 'Not Completed'
+
+    class SignerLocation(models.TextChoices):
+        WITH_DRIVER = 'With Driver', 'With Driver'
+        IN_COMPANY = 'In Company', 'In Company'
+        WITH_CLIENT = 'With Client', 'With Client'
+
+    page_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    document = models.ForeignKey(
+        TenantShipmentDocument,
+        on_delete=models.CASCADE,
+        related_name='document_pages',
+    )
+    line_no = models.PositiveIntegerField(default=1)
+    doc_ref_no = models.CharField(max_length=120, blank=True, default='')
+    extra_ref = models.CharField(max_length=120, blank=True, default='')
+    physical_page_no = models.PositiveIntegerField(default=1)
+    completion_status = models.CharField(
+        max_length=20,
+        choices=CompletionStatus.choices,
+        blank=True,
+        default='',
+    )
+    signer_location = models.CharField(
+        max_length=120,
+        choices=SignerLocation.choices,
+        blank=True,
+        default='',
+    )
+    attachment_storage_path = models.CharField(max_length=500, blank=True, default='')
+    attachment_label = models.CharField(max_length=255, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'tenant_shipment_document_pages'
+        ordering = ['line_no', 'created_at']
+        indexes = [
+            models.Index(fields=['document', 'line_no'], name='tenant_shipdocpage_doc_ln_idx'),
+        ]
+
+    def sync_doc_ref_from_document(self):
+        if self.document_id and self.document and not (self.doc_ref_no or '').strip():
+            self.doc_ref_no = self.document.document_ref_no
+
+    def save(self, *args, **kwargs):
+        self.sync_doc_ref_from_document()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f'{self.document.record_no} / Page {self.physical_page_no}'
 
 
 class TenantShipmentPodPage(models.Model):
@@ -3638,6 +3747,13 @@ class TenantShipmentPodPage(models.Model):
         related_name='pod_pages',
     )
     line_no = models.PositiveIntegerField(default=1)
+    source_page = models.ForeignKey(
+        'self',
+        on_delete=models.PROTECT,
+        related_name='pod_lines_referencing',
+        null=True,
+        blank=True,
+    )
     doc_page = models.CharField(max_length=64, blank=True, default='')
     source = models.CharField(max_length=64, blank=True, default='')
     action_log = models.CharField(max_length=120, blank=True, default='')
@@ -3654,7 +3770,17 @@ class TenantShipmentPodPage(models.Model):
         ordering = ['line_no', 'created_at']
         indexes = [
             models.Index(fields=['document', 'line_no'], name='tenant_podpage_doc_line_idx'),
+            models.Index(fields=['source_page'], name='tenant_podpage_source_idx'),
         ]
+
+    def sync_doc_page_from_source(self):
+        if self.source_page_id and self.source_page:
+            label = (self.source_page.doc_page or '').strip()
+            self.doc_page = label or f'Page-{self.source_page.line_no}'
+
+    def save(self, *args, **kwargs):
+        self.sync_doc_page_from_source()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f'{self.document.record_no} / Line {self.line_no}'
@@ -3703,6 +3829,13 @@ class TenantDocumentHandover(models.Model):
         blank=True,
     )
     physical_location = models.CharField(max_length=120, blank=True, default='')
+    receiver_user = models.ForeignKey(
+        'TenantUser',
+        on_delete=models.PROTECT,
+        related_name='document_handovers_received',
+        null=True,
+        blank=True,
+    )
     received_user = models.CharField(max_length=120, blank=True, default='')
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT)
     notes = models.TextField(blank=True, default='')
@@ -3724,8 +3857,16 @@ class TenantDocumentHandover(models.Model):
         if self.shipment_id and self.shipment.booking_id and not self.booking_id:
             self.booking = self.shipment.booking
 
+    def sync_received_user_label(self):
+        if self.receiver_user_id and self.receiver_user:
+            label = (self.receiver_user.full_name or self.receiver_user.username or '').strip()
+            if self.receiver_user.username and self.receiver_user.username not in label:
+                label = f'{label} ({self.receiver_user.username})' if label else self.receiver_user.username
+            self.received_user = label
+
     def save(self, *args, **kwargs):
         self.sync_booking_from_shipment()
+        self.sync_received_user_label()
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -3735,6 +3876,11 @@ class TenantDocumentHandover(models.Model):
 class TenantDocumentHandoverLine(models.Model):
     """Page verification lines under a handover transaction."""
 
+    class PhysicalStatus(models.TextChoices):
+        RECEIVED_OK = 'ReceivedOK', 'Received OK'
+        MISSING = 'Missing', 'Missing'
+        REJECTED = 'Rejected', 'Rejected'
+
     line_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     handover = models.ForeignKey(
         TenantDocumentHandover,
@@ -3742,6 +3888,13 @@ class TenantDocumentHandoverLine(models.Model):
         related_name='lines',
     )
     line_no = models.PositiveIntegerField(default=1)
+    source_page = models.ForeignKey(
+        'TenantShipmentPodPage',
+        on_delete=models.PROTECT,
+        related_name='handover_lines',
+        null=True,
+        blank=True,
+    )
     doc_page = models.CharField(max_length=64, blank=True, default='')
     page_status = models.CharField(max_length=64, blank=True, default='')
     physical_location = models.CharField(max_length=120, blank=True, default='')
@@ -3754,7 +3907,17 @@ class TenantDocumentHandoverLine(models.Model):
         ordering = ['line_no', 'created_at']
         indexes = [
             models.Index(fields=['handover', 'line_no'], name='tenant_doc_ho_line_idx'),
+            models.Index(fields=['source_page'], name='tenant_doc_ho_srcpage_idx'),
         ]
+
+    def sync_doc_page_from_source(self):
+        if self.source_page_id and self.source_page:
+            label = (self.source_page.doc_page or '').strip()
+            self.doc_page = label or f'Page-{self.source_page.line_no}'
+
+    def save(self, *args, **kwargs):
+        self.sync_doc_page_from_source()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f'{self.handover.handover_no} / Line {self.line_no}'
@@ -3877,5 +4040,113 @@ class TenantOperationAction(models.Model):
 
     def __str__(self):
         return self.action_code
+
+
+class TenantOperationActionLog(models.Model):
+    """Operation action log transaction (distinct from truck movement log)."""
+
+    log_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    log_no = models.CharField(max_length=64, unique=True)
+    log_sequence = models.PositiveIntegerField(default=0)
+    log_date = models.DateTimeField()
+    operation_action = models.ForeignKey(
+        'TenantOperationAction',
+        on_delete=models.SET_NULL,
+        related_name='action_logs',
+        null=True,
+        blank=True,
+    )
+    source = models.CharField(max_length=32, blank=True, default='Manual')
+    created_by = models.ForeignKey(
+        'TenantUser',
+        on_delete=models.SET_NULL,
+        related_name='operation_action_logs_created',
+        null=True,
+        blank=True,
+    )
+    created_by_label = models.CharField(max_length=200, blank=True, default='')
+    notes = models.TextField(blank=True, default='')
+    booking = models.ForeignKey(
+        'TenantBooking',
+        on_delete=models.SET_NULL,
+        related_name='operation_action_logs',
+        null=True,
+        blank=True,
+    )
+    shipment = models.ForeignKey(
+        'TenantShipment',
+        on_delete=models.SET_NULL,
+        related_name='operation_action_logs',
+        null=True,
+        blank=True,
+    )
+    truck_movement = models.ForeignKey(
+        'TenantTruckMovementLog',
+        on_delete=models.SET_NULL,
+        related_name='operation_action_logs',
+        null=True,
+        blank=True,
+    )
+    truck = models.ForeignKey(
+        'TruckMaster',
+        on_delete=models.SET_NULL,
+        related_name='operation_action_logs',
+        null=True,
+        blank=True,
+    )
+    driver = models.ForeignKey(
+        'DriverMaster',
+        on_delete=models.SET_NULL,
+        related_name='operation_action_logs',
+        null=True,
+        blank=True,
+    )
+    latitude = models.CharField(max_length=32, blank=True, default='')
+    longitude = models.CharField(max_length=32, blank=True, default='')
+    map_link = models.URLField(blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'tenant_operation_action_logs'
+        ordering = ['-log_date', '-created_at']
+        indexes = [
+            models.Index(fields=['log_no'], name='tenant_oal_no_idx'),
+            models.Index(fields=['log_date'], name='tenant_oal_date_idx'),
+            models.Index(fields=['source'], name='tenant_oal_source_idx'),
+            models.Index(fields=['booking'], name='tenant_oal_booking_idx'),
+            models.Index(fields=['shipment'], name='tenant_oal_shipment_idx'),
+            models.Index(fields=['truck_movement'], name='tenant_oal_movement_idx'),
+        ]
+
+    def __str__(self):
+        return self.log_no
+
+
+class TenantOperationActionMedia(models.Model):
+    """Media evidence rows linked to an operation action log."""
+
+    media_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    action_log = models.ForeignKey(
+        'TenantOperationActionLog',
+        on_delete=models.CASCADE,
+        related_name='media_rows',
+    )
+    line_no = models.PositiveIntegerField(default=1)
+    media_type = models.CharField(max_length=16, blank=True, default='')
+    captured_at = models.DateTimeField(null=True, blank=True)
+    description = models.CharField(max_length=255, blank=True, default='')
+    file = models.FileField(upload_to='tenant_operation_action_media/%Y/%m/', blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'tenant_operation_action_media'
+        ordering = ['line_no', 'created_at']
+        indexes = [
+            models.Index(fields=['action_log'], name='tenant_oal_media_log_idx'),
+        ]
+
+    def __str__(self):
+        return f'{self.action_log_id}:{self.line_no}'
 
 
