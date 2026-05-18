@@ -1742,8 +1742,32 @@ def _redirect_cargo_category_list(request):
     return _tenant_redirect(request, 'iroad_tenants:tenant_cargo_category_list')
 
 
+def _tenant_cargo_category_activity_entries(category):
+    """Timeline entries for cargo category detail sidebar (created / updated)."""
+    entries = []
+    created_at = getattr(category, 'created_at', None)
+    updated_at = getattr(category, 'updated_at', None)
+    if created_at and updated_at:
+        seconds_since_create = (updated_at - created_at).total_seconds()
+        if seconds_since_create >= 1:
+            entries.append({
+                'title': 'Updated',
+                'timestamp': updated_at,
+                'actor': 'System',
+                'color': '#28a745',
+            })
+    if created_at:
+        entries.append({
+            'title': 'Created',
+            'timestamp': created_at,
+            'actor': 'System',
+            'color': '#dc3545',
+        })
+    return entries
+
+
 class TenantCargoCategoryDetailView(View):
-    template_name = 'iroad_tenants/Master_Data/cargo_master/Cargo-category-config.html'
+    template_name = 'iroad_tenants/Master_Data/cargo_master/Cargo-category-detail.html'
 
     def get(self, request, category_id):
         context = _tenant_context_from_session(request)
@@ -1771,13 +1795,11 @@ class TenantCargoCategoryDetailView(View):
 
             context.update(
                 {
-                    'form': TenantCargoCategoryForm(instance=category),
-                    'category_instance': category,
+                    'category': category,
+                    'activity_log': _tenant_cargo_category_activity_entries(category),
                     'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
                     'back_to_list_url': list_url,
                     'edit_category_url': edit_url,
-                    'is_edit': True,
-                    'is_view': True,
                 }
             )
             return render(request, self.template_name, context)
