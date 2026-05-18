@@ -1,0 +1,250 @@
+{% extends 'iroad_tenants/base.html' %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}{% translate "View Service Item" %} | iRoad{% endblock %}
+{% block breadcrumb %}{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="page-header">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item">
+        <a href="{% url 'iroad_tenants:tenant_dashboard' %}">{% translate "Dashboard" %}</a>
+      </li>
+      <li class="breadcrumb-item">{% translate "Master Data" %}</li>
+      <li class="breadcrumb-item">{% translate "Services Management" %}</li>
+      <li class="breadcrumb-item">
+        <a href="{{ back_to_list_url }}">{% translate "Service Item Master List" %}</a>
+      </li>
+      <li class="breadcrumb-item active" aria-current="page">{% translate "View Service Item" %}</li>
+    </ol>
+  </nav>
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">
+        {% translate "View Service Item" %} &mdash;
+        <span style="color: var(--primary-color)">{{ service_item.service_code }}</span>
+      </h1>
+      <p class="page-subtitle">{{ service_item.english_name }}</p>
+    </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <a href="{{ back_to_list_url }}" class="eal-btn eal-btn-outline">
+          <i class="bi bi-arrow-left"></i>
+          <span>{% translate "Back to List" %}</span>
+        </a>
+        <a href="{{ edit_service_item_url }}" class="eal-btn eal-btn-primary">
+          <i class="bi bi-pencil-square"></i>
+          <span>{% translate "Edit" %}</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Details Content -->
+<div class="row g-4">
+  <!-- Left Column: Main Details -->
+  <div class="col-lg-8">
+    <!-- Basic Information -->
+    <div class="form-card" data-section="1">
+      <div class="form-card-header">
+        <div class="form-card-icon blue">
+          <i class="bi bi-info-circle"></i>
+        </div>
+        <div class="form-card-header-text">
+          <h2 class="form-card-title">{% translate "Basic Information" %}</h2>
+          <p class="form-card-desc">{% translate "Primary details, identity, and classification of the service item." %}</p>
+        </div>
+      </div>
+      <div class="form-card-body">
+        <p class="small text-uppercase fw-semibold text-secondary mb-3" style="letter-spacing: 0.06em">
+          {% translate "Identity" %}
+        </p>
+        <div class="fields-grid cols-3">
+          <div class="field">
+            <label class="form-label">{% translate "Service Code" %}</label>
+            <p class="detail-view-value"><span class="eal-entity-id">{{ service_item.service_code }}</span></p>
+          </div>
+          <div class="field">
+            <label class="form-label">{% translate "Service Type" %}</label>
+            <p class="detail-view-value">
+              <span class="eal-type-badge {% if service_item.service_type == 'Trip' %}org{% else %}ind{% endif %}">
+                <i class="bi {% if service_item.service_type == 'Trip' %}bi-signpost-split{% else %}bi-gear{% endif %}"></i>
+                {{ service_item.service_type }}
+              </span>
+            </p>
+          </div>
+          <div class="field">
+            <label class="form-label">{% translate "Status" %}</label>
+            <p class="detail-view-value">
+              {% if service_item.status == 'Active' %}
+              <span class="status-badge active">{% translate "Active" %}</span>
+              {% else %}
+              <span class="status-badge inactive">{% translate "Inactive" %}</span>
+              {% endif %}
+            </p>
+          </div>
+        </div>
+
+        <p class="small text-uppercase fw-semibold text-secondary mb-3 mt-4" style="letter-spacing: 0.06em">
+          {% translate "Naming" %}
+        </p>
+        <div class="fields-grid cols-3">
+          <div class="field">
+            <label class="form-label">{% translate "English Name" %}</label>
+            <p class="detail-view-value">{{ service_item.english_name }}</p>
+          </div>
+          <div class="field">
+            <label class="form-label">{% translate "Arabic Name" %}</label>
+            <p class="detail-view-value eal-arabic" lang="ar" dir="rtl">{{ service_item.arabic_name|default:"—" }}</p>
+          </div>
+          <div class="field">
+            <label class="form-label">{% translate "Category" %}</label>
+            <p class="detail-view-value">{{ service_item.category_name|default:"—" }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pricing & Route -->
+    <div class="form-card" data-section="2">
+      <div class="form-card-header">
+        <div class="form-card-icon amber">
+          <i class="bi bi-tags"></i>
+        </div>
+        <div class="form-card-header-text">
+          <h2 class="form-card-title">{% translate "Pricing & Route" %}</h2>
+          <p class="form-card-desc">{% translate "Pricing details based on service type." %}</p>
+        </div>
+      </div>
+      <div class="form-card-body">
+        {% if service_item.service_type == 'Trip' %}
+        <p class="small text-uppercase fw-semibold text-secondary mb-3" style="letter-spacing: 0.06em">
+          {% translate "Route" %}
+        </p>
+        <div class="fields-grid cols-1" style="margin-bottom: 20px">
+          <div class="field">
+            <label class="form-label">{% translate "Route" %}</label>
+            <p class="detail-view-value">
+              {% if service_item.route %}
+              {{ service_item.route.route_code }} &mdash; {{ service_item.route.route_label }}
+              {% else %}
+              —
+              {% endif %}
+            </p>
+          </div>
+        </div>
+        {% endif %}
+
+        <p class="small text-uppercase fw-semibold text-secondary mb-3" style="letter-spacing: 0.06em">
+          {% translate "Pricing" %}
+        </p>
+        <div class="pod-status-grid">
+          <div class="pod-status-tile">
+            <label class="form-label">{% translate "Sell Price" %}</label>
+            <p class="detail-view-value">{{ service_item.sell_price }}</p>
+          </div>
+          {% if service_item.service_type == 'Trip' %}
+          <div class="pod-status-tile">
+            <label class="form-label">{% translate "Outbound Sell Price" %}</label>
+            <p class="detail-view-value">
+              {% if service_item.outbound_sell_price is not None %}{{ service_item.outbound_sell_price }}{% else %}—{% endif %}
+            </p>
+          </div>
+          <div class="pod-status-tile">
+            <label class="form-label">{% translate "Inbound Sell Price" %}</label>
+            <p class="detail-view-value">
+              {% if service_item.inbound_sell_price is not None %}{{ service_item.inbound_sell_price }}{% else %}—{% endif %}
+            </p>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Column: Summary Sidebar -->
+  <div class="col-lg-4">
+    <!-- Quick Summary -->
+    <div class="form-card">
+      <div class="form-card-header">
+        <div class="form-card-icon blue">
+          <i class="bi bi-info-circle"></i>
+        </div>
+        <div class="form-card-header-text">
+          <h2 class="form-card-title">{% translate "Quick Summary" %}</h2>
+        </div>
+      </div>
+      <div class="form-card-body">
+        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
+          <span class="detail-field-label">{% translate "Service Code" %}</span>
+          <span class="detail-field-value" style="font-weight: 600; color: var(--primary-color)">{{ service_item.service_code }}</span>
+        </div>
+        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
+          <span class="detail-field-label">{% translate "English Name" %}</span>
+          <span class="detail-field-value">{{ service_item.english_name }}</span>
+        </div>
+        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
+          <span class="detail-field-label">{% translate "Service Type" %}</span>
+          <span class="detail-field-value">{{ service_item.service_type }}</span>
+        </div>
+        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
+          <span class="detail-field-label">{% translate "Status" %}</span>
+          <span class="detail-field-value">
+            {% if service_item.status == 'Active' %}
+            <span class="status-badge active">{% translate "Active" %}</span>
+            {% else %}
+            <span class="status-badge inactive">{% translate "Inactive" %}</span>
+            {% endif %}
+          </span>
+        </div>
+        <div class="detail-field" style="padding: 10px 0">
+          <span class="detail-field-label">{% translate "Sell Price" %}</span>
+          <span class="detail-field-value">{{ service_item.sell_price }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Activity Log -->
+    <div class="form-card">
+      <div class="form-card-header">
+        <div class="form-card-icon amber">
+          <i class="bi bi-clock-history"></i>
+        </div>
+        <div class="form-card-header-text">
+          <h2 class="form-card-title">{% translate "Activity Log" %}</h2>
+        </div>
+      </div>
+      <div class="form-card-body">
+        <div style="display: flex; flex-direction: column; gap: 16px">
+          {% for item in activity_log %}
+          <div style="display: flex; gap: 12px; align-items: flex-start">
+            <div
+              style="
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                background: {{ item.color }};
+                margin-top: 6px;
+                flex-shrink: 0;
+              "
+            ></div>
+            <div>
+              <div style="font-size: 13px; font-weight: 600; color: #333">{{ item.title }}</div>
+              <div style="font-size: 12px; color: #888">
+                {{ item.timestamp|date:"d M Y, g:i A" }} &mdash; {{ item.actor|default:"System" }}
+              </div>
+            </div>
+          </div>
+          {% empty %}
+          <div class="text-muted">{% translate "No activity available." %}</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

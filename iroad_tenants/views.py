@@ -3523,10 +3523,34 @@ class TenantServiceItemMasterEditView(View):
             connection.set_schema_to_public()
 
 
-class TenantServiceItemMasterDetailView(View):
-    """View-only service item detail using the create-page layout."""
+def _tenant_service_item_master_activity_entries(service_item):
+    """Timeline entries for service item detail sidebar (created / updated)."""
+    entries = []
+    created_at = getattr(service_item, 'created_at', None)
+    updated_at = getattr(service_item, 'updated_at', None)
+    if created_at and updated_at:
+        seconds_since_create = (updated_at - created_at).total_seconds()
+        if seconds_since_create >= 1:
+            entries.append({
+                'title': 'Updated',
+                'timestamp': updated_at,
+                'actor': 'System',
+                'color': '#28a745',
+            })
+    if created_at:
+        entries.append({
+            'title': 'Created',
+            'timestamp': created_at,
+            'actor': 'System',
+            'color': '#dc3545',
+        })
+    return entries
 
-    template_name = 'iroad_tenants/Master_Data/service_item_master/Service-item-master.html'
+
+class TenantServiceItemMasterDetailView(View):
+    """Read-only service item detail (enterprise layout)."""
+
+    template_name = 'iroad_tenants/Master_Data/service_item_master/Service-item-master-detail.html'
 
     def get(self, request, service_item_id):
         context = _tenant_context_from_session(request)
@@ -3543,38 +3567,31 @@ class TenantServiceItemMasterDetailView(View):
             clear_tenant_portal_cookie(response, request=request)
             return response
         try:
-            item = TenantServiceItemMaster.objects.filter(service_item_id=service_item_id).first()
-            if item is None:
+            service_item = (
+                TenantServiceItemMaster.objects.select_related(
+                    'route',
+                    'route__origin_point',
+                    'route__destination_point',
+                )
+                .filter(service_item_id=service_item_id)
+                .first()
+            )
+            if service_item is None:
                 messages.error(request, 'Service item not found.', extra_tags='tenant')
                 return _tenant_redirect(request, 'iroad_tenants:tenant_service_item_master_list')
+
+            list_url = reverse('iroad_tenants:tenant_service_item_master_list')
+            edit_url = reverse(
+                'iroad_tenants:tenant_service_item_master_edit',
+                kwargs={'service_item_id': service_item.service_item_id},
+            )
+
             context.update(
                 {
-                    'preview_service_item_code': item.service_code,
-                    'route_options': list(
-                        TenantRouteMaster.objects.filter(
-                            status=TenantRouteMaster.Status.ACTIVE,
-                        )
-                        .select_related('origin_point', 'destination_point')
-                        .order_by('route_code')
-                    ),
-                    'service_item_category_options': SERVICE_ITEM_CATEGORY_OPTIONS,
-                    'form_action_url': '#',
-                    'page_title': 'View Service Item',
-                    'submit_label': '',
-                    'is_view_mode': True,
-                    'is_edit_mode': False,
-                    'form_data': {
-                        'service_type': item.service_type,
-                        'status': item.status,
-                        'english_name': item.english_name,
-                        'arabic_name': item.arabic_name,
-                        'category_name': item.category_name,
-                        'route_id': str(item.route_id or ''),
-                        'sell_price': str(item.sell_price),
-                        'outbound_sell_price': '' if item.outbound_sell_price is None else str(item.outbound_sell_price),
-                        'inbound_sell_price': '' if item.inbound_sell_price is None else str(item.inbound_sell_price),
-                    },
-                    'field_errors': {},
+                    'service_item': service_item,
+                    'activity_log': _tenant_service_item_master_activity_entries(service_item),
+                    'back_to_list_url': list_url,
+                    'edit_service_item_url': edit_url,
                     'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
                 }
             )
