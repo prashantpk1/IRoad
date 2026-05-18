@@ -216,7 +216,9 @@
               {% for item in shipment_documents_page %}
               <tr>
                 <td class="eal-col-check"><input type="checkbox" class="eal-custom-check" /></td>
-                <td><span class="eal-entity-id">{{ item.record_no }}</span></td>
+                <td>
+                  <a href="{% url 'iroad_tenants:tenant_operation_shipment_documents_detail' item.document_id %}" class="eal-entity-id text-decoration-none" onclick="event.stopPropagation();">{{ item.record_no }}</a>
+                </td>
                 <td>{{ item.record_date|date:"d M Y" }}</td>
                 <td>{% if item.shipment %}{{ item.shipment.shipment_no }}{% else %}-{% endif %}</td>
                 <td>{% if item.booking %}{{ item.booking.booking_no }}{% else %}-{% endif %}</td>
@@ -233,22 +235,9 @@
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end shadow-sm" style="border-radius: 8px; border-color: #e2e8f0">
                       <li>
-                        <button
-                          type="button"
-                          class="dropdown-item js-shipment-doc-view"
-                          data-record-no="{{ item.record_no }}"
-                          data-shipment-ref="{% if item.shipment %}{{ item.shipment.shipment_no }}{% endif %}"
-                          data-document-type="{{ item.document_type }}"
-                          data-status="{{ item.status }}"
-                          data-is-delivery-note="{% if item.is_delivery_note %}Yes{% else %}No{% endif %}"
-                          data-document-ref-no="{{ item.document_ref_no }}"
-                          data-document-date="{{ item.document_date|date:'d M Y' }}"
-                          data-page-count="{{ item.page_count }}"
-                          data-sequence="{{ item.record_sequence }}"
-                          data-notes="{{ item.notes|default:'-' }}"
-                        >
+                        <a class="dropdown-item" href="{% url 'iroad_tenants:tenant_operation_shipment_documents_detail' item.document_id %}">
                           <i class="bi bi-eye text-info me-2"></i> View
-                        </button>
+                        </a>
                       </li>
                       <li>
                         <a class="dropdown-item" href="{% url 'iroad_tenants:tenant_operation_shipment_documents_edit' item.document_id %}">

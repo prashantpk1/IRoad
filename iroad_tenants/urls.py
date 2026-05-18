@@ -142,6 +142,7 @@ from .views import (
     TenantOperationShipmentDeleteView,
     TenantOperationShipmentDocumentsListView,
     TenantOperationShipmentDocumentsCreateView,
+    TenantOperationShipmentDocumentsDetailView,
     TenantOperationShipmentDocumentsEditView,
     TenantOperationShipmentDocumentsDownloadView,
     TenantOperationShipmentDocumentsDeleteView,
@@ -948,6 +949,11 @@ urlpatterns = [
         'operations/shipment-documents/create/',
         TenantOperationShipmentDocumentsCreateView.as_view(),
         name='tenant_operation_shipment_documents_create',
+    ),
+    path(
+        'operations/shipment-documents/<uuid:document_id>/',
+        TenantOperationShipmentDocumentsDetailView.as_view(),
+        name='tenant_operation_shipment_documents_detail',
     ),
     path(
         'operations/shipment-documents/<uuid:document_id>/edit/',

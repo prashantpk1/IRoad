@@ -10215,6 +10215,117 @@ def _tenant_shipment_document_save_pod_lines(document, form_data, line_rows):
         )
 
 
+def _tenant_shipment_document_detail_line_rows(document):
+    """Read-only line rows for shipment document detail template."""
+    rows = []
+    for line in document.pod_pages.all().order_by('line_no'):
+        storage_path = (line.map_url or '').strip()
+        rows.append({
+            'line_no': line.line_no,
+            'doc_ref_no': line.source or document.document_ref_no or '—',
+            'extra_ref': line.action_log or '—',
+            'page_no': line.doc_page or '—',
+            'status': line.soft_copy_status or '—',
+            'signer_location': line.physical_location or '—',
+            'attachment_label': line.attachment_label or '',
+            'attachment_url': _tenant_shipment_document_pod_file_url(storage_path) if storage_path else '',
+        })
+    return rows
+
+
+def _tenant_shipment_document_activity_entries(document):
+    """Timeline entries for shipment document detail sidebar."""
+    entries = []
+    created_at = getattr(document, 'created_at', None)
+    updated_at = getattr(document, 'updated_at', None)
+    if created_at and updated_at:
+        seconds_since_create = (updated_at - created_at).total_seconds()
+        if seconds_since_create >= 1:
+            entries.append({
+                'title': 'Updated',
+                'timestamp': updated_at,
+                'actor': document.created_by_label or 'System',
+                'color': '#28a745',
+            })
+    if created_at:
+        entries.append({
+            'title': 'Created',
+            'timestamp': created_at,
+            'actor': document.created_by_label or 'System',
+            'color': '#dc3545',
+        })
+    return entries
+
+
+class TenantOperationShipmentDocumentsDetailView(View):
+    """Read-only shipment document detail page (enterprise layout)."""
+
+    template_name = 'iroad_tenants/Operation_management/Shipment_Document/Shipment-documents-detail.html'
+
+    def get(self, request, document_id):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        if not context.get('is_tenant_admin') and not context.get('can_view_shipment'):
+            messages.error(request, 'You do not have permission to view Shipment Documents.', extra_tags='tenant')
+            return _tenant_redirect(request, 'iroad_tenants:tenant_dashboard')
+
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        if tenant_registry is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        try:
+            document = (
+                TenantShipmentDocument.objects.select_related(
+                    'booking',
+                    'shipment',
+                    'shipment__booking',
+                )
+                .prefetch_related('pod_pages')
+                .filter(pk=document_id)
+                .first()
+            )
+            if document is None:
+                messages.error(request, 'Shipment document not found.', extra_tags='tenant')
+                return _tenant_redirect(request, 'iroad_tenants:tenant_operation_shipment_documents_list')
+
+            shipment = document.shipment
+            booking = document.booking or (shipment.booking if shipment and shipment.booking_id else None)
+            booking_item = ''
+            if shipment and shipment.booking_item_ref:
+                booking_item = shipment.booking_item_ref
+
+            list_url = reverse('iroad_tenants:tenant_operation_shipment_documents_list')
+            edit_url = reverse(
+                'iroad_tenants:tenant_operation_shipment_documents_edit',
+                kwargs={'document_id': document.document_id},
+            )
+            download_url = reverse(
+                'iroad_tenants:tenant_operation_shipment_documents_download',
+                kwargs={'document_id': document.document_id},
+            )
+
+            context.update(
+                {
+                    'document': document,
+                    'booking': booking,
+                    'booking_item': booking_item,
+                    'line_rows': _tenant_shipment_document_detail_line_rows(document),
+                    'activity_log': _tenant_shipment_document_activity_entries(document),
+                    'back_to_list_url': list_url,
+                    'edit_document_url': edit_url,
+                    'download_document_url': download_url,
+                    'tenant_schema_name': tenant_registry.schema_name,
+                }
+            )
+            return render(request, self.template_name, context)
+        finally:
+            connection.set_schema_to_public()
+
+
 class TenantOperationShipmentDocumentsListView(View):
     template_name = 'iroad_tenants/Operation_management/Shipment_Document/Shipment-documents-list.html'
 

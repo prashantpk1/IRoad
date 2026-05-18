@@ -1,0 +1,362 @@
+{% extends 'iroad_tenants/base.html' %}
+
+{% block title %}{{ document.record_no }} | Shipment Document | iRoad{% endblock %}
+{% block breadcrumb %}{% endblock %}
+
+{% block extra_css %}
+<style>
+  .shipment-doc-detail-sidebar {
+    position: sticky;
+    top: 20px;
+    align-self: flex-start;
+  }
+  @media (max-width: 991.98px) {
+    .shipment-doc-detail-sidebar {
+      position: static;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="page-header">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{% url 'iroad_tenants:tenant_dashboard' %}">Dashboard</a></li>
+      <li class="breadcrumb-item">Operations</li>
+      <li class="breadcrumb-item">Operations Management</li>
+      <li class="breadcrumb-item">
+        <a href="{{ back_to_list_url }}">Shipment Documents List</a>
+      </li>
+      <li class="breadcrumb-item active" aria-current="page">Shipment Document Detail</li>
+    </ol>
+  </nav>
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">
+        Shipment Document Detail &mdash;
+        <span style="color: var(--primary-color)">{{ document.record_no }}</span>
+      </h1>
+      <p class="page-subtitle">Read-only shipment document review.</p>
+    </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <a href="{{ back_to_list_url }}" class="eal-btn eal-btn-outline">
+          <i class="bi bi-arrow-left"></i>
+          <span>Back to List</span>
+        </a>
+        <a href="{{ download_document_url }}" class="eal-btn eal-btn-outline">
+          <i class="bi bi-download"></i>
+          <span>Download</span>
+        </a>
+        <a href="{{ edit_document_url }}" class="eal-btn eal-btn-primary">
+          <i class="bi bi-pencil-square"></i>
+          <span>Edit</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Top: 8 / 4 -->
+<div class="row g-4">
+  <div class="col-lg-8">
+    <!-- Header Fields -->
+    <div class="form-card" data-section="1">
+      <div class="form-card-header">
+        <div class="form-card-icon blue">
+          <i class="bi bi-file-earmark-text"></i>
+        </div>
+        <div class="form-card-header-text">
+          <h2 class="form-card-title">Header Fields</h2>
+          <p class="form-card-desc">Primary document identification and properties.</p>
+        </div>
+      </div>
+      <div class="form-card-body">
+        <p class="small text-uppercase fw-semibold text-secondary mb-3" style="letter-spacing: 0.06em">
+          Document Identity
+        </p>
+        <div class="fields-grid cols-3">
+          <div class="field">
+            <label class="form-label">Record No</label>
+            <p class="detail-view-value"><span class="eal-entity-id">{{ document.record_no }}</span></p>
+          </div>
+          <div class="field">
+            <label class="form-label">Record Date</label>
+            <p class="detail-view-value">{{ document.record_date|date:"d M Y" }}</p>
+          </div>
+          <div class="field">
+            <label class="form-label">Sequence #</label>
+            <p class="detail-view-value">{{ document.record_sequence }}</p>
+          </div>
+        </div>
+
+        <p class="small text-uppercase fw-semibold text-secondary mb-3 mt-4" style="letter-spacing: 0.06em">
+          Booking &amp; Shipment
+        </p>
+        <div class="fields-grid cols-3">
+          <div class="field">
+            <label class="form-label">Booking No</label>
+            <p class="detail-view-value">
+              {% if booking %}{{ booking.booking_no }}{% else %}—{% endif %}
+            </p>
+          </div>
+          <div class="field">
+            <label class="form-label">Booking Item</label>
+            <p class="detail-view-value">{{ booking_item|default:"—" }}</p>
+          </div>
+          <div class="field">
+            <label class="form-label">Shipment</label>
+            <p class="detail-view-value">
+              {% if document.shipment %}{{ document.shipment.shipment_no }}{% else %}—{% endif %}
+            </p>
+          </div>
+        </div>
+
+        <p class="small text-uppercase fw-semibold text-secondary mb-3 mt-4" style="letter-spacing: 0.06em">
+          Document Details
+        </p>
+        <div class="fields-grid cols-3">
+          <div class="field">
+            <label class="form-label">Document Type</label>
+            <p class="detail-view-value">{{ document.document_type }}</p>
+          </div>
+          <div class="field">
+            <label class="form-label">Document Ref No</label>
+            <p class="detail-view-value">{{ document.document_ref_no }}</p>
+          </div>
+          <div class="field">
+            <label class="form-label">Document Date</label>
+            <p class="detail-view-value">{{ document.document_date|date:"d M Y" }}</p>
+          </div>
+        </div>
+
+        <p class="small text-uppercase fw-semibold text-secondary mb-3 mt-4" style="letter-spacing: 0.06em">
+          Status &amp; Location
+        </p>
+        <div class="fields-grid cols-3">
+          <div class="field">
+            <label class="form-label">Is Delivery Note</label>
+            <p class="detail-view-value">
+              {% if document.is_delivery_note %}
+              <span class="status-badge active">Yes</span>
+              {% else %}
+              <span class="status-badge pending">No</span>
+              {% endif %}
+            </p>
+          </div>
+          <div class="field">
+            <label class="form-label">Page Count</label>
+            <p class="detail-view-value">{{ document.page_count }}</p>
+          </div>
+          <div class="field">
+            <label class="form-label">Status</label>
+            <p class="detail-view-value">
+              {% if document.status == 'Verified' %}
+              <span class="status-badge active">{{ document.status }}</span>
+              {% elif document.status == 'Rejected' %}
+              <span class="status-badge inactive">{{ document.status }}</span>
+              {% elif document.status == 'Uploaded' %}
+              <span class="status-badge in-transit">{{ document.status }}</span>
+              {% else %}
+              <span class="status-badge pending">{{ document.status }}</span>
+              {% endif %}
+            </p>
+          </div>
+        </div>
+        <div class="fields-grid cols-2" style="margin-top: 20px">
+          <div class="field">
+            <label class="form-label">Physical Location</label>
+            <p class="detail-view-value">{{ document.physical_location|default:"—" }}</p>
+          </div>
+          <div class="field">
+            <label class="form-label">Notes</label>
+            <p class="detail-view-value mb-0" style="white-space: pre-wrap">{{ document.notes|default:"—" }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right sidebar -->
+  <div class="col-lg-4 shipment-doc-detail-sidebar">
+    <!-- Quick Summary -->
+    <div class="form-card">
+      <div class="form-card-header">
+        <div class="form-card-icon blue">
+          <i class="bi bi-info-circle"></i>
+        </div>
+        <div class="form-card-header-text">
+          <h2 class="form-card-title">Quick Summary</h2>
+        </div>
+      </div>
+      <div class="form-card-body">
+        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
+          <span class="detail-field-label">Record No.</span>
+          <span class="detail-field-value" style="font-weight: 600; color: var(--primary-color)">
+            {{ document.record_no }}
+          </span>
+        </div>
+        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
+          <span class="detail-field-label">Shipment Ref</span>
+          <span class="detail-field-value">
+            {% if document.shipment %}{{ document.shipment.shipment_no }}{% else %}—{% endif %}
+          </span>
+        </div>
+        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
+          <span class="detail-field-label">Document Type</span>
+          <span class="detail-field-value">{{ document.document_type }}</span>
+        </div>
+        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
+          <span class="detail-field-label">Status</span>
+          <span class="detail-field-value">
+            {% if document.status == 'Verified' %}
+            <span class="status-badge active">{{ document.status }}</span>
+            {% elif document.status == 'Rejected' %}
+            <span class="status-badge inactive">{{ document.status }}</span>
+            {% elif document.status == 'Uploaded' %}
+            <span class="status-badge in-transit">{{ document.status }}</span>
+            {% else %}
+            <span class="status-badge pending">{{ document.status }}</span>
+            {% endif %}
+          </span>
+        </div>
+        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
+          <span class="detail-field-label">Is Delivery Note?</span>
+          <span class="detail-field-value">
+            {% if document.is_delivery_note %}
+            <span class="status-badge active">Yes</span>
+            {% else %}
+            <span class="status-badge pending">No</span>
+            {% endif %}
+          </span>
+        </div>
+        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
+          <span class="detail-field-label">Document Ref No</span>
+          <span class="detail-field-value">{{ document.document_ref_no }}</span>
+        </div>
+        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
+          <span class="detail-field-label">Document Date</span>
+          <span class="detail-field-value">{{ document.document_date|date:"d M Y" }}</span>
+        </div>
+        <div class="detail-field" style="padding: 10px 0">
+          <span class="detail-field-label">Page Count</span>
+          <span class="detail-field-value">{{ document.page_count }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Activity Log -->
+    <div class="form-card">
+      <div class="form-card-header">
+        <div class="form-card-icon amber">
+          <i class="bi bi-clock-history"></i>
+        </div>
+        <div class="form-card-header-text">
+          <h2 class="form-card-title">Activity Log</h2>
+        </div>
+      </div>
+      <div class="form-card-body">
+        <div style="display: flex; flex-direction: column; gap: 16px">
+          {% for item in activity_log %}
+          <div style="display: flex; gap: 12px; align-items: flex-start">
+            <div
+              style="
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                background: {{ item.color }};
+                margin-top: 6px;
+                flex-shrink: 0;
+              "
+            ></div>
+            <div>
+              <div style="font-size: 13px; font-weight: 600; color: #333">{{ item.title }}</div>
+              <div style="font-size: 12px; color: #888">
+                {{ item.timestamp|date:"d M Y, g:i A" }} &mdash; {{ item.actor|default:"System" }}
+              </div>
+            </div>
+          </div>
+          {% empty %}
+          <div class="text-muted">No activity available.</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Bottom: full-width line table -->
+<div class="row g-4">
+  <div class="col-12">
+    <div class="form-card" data-section="2">
+      <div class="form-card-header">
+        <div class="form-card-icon amber">
+          <i class="bi bi-paperclip"></i>
+        </div>
+        <div class="form-card-header-text">
+          <h2 class="form-card-title">Subform Line Fields</h2>
+          <p class="form-card-desc">Line items detailing specific pages and attachments.</p>
+        </div>
+      </div>
+      <div class="form-card-body" style="padding: 0">
+        <div class="eal-table-wrap">
+          <table class="eal-table mb-0">
+            <thead>
+              <tr>
+                <th style="width: 60px">SN</th>
+                <th>Doc Ref No</th>
+                <th>Extra Ref</th>
+                <th>Page No</th>
+                {% if document.is_delivery_note %}<th>Status</th>{% endif %}
+                <th>Signer Location</th>
+                <th>Attachment</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in line_rows %}
+              <tr>
+                <td class="text-muted">{{ row.line_no }}</td>
+                <td>{{ row.doc_ref_no }}</td>
+                <td>{{ row.extra_ref }}</td>
+                <td>{{ row.page_no }}</td>
+                {% if document.is_delivery_note %}
+                <td>
+                  {% if row.status == 'Completed' %}
+                  <span class="status-badge active">{{ row.status }}</span>
+                  {% elif row.status == 'Not Completed' %}
+                  <span class="status-badge pending">{{ row.status }}</span>
+                  {% else %}
+                  {{ row.status }}
+                  {% endif %}
+                </td>
+                {% endif %}
+                <td>{{ row.signer_location }}</td>
+                <td>
+                  {% if row.attachment_url %}
+                  <a href="{{ row.attachment_url }}" target="_blank" rel="noopener" style="color: var(--primary-color)">
+                    <span class="status-badge in-transit"><i class="bi bi-paperclip"></i> {{ row.attachment_label|default:"View" }}</span>
+                  </a>
+                  {% elif row.attachment_label %}
+                  <span class="status-badge in-transit"><i class="bi bi-paperclip"></i> {{ row.attachment_label }}</span>
+                  {% else %}
+                  —
+                  {% endif %}
+                </td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="{% if document.is_delivery_note %}7{% else %}6{% endif %}" class="text-center text-muted py-4">
+                  No document page lines available.
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
