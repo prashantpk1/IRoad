@@ -21193,8 +21193,32 @@ class TenantLocationMasterDeleteView(View):
             connection.set_schema_to_public()
 
 
+def _tenant_location_master_activity_entries(location):
+    """Timeline entries for location detail sidebar (created / updated)."""
+    entries = []
+    created_at = getattr(location, 'created_at', None)
+    updated_at = getattr(location, 'updated_at', None)
+    if created_at and updated_at:
+        seconds_since_create = (updated_at - created_at).total_seconds()
+        if seconds_since_create >= 1:
+            entries.append({
+                'title': 'Updated',
+                'timestamp': updated_at,
+                'actor': 'System',
+                'color': '#28a745',
+            })
+    if created_at:
+        entries.append({
+            'title': 'Created',
+            'timestamp': created_at,
+            'actor': 'System',
+            'color': '#dc3545',
+        })
+    return entries
+
+
 class TenantLocationMasterDetailView(View):
-    template_name = 'iroad_tenants/Master_Data/location_master/Location-master.html'
+    template_name = 'iroad_tenants/Master_Data/location_master/Location-master-detail.html'
 
     def get(self, request, location_id):
         context = _tenant_context_from_session(request)
@@ -21222,16 +21246,19 @@ class TenantLocationMasterDetailView(View):
             if not location:
                 messages.error(request, 'Location not found.', extra_tags='tenant')
                 return _tenant_redirect(request, 'iroad_tenants:tenant_location_master_list')
+
+            list_url = reverse('iroad_tenants:tenant_location_master_list')
+            edit_url = reverse(
+                'iroad_tenants:tenant_location_master_edit',
+                kwargs={'location_id': location.location_id},
+            )
+
             context.update(
                 {
-                    'form': TenantLocationMasterForm(
-                        instance=location,
-                        allow_inactive_status=True,
-                    ),
                     'location': location,
-                    'preview_location_code': location.location_code,
-                    'is_edit': True,
-                    'is_view': True,
+                    'activity_log': _tenant_location_master_activity_entries(location),
+                    'back_to_list_url': list_url,
+                    'edit_location_url': edit_url,
                     'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
                 }
             )

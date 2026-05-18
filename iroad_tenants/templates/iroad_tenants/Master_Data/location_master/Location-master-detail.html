@@ -6,6 +6,7 @@
 {% block breadcrumb %}{% endblock %}
 
 {% block content %}
+<!-- Page Header -->
 <div class="page-header">
   <nav aria-label="breadcrumb">
     <ol class="breadcrumb">
@@ -14,50 +15,221 @@
       </li>
       <li class="breadcrumb-item">{% translate "Master Data" %}</li>
       <li class="breadcrumb-item">{% translate "Route Management" %}</li>
+      <li class="breadcrumb-item">
+        <a href="{{ back_to_list_url }}">{% translate "Location Master List" %}</a>
+      </li>
       <li class="breadcrumb-item active" aria-current="page">{% translate "Location Detail" %}</li>
     </ol>
   </nav>
   <div class="page-header-row">
     <div class="page-header-left">
-      <h1 class="page-title">{% translate "Location Detail" %}</h1>
-      <p class="page-subtitle">{{ location.location_code }} - {{ location.display_label }}</p>
+      <h1 class="page-title">
+        {% translate "Location Detail" %} &mdash;
+        <span style="color: var(--primary-color)">{{ location.location_code }}</span>
+      </h1>
+      <p class="page-subtitle">{{ location.display_label }}</p>
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
-        <a href="{% url 'iroad_tenants:tenant_location_master_edit' location.location_id %}" class="eal-btn eal-btn-outline">
-          <i class="bi bi-pencil"></i><span>{% translate "Edit" %}</span>
+        <a href="{{ back_to_list_url }}" class="eal-btn eal-btn-outline">
+          <i class="bi bi-arrow-left"></i>
+          <span>{% translate "Back to List" %}</span>
         </a>
-        <a href="{% url 'iroad_tenants:tenant_location_master_list' %}" class="eal-btn eal-btn-primary">
-          <i class="bi bi-arrow-left"></i><span>{% translate "Back to List" %}</span>
+        <a href="{{ edit_location_url }}" class="eal-btn eal-btn-primary">
+          <i class="bi bi-pencil-square"></i>
+          <span>{% translate "Edit" %}</span>
         </a>
       </div>
     </div>
   </div>
 </div>
 
-<div class="form-card">
-  <div class="form-card-header">
-    <div class="form-card-icon blue"><i class="bi bi-pin-map"></i></div>
-    <div class="form-card-header-text">
-      <h2 class="form-card-title">{% translate "Location Information" %}</h2>
-      <p class="form-card-desc">{% translate "Read-only location master details." %}</p>
+<!-- Details Content -->
+<div class="row g-4">
+  <!-- Left Column: Main Details -->
+  <div class="col-lg-8">
+    <!-- Region & Naming -->
+    <div class="form-card" data-section="1">
+      <div class="form-card-header">
+        <div class="form-card-icon blue">
+          <i class="bi bi-pin-map"></i>
+        </div>
+        <div class="form-card-header-text">
+          <h2 class="form-card-title">{% translate "Location Information" %}</h2>
+          <p class="form-card-desc">{% translate "Region, codes and display names for this location." %}</p>
+        </div>
+      </div>
+      <div class="form-card-body">
+        <p class="small text-uppercase fw-semibold text-secondary mb-3" style="letter-spacing: 0.06em">
+          {% translate "Identity & Region" %}
+        </p>
+        <div class="fields-grid cols-3">
+          <div class="field">
+            <label class="form-label">{% translate "Location Code" %}</label>
+            <p class="detail-view-value"><span class="eal-entity-id">{{ location.location_code }}</span></p>
+          </div>
+          <div class="field">
+            <label class="form-label">{% translate "Country" %}</label>
+            <p class="detail-view-value">{{ location.country.name_en }}</p>
+          </div>
+          <div class="field">
+            <label class="form-label">{% translate "Province" %}</label>
+            <p class="detail-view-value">{{ location.province|default:"—" }}</p>
+          </div>
+        </div>
+
+        <p class="small text-uppercase fw-semibold text-secondary mb-3 mt-4" style="letter-spacing: 0.06em">
+          {% translate "Naming" %}
+        </p>
+        <div class="fields-grid cols-3">
+          <div class="field">
+            <label class="form-label">{% translate "Location Name (Arabic)" %}</label>
+            <p class="detail-view-value eal-arabic" lang="ar" dir="rtl">{{ location.location_name_arabic|default:"—" }}</p>
+          </div>
+          <div class="field">
+            <label class="form-label">{% translate "Location Name (English)" %}</label>
+            <p class="detail-view-value">{{ location.location_name_english|default:"—" }}</p>
+          </div>
+          <div class="field">
+            <label class="form-label">{% translate "Display Label" %}</label>
+            <p class="detail-view-value">{{ location.display_label }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Classification & Status -->
+    <div class="form-card" data-section="2">
+      <div class="form-card-header">
+        <div class="form-card-icon amber">
+          <i class="bi bi-gear"></i>
+        </div>
+        <div class="form-card-header-text">
+          <h2 class="form-card-title">{% translate "Classification & Status" %}</h2>
+          <p class="form-card-desc">{% translate "Location type, operational status and serviceability." %}</p>
+        </div>
+      </div>
+      <div class="form-card-body">
+        <div class="pod-status-grid">
+          <div class="pod-status-tile">
+            <label class="form-label">{% translate "Location Type" %}</label>
+            <p class="detail-view-value">
+              <span class="eal-type-badge org">{{ location.location_type }}</span>
+            </p>
+          </div>
+          <div class="pod-status-tile">
+            <label class="form-label">{% translate "Status" %}</label>
+            <p class="detail-view-value">
+              {% if location.status == 'Active' %}
+              <span class="status-badge active">{% translate "Active" %}</span>
+              {% else %}
+              <span class="status-badge inactive">{% translate "Inactive" %}</span>
+              {% endif %}
+            </p>
+          </div>
+          <div class="pod-status-tile">
+            <label class="form-label">{% translate "Is Serviceable" %}</label>
+            <p class="detail-view-value">
+              {% if location.is_serviceable %}
+              <span class="status-badge active"><i class="bi bi-check-circle"></i> {% translate "Yes" %}</span>
+              {% else %}
+              <span class="status-badge pending">{% translate "No" %}</span>
+              {% endif %}
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
-  <div class="form-card-body">
-    <div class="fields-grid cols-3">
-      <div class="field"><label class="form-label">{% translate "Location Code" %}</label><div class="form-control">{{ location.location_code }}</div></div>
-      <div class="field"><label class="form-label">{% translate "Country" %}</label><div class="form-control">{{ location.country.name_en }}</div></div>
-      <div class="field"><label class="form-label">{% translate "Province" %}</label><div class="form-control">{{ location.province|default:"—" }}</div></div>
+
+  <!-- Right Column: Summary Sidebar -->
+  <div class="col-lg-4">
+    <!-- Quick Summary -->
+    <div class="form-card">
+      <div class="form-card-header">
+        <div class="form-card-icon blue">
+          <i class="bi bi-info-circle"></i>
+        </div>
+        <div class="form-card-header-text">
+          <h2 class="form-card-title">{% translate "Quick Summary" %}</h2>
+        </div>
+      </div>
+      <div class="form-card-body">
+        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
+          <span class="detail-field-label">{% translate "Location Code" %}</span>
+          <span class="detail-field-value" style="font-weight: 600; color: var(--primary-color)">{{ location.location_code }}</span>
+        </div>
+        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
+          <span class="detail-field-label">{% translate "Display Label" %}</span>
+          <span class="detail-field-value">{{ location.display_label }}</span>
+        </div>
+        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
+          <span class="detail-field-label">{% translate "Country" %}</span>
+          <span class="detail-field-value">{{ location.country.name_en }}</span>
+        </div>
+        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
+          <span class="detail-field-label">{% translate "Location Type" %}</span>
+          <span class="detail-field-value">{{ location.location_type }}</span>
+        </div>
+        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
+          <span class="detail-field-label">{% translate "Status" %}</span>
+          <span class="detail-field-value">
+            {% if location.status == 'Active' %}
+            <span class="status-badge active">{% translate "Active" %}</span>
+            {% else %}
+            <span class="status-badge inactive">{% translate "Inactive" %}</span>
+            {% endif %}
+          </span>
+        </div>
+        <div class="detail-field" style="padding: 10px 0">
+          <span class="detail-field-label">{% translate "Is Serviceable" %}</span>
+          <span class="detail-field-value">
+            {% if location.is_serviceable %}
+            <span class="status-badge active">{% translate "Yes" %}</span>
+            {% else %}
+            <span class="status-badge pending">{% translate "No" %}</span>
+            {% endif %}
+          </span>
+        </div>
+      </div>
     </div>
-    <div class="fields-grid cols-3 mt-3">
-      <div class="field"><label class="form-label">{% translate "Location Name (Arabic)" %}</label><div class="form-control">{{ location.location_name_arabic|default:"—" }}</div></div>
-      <div class="field"><label class="form-label">{% translate "Location Name (English)" %}</label><div class="form-control">{{ location.location_name_english|default:"—" }}</div></div>
-      <div class="field"><label class="form-label">{% translate "Display Label" %}</label><div class="form-control">{{ location.display_label }}</div></div>
-    </div>
-    <div class="fields-grid cols-3 mt-3">
-      <div class="field"><label class="form-label">{% translate "Location Type" %}</label><div class="form-control">{{ location.location_type }}</div></div>
-      <div class="field"><label class="form-label">{% translate "Status" %}</label><div class="form-control">{{ location.status }}</div></div>
-      <div class="field"><label class="form-label">{% translate "Is Serviceable" %}</label><div class="form-control">{% if location.is_serviceable %}{% translate "Yes" %}{% else %}{% translate "No" %}{% endif %}</div></div>
+
+    <!-- Activity Log -->
+    <div class="form-card">
+      <div class="form-card-header">
+        <div class="form-card-icon amber">
+          <i class="bi bi-clock-history"></i>
+        </div>
+        <div class="form-card-header-text">
+          <h2 class="form-card-title">{% translate "Activity Log" %}</h2>
+        </div>
+      </div>
+      <div class="form-card-body">
+        <div style="display: flex; flex-direction: column; gap: 16px">
+          {% for item in activity_log %}
+          <div style="display: flex; gap: 12px; align-items: flex-start">
+            <div
+              style="
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                background: {{ item.color }};
+                margin-top: 6px;
+                flex-shrink: 0;
+              "
+            ></div>
+            <div>
+              <div style="font-size: 13px; font-weight: 600; color: #333">{{ item.title }}</div>
+              <div style="font-size: 12px; color: #888">
+                {{ item.timestamp|date:"d M Y, g:i A" }} &mdash; {{ item.actor|default:"System" }}
+              </div>
+            </div>
+          </div>
+          {% empty %}
+          <div class="text-muted">{% translate "No activity available." %}</div>
+          {% endfor %}
+        </div>
+      </div>
     </div>
   </div>
 </div>
