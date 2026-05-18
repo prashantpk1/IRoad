@@ -1,287 +1,508 @@
 {% extends 'iroad_tenants/base.html' %}
 
-{% block title %}{{ booking.booking_no }} | Booking{% endblock %}
+{% block title %}{{ booking.booking_no }} | Booking | iRoad{% endblock %}
+{% block breadcrumb %}{% endblock %}
+
+{% block extra_css %}
+<style>
+  .booking-detail-sidebar {
+    position: sticky;
+    top: 20px;
+    align-self: flex-start;
+  }
+  @media (max-width: 991.98px) {
+    .booking-detail-sidebar {
+      position: static;
+    }
+  }
+</style>
+{% endblock %}
 
 {% block content %}
+<!-- Page Header -->
 <div class="page-header">
   <nav aria-label="breadcrumb">
     <ol class="breadcrumb">
       <li class="breadcrumb-item"><a href="{% url 'iroad_tenants:tenant_dashboard' %}">Dashboard</a></li>
       <li class="breadcrumb-item">Operations</li>
       <li class="breadcrumb-item">Operations Management</li>
-      <li class="breadcrumb-item"><a href="{% url 'iroad_tenants:tenant_operation_booking_list' %}">Booking List</a></li>
-      <li class="breadcrumb-item active" aria-current="page">{{ booking.booking_no }}</li>
+      <li class="breadcrumb-item">
+        <a href="{{ back_to_list_url }}">Booking List</a>
+      </li>
+      <li class="breadcrumb-item active" aria-current="page">Booking Detail</li>
     </ol>
   </nav>
   <div class="page-header-row">
     <div class="page-header-left">
-      <h1 class="page-title">Booking Detail</h1>
-      <p class="page-subtitle">{{ booking.booking_no }} - Read-only booking review.</p>
+      <h1 class="page-title">
+        Booking Detail &mdash;
+        <span style="color: var(--primary-color)">{{ booking.booking_no }}</span>
+      </h1>
+      <p class="page-subtitle">Read-only booking review.</p>
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
-        <a href="{% url 'iroad_tenants:tenant_operation_booking_create' %}" class="eal-btn eal-btn-primary">
-          <i class="bi bi-plus-lg"></i><span>Add Booking</span>
+        <a href="{{ back_to_list_url }}" class="eal-btn eal-btn-outline">
+          <i class="bi bi-arrow-left"></i>
+          <span>Back to List</span>
         </a>
-        <a href="{% url 'iroad_tenants:tenant_operation_booking_edit' booking.booking_id %}" class="eal-btn eal-btn-outline">
-          <i class="bi bi-pencil"></i><span>Edit</span>
+        <a href="{{ assign_truck_url }}" class="eal-btn eal-btn-outline">
+          <i class="bi bi-truck"></i>
+          <span>Assign Truck</span>
         </a>
-        <a href="{% url 'iroad_tenants:tenant_operation_booking_assign_truck' booking.booking_id %}" class="eal-btn eal-btn-outline">
-          <i class="bi bi-truck"></i><span>Assign Truck</span>
-        </a>
-        <a href="{% url 'iroad_tenants:tenant_operation_booking_list' %}" class="eal-btn eal-btn-outline">
-          <i class="bi bi-arrow-left"></i><span>Back</span>
+        <a href="{{ edit_booking_url }}" class="eal-btn eal-btn-primary">
+          <i class="bi bi-pencil-square"></i>
+          <span>Edit</span>
         </a>
       </div>
     </div>
   </div>
 </div>
 
-<div class="form-card">
-  <div class="form-card-header">
-    <div class="form-card-icon blue"><i class="bi bi-info-circle"></i></div>
-    <div class="form-card-header-text">
-      <h2 class="form-card-title">Booking Information</h2>
+<!-- Top: 8 / 4 -->
+<div class="row g-4">
+  <!-- Left: Booking, Service, Truck -->
+  <div class="col-lg-8">
+    <!-- Booking Information -->
+    <div class="form-card" data-section="1">
+      <div class="form-card-header">
+        <div class="form-card-icon blue">
+          <i class="bi bi-info-circle"></i>
+        </div>
+        <div class="form-card-header-text">
+          <h2 class="form-card-title">Booking Information</h2>
+          <p class="form-card-desc">Booking identity, dates, status, and POD summary.</p>
+        </div>
+      </div>
+      <div class="form-card-body">
+        <p class="small text-uppercase fw-semibold text-secondary mb-3" style="letter-spacing: 0.06em">
+          Identity &amp; Dates
+        </p>
+        <div class="fields-grid cols-3">
+          <div class="field">
+            <label class="form-label">Booking No.</label>
+            <p class="detail-view-value"><span class="eal-entity-id">{{ booking.booking_no }}</span></p>
+          </div>
+          <div class="field">
+            <label class="form-label">Creation Date</label>
+            <p class="detail-view-value">{{ booking.creation_date|date:"d M Y" }}</p>
+          </div>
+          <div class="field">
+            <label class="form-label">Booking Date</label>
+            <p class="detail-view-value">{{ booking.booking_date|date:"d M Y" }}</p>
+          </div>
+        </div>
+        <p class="small text-uppercase fw-semibold text-secondary mb-3 mt-4" style="letter-spacing: 0.06em">
+          Execution &amp; Status
+        </p>
+        <div class="fields-grid cols-3">
+          <div class="field">
+            <label class="form-label">Execution Date</label>
+            <p class="detail-view-value">{{ booking.execution_date|date:"d M Y"|default:"—" }}</p>
+          </div>
+          <div class="field">
+            <label class="form-label">Booking Status</label>
+            <p class="detail-view-value">
+              {% if booking.booking_status == 'Confirmed' %}
+              <span class="status-badge active">{{ booking.booking_status }}</span>
+              {% elif booking.booking_status == 'Cancelled' %}
+              <span class="status-badge inactive">{{ booking.booking_status }}</span>
+              {% else %}
+              <span class="status-badge pending">{{ booking.booking_status|default:"Draft" }}</span>
+              {% endif %}
+            </p>
+          </div>
+          <div class="field">
+            <label class="form-label">Sourcing Mode</label>
+            <p class="detail-view-value">{{ booking.sourcing_mode|default:"—" }}</p>
+          </div>
+        </div>
+        <p class="small text-uppercase fw-semibold text-secondary mb-3 mt-4" style="letter-spacing: 0.06em">
+          POD
+        </p>
+        <div class="fields-grid cols-2">
+          <div class="field">
+            <label class="form-label">POD Type</label>
+            <p class="detail-view-value">{{ booking.pod_type|default:"—" }}</p>
+          </div>
+          <div class="field">
+            <label class="form-label">POD Status</label>
+            <p class="detail-view-value">
+              {% if booking.pod_status == 'Compliant' %}
+              <span class="status-badge active">{{ booking.pod_status }}</span>
+              {% elif booking.pod_status %}
+              <span class="status-badge pending">{{ booking.pod_status }}</span>
+              {% else %}
+              —
+              {% endif %}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Service Details -->
+    <div class="form-card" data-section="2">
+      <div class="form-card-header">
+        <div class="form-card-icon amber">
+          <i class="bi bi-cart-check"></i>
+        </div>
+        <div class="form-card-header-text">
+          <h2 class="form-card-title">Service Details</h2>
+          <p class="form-card-desc">Client, pricing, route, and commercial details.</p>
+        </div>
+      </div>
+      <div class="form-card-body">
+        <p class="small text-uppercase fw-semibold text-secondary mb-3" style="letter-spacing: 0.06em">
+          Client &amp; Pricing
+        </p>
+        <div class="fields-grid cols-3">
+          <div class="field">
+            <label class="form-label">Client Account</label>
+            <p class="detail-view-value">
+              {{ booking.client_account.account_no }} &mdash; {{ booking.client_account.display_name }}
+            </p>
+          </div>
+          <div class="field">
+            <label class="form-label">Price List</label>
+            <p class="detail-view-value">
+              {% if booking.price_list %}
+              {{ booking.price_list.price_list_code }} &mdash; {{ booking.price_list.price_list_name }}
+              {% else %}
+              —
+              {% endif %}
+            </p>
+          </div>
+          <div class="field">
+            <label class="form-label">Service</label>
+            <p class="detail-view-value">
+              {% if booking.service_item %}
+              {{ booking.service_item.service_code }} &mdash; {{ booking.service_item.english_name }}
+              {% else %}
+              —
+              {% endif %}
+            </p>
+          </div>
+        </div>
+        <p class="small text-uppercase fw-semibold text-secondary mb-3 mt-4" style="letter-spacing: 0.06em">
+          Route &amp; Trip
+        </p>
+        <div class="fields-grid cols-3">
+          <div class="field">
+            <label class="form-label">Route</label>
+            <p class="detail-view-value">{{ booking.route_display|default:"—" }}</p>
+          </div>
+          <div class="field">
+            <label class="form-label">Order Type</label>
+            <p class="detail-view-value">{{ booking.order_type|default:"—" }}</p>
+          </div>
+          <div class="field">
+            <label class="form-label">Trip Type</label>
+            <p class="detail-view-value">{{ booking.trip_type|default:"—" }}</p>
+          </div>
+        </div>
+        <p class="small text-uppercase fw-semibold text-secondary mb-3 mt-4" style="letter-spacing: 0.06em">
+          Commercial
+        </p>
+        <div class="fields-grid cols-3">
+          <div class="field">
+            <label class="form-label">Sell Price</label>
+            <p class="detail-view-value">{{ booking.sell_price|floatformat:2 }}</p>
+          </div>
+          <div class="field">
+            <label class="form-label">Sales Report</label>
+            <p class="detail-view-value">—</p>
+          </div>
+          <div class="field">
+            <label class="form-label">Sales Report Status</label>
+            <p class="detail-view-value">—</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Truck & Driver -->
+    <div class="form-card" data-section="3">
+      <div class="form-card-header">
+        <div class="form-card-icon amber">
+          <i class="bi bi-truck"></i>
+        </div>
+        <div class="form-card-header-text">
+          <h2 class="form-card-title">Truck &amp; Driver</h2>
+          <p class="form-card-desc">Primary truck and driver assignment for this booking.</p>
+        </div>
+      </div>
+      <div class="form-card-body">
+        <div class="fields-grid cols-2">
+          <div class="field">
+            <label class="form-label">Truck No.</label>
+            <p class="detail-view-value">
+              {% if booking.assigned_truck %}{{ booking.assigned_truck.truck_code }}{% else %}—{% endif %}
+            </p>
+          </div>
+          <div class="field">
+            <label class="form-label">Driver</label>
+            <p class="detail-view-value">
+              {% if booking.assigned_driver %}{{ booking.assigned_driver }}{% else %}—{% endif %}
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
-  <div class="form-card-body">
-    <div class="fields-grid cols-3">
-      <div class="field">
-        <label class="form-label">Booking No.</label>
-        <input class="form-control" value="{{ booking.booking_no }}" readonly />
+
+  <!-- Right: Summary sidebar -->
+  <div class="col-lg-4 booking-detail-sidebar">
+    <!-- Quick Summary -->
+    <div class="form-card">
+      <div class="form-card-header">
+        <div class="form-card-icon blue">
+          <i class="bi bi-info-circle"></i>
+        </div>
+        <div class="form-card-header-text">
+          <h2 class="form-card-title">Quick Summary</h2>
+        </div>
       </div>
-      <div class="field">
-        <label class="form-label">Creation Date</label>
-        <input class="form-control" value="{{ booking.creation_date|date:'d M Y' }}" readonly />
-      </div>
-      <div class="field">
-        <label class="form-label">Booking Date</label>
-        <input class="form-control" value="{{ booking.booking_date|date:'d M Y' }}" readonly />
+      <div class="form-card-body">
+        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
+          <span class="detail-field-label">Booking No.</span>
+          <span class="detail-field-value" style="font-weight: 600; color: var(--primary-color)">
+            {{ booking.booking_no }}
+          </span>
+        </div>
+        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
+          <span class="detail-field-label">Client</span>
+          <span class="detail-field-value">{{ booking.client_account.display_name }}</span>
+        </div>
+        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
+          <span class="detail-field-label">Booking Status</span>
+          <span class="detail-field-value">
+            {% if booking.booking_status == 'Confirmed' %}
+            <span class="status-badge active">{{ booking.booking_status }}</span>
+            {% elif booking.booking_status == 'Cancelled' %}
+            <span class="status-badge inactive">{{ booking.booking_status }}</span>
+            {% else %}
+            <span class="status-badge pending">{{ booking.booking_status|default:"Draft" }}</span>
+            {% endif %}
+          </span>
+        </div>
+        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
+          <span class="detail-field-label">Execution Date</span>
+          <span class="detail-field-value">{{ booking.execution_date|date:"d M Y"|default:"—" }}</span>
+        </div>
+        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
+          <span class="detail-field-label">Trip Type</span>
+          <span class="detail-field-value">{{ booking.trip_type|default:"—" }}</span>
+        </div>
+        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
+          <span class="detail-field-label">Sell Price</span>
+          <span class="detail-field-value">{{ booking.sell_price|floatformat:2 }}</span>
+        </div>
+        <div class="detail-field" style="padding: 10px 0">
+          <span class="detail-field-label">POD Status</span>
+          <span class="detail-field-value">
+            {% if booking.pod_status == 'Compliant' %}
+            <span class="status-badge active">{{ booking.pod_status }}</span>
+            {% elif booking.pod_status %}
+            <span class="status-badge pending">{{ booking.pod_status }}</span>
+            {% else %}
+            —
+            {% endif %}
+          </span>
+        </div>
       </div>
     </div>
-    <div class="fields-grid cols-3 mt-3">
-      <div class="field">
-        <label class="form-label">Execution Date</label>
-        <input class="form-control" value="{{ booking.execution_date|date:'d M Y'|default:'-' }}" readonly />
+
+    <!-- Activity Log -->
+    <div class="form-card">
+      <div class="form-card-header">
+        <div class="form-card-icon amber">
+          <i class="bi bi-clock-history"></i>
+        </div>
+        <div class="form-card-header-text">
+          <h2 class="form-card-title">Activity Log</h2>
+        </div>
       </div>
-      <div class="field">
-        <label class="form-label">Booking Status</label>
-        <input class="form-control" value="{{ booking.booking_status|default:'-' }}" readonly />
-      </div>
-      <div class="field">
-        <label class="form-label">Sourcing Mode</label>
-        <input class="form-control" value="{{ booking.sourcing_mode|default:'-' }}" readonly />
+      <div class="form-card-body">
+        <div style="display: flex; flex-direction: column; gap: 16px">
+          {% for item in activity_log %}
+          <div style="display: flex; gap: 12px; align-items: flex-start">
+            <div
+              style="
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                background: {{ item.color }};
+                margin-top: 6px;
+                flex-shrink: 0;
+              "
+            ></div>
+            <div>
+              <div style="font-size: 13px; font-weight: 600; color: #333">{{ item.title }}</div>
+              <div style="font-size: 12px; color: #888">
+                {{ item.timestamp|date:"d M Y, g:i A" }} &mdash; {{ item.actor|default:"System" }}
+              </div>
+            </div>
+          </div>
+          {% empty %}
+          <div class="text-muted">No activity available.</div>
+          {% endfor %}
+        </div>
       </div>
     </div>
-    <div class="fields-grid cols-2 mt-3">
-      <div class="field">
-        <label class="form-label">POD Type</label>
-        <input class="form-control" value="{{ booking.pod_type|default:'-' }}" readonly />
+
+    <!-- Additional Information -->
+    <div class="form-card" data-section="4">
+      <div class="form-card-header">
+        <div class="form-card-icon amber">
+          <i class="bi bi-journal-text"></i>
+        </div>
+        <div class="form-card-header-text">
+          <h2 class="form-card-title">Additional Information</h2>
+        </div>
       </div>
-      <div class="field">
-        <label class="form-label">POD Status</label>
-        <input class="form-control" value="{{ booking.pod_status|default:'-' }}" readonly />
+      <div class="form-card-body">
+        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
+          <span class="detail-field-label">Container No</span>
+          <span class="detail-field-value">{{ booking.container_no|default:"—" }}</span>
+        </div>
+        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
+          <span class="detail-field-label">Attachment</span>
+          <span class="detail-field-value">
+            {% if booking.booking_attachment %}
+            <a href="{{ booking.booking_attachment.url }}" target="_blank" rel="noopener" style="color: var(--primary-color)">
+              <i class="bi bi-paperclip"></i> View
+            </a>
+            {% else %}
+            —
+            {% endif %}
+          </span>
+        </div>
+        <div class="detail-field" style="padding: 10px 0">
+          <span class="detail-field-label">Booking Instructions</span>
+          <span class="detail-field-value" style="white-space: pre-wrap">{{ booking.booking_instructions|default:"—" }}</span>
+        </div>
       </div>
     </div>
   </div>
 </div>
 
-<div class="form-card">
-  <div class="form-card-header">
-    <div class="form-card-icon amber"><i class="bi bi-cart-check"></i></div>
-    <div class="form-card-header-text">
-      <h2 class="form-card-title">Service Details</h2>
+<!-- Bottom: full-width tables -->
+<div class="row g-4">
+  <div class="col-12">
+    <!-- Booking Lines -->
+    <div class="form-card" data-section="5">
+      <div class="form-card-header">
+        <div class="form-card-icon blue">
+          <i class="bi bi-list-ul"></i>
+        </div>
+        <div class="form-card-header-text">
+          <h2 class="form-card-title">Booking Lines</h2>
+          <p class="form-card-desc">Outbound and backload lines with assignment and POD counts.</p>
+        </div>
+      </div>
+      <div class="form-card-body" style="padding: 0">
+        <div class="eal-table-wrap">
+          <table class="eal-table mb-0">
+            <thead>
+              <tr>
+                <th style="width: 60px">SN</th>
+                <th>Code</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Route</th>
+                <th>Truck</th>
+                <th>Driver</th>
+                <th>COD Amount</th>
+                <th>POD Doc Count</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for line in booking_lines %}
+              <tr>
+                <td class="text-muted">{{ line.sn }}</td>
+                <td>{{ line.code }}</td>
+                <td>{{ line.type }}</td>
+                <td>
+                  {% if line.status == 'POD Complete' or line.status == 'Closed' or line.status == 'Delivered' %}
+                  <span class="status-badge active">{{ line.status }}</span>
+                  {% elif line.status == 'In Transit' or line.status == 'Shipment Created' %}
+                  <span class="status-badge in-transit">{{ line.status }}</span>
+                  {% elif line.status == 'Cancelled' %}
+                  <span class="status-badge inactive">{{ line.status }}</span>
+                  {% else %}
+                  <span class="status-badge pending">{{ line.status }}</span>
+                  {% endif %}
+                </td>
+                <td>{{ line.route|default:"—" }}</td>
+                <td>{{ line.truck }}</td>
+                <td>{{ line.driver }}</td>
+                <td>{{ line.cod_amount|floatformat:2 }}</td>
+                <td>{{ line.pod_doc_count }}</td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="9" class="text-center text-muted py-4">No booking lines available.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
-  </div>
-  <div class="form-card-body">
-    <div class="fields-grid cols-3">
-      <div class="field">
-        <label class="form-label">Client Account</label>
-        <input class="form-control" value="{{ booking.client_account.account_no }} - {{ booking.client_account.display_name }}" readonly />
-      </div>
-      <div class="field">
-        <label class="form-label">Price List</label>
-        <input class="form-control" value="{% if booking.price_list %}{{ booking.price_list.price_list_code }} - {{ booking.price_list.price_list_name }}{% else %}-{% endif %}" readonly />
-      </div>
-      <div class="field">
-        <label class="form-label">Service</label>
-        <input class="form-control" value="{% if booking.service_item %}{{ booking.service_item.service_code }} - {{ booking.service_item.english_name }}{% else %}-{% endif %}" readonly />
-      </div>
-    </div>
-    <div class="fields-grid cols-3 mt-3">
-      <div class="field">
-        <label class="form-label">Route</label>
-        <input class="form-control" value="{{ booking.route_display|default:'-' }}" readonly />
-      </div>
-      <div class="field">
-        <label class="form-label">Order Type</label>
-        <input class="form-control" value="{{ booking.order_type|default:'-' }}" readonly />
-      </div>
-      <div class="field">
-        <label class="form-label">Trip Type</label>
-        <input class="form-control" value="{{ booking.trip_type|default:'-' }}" readonly />
-      </div>
-    </div>
-    <div class="fields-grid cols-3 mt-3">
-      <div class="field">
-        <label class="form-label">Sell Price</label>
-        <input class="form-control" value="{{ booking.sell_price|floatformat:2 }}" readonly />
-      </div>
-      <div class="field">
-        <label class="form-label">Sales Report</label>
-        <input class="form-control" value="-" readonly />
-      </div>
-      <div class="field">
-        <label class="form-label">Sales Report Status</label>
-        <input class="form-control" value="-" readonly />
-      </div>
-    </div>
-  </div>
-</div>
 
-<div class="form-card">
-  <div class="form-card-header">
-    <div class="form-card-icon blue"><i class="bi bi-list-ul"></i></div>
-    <div class="form-card-header-text">
-      <h2 class="form-card-title">Booking Lines</h2>
-    </div>
-  </div>
-  <div class="form-card-body">
-    <div class="eal-table-card">
-      <div class="eal-table-wrap">
-        <table class="eal-table">
-          <thead>
-            <tr>
-              <th>SN</th>
-              <th>Code</th>
-              <th>Type</th>
-              <th>Status</th>
-              <th>Route</th>
-              <th>Truck</th>
-              <th>Driver</th>
-              <th>COD Amount</th>
-              <th>POD Doc Count</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for line in booking_lines %}
-            <tr>
-              <td>{{ line.sn }}</td>
-              <td>{{ line.code }}</td>
-              <td>{{ line.type }}</td>
-              <td><span class="status-badge status-active">{{ line.status }}</span></td>
-              <td>{{ line.route|default:'-' }}</td>
-              <td>{{ line.truck }}</td>
-              <td>{{ line.driver }}</td>
-              <td>{{ line.cod_amount }}</td>
-              <td>{{ line.pod_doc_count }}</td>
-            </tr>
-            {% empty %}
-            <tr>
-              <td colspan="9" class="text-center text-muted py-3">No booking lines available.</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+    <!-- Cargo -->
+    <div class="form-card" data-section="6">
+      <div class="form-card-header">
+        <div class="form-card-icon red">
+          <i class="bi bi-box-seam"></i>
+        </div>
+        <div class="form-card-header-text">
+          <h2 class="form-card-title">Cargo</h2>
+          <p class="form-card-desc">Cargo item, weight, quantity, and totals.</p>
+        </div>
       </div>
-    </div>
-  </div>
-</div>
-
-<div class="form-card">
-  <div class="form-card-header">
-    <div class="form-card-icon red"><i class="bi bi-box-seam"></i></div>
-    <div class="form-card-header-text">
-      <h2 class="form-card-title">Cargo</h2>
-    </div>
-  </div>
-  <div class="form-card-body">
-    <div class="eal-table-card">
-      <div class="eal-table-wrap">
-        <table class="eal-table">
-          <thead>
-            <tr>
-              <th>SN</th>
-              <th>Booking Item</th>
-              <th>Cargo</th>
-              <th>Weight (Ton)</th>
-              <th>Unit</th>
-              <th>QTY</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>1</td>
-              <td>{{ booking.cargo_booking_item|default:'-' }}</td>
-              <td>{% if booking.cargo %}{{ booking.cargo.cargo_code }} - {{ booking.cargo.display_name }}{% else %}-{% endif %}</td>
-              <td>{{ booking.cargo_weight|floatformat:2 }}</td>
-              <td>{{ booking.cargo_unit|default:'-' }}</td>
-              <td>{{ booking.cargo_qty|floatformat:2 }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-    <div class="fields-grid cols-2 mt-3">
-      <div class="field">
-        <label class="form-label">Total Cargo Unit QTY</label>
-        <input class="form-control" value="{{ booking.total_cargo_qty|floatformat:2 }}" readonly />
-      </div>
-      <div class="field">
-        <label class="form-label">Total Cargo Weight</label>
-        <input class="form-control" value="{{ booking.total_cargo_weight|floatformat:2 }}" readonly />
-      </div>
-    </div>
-  </div>
-</div>
-
-<div class="form-card">
-  <div class="form-card-header">
-    <div class="form-card-icon amber"><i class="bi bi-truck"></i></div>
-    <div class="form-card-header-text">
-      <h2 class="form-card-title">Truck &amp; Driver</h2>
-    </div>
-  </div>
-  <div class="form-card-body">
-    <div class="fields-grid cols-2">
-      <div class="field">
-        <label class="form-label">Truck No.</label>
-        <input class="form-control" value="{% if booking.assigned_truck %}{{ booking.assigned_truck.truck_code }}{% else %}-{% endif %}" readonly />
-      </div>
-      <div class="field">
-        <label class="form-label">Driver</label>
-        <input class="form-control" value="{% if booking.assigned_driver %}{{ booking.assigned_driver }}{% else %}-{% endif %}" readonly />
-      </div>
-    </div>
-  </div>
-</div>
-
-<div class="form-card">
-  <div class="form-card-header">
-    <div class="form-card-icon amber"><i class="bi bi-journal-text"></i></div>
-    <div class="form-card-header-text">
-      <h2 class="form-card-title">Additional Information</h2>
-    </div>
-  </div>
-  <div class="form-card-body">
-    <div class="fields-grid cols-2">
-      <div class="field">
-        <label class="form-label">Container No</label>
-        <input class="form-control" value="{{ booking.container_no|default:'-' }}" readonly />
-      </div>
-      <div class="field">
-        <label class="form-label">Attachment</label>
-        {% if booking.booking_attachment %}
-        <a class="form-control" href="{{ booking.booking_attachment.url }}" target="_blank" rel="noopener">{{ booking.booking_attachment.name }}</a>
-        {% else %}
-        <input class="form-control" value="-" readonly />
-        {% endif %}
-      </div>
-    </div>
-    <div class="fields-grid cols-1 mt-3">
-      <div class="field">
-        <label class="form-label">Booking Instructions</label>
-        <textarea class="form-control" rows="4" readonly>{{ booking.booking_instructions|default:'' }}</textarea>
+      <div class="form-card-body">
+        <div class="eal-table-wrap" style="box-shadow: none; border-radius: 0">
+          <table class="eal-table mb-0">
+            <thead>
+              <tr>
+                <th style="width: 60px">SN</th>
+                <th>Booking Item</th>
+                <th>Cargo</th>
+                <th>Weight (Ton)</th>
+                <th>Unit</th>
+                <th>QTY</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="text-muted">1</td>
+                <td>{{ booking.cargo_booking_item|default:"—" }}</td>
+                <td>
+                  {% if booking.cargo %}
+                  {{ booking.cargo.cargo_code }} &mdash; {{ booking.cargo.display_name }}
+                  {% else %}
+                  —
+                  {% endif %}
+                </td>
+                <td>{{ booking.cargo_weight|floatformat:2 }}</td>
+                <td>{{ booking.cargo_unit|default:"—" }}</td>
+                <td>{{ booking.cargo_qty|floatformat:2 }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="fields-grid cols-2" style="margin-top: 20px">
+          <div class="field">
+            <label class="form-label">Total Cargo Unit QTY</label>
+            <p class="detail-view-value">{{ booking.total_cargo_qty|floatformat:2 }}</p>
+          </div>
+          <div class="field">
+            <label class="form-label">Total Cargo Weight</label>
+            <p class="detail-view-value">{{ booking.total_cargo_weight|floatformat:2 }}</p>
+          </div>
+        </div>
       </div>
     </div>
   </div>

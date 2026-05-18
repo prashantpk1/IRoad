@@ -8493,8 +8493,32 @@ class TenantOperationBookingListView(View):
             connection.set_schema_to_public()
 
 
+def _tenant_booking_activity_entries(booking):
+    """Timeline entries for booking detail sidebar (created / updated)."""
+    entries = []
+    created_at = getattr(booking, 'created_at', None)
+    updated_at = getattr(booking, 'updated_at', None)
+    if created_at and updated_at:
+        seconds_since_create = (updated_at - created_at).total_seconds()
+        if seconds_since_create >= 1:
+            entries.append({
+                'title': 'Updated',
+                'timestamp': updated_at,
+                'actor': booking.created_by_label or 'System',
+                'color': '#28a745',
+            })
+    if created_at:
+        entries.append({
+            'title': 'Created',
+            'timestamp': created_at,
+            'actor': booking.created_by_label or 'System',
+            'color': '#dc3545',
+        })
+    return entries
+
+
 class TenantOperationBookingDetailView(View):
-    """Render a full-page booking detail view."""
+    """Render a full-page booking detail view (enterprise layout)."""
 
     template_name = 'iroad_tenants/Operation_management/Booking/Booking-detail.html'
 
@@ -8578,10 +8602,24 @@ class TenantOperationBookingDetailView(View):
                         }
                     )
 
+            list_url = reverse('iroad_tenants:tenant_operation_booking_list')
+            edit_url = reverse(
+                'iroad_tenants:tenant_operation_booking_edit',
+                kwargs={'booking_id': booking.booking_id},
+            )
+            assign_truck_url = reverse(
+                'iroad_tenants:tenant_operation_booking_assign_truck',
+                kwargs={'booking_id': booking.booking_id},
+            )
+
             context.update(
                 {
                     'booking': booking,
                     'booking_lines': booking_lines,
+                    'activity_log': _tenant_booking_activity_entries(booking),
+                    'back_to_list_url': list_url,
+                    'edit_booking_url': edit_url,
+                    'assign_truck_url': assign_truck_url,
                     'tenant_schema_name': tenant_registry.schema_name,
                 }
             )
