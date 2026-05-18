@@ -1,0 +1,253 @@
+{% extends 'iroad_tenants/base.html' %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}{% translate "Route Detail" %} | iRoad{% endblock %}
+{% block breadcrumb %}{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="page-header">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item">
+        <a href="{% url 'iroad_tenants:tenant_dashboard' %}">{% translate "Dashboard" %}</a>
+      </li>
+      <li class="breadcrumb-item">{% translate "Master Data" %}</li>
+      <li class="breadcrumb-item">{% translate "Route Management" %}</li>
+      <li class="breadcrumb-item">
+        <a href="{{ back_to_list_url }}">{% translate "Route Master List" %}</a>
+      </li>
+      <li class="breadcrumb-item active" aria-current="page">{% translate "Route Detail" %}</li>
+    </ol>
+  </nav>
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">
+        {% translate "Route Detail" %} &mdash;
+        <span style="color: var(--primary-color)">{{ route.route_code }}</span>
+      </h1>
+      <p class="page-subtitle">{{ route.route_label }}</p>
+    </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <a href="{{ back_to_list_url }}" class="eal-btn eal-btn-outline">
+          <i class="bi bi-arrow-left"></i>
+          <span>{% translate "Back to List" %}</span>
+        </a>
+        <a href="{{ edit_route_url }}" class="eal-btn eal-btn-primary">
+          <i class="bi bi-pencil-square"></i>
+          <span>{% translate "Edit" %}</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Details Content -->
+<div class="row g-4">
+  <!-- Left Column: Main Details -->
+  <div class="col-lg-8">
+    <!-- Route Details -->
+    <div class="form-card" data-section="1">
+      <div class="form-card-header">
+        <div class="form-card-icon blue">
+          <i class="bi bi-signpost-split"></i>
+        </div>
+        <div class="form-card-header-text">
+          <h2 class="form-card-title">{% translate "Route Details" %}</h2>
+          <p class="form-card-desc">{% translate "Route identity, type, and origin–destination points." %}</p>
+        </div>
+      </div>
+      <div class="form-card-body">
+        <p class="small text-uppercase fw-semibold text-secondary mb-3" style="letter-spacing: 0.06em">
+          {% translate "Basic Information" %}
+        </p>
+        <div class="fields-grid cols-3">
+          <div class="field">
+            <label class="form-label">{% translate "Route Code" %}</label>
+            <p class="detail-view-value"><span class="eal-entity-id">{{ route.route_code }}</span></p>
+          </div>
+          <div class="field">
+            <label class="form-label">{% translate "Route Label" %}</label>
+            <p class="detail-view-value">{{ route.route_label }}</p>
+          </div>
+          <div class="field">
+            <label class="form-label">{% translate "Route Type" %}</label>
+            <p class="detail-view-value">
+              <span class="eal-type-badge org">{{ route.route_type }}</span>
+            </p>
+          </div>
+        </div>
+
+        <p class="small text-uppercase fw-semibold text-secondary mb-3 mt-4" style="letter-spacing: 0.06em">
+          {% translate "Endpoints" %}
+        </p>
+        <div class="fields-grid cols-3">
+          <div class="field">
+            <label class="form-label">{% translate "Origin Point" %}</label>
+            <p class="detail-view-value">{{ route.origin_point.display_label }}</p>
+          </div>
+          <div class="field">
+            <label class="form-label">{% translate "Destination Point" %}</label>
+            <p class="detail-view-value">{{ route.destination_point.display_label }}</p>
+          </div>
+          <div class="field">
+            <label class="form-label">{% translate "Status" %}</label>
+            <p class="detail-view-value">
+              {% if route.status == 'Active' %}
+              <span class="status-badge active">{% translate "Active" %}</span>
+              {% else %}
+              <span class="status-badge inactive">{% translate "Inactive" %}</span>
+              {% endif %}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Distance & Options -->
+    <div class="form-card" data-section="2">
+      <div class="form-card-header">
+        <div class="form-card-icon green">
+          <i class="bi bi-speedometer2"></i>
+        </div>
+        <div class="form-card-header-text">
+          <h2 class="form-card-title">{% translate "Distance & Duration" %}</h2>
+          <p class="form-card-desc">{% translate "Distance, estimated duration, and route-specific options." %}</p>
+        </div>
+      </div>
+      <div class="form-card-body">
+        <p class="small text-uppercase fw-semibold text-secondary mb-3" style="letter-spacing: 0.06em">
+          {% translate "Metrics" %}
+        </p>
+        <div class="fields-grid cols-2">
+          <div class="field">
+            <label class="form-label">{% translate "Distance (km)" %}</label>
+            <p class="detail-view-value">{{ route.distance_km }}</p>
+          </div>
+          <div class="field">
+            <label class="form-label">{% translate "Estimated Trip Duration (h)" %}</label>
+            <p class="detail-view-value">{{ route.estimated_duration_h }}</p>
+          </div>
+        </div>
+
+        <p class="small text-uppercase fw-semibold text-secondary mb-3 mt-4" style="letter-spacing: 0.06em">
+          {% translate "Route Options" %}
+        </p>
+        <div class="pod-status-grid">
+          <div class="pod-status-tile">
+            <label class="form-label">{% translate "Has Customs" %}</label>
+            <p class="detail-view-value">
+              {% if route.has_customs %}
+              <span class="status-badge active"><i class="bi bi-check-circle"></i> {% translate "Enabled" %}</span>
+              {% else %}
+              <span class="status-badge pending">{% translate "Disabled" %}</span>
+              {% endif %}
+            </p>
+          </div>
+          <div class="pod-status-tile">
+            <label class="form-label">{% translate "Has Toll Gates" %}</label>
+            <p class="detail-view-value">
+              {% if route.has_toll_gates %}
+              <span class="status-badge in-transit"><i class="bi bi-sign-turn-right"></i> {% translate "Enabled" %}</span>
+              {% else %}
+              <span class="status-badge pending">{% translate "Disabled" %}</span>
+              {% endif %}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Column: Summary Sidebar -->
+  <div class="col-lg-4">
+    <!-- Quick Summary -->
+    <div class="form-card">
+      <div class="form-card-header">
+        <div class="form-card-icon blue">
+          <i class="bi bi-info-circle"></i>
+        </div>
+        <div class="form-card-header-text">
+          <h2 class="form-card-title">{% translate "Quick Summary" %}</h2>
+        </div>
+      </div>
+      <div class="form-card-body">
+        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
+          <span class="detail-field-label">{% translate "Route Code" %}</span>
+          <span class="detail-field-value" style="font-weight: 600; color: var(--primary-color)">{{ route.route_code }}</span>
+        </div>
+        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
+          <span class="detail-field-label">{% translate "Route Label" %}</span>
+          <span class="detail-field-value">{{ route.route_label }}</span>
+        </div>
+        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
+          <span class="detail-field-label">{% translate "Origin" %}</span>
+          <span class="detail-field-value">{{ route.origin_point.display_label }}</span>
+        </div>
+        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
+          <span class="detail-field-label">{% translate "Destination" %}</span>
+          <span class="detail-field-value">{{ route.destination_point.display_label }}</span>
+        </div>
+        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
+          <span class="detail-field-label">{% translate "Distance (km)" %}</span>
+          <span class="detail-field-value">{{ route.distance_km }}</span>
+        </div>
+        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
+          <span class="detail-field-label">{% translate "Status" %}</span>
+          <span class="detail-field-value">
+            {% if route.status == 'Active' %}
+            <span class="status-badge active">{% translate "Active" %}</span>
+            {% else %}
+            <span class="status-badge inactive">{% translate "Inactive" %}</span>
+            {% endif %}
+          </span>
+        </div>
+        <div class="detail-field" style="padding: 10px 0">
+          <span class="detail-field-label">{% translate "Route Type" %}</span>
+          <span class="detail-field-value">{{ route.route_type }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Activity Log -->
+    <div class="form-card">
+      <div class="form-card-header">
+        <div class="form-card-icon amber">
+          <i class="bi bi-clock-history"></i>
+        </div>
+        <div class="form-card-header-text">
+          <h2 class="form-card-title">{% translate "Activity Log" %}</h2>
+        </div>
+      </div>
+      <div class="form-card-body">
+        <div style="display: flex; flex-direction: column; gap: 16px">
+          {% for item in activity_log %}
+          <div style="display: flex; gap: 12px; align-items: flex-start">
+            <div
+              style="
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                background: {{ item.color }};
+                margin-top: 6px;
+                flex-shrink: 0;
+              "
+            ></div>
+            <div>
+              <div style="font-size: 13px; font-weight: 600; color: #333">{{ item.title }}</div>
+              <div style="font-size: 12px; color: #888">
+                {{ item.timestamp|date:"d M Y, g:i A" }} &mdash; {{ item.actor|default:"System" }}
+              </div>
+            </div>
+          </div>
+          {% empty %}
+          <div class="text-muted">{% translate "No activity available." %}</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

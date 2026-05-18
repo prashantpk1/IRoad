@@ -21461,8 +21461,32 @@ class TenantRouteMasterCreateView(View):
             connection.set_schema_to_public()
 
 
+def _tenant_route_master_activity_entries(route):
+    """Timeline entries for route detail sidebar (created / updated)."""
+    entries = []
+    created_at = getattr(route, 'created_at', None)
+    updated_at = getattr(route, 'updated_at', None)
+    if created_at and updated_at:
+        seconds_since_create = (updated_at - created_at).total_seconds()
+        if seconds_since_create >= 1:
+            entries.append({
+                'title': 'Updated',
+                'timestamp': updated_at,
+                'actor': 'System',
+                'color': '#28a745',
+            })
+    if created_at:
+        entries.append({
+            'title': 'Created',
+            'timestamp': created_at,
+            'actor': 'System',
+            'color': '#dc3545',
+        })
+    return entries
+
+
 class TenantRouteMasterDetailView(View):
-    template_name = 'iroad_tenants/Master_Data/location_master/Route-master.html'
+    template_name = 'iroad_tenants/Master_Data/location_master/Route-master-detail.html'
 
     def get(self, request, route_id):
         context = _tenant_context_from_session(request)
@@ -21485,13 +21509,19 @@ class TenantRouteMasterDetailView(View):
             if not route:
                 messages.error(request, 'Route not found.', extra_tags='tenant')
                 return _tenant_redirect(request, 'iroad_tenants:tenant_route_master_list')
+
+            list_url = reverse('iroad_tenants:tenant_route_master_list')
+            edit_url = reverse(
+                'iroad_tenants:tenant_route_master_edit',
+                kwargs={'route_id': route.route_id},
+            )
+
             context.update(
                 {
-                    'form': TenantRouteMasterForm(instance=route, allow_inactive_status=True),
                     'route': route,
-                    'preview_route_code': route.route_code,
-                    'is_edit': False,
-                    'is_view': True,
+                    'activity_log': _tenant_route_master_activity_entries(route),
+                    'back_to_list_url': list_url,
+                    'edit_route_url': edit_url,
                     'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
                 }
             )
