@@ -1459,8 +1459,49 @@ class TenantCargoMasterEditView(View):
         return redirect_resp
 
 
+def _tenant_cargo_master_activity_entries(cargo, attachments):
+    """Timeline entries for cargo detail sidebar (created / updated / attachments)."""
+    entries = []
+    attachment_count = len(attachments) if attachments is not None else 0
+
+    created_at = getattr(cargo, 'created_at', None)
+    updated_at = getattr(cargo, 'updated_at', None)
+    if created_at and updated_at:
+        seconds_since_create = (updated_at - created_at).total_seconds()
+        if seconds_since_create >= 1:
+            entries.append({
+                'title': 'Updated',
+                'timestamp': updated_at,
+                'actor': 'System',
+                'color': '#28a745',
+            })
+
+    if attachment_count:
+        latest_attachment = max(attachments, key=lambda row: row.created_at)
+        entries.insert(
+            0,
+            {
+                'title': (
+                    f'{attachment_count} attachment{"s" if attachment_count != 1 else ""} on file'
+                ),
+                'timestamp': latest_attachment.created_at,
+                'actor': 'System',
+                'color': 'var(--primary-color)',
+            },
+        )
+
+    if created_at:
+        entries.append({
+            'title': 'Created',
+            'timestamp': created_at,
+            'actor': 'System',
+            'color': '#dc3545',
+        })
+    return entries
+
+
 class TenantCargoMasterDetailView(View):
-    template_name = 'iroad_tenants/Master_Data/cargo_master/Cargo-master.html'
+    template_name = 'iroad_tenants/Master_Data/cargo_master/Cargo-master-detail.html'
 
     def get(self, request, cargo_id):
         context = _tenant_context_from_session(request)
@@ -1484,6 +1525,7 @@ class TenantCargoMasterDetailView(View):
                 messages.error(request, 'Cargo record not found.', extra_tags='tenant')
                 return _tenant_redirect(request, 'iroad_tenants:tenant_cargo_master_list')
 
+            attachments = list(cargo.attachments.order_by('created_at'))
             list_url = reverse('iroad_tenants:tenant_cargo_master_list')
             edit_url = reverse(
                 'iroad_tenants:tenant_cargo_master_edit',
@@ -1492,14 +1534,12 @@ class TenantCargoMasterDetailView(View):
 
             context.update(
                 {
-                    'form': TenantCargoMasterForm(instance=cargo),
-                    'cargo_instance': cargo,
-                    'existing_attachments': list(cargo.attachments.all()),
+                    'cargo': cargo,
+                    'attachments': attachments,
+                    'activity_log': _tenant_cargo_master_activity_entries(cargo, attachments),
                     'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
                     'back_to_list_url': list_url,
                     'edit_cargo_url': edit_url,
-                    'is_edit': True,
-                    'is_view': True,
                 }
             )
             return render(request, self.template_name, context)
