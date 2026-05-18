@@ -4215,6 +4215,113 @@ def _price_list_line_payload(price_list):
     return list(trip_groups.values()) + service_rows
 
 
+def _price_list_detail_display_rows(price_list):
+    """Enriched read-only line rows for price list detail template."""
+    raw_lines = _price_list_line_payload(price_list)
+    trip_ids = [
+        line['service_item_id']
+        for line in raw_lines
+        if line.get('line_type') == 'Trip' and line.get('service_item_id')
+    ]
+    service_ids = [
+        line['service_item_id']
+        for line in raw_lines
+        if line.get('line_type') != 'Trip' and line.get('service_item_id')
+    ]
+    trip_items = {
+        str(item.service_item_id): item
+        for item in TenantServiceItemMaster.objects.filter(
+            service_item_id__in=trip_ids,
+        ).select_related('route', 'route__origin_point', 'route__destination_point')
+    }
+    service_items = {
+        str(item.service_item_id): item
+        for item in TenantServiceItemMaster.objects.filter(
+            service_item_id__in=service_ids,
+        )
+    }
+
+    rows = []
+    for index, line in enumerate(raw_lines, start=1):
+        line_type = line.get('line_type') or 'Service'
+        service_item_id = str(line.get('service_item_id') or '').strip()
+        service_item = trip_items.get(service_item_id) if line_type == 'Trip' else service_items.get(service_item_id)
+        if service_item:
+            service_item_label = f'{service_item.service_code} — {service_item.english_name}'
+        else:
+            service_item_label = service_item_id or '—'
+
+        route_display = '—'
+        route_origin = ''
+        route_destination = ''
+        if line_type == 'Trip' and service_item and service_item.route_id:
+            route_origin = (
+                service_item.route.origin_point.display_label
+                if service_item.route.origin_point_id
+                else '—'
+            )
+            route_destination = (
+                service_item.route.destination_point.display_label
+                if service_item.route.destination_point_id
+                else '—'
+            )
+            route_display = f'{route_origin} — {route_destination}'
+
+        def _display_price(value):
+            if value is None:
+                return '—'
+            text = str(value).strip()
+            return text if text else '—'
+
+        rows.append({
+            'line_no': index,
+            'line_type': line_type,
+            'service_item_label': service_item_label,
+            'route_display': route_display,
+            'route_origin': route_origin,
+            'route_destination': route_destination,
+            'unit': line_type,
+            'sell_price': _display_price(line.get('sell_price')),
+            'outbound_sell_price': _display_price(line.get('outbound_sell_price')),
+            'inbound_sell_price': _display_price(line.get('inbound_sell_price')),
+        })
+    return rows
+
+
+def _price_list_line_totals(line_rows):
+    service_count = sum(1 for row in line_rows if row.get('line_type') == 'Service')
+    trip_count = sum(1 for row in line_rows if row.get('line_type') == 'Trip')
+    return {
+        'total_items': len(line_rows),
+        'total_service_items': service_count,
+        'total_trip_items': trip_count,
+    }
+
+
+def _tenant_price_list_master_activity_entries(price_list):
+    """Timeline entries for price list detail sidebar (created / updated)."""
+    entries = []
+    created_at = getattr(price_list, 'created_at', None)
+    updated_at = getattr(price_list, 'updated_at', None)
+    if created_at and updated_at:
+        seconds_since_create = (updated_at - created_at).total_seconds()
+        if seconds_since_create >= 1:
+            entries.append({
+                'title': 'Updated',
+                'timestamp': updated_at,
+                'actor': 'System',
+                'color': '#28a745',
+            })
+    if created_at:
+        entries.append({
+            'title': 'Created',
+            'timestamp': created_at,
+            'actor': 'System',
+            'color': '#dc3545',
+        })
+    return entries
+
+
 def _resolve_price_list_by_ref(price_list_ref):
     ref = str(price_list_ref or '').strip()
     if not ref:
@@ -4234,9 +4341,9 @@ def _resolve_price_list_by_ref(price_list_ref):
 
 
 class TenantPriceListMasterDetailView(View):
-    """Read-only price list detail page."""
+    """Read-only price list detail page (enterprise layout)."""
 
-    template_name = 'iroad_tenants/Master_Data/service_item_master/Price-list.html'
+    template_name = 'iroad_tenants/Master_Data/service_item_master/Price-list-detail.html'
 
     def get(self, request, price_list_ref):
         context = _tenant_context_from_session(request)
@@ -4257,38 +4364,23 @@ class TenantPriceListMasterDetailView(View):
             if price_list is None:
                 messages.error(request, 'Price list not found.', extra_tags='tenant')
                 return _tenant_redirect(request, 'iroad_tenants:tenant_price_list_master_list')
-            line_payload = _price_list_line_payload(price_list)
+
+            line_rows = _price_list_detail_display_rows(price_list)
+            list_url = reverse('iroad_tenants:tenant_price_list_master_list')
+            edit_url = reverse(
+                'iroad_tenants:tenant_price_list_master_edit',
+                kwargs={'price_list_ref': price_list.price_list_code},
+            )
+
             context.update(
                 {
-                    'preview_price_list_code': price_list.price_list_code,
-                    'active_clients': [price_list.client_account] if price_list.client_account_id else [],
+                    'price_list': price_list,
+                    'line_rows': line_rows,
+                    'line_totals': _price_list_line_totals(line_rows),
+                    'activity_log': _tenant_price_list_master_activity_entries(price_list),
+                    'back_to_list_url': list_url,
+                    'edit_price_list_url': edit_url,
                     'tenant_base_currency': price_list.base_currency or 'SAR',
-                    'active_trip_services': list(
-                        TenantServiceItemMaster.objects.filter(
-                            status=TenantServiceItemMaster.Status.ACTIVE,
-                            service_type=TenantServiceItemMaster.ServiceType.TRIP,
-                        ).order_by('service_code')
-                    ),
-                    'active_service_items': list(
-                        TenantServiceItemMaster.objects.filter(
-                            status=TenantServiceItemMaster.Status.ACTIVE,
-                            service_type=TenantServiceItemMaster.ServiceType.SERVICE,
-                        ).order_by('service_code')
-                    ),
-                    'form_data': {
-                        'price_list_name': price_list.price_list_name,
-                        'client_account_id': str(price_list.client_account_id or ''),
-                        'status': price_list.status,
-                        'effective_from': str(price_list.effective_from or ''),
-                        'effective_to': str(price_list.effective_to or ''),
-                        'notes': price_list.notes or '',
-                        'line_payload': json.dumps(line_payload),
-                    },
-                    'field_errors': {},
-                    'is_view': True,
-                    'is_edit': False,
-                    'detail_price_list_id': price_list.price_list_code,
-                    'edit_price_list_id': price_list.price_list_code,
                     'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
                 }
             )
