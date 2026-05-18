@@ -9565,7 +9565,33 @@ class TenantOperationShipmentCreateView(View):
             connection.set_schema_to_public()
 
 
+def _tenant_shipment_activity_entries(shipment):
+    """Timeline entries for shipment detail sidebar (created / updated)."""
+    entries = []
+    created_at = getattr(shipment, 'created_at', None)
+    updated_at = getattr(shipment, 'updated_at', None)
+    if created_at and updated_at:
+        seconds_since_create = (updated_at - created_at).total_seconds()
+        if seconds_since_create >= 1:
+            entries.append({
+                'title': 'Updated',
+                'timestamp': updated_at,
+                'actor': shipment.created_by_label or 'System',
+                'color': '#28a745',
+            })
+    if created_at:
+        entries.append({
+            'title': 'Created',
+            'timestamp': created_at,
+            'actor': shipment.created_by_label or 'System',
+            'color': '#dc3545',
+        })
+    return entries
+
+
 class TenantOperationShipmentDetailView(View):
+    """Read-only shipment detail page (enterprise layout)."""
+
     template_name = 'iroad_tenants/Operation_management/Shipment/Shipment-detail.html'
 
     def get(self, request, shipment_id):
@@ -9584,22 +9610,51 @@ class TenantOperationShipmentDetailView(View):
             clear_tenant_portal_cookie(response, request=request)
             return response
         try:
-            shipment = TenantShipment.objects.select_related('truck').filter(pk=shipment_id).first()
+            shipment = (
+                TenantShipment.objects.select_related(
+                    'booking',
+                    'client_account',
+                    'truck',
+                    'driver',
+                    'loading_address',
+                    'delivery_address',
+                    'cargo',
+                )
+                .filter(pk=shipment_id)
+                .first()
+            )
             if shipment is None:
                 messages.error(request, 'Shipment not found.', extra_tags='tenant')
                 return _tenant_redirect(request, 'iroad_tenants:tenant_operation_shipment_list')
-            booking = (
-                TenantBooking.objects.select_related(
-                    'client_account',
-                    'price_list',
-                    'service_item',
-                    'cargo',
-                    'assigned_truck',
-                    'assigned_driver',
+            booking = shipment.booking
+            if booking is None and shipment.booking_id:
+                booking = (
+                    TenantBooking.objects.select_related(
+                        'client_account',
+                        'price_list',
+                        'service_item',
+                        'cargo',
+                        'assigned_truck',
+                        'assigned_driver',
+                    )
+                    .filter(booking_id=shipment.booking_id)
+                    .first()
                 )
-                .filter(booking_id=shipment.booking_id)
-                .first()
+
+            list_url = reverse('iroad_tenants:tenant_operation_shipment_list')
+            edit_url = reverse(
+                'iroad_tenants:tenant_operation_shipment_edit',
+                kwargs={'shipment_id': shipment.shipment_id},
             )
+            update_url = reverse(
+                'iroad_tenants:tenant_operation_shipment_update',
+                kwargs={'shipment_id': shipment.shipment_id},
+            )
+            print_url = reverse(
+                'iroad_tenants:tenant_shipment_print',
+                kwargs={'shipment_id': shipment.shipment_id},
+            )
+
             context.update(
                 {
                     'shipment': shipment,
@@ -9610,6 +9665,11 @@ class TenantOperationShipmentDetailView(View):
                         else 'Not Applicable'
                     ),
                     'additional_charges': shipment.total_additional_charges,
+                    'activity_log': _tenant_shipment_activity_entries(shipment),
+                    'back_to_list_url': list_url,
+                    'edit_shipment_url': edit_url,
+                    'update_shipment_url': update_url,
+                    'print_shipment_url': print_url,
                     'tenant_schema_name': tenant_registry.schema_name,
                 }
             )

@@ -1,281 +1,505 @@
 {% extends 'iroad_tenants/base.html' %}
 
-{% block title %}{{ shipment.shipment_no }} | Shipment{% endblock %}
+{% block title %}{{ shipment.shipment_no }} | Shipment | iRoad{% endblock %}
+{% block breadcrumb %}{% endblock %}
+
+{% block extra_css %}
+<style>
+  .shipment-detail-sidebar {
+    position: sticky;
+    top: 20px;
+    align-self: flex-start;
+  }
+  @media (max-width: 991.98px) {
+    .shipment-detail-sidebar {
+      position: static;
+    }
+  }
+</style>
+{% endblock %}
 
 {% block content %}
+<!-- Page Header -->
 <div class="page-header">
   <nav aria-label="breadcrumb">
     <ol class="breadcrumb">
       <li class="breadcrumb-item"><a href="{% url 'iroad_tenants:tenant_dashboard' %}">Dashboard</a></li>
       <li class="breadcrumb-item">Operations</li>
       <li class="breadcrumb-item">Operations Management</li>
-      <li class="breadcrumb-item"><a href="{% url 'iroad_tenants:tenant_operation_shipment_list' %}">Shipment List</a></li>
-      <li class="breadcrumb-item active" aria-current="page">{{ shipment.shipment_no }}</li>
+      <li class="breadcrumb-item">
+        <a href="{{ back_to_list_url }}">Shipment List</a>
+      </li>
+      <li class="breadcrumb-item active" aria-current="page">Shipment Detail</li>
     </ol>
   </nav>
   <div class="page-header-row">
     <div class="page-header-left">
-      <h1 class="page-title">Shipment Detail</h1>
-      <p class="page-subtitle">{{ shipment.shipment_no }} - Read-only shipment review.</p>
+      <h1 class="page-title">
+        Shipment Detail &mdash;
+        <span style="color: var(--primary-color)">{{ shipment.shipment_no }}</span>
+      </h1>
+      <p class="page-subtitle">Read-only shipment review.</p>
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
-        <a href="{% url 'iroad_tenants:tenant_operation_shipment_edit' shipment.shipment_id %}" class="eal-btn eal-btn-outline">
-          <i class="bi bi-pencil"></i><span>Edit</span>
+        <a href="{{ back_to_list_url }}" class="eal-btn eal-btn-outline">
+          <i class="bi bi-arrow-left"></i>
+          <span>Back to List</span>
         </a>
-        <a href="{% url 'iroad_tenants:tenant_operation_shipment_update' shipment.shipment_id %}" class="eal-btn eal-btn-outline">
-          <i class="bi bi-arrow-repeat"></i><span>Update</span>
+        <a href="{{ print_shipment_url }}" target="_blank" rel="noopener" class="eal-btn eal-btn-outline">
+          <i class="bi bi-printer"></i>
+          <span>Print</span>
         </a>
-        <a href="{% url 'iroad_tenants:tenant_shipment_print' shipment.shipment_id %}" target="_blank" rel="noopener" class="eal-btn eal-btn-outline">
-          <i class="bi bi-printer"></i><span>Print</span>
+        <a href="{{ update_shipment_url }}" class="eal-btn eal-btn-outline">
+          <i class="bi bi-arrow-repeat"></i>
+          <span>Update</span>
         </a>
-        <a href="{% url 'iroad_tenants:tenant_operation_shipment_list' %}" class="eal-btn eal-btn-outline">
-          <i class="bi bi-arrow-left"></i><span>Back</span>
+        <a href="{{ edit_shipment_url }}" class="eal-btn eal-btn-primary">
+          <i class="bi bi-pencil-square"></i>
+          <span>Edit</span>
         </a>
       </div>
     </div>
   </div>
 </div>
 
-<div class="form-card">
-  <div class="form-card-header">
-    <div class="form-card-icon blue"><i class="bi bi-box-seam"></i></div>
-    <div class="form-card-header-text">
-      <h2 class="form-card-title">Shipment Info</h2>
-      <p class="form-card-desc">Primary shipment details and status information.</p>
+<!-- Top: 8 / 4 -->
+<div class="row g-4">
+  <div class="col-lg-8">
+    <!-- Shipment Info -->
+    <div class="form-card" data-section="1">
+      <div class="form-card-header">
+        <div class="form-card-icon blue">
+          <i class="bi bi-box-seam"></i>
+        </div>
+        <div class="form-card-header-text">
+          <h2 class="form-card-title">Shipment Info</h2>
+          <p class="form-card-desc">Primary shipment details and status information.</p>
+        </div>
+      </div>
+      <div class="form-card-body">
+        <p class="small text-uppercase fw-semibold text-secondary mb-3" style="letter-spacing: 0.06em">
+          Identity
+        </p>
+        <div class="fields-grid cols-3">
+          <div class="field">
+            <label class="form-label">Shipment No.</label>
+            <p class="detail-view-value"><span class="eal-entity-id">{{ shipment.shipment_no }}</span></p>
+          </div>
+          <div class="field">
+            <label class="form-label">Order Type</label>
+            <p class="detail-view-value">{{ shipment.order_type|default:"—" }}</p>
+          </div>
+          <div class="field">
+            <label class="form-label">Shipment Date</label>
+            <p class="detail-view-value">{{ shipment.shipment_date|date:"d M Y" }}</p>
+          </div>
+        </div>
+        <p class="small text-uppercase fw-semibold text-secondary mb-3 mt-4" style="letter-spacing: 0.06em">
+          Status
+        </p>
+        <div class="fields-grid cols-3">
+          <div class="field">
+            <label class="form-label">Shipment Status</label>
+            <p class="detail-view-value">
+              {% if shipment.shipment_status == 'In Transit' %}
+              <span class="status-badge in-transit">{{ shipment.shipment_status }}</span>
+              {% elif shipment.shipment_status == 'Delivered' or shipment.shipment_status == 'Closed' %}
+              <span class="status-badge active">{{ shipment.shipment_status }}</span>
+              {% elif shipment.shipment_status == 'Cancelled' %}
+              <span class="status-badge inactive">{{ shipment.shipment_status }}</span>
+              {% else %}
+              <span class="status-badge pending">{{ shipment.shipment_status|default:"Created" }}</span>
+              {% endif %}
+            </p>
+          </div>
+          <div class="field">
+            <label class="form-label">Collection Status</label>
+            <p class="detail-view-value">
+              {% if shipment.collection_status == 'Collected' %}
+              <span class="status-badge active">{{ shipment.collection_status }}</span>
+              {% else %}
+              <span class="status-badge pending">{{ shipment.collection_status|default:"—" }}</span>
+              {% endif %}
+            </p>
+          </div>
+          <div class="field">
+            <label class="form-label">Created By</label>
+            <p class="detail-view-value">{{ shipment.created_by_label|default:"—" }}</p>
+          </div>
+        </div>
+      </div>
     </div>
-  </div>
-  <div class="form-card-body">
-    <div class="fields-grid cols-3">
-      <div class="field">
-        <label class="form-label">Shipment No.</label>
-        <input class="form-control" value="{{ shipment.shipment_no }}" readonly />
-      </div>
-      <div class="field">
-        <label class="form-label">Order Type</label>
-        <input class="form-control" value="{{ shipment.order_type|default:'-' }}" readonly />
-      </div>
-      <div class="field">
-        <label class="form-label">Shipment Date</label>
-        <input class="form-control" value="{{ shipment.shipment_date|date:'d M Y' }}" readonly />
-      </div>
-    </div>
-    <div class="fields-grid cols-3 mt-3">
-      <div class="field">
-        <label class="form-label">Shipment Status</label>
-        <input class="form-control" value="{{ shipment.shipment_status|default:'-' }}" readonly />
-      </div>
-      <div class="field">
-        <label class="form-label">Collection Status</label>
-        <input class="form-control" value="{{ shipment.collection_status|default:'-' }}" readonly />
-      </div>
-      <div class="field">
-        <label class="form-label">Created By</label>
-        <input class="form-control" value="{{ shipment.created_by_label|default:'-' }}" readonly />
-      </div>
-    </div>
-  </div>
-</div>
 
-<div class="form-card">
-  <div class="form-card-header">
-    <div class="form-card-icon amber"><i class="bi bi-calendar-check"></i></div>
-    <div class="form-card-header-text">
-      <h2 class="form-card-title">Booking Info</h2>
-      <p class="form-card-desc">Booking reference and auto-updated booking attributes.</p>
+    <!-- Booking Info -->
+    <div class="form-card" data-section="2">
+      <div class="form-card-header">
+        <div class="form-card-icon amber">
+          <i class="bi bi-calendar-check"></i>
+        </div>
+        <div class="form-card-header-text">
+          <h2 class="form-card-title">Booking Info</h2>
+          <p class="form-card-desc">Booking reference and auto-updated booking attributes.</p>
+        </div>
+      </div>
+      <div class="form-card-body">
+        <div class="fields-grid cols-3">
+          <div class="field">
+            <label class="form-label">Client Account</label>
+            <p class="detail-view-value">
+              {% if shipment.client_account %}
+              {{ shipment.client_account.account_no }} &mdash; {{ shipment.client_account.display_name }}
+              {% else %}
+              —
+              {% endif %}
+            </p>
+          </div>
+          <div class="field">
+            <label class="form-label">Booking No.</label>
+            <p class="detail-view-value">
+              {% if shipment.booking %}{{ shipment.booking.booking_no }}{% else %}—{% endif %}
+            </p>
+          </div>
+          <div class="field">
+            <label class="form-label">Booking Item</label>
+            <p class="detail-view-value">{{ shipment.booking_item_ref|default:"—" }}</p>
+          </div>
+        </div>
+        <div class="fields-grid cols-3" style="margin-top: 20px">
+          <div class="field">
+            <label class="form-label">Booking Item Type</label>
+            <p class="detail-view-value">{{ shipment.booking_item_type|default:"—" }}</p>
+          </div>
+          <div class="field">
+            <label class="form-label">Sourcing Mode</label>
+            <p class="detail-view-value">{{ shipment.sourcing_mode|default:"—" }}</p>
+          </div>
+          <div class="field">
+            <label class="form-label">Trip Type</label>
+            <p class="detail-view-value">{{ shipment.trip_type|default:"—" }}</p>
+          </div>
+        </div>
+      </div>
     </div>
-  </div>
-  <div class="form-card-body">
-    <div class="fields-grid cols-3">
-      <div class="field">
-        <label class="form-label">Client Account</label>
-        <input class="form-control" value="{% if shipment.client_account %}{{ shipment.client_account.account_no }} - {{ shipment.client_account.display_name }}{% else %}-{% endif %}" readonly />
-      </div>
-      <div class="field">
-        <label class="form-label">Booking No.</label>
-        <input class="form-control" value="{% if shipment.booking %}{{ shipment.booking.booking_no }}{% else %}-{% endif %}" readonly />
-      </div>
-      <div class="field">
-        <label class="form-label">Booking Item</label>
-        <input class="form-control" value="{{ shipment.booking_item_ref|default:'-' }}" readonly />
-      </div>
-    </div>
-    <div class="fields-grid cols-3 mt-3">
-      <div class="field">
-        <label class="form-label">Booking Item Type</label>
-        <input class="form-control" value="{{ shipment.booking_item_type|default:'-' }}" readonly />
-      </div>
-      <div class="field">
-        <label class="form-label">Sourcing Mode</label>
-        <input class="form-control" value="{{ shipment.sourcing_mode|default:'-' }}" readonly />
-      </div>
-      <div class="field">
-        <label class="form-label">Trip Type</label>
-        <input class="form-control" value="{{ shipment.trip_type|default:'-' }}" readonly />
-      </div>
-    </div>
-  </div>
-</div>
 
-<div class="form-card">
-  <div class="form-card-header">
-    <div class="form-card-icon green"><i class="bi bi-geo-alt"></i></div>
-    <div class="form-card-header-text">
-      <h2 class="form-card-title">Route & Addresses</h2>
+    <!-- Route & Addresses -->
+    <div class="form-card" data-section="3">
+      <div class="form-card-header">
+        <div class="form-card-icon green">
+          <i class="bi bi-geo-alt"></i>
+        </div>
+        <div class="form-card-header-text">
+          <h2 class="form-card-title">Route &amp; Addresses</h2>
+          <p class="form-card-desc">Route display and loading/delivery locations.</p>
+        </div>
+      </div>
+      <div class="form-card-body">
+        <div class="fields-grid cols-3">
+          <div class="field">
+            <label class="form-label">Route</label>
+            <p class="detail-view-value">{{ shipment.route_display|default:"—" }}</p>
+          </div>
+          <div class="field">
+            <label class="form-label">Loading Address</label>
+            <p class="detail-view-value">
+              {% if shipment.loading_address %}
+              {{ shipment.loading_address.address_code }} &mdash; {{ shipment.loading_address.display_name }}
+              {% else %}
+              —
+              {% endif %}
+            </p>
+          </div>
+          <div class="field">
+            <label class="form-label">Delivery Address</label>
+            <p class="detail-view-value">
+              {% if shipment.delivery_address %}
+              {{ shipment.delivery_address.address_code }} &mdash; {{ shipment.delivery_address.display_name }}
+              {% else %}
+              —
+              {% endif %}
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
-  </div>
-  <div class="form-card-body">
-    <div class="fields-grid cols-3">
-      <div class="field">
-        <label class="form-label">Route</label>
-        <input class="form-control" value="{{ shipment.route_display|default:'-' }}" readonly />
-      </div>
-      <div class="field">
-        <label class="form-label">Loading Address</label>
-        <input class="form-control" value="{{ shipment.from_location|default:'-' }}" readonly />
-      </div>
-      <div class="field">
-        <label class="form-label">Delivery Address</label>
-        <input class="form-control" value="{{ shipment.to_location|default:'-' }}" readonly />
-      </div>
-    </div>
-  </div>
-</div>
 
-<div class="form-card">
-  <div class="form-card-header">
-    <div class="form-card-icon blue"><i class="bi bi-file-check"></i></div>
-    <div class="form-card-header-text">
-      <h2 class="form-card-title">POD & COD</h2>
+    <!-- POD & COD -->
+    <div class="form-card" data-section="4">
+      <div class="form-card-header">
+        <div class="form-card-icon blue">
+          <i class="bi bi-file-check"></i>
+        </div>
+        <div class="form-card-header-text">
+          <h2 class="form-card-title">POD &amp; COD</h2>
+          <p class="form-card-desc">Proof of delivery and cash-on-delivery details.</p>
+        </div>
+      </div>
+      <div class="form-card-body">
+        <div class="fields-grid cols-3">
+          <div class="field">
+            <label class="form-label">POD Type</label>
+            <p class="detail-view-value">{{ shipment.pod_type|default:"—" }}</p>
+          </div>
+          <div class="field">
+            <label class="form-label">POD Status</label>
+            <p class="detail-view-value">
+              {% if shipment.pod_status == 'Compliant' %}
+              <span class="status-badge active">{{ shipment.pod_status }}</span>
+              {% else %}
+              <span class="status-badge pending">{{ shipment.pod_status|default:"—" }}</span>
+              {% endif %}
+            </p>
+          </div>
+          <div class="field">
+            <label class="form-label">POD Doc Count</label>
+            <p class="detail-view-value">{{ shipment.pod_doc_count|default:0 }}</p>
+          </div>
+        </div>
+        <div class="fields-grid cols-3" style="margin-top: 20px">
+          <div class="field">
+            <label class="form-label">COD Amount</label>
+            <p class="detail-view-value">{{ shipment.cod_amount|floatformat:2 }}</p>
+          </div>
+          <div class="field">
+            <label class="form-label">COD Payment Status (auto Update)</label>
+            <p class="detail-view-value">{{ cod_payment_status }}</p>
+          </div>
+          <div class="field">
+            <label class="form-label">Additional Charges</label>
+            <p class="detail-view-value">{{ additional_charges|floatformat:2 }}</p>
+          </div>
+        </div>
+      </div>
     </div>
-  </div>
-  <div class="form-card-body">
-    <div class="fields-grid cols-3">
-      <div class="field">
-        <label class="form-label">POD Type</label>
-        <input class="form-control" value="{{ shipment.pod_type|default:'-' }}" readonly />
-      </div>
-      <div class="field">
-        <label class="form-label">POD Status</label>
-        <input class="form-control" value="{{ shipment.pod_status|default:'-' }}" readonly />
-      </div>
-      <div class="field">
-        <label class="form-label">POD Doc Count</label>
-        <input class="form-control" value="{{ shipment.pod_doc_count|default:0 }}" readonly />
-      </div>
-    </div>
-    <div class="fields-grid cols-3 mt-3">
-      <div class="field">
-        <label class="form-label">COD Amount</label>
-        <input class="form-control" value="{{ shipment.cod_amount|floatformat:2 }}" readonly />
-      </div>
-      <div class="field">
-        <label class="form-label">COD Payment Status (auto Update)</label>
-        <input class="form-control" value="{{ cod_payment_status }}" readonly />
-      </div>
-      <div class="field">
-        <label class="form-label">Additional Charges</label>
-        <input class="form-control" value="{{ additional_charges|floatformat:2 }}" readonly />
-      </div>
-    </div>
-  </div>
-</div>
 
-<div class="form-card">
-  <div class="form-card-header">
-    <div class="form-card-icon purple"><i class="bi bi-receipt"></i></div>
-    <div class="form-card-header-text">
-      <h2 class="form-card-title">Sales & Billing</h2>
+    <!-- Sales & Billing -->
+    <div class="form-card" data-section="5">
+      <div class="form-card-header">
+        <div class="form-card-icon amber">
+          <i class="bi bi-receipt"></i>
+        </div>
+        <div class="form-card-header-text">
+          <h2 class="form-card-title">Sales &amp; Billing</h2>
+          <p class="form-card-desc">Sales order and invoice references.</p>
+        </div>
+      </div>
+      <div class="form-card-body">
+        <div class="fields-grid cols-3">
+          <div class="field">
+            <label class="form-label">Sales Report</label>
+            <p class="detail-view-value">{{ shipment.sales_order_ref|default:"—" }}</p>
+          </div>
+          <div class="field">
+            <label class="form-label">Sales Report Status</label>
+            <p class="detail-view-value">{{ shipment.sales_invoice_status|default:"—" }}</p>
+          </div>
+          <div class="field">
+            <label class="form-label">SO Item</label>
+            <p class="detail-view-value">{{ shipment.sales_order_item_ref|default:"—" }}</p>
+          </div>
+        </div>
+        <div class="fields-grid cols-1" style="margin-top: 20px">
+          <div class="field">
+            <label class="form-label">Sales Invoice</label>
+            <p class="detail-view-value">{{ shipment.sales_invoice_ref|default:"—" }}</p>
+          </div>
+        </div>
+      </div>
     </div>
-  </div>
-  <div class="form-card-body">
-    <div class="fields-grid cols-3">
-      <div class="field">
-        <label class="form-label">Sales Report</label>
-        <input class="form-control" value="{{ shipment.sales_order_ref|default:'-' }}" readonly />
-      </div>
-      <div class="field">
-        <label class="form-label">Sales Report Status</label>
-        <input class="form-control" value="{{ shipment.sales_invoice_status|default:'-' }}" readonly />
-      </div>
-      <div class="field">
-        <label class="form-label">SO Item</label>
-        <input class="form-control" value="{{ shipment.sales_order_item_ref|default:'-' }}" readonly />
-      </div>
-    </div>
-    <div class="fields-grid cols-1 mt-3">
-      <div class="field">
-        <label class="form-label">Sales Invoice</label>
-        <input class="form-control" value="{{ shipment.sales_invoice_ref|default:'-' }}" readonly />
-      </div>
-    </div>
-  </div>
-</div>
 
-<div class="form-card">
-  <div class="form-card-header">
-    <div class="form-card-icon amber"><i class="bi bi-truck"></i></div>
-    <div class="form-card-header-text">
-      <h2 class="form-card-title">Truck & Driver</h2>
+    <!-- Truck & Driver -->
+    <div class="form-card" data-section="6">
+      <div class="form-card-header">
+        <div class="form-card-icon amber">
+          <i class="bi bi-truck"></i>
+        </div>
+        <div class="form-card-header-text">
+          <h2 class="form-card-title">Truck &amp; Driver</h2>
+          <p class="form-card-desc">Assigned truck and driver for this shipment.</p>
+        </div>
+      </div>
+      <div class="form-card-body">
+        <div class="fields-grid cols-2">
+          <div class="field">
+            <label class="form-label">Truck</label>
+            <p class="detail-view-value">
+              {% if shipment.truck %}{{ shipment.truck.truck_code }}{% else %}—{% endif %}
+            </p>
+          </div>
+          <div class="field">
+            <label class="form-label">Driver</label>
+            <p class="detail-view-value">
+              {% if shipment.driver %}{{ shipment.driver.driver_code }}{% else %}—{% endif %}
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
-  <div class="form-card-body">
-    <div class="fields-grid cols-2">
-      <div class="field">
-        <label class="form-label">Truck</label>
-        <input class="form-control" value="{% if shipment.truck %}{{ shipment.truck.truck_code }}{% else %}-{% endif %}" readonly />
+
+  <!-- Right sidebar -->
+  <div class="col-lg-4 shipment-detail-sidebar">
+    <!-- Quick Summary -->
+    <div class="form-card">
+      <div class="form-card-header">
+        <div class="form-card-icon blue">
+          <i class="bi bi-info-circle"></i>
+        </div>
+        <div class="form-card-header-text">
+          <h2 class="form-card-title">Quick Summary</h2>
+        </div>
       </div>
-      <div class="field">
-        <label class="form-label">Driver</label>
-        <input class="form-control" value="{% if shipment.driver %}{{ shipment.driver.driver_code }}{% else %}-{% endif %}" readonly />
+      <div class="form-card-body">
+        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
+          <span class="detail-field-label">Shipment No.</span>
+          <span class="detail-field-value" style="font-weight: 600; color: var(--primary-color)">
+            {{ shipment.shipment_no }}
+          </span>
+        </div>
+        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
+          <span class="detail-field-label">Booking No.</span>
+          <span class="detail-field-value">
+            {% if shipment.booking %}{{ shipment.booking.booking_no }}{% else %}—{% endif %}
+          </span>
+        </div>
+        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
+          <span class="detail-field-label">Shipment Status</span>
+          <span class="detail-field-value">
+            {% if shipment.shipment_status == 'In Transit' %}
+            <span class="status-badge in-transit">{{ shipment.shipment_status }}</span>
+            {% elif shipment.shipment_status == 'Delivered' or shipment.shipment_status == 'Closed' %}
+            <span class="status-badge active">{{ shipment.shipment_status }}</span>
+            {% elif shipment.shipment_status == 'Cancelled' %}
+            <span class="status-badge inactive">{{ shipment.shipment_status }}</span>
+            {% else %}
+            <span class="status-badge pending">{{ shipment.shipment_status|default:"Created" }}</span>
+            {% endif %}
+          </span>
+        </div>
+        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
+          <span class="detail-field-label">Client</span>
+          <span class="detail-field-value">
+            {% if shipment.client_account %}{{ shipment.client_account.display_name }}{% else %}—{% endif %}
+          </span>
+        </div>
+        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
+          <span class="detail-field-label">Route</span>
+          <span class="detail-field-value">{{ shipment.route_display|default:"—" }}</span>
+        </div>
+        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
+          <span class="detail-field-label">Truck</span>
+          <span class="detail-field-value">
+            {% if shipment.truck %}{{ shipment.truck.truck_code }}{% else %}—{% endif %}
+          </span>
+        </div>
+        <div class="detail-field" style="padding: 10px 0">
+          <span class="detail-field-label">POD Status</span>
+          <span class="detail-field-value">
+            {% if shipment.pod_status == 'Compliant' %}
+            <span class="status-badge active">{{ shipment.pod_status }}</span>
+            {% else %}
+            <span class="status-badge pending">{{ shipment.pod_status|default:"—" }}</span>
+            {% endif %}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Activity Log -->
+    <div class="form-card">
+      <div class="form-card-header">
+        <div class="form-card-icon amber">
+          <i class="bi bi-clock-history"></i>
+        </div>
+        <div class="form-card-header-text">
+          <h2 class="form-card-title">Activity Log</h2>
+        </div>
+      </div>
+      <div class="form-card-body">
+        <div style="display: flex; flex-direction: column; gap: 16px">
+          {% for item in activity_log %}
+          <div style="display: flex; gap: 12px; align-items: flex-start">
+            <div
+              style="
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                background: {{ item.color }};
+                margin-top: 6px;
+                flex-shrink: 0;
+              "
+            ></div>
+            <div>
+              <div style="font-size: 13px; font-weight: 600; color: #333">{{ item.title }}</div>
+              <div style="font-size: 12px; color: #888">
+                {{ item.timestamp|date:"d M Y, g:i A" }} &mdash; {{ item.actor|default:"System" }}
+              </div>
+            </div>
+          </div>
+          {% empty %}
+          <div class="text-muted">No activity available.</div>
+          {% endfor %}
+        </div>
       </div>
     </div>
   </div>
 </div>
 
 {% if booking %}
-<div class="form-card">
-  <div class="form-card-header">
-    <div class="form-card-icon amber"><i class="bi bi-box"></i></div>
-    <div class="form-card-header-text">
-      <h2 class="form-card-title">Cargo Information</h2>
-    </div>
-  </div>
-  <div class="form-card-body">
-    <div class="eal-table-card">
-      <div class="eal-table-wrap">
-        <table class="eal-table">
-          <thead>
-            <tr>
-              <th>SN</th>
-              <th>Booking Item</th>
-              <th>Cargo</th>
-              <th>Weight (Ton)</th>
-              <th>Unit</th>
-              <th>QTY</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>1</td>
-              <td>{{ booking.cargo_booking_item|default:'-' }}</td>
-              <td>{% if booking.cargo %}{{ booking.cargo.cargo_code }} - {{ booking.cargo.display_name }}{% else %}-{% endif %}</td>
-              <td>{{ booking.cargo_weight|floatformat:2 }}</td>
-              <td>{{ booking.cargo_unit|default:'-' }}</td>
-              <td>{{ booking.cargo_qty|floatformat:2 }}</td>
-            </tr>
-          </tbody>
-        </table>
+<!-- Bottom: full-width cargo table -->
+<div class="row g-4">
+  <div class="col-12">
+    <div class="form-card" data-section="7">
+      <div class="form-card-header">
+        <div class="form-card-icon red">
+          <i class="bi bi-box"></i>
+        </div>
+        <div class="form-card-header-text">
+          <h2 class="form-card-title">Cargo Information</h2>
+          <p class="form-card-desc">Cargo item, weight, quantity, and totals from linked booking.</p>
+        </div>
       </div>
-    </div>
-    <div class="fields-grid cols-2 mt-3">
-      <div class="field">
-        <label class="form-label">Total Cargo Unit QTY</label>
-        <input class="form-control" value="{{ booking.total_cargo_qty|floatformat:2 }}" readonly />
-      </div>
-      <div class="field">
-        <label class="form-label">Total Cargo Weight</label>
-        <input class="form-control" value="{{ booking.total_cargo_weight|floatformat:2 }}" readonly />
+      <div class="form-card-body">
+        <div class="eal-table-wrap" style="box-shadow: none; border-radius: 0">
+          <table class="eal-table mb-0">
+            <thead>
+              <tr>
+                <th style="width: 60px">SN</th>
+                <th>Booking Item</th>
+                <th>Cargo</th>
+                <th>Weight (Ton)</th>
+                <th>Unit</th>
+                <th>QTY</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="text-muted">1</td>
+                <td>{{ booking.cargo_booking_item|default:"—" }}</td>
+                <td>
+                  {% if booking.cargo %}
+                  {{ booking.cargo.cargo_code }} &mdash; {{ booking.cargo.display_name }}
+                  {% else %}
+                  —
+                  {% endif %}
+                </td>
+                <td>{{ booking.cargo_weight|floatformat:2 }}</td>
+                <td>{{ booking.cargo_unit|default:"—" }}</td>
+                <td>{{ booking.cargo_qty|floatformat:2 }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="fields-grid cols-2" style="margin-top: 20px">
+          <div class="field">
+            <label class="form-label">Total Cargo Unit QTY</label>
+            <p class="detail-view-value">{{ booking.total_cargo_qty|floatformat:2 }}</p>
+          </div>
+          <div class="field">
+            <label class="form-label">Total Cargo Weight</label>
+            <p class="detail-view-value">{{ booking.total_cargo_weight|floatformat:2 }}</p>
+          </div>
+        </div>
       </div>
     </div>
   </div>
