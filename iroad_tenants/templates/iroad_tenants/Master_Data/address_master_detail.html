@@ -2,10 +2,11 @@
 {% load static %}
 {% load i18n %}
 
-{% block title %}{% translate "Address Detail" %} | iRoad{% endblock %}
+{% block title %}{% translate "Address Detail" %} | iRoad Admin{% endblock %}
 {% block breadcrumb %}{% endblock %}
 
 {% block content %}
+<!-- Page Header -->
 <div class="page-header">
   <nav aria-label="breadcrumb">
     <ol class="breadcrumb">
@@ -17,204 +18,249 @@
       <li class="breadcrumb-item active" aria-current="page">{% translate "Address Detail" %}</li>
     </ol>
   </nav>
-  <div class="page-header-row align-items-start">
+  <div class="page-header-row">
     <div class="page-header-left">
-      <h1 class="page-title">{% translate "Address Detail" %}</h1>
+      <h1 class="page-title">
+        {% translate "Address Detail" %} &mdash;
+        <span style="color: var(--primary-color)">{{ address.address_code }}</span>
+      </h1>
       <p class="page-subtitle">{{ address.address_code }} - {{ address.display_name }}</p>
     </div>
-    <div class="page-header-right ms-auto">
+    <div class="page-header-right">
       <div class="eal-header-actions">
         <a
-          href="{% url 'iroad_tenants:tenant_address_master_edit' address.address_code %}"
-          class="btn btn-outline-secondary"
+          href="{% url 'iroad_tenants:tenant_address_master' %}"
+          class="eal-btn eal-btn-outline"
         >
-          <i class="bi bi-pencil me-1"></i>{% translate "Edit" %}
+          <i class="bi bi-arrow-left"></i>
+          <span>{% translate "Back to List" %}</span>
         </a>
         <a
-          href="{% url 'iroad_tenants:tenant_address_master' %}"
-          class="btn btn-primary"
+          class="eal-btn eal-btn-primary"
+          href="{% url 'iroad_tenants:tenant_address_master_edit' address.address_code %}"
         >
-          <i class="bi bi-arrow-left me-1"></i>{% translate "Back to List" %}
+          <i class="bi bi-pencil-square"></i>
+          <span>{% translate "Edit" %}</span>
         </a>
       </div>
     </div>
   </div>
 </div>
 
-<div class="form-card mb-3">
+<!-- Identity & Client -->
+<div class="form-card" data-section="1">
+  <div class="form-card-header">
+    <div class="form-card-icon blue">
+      <i class="bi bi-person-vcard"></i>
+    </div>
+    <div class="form-card-header-text">
+      <h2 class="form-card-title">{% translate "Identity & Client" %}</h2>
+      <p class="form-card-desc">{% translate "Identity, labels and category defaults." %}</p>
+    </div>
+  </div>
   <div class="form-card-body">
-    <h2 class="form-card-title mb-4">{% translate "Identity & Client" %}</h2>
-
     <p class="small text-uppercase fw-semibold text-secondary mb-3" style="letter-spacing: 0.06em">
       {% translate "Identity" %}
     </p>
-    <div class="fields-grid cols-2 mb-4">
+    <div class="fields-grid cols-2">
       <div class="field">
         <label class="form-label">{% translate "Address Code" %}</label>
-        <div class="form-control">{{ address.address_code }}</div>
+        <p class="detail-view-value">{{ address.address_code }}</p>
       </div>
       <div class="field">
         <label class="form-label">{% translate "Client Account" %}</label>
-        <div class="form-control">{{ address.client_account.account_no }} - {{ address.client_account.display_name }}</div>
+        <p class="detail-view-value">
+          {% if address.client_account %}
+            {{ address.client_account.account_no }} - {{ address.client_account.display_name }}
+          {% else %}
+            &mdash;
+          {% endif %}
+        </p>
       </div>
     </div>
-    <div class="fields-grid cols-3 mb-4">
+    <div class="fields-grid cols-3" style="margin-top: 20px">
       <div class="field">
         <label class="form-label">{% translate "Display Name" %}</label>
-        <div class="form-control">{{ address.display_name }}</div>
+        <p class="detail-view-value">{{ address.display_name|default:"—" }}</p>
       </div>
       <div class="field">
         <label class="form-label">{% translate "Arabic Label" %}</label>
-        <div class="form-control">{{ address.arabic_label|default:"—" }}</div>
+        <p class="detail-view-value">{{ address.arabic_label|default:"—" }}</p>
       </div>
       <div class="field">
         <label class="form-label">{% translate "English Label" %}</label>
-        <div class="form-control">{{ address.english_label|default:"—" }}</div>
+        <p class="detail-view-value">{{ address.english_label|default:"—" }}</p>
       </div>
     </div>
 
-    <p class="small text-uppercase fw-semibold text-secondary mb-3" style="letter-spacing: 0.06em">
+    <p class="small text-uppercase fw-semibold text-secondary mb-3 mt-4" style="letter-spacing: 0.06em">
       {% translate "Category & defaults" %}
     </p>
-    <div class="fields-grid cols-2 mb-3">
+    <div class="fields-grid cols-2">
       <div class="field">
         <label class="form-label">{% translate "Address Category" %}</label>
-        <div class="form-control">{{ address.address_category }}</div>
+        <p class="detail-view-value">{{ address.address_category|default:"—" }}</p>
       </div>
       <div class="field">
         <label class="form-label">{% translate "Status" %}</label>
-        <div class="form-control">{{ address.status }}</div>
+        <p class="detail-view-value">{{ address.status|default:"—" }}</p>
       </div>
     </div>
-    <div class="fields-grid cols-2">
+    <div class="fields-grid cols-2" style="margin-top: 20px">
       <div class="field">
         <label class="form-label">{% translate "Default Pickup Address" %}</label>
-        <div class="form-control">{% if address.default_pickup_address %}{% translate "Yes" %}{% else %}{% translate "No" %}{% endif %}</div>
+        <p class="detail-view-value">
+          {% if address.default_pickup_address %}{% translate "Yes" %}{% else %}{% translate "No" %}{% endif %}
+        </p>
       </div>
       <div class="field">
         <label class="form-label">{% translate "Default Delivery Address" %}</label>
-        <div class="form-control">{% if address.default_delivery_address %}{% translate "Yes" %}{% else %}{% translate "No" %}{% endif %}</div>
+        <p class="detail-view-value">
+          {% if address.default_delivery_address %}{% translate "Yes" %}{% else %}{% translate "No" %}{% endif %}
+        </p>
       </div>
     </div>
   </div>
 </div>
 
-<div class="form-card mb-3">
+<!-- Location -->
+<div class="form-card" data-section="2">
+  <div class="form-card-header">
+    <div class="form-card-icon amber">
+      <i class="bi bi-geo-alt"></i>
+    </div>
+    <div class="form-card-header-text">
+      <h2 class="form-card-title">{% translate "Location" %}</h2>
+      <p class="form-card-desc">{% translate "Region hierarchy, address lines, map link and site instructions." %}</p>
+    </div>
+  </div>
   <div class="form-card-body">
-    <h2 class="form-card-title mb-4">{% translate "Location" %}</h2>
-
     <p class="small text-uppercase fw-semibold text-secondary mb-3" style="letter-spacing: 0.06em">
       {% translate "Region" %}
     </p>
-    <div class="fields-grid cols-3 mb-3">
+    <div class="fields-grid cols-3">
       <div class="field">
         <label class="form-label">{% translate "Country" %}</label>
-        <div class="form-control">{{ country_display }}</div>
+        <p class="detail-view-value">{{ country_display|default:"—" }}</p>
       </div>
       <div class="field">
         <label class="form-label">{% translate "Province" %}</label>
-        <div class="form-control">{{ address.province|default:"—" }}</div>
+        <p class="detail-view-value">{{ address.province|default:"—" }}</p>
       </div>
       <div class="field">
         <label class="form-label">{% translate "City" %}</label>
-        <div class="form-control">{{ address.city|default:"—" }}</div>
+        <p class="detail-view-value">{{ address.city|default:"—" }}</p>
       </div>
     </div>
-    <div class="fields-grid cols-3 mb-4">
+    <div class="fields-grid cols-3" style="margin-top: 20px">
       <div class="field">
         <label class="form-label">{% translate "District" %}</label>
-        <div class="form-control">{{ address.district|default:"—" }}</div>
+        <p class="detail-view-value">{{ address.district|default:"—" }}</p>
       </div>
       <div class="field">
         <label class="form-label">{% translate "Street" %}</label>
-        <div class="form-control">{{ address.street|default:"—" }}</div>
+        <p class="detail-view-value">{{ address.street|default:"—" }}</p>
       </div>
       <div class="field">
         <label class="form-label">{% translate "Building Number" %}</label>
-        <div class="form-control">{{ address.building_no|default:"—" }}</div>
+        <p class="detail-view-value">{{ address.building_no|default:"—" }}</p>
       </div>
     </div>
-    <div class="fields-grid cols-3 mb-4">
+    <div class="fields-grid cols-2" style="margin-top: 20px">
       <div class="field">
         <label class="form-label">{% translate "Postal Code" %}</label>
-        <div class="form-control">{{ address.postal_code|default:"—" }}</div>
+        <p class="detail-view-value">{{ address.postal_code|default:"—" }}</p>
       </div>
       <div class="field">
         <label class="form-label">{% translate "City / Country" %}</label>
-        <div class="form-control">{{ city_country_display }}</div>
+        <p class="detail-view-value">{{ city_country_display|default:"—" }}</p>
       </div>
     </div>
 
-    <p class="small text-uppercase fw-semibold text-secondary mb-3" style="letter-spacing: 0.06em">
+    <p class="small text-uppercase fw-semibold text-secondary mb-3 mt-4" style="letter-spacing: 0.06em">
       {% translate "Address lines & map" %}
     </p>
-    <div class="fields-grid cols-2 mb-3">
+    <div class="fields-grid cols-2">
       <div class="field">
         <label class="form-label">{% translate "Address Line 1" %}</label>
-        <div class="form-control">{{ address.address_line_1|default:"—" }}</div>
+        <p class="detail-view-value">{{ address.address_line_1|default:"—" }}</p>
       </div>
       <div class="field">
         <label class="form-label">{% translate "Address Line 2" %}</label>
-        <div class="form-control">{{ address.address_line_2|default:"—" }}</div>
+        <p class="detail-view-value">{{ address.address_line_2|default:"—" }}</p>
       </div>
     </div>
-    <div class="field mb-3">
-      <label class="form-label">{% translate "Map Link" %}</label>
-      <div class="form-control text-break">
-        {% if address.map_link %}
-          <a href="{{ address.map_link }}" target="_blank" rel="noopener">{{ address.map_link }}</a>
-        {% else %}
-          —
-        {% endif %}
+    <div class="fields-grid cols-1" style="margin-top: 20px">
+      <div class="field">
+        <label class="form-label">{% translate "Map Link" %}</label>
+        <p class="detail-view-value text-break">
+          {% if address.map_link %}
+            <a href="{{ address.map_link }}" style="color: var(--primary-color)" target="_blank" rel="noopener">{{ address.map_link }}</a>
+          {% else %}
+            &mdash;
+          {% endif %}
+        </p>
       </div>
     </div>
-    <div class="field">
-      <label class="form-label">{% translate "Site Instructions" %}</label>
-      <div class="form-control">{{ address.site_instructions|default:"—" }}</div>
+    <div class="fields-grid cols-1" style="margin-top: 20px">
+      <div class="field">
+        <label class="form-label">{% translate "Site Instructions" %}</label>
+        <p class="detail-view-value" style="white-space: pre-line">{{ address.site_instructions|default:"—" }}</p>
+      </div>
     </div>
   </div>
 </div>
 
-<div class="form-card mb-3">
+<!-- Contact -->
+<div class="form-card" data-section="3">
+  <div class="form-card-header">
+    <div class="form-card-icon green">
+      <i class="bi bi-person-lines-fill"></i>
+    </div>
+    <div class="form-card-header-text">
+      <h2 class="form-card-title">{% translate "Contact" %}</h2>
+      <p class="form-card-desc">{% translate "Site contact person and reachable channels." %}</p>
+    </div>
+  </div>
   <div class="form-card-body">
-    <h2 class="form-card-title mb-4">{% translate "Contact" %}</h2>
-
     <p class="small text-uppercase fw-semibold text-secondary mb-3" style="letter-spacing: 0.06em">
       {% translate "Contact details" %}
     </p>
-    <div class="fields-grid cols-2 mb-3">
+    <div class="fields-grid cols-2">
       <div class="field">
         <label class="form-label">{% translate "Contact Name" %}</label>
-        <div class="form-control">{{ address.contact_name|default:"—" }}</div>
+        <p class="detail-view-value">{{ address.contact_name|default:"—" }}</p>
       </div>
       <div class="field">
         <label class="form-label">{% translate "Position" %}</label>
-        <div class="form-control">{{ address.position|default:"—" }}</div>
+        <p class="detail-view-value">{{ address.position|default:"—" }}</p>
       </div>
     </div>
-    <div class="fields-grid cols-2 mb-3">
+    <div class="fields-grid cols-2" style="margin-top: 20px">
       <div class="field">
         <label class="form-label">{% translate "Mobile No. 1" %}</label>
-        <div class="form-control">{{ mobile_no_1_display }}</div>
+        <p class="detail-view-value">{{ mobile_no_1_display|default:"—" }}</p>
       </div>
       <div class="field">
         <label class="form-label">{% translate "Mobile No. 2" %}</label>
-        <div class="form-control">{{ mobile_no_2_display }}</div>
+        <p class="detail-view-value">{{ mobile_no_2_display|default:"—" }}</p>
       </div>
     </div>
-    <div class="fields-grid cols-2 mb-3">
+    <div class="fields-grid cols-2" style="margin-top: 20px">
       <div class="field">
         <label class="form-label">{% translate "WhatsApp No." %}</label>
-        <div class="form-control">{{ whatsapp_no_display }}</div>
+        <p class="detail-view-value">{{ whatsapp_no_display|default:"—" }}</p>
       </div>
       <div class="field">
         <label class="form-label">{% translate "Phone No." %}</label>
-        <div class="form-control">{{ phone_no_display }}</div>
+        <p class="detail-view-value">{{ phone_no_display|default:"—" }}</p>
       </div>
     </div>
-    <div class="field">
-      <label class="form-label">{% translate "Email" %}</label>
-      <div class="form-control">{{ address.email|default:"—" }}</div>
+    <div class="fields-grid cols-1" style="margin-top: 20px">
+      <div class="field">
+        <label class="form-label">{% translate "Email" %}</label>
+        <p class="detail-view-value text-break">{{ address.email|default:"—" }}</p>
+      </div>
     </div>
   </div>
 </div>

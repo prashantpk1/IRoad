@@ -42,25 +42,40 @@
 {% endblock %}
 
 {% block content %}
+{% if is_view_mode or is_deleted_user %}
+<!-- ───────────────────────── VIEW / DELETED DETAIL PAGE ───────────────────────── -->
 <div class="page-header">
   <nav aria-label="breadcrumb">
     <ol class="breadcrumb">
       <li class="breadcrumb-item"><a href="{% url 'iroad_tenants:tenant_dashboard' %}">Dashboard</a></li>
       <li class="breadcrumb-item">Administration</li>
-      <li class="breadcrumb-item">User Management</li>
-      <li class="breadcrumb-item active" aria-current="page">{% if is_deleted_user %}Deleted user{% elif is_view_mode %}View User Administration{% elif is_edit_mode %}Edit User Administration{% else %}Create User Administration{% endif %}</li>
+      <li class="breadcrumb-item">
+        <a href="{% url 'iroad_tenants:tenant_users_administration' %}">User Management</a>
+      </li>
+      <li class="breadcrumb-item active" aria-current="page">
+        {% if is_deleted_user %}Deleted user{% else %}View User Administration{% endif %}
+      </li>
     </ol>
   </nav>
   <div class="page-header-row">
     <div class="page-header-left">
-      <h1 class="page-title">{% if is_deleted_user %}Deleted user (read-only){% elif is_view_mode %}View User Administration{% elif is_edit_mode %}Edit User Administration{% else %}Create User Administration{% endif %}</h1>
-      <p class="page-subtitle">{% if is_deleted_user %}This account is soft-deleted. Use Restore to clear deletion; the account stays Inactive until you activate it.{% elif is_view_mode %}Review user account details.{% elif is_edit_mode %}Update the details below to edit this user account.{% else %}Fill in the details below to create a new user account.{% endif %}</p>
+      <h1 class="page-title">
+        {% if is_deleted_user %}Deleted User{% else %}User Administration{% endif %} &mdash;
+        <span style="color: var(--primary-color)">{{ editing_user.username }}</span>
+      </h1>
+      <p class="page-subtitle">
+        {% if is_deleted_user %}
+          This account is soft-deleted. Use Restore to clear deletion; the account stays Inactive until you activate it.
+        {% else %}
+          Read-only view of this user account.
+        {% endif %}
+      </p>
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
         <a href="{% url 'iroad_tenants:tenant_users_administration' %}" class="eal-btn eal-btn-outline">
           <i class="bi bi-arrow-left"></i>
-          <span>Back</span>
+          <span>Back to List</span>
         </a>
         {% if is_deleted_user and editing_user %}
         <form method="post" action="{% url 'iroad_tenants:tenant_users_administration_restore' editing_user.user_id %}" class="d-inline" onsubmit="return confirm('Restore this user? They will remain Inactive until you activate the account.');">
@@ -70,7 +85,361 @@
             <span>Restore user</span>
           </button>
         </form>
+        {% elif editing_user %}
+        <a class="eal-btn eal-btn-primary" href="{% url 'iroad_tenants:tenant_users_administration_edit' editing_user.user_id %}">
+          <i class="bi bi-pencil-square"></i>
+          <span>Edit User</span>
+        </a>
         {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- Left Column: Main Details -->
+  <div class="col-lg-8">
+    <!-- User Account Details -->
+    <div class="form-card" data-section="1">
+      <div class="form-card-header">
+        <div class="form-card-icon blue">
+          <i class="bi bi-person-badge"></i>
+        </div>
+        <div class="form-card-header-text">
+          <h2 class="form-card-title">User Account Details</h2>
+          <p class="form-card-desc">Core identity and contact information for the user.</p>
+        </div>
+      </div>
+      <div class="form-card-body">
+        <p class="small text-uppercase fw-semibold text-secondary mb-3" style="letter-spacing: 0.06em">
+          Basic Information
+        </p>
+        <div class="fields-grid cols-2">
+          <div class="field">
+            <label class="form-label">Username</label>
+            <p class="detail-view-value">{{ form_data.username|default:editing_user.username|default:"—" }}</p>
+          </div>
+          <div class="field">
+            <label class="form-label">Full Name</label>
+            <p class="detail-view-value">{{ form_data.full_name|default:editing_user.full_name|default:"—" }}</p>
+          </div>
+        </div>
+
+        <p class="small text-uppercase fw-semibold text-secondary mb-3 mt-4" style="letter-spacing: 0.06em">
+          Contact Information
+        </p>
+        <div class="fields-grid cols-2">
+          <div class="field">
+            <label class="form-label">Email Address</label>
+            <p class="detail-view-value text-break">
+              {% if form_data.email or editing_user.email %}
+                <a href="mailto:{{ form_data.email|default:editing_user.email }}" style="color: var(--primary-color)">
+                  {{ form_data.email|default:editing_user.email }}
+                </a>
+              {% else %}
+                &mdash;
+              {% endif %}
+            </p>
+          </div>
+          <div class="field">
+            <label class="form-label">Mobile Number</label>
+            <p class="detail-view-value">
+              {% if form_data.mobile_country_code or form_data.mobile_no %}
+                {{ form_data.mobile_country_code }} {{ form_data.mobile_no }}
+              {% elif editing_user.mobile_country_code or editing_user.mobile_no %}
+                {{ editing_user.mobile_country_code }} {{ editing_user.mobile_no }}
+              {% else %}
+                &mdash;
+              {% endif %}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Security & Access -->
+    <div class="form-card" data-section="2">
+      <div class="form-card-header">
+        <div class="form-card-icon green">
+          <i class="bi bi-shield-lock"></i>
+        </div>
+        <div class="form-card-header-text">
+          <h2 class="form-card-title">Security &amp; Access</h2>
+          <p class="form-card-desc">Authentication and role-based permissions.</p>
+        </div>
+      </div>
+      <div class="form-card-body">
+        <div class="pod-status-grid">
+          <div class="pod-status-tile">
+            <label class="form-label">Account Status</label>
+            <p class="detail-view-value">
+              <span class="status-badge {% if form_data.status == 'Active' %}active{% else %}pending{% endif %}">
+                {% if form_data.status == 'Active' %}
+                  <i class="bi bi-check-circle"></i> Active
+                {% else %}
+                  Inactive
+                {% endif %}
+              </span>
+            </p>
+          </div>
+          {% if is_deleted_user %}
+          <div class="pod-status-tile">
+            <label class="form-label">Account State</label>
+            <p class="detail-view-value">
+              <span class="status-badge pending">
+                <i class="bi bi-trash"></i> Soft-deleted
+              </span>
+            </p>
+          </div>
+          {% endif %}
+        </div>
+
+        <p class="small text-uppercase fw-semibold text-secondary mb-3 mt-4" style="letter-spacing: 0.06em">
+          Role Assignment
+        </p>
+        <div class="fields-grid cols-1">
+          <div class="field">
+            <label class="form-label">System Roles</label>
+            <p class="detail-view-value">
+              {% if form_data.roles %}
+                {% for role_name in form_data.roles %}
+                  <span class="status-badge in-transit" style="margin-right: 6px; margin-bottom: 6px; display: inline-block">
+                    <i class="bi bi-person-gear"></i> {{ role_name }}
+                  </span>
+                {% endfor %}
+              {% else %}
+                &mdash;
+              {% endif %}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- System & Audit -->
+    <div class="form-card" data-section="3">
+      <div class="form-card-header">
+        <div class="form-card-icon amber">
+          <i class="bi bi-clock-history"></i>
+        </div>
+        <div class="form-card-header-text">
+          <h2 class="form-card-title">System &amp; Audit</h2>
+          <p class="form-card-desc">System generated tracking and logs.</p>
+        </div>
+      </div>
+      <div class="form-card-body">
+        <p class="small text-uppercase fw-semibold text-secondary mb-3" style="letter-spacing: 0.06em">
+          Audit Details
+        </p>
+        <div class="fields-grid cols-3">
+          <div class="field">
+            <label class="form-label">Last Login</label>
+            <p class="detail-view-value">
+              {% if editing_user and editing_user.last_login_at %}
+                {{ editing_user.last_login_at|date:'d M Y, h:i A' }}
+              {% else %}
+                N/A
+              {% endif %}
+            </p>
+          </div>
+          <div class="field">
+            <label class="form-label">Login Attempts</label>
+            <p class="detail-view-value">
+              {% if editing_user %}{{ editing_user.login_attempts }}{% else %}0{% endif %}
+            </p>
+          </div>
+          <div class="field">
+            <label class="form-label">Created By</label>
+            <p class="detail-view-value">
+              {% if editing_user and editing_user.created_by_label %}
+                {{ editing_user.created_by_label }}
+              {% else %}
+                {{ display_name }} (Tenant Admin)
+              {% endif %}
+            </p>
+          </div>
+        </div>
+
+        {% if editing_user %}
+        <div class="fields-grid cols-3" style="margin-top: 20px">
+          <div class="field">
+            <label class="form-label">Soft-deleted</label>
+            <p class="detail-view-value">
+              <span class="status-badge {% if editing_user.is_deleted %}pending{% else %}active{% endif %}">
+                {% if editing_user.is_deleted %}Yes{% else %}No{% endif %}
+              </span>
+            </p>
+          </div>
+          <div class="field">
+            <label class="form-label">Deleted at</label>
+            <p class="detail-view-value">
+              {% if editing_user.deleted_at %}
+                {{ editing_user.deleted_at|date:'d M Y, h:i A' }}
+              {% else %}
+                &mdash;
+              {% endif %}
+            </p>
+          </div>
+          <div class="field">
+            <label class="form-label">Deleted by</label>
+            <p class="detail-view-value">{{ deleted_by_display|default:'—' }}</p>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Column: Summary Sidebar -->
+  <div class="col-lg-4">
+    <!-- Quick Summary -->
+    <div class="form-card">
+      <div class="form-card-header">
+        <div class="form-card-icon blue">
+          <i class="bi bi-info-circle"></i>
+        </div>
+        <div class="form-card-header-text">
+          <h2 class="form-card-title">Quick Summary</h2>
+        </div>
+      </div>
+      <div class="form-card-body">
+        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
+          <span class="detail-field-label">Username</span>
+          <span class="detail-field-value" style="font-weight: 600; color: var(--primary-color)">
+            {{ editing_user.username|default:'—' }}
+          </span>
+        </div>
+        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
+          <span class="detail-field-label">Full Name</span>
+          <span class="detail-field-value">{{ editing_user.full_name|default:'—' }}</span>
+        </div>
+        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
+          <span class="detail-field-label">Email</span>
+          <span class="detail-field-value text-break">{{ editing_user.email|default:'—' }}</span>
+        </div>
+        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
+          <span class="detail-field-label">Status</span>
+          <span class="detail-field-value">
+            <span class="status-badge {% if form_data.status == 'Active' %}active{% else %}pending{% endif %}">
+              {% if form_data.status == 'Active' %}Active{% else %}Inactive{% endif %}
+            </span>
+          </span>
+        </div>
+        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
+          <span class="detail-field-label">Role</span>
+          <span class="detail-field-value">
+            {% if form_data.roles %}
+              <span class="status-badge in-transit">
+                <i class="bi bi-person-gear"></i> {{ form_data.roles|join:', ' }}
+              </span>
+            {% else %}
+              &mdash;
+            {% endif %}
+          </span>
+        </div>
+        <div class="detail-field" style="padding: 10px 0; border-bottom: 1px solid #eee">
+          <span class="detail-field-label">Last Login</span>
+          <span class="detail-field-value">
+            {% if editing_user.last_login_at %}
+              {{ editing_user.last_login_at|date:'d M Y, h:i A' }}
+            {% else %}
+              N/A
+            {% endif %}
+          </span>
+        </div>
+        <div class="detail-field" style="padding: 10px 0">
+          <span class="detail-field-label">Login Attempts</span>
+          <span class="detail-field-value">{{ editing_user.login_attempts|default:'0' }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Activity Log -->
+    <div class="form-card">
+      <div class="form-card-header">
+        <div class="form-card-icon amber">
+          <i class="bi bi-clock-history"></i>
+        </div>
+        <div class="form-card-header-text">
+          <h2 class="form-card-title">Activity Log</h2>
+        </div>
+      </div>
+      <div class="form-card-body">
+        <div style="display: flex; flex-direction: column; gap: 16px">
+          {% if editing_user.is_deleted %}
+          <div style="display: flex; gap: 12px; align-items: flex-start">
+            <div style="width: 8px; height: 8px; border-radius: 50%; background: #dc3545; margin-top: 6px; flex-shrink: 0"></div>
+            <div>
+              <div style="font-size: 13px; font-weight: 600; color: #333">Soft-deleted</div>
+              <div style="font-size: 12px; color: #888">
+                {% if editing_user.deleted_at %}{{ editing_user.deleted_at|date:'d M Y, g:i A' }}{% else %}—{% endif %}
+                &mdash; {{ deleted_by_display|default:'System' }}
+              </div>
+            </div>
+          </div>
+          {% endif %}
+
+          {% if editing_user.last_login_at %}
+          <div style="display: flex; gap: 12px; align-items: flex-start">
+            <div style="width: 8px; height: 8px; border-radius: 50%; background: #0d6efd; margin-top: 6px; flex-shrink: 0"></div>
+            <div>
+              <div style="font-size: 13px; font-weight: 600; color: #333">Last Login</div>
+              <div style="font-size: 12px; color: #888">
+                {{ editing_user.last_login_at|date:'d M Y, g:i A' }}
+              </div>
+            </div>
+          </div>
+          {% endif %}
+
+          {% if editing_user.updated_at and editing_user.updated_at != editing_user.created_at %}
+          <div style="display: flex; gap: 12px; align-items: flex-start">
+            <div style="width: 8px; height: 8px; border-radius: 50%; background: #28a745; margin-top: 6px; flex-shrink: 0"></div>
+            <div>
+              <div style="font-size: 13px; font-weight: 600; color: #333">Updated</div>
+              <div style="font-size: 12px; color: #888">
+                {{ editing_user.updated_at|date:'d M Y, g:i A' }} &mdash; User record was modified.
+              </div>
+            </div>
+          </div>
+          {% endif %}
+
+          <div style="display: flex; gap: 12px; align-items: flex-start">
+            <div style="width: 8px; height: 8px; border-radius: 50%; background: var(--primary-color); margin-top: 6px; flex-shrink: 0"></div>
+            <div>
+              <div style="font-size: 13px; font-weight: 600; color: #333">Created</div>
+              <div style="font-size: 12px; color: #888">
+                {% if editing_user.created_at %}{{ editing_user.created_at|date:'d M Y, g:i A' }}{% endif %}
+                {% if editing_user.created_by_label %}&mdash; {{ editing_user.created_by_label }}{% endif %}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% else %}
+<!-- ───────────────────────── CREATE / EDIT FORM (UNCHANGED) ───────────────────────── -->
+<div class="page-header">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{% url 'iroad_tenants:tenant_dashboard' %}">Dashboard</a></li>
+      <li class="breadcrumb-item">Administration</li>
+      <li class="breadcrumb-item">User Management</li>
+      <li class="breadcrumb-item active" aria-current="page">{% if is_edit_mode %}Edit User Administration{% else %}Create User Administration{% endif %}</li>
+    </ol>
+  </nav>
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">{% if is_edit_mode %}Edit User Administration{% else %}Create User Administration{% endif %}</h1>
+      <p class="page-subtitle">{% if is_edit_mode %}Update the details below to edit this user account.{% else %}Fill in the details below to create a new user account.{% endif %}</p>
+    </div>
+    <div class="page-header-right">
+      <div class="eal-header-actions">
+        <a href="{% url 'iroad_tenants:tenant_users_administration' %}" class="eal-btn eal-btn-outline">
+          <i class="bi bi-arrow-left"></i>
+          <span>Back</span>
+        </a>
       </div>
     </div>
   </div>
@@ -185,14 +554,14 @@
                                     <div class="d-flex align-items-stretch gap-2">
                                         <div class="flex-grow-1 password-input-wrapper">
                                             <i class="bi bi-lock password-lock-inside"></i>
-                                            <input type="password" class="form-control {% if form_errors.password %}is-invalid{% endif %}" id="password" name="password" placeholder="••••••••" autocomplete="new-password" {% if is_view_mode or is_edit_mode or is_deleted_user %}disabled{% else %}required{% endif %}/>
+                                            <input type="password" class="form-control {% if form_errors.password %}is-invalid{% endif %}" id="password" name="password" placeholder="••••••••" autocomplete="new-password" {% if is_edit_mode %}disabled{% else %}required{% endif %}/>
                                             <button
                                               type="button"
                                               class="password-toggle-inside"
                                               id="togglePasswordBtn"
                                               title="Show password"
                                               aria-label="Show password"
-                                              {% if is_view_mode or is_edit_mode or is_deleted_user %}disabled{% endif %}
+                                              {% if is_edit_mode %}disabled{% endif %}
                                             >
                                               <i class="bi bi-eye"></i>
                                             </button>
@@ -202,7 +571,7 @@
                                           class="btn btn-outline-secondary"
                                           id="generatePasswordBtn"
                                           title="Generate random password"
-                                          {% if is_view_mode or is_edit_mode or is_deleted_user %}disabled{% endif %}
+                                          {% if is_edit_mode %}disabled{% endif %}
                                         >
                                           <i class="bi bi-shuffle me-1"></i>Generate
                                         </button>
@@ -324,31 +693,25 @@
                 </div>
 
   <div class="form-actions-bar">
-                    {% if not is_effective_readonly %}
                     <div class="form-actions-left">
                         <button type="reset" class="btn btn-outline-secondary">
                             <i class="bi bi-arrow-counterclockwise"></i>
                             Reset Form
                         </button>
                     </div>
-                    {% endif %}
                     <div class="form-actions-right">
-                        {% if not is_effective_readonly %}
                         <button type="submit" class="btn btn-primary">
                             <i class="bi bi-check-circle"></i>
                             {% if is_edit_mode %}Update User{% else %}Create User{% endif %}
                         </button>
-                        {% else %}
-                        <a href="{% url 'iroad_tenants:tenant_users_administration' %}" class="btn btn-outline-secondary">
-                          <i class="bi bi-arrow-left"></i> Back to List
-                        </a>
-                        {% endif %}
                     </div>
                 </div>
 </form>
+{% endif %}
 {% endblock %}
 
 {% block extra_js %}
+{% if not is_view_mode and not is_deleted_user %}
 <script>
   document.addEventListener("DOMContentLoaded", function () {
     const toggleInputs = document.querySelectorAll(".setting-toggle input");
@@ -425,4 +788,5 @@
     });
   });
 </script>
+{% endif %}
 {% endblock %}
