@@ -7835,6 +7835,20 @@ def _tenant_truck_movement_lookup_route_distance(from_point, to_point):
     return route.distance_km
 
 
+def _tenant_shipment_route_display(shipment):
+    """Human-readable route for shipment list/detail sidebars."""
+    route = (getattr(shipment, 'route_display', None) or '').strip()
+    if route:
+        return route
+    loading = getattr(shipment, 'loading_address', None)
+    delivery = getattr(shipment, 'delivery_address', None)
+    origin = (loading.display_name or '').strip() if loading else ''
+    destination = (delivery.display_name or '').strip() if delivery else ''
+    if origin and destination:
+        return f'{origin} → {destination}'
+    return origin or destination or '—'
+
+
 def _tenant_truck_movement_route_points_from_shipment(shipment):
     booking = None
     if shipment.booking_id:
@@ -20716,12 +20730,29 @@ class TruckMasterDetailView(View):
                     if cobj:
                         reg_country_display = f'{cobj.country_code} — {cobj.name_en}'
 
-            truck_ref_q = Q(truck=truck) | Q(truck_ref=truck.truck_code) | Q(truck_ref=str(truck.truck_id))
             movement_log_rows = list(
-                TenantTruckMovementLog.objects.filter(truck_ref_q)
-                .select_related('truck', 'driver', 'shipment', 'booking')
+                TenantTruckMovementLog.objects.filter(truck=truck)
+                .select_related(
+                    'truck',
+                    'driver',
+                    'shipment',
+                    'booking',
+                    'from_location_point',
+                    'to_location_point',
+                )
                 .order_by('-movement_date', '-created_at')[:100]
             )
+            for movement in movement_log_rows:
+                movement.from_location = (
+                    movement.from_location_point.display_label
+                    if movement.from_location_point_id and movement.from_location_point
+                    else ''
+                )
+                movement.to_location = (
+                    movement.to_location_point.display_label
+                    if movement.to_location_point_id and movement.to_location_point
+                    else ''
+                )
 
             truck_location_display = '—'
             for m in movement_log_rows:
@@ -20744,20 +20775,14 @@ class TruckMasterDetailView(View):
                             break
 
             truck_shipment_rows = []
-            for s in TenantShipment.objects.filter(truck=truck).order_by(
-                '-shipment_date', '-created_at'
-            )[:100]:
-                route = (s.route_display or '').strip()
-                if not route:
-                    fl = (s.from_location or '').strip()
-                    tl = (s.to_location or '').strip()
-                    if fl and tl:
-                        route = f'{fl} → {tl}'
-                    elif fl or tl:
-                        route = fl or tl
-                    else:
-                        route = '—'
-                truck_shipment_rows.append({'shipment': s, 'route': route})
+            for s in (
+                TenantShipment.objects.filter(truck=truck)
+                .select_related('loading_address', 'delivery_address')
+                .order_by('-shipment_date', '-created_at')[:100]
+            ):
+                truck_shipment_rows.append(
+                    {'shipment': s, 'route': _tenant_shipment_route_display(s)}
+                )
 
             default_driver_display = '—'
             dd = truck.default_driver_id
@@ -21544,32 +21569,47 @@ class DriverMasterDetailView(View):
             else:
                 assigned_trucks_display = '—'
 
-            driver_ref_q = Q(driver=driver) | Q(driver_ref=driver.driver_code) | Q(
-                driver_ref=str(driver.driver_id)
-            )
             driver_shipment_rows = []
             for s in (
-                TenantShipment.objects.filter(driver_ref_q)
-                .select_related('truck')
+                TenantShipment.objects.filter(driver=driver)
+                .select_related('truck', 'loading_address', 'delivery_address')
                 .order_by('-shipment_date', '-created_at')[:100]
             ):
-                route = (s.route_display or '').strip()
-                if not route:
-                    fl = (s.from_location or '').strip()
-                    tl = (s.to_location or '').strip()
-                    if fl and tl:
-                        route = f'{fl} → {tl}'
-                    elif fl or tl:
-                        route = fl or tl
-                    else:
-                        route = '—'
-                driver_shipment_rows.append({'shipment': s, 'route': route})
+                driver_shipment_rows.append(
+                    {'shipment': s, 'route': _tenant_shipment_route_display(s)}
+                )
 
             driver_movement_rows = list(
-                TenantTruckMovementLog.objects.filter(driver_ref_q)
-                .select_related('truck', 'driver', 'shipment', 'booking')
+                TenantTruckMovementLog.objects.filter(driver=driver)
+                .select_related(
+                    'truck',
+                    'driver',
+                    'shipment',
+                    'booking',
+                    'from_location_point',
+                    'to_location_point',
+                )
                 .order_by('-movement_date', '-created_at')[:100]
             )
+            for movement in driver_movement_rows:
+                movement.from_location = (
+                    movement.from_location_point.display_label
+                    if movement.from_location_point_id and movement.from_location_point
+                    else ''
+                )
+                movement.to_location = (
+                    movement.to_location_point.display_label
+                    if movement.to_location_point_id and movement.to_location_point
+                    else ''
+                )
+                movement.truck_ref = (
+                    movement.truck.truck_code if movement.truck_id and movement.truck else ''
+                )
+                movement.shipment_ref = (
+                    movement.shipment.shipment_no
+                    if movement.shipment_id and movement.shipment
+                    else ''
+                )
 
             primary_treasury = (
                 DriverTreasury.objects.filter(
