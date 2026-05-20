@@ -76,3 +76,5 @@ node_modules/
 twilio_test.py
 real_twilio_test.py
 *twilio*test*.py
+*.txt
+.txt

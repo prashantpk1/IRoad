@@ -10,6 +10,8 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
+from urllib.parse import urlparse
+
 from decouple import config
 from pathlib import Path
 from celery.schedules import crontab
@@ -28,6 +30,7 @@ SECRET_KEY = config('SECRET_KEY')
 DEBUG = config('DEBUG', default=False, cast=bool)
 
 # ALLOWED_HOSTS: comma-separated; use explicit hostnames in production (never '*').
+# Leading dot = subdomain wildcard (e.g. `.trycloudflare.com` → any `*.trycloudflare.com`).
 _allowed_hosts_raw = config('ALLOWED_HOSTS', default='*', cast=str).strip()
 ALLOWED_HOSTS = [h.strip() for h in _allowed_hosts_raw.split(',') if h.strip()] or ['*']
 CSRF_TRUSTED_ORIGINS = [
@@ -37,6 +40,25 @@ CSRF_TRUSTED_ORIGINS = [
     "http://127.0.0.1:8000",
     "http://localhost:8000",
 ]
+
+# Optional: current cloudflared/ngrok URL (changes when you restart the tunnel).
+# Set DEV_TUNNEL_URL in .env — host/origin are merged into ALLOWED_HOSTS / CSRF / CORS.
+_dev_tunnel_url = config('DEV_TUNNEL_URL', default='', cast=str).strip().rstrip('/')
+_tunnel_origin = ''
+if _dev_tunnel_url:
+    _tunnel_parsed = urlparse(_dev_tunnel_url)
+    _tunnel_host = (_tunnel_parsed.netloc or '').split('@')[-1].strip()
+    if _tunnel_host and _tunnel_host not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(_tunnel_host)
+    if _tunnel_parsed.scheme and _tunnel_host:
+        _tunnel_origin = f'{_tunnel_parsed.scheme}://{_tunnel_host}'
+    if _tunnel_origin and _tunnel_origin not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(_tunnel_origin)
+
+if DEBUG:
+    for _dev_host in ('.trycloudflare.com', '.ngrok-free.app', '.ngrok.io'):
+        if _dev_host not in ALLOWED_HOSTS:
+            ALLOWED_HOSTS.append(_dev_host)
 
 # Allow SSL termination at proxy
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
@@ -414,6 +436,8 @@ if DEBUG:
     ):
         if _origin not in CORS_ALLOWED_ORIGINS:
             CORS_ALLOWED_ORIGINS.append(_origin)
+    if _tunnel_origin and _tunnel_origin not in CORS_ALLOWED_ORIGINS:
+        CORS_ALLOWED_ORIGINS.append(_tunnel_origin)
 
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_HEADERS = [
