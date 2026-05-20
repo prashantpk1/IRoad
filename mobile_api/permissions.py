@@ -14,6 +14,7 @@ from rest_framework.permissions import BasePermission
 from django.utils.translation import gettext_lazy as _
 
 from mobile_api.rbac import (
+    get_mobile_jwt_payload,
     request_has_capability,
     user_in_dispatcher_group,
     user_in_driver_group,
@@ -122,6 +123,42 @@ class HasViewMobileCapability(BasePermission):
         if not cap:
             return True
         return request_has_capability(request, str(cap))
+
+
+class HasDriverDashboardAccess(BasePermission):
+    """
+    Home dashboard gate: authenticated driver principal + ``mobile.driver.dashboard``
+    capability + JWT tenant binding (prevents cross-tenant header tampering).
+
+    Use on all ``/api/v1/mobile/driver/dashboard/*`` views instead of composing
+    three permissions manually.
+    """
+    message = _('mobile.auth.dashboard_denied')
+
+    def has_permission(self, request, view):
+        if not IsMobileAuthenticated().has_permission(request, view):
+            return False
+        if not user_in_driver_group(request):
+            return False
+        cap = (
+            getattr(view, 'required_mobile_capability', None)
+            or getattr(view, 'mobile_capability', None)
+            or 'mobile.driver.dashboard'
+        )
+        if not request_has_capability(request, str(cap)):
+            return False
+        payload = get_mobile_jwt_payload(request)
+        tenant_schema = str(payload.get('tenant_schema') or '').strip()
+        if not tenant_schema:
+            return False
+        from mobile_api.helpers.dashboard_security import (
+            validate_dashboard_tenant_binding,
+        )
+
+        return validate_dashboard_tenant_binding(
+            request,
+            expected_schema=tenant_schema,
+        )
 
 
 # Backwards-compatible alias (older imports / docs)

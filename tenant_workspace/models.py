@@ -3295,6 +3295,10 @@ class TenantBooking(models.Model):
         indexes = [
             models.Index(fields=['booking_no'], name='tenant_booking_no_idx'),
             models.Index(fields=['client_account', 'booking_status'], name='tenant_bkg_client_status_idx'),
+            models.Index(
+                fields=['assigned_driver'],
+                name='tenant_book_assign_drv_idx',
+            ),
         ]
 
     def __str__(self):
@@ -3441,6 +3445,30 @@ class TenantShipment(models.Model):
             models.Index(fields=['booking'], name='tenant_shipment_booking_fk_idx'),
             models.Index(fields=['client_account'], name='tenant_shipment_client_fk_idx'),
             models.Index(fields=['driver'], name='tenant_shipment_driver_fk_idx'),
+            models.Index(
+                fields=['driver', 'shipment_status'],
+                name='tenant_ship_driver_status_idx',
+            ),
+            models.Index(
+                fields=['driver', 'updated_at'],
+                name='tenant_ship_driver_upd_idx',
+            ),
+            models.Index(
+                fields=['driver', 'shipment_status', '-updated_at'],
+                name='tenant_ship_drv_stat_upd_idx',
+            ),
+            models.Index(
+                fields=['booking', 'shipment_status'],
+                name='tenant_ship_book_stat_idx',
+            ),
+            models.Index(
+                fields=['shipment_status', 'pod_status'],
+                name='tenant_ship_stat_pod_idx',
+            ),
+            models.Index(
+                fields=['shipment_status', 'collection_status'],
+                name='tenant_ship_stat_coll_idx',
+            ),
         ]
 
     def apply_truck_default_driver(self):
@@ -3665,6 +3693,10 @@ class TenantShipmentDocument(models.Model):
             models.Index(fields=['status'], name='tenant_shipdoc_status_idx'),
             models.Index(fields=['booking'], name='tenant_shipdoc_booking_idx'),
             models.Index(fields=['shipment'], name='tenant_shipdoc_shipment_idx'),
+            models.Index(
+                fields=['shipment', 'is_delivery_note', '-updated_at'],
+                name='tenant_shipdoc_ship_dn_upd_idx',
+            ),
             models.Index(fields=['source_document'], name='tenant_shipdoc_source_idx'),
             models.Index(fields=['receiver_user'], name='tenant_shipdoc_receiver_idx'),
         ]
@@ -4036,6 +4068,22 @@ class TenantTruckMovementLog(models.Model):
             models.Index(fields=['shipment'], name='tenant_tml_shipment_idx'),
             models.Index(fields=['truck'], name='tenant_tml_truck_idx'),
             models.Index(fields=['driver'], name='tenant_tml_driver_idx'),
+            models.Index(
+                fields=['driver', 'status'],
+                name='tenant_tml_driver_status_idx',
+            ),
+            models.Index(
+                fields=['driver', '-updated_at'],
+                name='tenant_tml_driver_upd_idx',
+            ),
+            models.Index(
+                fields=['driver', 'status', '-updated_at'],
+                name='tenant_tml_drv_stat_upd_idx',
+            ),
+            models.Index(
+                fields=['shipment', 'status', '-updated_at'],
+                name='tenant_tml_ship_stat_upd_idx',
+            ),
         ]
 
     def __str__(self):
@@ -4157,6 +4205,14 @@ class TenantOperationActionLog(models.Model):
             models.Index(fields=['booking'], name='tenant_oal_booking_idx'),
             models.Index(fields=['shipment'], name='tenant_oal_shipment_idx'),
             models.Index(fields=['truck_movement'], name='tenant_oal_movement_idx'),
+            models.Index(
+                fields=['shipment', 'driver', '-log_date'],
+                name='tenant_oal_ship_drv_date_idx',
+            ),
+            models.Index(
+                fields=['driver', '-log_date'],
+                name='tenant_oal_driver_date_idx',
+            ),
         ]
 
     def __str__(self):
@@ -4193,5 +4249,103 @@ class TenantOperationActionMedia(models.Model):
 
     def __str__(self):
         return f'{self.action_log_id}:{self.line_no}'
+
+
+class DriverMobileNotification(models.Model):
+    """
+    Tenant-scoped driver inbox row for mobile dashboard / FCM follow-up.
+
+    Phase 1: populated by operational sync + future push ingest; dashboard
+    returns summary projections only (not full inbox history).
+    """
+
+    class Category(models.TextChoices):
+        GENERAL = 'general', 'General'
+        CRITICAL = 'critical', 'Critical'
+        ASSIGNMENT = 'assignment', 'Assignment'
+        OPERATIONAL_WARNING = 'operational_warning', 'Operational Warning'
+
+    class Severity(models.TextChoices):
+        INFO = 'info', 'Info'
+        WARNING = 'warning', 'Warning'
+        CRITICAL = 'critical', 'Critical'
+
+    class Source(models.TextChoices):
+        SYSTEM = 'system', 'System'
+        OPERATIONAL = 'operational', 'Operational'
+        PUSH = 'push', 'Push'
+        FCM = 'fcm', 'FCM'
+
+    notification_id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False,
+    )
+    driver = models.ForeignKey(
+        'DriverMaster',
+        on_delete=models.CASCADE,
+        related_name='mobile_notifications',
+    )
+    category = models.CharField(
+        max_length=32,
+        choices=Category.choices,
+        default=Category.GENERAL,
+    )
+    severity = models.CharField(
+        max_length=16,
+        choices=Severity.choices,
+        default=Severity.INFO,
+    )
+    source = models.CharField(
+        max_length=16,
+        choices=Source.choices,
+        default=Source.SYSTEM,
+    )
+    title = models.CharField(max_length=255)
+    body = models.TextField(blank=True, default='')
+    event_code = models.CharField(max_length=64, blank=True, default='')
+    is_read = models.BooleanField(default=False, db_index=True)
+    read_at = models.DateTimeField(null=True, blank=True)
+    shipment_id = models.UUIDField(null=True, blank=True)
+    movement_id = models.UUIDField(null=True, blank=True)
+    fcm_message_id = models.CharField(max_length=128, blank=True, default='')
+    push_receipt_id = models.UUIDField(
+        null=True,
+        blank=True,
+        help_text='Optional link to public ``PushNotificationReceipt``.',
+    )
+    dedupe_key = models.CharField(
+        max_length=128,
+        blank=True,
+        default='',
+        db_index=True,
+        help_text='Idempotent upsert key for operational/FCM ingest.',
+    )
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'tenant_driver_mobile_notifications'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(
+                fields=['driver', 'is_read', '-created_at'],
+                name='tenant_drv_notif_unread_idx',
+            ),
+            models.Index(
+                fields=['driver', 'category', 'is_read'],
+                name='tenant_drv_notif_cat_idx',
+            ),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['driver', 'dedupe_key'],
+                condition=~models.Q(dedupe_key=''),
+                name='tenant_drv_notif_dedupe_uniq',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.driver_id} :: {self.category} :: {self.title[:40]}'
 
 

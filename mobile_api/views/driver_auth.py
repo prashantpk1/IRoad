@@ -14,14 +14,13 @@ Endpoints:
   POST /api/v1/mobile/driver/auth/delete-account/
 
 Tenant safety:
-  Login resolves the subscriber from **email + password** (optional JSON
-  ``tenant_id`` only when you must disambiguate). ``X-Tenant-ID`` is **not**
-  used for login tenant selection.
+  **Public (non-auth) endpoints** — login, forgot-password, verify-otp,
+  reset-password, refresh: optional JSON ``tenant_id`` only when disambiguation
+  is needed. ``X-Tenant-ID`` is **not** used for tenant selection on these routes.
 
-  Authenticated routes merge optional ``tenant_id`` / ``X-Tenant-ID`` /
-  ``request.tenant`` with the JWT ``tenant_schema`` (see
-  ``merge_mobile_jwt_tenant_context``) so clients can rely on the Bearer token
-  alone unless they choose to send an explicit tenant hint.
+  **Authenticated endpoints** — tenant comes from the JWT ``tenant_schema``
+  (``merge_mobile_jwt_tenant_context``). Optional body ``tenant_id`` must match
+  the token when sent; clients can use Bearer alone.
 """
 from django.conf import settings
 from django.utils.translation import gettext as _
@@ -31,7 +30,7 @@ from mobile_api.helpers.mobile_tenant import (
     get_mobile_tenant_schema_from_request,
     merge_mobile_jwt_tenant_context,
     resolve_active_tenant_registry,
-    resolve_mobile_auth_tenant_context,
+    resolve_optional_body_tenant_schema,
 )
 
 from mobile_api.views.base import MobileAPIView
@@ -66,6 +65,7 @@ from mobile_api.services.driver_auth_service import (
     driver_reset_password,
     driver_logout,
     driver_logout_all_devices,
+    resolve_driver_password_reset_tenant,
 )
 from mobile_api.response_envelope import mobile_auth_error_message_key
 
@@ -99,21 +99,17 @@ def _tenant_context_error_response(view, err: str):
     return None
 
 
-def _require_explicit_auth_tenant_hint(view, schema: str):
+def _public_auth_tenant_from_body(body_tenant_id: str) -> tuple[str, object | None]:
     """
-    Enforce subscriber context on unauthenticated password-reset endpoints.
+    Optional JSON ``tenant_id`` for public auth endpoints (no ``X-Tenant-ID``).
 
-    Controlled by ``MOBILE_API_AUTH_ENDPOINTS_REQUIRE_TENANT_HINT`` (default True).
+    Returns ``(schema_name, error_response)``; ``error_response`` is set on
+    ``invalid_tenant``.
     """
-    if getattr(settings, 'MOBILE_API_AUTH_ENDPOINTS_REQUIRE_TENANT_HINT', True):
-        if not (schema or '').strip():
-            return view.error(
-                message=_('mobile.auth.tenant_required'),
-                http_code=400,
-                code='tenant_required',
-                message_key='mobile.auth.tenant_required',
-            )
-    return None
+    schema, err = resolve_optional_body_tenant_schema(body_tenant_id)
+    if err == 'invalid_tenant':
+        return '', err
+    return schema, None
 
 
 class DriverLoginView(MobileAPIView):
@@ -230,8 +226,8 @@ class DriverRefreshTokenView(MobileAPIView):
     Fallback when ``refresh_token`` is empty:
       Authorization: Bearer <JWT refresh>
 
-    ``tenant_id`` (or ``X-Tenant-ID``) must match the refresh token's
-    ``tenant_schema`` when provided; if omitted, the token's schema is used.
+    Optional JSON ``tenant_id`` must match the refresh token's ``tenant_schema``
+    when provided; if omitted, the token's schema is used (no ``X-Tenant-ID``).
 
     Success ``data``:
       access_token, refresh_token, token_type, expires_in, refresh_expires_in
@@ -240,7 +236,7 @@ class DriverRefreshTokenView(MobileAPIView):
       - ``verify_token`` (signature, expiry, iss/aud, blacklist)
       - Redis SET NX per refresh ``jti`` (one-time use / replay & race)
       - Blacklist consumed refresh ``jti`` then mint new pair (same ``rt_fam``)
-      - Optional ``X-Tenant-ID`` must match token ``tenant_schema`` when sent
+      - Optional body ``tenant_id`` must match token ``tenant_schema`` when sent
 
     Lifecycle (text):
 
@@ -270,13 +266,9 @@ class DriverRefreshTokenView(MobileAPIView):
             )
 
         body_tid = (serializer.validated_data.get('tenant_id') or '').strip()
-        tenant_hint, terr = resolve_mobile_auth_tenant_context(
-            request,
-            body_tenant_id=body_tid,
-        )
-        terr_resp = _tenant_context_error_response(self, terr or '')
-        if terr_resp is not None:
-            return terr_resp
+        tenant_hint, terr = _public_auth_tenant_from_body(body_tid)
+        if terr == 'invalid_tenant':
+            return _tenant_context_error_response(self, terr)
         result = driver_refresh_session(
             refresh,
             request=request,
@@ -312,7 +304,10 @@ class DriverForgotPasswordView(MobileAPIView):
     POST /api/v1/mobile/driver/auth/forgot-password/
 
     Request body:
-      { "email": "..." }
+      { "email": "...", "tenant_id": "<optional>" }
+
+    Tenant is resolved from email (same rules as login). Send ``tenant_id`` only
+    when the email exists on multiple subscribers (409 returns ``candidates``).
 
     Response: Same success envelope whether or not an email was sent
       (anti-enumeration). ``email_dispatch_status`` is for internal use only
@@ -335,26 +330,33 @@ class DriverForgotPasswordView(MobileAPIView):
 
         email = serializer.validated_data['email']
         body_tid = (serializer.validated_data.get('tenant_id') or '').strip()
-        tenant_schema, terr = resolve_mobile_auth_tenant_context(
-            request,
-            body_tenant_id=body_tid,
+        explicit_schema, terr = _public_auth_tenant_from_body(body_tid)
+        if terr == 'invalid_tenant':
+            return _tenant_context_error_response(self, terr)
+
+        resolution = resolve_driver_password_reset_tenant(
+            email,
+            explicit_tenant=explicit_schema,
         )
-        terr_resp = _tenant_context_error_response(self, terr or '')
-        if terr_resp is not None:
-            return terr_resp
-        req_resp = _require_explicit_auth_tenant_hint(self, tenant_schema)
-        if req_resp is not None:
-            return req_resp
+        if not resolution.get('ok'):
+            code = resolution.get('error_code', 'tenant_ambiguous')
+            return self.error(
+                message=resolution.get('error', _('mobile.auth.tenant_ambiguous')),
+                code=code,
+                message_key=mobile_auth_error_message_key(code),
+                details={'candidates': resolution.get('candidates') or []},
+                http_code=409,
+            )
 
         result = driver_forgot_password(
             email=email,
-            tenant_schema=tenant_schema,
+            tenant_schema=resolution.get('schema_name', '') or '',
             request=request,
         )
 
         if not result['success']:
             code = result.get('error_code', '') or 'error'
-            http = 409 if code == 'tenant_ambiguous_operation' else 400
+            http = 409 if code in ('tenant_ambiguous', 'tenant_ambiguous_operation') else 400
             return self.error(
                 message=result['error'],
                 code=code,
@@ -457,16 +459,9 @@ class DriverResetPasswordView(MobileAPIView):
         otp_code = serializer.validated_data['otp_code']
         new_password = serializer.validated_data['new_password']
         body_tid = (serializer.validated_data.get('tenant_id') or '').strip()
-        tenant_schema, terr = resolve_mobile_auth_tenant_context(
-            request,
-            body_tenant_id=body_tid,
-        )
-        terr_resp = _tenant_context_error_response(self, terr or '')
-        if terr_resp is not None:
-            return terr_resp
-        req_resp = _require_explicit_auth_tenant_hint(self, tenant_schema)
-        if req_resp is not None:
-            return req_resp
+        tenant_schema, terr = _public_auth_tenant_from_body(body_tid)
+        if terr == 'invalid_tenant':
+            return _tenant_context_error_response(self, terr)
 
         result = driver_reset_password(
             email=email,
@@ -478,11 +473,17 @@ class DriverResetPasswordView(MobileAPIView):
 
         if not result['success']:
             code = result.get('error_code', '') or 'error'
+            http = 409 if code in ('tenant_ambiguous', 'tenant_ambiguous_operation') else 400
             return self.error(
                 message=result['error'],
                 code=code,
                 message_key=mobile_auth_error_message_key(code),
-                http_code=409 if code == 'tenant_ambiguous_operation' else 400,
+                details=(
+                    {'candidates': result.get('candidates') or []}
+                    if code == 'tenant_ambiguous'
+                    else {}
+                ),
+                http_code=http,
             )
 
         return self.success(

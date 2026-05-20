@@ -26,7 +26,14 @@ CAPABILITY_GROUPS: dict[str, tuple[str, ...]] = {
     # Driver self-service (requires driver principal + driver role policy)
     'mobile.driver.profile': ('driver',),
     'mobile.driver.organization': ('driver',),
+    'mobile.driver.dashboard': ('driver',),
     'mobile.driver.auth_session': ('driver',),
+    # Dashboard quick-action visibility (Phase 1 — metadata only; driver group)
+    'mobile.driver.quick_action.continue_job': ('driver',),
+    'mobile.driver.quick_action.upload_pod': ('driver',),
+    'mobile.driver.quick_action.active_movements': ('driver',),
+    'mobile.driver.quick_action.cod_collection': ('driver',),
+    'mobile.driver.quick_action.empty_move': ('driver',),
     # Operational / back-office style mobile modules (dispatcher + tenant admin)
     'mobile.operations.read': ('dispatcher', 'tenant_admin'),
     'mobile.operations.write': ('dispatcher', 'tenant_admin'),
@@ -113,14 +120,21 @@ def has_driver_id_claim(request: Any) -> bool:
 
 def user_in_driver_group(request: Any) -> bool:
     """
-    Driver mobile principal: non-empty ``driver_id`` and ``role_name`` allowed
-    by ``MOBILE_API_RBAC_DRIVER_ROLE_NAMES`` (or defaults).
+    Driver mobile principal: non-empty ``driver_id`` claim.
+
+    When ``MOBILE_API_DRIVER_ROLE_ALLOWLIST`` is empty, the linked ``DriverMaster``
+    row validated at authentication is authoritative (supports tenant-specific
+    role labels such as custom RBAC role names).
     """
     if not has_driver_id_claim(request):
         return False
+    raw_allow = (
+        getattr(settings, 'MOBILE_API_DRIVER_ROLE_ALLOWLIST', None) or ''
+    ).strip()
+    if not raw_allow:
+        return True
     rn = normalized_role_name(request)
-    allowed = driver_role_names()
-    return rn in allowed
+    return rn in driver_role_names()
 
 
 def user_in_dispatcher_group(request: Any) -> bool:

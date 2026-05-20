@@ -1359,6 +1359,12 @@ class PushDeviceToken(models.Model):
     class Meta:
         db_table = 'comm_push_device_tokens'
         ordering = ['-updated_at']
+        indexes = [
+            models.Index(
+                fields=['tenant', 'user_domain', 'reference_id', 'is_active'],
+                name='comm_push_token_drv_lookup_idx',
+            ),
+        ]
 
 
 class PushNotificationReceipt(models.Model):
@@ -1396,6 +1402,12 @@ class PushNotificationReceipt(models.Model):
     class Meta:
         db_table = 'comm_push_receipts'
         ordering = ['-created_at']
+        indexes = [
+            models.Index(
+                fields=['tenant', 'user_domain', 'reference_id', '-created_at'],
+                name='comm_push_rcpt_drv_lookup_idx',
+            ),
+        ]
 
 
 class SystemBanner(models.Model):

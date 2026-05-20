@@ -142,6 +142,7 @@ MIDDLEWARE = [
     'django_tenants.middleware.main.TenantMainMiddleware',
     'superadmin.middleware.TenantApiSchemaMiddleware',
     'mobile_api.middleware.MobileApiTenantGateMiddleware',
+    'mobile_api.middleware.MobileDashboardSecurityMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'mobile_api.middleware.MobileApiSecurityHeadersMiddleware',
     # Serve /static/ when DEBUG=False (see STATICFILES_DIRS); required for styled 404 and marketing pages.
@@ -575,6 +576,88 @@ MOBILE_API_LOGIN_BURST_FAIL_CLOSED_ON_CACHE_ERROR = config(
     cast=bool,
 )
 
+# Driver home dashboard (recent activity row cap; keep low for mobile latency).
+MOBILE_API_DASHBOARD_RECENT_ACTIVITY_LIMIT = config(
+    'MOBILE_API_DASHBOARD_RECENT_ACTIVITY_LIMIT',
+    default=10,
+    cast=int,
+)
+MOBILE_API_DASHBOARD_SUMMARY_RECENT_ACTIVITY_LIMIT = config(
+    'MOBILE_API_DASHBOARD_SUMMARY_RECENT_ACTIVITY_LIMIT',
+    default=5,
+    cast=int,
+)
+# Notification summary (inbox + push receipts + ephemeral operational hints).
+MOBILE_API_DASHBOARD_NOTIFICATION_ITEMS_LIMIT = config(
+    'MOBILE_API_DASHBOARD_NOTIFICATION_ITEMS_LIMIT',
+    default=8,
+    cast=int,
+)
+MOBILE_API_DASHBOARD_NOTIFICATION_SUMMARY_ITEMS_LIMIT = config(
+    'MOBILE_API_DASHBOARD_NOTIFICATION_SUMMARY_ITEMS_LIMIT',
+    default=5,
+    cast=int,
+)
+MOBILE_API_DASHBOARD_NOTIFICATIONS_PUSH_LOOKBACK_DAYS = config(
+    'MOBILE_API_DASHBOARD_NOTIFICATIONS_PUSH_LOOKBACK_DAYS',
+    default=14,
+    cast=int,
+)
+MOBILE_API_DASHBOARD_NOTIFICATIONS_USE_PUSH_RECEIPTS = config(
+    'MOBILE_API_DASHBOARD_NOTIFICATIONS_USE_PUSH_RECEIPTS',
+    default=True,
+    cast=bool,
+)
+# Performance: skip nested DRF re-validation when True (payload built by services).
+MOBILE_API_DASHBOARD_FAST_SERIALIZE = config(
+    'MOBILE_API_DASHBOARD_FAST_SERIALIZE',
+    default=True,
+    cast=bool,
+)
+# Summary poll: skip POD document source query (saves 1 round-trip).
+MOBILE_API_DASHBOARD_SUMMARY_SKIP_POD_ACTIVITY = config(
+    'MOBILE_API_DASHBOARD_SUMMARY_SKIP_POD_ACTIVITY',
+    default=True,
+    cast=bool,
+)
+# Optional Redis cache for full/summary dashboard (0 = disabled; 20s recommended).
+MOBILE_API_DASHBOARD_CACHE_TTL_SECONDS = config(
+    'MOBILE_API_DASHBOARD_CACHE_TTL_SECONDS',
+    default=20,
+    cast=int,
+)
+MOBILE_API_DASHBOARD_SLICE_CACHE_TTL_SECONDS = config(
+    'MOBILE_API_DASHBOARD_SLICE_CACHE_TTL_SECONDS',
+    default=20,
+    cast=int,
+)
+MOBILE_API_DASHBOARD_MOVEMENT_SCOPE_PK_CAP = config(
+    'MOBILE_API_DASHBOARD_MOVEMENT_SCOPE_PK_CAP',
+    default=500,
+    cast=int,
+)
+MOBILE_API_DASHBOARD_SLOW_REQUEST_MS = config(
+    'MOBILE_API_DASHBOARD_SLOW_REQUEST_MS',
+    default=800,
+    cast=int,
+)
+MOBILE_API_DASHBOARD_SHIPMENT_SCOPE_PK_CAP = config(
+    'MOBILE_API_DASHBOARD_SHIPMENT_SCOPE_PK_CAP',
+    default=500,
+    cast=int,
+)
+# Dashboard security: sanitize outbound IDs; middleware JWT/header tenant binding.
+MOBILE_API_DASHBOARD_ENFORCE_OWNERSHIP_SANITIZE = config(
+    'MOBILE_API_DASHBOARD_ENFORCE_OWNERSHIP_SANITIZE',
+    default=True,
+    cast=bool,
+)
+MOBILE_API_DASHBOARD_MIDDLEWARE_ENFORCE_TENANT = config(
+    'MOBILE_API_DASHBOARD_MIDDLEWARE_ENFORCE_TENANT',
+    default=True,
+    cast=bool,
+)
+
 # Mobile driver JWT: require JWT email/driver_id/role_name to match DB when present.
 MOBILE_API_JWT_STRICT_CLAIM_BINDING = config(
     'MOBILE_API_JWT_STRICT_CLAIM_BINDING',
@@ -598,11 +681,11 @@ MOBILE_API_JWT_REQUIRE_TENANT_HINT = config(
     cast=bool,
 )
 
-# Forgot-password / verify-otp / reset-password: require explicit tenant context
-# (tenant_id body field and/or X-Tenant-ID) so OTP flows cannot target the wrong tenant.
+# Legacy: password-reset no longer requires X-Tenant-ID (email/OTP discovery).
+# Kept for compatibility if re-enabled in custom deployments.
 MOBILE_API_AUTH_ENDPOINTS_REQUIRE_TENANT_HINT = config(
     'MOBILE_API_AUTH_ENDPOINTS_REQUIRE_TENANT_HINT',
-    default=True,
+    default=False,
     cast=bool,
 )
 

@@ -100,8 +100,8 @@ class ForgotPasswordSerializer(serializers.Serializer):
     Validates forgot password input.
     API 2: POST /api/v1/mobile/driver/auth/forgot-password/
 
-    ``tenant_id`` (subscriber UUID or ``schema_name``) disambiguates the tenant
-    when the same email exists on multiple subscribers (recommended).
+    Optional ``tenant_id`` only when the same email exists on multiple subscribers.
+    ``X-Tenant-ID`` is not used; tenant is resolved from email when omitted.
     """
     email = serializers.EmailField(
         required=True,
@@ -123,7 +123,8 @@ class VerifyOtpSerializer(serializers.Serializer):
     Validates OTP verification input.
     API 3: POST /api/v1/mobile/driver/auth/verify-otp/
 
-    ``tenant_id`` identifies which subscriber issued the OTP when needed.
+    Optional ``tenant_id`` when multiple subscribers match; otherwise OTP + email
+    resolve the tenant (no ``X-Tenant-ID``).
     """
     email = serializers.EmailField(
         required=True,
@@ -163,7 +164,7 @@ class ResetPasswordSerializer(serializers.Serializer):
     Validates new password input.
     API 4: POST /api/v1/mobile/driver/auth/reset-password/
 
-    ``tenant_id`` identifies which subscriber holds the verified OTP.
+    Optional ``tenant_id`` when needed; otherwise OTP + email resolve the tenant.
     """
     email = serializers.EmailField(
         required=True,

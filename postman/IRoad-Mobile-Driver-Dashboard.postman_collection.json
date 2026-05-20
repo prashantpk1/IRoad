@@ -1,0 +1,731 @@
+{
+	"info": {
+		"_postman_id": "e5f6a7b8-c9d0-4123-ef45-678901234567",
+		"name": "IRoad Mobile Driver — Home Dashboard Module",
+		"description": "# IRoad Mobile — Home Dashboard Module\n\nProduction-ready collection for driver home dashboard APIs.\n\n## Prerequisites\n1. Import **IRoad Mobile Driver Dashboard — Local** environment.\n2. Set `base_url`, `email`, `password`.\n3. Run **Setup → Login** (saves `access_token`, `refresh_token`, `driver_id`).\n4. Run **Testing Flow → Full Dashboard Smoke** (folder runner) or individual requests.\n\n## Auth & tenant\n| Item | Rule |\n|------|------|\n| **Authorization** | `Bearer {{access_token}}` — required on all dashboard routes |\n| **Tenant** | Resolved from JWT `tenant_schema` — **no X-Tenant-ID required** |\n| **X-Tenant-ID** | Optional; if sent, must match JWT tenant (else **403** `tenant_mismatch`) |\n| **Capability** | `mobile.driver.dashboard` (driver principal + `driver_id` claim) |\n\n## Envelope\n```json\n{ \"status\": 1, \"message\": \"…\", \"data\": { }, \"meta\": { } }\n```\n- `status` **1** = success, **0** = business/validation, **2** = auth (**401**/**403**)\n\n## API map\n| Request | Method | Path | Dedicated endpoint? |\n|---------|--------|------|-------------------|\n| Dashboard (full) | GET | `/driver/dashboard/` | Yes — includes `current_job`, `quick_actions` |\n| Dashboard summary | GET | `/driver/dashboard/summary/` | Yes |\n| Recent activity | GET | `/driver/dashboard/recent-activity/` | Yes |\n| Notifications summary | GET | `/driver/dashboard/notifications-summary/` | Yes |\n| Current job | — | — | **Embedded** in full/summary dashboard (`data.current_job`) |\n| Quick actions | — | — | **Embedded** in full/summary dashboard (`data.quick_actions`) |\n\nUse **Extract Current Job** / **Extract Quick Actions** requests to validate embedded sections and save env vars.\n\n## Docs\n- `mobile_api/docs/driver_dashboard.md`\n- `mobile_api/docs/driver_dashboard_security.md`\n- `mobile_api/docs/driver_dashboard_performance.md`",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{access_token}}",
+				"type": "string"
+			}
+		]
+	},
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"if (!pm.environment.get('access_token') && !pm.request.url.path.join('/').includes('login')) {",
+					"    console.warn('access_token empty — run Setup → Login first');",
+					"}"
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://127.0.0.1:8000"
+		},
+		{
+			"key": "api_prefix",
+			"value": "/api/v1/mobile"
+		}
+	],
+	"item": [
+		{
+			"name": "Setup",
+			"description": "Authenticate before dashboard calls. Login does **not** require X-Tenant-ID.",
+			"item": [
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+									"var json = pm.response.json();",
+									"pm.test('status === 1', function () { pm.expect(json.status).to.eql(1); });",
+									"if (json.status === 1 && json.data) {",
+									"    if (json.data.access_token) pm.environment.set('access_token', json.data.access_token);",
+									"    if (json.data.refresh_token) pm.environment.set('refresh_token', json.data.refresh_token);",
+									"    if (json.data.driver && json.data.driver.driver_id) {",
+									"        pm.environment.set('driver_id', json.data.driver.driver_id);",
+									"    }",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\",\n  \"device_platform\": \"{{device_platform}}\",\n  \"device_id\": \"{{fcm_token}}\",\n  \"device_name\": \"{{device_name}}\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": "{{base_url}}{{api_prefix}}/driver/auth/login/",
+						"description": "**Method:** POST\n\n**Auth:** None\n\n**Tenant header:** Not used on login.\n\nSaves `access_token`, `refresh_token`, `driver_id` to environment."
+					},
+					"response": [
+						{
+							"name": "200 Login success",
+							"status": "OK",
+							"code": 200,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\n  \"status\": 1,\n  \"message\": \"Login successful.\",\n  \"message_key\": \"mobile.auth.login_success\",\n  \"data\": {\n    \"access_token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\",\n    \"refresh_token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\",\n    \"driver\": {\n      \"driver_id\": \"550e8400-e29b-41d4-a716-446655440000\",\n      \"driver_code\": \"DRV001\",\n      \"name\": \"John Driver\",\n      \"driver_status\": \"Active\"\n    }\n  },\n  \"meta\": { \"locale\": \"en\", \"api_version\": \"1.0\" }\n}"
+						},
+						{
+							"name": "401 Invalid credentials",
+							"status": "Unauthorized",
+							"code": 401,
+							"header": [],
+							"body": "{\n  \"status\": 0,\n  \"message\": \"Invalid email or password.\",\n  \"data\": { \"error_code\": \"invalid_credentials\" }\n}"
+						}
+					]
+				},
+				{
+					"name": "Refresh Token",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"var json = pm.response.json();",
+									"if (json.status === 1 && json.data) {",
+									"    if (json.data.access_token) pm.environment.set('access_token', json.data.access_token);",
+									"    if (json.data.refresh_token) pm.environment.set('refresh_token', json.data.refresh_token);",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": "{{base_url}}{{api_prefix}}/driver/auth/refresh/",
+						"description": "Rotate tokens after login. Optional body `tenant_id` must match refresh JWT if sent."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Home Dashboard",
+			"description": "All routes require **Bearer {{access_token}}** and capability **mobile.driver.dashboard**.",
+			"item": [
+				{
+					"name": "01 — Get Dashboard (full)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 200', () => pm.response.to.have.status(200));",
+									"const j = pm.response.json();",
+									"pm.test('Envelope success', () => pm.expect(j.status).to.eql(1));",
+									"pm.test('Has dashboard sections', () => {",
+									"    const d = j.data;",
+									"    pm.expect(d).to.have.property('variant', 'full');",
+									"    pm.expect(d).to.have.property('welcome');",
+									"    pm.expect(d).to.have.property('counters');",
+									"    pm.expect(d).to.have.property('current_job');",
+									"    pm.expect(d).to.have.property('quick_actions');",
+									"    pm.expect(d).to.have.property('notifications_summary');",
+									"    pm.expect(d).to.have.property('recent_activity');",
+									"});",
+									"if (j.data && j.data.current_job && j.data.current_job.shipment_id) {",
+									"    pm.environment.set('current_job_shipment_id', j.data.current_job.shipment_id);",
+									"}",
+									"if (j.data && j.data.welcome && j.data.welcome.operational_context) {",
+									"    pm.environment.set('tenant_schema', j.data.welcome.operational_context.tenant_schema || '');",
+									"}",
+									"if (j.data && j.data.quick_actions_meta) {",
+									"    pm.environment.set('quick_actions_enabled_count', String(j.data.quick_actions_meta.total_enabled || 0));",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							}
+						],
+						"url": "{{base_url}}{{api_prefix}}/driver/dashboard/",
+						"description": "| Field | Value |\n|-------|-------|\n| **Method** | GET |\n| **URL** | `{{base_url}}/api/v1/mobile/driver/dashboard/` |\n| **Auth** | Bearer `{{access_token}}` |\n| **X-Tenant-ID** | Optional (must match JWT) |\n| **Body** | None |\n\nReturns full dashboard: `welcome`, `driver_summary`, `counters`, **`current_job`**, **`quick_actions`**, `notifications_summary`, `recent_activity` (max 10), `timestamps`."
+					},
+					"response": [
+						{
+							"name": "200 Full dashboard",
+							"status": "OK",
+							"code": 200,
+							"header": [],
+							"body": "{\n  \"status\": 1,\n  \"message\": \"Dashboard loaded successfully.\",\n  \"message_key\": \"mobile.dashboard.fetch_success\",\n  \"data\": {\n    \"variant\": \"full\",\n    \"welcome\": {\n      \"driver\": { \"driver_id\": \"550e8400-e29b-41d4-a716-446655440000\", \"name\": \"John Driver\" },\n      \"organization\": { \"tenant_id\": \"uuid\", \"schema_name\": \"tenant_acme\", \"organization_name\": \"Acme Logistics\" },\n      \"operational_context\": { \"tenant_schema\": \"tenant_acme\", \"driver_assignment_required\": false }\n    },\n    \"driver_summary\": { \"driver_id\": \"550e8400-e29b-41d4-a716-446655440000\", \"driver_code\": \"DRV001\", \"name\": \"John Driver\" },\n    \"counters\": {\n      \"active_shipments\": 2,\n      \"active_movements\": 1,\n      \"pending_pod\": 1,\n      \"cod_pending\": 0,\n      \"completed_today\": 3,\n      \"completed_this_week\": 12,\n      \"pending_actions\": 2\n    },\n    \"current_job\": {\n      \"has_active_job\": true,\n      \"shipment_id\": \"660e8400-e29b-41d4-a716-446655440001\",\n      \"shipment_no\": \"SH-2026-001\",\n      \"shipment_status\": \"In Transit\",\n      \"route_summary\": \"Riyadh → Jeddah\",\n      \"shipment\": { \"shipment_id\": \"660e8400-e29b-41d4-a716-446655440001\", \"shipment_no\": \"SH-2026-001\" },\n      \"movement\": { \"movement_id\": \"770e8400-e29b-41d4-a716-446655440002\", \"status\": \"In Progress\" },\n      \"latest_action\": { \"action_code\": \"LOADED\", \"action_label\": \"Loaded\" },\n      \"pod\": { \"status\": \"Pending\", \"needs_attention\": true },\n      \"cod\": { \"is_cod_order\": false },\n      \"next_action_hint\": \"Submit proof of delivery\"\n    },\n    \"quick_actions\": [\n      {\n        \"id\": \"continue_active_job\",\n        \"label\": \"Continue active job\",\n        \"visible\": true,\n        \"enabled\": true,\n        \"required_capabilities\": [\"mobile.driver.quick_action.continue_job\"],\n        \"execution\": { \"phase\": \"route_hint\", \"deep_link\": \"/driver/jobs/active/660e8400-e29b-41d4-a716-446655440001\" },\n        \"shipment_id\": \"660e8400-e29b-41d4-a716-446655440001\"\n      },\n      {\n        \"id\": \"upload_pod\",\n        \"label\": \"Upload POD\",\n        \"visible\": true,\n        \"enabled\": true,\n        \"required_capabilities\": [\"mobile.driver.quick_action.upload_pod\"]\n      }\n    ],\n    \"quick_actions_meta\": { \"total_visible\": 5, \"total_enabled\": 2 },\n    \"notifications_summary\": {\n      \"unread_count\": 3,\n      \"critical_count\": 0,\n      \"assignment_count\": 0,\n      \"operational_warnings_count\": 2,\n      \"items\": [],\n      \"fcm\": { \"push_enabled\": true, \"device_token_registered\": false, \"channel\": \"fcm\" }\n    },\n    \"recent_activity\": [\n      {\n        \"activity_type\": \"action\",\n        \"occurred_at\": \"2026-05-20T10:00:00Z\",\n        \"title\": \"Loaded\",\n        \"shipment_id\": \"660e8400-e29b-41d4-a716-446655440001\",\n        \"shipment_no\": \"SH-2026-001\"\n      }\n    ],\n    \"timestamps\": { \"generated_at\": \"2026-05-20T12:00:00Z\", \"timezone\": \"Asia/Riyadh\", \"locale\": \"en\" },\n    \"generated_at\": \"2026-05-20T12:00:00Z\"\n  }\n}"
+						},
+						{
+							"name": "401 Missing token",
+							"status": "Unauthorized",
+							"code": 401,
+							"header": [],
+							"body": "{\n  \"status\": 2,\n  \"message\": \"Unauthorized access. Please login to continue.\",\n  \"message_key\": \"mobile.auth.unauthorized\",\n  \"data\": { \"error_code\": \"unauthorized\" }\n}"
+						},
+						{
+							"name": "403 Dashboard denied (non-driver)",
+							"status": "Forbidden",
+							"code": 403,
+							"header": [],
+							"body": "{\n  \"status\": 2,\n  \"message\": \"You do not have access to the driver dashboard.\",\n  \"message_key\": \"mobile.auth.dashboard_denied\",\n  \"data\": { \"error_code\": \"dashboard_denied\" }\n}"
+						},
+						{
+							"name": "403 Tenant mismatch (X-Tenant-ID)",
+							"status": "Forbidden",
+							"code": 403,
+							"header": [],
+							"body": "{\n  \"status\": 2,\n  \"message\": \"Tenant context does not match your session.\",\n  \"message_key\": \"mobile.auth.tenant_mismatch\",\n  \"data\": { \"error_code\": \"tenant_mismatch\" }\n}"
+						}
+					]
+				},
+				{
+					"name": "02 — Get Dashboard Summary",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('200 OK', () => pm.response.to.have.status(200));",
+									"const j = pm.response.json();",
+									"pm.test('variant summary', () => pm.expect(j.data.variant).to.eql('summary'));",
+									"pm.test('recent_activity capped', () => {",
+									"    pm.expect(j.data.recent_activity.length).to.be.at.most(5);",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							}
+						],
+						"url": "{{base_url}}{{api_prefix}}/driver/dashboard/summary/",
+						"description": "Polling-friendly dashboard. Same shape as full; `variant=summary`, smaller `recent_activity` cap (default 5)."
+					},
+					"response": [
+						{
+							"name": "200 Summary dashboard",
+							"status": "OK",
+							"code": 200,
+							"header": [],
+							"body": "{\n  \"status\": 1,\n  \"message\": \"Dashboard summary loaded.\",\n  \"message_key\": \"mobile.dashboard.summary_fetch_success\",\n  \"data\": {\n    \"variant\": \"summary\",\n    \"counters\": { \"active_shipments\": 2, \"pending_actions\": 2 },\n    \"current_job\": { \"has_active_job\": true, \"shipment_no\": \"SH-2026-001\" },\n    \"quick_actions\": [],\n    \"recent_activity\": []\n  }\n}"
+						}
+					]
+				},
+				{
+					"name": "03 — Get Current Job (dedicated)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"const j = pm.response.json();",
+									"pm.test('Success', () => pm.expect(j.status).to.eql(1));",
+									"const cj = j.data;",
+									"pm.test('current_job object present', () => pm.expect(cj).to.be.an('object'));",
+									"pm.test('has_active_job boolean', () => pm.expect(cj.has_active_job).to.be.a('boolean'));",
+									"if (cj.has_active_job) {",
+									"    pm.test('Active job has shipment_id', () => pm.expect(cj.shipment_id).to.be.a('string'));",
+									"    pm.environment.set('current_job_shipment_id', cj.shipment_id);",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							}
+						],
+						"url": "{{base_url}}{{api_prefix}}/driver/dashboard/current-job/",
+						"description": "Lightweight current-job poll. Returns `data` = current_job snapshot only (no notifications, activity, or counters)."
+					},
+					"response": [
+						{
+							"name": "200 Active current job",
+							"status": "OK",
+							"code": 200,
+							"header": [],
+							"body": "{\n  \"status\": 1,\n  \"data\": {\n    \"current_job\": {\n      \"has_active_job\": true,\n      \"shipment_id\": \"660e8400-e29b-41d4-a716-446655440001\",\n      \"shipment_no\": \"SH-2026-001\",\n      \"shipment_status\": \"In Transit\",\n      \"route_summary\": \"Riyadh → Jeddah\",\n      \"movement\": { \"movement_no\": \"MVT-001\", \"status\": \"In Progress\" },\n      \"next_action_hint\": \"Submit proof of delivery\"\n    }\n  }\n}"
+						},
+						{
+							"name": "200 No active job",
+							"status": "OK",
+							"code": 200,
+							"header": [],
+							"body": "{\n  \"status\": 1,\n  \"data\": {\n    \"current_job\": {\n      \"has_active_job\": false,\n      \"shipment\": null,\n      \"movement\": null,\n      \"route_summary\": \"\"\n    }\n  }\n}"
+						}
+					]
+				},
+				{
+					"name": "04 — Get Recent Activity",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('200', () => pm.response.to.have.status(200));",
+									"const j = pm.response.json();",
+									"pm.test('Feed shape', () => {",
+									"    pm.expect(j.data).to.have.property('limit');",
+									"    pm.expect(j.data).to.have.property('items');",
+									"    pm.expect(j.data.items).to.be.an('array');",
+									"});",
+									"pm.test('Limit respected', () => {",
+									"    const lim = parseInt(pm.environment.get('dashboard_activity_limit') || '10', 10);",
+									"    pm.expect(j.data.items.length).to.be.at.most(lim);",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}{{api_prefix}}/driver/dashboard/recent-activity/?limit={{dashboard_activity_limit}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"mobile",
+								"driver",
+								"dashboard",
+								"recent-activity",
+								""
+							],
+							"query": [
+								{
+									"key": "limit",
+									"value": "{{dashboard_activity_limit}}",
+									"description": "1–10 (default 10)"
+								}
+							]
+						},
+						"description": "| Field | Value |\n|-------|-------|\n| **Method** | GET |\n| **Query** | `limit` optional 1–10 |\n| **Response** | `{ limit, items[] }` |\n\n`activity_type`: `action` | `shipment` | `movement` | `pod`"
+					},
+					"response": [
+						{
+							"name": "200 Activity feed",
+							"status": "OK",
+							"code": 200,
+							"header": [],
+							"body": "{\n  \"status\": 1,\n  \"message\": \"Recent activity loaded.\",\n  \"message_key\": \"mobile.dashboard.activity_fetch_success\",\n  \"data\": {\n    \"limit\": 10,\n    \"items\": [\n      {\n        \"activity_type\": \"action\",\n        \"occurred_at\": \"2026-05-20T10:00:00Z\",\n        \"title\": \"Loaded\",\n        \"route_summary\": \"Riyadh → Jeddah\",\n        \"shipment_id\": \"660e8400-e29b-41d4-a716-446655440001\",\n        \"shipment_no\": \"SH-2026-001\",\n        \"log_id\": \"880e8400-e29b-41d4-a716-446655440003\",\n        \"log_no\": \"OAL-001\"\n      },\n      {\n        \"activity_type\": \"movement\",\n        \"occurred_at\": \"2026-05-20T09:30:00Z\",\n        \"title\": \"Movement MVT-002 — In Progress\",\n        \"movement_id\": \"770e8400-e29b-41d4-a716-446655440002\"\n      }\n    ]\n  }\n}"
+						},
+						{
+							"name": "401 Unauthorized",
+							"status": "Unauthorized",
+							"code": 401,
+							"header": [],
+							"body": "{\n  \"status\": 2,\n  \"message\": \"Unauthorized access. Please login to continue.\",\n  \"data\": {}\n}"
+						}
+					]
+				},
+				{
+					"name": "05 — Get Notifications Summary",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('200', () => pm.response.to.have.status(200));",
+									"const j = pm.response.json();",
+									"pm.test('Notification summary fields', () => {",
+									"    const n = j.data;",
+									"    pm.expect(n).to.have.keys('unread_count','critical_count','assignment_count','operational_warnings_count','items','fcm');",
+									"    pm.expect(n.fcm).to.have.property('push_enabled');",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}{{api_prefix}}/driver/dashboard/notifications-summary/?variant={{dashboard_variant}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"mobile",
+								"driver",
+								"dashboard",
+								"notifications-summary",
+								""
+							],
+							"query": [
+								{
+									"key": "variant",
+									"value": "{{dashboard_variant}}",
+									"description": "full (8 items) or summary (5 items)"
+								}
+							]
+						},
+						"description": "Lightweight notification summary only (not full inbox).\n\n**Query:** `variant=full|summary` (optional)"
+					},
+					"response": [
+						{
+							"name": "200 Notifications summary",
+							"status": "OK",
+							"code": 200,
+							"header": [],
+							"body": "{\n  \"status\": 1,\n  \"message\": \"Notification summary loaded.\",\n  \"message_key\": \"mobile.dashboard.notifications_fetch_success\",\n  \"data\": {\n    \"unread_count\": 3,\n    \"critical_count\": 0,\n    \"assignment_count\": 1,\n    \"operational_warnings_count\": 2,\n    \"items\": [\n      {\n        \"id\": \"eph:pending_pod\",\n        \"category\": \"operational_warning\",\n        \"severity\": \"warning\",\n        \"source\": \"operational\",\n        \"title\": \"POD pending\",\n        \"is_read\": false,\n        \"ephemeral\": true\n      }\n    ],\n    \"fcm\": {\n      \"push_enabled\": true,\n      \"device_token_registered\": false,\n      \"channel\": \"fcm\",\n      \"inbox_deep_link\": \"/driver/notifications\",\n      \"register_token_route\": \"/api/tenant/push/token/\"\n    }\n  }\n}"
+						}
+					]
+				},
+				{
+					"name": "06 — Get Quick Actions (dedicated)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"const j = pm.response.json();",
+									"pm.test('Success', () => pm.expect(j.status).to.eql(1));",
+									"pm.test('quick_actions array', () => {",
+									"    pm.expect(j.data.quick_actions).to.be.an('array');",
+									"    pm.expect(j.data.quick_actions_meta).to.have.property('total_visible');",
+									"});",
+									"j.data.quick_actions.forEach((a, i) => {",
+									"    pm.test('Action ' + i + ' has id and capabilities', () => {",
+									"        pm.expect(a).to.have.property('id');",
+									"        pm.expect(a).to.have.property('required_capabilities');",
+									"        pm.expect(a).to.have.property('execution');",
+									"    });",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							}
+						],
+						"url": "{{base_url}}{{api_prefix}}/driver/dashboard/quick-actions/",
+						"description": "Lightweight quick-actions refresh. Returns `data.quick_actions` + `data.quick_actions_meta` only."
+					},
+					"response": [
+						{
+							"name": "200 Quick actions",
+							"status": "OK",
+							"code": 200,
+							"header": [],
+							"body": "{\n  \"status\": 1,\n  \"data\": {\n    \"quick_actions\": [\n      {\n        \"id\": \"continue_active_job\",\n        \"label\": \"Continue active job\",\n        \"visible\": true,\n        \"enabled\": true,\n        \"reason_code\": null,\n        \"required_capabilities\": [\"mobile.driver.quick_action.continue_job\"],\n        \"execution\": { \"phase\": \"route_hint\", \"deep_link\": \"/driver/jobs/active/uuid\" },\n        \"shipment_id\": \"660e8400-e29b-41d4-a716-446655440001\"\n      },\n      {\n        \"id\": \"create_empty_move\",\n        \"label\": \"Create empty move\",\n        \"visible\": true,\n        \"enabled\": false,\n        \"reason_code\": \"module_not_available\",\n        \"required_capabilities\": [\"mobile.driver.quick_action.empty_move\"]\n      }\n    ],\n    \"quick_actions_meta\": { \"total_visible\": 5, \"total_enabled\": 1 }\n  }\n}"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Testing Flows",
+			"description": "Run this folder with Collection Runner (in order). Login must run first.",
+			"item": [
+				{
+					"name": "Flow A — Full Dashboard Smoke",
+					"item": [
+						{
+							"name": "A1 Login",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\",\n  \"device_platform\": \"{{device_platform}}\",\n  \"device_name\": \"{{device_name}}\"\n}"
+								},
+								"url": "{{base_url}}{{api_prefix}}/driver/auth/login/"
+							},
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"var j = pm.response.json();",
+											"if (j.data && j.data.access_token) pm.environment.set('access_token', j.data.access_token);"
+										],
+										"type": "text/javascript"
+									}
+								}
+							]
+						},
+						{
+							"name": "A2 Dashboard Full",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{access_token}}"
+									},
+									{
+										"key": "Accept-Language",
+										"value": "{{accept_language}}"
+									}
+								],
+								"url": "{{base_url}}{{api_prefix}}/driver/dashboard/"
+							}
+						},
+						{
+							"name": "A3 Recent Activity",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{access_token}}"
+									}
+								],
+								"url": "{{base_url}}{{api_prefix}}/driver/dashboard/recent-activity/?limit=5"
+							}
+						},
+						{
+							"name": "A4 Notifications Summary",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{access_token}}"
+									}
+								],
+								"url": "{{base_url}}{{api_prefix}}/driver/dashboard/notifications-summary/"
+							}
+						},
+						{
+							"name": "A5 Current Job",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{access_token}}"
+									}
+								],
+								"url": "{{base_url}}{{api_prefix}}/driver/dashboard/current-job/"
+							}
+						},
+						{
+							"name": "A6 Quick Actions",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{access_token}}"
+									}
+								],
+								"url": "{{base_url}}{{api_prefix}}/driver/dashboard/quick-actions/"
+							}
+						}
+					]
+				},
+				{
+					"name": "Flow B — Polling (summary)",
+					"item": [
+						{
+							"name": "B1 Dashboard Summary",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{access_token}}"
+									}
+								],
+								"url": "{{base_url}}{{api_prefix}}/driver/dashboard/summary/"
+							}
+						},
+						{
+							"name": "B2 Notifications variant=summary",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{access_token}}"
+									}
+								],
+								"url": "{{base_url}}{{api_prefix}}/driver/dashboard/notifications-summary/?variant=summary"
+							}
+						}
+					]
+				},
+				{
+					"name": "Flow C — Error cases (manual)",
+					"item": [
+						{
+							"name": "C1 Dashboard without token",
+							"request": {
+								"auth": {
+									"type": "noauth"
+								},
+								"method": "GET",
+								"url": "{{base_url}}{{api_prefix}}/driver/dashboard/"
+							},
+							"response": [
+								{
+									"name": "401",
+									"status": "Unauthorized",
+									"code": 401,
+									"body": "{\n  \"status\": 2,\n  \"message\": \"Unauthorized access. Please login to continue.\",\n  \"data\": {}\n}"
+								}
+							]
+						},
+						{
+							"name": "C2 POST dashboard (method not allowed)",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{access_token}}"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{}"
+								},
+								"url": "{{base_url}}{{api_prefix}}/driver/dashboard/"
+							},
+							"response": [
+								{
+									"name": "405",
+									"status": "Method Not Allowed",
+									"code": 405,
+									"body": "{\n  \"status\": 0,\n  \"message\": \"This dashboard endpoint only supports read requests.\",\n  \"data\": { \"error_code\": \"dashboard_method_not_allowed\" }\n}"
+								}
+							]
+						}
+					]
+				}
+			]
+		}
+	]
+}

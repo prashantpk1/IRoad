@@ -139,10 +139,15 @@ def resolve_mobile_driver_session(
         with schema_context(tenant_schema):
             driver = (
                 DriverMaster.objects.filter(user_account_id=user_id)
-                .select_related('user_account')
+                .select_related('user_account_id')
                 .first()
             )
     except Exception:
+        logger.exception(
+            'resolve_mobile_driver_session ORM failed user_id=%s schema=%s',
+            user_id,
+            tenant_schema,
+        )
         return None, None, _('mobile.auth.token_invalid'), 'token_invalid'
 
     if driver is None:
@@ -150,7 +155,7 @@ def resolve_mobile_driver_session(
     if str(driver.driver_status) != DriverMaster.Status.ACTIVE:
         return None, None, _('mobile.auth.driver_inactive'), 'driver_inactive'
 
-    tu = getattr(driver, 'user_account', None)
+    tu = getattr(driver, 'user_account_id', None)
     if tu is None:
         return None, None, _('mobile.auth.not_a_driver'), 'not_a_driver'
     if getattr(tu, 'is_deleted', False):

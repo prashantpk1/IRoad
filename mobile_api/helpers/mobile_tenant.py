@@ -195,6 +195,25 @@ def resolve_tenant_hint_for_mobile_jwt(
     return '', None
 
 
+def resolve_optional_body_tenant_schema(
+    body_tenant_id: str = '',
+) -> tuple[str, TenantResolveErr]:
+    """
+    Resolve tenant from JSON ``tenant_id`` only (public mobile auth endpoints).
+
+    Does **not** read ``X-Tenant-ID`` or ``request.tenant``. Use for login,
+    forgot-password, verify-otp, and reset-password so non-auth clients are not
+    required to send a tenant header.
+    """
+    b = (body_tenant_id or '').strip()
+    if not b:
+        return '', None
+    reg = resolve_active_tenant_registry(b)
+    if reg is None:
+        return '', 'invalid_tenant'
+    return str(reg.schema_name).strip(), None
+
+
 def get_mobile_tenant_schema_from_request(request) -> str:
     """
     Best-effort schema string for callers that only need a string (legacy).

@@ -36,7 +36,7 @@ This document reviews persistence used by the **driver mobile** login, JWT sessi
 
 ## 3. DriverMaster (`tenant_driver_master`)
 
-**Role:** Links `user_account_id` → `TenantUser` (OneToOne, `on_delete=PROTECT`, **unique**). Mobile session resolution: `DriverMaster.objects.filter(user_account_id=...).select_related('user_account')`.
+**Role:** Links `user_account_id` → `TenantUser` (OneToOne, `on_delete=PROTECT`, **unique**). Mobile session resolution: `DriverMaster.objects.filter(user_account_id=...).select_related('user_account_id')`.
 
 **Indexes:** Existing `driver_status`, `driver_code` indexes support operational UI; FK side on `user_account_id` is covered by the **unique** OneToOne constraint.
 

@@ -31,6 +31,17 @@
 
 Use `mobile_api.decorators.mobile_capability_required('mobile.operations.read')`.
 
+## Driver home dashboard
+
+| Capability | Role | Notes |
+|------------|------|--------|
+| `mobile.driver.dashboard` | `driver` | All `GET /driver/dashboard/*` routes |
+| `mobile.driver.quick_action.*` | `driver` | Per-action visibility in `quick_actions[]` |
+
+Permission class: `HasDriverDashboardAccess`. Middleware: `MobileDashboardSecurityMiddleware`.
+
+Details: [driver_dashboard_security.md](./driver_dashboard_security.md).
+
 ## Operational stub
 
 `GET /api/v1/mobile/operational/health/` requires capability `mobile.operations.read` (dispatcher or tenant admin).

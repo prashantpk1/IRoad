@@ -16,6 +16,14 @@ from mobile_api.views.driver_auth import (
     DriverResetPasswordView,
     DriverVerifyOtpView,
 )
+from mobile_api.views.driver_dashboard import (
+    DriverDashboardCurrentJobView,
+    DriverDashboardNotificationsSummaryView,
+    DriverDashboardQuickActionsView,
+    DriverDashboardRecentActivityView,
+    DriverDashboardSummaryView,
+    DriverDashboardView,
+)
 from mobile_api.views.driver_organization_profile import (
     DriverOrganizationProfileView,
 )
@@ -85,6 +93,36 @@ urlpatterns = [
         'driver/auth/change-password/',
         DriverChangePasswordView.as_view(),
         name='driver_change_password',
+    ),
+    path(
+        'driver/dashboard/current-job/',
+        DriverDashboardCurrentJobView.as_view(),
+        name='driver_dashboard_current_job',
+    ),
+    path(
+        'driver/dashboard/quick-actions/',
+        DriverDashboardQuickActionsView.as_view(),
+        name='driver_dashboard_quick_actions',
+    ),
+    path(
+        'driver/dashboard/notifications-summary/',
+        DriverDashboardNotificationsSummaryView.as_view(),
+        name='driver_dashboard_notifications_summary',
+    ),
+    path(
+        'driver/dashboard/recent-activity/',
+        DriverDashboardRecentActivityView.as_view(),
+        name='driver_dashboard_recent_activity',
+    ),
+    path(
+        'driver/dashboard/summary/',
+        DriverDashboardSummaryView.as_view(),
+        name='driver_dashboard_summary',
+    ),
+    path(
+        'driver/dashboard/',
+        DriverDashboardView.as_view(),
+        name='driver_dashboard',
     ),
     path(
         'driver/profile/',

@@ -2,7 +2,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: iRoad\n"
 "POT-Creation-Date: 2026-04-20 00:00+0000\n"
-"PO-Revision-Date: 2026-05-20 16:36+0530\n"
+"PO-Revision-Date: 2026-05-20 19:09+0530\n"
 "Last-Translator: \n"
 "Language-Team: \n"
 "Language: ar\n"
@@ -588,6 +588,12 @@ msgstr "This action is only available to users with a dispatcher role."
 msgid "mobile.auth.capability_denied"
 msgstr "You do not have the required permission for this operation."
 
+msgid "mobile.auth.dashboard_denied"
+msgstr "You do not have access to the driver dashboard."
+
+msgid "mobile.auth.dashboard_method_not_allowed"
+msgstr "This dashboard endpoint only supports read requests."
+
 # Mobile API — Validation messages
 msgid "mobile.validation.failed"
 msgstr "Validation failed. Please check your input."
@@ -812,6 +818,102 @@ msgstr "Full name is too long."
 
 msgid "mobile.profile.mobile_digits_only"
 msgstr "Mobile number must contain digits only."
+
+msgid "mobile.dashboard.fetch_success"
+msgstr "Dashboard loaded successfully."
+
+msgid "mobile.dashboard.summary_fetch_success"
+msgstr "Dashboard summary loaded successfully."
+
+msgid "mobile.dashboard.action.continue_job"
+msgstr "Continue active job"
+
+msgid "mobile.dashboard.action.upload_pod"
+msgstr "Upload POD"
+
+msgid "mobile.dashboard.action.view_jobs"
+msgstr "View active jobs"
+
+msgid "mobile.dashboard.action.active_movement"
+msgstr "Active movement"
+
+msgid "mobile.dashboard.action.cod"
+msgstr "COD collection"
+
+msgid "mobile.dashboard.action.empty_move"
+msgstr "Create empty move"
+
+msgid "mobile.dashboard.action.reason.no_active_job"
+msgstr "No active shipment assigned."
+
+msgid "mobile.dashboard.action.reason.pod_not_pending"
+msgstr "POD is not required right now."
+
+msgid "mobile.dashboard.action.reason.no_active_movement"
+msgstr "No active movements."
+
+msgid "mobile.dashboard.action.reason.no_cod_pending"
+msgstr "No COD collection pending."
+
+msgid "mobile.dashboard.action.reason.module_not_available"
+msgstr "Coming soon in a future update."
+
+msgid "mobile.dashboard.next_action.pod"
+msgstr "Submit proof of delivery"
+
+msgid "mobile.dashboard.next_action.transit"
+msgstr "Start or continue transit"
+
+msgid "mobile.dashboard.next_action.deliver"
+msgstr "Complete delivery"
+
+msgid "mobile.dashboard.next_action.cod"
+msgstr "Collect COD payment"
+
+msgid "mobile.dashboard.next_action.pod_review"
+msgstr "Await POD confirmation"
+
+msgid "mobile.dashboard.notifications_fetch_success"
+msgstr "Notification summary loaded."
+
+msgid "mobile.dashboard.notification.assignment_required"
+msgstr "Truck assignment required"
+
+msgid "mobile.dashboard.notification.assignment_required_body"
+msgstr "Assign a truck before starting operations."
+
+msgid "mobile.dashboard.notification.no_truck"
+msgstr "No truck assigned"
+
+msgid "mobile.dashboard.notification.pending_pod"
+msgstr "POD pending"
+
+msgid "mobile.dashboard.notification.pending_pod_body"
+msgstr "%(count)s shipment(s) need proof of delivery."
+
+msgid "mobile.dashboard.notification.cod_pending"
+msgstr "COD collection pending"
+
+msgid "mobile.dashboard.notification.cod_pending_body"
+msgstr "%(count)s shipment(s) await COD collection."
+
+msgid "mobile.dashboard.notification.push"
+msgstr "Push notification"
+
+msgid "mobile.dashboard.activity_fetch_success"
+msgstr "Recent activity loaded."
+
+msgid "mobile.dashboard.activity.action"
+msgstr "Operation action"
+
+msgid "mobile.dashboard.activity.shipment %(shipment_no)s — %(status)s"
+msgstr "Shipment %(shipment_no)s — %(status)s"
+
+msgid "mobile.dashboard.activity.movement %(movement_no)s — %(status)s"
+msgstr "Movement %(movement_no)s — %(status)s"
+
+msgid "mobile.dashboard.activity.pod %(record_no)s — %(status)s"
+msgstr "POD %(record_no)s — %(status)s"
 
 msgid "mobile.profile.mobile_number_required"
 msgstr "Driver mobile number cannot be empty when provided."

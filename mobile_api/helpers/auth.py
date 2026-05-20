@@ -510,8 +510,15 @@ def get_token_from_request(request: HttpRequest) -> str | None:
         Token string or None if not present/invalid format
     """
     auth_header = request.headers.get('Authorization', '').strip()
-    if auth_header.lower().startswith('bearer '):
+    if not auth_header:
+        return None
+    lower = auth_header.lower()
+    if lower.startswith('bearer '):
         return auth_header.split(' ', 1)[1].strip()
+    if lower.startswith('bearer'):
+        # Tolerate Postman/clients that omit the space after "Bearer"
+        token = auth_header[6:].strip()
+        return token or None
     return None
 
 

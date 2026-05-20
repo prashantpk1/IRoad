@@ -7,6 +7,10 @@ from mobile_api.services.driver_auth_service import (
     driver_reset_password,
     driver_verify_otp,
 )
+from mobile_api.services.driver_dashboard_service import (
+    get_driver_dashboard,
+    get_driver_dashboard_summary,
+)
 from mobile_api.services.driver_profile_service import (
     driver_change_password,
     driver_request_change_password_otp,
@@ -24,6 +28,8 @@ __all__ = [
     'driver_reset_password',
     'driver_verify_change_password_otp',
     'driver_verify_otp',
+    'get_driver_dashboard',
+    'get_driver_dashboard_summary',
     'get_driver_profile',
     'update_driver_profile_photo',
 ]

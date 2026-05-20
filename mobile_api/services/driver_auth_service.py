@@ -234,6 +234,110 @@ def _ambiguous_candidate_payload(schema_name: str) -> dict:
         }
 
 
+def _schema_eligible_for_driver_password_reset(
+    email_norm: str,
+    schema_name: str,
+) -> bool:
+    """True when this schema has an active driver account for the email."""
+    try:
+        from tenant_workspace.models import DriverMaster, TenantUser
+
+        with schema_context(schema_name):
+            tenant_user = TenantUser.all_objects.filter(
+                email__iexact=email_norm,
+            ).first()
+            if tenant_user is None or getattr(tenant_user, 'is_deleted', False):
+                return False
+            if tenant_user.status != TenantUser.Status.ACTIVE:
+                return False
+            driver = DriverMaster.objects.filter(
+                user_account_id=tenant_user.pk,
+            ).first()
+            if driver is None or str(driver.driver_status) != DriverMaster.Status.ACTIVE:
+                return False
+        return True
+    except Exception:
+        return False
+
+
+def _list_eligible_password_reset_schemas(email_norm: str) -> list[str]:
+    """Schemas where ``email`` belongs to an active driver (deterministic order)."""
+    try:
+        from iroad_tenants.models import TenantRegistry
+
+        out: list[str] = []
+        registries = (
+            TenantRegistry.objects.select_related('tenant_profile')
+            .order_by('schema_name')
+        )
+        for reg in registries:
+            profile = getattr(reg, 'tenant_profile', None)
+            if profile and getattr(profile, 'account_status', None) != 'Active':
+                continue
+            if _schema_eligible_for_driver_password_reset(
+                email_norm,
+                reg.schema_name,
+            ):
+                out.append(reg.schema_name)
+        return out
+    except Exception as exc:
+        logger.error('_list_eligible_password_reset_schemas error: %s', exc)
+        return []
+
+
+def resolve_driver_password_reset_tenant(
+    email: str,
+    *,
+    explicit_tenant: str,
+) -> dict:
+    """
+    Resolve tenant for forgot-password (email only, no password).
+
+    Mirrors ``resolve_driver_login_tenant``: optional explicit ``tenant_id`` from
+    the JSON body only; otherwise auto-discovery across active subscribers.
+    """
+    email_norm = (email or '').strip().lower()
+    explicit = (explicit_tenant or '').strip()
+
+    if explicit:
+        reg = resolve_active_tenant_registry(explicit)
+        if reg is None:
+            return {
+                'ok': False,
+                'error_code': 'invalid_tenant',
+                'error': _('mobile.auth.invalid_tenant'),
+            }
+        schema = reg.schema_name
+        if not _schema_eligible_for_driver_password_reset(email_norm, schema):
+            return {
+                'ok': True,
+                'schema_name': schema,
+                'mode': 'explicit_no_driver',
+            }
+        return {'ok': True, 'schema_name': schema, 'mode': 'explicit'}
+
+    eligible = _list_eligible_password_reset_schemas(email_norm)
+    if not eligible:
+        return {'ok': True, 'schema_name': '', 'mode': 'none'}
+
+    if len(eligible) == 1:
+        return {'ok': True, 'schema_name': eligible[0], 'mode': 'auto'}
+
+    candidates = [_ambiguous_candidate_payload(s) for s in eligible]
+    candidates.sort(
+        key=lambda c: (
+            (c.get('company_name') or '').lower(),
+            c.get('schema_name') or '',
+        )
+    )
+    return {
+        'ok': False,
+        'error_code': 'tenant_ambiguous',
+        'error': _('mobile.auth.tenant_ambiguous'),
+        'candidates': candidates,
+    }
+
+
 def resolve_driver_login_tenant(
     email: str,
     password: str,
@@ -373,12 +477,12 @@ def resolve_tenant_schema_for_otp(
     return None
 
 
-def resolve_tenant_schema_for_otp_with_kind(
+def _list_otp_match_schemas(
     email: str,
     otp_code: str,
     otp_status: str,
-) -> tuple[str | None, str]:
-    """Returns ``(schema, 'unique'|'none'|'ambiguous')``."""
+) -> list[str]:
+    """All tenant schemas with a matching OTP row (deterministic order)."""
     matches: list[str] = []
     try:
         from iroad_tenants.models import TenantRegistry
@@ -405,8 +509,17 @@ def resolve_tenant_schema_for_otp_with_kind(
             except Exception:
                 continue
     except Exception as e:
-        logger.error('resolve_tenant_schema_for_otp_with_kind error: %s', e)
-        return None, 'none'
+        logger.error('_list_otp_match_schemas error: %s', e)
+    return matches
+
+
+def resolve_tenant_schema_for_otp_with_kind(
+    email: str,
+    otp_code: str,
+    otp_status: str,
+) -> tuple[str | None, str]:
+    """Returns ``(schema, 'unique'|'none'|'ambiguous')``."""
+    matches = _list_otp_match_schemas(email, otp_code, otp_status)
     if len(matches) == 1:
         return matches[0], 'unique'
     if len(matches) > 1:
@@ -1071,34 +1184,14 @@ def driver_forgot_password(
         return {'success': True, 'email_dispatch_status': False}
 
     ts_in = (tenant_schema or '').strip()
-
     if not ts_in:
-        if not _password_reset_allows_cross_tenant_discovery():
-            audit_password_reset_event(
-                'forgot_discovery_disabled_no_tenant',
-                tenant_schema='',
-                email=email_n,
-                request=request,
-            )
-            return ok_no_send()
-        sch, kind = resolve_tenant_schema_for_email_with_kind(email or '')
-        if kind == 'ambiguous':
-            timing_jitter_small()
-            return {
-                'success': False,
-                'error': _('mobile.auth.tenant_ambiguous_operation'),
-                'error_code': 'tenant_ambiguous_operation',
-                'email_dispatch_status': False,
-            }
-        ts_in = (sch or '').strip()
-        if not ts_in:
-            audit_password_reset_event(
-                'forgot_no_matching_tenant',
-                tenant_schema='',
-                email=email_n,
-                request=request,
-            )
-            return ok_no_send()
+        audit_password_reset_event(
+            'forgot_no_matching_tenant',
+            tenant_schema='',
+            email=email_n,
+            request=request,
+        )
+        return ok_no_send()
 
     if not forgot_password_rate_allow(
         email=email_n,
@@ -1233,14 +1326,6 @@ def driver_verify_otp(
 
     ts_work = (tenant_schema or '').strip()
     if not ts_work:
-        if not _password_reset_allows_cross_tenant_discovery():
-            audit_password_reset_event(
-                'verify_discovery_disabled_no_tenant',
-                tenant_schema='',
-                email=email_n,
-                request=request,
-            )
-            return fail_verify()
         sch, kind = resolve_tenant_schema_for_otp_with_kind(
             email=email_n,
             otp_code=otp_in,
@@ -1254,10 +1339,23 @@ def driver_verify_otp(
                 request=request,
             )
             timing_jitter_small()
+            matches = _list_otp_match_schemas(
+                email_n,
+                otp_in,
+                DriverPasswordResetOTP.Status.PENDING,
+            )
+            candidates = [_ambiguous_candidate_payload(s) for s in matches]
+            candidates.sort(
+                key=lambda c: (
+                    (c.get('company_name') or '').lower(),
+                    c.get('schema_name') or '',
+                )
+            )
             return {
                 'success': False,
-                'error': _('mobile.auth.tenant_ambiguous_operation'),
-                'error_code': 'tenant_ambiguous_operation',
+                'error': _('mobile.auth.tenant_ambiguous'),
+                'error_code': 'tenant_ambiguous',
+                'candidates': candidates,
             }
         ts_work = (sch or '').strip()
 
@@ -1391,14 +1489,6 @@ def driver_reset_password(
 
     ts_work = (tenant_schema or '').strip()
     if not ts_work:
-        if not _password_reset_allows_cross_tenant_discovery():
-            audit_password_reset_event(
-                'reset_discovery_disabled_no_tenant',
-                tenant_schema='',
-                email=email_n,
-                request=request,
-            )
-            return fail_reset()
         sch, kind = resolve_tenant_schema_for_otp_with_kind(
             email=email_n,
             otp_code=otp_in,
@@ -1406,10 +1496,23 @@ def driver_reset_password(
         )
         if kind == 'ambiguous':
             timing_jitter_small()
+            matches = _list_otp_match_schemas(
+                email_n,
+                otp_in,
+                DriverPasswordResetOTP.Status.VERIFIED,
+            )
+            candidates = [_ambiguous_candidate_payload(s) for s in matches]
+            candidates.sort(
+                key=lambda c: (
+                    (c.get('company_name') or '').lower(),
+                    c.get('schema_name') or '',
+                )
+            )
             return {
                 'success': False,
-                'error': _('mobile.auth.tenant_ambiguous_operation'),
-                'error_code': 'tenant_ambiguous_operation',
+                'error': _('mobile.auth.tenant_ambiguous'),
+                'error_code': 'tenant_ambiguous',
+                'candidates': candidates,
             }
         ts_work = (sch or '').strip()
 

@@ -2,7 +2,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: iRoad\n"
 "POT-Creation-Date: 2026-04-20 00:00+0000\n"
-"PO-Revision-Date: 2026-05-20 16:36+0530\n"
+"PO-Revision-Date: 2026-05-20 19:09+0530\n"
 "Last-Translator: \n"
 "Language-Team: \n"
 "Language: ar\n"
@@ -588,6 +588,12 @@ msgstr "هذا الإجراء متاح فقط للمستخدمين بدور مر
 msgid "mobile.auth.capability_denied"
 msgstr "ليست لديك الصلاحية المطلوبة لهذه العملية."
 
+msgid "mobile.auth.dashboard_denied"
+msgstr "ليس لديك صلاحية الوصول إلى لوحة تحكم السائق."
+
+msgid "mobile.auth.dashboard_method_not_allowed"
+msgstr "نقطة نهاية لوحة التحكم هذه تدعم طلبات القراءة فقط."
+
 # Mobile API — Validation messages
 msgid "mobile.validation.failed"
 msgstr "البيانات المدخلة غير صحيحة. يرجى المراجعة."
@@ -818,3 +824,99 @@ msgstr "لا يمكن أن يكون رقم جوال السائق فارغاً ع
 
 msgid "mobile.profile.field_too_long"
 msgstr "هذا الحقل يتجاوز الحد الأقصى للطول."
+
+msgid "mobile.dashboard.fetch_success"
+msgstr "تم تحميل لوحة التحكم بنجاح."
+
+msgid "mobile.dashboard.summary_fetch_success"
+msgstr "تم تحميل ملخص لوحة التحكم بنجاح."
+
+msgid "mobile.dashboard.action.continue_job"
+msgstr "متابعة المهمة النشطة"
+
+msgid "mobile.dashboard.action.upload_pod"
+msgstr "رفع إثبات التسليم"
+
+msgid "mobile.dashboard.action.view_jobs"
+msgstr "عرض المهام النشطة"
+
+msgid "mobile.dashboard.action.active_movement"
+msgstr "الحركة النشطة"
+
+msgid "mobile.dashboard.action.cod"
+msgstr "تحصيل الدفع عند الاستلام"
+
+msgid "mobile.dashboard.action.empty_move"
+msgstr "إنشاء حركة فارغة"
+
+msgid "mobile.dashboard.action.reason.no_active_job"
+msgstr "لا توجد شحنة نشطة معينة."
+
+msgid "mobile.dashboard.action.reason.pod_not_pending"
+msgstr "إثبات التسليم غير مطلوب حالياً."
+
+msgid "mobile.dashboard.action.reason.no_active_movement"
+msgstr "لا توجد حركات نشطة."
+
+msgid "mobile.dashboard.action.reason.no_cod_pending"
+msgstr "لا يوجد تحصيل COD معلق."
+
+msgid "mobile.dashboard.action.reason.module_not_available"
+msgstr "متاح قريباً في تحديث لاحق."
+
+msgid "mobile.dashboard.next_action.pod"
+msgstr "تقديم إثبات التسليم"
+
+msgid "mobile.dashboard.next_action.transit"
+msgstr "بدء أو متابعة النقل"
+
+msgid "mobile.dashboard.next_action.deliver"
+msgstr "إكمال التسليم"
+
+msgid "mobile.dashboard.next_action.cod"
+msgstr "تحصيل الدفع عند الاستلام"
+
+msgid "mobile.dashboard.next_action.pod_review"
+msgstr "في انتظار تأكيد إثبات التسليم"
+
+msgid "mobile.dashboard.notifications_fetch_success"
+msgstr "تم تحميل ملخص الإشعارات."
+
+msgid "mobile.dashboard.notification.assignment_required"
+msgstr "مطلوب تعيين شاحنة"
+
+msgid "mobile.dashboard.notification.assignment_required_body"
+msgstr "عيّن شاحنة قبل بدء العمليات."
+
+msgid "mobile.dashboard.notification.no_truck"
+msgstr "لا توجد شاحنة معينة"
+
+msgid "mobile.dashboard.notification.pending_pod"
+msgstr "إثبات التسليم معلق"
+
+msgid "mobile.dashboard.notification.pending_pod_body"
+msgstr "%(count)s شحنة/شحنات تحتاج إثبات تسليم."
+
+msgid "mobile.dashboard.notification.cod_pending"
+msgstr "تحصيل الدفع عند الاستلام معلق"
+
+msgid "mobile.dashboard.notification.cod_pending_body"
+msgstr "%(count)s شحنة/شحنات بانتظار تحصيل الدفع عند الاستلام."
+
+msgid "mobile.dashboard.notification.push"
+msgstr "إشعار دفع"
+
+msgid "mobile.dashboard.activity_fetch_success"
+msgstr "تم تحميل النشاط الأخير."
+
+msgid "mobile.dashboard.activity.action"
+msgstr "إجراء تشغيلي"
+
+msgid "mobile.dashboard.activity.shipment %(shipment_no)s — %(status)s"
+msgstr "شحنة %(shipment_no)s — %(status)s"
+
+msgid "mobile.dashboard.activity.movement %(movement_no)s — %(status)s"
+msgstr "حركة %(movement_no)s — %(status)s"
+
+msgid "mobile.dashboard.activity.pod %(record_no)s — %(status)s"
+msgstr "إثبات تسليم %(record_no)s — %(status)s"
