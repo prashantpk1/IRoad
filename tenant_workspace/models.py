@@ -169,6 +169,11 @@ def surcharge_attachment_upload_to(instance, filename):
     return _random_prefixed_stored_name('surcharges/attachments', 'SST', filename)
 
 
+def operation_action_media_upload_to(instance, filename):
+    """``tenant_operation_action_media/OAM_<32_hex>.ext`` per upload."""
+    return _random_prefixed_stored_name('tenant_operation_action_media', 'OAM', filename)
+
+
 class AutoNumberConfiguration(models.Model):
     """Per-tenant auto numbering settings by form code."""
 
@@ -4065,6 +4070,7 @@ class TenantOperationActionLog(models.Model):
 
     log_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     log_no = models.CharField(max_length=64, unique=True)
+    idempotency_key = models.CharField(max_length=128, blank=True, null=True, unique=True)
     log_sequence = models.PositiveIntegerField(default=0)
     log_date = models.DateTimeField()
     operation_action = models.ForeignKey(
@@ -4075,6 +4081,8 @@ class TenantOperationActionLog(models.Model):
         blank=True,
     )
     source = models.CharField(max_length=32, blank=True, default='Manual')
+    source_channel = models.CharField(max_length=32, blank=True, default='admin_manual')
+    source_ref = models.CharField(max_length=128, blank=True, default='')
     created_by = models.ForeignKey(
         'TenantUser',
         on_delete=models.SET_NULL,
@@ -4132,6 +4140,8 @@ class TenantOperationActionLog(models.Model):
             models.Index(fields=['log_no'], name='tenant_oal_no_idx'),
             models.Index(fields=['log_date'], name='tenant_oal_date_idx'),
             models.Index(fields=['source'], name='tenant_oal_source_idx'),
+            models.Index(fields=['source_channel'], name='tenant_oal_channel_idx'),
+            models.Index(fields=['source_ref'], name='tenant_oal_source_ref_idx'),
             models.Index(fields=['booking'], name='tenant_oal_booking_idx'),
             models.Index(fields=['shipment'], name='tenant_oal_shipment_idx'),
             models.Index(fields=['truck_movement'], name='tenant_oal_movement_idx'),
@@ -4154,7 +4164,12 @@ class TenantOperationActionMedia(models.Model):
     media_type = models.CharField(max_length=16, blank=True, default='')
     captured_at = models.DateTimeField(null=True, blank=True)
     description = models.CharField(max_length=255, blank=True, default='')
-    file = models.FileField(upload_to='tenant_operation_action_media/%Y/%m/', blank=True, default='')
+    file = models.FileField(
+        upload_to=operation_action_media_upload_to,
+        blank=True,
+        default='',
+        max_length=500,
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

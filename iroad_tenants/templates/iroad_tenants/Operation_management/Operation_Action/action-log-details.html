@@ -33,10 +33,12 @@
                 <i class="bi bi-arrow-left"></i>
                 <span>Back to List</span>
               </a>
+              {% if is_tenant_admin %}
               <a href="{{ action_log_detail.edit_url }}" class="eal-btn eal-btn-primary">
                 <i class="bi bi-pencil-square"></i>
                 <span>Edit Record</span>
               </a>
+              {% endif %}
             </div>
           </div>
         </div>
@@ -244,7 +246,15 @@
                   <td>{{ forloop.counter }}</td>
                   <td>{{ media.media_type }}</td>
                   <td>{{ media.timestamp|date:'d M Y, h:i A' }}</td>
-                  <td><span class="status-badge in-transit"><i class="bi bi-paperclip"></i> {{ media.file_name }}</span></td>
+                  <td>
+                    {% if media.file_url %}
+                    <a href="{{ media.file_url }}" class="status-badge in-transit" target="_blank" rel="noopener">
+                      <i class="bi bi-paperclip"></i> {{ media.file_name }}
+                    </a>
+                    {% else %}
+                    <span class="status-badge in-transit"><i class="bi bi-paperclip"></i> {{ media.file_name }}</span>
+                    {% endif %}
+                  </td>
                 </tr>
                 {% empty %}
                 <tr>

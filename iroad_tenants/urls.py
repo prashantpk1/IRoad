@@ -164,6 +164,7 @@ from .views import (
     TenantOperationActionsEditView,
     TenantOperationActionsDeleteView,
     TenantOperationActionLogListView,
+    TenantOperationActionLogAllowedActionsView,
     TenantOperationActionLogCreateView,
     TenantOperationActionLogDetailView,
     TenantOperationActionLogEditView,
@@ -1083,6 +1084,11 @@ urlpatterns = [
         'operations/operation-action-log/',
         TenantOperationActionLogListView.as_view(),
         name='tenant_operation_action_log_list',
+    ),
+    path(
+        'operations/operation-action-log/allowed-actions/',
+        TenantOperationActionLogAllowedActionsView.as_view(),
+        name='tenant_operation_action_log_allowed_actions',
     ),
     path(
         'operations/operation-action-log/create/',

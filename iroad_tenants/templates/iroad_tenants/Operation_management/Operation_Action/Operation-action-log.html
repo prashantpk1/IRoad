@@ -4,9 +4,10 @@
 
 {% block extra_css %}
 <style>
-      /* Action Log: OperationActionMedia internal sub-table (no horizontal scroll) */
+      /* Action Log: Evidence Attachments sub-table */
       .oal-media-table {
-        table-layout: auto;
+        table-layout: fixed;
+        width: 100%;
       }
 
       .oal-media-table th,
@@ -14,26 +15,46 @@
         white-space: normal;
         word-break: break-word;
         vertical-align: middle;
+        padding: 10px 8px;
       }
       .oal-media-table thead th {
         white-space: nowrap;
         font-size: 12px;
+        font-weight: 600;
       }
 
       .oal-media-table .form-control,
       .oal-media-table .form-select {
         min-width: 0;
+        width: 100%;
       }
       .oal-media-table td[data-col="actions"] {
         text-align: center;
+        width: 110px;
       }
       .oal-media-table td[data-col="actions"] .btn {
         white-space: nowrap;
-        min-width: 72px;
+        min-width: 86px;
       }
       .oal-media-sn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 28px;
+        height: 28px;
         font-weight: 600;
         color: #34384a;
+        background: #f1f5f9;
+        border-radius: 8px;
+      }
+      .oal-media-file-hint {
+        font-size: 11px;
+        color: #64748b;
+        margin-top: 4px;
+        line-height: 1.3;
+      }
+      .oal-media-table tbody tr[data-oal-media] {
+        border-bottom: 1px solid #e8edf5;
       }
       .oal-action-btn {
         border-color: #d7dcef;
@@ -136,10 +157,11 @@
         }
 
         .oal-media-table tbody td[data-col="actions"] {
-          align-items: flex-start;
+          align-items: stretch;
+          grid-column: 1 / -1;
         }
 
-        .oal-media-table tbody td[data-col="actions"] button {
+        .oal-media-table tbody td[data-col="actions"] .btn {
           width: 100%;
         }
       }
@@ -195,8 +217,10 @@
         </div>
       </div>
 
-      <form id="operationActionLogForm" method="post"{% if action_log_form.edit_url %} action="{{ action_log_form.edit_url }}"{% endif %}>
+      <form id="operationActionLogForm" method="post" enctype="multipart/form-data"{% if action_log_form.edit_url %} action="{{ action_log_form.edit_url }}"{% endif %}>
         {% csrf_token %}
+        <input type="hidden" name="idempotency_key" value="{{ action_log_form.idempotency_key|default:'' }}" />
+        <input type="hidden" name="source_ref" value="{{ action_log_form.source_ref|default:'' }}" />
         <div class="form-card" data-section="1">
           <div class="form-card-header">
             <div class="form-card-icon amber">
@@ -236,12 +260,19 @@
               </div>
               <div class="field">
                 <label for="actionLookup" class="form-label">Action</label>
-                <select class="form-select{% if action_log_form_errors.operation_action_id %} is-invalid{% endif %}" id="actionLookup" name="operation_action_id" required>
+                <select class="form-select{% if action_log_form_errors.operation_action_id %} is-invalid{% endif %}" id="actionLookup" name="operation_action_id" required data-initial-action-id="{{ action_log_form.operation_action_id|default:'' }}">
                   <option value="" disabled {% if not action_log_form.operation_action_id %}selected{% endif %}>-Select action-</option>
                   {% for action in action_options %}
                   <option value="{{ action.action_id }}" {% if action_log_form.operation_action_id == action.action_id %}selected{% endif %}>{{ action.label }} ({{ action.action_code }})</option>
                   {% endfor %}
                 </select>
+                <div class="form-text text-muted" id="actionAllowedHint">{{ action_allowed_context_label|default:"Select a booking or shipment to see allowed actions." }}</div>
+                {% if action_log_is_edit %}
+                <div class="form-text text-warning">
+                  Edit mode policy: workflow fields (Action, Date, and linked Booking/Shipment/Movement/Truck/Driver) are locked after create.
+                  Use a new correction/reversal Action Log for timeline changes.
+                </div>
+                {% endif %}
                 {% if action_log_form_errors.operation_action_id %}<div class="invalid-feedback d-block">{{ action_log_form_errors.operation_action_id }}</div>{% endif %}
               </div>
             </div>
@@ -504,10 +535,11 @@
               >
                 <thead class="table-light">
                   <tr>
-                    <th style="width: 56px">SN</th>
-                    <th style="min-width: 150px">Media Type (list)</th>
-                    <th style="min-width: 190px">Timestamp (Date-time)</th>
-                    <th style="min-width: 220px">File</th>
+                    <th style="width: 52px">SN</th>
+                    <th style="width: 16%">Media Type</th>
+                    <th style="width: 20%">Timestamp</th>
+                    <th style="width: 22%">File</th>
+                    <th style="width: 24%">Description</th>
                     <th style="width: 110px">Actions</th>
                   </tr>
                 </thead>
@@ -544,7 +576,7 @@
             </button>
           </div>
           <div class="form-actions-right">
-            <button type="submit" class="btn btn-primary">
+            <button type="submit" class="btn btn-primary" id="actionLogSubmitBtn">
               <i class="bi bi-check-circle"></i>
               {{ action_log_submit_label|default:'Save Action Log' }}
             </button>
@@ -559,6 +591,16 @@
 {% block extra_js %}
 <script>
       (function () {
+        var actionLogForm = document.getElementById("operationActionLogForm");
+        var actionLogSubmitBtn = document.getElementById("actionLogSubmitBtn");
+        if (actionLogForm && actionLogSubmitBtn) {
+          actionLogForm.addEventListener("submit", function () {
+            if (actionLogSubmitBtn.disabled) return;
+            actionLogSubmitBtn.disabled = true;
+            actionLogSubmitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Saving...';
+          });
+        }
+
         var logDateEl = document.getElementById("logDate");
         if (logDateEl && !logDateEl.value) {
           var now = new Date();
@@ -773,17 +815,85 @@
             hideBookingMenu();
           });
         }
-        if (bookingLineBirthSelect) {
-          bookingLineBirthSelect.addEventListener("change", syncBookingFromBirthLine);
+        var actionLookup = document.getElementById("actionLookup");
+        var actionAllowedHint = document.getElementById("actionAllowedHint");
+        var allowedActionsUrl = "{% url 'iroad_tenants:tenant_operation_action_log_allowed_actions' %}";
+
+        function rebuildActionOptions(actions, selectedId) {
+          if (!actionLookup) return;
+          var keep = selectedId || actionLookup.getAttribute("data-initial-action-id") || "";
+          actionLookup.innerHTML = "";
+          var placeholder = document.createElement("option");
+          placeholder.value = "";
+          placeholder.textContent = "-Select action-";
+          placeholder.disabled = true;
+          if (!keep) placeholder.selected = true;
+          actionLookup.appendChild(placeholder);
+          (actions || []).forEach(function (row) {
+            var opt = document.createElement("option");
+            opt.value = row.action_id;
+            opt.textContent = (row.label || row.action_code) + " (" + (row.action_code || "") + ")";
+            if (keep && String(keep) === String(row.action_id)) opt.selected = true;
+            actionLookup.appendChild(opt);
+          });
         }
+
+        function refreshAllowedActions() {
+          if (!actionLookup || !allowedActionsUrl) return;
+          var params = new URLSearchParams();
+          if (bookingIdInput && bookingIdInput.value) params.set("booking_id", bookingIdInput.value);
+          if (shipmentSelect && shipmentSelect.value) params.set("shipment_id", shipmentSelect.value);
+          if (movementSelect && movementSelect.value) params.set("movement_id", movementSelect.value);
+          if (bookingLineBirthSelect && bookingLineBirthSelect.value) {
+            params.set("booking_item_type", bookingLineBirthSelect.value);
+          }
+          var includeId = actionLookup.value || actionLookup.getAttribute("data-initial-action-id") || "";
+          if (includeId) params.set("include_action_id", includeId);
+          fetch(allowedActionsUrl + "?" + params.toString(), {
+            headers: { Accept: "application/json" },
+            credentials: "same-origin",
+          })
+            .then(function (res) {
+              return res.json();
+            })
+            .then(function (data) {
+              if (!data || !Array.isArray(data.actions)) return;
+              rebuildActionOptions(data.actions, includeId);
+              if (actionAllowedHint && data.context_label) {
+                actionAllowedHint.textContent = data.context_label;
+              }
+            })
+            .catch(function () {
+              /* Keep server-rendered options on network error */
+            });
+        }
+
         if (shipmentSelect) {
-          shipmentSelect.addEventListener("change", syncBookingFromShipment);
+          shipmentSelect.addEventListener("change", function () {
+            syncBookingFromShipment();
+            refreshAllowedActions();
+          });
         }
-        if (bookingItemSelect) {
-          bookingItemSelect.addEventListener("change", syncShipmentFromBookingItem);
+        if (bookingLineBirthSelect) {
+          bookingLineBirthSelect.addEventListener("change", function () {
+            syncBookingFromBirthLine();
+            refreshAllowedActions();
+          });
         }
         if (movementSelect) {
-          movementSelect.addEventListener("change", applyMovementSelection);
+          movementSelect.addEventListener("change", function () {
+            applyMovementSelection();
+            refreshAllowedActions();
+          });
+        }
+        if (bookingInput) {
+          bookingInput.addEventListener("change", refreshAllowedActions);
+        }
+        if (bookingItemSelect) {
+          bookingItemSelect.addEventListener("change", function () {
+            syncShipmentFromBookingItem();
+            refreshAllowedActions();
+          });
         }
         if (truckSelect) {
           truckSelect.addEventListener("change", function () {
@@ -800,32 +910,60 @@
         if (!tbody || !addBtn || !deleteBtnTemplate) return;
 
         function renumberRows() {
-          Array.prototype.slice.call(tbody.querySelectorAll("tr")).forEach(function (row, idx) {
+          Array.prototype.slice.call(tbody.querySelectorAll("tr[data-oal-media]")).forEach(function (row, idx) {
             var sn = row.querySelector(".oal-media-sn");
             if (sn) sn.textContent = idx + 1;
           });
         }
 
-        function createMediaRow() {
+        function escapeAttr(value) {
+          return String(value || "")
+            .replace(/&/g, "&amp;")
+            .replace(/"/g, "&quot;")
+            .replace(/</g, "&lt;");
+        }
+
+        function formatCapturedAt(value) {
+          if (!value) return "";
+          var parsed = new Date(value);
+          if (isNaN(parsed.getTime())) return "";
+          parsed.setMinutes(parsed.getMinutes() - parsed.getTimezoneOffset());
+          return parsed.toISOString().slice(0, 16);
+        }
+
+        function createMediaRow(initial) {
+          initial = initial || {};
           var tr = document.createElement("tr");
-          var nextSn = tbody.querySelectorAll("tr").length + 1;
+          tr.setAttribute("data-oal-media", "true");
+          var mediaType = escapeAttr(initial.media_type || "");
+          var capturedAt = escapeAttr(formatCapturedAt(initial.captured_at || initial.timestamp || ""));
+          var description = escapeAttr(initial.description || "");
+          var mediaId = escapeAttr(initial.media_id || "");
+          var existingFile = escapeAttr(initial.file_name || "");
           tr.innerHTML =
-            '<td data-label="SN"><span class="oal-media-sn">' +
-            nextSn +
-            "</span></td>" +
+            '<td data-label="SN"><span class="oal-media-sn">1</span></td>' +
             '<td data-label="Media Type">' +
-            '<select class="form-select form-select-sm">' +
-            '<option value="" selected disabled>-Select type-</option>' +
-            '<option value="photo">Photo</option>' +
-            '<option value="video">Video</option>' +
-            '<option value="document">Document</option>' +
+            '<input type="hidden" name="oal_media_id[]" value="' + mediaId + '" />' +
+            '<select class="form-select form-select-sm" name="oal_media_type[]">' +
+            '<option value=""' + (mediaType ? "" : " selected") + ' disabled>-Select type-</option>' +
+            '<option value="photo"' + (mediaType === "photo" ? " selected" : "") + '>Photo</option>' +
+            '<option value="video"' + (mediaType === "video" ? " selected" : "") + '>Video</option>' +
+            '<option value="document"' + (mediaType === "document" ? " selected" : "") + '>Document</option>' +
             "</select></td>" +
             '<td data-label="Timestamp">' +
-            '<input type="datetime-local" class="form-control form-control-sm" />' +
-            "</td>" +
+            '<input type="datetime-local" class="form-control form-control-sm" name="oal_media_captured_at[]" value="' +
+            capturedAt +
+            '" /></td>' +
             '<td data-label="File">' +
-            '<input type="file" class="form-control form-control-sm" />' +
+            '<input type="file" class="form-control form-control-sm" name="oal_media_file[]" accept="image/*,video/*,application/pdf" />' +
+            (existingFile && existingFile !== "-" && existingFile !== ""
+              ? '<div class="oal-media-file-hint">Current: ' + existingFile + "</div>"
+              : "") +
             "</td>" +
+            '<td data-label="Description">' +
+            '<input type="text" class="form-control form-control-sm" name="oal_media_description[]" value="' +
+            description +
+            '" placeholder="Brief description" maxlength="255" /></td>' +
             '<td data-label="Actions" data-col="actions"></td>';
           var actionCell = tr.querySelector('td[data-col="actions"]');
           if (actionCell) {
@@ -835,17 +973,49 @@
           renumberRows();
         }
 
-        addBtn.addEventListener("click", createMediaRow);
+        addBtn.addEventListener("click", function () {
+          createMediaRow();
+        });
         tbody.addEventListener("click", function (e) {
           var btn = e.target.closest(".oal-delete-row");
           if (!btn) return;
           var row = btn.closest("tr");
           if (row) row.remove();
-          if (!tbody.querySelector("tr")) createMediaRow();
+          if (!tbody.querySelector("tr[data-oal-media]")) createMediaRow();
           renumberRows();
         });
 
-        createMediaRow();
+        var initialRows = [];
+        var initialDataEl = document.getElementById("oal-media-initial-data");
+        if (initialDataEl) {
+          try {
+            initialRows = JSON.parse(initialDataEl.textContent);
+          } catch (err) {
+            initialRows = [];
+          }
+        }
+        tbody.innerHTML = "";
+        if (Array.isArray(initialRows) && initialRows.length) {
+          initialRows.forEach(function (row) {
+            createMediaRow(row);
+          });
+        } else {
+          createMediaRow();
+        }
+
+        var coordinatesEl = document.getElementById("coordinates");
+        var latitudeEl = document.getElementById("latitude");
+        var longitudeEl = document.getElementById("longitude");
+        if (coordinatesEl && latitudeEl && longitudeEl) {
+          coordinatesEl.addEventListener("change", function () {
+            var parts = String(coordinatesEl.value || "").split(",");
+            if (parts.length >= 2) {
+              latitudeEl.value = parts[0].trim();
+              longitudeEl.value = parts[1].trim();
+            }
+          });
+        }
       })();
     </script>
+    {{ action_log_media_initial_rows|json_script:"oal-media-initial-data" }}
 {% endblock %}

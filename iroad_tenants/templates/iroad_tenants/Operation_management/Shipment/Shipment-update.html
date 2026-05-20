@@ -78,6 +78,20 @@
           <label for="podDocCount" class="form-label">POD Doc Count</label>
           <input type="number" class="form-control" id="podDocCount" name="pod_doc_count" min="0" value="{{ shipment.pod_doc_count|default:0 }}" />
         </div>
+        <div class="field">
+          <label for="manualOverrideReason" class="form-label">Manual Override Reason</label>
+          <input
+            type="text"
+            class="form-control"
+            id="manualOverrideReason"
+            name="manual_override_reason"
+            maxlength="255"
+            placeholder="Required only when Shipment Status is changed manually"
+          />
+          <div class="form-text text-muted">
+            Governance control (Gap 7): provide reason when changing Shipment Status.
+          </div>
+        </div>
       </div>
     </div>
   </div>

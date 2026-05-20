@@ -987,8 +987,8 @@ function initOperationActionLogMedia() {
   const tbody = document.getElementById("oalMediaTbody");
   const addBtn = document.getElementById("addOalMediaBtn");
 
-  // Only run on Operation-action-log.html
-  if (!tbody || !addBtn) return;
+  // Operation-action-log.html manages its own media rows (save + layout).
+  if (!tbody || !addBtn || document.getElementById("oalDeleteButtonTemplate")) return;
 
   function getRows() {
     return Array.from(tbody.querySelectorAll("tr[data-oal-media]"));
