@@ -4,10 +4,14 @@ mobile_api/throttling.py
 Custom throttle classes for Mobile API rate limiting.
 
 Throttle rates configured in REST_FRAMEWORK settings:
-  'mobile_auth': '10/minute'   — login, refresh
-  'mobile_otp': '5/minute'     — OTP request/verify
-  'anon': '30/minute'          — unauthenticated general
-  'user': '100/minute'         — authenticated general
+  'mobile_auth': '12/minute'       — refresh, logout, etc.
+  'mobile_login': '6/minute'      — password login only
+  'mobile_otp': '5/minute'          — generic OTP-style endpoints (e.g. profile)
+  'mobile_forgot_password': '5/minute'
+  'mobile_verify_otp': '15/minute'
+  'mobile_reset_password': '8/minute'
+  'anon': '30/minute'               — unauthenticated general
+  'user': '100/minute'              — authenticated general
 
 Usage in views:
   class LoginView(APIView):
@@ -22,11 +26,16 @@ from rest_framework.throttling import (
 )
 
 
+class MobileLoginThrottle(AnonRateThrottle):
+    """Driver password login only (stricter than refresh/logout)."""
+    scope = 'mobile_login'
+
+
 class MobileAuthThrottle(AnonRateThrottle):
     """
-    Strict throttle for auth endpoints.
-    login, refresh, logout.
-    Rate: 10 requests/minute per IP.
+    Throttle for mobile auth endpoints other than password login
+    (refresh, logout, etc.). Login uses ``MobileLoginThrottle``.
+    Rate: see REST_FRAMEWORK ``DEFAULT_THROTTLE_RATES`` ``mobile_auth``.
     """
     scope = 'mobile_auth'
 
@@ -38,6 +47,21 @@ class MobileOtpThrottle(AnonRateThrottle):
     Rate: 5 requests/minute per IP.
     """
     scope = 'mobile_otp'
+
+
+class MobileForgotPasswordThrottle(AnonRateThrottle):
+    """Driver forgot-password: issue / no-op path (per-IP burst control)."""
+    scope = 'mobile_forgot_password'
+
+
+class MobileVerifyOtpThrottle(AnonRateThrottle):
+    """Driver verify-OTP (per-IP; pairs with cache-backed verify limits)."""
+    scope = 'mobile_verify_otp'
+
+
+class MobileResetPasswordThrottle(AnonRateThrottle):
+    """Driver reset-password after OTP verify."""
+    scope = 'mobile_reset_password'
 
 
 class MobileUserThrottle(UserRateThrottle):

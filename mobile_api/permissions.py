@@ -1,20 +1,24 @@
 """
 mobile_api/permissions.py
 
-DRF Custom Permission classes for Mobile API.
+DRF permission classes for the Mobile API.
 
-Permission classes control WHO can access each endpoint.
+Layering:
+  1. ``IsMobileAuthenticated`` — valid JWT + driver session (from authentication).
+  2. Role gates: ``IsDriver``, ``IsDispatcher``, ``IsTenantAdmin`` — enforce RBAC.
+  3. ``HasViewMobileCapability`` — reads ``required_mobile_capability`` on the view.
 
-Usage in views:
-  class TruckListView(APIView):
-      permission_classes = [IsMobileAuthenticated]
-
-  class LoginView(APIView):
-      authentication_classes = []
-      permission_classes = [AllowAnyMobile]
+RBAC rules live in ``mobile_api.rbac`` (capabilities, role groups, JWT helpers).
 """
 from rest_framework.permissions import BasePermission
 from django.utils.translation import gettext_lazy as _
+
+from mobile_api.rbac import (
+    request_has_capability,
+    user_in_dispatcher_group,
+    user_in_driver_group,
+    user_in_tenant_admin_group,
+)
 
 
 class IsMobileAuthenticated(BasePermission):
@@ -48,21 +52,79 @@ class AllowAnyMobile(BasePermission):
         return True
 
 
+class IsDriver(BasePermission):
+    """
+    **Driver mobile app** — JWT must represent an allowed driver principal
+    (``driver_id`` + ``role_name`` per ``MOBILE_API_RBAC_DRIVER_ROLE_NAMES``).
+
+    Use on endpoints that must never be callable by dispatchers/admins unless
+    they also carry a driver session (they normally do not).
+    """
+    message = _('mobile.auth.driver_role_required')
+
+    def has_permission(self, request, view):
+        if not IsMobileAuthenticated().has_permission(request, view):
+            return False
+        return user_in_driver_group(request)
+
+
+class IsDispatcher(BasePermission):
+    """
+    **Dispatcher** operational principal — ``role_name`` matches dispatcher CSV.
+
+    Tenant admins do **not** pass this gate; use ``HasViewMobileCapability`` or
+    combine permissions in the view if both dispatcher and admin should access.
+    """
+    message = _('mobile.auth.dispatcher_role_required')
+
+    def has_permission(self, request, view):
+        if not IsMobileAuthenticated().has_permission(request, view):
+            return False
+        return user_in_dispatcher_group(request)
+
+
 class IsTenantAdmin(BasePermission):
     """
-    Allow access only to tenant admin users.
-    Checks is_admin flag set during authentication.
+    **Tenant administrator** — JWT ``is_admin`` **or** ``role_name`` in admin CSV.
+
+    Replaces legacy ``payload.is_admin``-only checks with explicit role mapping.
     """
     message = _('mobile.auth.admin_required')
 
     def has_permission(self, request, view):
-        if not (
-            request.user is not None
-            and hasattr(request.user, 'is_authenticated')
-            and request.user.is_authenticated
-        ):
+        if not IsMobileAuthenticated().has_permission(request, view):
             return False
-        # Check admin flag in token payload
-        payload = getattr(request.user, 'payload', {})
-        return payload.get('is_admin', False) is True
+        return user_in_tenant_admin_group(request)
 
+
+class HasViewMobileCapability(BasePermission):
+    """
+    Capability-based authorization.
+
+    Set on the view::
+
+        class MyView(MobileAPIView):
+            required_mobile_capability = 'mobile.operations.read'
+
+    If the attribute is missing, this permission **allows** (no-op) so base
+    views are not broken — prefer setting the attribute explicitly.
+    """
+    message = _('mobile.auth.capability_denied')
+
+    def has_permission(self, request, view):
+        if not IsMobileAuthenticated().has_permission(request, view):
+            return False
+        cap = getattr(view, 'required_mobile_capability', None) or getattr(
+            view,
+            'mobile_capability',
+            None,
+        )
+        if not cap:
+            return True
+        return request_has_capability(request, str(cap))
+
+
+# Backwards-compatible alias (older imports / docs)
+IsMobileDriver = IsDriver
+IsMobileDispatcher = IsDispatcher
+IsMobileTenantAdmin = IsTenantAdmin

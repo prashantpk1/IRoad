@@ -17,7 +17,8 @@ from typing import Any
 from django.contrib.auth.hashers import check_password, make_password
 from django.core.exceptions import ValidationError
 from django.core.files.images import get_image_dimensions
-from django.utils import timezone
+from django.db.models import F
+from django.conf import settings as django_settings
 from django.utils.translation import gettext as _
 from django_tenants.utils import schema_context
 
@@ -98,6 +99,160 @@ def _resolve_driver_context(
         'tenant_user': tenant_user,
         'driver': driver,
     }
+
+
+def _assignment_history_rows(driver, limit: int = 15) -> list[dict[str, Any]]:
+    """Recent truck assignment rows for operational summary (tenant schema)."""
+    from tenant_workspace.models import TruckDriverAssignmentHistory
+
+    rows: list[dict[str, Any]] = []
+    qs = (
+        TruckDriverAssignmentHistory.objects.filter(driver=driver)
+        .select_related('truck', 'truck__truck_type')
+        .order_by('-assigned_from', '-created_at')[:limit]
+    )
+    for a in qs:
+        t = a.truck
+        rows.append(
+            {
+                'assignment_id': str(a.assignment_id),
+                'truck_id': str(t.truck_id) if t else None,
+                'truck_code': getattr(t, 'truck_code', None),
+                'plate_number': getattr(t, 'plate_number', None),
+                'assigned_from': a.assigned_from,
+                'assigned_to': a.assigned_to,
+                'assignment_status': a.assignment_status,
+            }
+        )
+    return rows
+
+
+def _build_organization_summary(
+    *,
+    request,
+    tenant_schema: str,
+    org_profile,
+) -> dict[str, Any]:
+    from iroad_tenants.models import TenantRegistry
+    from mobile_api.serializers.driver_organization_profile import (
+        DriverOrganizationProfileSerializer,
+    )
+
+    flat: dict[str, Any] = {}
+    if org_profile is not None:
+        flat = DriverOrganizationProfileSerializer(
+            instance=org_profile,
+            context={'request': request},
+        ).data
+    reg = None
+    try:
+        reg = (
+            TenantRegistry.objects.select_related('tenant_profile')
+            .filter(schema_name=tenant_schema)
+            .first()
+        )
+    except Exception as exc:
+        logger.warning('organization registry lookup failed: %s', exc)
+    tp = getattr(reg, 'tenant_profile', None) if reg else None
+    flat['tenant_id'] = str(reg.tenant_profile_id) if reg else ''
+    flat['schema_name'] = tenant_schema or ''
+    flat['company_name'] = (tp.company_name or '') if tp else ''
+    return flat
+
+
+def _build_settings_dict(*, request, org_profile) -> dict[str, Any]:
+    from mobile_api.helpers.i18n import SUPPORTED_LANGUAGES, get_request_language
+
+    tz = getattr(django_settings, 'TIME_ZONE', 'UTC')
+    sys_lang = 'en'
+    date_fmt = 'DD/MM/YYYY'
+    num_fmt = '1,234.56'
+    neg_fmt = '-100'
+    if org_profile is not None:
+        sys_lang = getattr(org_profile, 'system_language', None) or 'en'
+        tz = getattr(org_profile, 'timezone', None) or tz
+        date_fmt = getattr(org_profile, 'date_format', None) or date_fmt
+        num_fmt = getattr(org_profile, 'number_format', None) or num_fmt
+        neg_fmt = getattr(org_profile, 'negative_format', None) or neg_fmt
+
+    return {
+        'request_language': get_request_language(request),
+        'supported_languages': sorted(SUPPORTED_LANGUAGES),
+        'timezone': tz,
+        'system_language': sys_lang,
+        'date_format': date_fmt,
+        'number_format': num_fmt,
+        'negative_format': neg_fmt,
+    }
+
+
+def _build_operational_summary(
+    *,
+    driver,
+    assignment,
+    truck,
+    tenant_schema: str,
+) -> dict[str, Any]:
+    from tenant_workspace.models import DriverSettings
+
+    driver_assignment_required = False
+    try:
+        driver_assignment_required = bool(
+            DriverSettings.get_or_create_singleton().driver_assignment_required
+        )
+    except Exception as exc:
+        logger.debug('DriverSettings singleton read failed: %s', exc)
+
+    current = {
+        'assignment_id': str(assignment.assignment_id) if assignment else None,
+        'truck_id': str(truck.truck_id) if truck else None,
+        'truck_code': getattr(truck, 'truck_code', None),
+        'plate_number': getattr(truck, 'plate_number', None),
+        'assigned_from': assignment.assigned_from if assignment else None,
+        'assigned_to': assignment.assigned_to if assignment else None,
+        'assignment_status': assignment.assignment_status if assignment else None,
+    }
+    return {
+        'tenant_schema': tenant_schema,
+        'driver_assignment_required': driver_assignment_required,
+        'current_assignment': current,
+        'assignment_history': _assignment_history_rows(driver),
+    }
+
+
+def _build_contact_dict(*, tenant_user, driver) -> dict[str, Any]:
+    uid = str(tenant_user.pk) if tenant_user else ''
+    return {
+        'user_id': uid or None,
+        'email': getattr(tenant_user, 'email', None),
+        'full_name': getattr(tenant_user, 'full_name', None),
+        'username': getattr(tenant_user, 'username', None),
+        'mobile_country_code': getattr(tenant_user, 'mobile_country_code', None)
+        or '',
+        'mobile_no': getattr(tenant_user, 'mobile_no', None) or '',
+        'driver_mobile_number': getattr(driver, 'mobile_number', None),
+        'driver_whatsapp_number': getattr(driver, 'whatsapp_number', None) or '',
+    }
+
+
+def _build_permissions_dict(
+    *,
+    tenant_user,
+    driver,
+    request=None,
+) -> dict[str, Any]:
+    core = {
+        'role_name': getattr(tenant_user, 'role_name', '') or '',
+        'user_status': getattr(tenant_user, 'status', ''),
+        'driver_status': getattr(driver, 'driver_status', ''),
+    }
+    if request is not None:
+        from mobile_api.serializers.rbac import serialize_mobile_rbac_permissions
+
+        snap = serialize_mobile_rbac_permissions(request)
+        if snap:
+            core['rbac'] = snap
+    return core
 
 
 def _otp_email_key(tenant_user) -> str:
@@ -383,6 +538,7 @@ def driver_change_password(
     with schema_context(tenant_schema):
         TenantUser.all_objects.filter(pk=tenant_user.pk).update(
             password_hash=new_hash,
+            mobile_token_version=F('mobile_token_version') + 1,
         )
         DriverPasswordResetOTP.objects.filter(pk=otp_record.pk).update(
             status=DriverPasswordResetOTP.Status.USED,
@@ -404,7 +560,7 @@ def driver_change_password(
             logger.error('post password-change token revoke error: %s', exc)
 
     logger.info(
-        'Password changed via mobile schema=%s user_id=%s',
+        'mobile.session event=driver_password_changed schema=%s user_id=%s',
         tenant_schema,
         user_id,
     )
@@ -425,6 +581,9 @@ def get_driver_profile(
       ``TruckDriverAssignmentHistory`` rows with ``assigned_to IS NULL``,
       latest by ``assigned_from`` then ``created_at``.
 
+    Includes organization summary, permissions, locale/settings from
+    ``OrganizationProfile``, operational assignment history, and merged contact.
+
     All ORM access and ``DriverProfileSerializer`` rendering run inside
     ``schema_context(tenant_schema)`` so FKs resolve in the correct tenant.
 
@@ -432,7 +591,10 @@ def get_driver_profile(
         {'success': True, 'profile': <nested dict>}
         {'success': False, 'error': ...}
     """
-    from tenant_workspace.models import TruckDriverAssignmentHistory
+    from tenant_workspace.models import (
+        OrganizationProfile,
+        TruckDriverAssignmentHistory,
+    )
     from mobile_api.serializers.driver_profile import DriverProfileSerializer
 
     jwt_email = (jwt_payload or {}).get('email')
@@ -476,12 +638,40 @@ def get_driver_profile(
         truck = assignment.truck if assignment else None
         truck_type = truck.truck_type if truck else None
 
+        org_profile = (
+            OrganizationProfile.objects.order_by('-updated_at', '-created_at').first()
+        )
+
         profile_ctx = {
             'driver': driver,
             'tenant_user': tenant_user,
             'current_truck': truck,
             'truck_type': truck_type,
             'assignment': assignment,
+            'organization': _build_organization_summary(
+                request=request,
+                tenant_schema=tenant_schema,
+                org_profile=org_profile,
+            ),
+            'permissions': _build_permissions_dict(
+                tenant_user=tenant_user,
+                driver=driver,
+                request=request,
+            ),
+            'settings': _build_settings_dict(
+                request=request,
+                org_profile=org_profile,
+            ),
+            'operational': _build_operational_summary(
+                driver=driver,
+                assignment=assignment,
+                truck=truck,
+                tenant_schema=tenant_schema,
+            ),
+            'contact': _build_contact_dict(
+                tenant_user=tenant_user,
+                driver=driver,
+            ),
         }
         profile_data = DriverProfileSerializer(
             instance=profile_ctx,
@@ -491,7 +681,84 @@ def get_driver_profile(
     return {'success': True, 'profile': profile_data}
 
 
-def _validate_profile_photo_upload(uploaded_file) -> None:
+def update_driver_profile(
+    *,
+    user_id: str,
+    tenant_schema: str,
+    updates: dict[str, Any],
+    jwt_payload: dict | None = None,
+    request=None,
+) -> dict[str, Any]:
+    """
+    Apply validated partial updates to ``TenantUser`` and ``DriverMaster``.
+
+    Only fields present in ``updates`` are written. Re-reads profile on success.
+    """
+    jwt_email = (jwt_payload or {}).get('email')
+    ctx = _resolve_driver_context(
+        user_id=user_id,
+        tenant_schema=tenant_schema,
+        jwt_email=jwt_email,
+    )
+    if not ctx['success']:
+        return {'success': False, 'error': ctx['error']}
+
+    tenant_user = ctx['tenant_user']
+    driver = ctx['driver']
+
+    with schema_context(tenant_schema):
+        tu = TenantUser.all_objects.filter(pk=tenant_user.pk).first()
+        dr = DriverMaster.objects.filter(pk=driver.pk).first()
+        if tu is None or dr is None:
+            return {'success': False, 'error': _('mobile.auth.unauthorized')}
+
+        tu_fields: list[str] = []
+        dr_fields: list[str] = []
+
+        if 'full_name' in updates:
+            tu.full_name = str(updates['full_name']).strip()[:200]
+            tu_fields.append('full_name')
+        if 'mobile_country_code' in updates:
+            tu.mobile_country_code = str(updates['mobile_country_code'] or '')[:8]
+            tu_fields.append('mobile_country_code')
+        if 'mobile_no' in updates:
+            tu.mobile_no = str(updates['mobile_no'] or '')[:30]
+            tu_fields.append('mobile_no')
+
+        if 'english_name' in updates:
+            dr.english_name = str(updates['english_name'] or '')[:200]
+            dr_fields.append('english_name')
+        if 'arabic_name' in updates:
+            dr.arabic_name = str(updates['arabic_name']).strip()[:200]
+            dr_fields.append('arabic_name')
+        if 'mobile_number' in updates:
+            dr.mobile_number = str(updates['mobile_number']).strip()[:30]
+            dr_fields.append('mobile_number')
+        if 'whatsapp_number' in updates:
+            dr.whatsapp_number = str(updates['whatsapp_number'] or '').strip()[:30]
+            dr_fields.append('whatsapp_number')
+        if 'whatsapp_same_as_mobile' in updates:
+            dr.whatsapp_same_as_mobile = bool(updates['whatsapp_same_as_mobile'])
+            dr_fields.append('whatsapp_same_as_mobile')
+
+        if dr.whatsapp_same_as_mobile:
+            dr.whatsapp_number = (dr.mobile_number or '').strip()[:30]
+            if 'whatsapp_number' not in dr_fields:
+                dr_fields.append('whatsapp_number')
+
+        if tu_fields:
+            tu_fields.append('updated_at')
+            tu.save(update_fields=tu_fields)
+        if dr_fields:
+            dr_fields.append('updated_at')
+            dr.save(update_fields=dr_fields)
+
+    return get_driver_profile(
+        user_id=user_id,
+        tenant_schema=tenant_schema,
+        jwt_payload=jwt_payload,
+        request=request,
+    )
     """Raise ValidationError if upload violates Phase-1 image rules."""
     name = getattr(uploaded_file, 'name', '') or ''
     ext = os.path.splitext(name)[1].lower()

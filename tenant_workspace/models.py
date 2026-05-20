@@ -2969,7 +2969,13 @@ class TenantUser(models.Model):
     role_name = models.CharField(max_length=100, default='Administrator')
     status = models.CharField(max_length=12, choices=Status.choices, default=Status.ACTIVE)
     last_login_at = models.DateTimeField(null=True, blank=True)
+    last_login_ip = models.CharField(max_length=45, blank=True, default='')
+    last_failed_login_at = models.DateTimeField(null=True, blank=True)
     login_attempts = models.PositiveIntegerField(default=0)
+    mobile_token_version = models.PositiveIntegerField(
+        default=0,
+        help_text='Incremented on password change to invalidate outstanding mobile JWTs.',
+    )
     created_by_label = models.CharField(max_length=200, blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -2991,6 +2997,12 @@ class TenantUser(models.Model):
         db_table = 'tenant_users'
         ordering = ['-created_at']
         base_manager_name = 'all_objects'
+        indexes = [
+            models.Index(
+                fields=['is_deleted', 'status'],
+                name='tu_deleted_status_idx',
+            ),
+        ]
 
     def __str__(self):
         return f'{self.full_name} ({self.username})'

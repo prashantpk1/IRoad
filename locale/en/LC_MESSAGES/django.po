@@ -579,6 +579,15 @@ msgstr "You do not have permission to access this resource."
 msgid "mobile.auth.admin_required"
 msgstr "Admin permissions are required for this action."
 
+msgid "mobile.auth.driver_role_required"
+msgstr "This action is only available to driver mobile users with an allowed driver role."
+
+msgid "mobile.auth.dispatcher_role_required"
+msgstr "This action is only available to users with a dispatcher role."
+
+msgid "mobile.auth.capability_denied"
+msgstr "You do not have the required permission for this operation."
+
 # Mobile API — Validation messages
 msgid "mobile.validation.failed"
 msgstr "Validation failed. Please check your input."
@@ -650,6 +659,24 @@ msgstr "OTP must contain digits only."
 msgid "mobile.auth.invalid_credentials"
 msgstr "Invalid email or password."
 
+msgid "mobile.auth.invalid_tenant"
+msgstr "Unknown or inactive organization. Check your tenant ID and try again."
+
+msgid "mobile.auth.tenant_mismatch"
+msgstr "Organization in the request does not match this session. Check X-Tenant-ID or sign in again."
+
+msgid "mobile.auth.tenant_ambiguous"
+msgstr "This account exists on more than one organization. Send tenant_id (or X-Tenant-ID) and try again."
+
+msgid "mobile.auth.tenant_required"
+msgstr "Organization is required. Send tenant_id in the request body or X-Tenant-ID."
+
+msgid "mobile.auth.tenant_ambiguous_operation"
+msgstr "This action requires a specific organization because the same email or OTP exists on more than one tenant. Send tenant_id or X-Tenant-ID."
+
+msgid "mobile.auth.account_locked"
+msgstr "Too many failed sign-in attempts. Try again later or reset your password."
+
 msgid "mobile.auth.account_inactive"
 msgstr "This account is inactive. Please contact support."
 
@@ -677,6 +704,15 @@ msgstr "Login successful."
 msgid "mobile.auth.otp_sent"
 msgstr "OTP has been sent if the email is registered."
 
+msgid "mobile.auth.forgot_password_accepted"
+msgstr "If this email is registered for your organization, you will receive a verification code shortly."
+
+msgid "mobile.auth.otp_verify_failed"
+msgstr "We could not verify that code. Request a new code or try again."
+
+msgid "mobile.auth.reset_password_failed"
+msgstr "Password reset could not be completed. Verify your code and try again."
+
 msgid "mobile.auth.otp_not_found"
 msgstr "No active OTP found."
 
@@ -703,6 +739,18 @@ msgstr "Password reset successful."
 
 msgid "mobile.auth.logout_success"
 msgstr "Logout successful."
+
+msgid "mobile.auth.logout_all_success"
+msgstr "You have been signed out on all devices."
+
+msgid "mobile.auth.refresh_success"
+msgstr "Session refreshed successfully."
+
+msgid "mobile.auth.refresh_invalid"
+msgstr "Invalid or expired refresh token."
+
+msgid "mobile.auth.refresh_replay"
+msgstr "This refresh token was already used. Sign in again with your email and password."
 
 msgid "mobile.auth.change_password_otp_sent"
 msgstr "Verification code sent."
@@ -746,3 +794,27 @@ msgstr "Profile loaded successfully."
 
 msgid "mobile.profile.photo_updated"
 msgstr "Profile photo updated successfully."
+
+msgid "mobile.profile.update_success"
+msgstr "Profile updated successfully."
+
+msgid "mobile.profile.update_empty"
+msgstr "No profile fields to update. Send at least one allowed field."
+
+msgid "mobile.profile.arabic_name_required"
+msgstr "Arabic name cannot be empty when provided."
+
+msgid "mobile.profile.full_name_required"
+msgstr "Full name cannot be empty when provided."
+
+msgid "mobile.profile.full_name_too_long"
+msgstr "Full name is too long."
+
+msgid "mobile.profile.mobile_digits_only"
+msgstr "Mobile number must contain digits only."
+
+msgid "mobile.profile.mobile_number_required"
+msgstr "Driver mobile number cannot be empty when provided."
+
+msgid "mobile.profile.field_too_long"
+msgstr "This field exceeds the maximum allowed length."

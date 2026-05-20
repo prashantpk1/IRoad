@@ -579,6 +579,15 @@ msgstr "ليس لديك صلاحية للوصول لهذا المورد"
 msgid "mobile.auth.admin_required"
 msgstr "هذه الصفحة تتطلب صلاحيات المسؤول"
 
+msgid "mobile.auth.driver_role_required"
+msgstr "هذا الإجراء متاح فقط لمستخدمي تطبيق السائقين بدور مسموح."
+
+msgid "mobile.auth.dispatcher_role_required"
+msgstr "هذا الإجراء متاح فقط للمستخدمين بدور مراقب العمليات."
+
+msgid "mobile.auth.capability_denied"
+msgstr "ليست لديك الصلاحية المطلوبة لهذه العملية."
+
 # Mobile API — Validation messages
 msgid "mobile.validation.failed"
 msgstr "البيانات المدخلة غير صحيحة. يرجى المراجعة."
@@ -650,6 +659,24 @@ msgstr "رمز التحقق يجب أن يحتوي على أرقام فقط"
 msgid "mobile.auth.invalid_credentials"
 msgstr "البريد الإلكتروني أو كلمة المرور غير صحيحة"
 
+msgid "mobile.auth.invalid_tenant"
+msgstr "مؤسسة غير معروفة أو غير نشطة. تحقق من معرف المؤسسة وأعد المحاولة."
+
+msgid "mobile.auth.tenant_mismatch"
+msgstr "المؤسسة في الطلب لا تطابق هذه الجلسة. تحقق من ترويسة X-Tenant-ID أو سجّل الدخول مجدداً."
+
+msgid "mobile.auth.tenant_ambiguous"
+msgstr "هذا الحساب موجود في أكثر من مؤسسة. أرسل tenant_id (أو ترويسة X-Tenant-ID) وأعد المحاولة."
+
+msgid "mobile.auth.tenant_required"
+msgstr "المؤسسة مطلوبة. أرسل tenant_id في جسم الطلب أو ترويسة X-Tenant-ID."
+
+msgid "mobile.auth.tenant_ambiguous_operation"
+msgstr "تتطلب هذه العملية مؤسسة محددة لأن نفس البريد أو رمز التحقق موجود على أكثر من مستأجر. أرسل tenant_id أو X-Tenant-ID."
+
+msgid "mobile.auth.account_locked"
+msgstr "محاولات تسجيل دخول فاشلة كثيرة. أعد المحاولة لاحقاً أو أعد تعيين كلمة المرور."
+
 msgid "mobile.auth.account_inactive"
 msgstr "هذا الحساب غير نشط. يرجى التواصل مع الدعم"
 
@@ -677,6 +704,15 @@ msgstr "تم تسجيل الدخول بنجاح"
 msgid "mobile.auth.otp_sent"
 msgstr "تم إرسال رمز التحقق إلى بريدك الإلكتروني إن كان مسجلاً"
 
+msgid "mobile.auth.forgot_password_accepted"
+msgstr "إذا كان هذا البريد مسجلاً لدى منظمتك، ستصلك رسالة تحتوي على رمز التحقق قريباً."
+
+msgid "mobile.auth.otp_verify_failed"
+msgstr "تعذر التحقق من الرمز. اطلب رمزاً جديداً أو أعد المحاولة."
+
+msgid "mobile.auth.reset_password_failed"
+msgstr "تعذر إكمال إعادة تعيين كلمة المرور. تحقق من الرمز وحاول مرة أخرى."
+
 msgid "mobile.auth.otp_not_found"
 msgstr "لم يتم العثور على رمز تحقق نشط"
 
@@ -703,6 +739,18 @@ msgstr "تم تغيير كلمة المرور بنجاح"
 
 msgid "mobile.auth.logout_success"
 msgstr "تم تسجيل الخروج بنجاح"
+
+msgid "mobile.auth.logout_all_success"
+msgstr "تم تسجيل الخروج من جميع الأجهزة."
+
+msgid "mobile.auth.refresh_success"
+msgstr "تم تجديد الجلسة بنجاح."
+
+msgid "mobile.auth.refresh_invalid"
+msgstr "رمز التحديث غير صالح أو منتهي."
+
+msgid "mobile.auth.refresh_replay"
+msgstr "تم استخدام رمز التحديث هذا مسبقاً. سجّل الدخول مجدداً بالبريد وكلمة المرور."
 
 msgid "mobile.auth.change_password_otp_sent"
 msgstr "تم إرسال رمز التحقق."
@@ -746,3 +794,27 @@ msgstr "تم تحميل الملف الشخصي بنجاح."
 
 msgid "mobile.profile.photo_updated"
 msgstr "تم تحديث صورة الملف الشخصي بنجاح."
+
+msgid "mobile.profile.update_success"
+msgstr "تم تحديث الملف الشخصي بنجاح."
+
+msgid "mobile.profile.update_empty"
+msgstr "لا توجد حقول للتحديث. أرسل حقلاً واحداً على الأقل من الحقول المسموح بها."
+
+msgid "mobile.profile.arabic_name_required"
+msgstr "لا يمكن أن يكون الاسم العربي فارغاً عند إرساله."
+
+msgid "mobile.profile.full_name_required"
+msgstr "لا يمكن أن يكون الاسم الكامل فارغاً عند إرساله."
+
+msgid "mobile.profile.full_name_too_long"
+msgstr "الاسم الكامل أطول من المسموح."
+
+msgid "mobile.profile.mobile_digits_only"
+msgstr "يجب أن يحتوي رقم الجوال على أرقام فقط."
+
+msgid "mobile.profile.mobile_number_required"
+msgstr "لا يمكن أن يكون رقم جوال السائق فارغاً عند إرساله."
+
+msgid "mobile.profile.field_too_long"
+msgstr "هذا الحقل يتجاوز الحد الأقصى للطول."

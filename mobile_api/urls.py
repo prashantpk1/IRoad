@@ -10,7 +10,9 @@ from mobile_api.views.driver_auth import (
     DriverDeleteAccountView,
     DriverForgotPasswordView,
     DriverLoginView,
+    DriverLogoutAllDevicesView,
     DriverLogoutView,
+    DriverRefreshTokenView,
     DriverResetPasswordView,
     DriverVerifyOtpView,
 )
@@ -24,6 +26,7 @@ from mobile_api.views.driver_profile import (
     DriverRequestChangePasswordOtpView,
     DriverVerifyChangePasswordOtpView,
 )
+from mobile_api.views.mobile_operational import MobileOperationalHealthView
 
 app_name = 'mobile_api'
 
@@ -32,6 +35,11 @@ urlpatterns = [
         'driver/auth/login/',
         DriverLoginView.as_view(),
         name='driver_login',
+    ),
+    path(
+        'driver/auth/refresh/',
+        DriverRefreshTokenView.as_view(),
+        name='driver_refresh',
     ),
     path(
         'driver/auth/forgot-password/',
@@ -52,6 +60,11 @@ urlpatterns = [
         'driver/auth/logout/',
         DriverLogoutView.as_view(),
         name='driver_logout',
+    ),
+    path(
+        'driver/auth/logout-all/',
+        DriverLogoutAllDevicesView.as_view(),
+        name='driver_logout_all',
     ),
     path(
         'driver/auth/delete-account/',
@@ -90,5 +103,9 @@ urlpatterns = [
         DriverProfilePhotoUpdateView.as_view(),
         name='driver_profile_photo_update',
     ),
+    path(
+        'operational/health/',
+        MobileOperationalHealthView.as_view(),
+        name='mobile_operational_health',
+    ),
 ]
-

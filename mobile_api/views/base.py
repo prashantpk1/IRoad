@@ -8,23 +8,9 @@ of directly extending APIView. This ensures:
   1. Language activated from request header on every request
   2. Request logging for debugging
   3. Helper methods available (success, error, paginate)
-  4. Consistent error handling
+  4. Unified response envelope (``meta``, ``message_key``, structured errors)
 
-Usage:
-  from mobile_api.views.base import MobileAPIView
-  from mobile_api.permissions import AllowAnyMobile
-
-  class LoginView(MobileAPIView):
-      authentication_classes = []
-      permission_classes = [AllowAnyMobile]
-
-      def post(self, request):
-          lang = self.get_language()
-          # ... login logic
-          return self.success(
-              message=_('mobile.auth.login_success'),
-              data={'access_token': '...'},
-          )
+See ``mobile_api/docs/API_RESPONSE_CONTRACT.md`` and ``mobile_api.response_envelope``.
 """
 import logging
 from rest_framework.views import APIView
@@ -33,6 +19,12 @@ from rest_framework import status as http_status
 
 from mobile_api.helpers.i18n import activate_request_language
 from mobile_api.pagination import MobileApiPagination
+from mobile_api.response_envelope import (
+    build_success_body,
+    build_error_body,
+    validation_error_body_from_drf,
+    ensure_mobile_request_id,
+)
 
 logger = logging.getLogger('mobile_api')
 
@@ -43,7 +35,7 @@ class MobileAPIView(APIView):
 
     Provides:
     - Language activation on every request
-    - Standardized response helpers
+    - Unified JSON envelope (success / error / auth_error / validation_error)
     - Pagination helper
     - Request logging
     """
@@ -56,9 +48,10 @@ class MobileAPIView(APIView):
         return result
 
     def initial(self, request, *args, **kwargs):
-        """Called before dispatch — activate i18n here."""
+        """Called before dispatch — activate i18n and assign ``request_id``."""
         super().initial(request, *args, **kwargs)
         activate_request_language(request)
+        ensure_mobile_request_id(request)
 
     # ── Response helpers ──────────────────────────────────────────
 
@@ -67,58 +60,107 @@ class MobileAPIView(APIView):
         message: str,
         data=None,
         http_code: int = http_status.HTTP_200_OK,
+        *,
+        message_key: str | None = None,
+        meta_extra: dict | None = None,
     ) -> Response:
-        """Return a success response with status=1."""
-        return Response(
-            {
-                'status': 1,
-                'message': message,
-                'data': data if data is not None else {},
-            },
-            status=http_code,
+        """Return a success response with ``status`` = 1 and ``meta``."""
+        body = build_success_body(
+            message=str(message),
+            data=data if data is not None else {},
+            request=self.request,
+            message_key=message_key,
+            meta_extra=meta_extra,
         )
+        return Response(body, status=http_code)
 
     def error(
         self,
         message: str,
         data=None,
         http_code: int = http_status.HTTP_400_BAD_REQUEST,
+        *,
+        code: str = 'error',
+        message_key: str | None = None,
+        details: dict | None = None,
+        validation_fields: dict | None = None,
+        meta_extra: dict | None = None,
     ) -> Response:
-        """Return an error response with status=0."""
-        return Response(
-            {
-                'status': 0,
-                'message': message,
-                'data': data if data is not None else {},
-            },
-            status=http_code,
+        """
+        Return a business/client error with ``status`` = 0.
+
+        ``code`` is the canonical machine-readable code (also exposed as
+        ``data.error_code`` for legacy clients).
+        """
+        body = build_error_body(
+            app_status=0,
+            message=str(message),
+            request=self.request,
+            code=code,
+            message_key=message_key,
+            data=data,
+            details=details,
+            validation_fields=validation_fields,
+            meta_extra=meta_extra,
         )
+        return Response(body, status=http_code)
 
     def auth_error(
         self,
         message: str,
         data=None,
+        *,
+        code: str = 'unauthorized',
+        message_key: str | None = None,
+        details: dict | None = None,
+        meta_extra: dict | None = None,
     ) -> Response:
-        """Return an auth error response with status=2."""
-        return Response(
-            {
-                'status': 2,
-                'message': message,
-                'data': data if data is not None else {},
-            },
-            status=http_status.HTTP_401_UNAUTHORIZED,
+        """Return an auth/session error with ``status`` = 2 (HTTP 401)."""
+        body = build_error_body(
+            app_status=2,
+            message=str(message),
+            request=self.request,
+            code=code,
+            message_key=message_key,
+            data=data,
+            details=details,
+            validation_fields=None,
+            meta_extra=meta_extra,
         )
+        return Response(body, status=http_status.HTTP_401_UNAUTHORIZED)
 
-    def not_found(self, message: str) -> Response:
-        """Return a 404 response with status=0."""
-        return Response(
-            {
-                'status': 0,
-                'message': message,
-                'data': {},
-            },
-            status=http_status.HTTP_404_NOT_FOUND,
+    def not_found(self, message: str, *, message_key: str | None = None) -> Response:
+        """Return HTTP 404 with ``status`` = 0."""
+        body = build_error_body(
+            app_status=0,
+            message=str(message),
+            request=self.request,
+            code='not_found',
+            message_key=message_key,
+            data=None,
+            details={},
+            validation_fields=None,
         )
+        return Response(body, status=http_status.HTTP_404_NOT_FOUND)
+
+    def validation_error(
+        self,
+        serializer,
+        *,
+        message=None,
+        message_key: str = 'mobile.validation.failed',
+    ) -> Response:
+        """DRF serializer invalid → standard ``validation_failed`` envelope."""
+        from django.utils.translation import gettext as _
+
+        msg = str(message) if message is not None else str(_('mobile.validation.failed'))
+        body = validation_error_body_from_drf(
+            message=msg,
+            request=self.request,
+            drf_detail=serializer.errors,
+            message_key=message_key,
+        )
+        return Response(body, status=http_status.HTTP_400_BAD_REQUEST)
 
     # ── Pagination helper ─────────────────────────────────────────
 

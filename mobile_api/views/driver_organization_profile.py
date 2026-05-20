@@ -8,7 +8,11 @@ Developer notes: ``mobile_api/docs/driver_organization_profile.md``
 from django.utils.translation import gettext as _
 
 from mobile_api.views.base import MobileAPIView
-from mobile_api.permissions import IsMobileAuthenticated
+from mobile_api.permissions import (
+    HasViewMobileCapability,
+    IsDriver,
+    IsMobileAuthenticated,
+)
 from mobile_api.throttling import MobileUserThrottle
 from mobile_api.services.driver_organization_profile_service import (
     get_driver_organization_profile,
@@ -33,7 +37,12 @@ class DriverOrganizationProfileView(MobileAPIView):
     - ``logo_url``: absolute URL or empty string when no file.
     """
 
-    permission_classes = [IsMobileAuthenticated]
+    permission_classes = [
+        IsMobileAuthenticated,
+        IsDriver,
+        HasViewMobileCapability,
+    ]
+    required_mobile_capability = 'mobile.driver.organization'
     throttle_classes = [MobileUserThrottle]
 
     def get(self, request):
@@ -47,10 +56,13 @@ class DriverOrganizationProfileView(MobileAPIView):
         if not result.get('success'):
             return self.error(
                 message=result.get('error', _('mobile.validation.failed')),
+                code='organization_profile_failed',
+                message_key='mobile.error.generic',
                 data={},
             )
 
         return self.success(
             message=_('mobile.success.data_retrieved'),
             data=result.get('organization_profile') or {},
+            message_key='mobile.success.data_retrieved',
         )

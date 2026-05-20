@@ -16,6 +16,41 @@ from django_tenants.utils import schema_context
 OTP_EXPIRY_MINUTES = 10
 
 
+def _otp_expiry_minutes_runtime() -> int:
+    from django.conf import settings
+
+    return int(
+        getattr(
+            settings,
+            'MOBILE_API_PASSWORD_RESET_OTP_EXPIRY_MINUTES',
+            OTP_EXPIRY_MINUTES,
+        )
+        or OTP_EXPIRY_MINUTES,
+    )
+
+
+def _otp_max_attempts_runtime() -> int:
+    from django.conf import settings
+
+    return int(
+        getattr(
+            settings,
+            'MOBILE_API_PASSWORD_RESET_OTP_MAX_ATTEMPTS',
+            5,
+        )
+        or 5,
+    )
+
+
+def _resend_cooldown_seconds() -> int:
+    from django.conf import settings
+
+    return int(
+        getattr(settings, 'MOBILE_API_PASSWORD_RESET_RESEND_COOLDOWN_SECONDS', 90)
+        or 90,
+    )
+
+
 class DriverPasswordResetOTP(models.Model):
     """
     Stores OTP for driver password reset flow.
@@ -80,6 +115,12 @@ class DriverPasswordResetOTP(models.Model):
         ordering = ['-created_at']
         verbose_name = 'Driver Password Reset OTP'
         verbose_name_plural = 'Driver Password Reset OTPs'
+        indexes = [
+            models.Index(
+                fields=['tenant_schema', 'email', 'status'],
+                name='ma_otp_tenant_email_status',
+            ),
+        ]
 
     def __str__(self):
         return f"OTP for {self.email} [{self.status}]"
@@ -90,12 +131,43 @@ class DriverPasswordResetOTP(models.Model):
 
     @property
     def is_valid(self) -> bool:
-        """OTP is valid if pending, not expired, attempts < 5."""
+        """OTP is valid if pending, not expired, attempts below configured max."""
         return (
             self.status == self.Status.PENDING
             and not self.is_expired
-            and self.attempts < 5
+            and self.attempts < _otp_max_attempts_runtime()
         )
+
+    @classmethod
+    def seconds_since_last_issue(cls, email: str, tenant_schema: str) -> float | None:
+        """
+        Seconds since the most recent OTP row (any status) for this channel.
+
+        None when no prior row exists.
+        """
+        if not tenant_schema:
+            return None
+        with schema_context(tenant_schema):
+            row = (
+                cls.objects.filter(
+                    email=email,
+                    tenant_schema=tenant_schema,
+                )
+                .order_by('-created_at')
+                .only('created_at')
+                .first()
+            )
+            if row is None:
+                return None
+            return (timezone.now() - row.created_at).total_seconds()
+
+    @classmethod
+    def resend_is_throttled(cls, email: str, tenant_schema: str) -> bool:
+        """True when a new OTP should not be issued yet (resend cooldown)."""
+        sec = cls.seconds_since_last_issue(email, tenant_schema)
+        if sec is None:
+            return False
+        return sec < float(_resend_cooldown_seconds())
 
     @property
     def is_verified_and_unused(self) -> bool:
@@ -139,7 +211,7 @@ class DriverPasswordResetOTP(models.Model):
                 ).update(status=cls.Status.EXPIRED)
 
             expiry = timezone.now() + timedelta(
-                minutes=OTP_EXPIRY_MINUTES
+                minutes=_otp_expiry_minutes_runtime(),
             )
             return cls.objects.create(
                 email=email,

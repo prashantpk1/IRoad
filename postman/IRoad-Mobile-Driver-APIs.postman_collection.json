@@ -2,7 +2,7 @@
 	"info": {
 		"_postman_id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
 		"name": "IRoad Mobile Driver APIs",
-		"description": "## IRoad Mobile Driver APIs\n\n### Base URL\nUse environment variable `{{base_url}}` (no trailing slash). Full paths begin with `/api/v1/mobile/`.\n\nExample: `http://127.0.0.1:8000/api/v1/mobile/driver/auth/login/`\n\n### Standard JSON envelope\n```json\n{\n  \"status\": 1,\n  \"message\": \"…\",\n  \"data\": { }\n}\n```\n- **status `1`**: Success (`data` may be empty `{}`).\n- **status `0`**: Validation or business error; `data` often includes `errors` (DRF serializer shape) or extra fields such as `attempts_remaining`.\n- **status `2`**: Authentication failure (e.g. missing/invalid/expired JWT) — HTTP **401**; used by the mobile API exception handler for auth failures.\n\n### Headers\n| Header | When |\n|--------|------|\n| **X-Tenant-ID** | Send tenant profile UUID or schema name when tenant middleware cannot resolve the host; required for correct tenant DB in many deployments. |\n| **Accept-Language** | Optional `en` or `ar` (first tag) for translated `message` strings, localized `name` / `label` in `data`, and **`organization_name`** on **Get Organization Profile** (`driver_instructions` is not split by language). Use environment variable `accept_language` (default `en`). |\n| **Authorization** | `Bearer {{access_token}}` on all **authenticated** routes. |\n| **Content-Type** | `application/json` for JSON bodies. For profile photo, use **multipart/form-data** (field `profile_photo`); Postman sets the boundary automatically. |\n\n### Login and tokens\n1. Set `base_url`, `email`, `password`, `accept_language` (`en` or `ar`), and `tenant_id` (if needed) in the **IRoad Mobile Driver — Local** environment.\n2. Run **Login**. The **Tests** script saves `access_token` and `refresh_token` into the active environment.\n3. Call protected endpoints with **Bearer** `access_token`.\n\n> Refresh-token exchange is not part of this collection unless you add it separately; tokens are issued by the mobile auth service.\n\n### Forgot password / reset (unauthenticated)\n1. **Forgot Password** — `POST` with `email`.\n2. **Verify OTP** — `POST` with `email` and `otp_code` from email/SMS.\n3. **Reset Password** — `POST` with `email`, `otp_code`, `new_password`, `confirm_password`.\n\n### Change password while logged in (OTP)\n1. **Request OTP** — `POST` with `send_via`: `email` or `mobile` (SMS requires a phone number on the driver profile).\n2. **Verify Change Password OTP** — `POST` with `otp_code`.\n3. **Change Password** — `POST` with `current_password`, `new_password`, `confirm_password`, `otp_code`.\n\n### Profile\n- **Get Profile** — `GET` returns driver/profile payload in `data`.\n- **Get Organization Profile** — `GET` returns tenant organization support fields (`organization_name`, support contacts, `driver_instructions`, `logo_url`) in `data`.\n- **Update Profile Photo** — `POST` or `PATCH` same URL; **form-data** key **`profile_photo`** (image file: jpg, jpeg, png, webp; max 10 MB).\n\n### Logout\n`POST` with **Bearer** access token; empty body. Invalidates the current access token server-side where implemented.",
+		"description": "## IRoad Mobile Driver APIs\n\n### Base URL\nUse environment variable `{{base_url}}` (no trailing slash). Full paths begin with `/api/v1/mobile/`.\n\nExample: `http://127.0.0.1:8000/api/v1/mobile/driver/auth/login/`\n\n### Standard JSON envelope\n```json\n{\n  \"status\": 1,\n  \"message\": \"…\",\n  \"data\": { }\n}\n```\n- **status `1`**: Success (`data` may be empty `{}`).\n- **status `0`**: Validation or business error; `data` often includes `errors` (DRF serializer shape) or extra fields such as `attempts_remaining`.\n- **status `2`**: Authentication failure (e.g. missing/invalid/expired JWT) — HTTP **401**; used by the mobile API exception handler for auth failures.\n\n### Headers\n| Header | When |\n|--------|------|\n| **X-Tenant-ID** | **Forgot / Verify OTP / Reset Password only** (and whenever you send an explicit subscriber hint). Authenticated driver calls use the JWT `tenant_schema` — this header is optional and must match the token if sent. |\n| **Accept-Language** | Optional `en` or `ar` (first tag) for translated `message` strings, localized `name` / `label` in `data`, and **`organization_name`** on **Get Organization Profile** (`driver_instructions` is not split by language). Use environment variable `accept_language` (default `en`). |\n| **Authorization** | `Bearer {{access_token}}` on all **authenticated** routes. |\n| **Content-Type** | `application/json` for JSON bodies. For profile photo, use **multipart/form-data** (field `profile_photo`); Postman sets the boundary automatically. |\n\n### Login and tokens\n1. Set `base_url`, `email`, `password`, `fcm_token`, `device_platform`, `device_name`, and `accept_language` in **IRoad Mobile Driver — Local**. Optional: `tenant_id` only for multi-tenant credential overlap.\n2. Run **Login** — tenant is resolved from email + password (no `X-Tenant-ID` on login).\n3. Use **Bearer** `access_token` on protected routes (tenant comes from the token).\n\n### Full auth lifecycle (recommended order)\n1. **Login** — saves `access_token` + `refresh_token` to the active environment.\n2. **Refresh Token** — rotate refresh JWT (replay-safe); updates tokens in the environment.\n3. **Logout** — blacklists current access (and optional `refresh_token` in body for full teardown).\n4. **Logout All Devices** — kills all mobile sessions (version bump + Redis families).\n5. **Forgot → Verify OTP → Reset Password** — unauthenticated reset path; **always** send `X-Tenant-ID` / `tenant_id` (cross-tenant discovery is off by default).\n6. **Delete Account** — authenticated soft-delete with password confirmation.\n\n### Optional `meta` and `message_key`\nSuccessful responses may include `meta` (e.g. contract version) and `message_key` for clients; see `mobile_api/docs/API_RESPONSE_CONTRACT.md`.\n\n### RBAC / capabilities (authenticated driver routes)\nDriver profile, organization profile, change-password, logout-all, and delete-account require a **driver** JWT and the mapped capability (`mobile.driver.profile`, `mobile.driver.organization`, `mobile.driver.auth_session`). If you get **403 capability_denied**, the role/capability map in `mobile_api/rbac.py` does not match the test user.\n\n### Forgot password / reset (unauthenticated)\n1. **Forgot Password** — `POST` with `email` and optional `tenant_id` (header `X-Tenant-ID` is required when settings enforce tenant hint).\n2. **Verify OTP** — `POST` with `email`, `otp_code`, optional `tenant_id`.\n3. **Reset Password** — `POST` with `email`, `otp_code`, `new_password`, `confirm_password`, optional `tenant_id`.\n\n### Change password while logged in (OTP)\n1. **Request OTP** — `POST` with `send_via`: `email` or `mobile` (SMS requires a phone number on the driver profile).\n2. **Verify Change Password OTP** — `POST` with `otp_code`.\n3. **Change Password** — `POST` with `current_password`, `new_password`, `confirm_password`, `otp_code`.\n\n### Profile\n- **Get Profile** — `GET` returns driver/profile payload in `data`.\n- **Get Organization Profile** — `GET` returns tenant organization support fields (`organization_name`, support contacts, `driver_instructions`, `logo_url`) in `data`.\n- **Update Profile Photo** — `POST` or `PATCH` same URL; **form-data** key **`profile_photo`** (image file: jpg, jpeg, png, webp; max 10 MB).\n\n### Logout\n`POST` with **Bearer** access token. Optional JSON body `{ \"refresh_token\": \"...\" }` to revoke the refresh JTI and refresh family in Redis (recommended).\n\n### Logout all devices\n`POST` **Bearer** access; optional body `refresh_token`. Tenant is taken from the JWT (no `X-Tenant-ID` required).\n\n### Operational smoke (dispatcher / tenant admin)\n`GET /api/v1/mobile/operational/health/` — **403** for a normal driver principal; use a dispatcher/admin JWT to test RBAC.",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"item": [
@@ -42,11 +42,6 @@
 								"value": "application/json"
 							},
 							{
-								"key": "X-Tenant-ID",
-								"value": "{{tenant_id}}",
-								"description": "Tenant UUID or schema name when needed"
-							},
-							{
 								"key": "Accept-Language",
 								"value": "{{accept_language}}",
 								"description": "Primary tag: en or ar (e.g. Accept-Language: ar). Controls translated message strings and localized name/label in data. Use environment variable accept_language (default en)."
@@ -54,7 +49,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}",
+							"raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\",\n  \"device_platform\": \"{{device_platform}}\",\n  \"device_id\": \"{{fcm_token}}\",\n  \"device_name\": \"{{device_name}}\"\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -62,7 +57,7 @@
 							}
 						},
 						"url": "{{base_url}}/api/v1/mobile/driver/auth/login/",
-						"description": "Authenticate driver. On success, `data` contains `access_token`, `refresh_token`, and `driver`."
+						"description": "Authenticate with email + password; tenant is resolved server-side. Optional `tenant_id` in JSON only when the same credentials exist on multiple tenants. `device_id` = Firebase FCM registration token; `device_platform` = e.g. iOS or Android; `device_name` = device model (e.g. iPhone 16, Samsung Galaxy S24)."
 					},
 					"response": [
 						{
@@ -75,11 +70,6 @@
 										"value": "application/json"
 									},
 									{
-										"key": "X-Tenant-ID",
-										"value": "{{tenant_id}}",
-										"description": "Tenant UUID or schema name when needed"
-									},
-									{
 										"key": "Accept-Language",
 										"value": "en",
 										"description": "Primary tag: en or ar (e.g. Accept-Language: ar). Controls translated message strings and localized name/label in data. Use environment variable accept_language (default en)."
@@ -87,7 +77,7 @@
 								],
 								"body": {
 									"mode": "raw",
-									"raw": "{\n  \"email\": \"driver@example.com\",\n  \"password\": \"Password@123\"\n}"
+									"raw": "{\n  \"email\": \"driver@example.com\",\n  \"password\": \"Password@123\",\n  \"device_platform\": \"Android\",\n  \"device_id\": \"<fcm-registration-token>\",\n  \"device_name\": \"Samsung Galaxy S24\"\n}"
 								},
 								"url": "{{base_url}}/api/v1/mobile/driver/auth/login/"
 							},
@@ -107,11 +97,6 @@
 										"value": "application/json"
 									},
 									{
-										"key": "X-Tenant-ID",
-										"value": "{{tenant_id}}",
-										"description": "Tenant UUID or schema name when needed"
-									},
-									{
 										"key": "Accept-Language",
 										"value": "ar",
 										"description": "Primary tag: en or ar (e.g. Accept-Language: ar). Controls translated message strings and localized name/label in data. Use environment variable accept_language (default en)."
@@ -119,7 +104,7 @@
 								],
 								"body": {
 									"mode": "raw",
-									"raw": "{\n  \"email\": \"driver@example.com\",\n  \"password\": \"Password@123\"\n}"
+									"raw": "{\n  \"email\": \"driver@example.com\",\n  \"password\": \"Password@123\",\n  \"device_platform\": \"Android\",\n  \"device_id\": \"<fcm-registration-token>\",\n  \"device_name\": \"Samsung Galaxy S24\"\n}"
 								},
 								"url": "{{base_url}}/api/v1/mobile/driver/auth/login/"
 							},
@@ -155,6 +140,56 @@
 					]
 				},
 				{
+					"name": "Refresh Token",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"try {",
+									"    var json = pm.response.json();",
+									"    if (json && json.status === 1 && json.data) {",
+									"        if (json.data.access_token) {",
+									"            pm.environment.set(\"access_token\", json.data.access_token);",
+									"        }",
+									"        if (json.data.refresh_token) {",
+									"            pm.environment.set(\"refresh_token\", json.data.refresh_token);",
+									"        }",
+									"    }",
+									"} catch (e) {",
+									"    console.warn(\"Refresh: could not save tokens\", e);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": "{{base_url}}/api/v1/mobile/driver/auth/refresh/",
+						"description": "Rotate refresh JWT. Tenant is taken from the refresh token; optional `tenant_id` in body or X-Tenant-ID only when you send an explicit hint (must match token tenant_schema)."
+					}
+				},
+				{
 					"name": "Forgot Password",
 					"request": {
 						"method": "POST",
@@ -175,7 +210,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"email\": \"{{email}}\"\n}",
+							"raw": "{\n  \"email\": \"{{email}}\",\n  \"tenant_id\": \"{{tenant_id}}\"\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -217,7 +252,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"email\": \"{{email}}\",\n  \"otp_code\": \"{{otp_code}}\"\n}",
+							"raw": "{\n  \"email\": \"{{email}}\",\n  \"otp_code\": \"{{otp_code}}\",\n  \"tenant_id\": \"{{tenant_id}}\"\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -267,7 +302,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"email\": \"{{email}}\",\n  \"otp_code\": \"{{otp_code}}\",\n  \"new_password\": \"NewPassword@123\",\n  \"confirm_password\": \"NewPassword@123\"\n}",
+							"raw": "{\n  \"email\": \"{{email}}\",\n  \"otp_code\": \"{{otp_code}}\",\n  \"new_password\": \"NewPassword@123\",\n  \"confirm_password\": \"NewPassword@123\",\n  \"tenant_id\": \"{{tenant_id}}\"\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -298,17 +333,26 @@
 								"value": "Bearer {{access_token}}"
 							},
 							{
-								"key": "X-Tenant-ID",
-								"value": "{{tenant_id}}"
-							},
-							{
 								"key": "Accept-Language",
 								"value": "{{accept_language}}",
 								"description": "Primary tag: en or ar (e.g. Accept-Language: ar). Controls translated message strings and localized name/label in data. Use environment variable accept_language (default en)."
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
 							}
 						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
 						"url": "{{base_url}}/api/v1/mobile/driver/auth/logout/",
-						"description": "Invalidate current access token. No JSON body."
+						"description": "Blacklists access JTI. Send current `refresh_token` in body (recommended) to revoke refresh JTI and invalidate the refresh family in Redis. Use `{}` if you only want access revoked."
 					},
 					"response": [
 						{
@@ -328,6 +372,68 @@
 							"body": "{\n  \"status\": 0,\n  \"message\": \"Invalid authentication token. Please login again.\",\n  \"data\": {}\n}"
 						}
 					]
+				},
+				{
+					"name": "Logout All Devices",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": "{{base_url}}/api/v1/mobile/driver/auth/logout-all/",
+						"description": "Revokes all mobile sessions for the driver (token version bump + Redis family invalidation). Optional `refresh_token` in body. Requires driver JWT + capability `mobile.driver.auth_session`."
+					}
+				},
+				{
+					"name": "Delete Account (soft-delete)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"password\": \"{{password}}\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": "{{base_url}}/api/v1/mobile/driver/auth/delete-account/",
+						"description": "Soft-delete the driver workspace user after password confirmation. Requires driver JWT + `mobile.driver.auth_session`."
+					}
 				}
 			]
 		},
@@ -346,10 +452,6 @@
 							{
 								"key": "Content-Type",
 								"value": "application/json"
-							},
-							{
-								"key": "X-Tenant-ID",
-								"value": "{{tenant_id}}"
 							},
 							{
 								"key": "Accept-Language",
@@ -392,10 +494,6 @@
 							{
 								"key": "Content-Type",
 								"value": "application/json"
-							},
-							{
-								"key": "X-Tenant-ID",
-								"value": "{{tenant_id}}"
 							},
 							{
 								"key": "Accept-Language",
@@ -446,10 +544,6 @@
 							{
 								"key": "Content-Type",
 								"value": "application/json"
-							},
-							{
-								"key": "X-Tenant-ID",
-								"value": "{{tenant_id}}"
 							},
 							{
 								"key": "Accept-Language",
@@ -503,10 +597,6 @@
 								"value": "Bearer {{access_token}}"
 							},
 							{
-								"key": "X-Tenant-ID",
-								"value": "{{tenant_id}}"
-							},
-							{
 								"key": "Accept-Language",
 								"value": "{{accept_language}}",
 								"description": "Primary tag: en or ar (e.g. Accept-Language: ar). Controls translated message strings and localized name/label in data. Use environment variable accept_language (default en)."
@@ -531,10 +621,6 @@
 										"value": "Bearer {{access_token}}"
 									},
 									{
-										"key": "X-Tenant-ID",
-										"value": "{{tenant_id}}"
-									},
-									{
 										"key": "Accept-Language",
 										"value": "en",
 										"description": "Primary tag: en or ar (e.g. Accept-Language: ar). Controls translated message strings and localized name/label in data. Use environment variable accept_language (default en)."
@@ -556,10 +642,6 @@
 									{
 										"key": "Authorization",
 										"value": "Bearer {{access_token}}"
-									},
-									{
-										"key": "X-Tenant-ID",
-										"value": "{{tenant_id}}"
 									},
 									{
 										"key": "Accept-Language",
@@ -590,17 +672,13 @@
 								"value": "Bearer {{access_token}}"
 							},
 							{
-								"key": "X-Tenant-ID",
-								"value": "{{tenant_id}}"
-							},
-							{
 								"key": "Accept-Language",
 								"value": "{{accept_language}}",
 								"description": "Primary tag: en or ar. Localizes `organization_name` from `name_en` / `name_ar`. Set environment `accept_language` to `en` or `ar` (default en)."
 							}
 						],
 						"url": "{{base_url}}/api/v1/mobile/driver/organization-profile/",
-						"description": "## GET Organization Profile\n\n**Auth:** `Authorization: Bearer {{access_token}}` is **required**.\n\n**Tenant:** Send `X-Tenant-ID` when your environment needs it (same as Get Profile).\n\n**Localization:** `Accept-Language` (`en` or `ar`, first tag) affects **`data.organization_name`** only (from `name_en` / `name_ar` with fallback). **`driver_instructions`** is a **single** DB field — the API returns the **same** value for both languages (may contain HTML).\n\n**Media:** `logo_url` is an absolute URL when a logo exists; otherwise an empty string.\n\n**Envelope:** `status: 1` on success; `data` holds the flat organization fields."
+						"description": "## GET Organization Profile\n\n**Auth:** `Authorization: Bearer {{access_token}}` is **required**.\n\n**Tenant:** resolved from the JWT `tenant_schema` (Bearer). Optional `X-Tenant-ID` only as an explicit hint and must match the token when sent.\n\n**Localization:** `Accept-Language` (`en` or `ar`, first tag) affects **`data.organization_name`** only (from `name_en` / `name_ar` with fallback). **`driver_instructions`** is a **single** DB field — the API returns the **same** value for both languages (may contain HTML).\n\n**Media:** `logo_url` is an absolute URL when a logo exists; otherwise an empty string.\n\n**Envelope:** `status: 1` on success; `data` holds the flat organization fields."
 					},
 					"response": [
 						{
@@ -616,10 +694,6 @@
 									{
 										"key": "Authorization",
 										"value": "Bearer {{access_token}}"
-									},
-									{
-										"key": "X-Tenant-ID",
-										"value": "{{tenant_id}}"
 									},
 									{
 										"key": "Accept-Language",
@@ -643,10 +717,6 @@
 									{
 										"key": "Authorization",
 										"value": "Bearer {{access_token}}"
-									},
-									{
-										"key": "X-Tenant-ID",
-										"value": "{{tenant_id}}"
 									},
 									{
 										"key": "Accept-Language",
@@ -683,10 +753,6 @@
 							{
 								"key": "Authorization",
 								"value": "Bearer {{access_token}}"
-							},
-							{
-								"key": "X-Tenant-ID",
-								"value": "{{tenant_id}}"
 							},
 							{
 								"key": "Accept-Language",
@@ -726,6 +792,29 @@
 							"body": "{\n  \"status\": 0,\n  \"message\": \"Validation failed. Please check your input.\",\n  \"data\": {\n    \"errors\": {\n      \"profile_photo\": [\"The file must be a valid image (JPG, JPEG, PNG, or WEBP).\"]\n    }\n  }\n}"
 						}
 					]
+				}
+			]
+		},
+		{
+			"name": "Mobile operational (RBAC smoke)",
+			"item": [
+				{
+					"name": "Operational health (GET)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							}
+						],
+						"url": "{{base_url}}/api/v1/mobile/operational/health/",
+						"description": "Requires capability `mobile.operations.read` (dispatcher or tenant admin). A normal **driver** JWT should return **403** — use to confirm RBAC is wired."
+					}
 				}
 			]
 		}

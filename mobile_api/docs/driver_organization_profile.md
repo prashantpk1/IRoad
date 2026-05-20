@@ -15,7 +15,8 @@ Lightweight notes for **`GET /api/v1/mobile/driver/organization-profile/`**.
 
 ## Tenant
 
-- Send **`X-Tenant-ID`** when the deployment needs explicit tenant resolution (same as other driver calls).
+- **Primary:** the access JWT carries **`tenant_schema`**; the server uses it for authenticated driver routes (same as profile, logout, and so on).
+- **Optional:** send **`X-Tenant-ID`** only if you supply an explicit subscriber hint; it **must match** the JWT `tenant_schema` when both are present.
 
 ## Localization (`Accept-Language`)
 

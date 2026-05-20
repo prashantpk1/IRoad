@@ -3,7 +3,8 @@ mobile_api/pagination.py
 
 DRF Custom Pagination class for Mobile API.
 
-Enforces standard pagination envelope:
+Enforces standard pagination envelope (same as ``MobileAPIView.success``):
+
 {
   "status": 1,
   "message": "...",
@@ -13,7 +14,8 @@ Enforces standard pagination envelope:
     "total_pages": 10,
     "current_page": 1,
     "page_size": 10
-  }
+  },
+  "meta": { "request_id": "...", "timestamp": "...", "locale": "...", "api_version": "..." }
 }
 
 Usage in views:
@@ -28,6 +30,8 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from django.conf import settings
 import math
+
+from mobile_api.response_envelope import build_meta
 
 
 class MobileApiPagination(PageNumberPagination):
@@ -55,14 +59,15 @@ class MobileApiPagination(PageNumberPagination):
 
         return Response({
             'status': 1,
-            'message': message,
+            'message': str(message),
             'data': {
                 'items': data,
                 'total_records': total_records,
                 'total_pages': total_pages,
                 'current_page': self.page.number,
                 'page_size': page_size,
-            }
+            },
+            'meta': build_meta(self.request),
         })
 
     def get_paginated_response_schema(self, schema):

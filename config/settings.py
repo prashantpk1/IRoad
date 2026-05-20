@@ -27,9 +27,9 @@ SECRET_KEY = config('SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=False, cast=bool)
 
-# ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='').split(',')
-
-ALLOWED_HOSTS = ["*"]
+# ALLOWED_HOSTS: comma-separated; use explicit hostnames in production (never '*').
+_allowed_hosts_raw = config('ALLOWED_HOSTS', default='*', cast=str).strip()
+ALLOWED_HOSTS = [h.strip() for h in _allowed_hosts_raw.split(',') if h.strip()] or ['*']
 CSRF_TRUSTED_ORIGINS = [
     "https://*.ngrok-free.app",
     "https://*.ngrok.io",
@@ -40,6 +40,41 @@ CSRF_TRUSTED_ORIGINS = [
 
 # Allow SSL termination at proxy
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+# HTTPS / browser cookie hardening (defaults follow DEBUG: strict when DEBUG=False)
+SECURE_SSL_REDIRECT = config('SECURE_SSL_REDIRECT', default=not DEBUG, cast=bool)
+SESSION_COOKIE_SECURE = config('SESSION_COOKIE_SECURE', default=not DEBUG, cast=bool)
+CSRF_COOKIE_SECURE = config('CSRF_COOKIE_SECURE', default=not DEBUG, cast=bool)
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = config('SESSION_COOKIE_SAMESITE', default='Lax', cast=str)
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_BROWSER_XSS_FILTER = True
+X_FRAME_OPTIONS = 'DENY'
+SECURE_HSTS_SECONDS = config(
+    'SECURE_HSTS_SECONDS',
+    default=(31536000 if not DEBUG else 0),
+    cast=int,
+)
+SECURE_HSTS_INCLUDE_SUBDOMAINS = config(
+    'SECURE_HSTS_INCLUDE_SUBDOMAINS',
+    default=False,
+    cast=bool,
+)
+SECURE_HSTS_PRELOAD = config(
+    'SECURE_HSTS_PRELOAD',
+    default=False,
+    cast=bool,
+)
+SECURE_REFERRER_POLICY = config(
+    'SECURE_REFERRER_POLICY',
+    default='same-origin',
+    cast=str,
+).strip() or 'same-origin'
+SECURE_CROSS_ORIGIN_OPENER_POLICY = config(
+    'SECURE_CROSS_ORIGIN_OPENER_POLICY',
+    default='same-origin',
+    cast=str,
+).strip() or 'same-origin'
 
 # Application definition (django-tenants: shared = public schema, tenant = per subscriber)
 # https://django-tenants.readthedocs.io/
@@ -84,7 +119,9 @@ MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django_tenants.middleware.main.TenantMainMiddleware',
     'superadmin.middleware.TenantApiSchemaMiddleware',
+    'mobile_api.middleware.MobileApiTenantGateMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    'mobile_api.middleware.MobileApiSecurityHeadersMiddleware',
     # Serve /static/ when DEBUG=False (see STATICFILES_DIRS); required for styled 404 and marketing pages.
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -294,6 +331,15 @@ SESSION_ENGINE = 'django.contrib.sessions.backends.db'
 SESSION_COOKIE_AGE = 86400  # 24hrs max — Redis TTL controls real expiry
 
 # ─────────────────────────────────────────
+# Mobile API — response contract
+# ─────────────────────────────────────────
+MOBILE_API_CONTRACT_VERSION = config(
+    'MOBILE_API_CONTRACT_VERSION',
+    default='1.0',
+    cast=str,
+).strip() or '1.0'
+
+# ─────────────────────────────────────────
 # Mobile API — Django REST Framework
 # ─────────────────────────────────────────
 REST_FRAMEWORK = {
@@ -334,15 +380,41 @@ REST_FRAMEWORK = {
     'DEFAULT_THROTTLE_RATES': {
         'anon': '30/minute',
         'user': '100/minute',
-        'mobile_auth': '10/minute',
+        'mobile_auth': '12/minute',
+        'mobile_login': '6/minute',
         'mobile_otp': '5/minute',
+        'mobile_forgot_password': '5/minute',
+        'mobile_verify_otp': '15/minute',
+        'mobile_reset_password': '8/minute',
     },
 }
 
 # ─────────────────────────────────────────
 # Mobile API — CORS Settings
 # ─────────────────────────────────────────
-CORS_ALLOW_ALL_ORIGINS = True
+# Production: set CORS_ALLOW_ALL_ORIGINS=False and CORS_ALLOWED_ORIGINS to explicit
+# https:// origins for any browser-based clients (never use '*' with credentials).
+_cors_origins_raw = config('CORS_ALLOWED_ORIGINS', default='', cast=str).strip()
+CORS_ALLOWED_ORIGINS = [o.strip() for o in _cors_origins_raw.split(',') if o.strip()]
+
+CORS_ALLOW_ALL_ORIGINS = config(
+    'CORS_ALLOW_ALL_ORIGINS',
+    default=bool(DEBUG),
+    cast=bool,
+)
+# Typical local web dev (Expo / React) — only when DEBUG is True.
+if DEBUG:
+    for _origin in (
+        'http://127.0.0.1:3000',
+        'http://localhost:3000',
+        'http://127.0.0.1:8081',
+        'http://localhost:8081',
+        'http://127.0.0.1:19006',
+        'http://localhost:19006',
+    ):
+        if _origin not in CORS_ALLOWED_ORIGINS:
+            CORS_ALLOWED_ORIGINS.append(_origin)
+
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_HEADERS = [
     'accept',
@@ -373,6 +445,244 @@ MOBILE_API_JWT_SIGNING_KEY = config(
     'MOBILE_API_JWT_SIGNING_KEY',
     default='',
 )
+# Minimum length for MOBILE_API_JWT_SIGNING_KEY when DEBUG is False (see mobile_api.checks).
+MOBILE_API_JWT_SIGNING_KEY_MIN_LENGTH = config(
+    'MOBILE_API_JWT_SIGNING_KEY_MIN_LENGTH',
+    default=32,
+    cast=int,
+)
+# JWT issuer / audience — embedded in mobile tokens; verified when present on decode.
+MOBILE_API_JWT_ISS = config('MOBILE_API_JWT_ISS', default='', cast=str).strip()
+MOBILE_API_JWT_AUD = config('MOBILE_API_JWT_AUD', default='', cast=str).strip()
+# Small leeway for access/refresh verification (client clock skew vs strict exp).
+MOBILE_API_JWT_LEEWAY_SECONDS = config(
+    'MOBILE_API_JWT_LEEWAY_SECONDS',
+    default=30,
+    cast=int,
+)
+# Require ``iat`` claim on decode (tokens issued by this app always include it).
+MOBILE_API_JWT_REQUIRE_IAT_CLAIM = config(
+    'MOBILE_API_JWT_REQUIRE_IAT_CLAIM',
+    default=not DEBUG,
+    cast=bool,
+)
+
+# Driver login lockout (per TenantUser row). Set lockout minutes to 0 to disable time window
+# (only max attempts applies until successful login resets the counter).
+MOBILE_API_LOGIN_MAX_ATTEMPTS = config(
+    'MOBILE_API_LOGIN_MAX_ATTEMPTS',
+    default=10,
+    cast=int,
+)
+MOBILE_API_LOGIN_LOCKOUT_MINUTES = config(
+    'MOBILE_API_LOGIN_LOCKOUT_MINUTES',
+    default=15,
+    cast=int,
+)
+
+# Refresh rotation: ``try_consume_refresh_jti_once`` uses Redis SET NX. When True and
+# Redis is unavailable, refresh returns failure instead of fail-open.
+MOBILE_API_REFRESH_REQUIRE_REDIS = config(
+    'MOBILE_API_REFRESH_REQUIRE_REDIS',
+    default=not DEBUG,
+    cast=bool,
+)
+
+# JWT blacklist writes: transient Redis errors are retried this many times.
+MOBILE_API_BLACKLIST_WRITE_RETRIES = config(
+    'MOBILE_API_BLACKLIST_WRITE_RETRIES',
+    default=2,
+    cast=int,
+)
+
+# When True, Redis GET errors while checking blacklist / family invalidation
+# deny the token (fail closed). Defaults to True when DEBUG is False.
+MOBILE_API_JWT_DENY_ON_REDIS_READ_ERROR = config(
+    'MOBILE_API_JWT_DENY_ON_REDIS_READ_ERROR',
+    default=not DEBUG,
+    cast=bool,
+)
+
+# When True, a Redis exception during refresh ``SET NX`` denies rotation (replay-safe).
+# Recommended True in production even if ``MOBILE_API_REFRESH_REQUIRE_REDIS`` is False.
+MOBILE_API_REFRESH_CONSUME_FAIL_CLOSED_ON_REDIS_ERROR = config(
+    'MOBILE_API_REFRESH_CONSUME_FAIL_CLOSED_ON_REDIS_ERROR',
+    default=True,
+    cast=bool,
+)
+
+# Extra HTTP headers on ``/api/v1/mobile/*`` (see ``MobileApiSecurityHeadersMiddleware``).
+MOBILE_API_SECURITY_HEADERS_ENABLED = config(
+    'MOBILE_API_SECURITY_HEADERS_ENABLED',
+    default=True,
+    cast=bool,
+)
+MOBILE_API_REFERRER_POLICY = config(
+    'MOBILE_API_REFERRER_POLICY',
+    default='strict-origin-when-cross-origin',
+    cast=str,
+).strip()
+MOBILE_API_PERMISSIONS_POLICY = config(
+    'MOBILE_API_PERMISSIONS_POLICY',
+    default='camera=(), microphone=(), geolocation=()',
+    cast=str,
+).strip()
+
+# Login burst limits (Django cache) — see ``mobile_api.helpers.login_throttle``.
+MOBILE_API_LOGIN_BURST_WINDOW_SECONDS = config(
+    'MOBILE_API_LOGIN_BURST_WINDOW_SECONDS',
+    default=900,
+    cast=int,
+)
+MOBILE_API_LOGIN_BURST_MAX_PER_IP = config(
+    'MOBILE_API_LOGIN_BURST_MAX_PER_IP',
+    default=60,
+    cast=int,
+)
+MOBILE_API_LOGIN_BURST_MAX_PER_EMAIL = config(
+    'MOBILE_API_LOGIN_BURST_MAX_PER_EMAIL',
+    default=25,
+    cast=int,
+)
+# When True, cache errors while reading login burst counters deny the attempt.
+MOBILE_API_LOGIN_BURST_FAIL_CLOSED_ON_CACHE_ERROR = config(
+    'MOBILE_API_LOGIN_BURST_FAIL_CLOSED_ON_CACHE_ERROR',
+    default=not DEBUG,
+    cast=bool,
+)
+
+# Mobile driver JWT: require JWT email/driver_id/role_name to match DB when present.
+MOBILE_API_JWT_STRICT_CLAIM_BINDING = config(
+    'MOBILE_API_JWT_STRICT_CLAIM_BINDING',
+    default=True,
+    cast=bool,
+)
+
+# Optional CSV of allowed ``TenantUser.role_name`` values (case-insensitive) for
+# mobile API. When empty, any user with an active linked DriverMaster is allowed.
+MOBILE_API_DRIVER_ROLE_ALLOWLIST = config(
+    'MOBILE_API_DRIVER_ROLE_ALLOWLIST',
+    default='',
+    cast=str,
+).strip()
+
+# When True, every mobile JWT access/refresh validation requires a resolvable
+# tenant hint (X-Tenant-ID and/or request.tenant) that matches token tenant_schema.
+MOBILE_API_JWT_REQUIRE_TENANT_HINT = config(
+    'MOBILE_API_JWT_REQUIRE_TENANT_HINT',
+    default=True,
+    cast=bool,
+)
+
+# Forgot-password / verify-otp / reset-password: require explicit tenant context
+# (tenant_id body field and/or X-Tenant-ID) so OTP flows cannot target the wrong tenant.
+MOBILE_API_AUTH_ENDPOINTS_REQUIRE_TENANT_HINT = config(
+    'MOBILE_API_AUTH_ENDPOINTS_REQUIRE_TENANT_HINT',
+    default=True,
+    cast=bool,
+)
+
+# When True, driver login never uses cross-tenant auto-discovery; tenant_id or
+# X-Tenant-ID is mandatory. Defaults to True when DEBUG is False.
+MOBILE_API_LOGIN_REQUIRE_EXPLICIT_TENANT = config(
+    'MOBILE_API_LOGIN_REQUIRE_EXPLICIT_TENANT',
+    default=not DEBUG,
+    cast=bool,
+)
+
+# Password reset: allow legacy email/OTP **cross-tenant schema scan** when no
+# tenant hint is provided. **Strongly discouraged** — keep False in production.
+MOBILE_API_PASSWORD_RESET_ALLOW_CROSS_TENANT_DISCOVERY = config(
+    'MOBILE_API_PASSWORD_RESET_ALLOW_CROSS_TENANT_DISCOVERY',
+    default=False,
+    cast=bool,
+)
+
+# When True, cache errors while reading password-reset rate-limit counters deny
+# the request (fail closed). Defaults to True when DEBUG is False.
+MOBILE_API_PASSWORD_RESET_RATE_FAIL_CLOSED_ON_CACHE_ERROR = config(
+    'MOBILE_API_PASSWORD_RESET_RATE_FAIL_CLOSED_ON_CACHE_ERROR',
+    default=not DEBUG,
+    cast=bool,
+)
+
+# Password reset / OTP (see ``mobile_api.helpers.password_reset_security``)
+MOBILE_API_PASSWORD_RESET_OTP_EXPIRY_MINUTES = config(
+    'MOBILE_API_PASSWORD_RESET_OTP_EXPIRY_MINUTES',
+    default=10,
+    cast=int,
+)
+MOBILE_API_PASSWORD_RESET_OTP_MAX_ATTEMPTS = config(
+    'MOBILE_API_PASSWORD_RESET_OTP_MAX_ATTEMPTS',
+    default=5,
+    cast=int,
+)
+MOBILE_API_PASSWORD_RESET_RESEND_COOLDOWN_SECONDS = config(
+    'MOBILE_API_PASSWORD_RESET_RESEND_COOLDOWN_SECONDS',
+    default=90,
+    cast=int,
+)
+MOBILE_API_PASSWORD_RESET_RATE_WINDOW_SECONDS = config(
+    'MOBILE_API_PASSWORD_RESET_RATE_WINDOW_SECONDS',
+    default=3600,
+    cast=int,
+)
+MOBILE_API_PASSWORD_RESET_FORGOT_EMAIL_MAX_PER_HOUR = config(
+    'MOBILE_API_PASSWORD_RESET_FORGOT_EMAIL_MAX_PER_HOUR',
+    default=5,
+    cast=int,
+)
+MOBILE_API_PASSWORD_RESET_FORGOT_IP_MAX_PER_HOUR = config(
+    'MOBILE_API_PASSWORD_RESET_FORGOT_IP_MAX_PER_HOUR',
+    default=25,
+    cast=int,
+)
+MOBILE_API_PASSWORD_RESET_VERIFY_IP_MAX_PER_HOUR = config(
+    'MOBILE_API_PASSWORD_RESET_VERIFY_IP_MAX_PER_HOUR',
+    default=60,
+    cast=int,
+)
+MOBILE_API_PASSWORD_RESET_VERIFY_EMAIL_MAX_PER_HOUR = config(
+    'MOBILE_API_PASSWORD_RESET_VERIFY_EMAIL_MAX_PER_HOUR',
+    default=40,
+    cast=int,
+)
+MOBILE_API_PASSWORD_RESET_RESET_IP_MAX_PER_HOUR = config(
+    'MOBILE_API_PASSWORD_RESET_RESET_IP_MAX_PER_HOUR',
+    default=20,
+    cast=int,
+)
+MOBILE_API_PASSWORD_RESET_TIMING_JITTER_MS = config(
+    'MOBILE_API_PASSWORD_RESET_TIMING_JITTER_MS',
+    default=35,
+    cast=int,
+)
+
+# ─────────────────────────────────────────
+# Mobile API — RBAC (role groups + capabilities)
+# ─────────────────────────────────────────
+# CSV of TenantUser.role_name values (case-insensitive) that count as **driver**
+# mobile principals when ``driver_id`` is present in the JWT. When blank,
+# built-in defaults apply and entries from MOBILE_API_DRIVER_ROLE_ALLOWLIST are unioned.
+MOBILE_API_RBAC_DRIVER_ROLE_NAMES = config(
+    'MOBILE_API_RBAC_DRIVER_ROLE_NAMES',
+    default='',
+    cast=str,
+).strip()
+
+# CSV for **dispatcher** operational mobile APIs (see ``mobile.operations.*``).
+MOBILE_API_RBAC_DISPATCHER_ROLE_NAMES = config(
+    'MOBILE_API_RBAC_DISPATCHER_ROLE_NAMES',
+    default='',
+    cast=str,
+).strip()
+
+# CSV for **tenant admin** (JWT ``is_admin`` is also set from this list at login).
+MOBILE_API_RBAC_TENANT_ADMIN_ROLE_NAMES = config(
+    'MOBILE_API_RBAC_TENANT_ADMIN_ROLE_NAMES',
+    default='',
+    cast=str,
+).strip()
 
 # ─────────────────────────────────────────
 # Mobile API — Pagination

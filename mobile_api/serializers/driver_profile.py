@@ -4,8 +4,9 @@ mobile_api/serializers/driver_profile.py
 Serializers for driver profile read/update and authenticated change-password flow.
 
 Input serializers: validation only (no DB password checks here).
-Output: DriverProfileSerializer builds a read-only envelope from model instances
-passed in ``instance`` (see ``DriverProfileSerializer`` docstring).
+Output: ``DriverProfileSerializer`` builds a read-only envelope from model instances
+passed in ``instance`` (see class docstring). ``DriverProfileUpdateSerializer`` validates
+``PUT /driver/profile/`` partial updates.
 """
 from __future__ import annotations
 
@@ -398,6 +399,11 @@ class DriverProfileSerializer(LocalizedSerializerMixin, serializers.Serializer):
       - current_truck: TruckMaster | None
       - truck_type: TruckTypeMaster | None (defaults to current_truck.truck_type)
       - assignment: TruckDriverAssignmentHistory | None
+      - organization: pre-built dict (registry + OrganizationProfile fields)
+      - permissions: pre-built dict
+      - settings: pre-built dict (language / timezone / formats)
+      - operational: pre-built dict (current + assignment history summary)
+      - contact: pre-built dict (merged driver + account contact)
 
     Localized display (``Accept-Language`` via ``serialize_localized_*``):
       - ``driver`` includes ``name`` (not ``english_name`` / ``arabic_name``).
@@ -431,12 +437,137 @@ class DriverProfileSerializer(LocalizedSerializerMixin, serializers.Serializer):
         # Phase 1 avatar fallback = driving licence scan image (explicit contract).
         profile_photo_url = licence_block.get('dl_image_url')
 
+        uid = ''
+        if tenant_user is not None and getattr(tenant_user, 'pk', None):
+            uid = str(tenant_user.pk)
+
+        contact = instance.get('contact')
+        if not isinstance(contact, dict):
+            contact = {
+                'user_id': uid or None,
+                'email': tenant_block.get('email'),
+                'full_name': tenant_block.get('full_name'),
+                'username': tenant_block.get('username'),
+                'mobile_country_code': tenant_block.get('mobile_country_code'),
+                'mobile_no': tenant_block.get('mobile_no'),
+                'driver_mobile_number': driver_block.get('mobile_number'),
+                'driver_whatsapp_number': driver_block.get('whatsapp_number'),
+            }
+
         return {
+            'user_id': uid or None,
             'driver': driver_block,
             'tenant_user': tenant_block,
+            'contact': contact,
+            'organization': instance.get('organization') or {},
+            'permissions': instance.get('permissions') or {},
+            'settings': instance.get('settings') or {},
+            'operational': instance.get('operational') or {},
             'current_truck': truck_block,
             'truck_type': truck_type_block,
             'licence': licence_block,
             'assignment': assignment_block,
             'profile_photo_url': profile_photo_url,
         }
+
+
+class DriverProfileUpdateSerializer(serializers.Serializer):
+    """
+    Partial update for driver-owned contact and display fields.
+
+    All fields optional; at least one must be present (enforced in ``validate``).
+    """
+
+    full_name = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=200,
+    )
+    mobile_country_code = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=8,
+    )
+    mobile_no = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=30,
+    )
+    english_name = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=200,
+    )
+    arabic_name = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=200,
+    )
+    mobile_number = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=30,
+    )
+    whatsapp_number = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=30,
+    )
+    whatsapp_same_as_mobile = serializers.BooleanField(required=False)
+
+    def validate_full_name(self, value: str) -> str:
+        v = (value or '').strip()
+        if v and len(v) > 200:
+            raise serializers.ValidationError(
+                _('mobile.profile.full_name_too_long')
+            )
+        return v
+
+    def validate_mobile_no(self, value: str) -> str:
+        v = (value or '').strip()
+        if v and not v.replace(' ', '').isdigit():
+            raise serializers.ValidationError(
+                _('mobile.profile.mobile_digits_only')
+            )
+        return v
+
+    def validate_mobile_number(self, value: str) -> str:
+        v = (value or '').strip()
+        raw = getattr(self, 'initial_data', None) or {}
+        if 'mobile_number' in raw and not v:
+            raise serializers.ValidationError(
+                _('mobile.profile.mobile_number_required')
+            )
+        if v and len(v) > 30:
+            raise serializers.ValidationError(
+                _('mobile.profile.field_too_long')
+            )
+        return v
+
+    def validate(self, data: dict) -> dict:
+        allowed = {
+            'full_name',
+            'mobile_country_code',
+            'mobile_no',
+            'english_name',
+            'arabic_name',
+            'mobile_number',
+            'whatsapp_number',
+            'whatsapp_same_as_mobile',
+        }
+        raw = getattr(self, 'initial_data', None) or {}
+        if not any(k in raw for k in allowed):
+            raise serializers.ValidationError(
+                {'non_field_errors': [_('mobile.profile.update_empty')]}
+            )
+        if 'arabic_name' in raw:
+            if not str(raw.get('arabic_name') or '').strip():
+                raise serializers.ValidationError({
+                    'arabic_name': [_('mobile.profile.arabic_name_required')],
+                })
+        if 'full_name' in raw:
+            if not str(raw.get('full_name') or '').strip():
+                raise serializers.ValidationError({
+                    'full_name': [_('mobile.profile.full_name_required')],
+                })
+        return data

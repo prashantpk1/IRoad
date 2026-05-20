@@ -3,6 +3,7 @@
 from mobile_api.serializers.driver_auth import (
     DeleteAccountSerializer,
     DriverLoginSerializer,
+    DriverRefreshSerializer,
     ForgotPasswordSerializer,
     LogoutSerializer,
     ResetPasswordSerializer,
@@ -29,6 +30,7 @@ __all__ = [
     'DeleteAccountSerializer',
     'DriverChangePasswordSerializer',
     'DriverLoginSerializer',
+    'DriverRefreshSerializer',
     'DriverProfilePhotoUpdateSerializer',
     'DriverProfileSerializer',
     'DriverRequestChangePasswordOtpSerializer',

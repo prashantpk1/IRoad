@@ -10,7 +10,11 @@ from django.utils.translation import gettext as _
 from rest_framework.parsers import FormParser, MultiPartParser
 
 from mobile_api.views.base import MobileAPIView
-from mobile_api.permissions import IsMobileAuthenticated
+from mobile_api.permissions import (
+    HasViewMobileCapability,
+    IsDriver,
+    IsMobileAuthenticated,
+)
 from mobile_api.throttling import (
     MobileAuthThrottle,
     MobileOtpThrottle,
@@ -19,6 +23,7 @@ from mobile_api.throttling import (
 from mobile_api.serializers.driver_profile import (
     DriverChangePasswordSerializer,
     DriverProfilePhotoUpdateSerializer,
+    DriverProfileUpdateSerializer,
     DriverRequestChangePasswordOtpSerializer,
     DriverVerifyChangePasswordOtpSerializer,
 )
@@ -27,6 +32,7 @@ from mobile_api.services.driver_profile_service import (
     driver_request_change_password_otp,
     driver_verify_change_password_otp,
     get_driver_profile,
+    update_driver_profile,
     update_driver_profile_photo,
 )
 from mobile_api.views.driver_auth import get_tenant_schema
@@ -49,10 +55,15 @@ def _mobile_user_id(request) -> str:
 
 
 def _mobile_tenant_schema(request) -> str:
+    """Prefer JWT ``tenant_schema``; then ``MobileUser``; then header/middleware."""
+    pl = _mobile_jwt_payload(request)
+    ts = str(pl.get('tenant_schema') or '').strip()
+    if ts:
+        return ts
     user = getattr(request, 'user', None)
     schema = getattr(user, 'tenant_schema', None)
     if schema:
-        return schema
+        return str(schema).strip()
     return get_tenant_schema(request)
 
 
@@ -63,16 +74,18 @@ class DriverRequestChangePasswordOtpView(MobileAPIView):
     Body: { "send_via": "email" | "mobile" }
     """
 
-    permission_classes = [IsMobileAuthenticated]
+    permission_classes = [
+        IsMobileAuthenticated,
+        IsDriver,
+        HasViewMobileCapability,
+    ]
+    required_mobile_capability = 'mobile.driver.auth_session'
     throttle_classes = [MobileOtpThrottle]
 
     def post(self, request):
         serializer = DriverRequestChangePasswordOtpSerializer(data=request.data)
         if not serializer.is_valid():
-            return self.error(
-                message=_('mobile.validation.failed'),
-                data={'errors': serializer.errors},
-            )
+            return self.validation_error(serializer)
 
         send_via = serializer.validated_data['send_via']
         result = driver_request_change_password_otp(
@@ -85,6 +98,8 @@ class DriverRequestChangePasswordOtpView(MobileAPIView):
         if not result.get('success'):
             return self.error(
                 message=result.get('error', _('mobile.validation.failed')),
+                code='profile_request_failed',
+                message_key='mobile.error.generic',
                 data={},
             )
 
@@ -92,6 +107,7 @@ class DriverRequestChangePasswordOtpView(MobileAPIView):
         return self.success(
             message=_('mobile.auth.change_password_otp_sent'),
             data={},
+            message_key='mobile.auth.change_password_otp_sent',
         )
 
 
@@ -102,16 +118,18 @@ class DriverVerifyChangePasswordOtpView(MobileAPIView):
     Body: { "otp_code": "123456" }
     """
 
-    permission_classes = [IsMobileAuthenticated]
+    permission_classes = [
+        IsMobileAuthenticated,
+        IsDriver,
+        HasViewMobileCapability,
+    ]
+    required_mobile_capability = 'mobile.driver.auth_session'
     throttle_classes = [MobileOtpThrottle]
 
     def post(self, request):
         serializer = DriverVerifyChangePasswordOtpSerializer(data=request.data)
         if not serializer.is_valid():
-            return self.error(
-                message=_('mobile.validation.failed'),
-                data={'errors': serializer.errors},
-            )
+            return self.validation_error(serializer)
 
         otp_code = serializer.validated_data['otp_code']
         result = driver_verify_change_password_otp(
@@ -128,6 +146,8 @@ class DriverVerifyChangePasswordOtpView(MobileAPIView):
             }
             return self.error(
                 message=result.get('error', _('mobile.validation.failed')),
+                code='change_password_otp_verify_failed',
+                message_key='mobile.validation.invalid_otp',
                 data=data,
             )
 
@@ -137,6 +157,7 @@ class DriverVerifyChangePasswordOtpView(MobileAPIView):
                 'attempts_remaining': result.get('attempts_remaining', 0),
                 'verified': result.get('verified', True),
             },
+            message_key='mobile.auth.change_password_otp_verified',
         )
 
 
@@ -148,16 +169,18 @@ class DriverChangePasswordView(MobileAPIView):
       current_password, new_password, confirm_password, otp_code
     """
 
-    permission_classes = [IsMobileAuthenticated]
+    permission_classes = [
+        IsMobileAuthenticated,
+        IsDriver,
+        HasViewMobileCapability,
+    ]
+    required_mobile_capability = 'mobile.driver.auth_session'
     throttle_classes = [MobileAuthThrottle]
 
     def post(self, request):
         serializer = DriverChangePasswordSerializer(data=request.data)
         if not serializer.is_valid():
-            return self.error(
-                message=_('mobile.validation.failed'),
-                data={'errors': serializer.errors},
-            )
+            return self.validation_error(serializer)
 
         payload = _mobile_jwt_payload(request)
         result = driver_change_password(
@@ -174,21 +197,44 @@ class DriverChangePasswordView(MobileAPIView):
         if not result.get('success'):
             return self.error(
                 message=result.get('error', _('mobile.validation.failed')),
+                code='change_password_failed',
+                message_key='mobile.error.generic',
                 data={},
             )
 
         return self.success(
             message=_('mobile.auth.password_changed_successfully'),
             data={},
+            message_key='mobile.auth.password_changed_successfully',
         )
 
 
 class DriverProfileView(MobileAPIView):
     """
     GET /api/v1/mobile/driver/profile/
+    PUT /api/v1/mobile/driver/profile/
+    PATCH /api/v1/mobile/driver/profile/  (same as PUT)
+
+    PUT body (optional fields — send at least one):
+
+      {
+        "full_name": "...",
+        "mobile_country_code": "966",
+        "mobile_no": "...",
+        "english_name": "...",
+        "arabic_name": "...",
+        "mobile_number": "...",
+        "whatsapp_number": "...",
+        "whatsapp_same_as_mobile": true
+      }
     """
 
-    permission_classes = [IsMobileAuthenticated]
+    permission_classes = [
+        IsMobileAuthenticated,
+        IsDriver,
+        HasViewMobileCapability,
+    ]
+    required_mobile_capability = 'mobile.driver.profile'
     throttle_classes = [MobileUserThrottle]
 
     def get(self, request):
@@ -202,13 +248,47 @@ class DriverProfileView(MobileAPIView):
         if not result.get('success'):
             return self.error(
                 message=result.get('error', _('mobile.validation.failed')),
+                code='profile_fetch_failed',
+                message_key='mobile.error.generic',
                 data={},
             )
 
         return self.success(
             message=_('mobile.profile.fetch_success'),
             data=result.get('profile') or {},
+            message_key='mobile.profile.fetch_success',
         )
+
+    def put(self, request):
+        serializer = DriverProfileUpdateSerializer(data=request.data)
+        if not serializer.is_valid():
+            return self.validation_error(serializer)
+
+        result = update_driver_profile(
+            user_id=_mobile_user_id(request),
+            tenant_schema=_mobile_tenant_schema(request),
+            updates=dict(serializer.validated_data),
+            jwt_payload=_mobile_jwt_payload(request),
+            request=request,
+        )
+
+        if not result.get('success'):
+            return self.error(
+                message=result.get('error', _('mobile.validation.failed')),
+                code='profile_update_failed',
+                message_key='mobile.error.generic',
+                data={},
+            )
+
+        return self.success(
+            message=_('mobile.profile.update_success'),
+            data=result.get('profile') or {},
+            message_key='mobile.profile.update_success',
+        )
+
+    def patch(self, request):
+        """Alias for partial updates (same validation and body as ``PUT``)."""
+        return self.put(request)
 
 
 class DriverProfilePhotoUpdateView(MobileAPIView):
@@ -218,7 +298,12 @@ class DriverProfilePhotoUpdateView(MobileAPIView):
     Multipart: profile_photo (image file)
     """
 
-    permission_classes = [IsMobileAuthenticated]
+    permission_classes = [
+        IsMobileAuthenticated,
+        IsDriver,
+        HasViewMobileCapability,
+    ]
+    required_mobile_capability = 'mobile.driver.profile'
     throttle_classes = [MobileUserThrottle]
     parser_classes = [MultiPartParser, FormParser]
 
@@ -231,10 +316,7 @@ class DriverProfilePhotoUpdateView(MobileAPIView):
     def _update_photo(self, request):
         serializer = DriverProfilePhotoUpdateSerializer(data=request.data)
         if not serializer.is_valid():
-            return self.error(
-                message=_('mobile.validation.failed'),
-                data={'errors': serializer.errors},
-            )
+            return self.validation_error(serializer)
 
         uploaded = serializer.validated_data['profile_photo']
         result = update_driver_profile_photo(
@@ -248,6 +330,8 @@ class DriverProfilePhotoUpdateView(MobileAPIView):
         if not result.get('success'):
             return self.error(
                 message=result.get('error', _('mobile.validation.failed')),
+                code='profile_photo_update_failed',
+                message_key='mobile.error.generic',
                 data={},
             )
 
@@ -256,4 +340,5 @@ class DriverProfilePhotoUpdateView(MobileAPIView):
             data={
                 'profile_photo_url': result.get('profile_photo_url'),
             },
+            message_key='mobile.profile.photo_updated',
         )
