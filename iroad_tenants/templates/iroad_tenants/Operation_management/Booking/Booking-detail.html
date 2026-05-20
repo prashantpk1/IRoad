@@ -99,16 +99,31 @@
           <div class="field">
             <label class="form-label">Execution Date</label>
             <p class="detail-view-value">{{ booking.execution_date|date:"d M Y"|default:"—" }}</p>
+            <span class="field-hint d-block mt-1">Set when the driver starts the job (Action 1), not at booking confirm.</span>
           </div>
           <div class="field">
-            <label class="form-label">Booking Status</label>
+            <label class="form-label">Booking Status (DB)</label>
             <p class="detail-view-value">
               {% if booking.booking_status == 'Confirmed' %}
-              <span class="status-badge active">{{ booking.booking_status }}</span>
+              <span class="status-badge active">Active</span>
               {% elif booking.booking_status == 'Cancelled' %}
               <span class="status-badge inactive">{{ booking.booking_status }}</span>
               {% else %}
               <span class="status-badge pending">{{ booking.booking_status|default:"Draft" }}</span>
+              {% endif %}
+            </p>
+          </div>
+          <div class="field">
+            <label class="form-label">Operational Status</label>
+            <p class="detail-view-value">
+              {% if booking_derived_status == 'Executed' %}
+              <span class="status-badge active">{{ booking_derived_status }}</span>
+              {% elif booking_derived_status == 'Active' %}
+              <span class="status-badge in-transit">{{ booking_derived_status }}</span>
+              {% elif booking_derived_status == 'Cancelled' %}
+              <span class="status-badge inactive">{{ booking_derived_status }}</span>
+              {% else %}
+              <span class="status-badge pending">{{ booking_derived_status|default:"Draft" }}</span>
               {% endif %}
             </p>
           </div>
@@ -415,6 +430,7 @@
                 <th>Driver</th>
                 <th>COD Amount</th>
                 <th>POD Doc Count</th>
+                <th>Shipment</th>
               </tr>
             </thead>
             <tbody>
@@ -439,10 +455,19 @@
                 <td>{{ line.driver }}</td>
                 <td>{{ line.cod_amount|floatformat:2 }}</td>
                 <td>{{ line.pod_doc_count }}</td>
+                <td>
+                  {% if line.shipment %}
+                  <a href="{% url 'iroad_tenants:tenant_operation_shipment_detail' line.shipment.shipment_id %}">{{ line.shipment.shipment_no }}</a>
+                  {% else %}
+                  <a href="{% url 'iroad_tenants:tenant_operation_shipment_create' %}">Add Shipment</a>
+                  ·
+                  <a href="{% url 'iroad_tenants:tenant_operation_action_log_create' %}">Action Log</a>
+                  {% endif %}
+                </td>
               </tr>
               {% empty %}
               <tr>
-                <td colspan="9" class="text-center text-muted py-4">No booking lines available.</td>
+                <td colspan="10" class="text-center text-muted py-4">No booking lines available.</td>
               </tr>
               {% endfor %}
             </tbody>

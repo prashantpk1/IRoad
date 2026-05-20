@@ -3162,6 +3162,7 @@ class TenantBooking(models.Model):
     booking_sequence = models.PositiveIntegerField(default=0)
     creation_date = models.DateField(default=date.today)
     booking_date = models.DateField(default=date.today)
+    is_scheduled = models.BooleanField(default=False)
     execution_date = models.DateField(null=True, blank=True)
     booking_status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT)
     client_account = models.ForeignKey(
@@ -3288,11 +3289,14 @@ class TenantShipment(models.Model):
     """SH-001 Shipment execution record (Phase 1 foundation)."""
 
     class ShipmentStatus(models.TextChoices):
-        CREATED = 'Created', 'Created'
+        LOADED = 'Loaded', 'Loaded'
         IN_TRANSIT = 'In Transit', 'In Transit'
+        AT_DELIVERY = 'At Delivery', 'At Delivery'
+        POD_SUBMITTED = 'POD Submitted', 'POD Submitted'
         DELIVERED = 'Delivered', 'Delivered'
         CLOSED = 'Closed', 'Closed'
         CANCELLED = 'Cancelled', 'Cancelled'
+        CREATED = 'Created', 'Created'  # legacy rows; new shipments use Loaded
 
     class PodType(models.TextChoices):
         DIGITAL = 'Digital', 'Digital'
@@ -3320,7 +3324,7 @@ class TenantShipment(models.Model):
     shipment_status = models.CharField(
         max_length=20,
         choices=ShipmentStatus.choices,
-        default=ShipmentStatus.CREATED,
+        default=ShipmentStatus.LOADED,
     )
     booking = models.ForeignKey(
         'TenantBooking',
@@ -3453,14 +3457,28 @@ class TenantShipment(models.Model):
             if self.sourcing_mode == self.SourcingMode.OUT_SOURCE and self.truck.sourcing_mode != TruckMaster.SourcingMode.OUT_SOURCE:
                 errors['truck'] = [_('Out-Source shipment requires an Out-Source truck.')]
 
+        if self.booking_id and self.client_account_id:
+            booking_client_id = TenantBooking.objects.filter(
+                pk=self.booking_id,
+            ).values_list('client_account_id', flat=True).first()
+            if booking_client_id and booking_client_id != self.client_account_id:
+                errors['client_account'] = [_('Client account must match the linked booking.')]
+
         if self.shipment_status == self.ShipmentStatus.CANCELLED:
             if self.pk:
                 previous = TenantShipment.objects.filter(pk=self.pk).values_list(
                     'shipment_status', flat=True
                 ).first()
-                if previous not in {self.ShipmentStatus.CREATED, self.ShipmentStatus.IN_TRANSIT}:
+                cancellable = {
+                    self.ShipmentStatus.LOADED,
+                    self.ShipmentStatus.CREATED,
+                    self.ShipmentStatus.IN_TRANSIT,
+                    self.ShipmentStatus.AT_DELIVERY,
+                    self.ShipmentStatus.POD_SUBMITTED,
+                }
+                if previous not in cancellable:
                     errors['shipment_status'] = [
-                        _('Cancelled is allowed only from Created or In Transit.'),
+                        _('Cancelled is allowed only before the shipment is closed.'),
                     ]
 
         if self.order_type.upper() == 'COD':

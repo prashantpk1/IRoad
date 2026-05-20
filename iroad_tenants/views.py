@@ -5479,6 +5479,14 @@ class TenantSalesInvoiceReportStatusUpdateView(View):
                 report.sales_invoice_ref = uuid.uuid4()
             report.updated_by = (context.get('display_name') or '').strip()
             report.save(update_fields=['status', 'sales_invoice_ref', 'updated_by', 'updated_at'])
+            if next_status == SalesInvoiceReport.Status.CONVERTED:
+                invoiced_count = _tenant_surcharge_mark_invoiced_for_converted_report(report)
+                if invoiced_count:
+                    messages.info(
+                        request,
+                        f'{invoiced_count} surcharge(s) marked as Invoiced.',
+                        extra_tags='tenant',
+                    )
             messages.success(request, f'Status updated to {next_status}.', extra_tags='tenant')
             return _tenant_redirect(
                 request,
@@ -5699,11 +5707,10 @@ class TenantOperationBookingCreateView(View):
             route = validated['route']
             route_direction = validated['route_direction']
             route_display = validated['route_display']
-            execution_date = validated['execution_date']
-            sell_price = validated['derived_sell_price']
+            sell_price = validated['sell_price']
             sourcing_mode = validated['sourcing_mode']
-
-            booking_date = parse_date((request.POST.get('booking_date') or '').strip()) or timezone.localdate()
+            booking_date = validated.get('booking_date') or timezone.localdate()
+            booking_status = validated['booking_status']
             extra_payload = _tenant_booking_extra_payload(request)
 
             with db_transaction.atomic():
@@ -5717,8 +5724,8 @@ class TenantOperationBookingCreateView(View):
                     booking_sequence=booking_sequence,
                     creation_date=timezone.localdate(),
                     booking_date=booking_date,
-                    execution_date=execution_date,
-                    booking_status=(request.POST.get('booking_status') or TenantBooking.Status.DRAFT).strip(),
+                    execution_date=None,
+                    booking_status=booking_status,
                     client_account=client,
                     price_list=price_list,
                     service_item=service_item,
@@ -5730,16 +5737,17 @@ class TenantOperationBookingCreateView(View):
                     sell_price=sell_price,
                     sourcing_mode=sourcing_mode,
                     pod_type=(request.POST.get('pod_type') or '').strip(),
-                    pod_status=(request.POST.get('pod_status') or '').strip(),
+                    pod_status='',
                     **extra_payload,
                     created_by_label=(context.get('display_name') or '').strip(),
                 )
                 if request.FILES.get('booking_attachment'):
                     booking.booking_attachment = request.FILES['booking_attachment']
                     booking.save(update_fields=['booking_attachment', 'updated_at'])
+            status_label = _tenant_booking_display_status(booking.booking_status)
             messages.success(
                 request,
-                f'{booking.booking_no} completed successfully.',
+                f'{booking.booking_no} saved ({status_label}).',
                 extra_tags='tenant',
             )
             return _tenant_redirect(request, 'iroad_tenants:tenant_operation_booking_list')
@@ -5790,6 +5798,7 @@ class TenantOperationBookingListView(View):
             start_index = booking_page_obj.start_index() if booking_page_obj.paginator.count else 0
             booking_rows = []
             for idx, booking in enumerate(booking_page_obj.object_list, start=start_index):
+                has_any_shipment = TenantShipment.objects.filter(booking_id=booking.booking_id).exists()
                 booking_rows.append(
                     {
                         'sn': idx,
@@ -5801,6 +5810,13 @@ class TenantOperationBookingListView(View):
                         'client_name': booking.client_account.display_name,
                         'route_text': booking.route_display or '-',
                         'trip_type': booking.trip_type or '-',
+                        'derived_status': _tenant_booking_derived_header_status(booking),
+                        'db_status': booking.booking_status,
+                        'has_active_shipment': _tenant_booking_has_active_shipment(booking),
+                        'can_cancel': (
+                            booking.booking_status != TenantBooking.Status.CANCELLED
+                            and not has_any_shipment
+                        ),
                         'sales_order_no': booking.price_list.price_list_code if booking.price_list else '-',
                         'truck_no': booking.assigned_truck.truck_code if booking.assigned_truck else '-',
                         'sales_report': '-',
@@ -5813,16 +5829,7 @@ class TenantOperationBookingListView(View):
                     'booking_rows': booking_rows,
                     'booking_page_obj': booking_page_obj,
                     'booking_search_query': search_q,
-                    'booking_stats': {
-                        'total': stats_qs.count(),
-                        'active': stats_qs.exclude(booking_status=TenantBooking.Status.CANCELLED).count(),
-                        'executed': 0,
-                        'cancelled': stats_qs.filter(booking_status=TenantBooking.Status.CANCELLED).count(),
-                        'round': stats_qs.filter(trip_type='Round').count(),
-                        'inbound': stats_qs.filter(route_direction='reverse').count(),
-                        'outbound': stats_qs.filter(route_direction='forward').count(),
-                        'unassigned_truck': stats_qs.filter(assigned_truck__isnull=True).count(),
-                    },
+                    'booking_stats': _tenant_booking_stats(),
                     'tenant_schema_name': tenant_registry.schema_name,
                 }
             )
@@ -5890,22 +5897,23 @@ class TenantOperationShipmentListView(View):
                     if shipment.booking_id
                     else None
                 )
+                shipment.ui_locks = _tenant_shipment_ui_lock_flags(shipment)
             stats_qs = TenantShipment.objects.all()
             context.update(
                 {
                     'shipment_records': shipment_records,
                     'shipment_stats': {
-                        'active': stats_qs.exclude(
-                            shipment_status=TenantShipment.ShipmentStatus.CANCELLED,
+                        'active': stats_qs.filter(
+                            shipment_status__in=_tenant_shipment_active_statuses(),
                         ).count(),
                         'delivered': stats_qs.filter(
                             shipment_status=TenantShipment.ShipmentStatus.DELIVERED,
                         ).count(),
-                        'credit': stats_qs.filter(cod_amount__lte=0).exclude(
-                            shipment_status=TenantShipment.ShipmentStatus.CANCELLED,
+                        'credit': stats_qs.filter(cod_amount__lte=0).filter(
+                            shipment_status__in=_tenant_shipment_active_statuses(),
                         ).count(),
-                        'cod': stats_qs.filter(cod_amount__gt=0).exclude(
-                            shipment_status=TenantShipment.ShipmentStatus.CANCELLED,
+                        'cod': stats_qs.filter(cod_amount__gt=0).filter(
+                            shipment_status__in=_tenant_shipment_active_statuses(),
                         ).count(),
                         'inbound': stats_qs.filter(booking_item_type__iexact='Inbound').count(),
                         'outbound': stats_qs.filter(booking_item_type__iexact='Outbound').count(),
@@ -5971,7 +5979,7 @@ class TenantOperationShipmentCreateView(View):
             return response
         try:
             shipment_form_data = {
-                'order_type': (request.POST.get('order_type') or request.POST.get('booking_order_type') or '').strip(),
+                'order_type': (request.POST.get('booking_order_type') or '').strip(),
                 'shipment_date': (request.POST.get('shipment_date') or '').strip(),
                 'client_account': (request.POST.get('client_account') or '').strip(),
                 'booking_id': (request.POST.get('booking_id') or '').strip(),
@@ -6005,6 +6013,27 @@ class TenantOperationShipmentCreateView(View):
             if selected_booking is not None:
                 shipment_form_data['booking_id'] = str(selected_booking.booking_id)
                 shipment_form_data['booking_no'] = selected_booking.booking_no
+
+            matched_line = _tenant_shipment_match_booking_line(
+                selected_booking,
+                booking_item=shipment_form_data['booking_item'],
+                booking_item_type=shipment_form_data['booking_item_type'],
+            )
+            _tenant_shipment_apply_booking_line_to_form(
+                shipment_form_data,
+                matched_line,
+                selected_booking,
+            )
+            truck = None
+            selected_driver = None
+            if matched_line:
+                truck = matched_line.get('truck')
+                selected_driver = matched_line.get('driver')
+            elif selected_booking is not None:
+                truck, selected_driver = _tenant_shipment_line_truck_driver(
+                    selected_booking,
+                    shipment_form_data['booking_item_type'],
+                )
 
             loading_address = None
             if selected_client is not None and shipment_form_data['loading_address']:
@@ -6052,27 +6081,6 @@ class TenantOperationShipmentCreateView(View):
                     form_errors['cod_amount'] = 'COD Amount must be 0 or greater.'
                     cod_amount = Decimal('0')
 
-            matched_line = _tenant_shipment_match_booking_line(
-                selected_booking,
-                booking_item=shipment_form_data['booking_item'],
-                booking_item_type=shipment_form_data['booking_item_type'],
-            )
-            truck = None
-            selected_driver = None
-            if matched_line:
-                shipment_form_data['order_type'] = matched_line['order_type']
-                shipment_form_data['booking_item'] = matched_line['booking_item']
-                shipment_form_data['booking_item_type'] = matched_line['booking_item_type']
-                shipment_form_data['booking_item_route'] = matched_line['route_display']
-                shipment_form_data['sourcing_mode'] = matched_line['sourcing_mode']
-                truck = matched_line.get('truck')
-                selected_driver = matched_line.get('driver')
-            elif selected_booking is not None:
-                truck, selected_driver = _tenant_shipment_line_truck_driver(
-                    selected_booking,
-                    shipment_form_data['booking_item_type'],
-                )
-
             validation_errors, normalized_order_type = _tenant_shipment_validate_submission(
                 shipment_form_data=shipment_form_data,
                 selected_client=selected_client,
@@ -6090,6 +6098,8 @@ class TenantOperationShipmentCreateView(View):
             )
             form_errors.update(validation_errors)
             shipment_form_data['order_type'] = normalized_order_type
+            if normalized_order_type != 'COD':
+                cod_amount = Decimal('0')
 
             pod_doc_count = _int_from_request(request, 'pod_doc_count', default=0)
             if matched_line:
@@ -6171,6 +6181,7 @@ class TenantOperationShipmentCreateView(View):
                 pod_status=pod_status,
                 pod_doc_count=pod_doc_count,
                 cod_amount=cod_amount,
+                shipment_status=TenantShipment.ShipmentStatus.LOADED,
                 collection_status=TenantShipment.CollectionStatus.PENDING,
                 created_by_label=(context.get('display_name') or '').strip(),
             )
@@ -6291,8 +6302,15 @@ class TenantOperationShipmentDocumentsListView(View):
 class TenantOperationShipmentDocumentsCreateView(View):
     template_name = 'iroad_tenants/Operation_management/Shipment_Document/Shipment-documents.html'
     line_completion_statuses = {'Completed', 'Not Completed'}
-    line_signer_locations = {'With Driver', 'In Company', 'With Client'}
+    line_signer_locations = {
+        'Not Collected',
+        'With Driver',
+        'Submitted to Receiver',
+        'In Company',
+        'With Client',
+    }
     header_status_choices = {
+        TenantShipmentDocument.Status.DRAFT,
         TenantShipmentDocument.Status.PENDING,
         TenantShipmentDocument.Status.UPLOADED,
         TenantShipmentDocument.Status.VERIFIED,
@@ -6414,7 +6432,7 @@ class TenantOperationShipmentDocumentsCreateView(View):
                 'record_date': timezone.localdate().isoformat(),
                 'document_date': timezone.localdate().isoformat(),
                 'page_count': '1',
-                'status': TenantShipmentDocument.Status.PENDING,
+                'status': TenantShipmentDocument.Status.DRAFT,
             },
             'shipment_document_form_errors': form_errors or {},
             'shipment_document_booking_options': booking_options,
@@ -6965,6 +6983,9 @@ class TenantOperationShipmentPodCreateView(View):
                 existing_document = TenantShipmentDocument.objects.prefetch_related('pod_pages').filter(
                     record_no=form_data['existing_record_no']
                 ).first()
+
+            if source_document is not None and existing_document is None:
+                _tenant_shipment_pod_assert_unique_source(source_document, form_errors)
 
             if form_errors:
                 context.update(
@@ -8951,6 +8972,7 @@ def _tenant_operation_action_log_lookup_context():
 
     return {
         'booking_options': booking_options,
+        'booking_line_birth_options': _tenant_operation_action_log_booking_line_birth_options(),
         'shipment_options': shipments,
         'movement_options': movement_options,
         'truck_options': [
@@ -9423,7 +9445,37 @@ class TenantOperationActionLogCreateView(View):
                             else (context.get('display_name') or '').strip()
                         ),
                     )
+                    action_log._birth_booking_item_type = (
+                        request.POST.get('booking_item_type') or ''
+                    ).strip()
                     action_log.save()
+                    _tenant_operation_action_log_apply_side_effects(
+                        action_log,
+                        created_by_label=action_log.created_by_label,
+                    )
+                    if action_log.shipment_id:
+                        request.session['tenant_action_log_birth'] = {
+                            'shipment_id': str(action_log.shipment_id),
+                            'movement_id': str(action_log.truck_movement_id or ''),
+                            'shipment_no': action_log.shipment.shipment_no if action_log.shipment else '',
+                            'movement_no': (
+                                action_log.truck_movement.movement_no
+                                if action_log.truck_movement_id
+                                else ''
+                            ),
+                        }
+            except ValidationError as exc:
+                validation_message = '; '.join(getattr(exc, 'messages', []) or [str(exc)])
+                context.update(
+                    _tenant_operation_action_log_create_form_context(
+                        display_name=context.get('display_name') or '',
+                        form_data=form_data,
+                        form_errors={'operation_action_id': validation_message},
+                        default_user_id=_tenant_session_tenant_user_id(request),
+                    )
+                )
+                messages.error(request, validation_message, extra_tags='tenant')
+                return render(request, self.template_name, context)
             except (IntegrityError, ValueError) as exc:
                 context.update(
                     _tenant_operation_action_log_create_form_context(
@@ -9551,12 +9603,59 @@ class TenantOperationActionLogDetailView(View):
             if action_log is None:
                 messages.error(request, 'Action log record not found.', extra_tags='tenant')
                 return _tenant_redirect(request, 'iroad_tenants:tenant_operation_action_log_list')
+            action_log_birth = request.session.pop('tenant_action_log_birth', None)
             context.update({
                 'action_log_detail': _tenant_operation_action_log_detail_dict(action_log),
                 'action_log_media_rows': _tenant_operation_action_log_media_rows(action_log),
+                'action_log_birth': action_log_birth,
                 'tenant_schema_name': tenant_registry.schema_name,
             })
             return render(request, self.template_name, context)
+        finally:
+            connection.set_schema_to_public()
+
+
+class TenantOperationBookingCancelView(View):
+    """Cancel whole booking (R3) when no shipment exists."""
+
+    def post(self, request, booking_id):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        if not context.get('is_tenant_admin') and not context.get('can_view_booking'):
+            messages.error(request, 'You do not have permission to cancel Booking.', extra_tags='tenant')
+            return _tenant_redirect(request, 'iroad_tenants:tenant_dashboard')
+
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        if tenant_registry is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        try:
+            booking = TenantBooking.objects.filter(pk=booking_id).first()
+            if booking is None:
+                messages.error(request, 'Booking not found.', extra_tags='tenant')
+                return _tenant_redirect(request, 'iroad_tenants:tenant_operation_booking_list')
+
+            cancel_errors = _tenant_booking_cancel_guard_errors(
+                booking,
+                TenantBooking.Status.CANCELLED,
+            )
+            if cancel_errors:
+                for error in cancel_errors:
+                    messages.error(request, error, extra_tags='tenant')
+                return redirect('iroad_tenants:tenant_operation_booking_edit', booking_id=booking_id)
+
+            booking.booking_status = TenantBooking.Status.CANCELLED
+            booking.save(update_fields=['booking_status', 'updated_at'])
+            messages.success(
+                request,
+                f'{booking.booking_no} has been cancelled.',
+                extra_tags='tenant',
+            )
+            return redirect('iroad_tenants:tenant_operation_booking_detail', booking_id=booking.booking_id)
         finally:
             connection.set_schema_to_public()
 
@@ -10112,6 +10211,7 @@ def _tenant_booking_form_options_context(tenant_registry, booking=None):
             'total_cargo_weight': str(booking.total_cargo_weight or '0.00'),
             'container_no': booking.container_no,
             'booking_instructions': booking.booking_instructions,
+            'is_scheduled': bool(getattr(booking, 'is_scheduled', False)),
         }
 
     return {
@@ -10131,7 +10231,7 @@ def _tenant_booking_form_options_context(tenant_registry, booking=None):
         'booking_line_type_options': ('Outbound', 'Backload'),
         'booking_order_type_options': ('Credit', 'COD'),
         'booking_trip_type_options': ('One-Way', 'Round'),
-        'booking_pod_type_options': ('Signature', 'Photo', 'Digital'),
+        'booking_pod_type_options': ('Digital', 'Soft', 'Hard'),
         'booking_pod_status_options': ('Pending', 'Received', 'Verified'),
         'booking_form_data': form_data,
         'tenant_schema_name': tenant_registry.schema_name,
@@ -10146,33 +10246,825 @@ def _tenant_booking_shipment_line_key(booking, booking_item_type):
 
 
 def _tenant_booking_line_status_from_shipment(shipment):
-    if shipment.shipment_status == TenantShipment.ShipmentStatus.CREATED:
-        return 'Shipment Created'
-    if shipment.shipment_status == TenantShipment.ShipmentStatus.IN_TRANSIT:
-        return 'In Transit'
-    if shipment.shipment_status == TenantShipment.ShipmentStatus.DELIVERED:
-        if shipment.pod_status == TenantShipment.PodStatus.COMPLIANT:
-            return 'POD Complete'
-        return 'Delivered'
-    if shipment.shipment_status == TenantShipment.ShipmentStatus.CLOSED:
-        return 'Closed'
+    """Map shipment state to booking-item display label (doc §3.5 / Ch.4)."""
     if shipment.shipment_status == TenantShipment.ShipmentStatus.CANCELLED:
         return 'Cancelled'
-    return shipment.shipment_status or 'Shipment Created'
+    if shipment.shipment_status == TenantShipment.ShipmentStatus.CLOSED:
+        return 'Executed'
+    if shipment.shipment_status in {
+        TenantShipment.ShipmentStatus.LOADED,
+        TenantShipment.ShipmentStatus.CREATED,
+        TenantShipment.ShipmentStatus.IN_TRANSIT,
+        TenantShipment.ShipmentStatus.AT_DELIVERY,
+        TenantShipment.ShipmentStatus.POD_SUBMITTED,
+        TenantShipment.ShipmentStatus.DELIVERED,
+    }:
+        return 'In Execution'
+    return shipment.shipment_status or 'Planned'
+
+
+def _tenant_booking_line_operational_status(booking, booking_item_type):
+    """Doc §3.5.1 item states: Planned · In Execution · Executed · Cancelled."""
+    if booking is None:
+        return 'Planned'
+    if booking.booking_status == TenantBooking.Status.DRAFT:
+        return 'Draft'
+    line_type = (booking_item_type or '').strip()
+    if not line_type:
+        line_type = 'Outbound'
+    shipments = TenantShipment.objects.filter(
+        booking_id=booking.booking_id,
+        booking_item_type=line_type,
+    ).order_by('-created_at')
+    if not shipments.exists():
+        return 'Planned' if booking.booking_status == TenantBooking.Status.CONFIRMED else 'Draft'
+    latest = shipments.first()
+    if latest.shipment_status == TenantShipment.ShipmentStatus.CANCELLED:
+        return 'Cancelled'
+    if latest.shipment_status == TenantShipment.ShipmentStatus.CLOSED:
+        return 'Executed'
+    return 'In Execution'
 
 
 def _tenant_booking_line_status_map(booking):
-    status_map = {'Outbound': 'Draft', 'Backload': 'Draft'}
+    """Booking item row labels for UI subform (doc §3.3 section 4)."""
     if booking is None or not (booking.booking_no or '').strip():
-        return status_map
-    shipments = (
-        TenantShipment.objects.filter(booking_id=booking.booking_id)
-        .order_by('created_at', 'updated_at')
-    )
-    for shipment in shipments:
-        line_key = _tenant_booking_shipment_line_key(booking, shipment.booking_item_type)
-        status_map[line_key] = _tenant_booking_line_status_from_shipment(shipment)
+        return {'Outbound': 'Draft', 'Backload': 'Draft'}
+    status_map = {}
+    for line in _tenant_shipment_booking_line_rows(booking):
+        line_key = _tenant_booking_shipment_line_key(booking, line['booking_item_type'])
+        status_map[line_key] = _tenant_booking_line_operational_status(
+            booking,
+            line['booking_item_type'],
+        )
+    if not status_map:
+        status_map = {'Outbound': 'Draft', 'Backload': 'Draft'}
     return status_map
+
+
+def _tenant_booking_derived_header_status(booking):
+    """Doc §3.5.3 derived booking status (Active / Executed / Cancelled / Draft)."""
+    if booking is None:
+        return 'Draft'
+    if booking.booking_status == TenantBooking.Status.DRAFT:
+        return 'Draft'
+    if booking.booking_status == TenantBooking.Status.CANCELLED:
+        return 'Cancelled'
+    line_rows = _tenant_shipment_booking_line_rows(booking)
+    if not line_rows:
+        return 'Active'
+    line_states = [
+        _tenant_booking_line_operational_status(booking, line['booking_item_type'])
+        for line in line_rows
+    ]
+    non_cancelled = [state for state in line_states if state != 'Cancelled']
+    if not non_cancelled:
+        return 'Cancelled'
+    if all(state == 'Executed' for state in non_cancelled):
+        return 'Executed'
+    return 'Active'
+
+
+def _tenant_booking_has_active_shipment(booking, *, booking_item_type=None):
+    if booking is None:
+        return False
+    qs = TenantShipment.objects.filter(booking_id=booking.booking_id).exclude(
+        shipment_status__in=(
+            TenantShipment.ShipmentStatus.CANCELLED,
+            TenantShipment.ShipmentStatus.CLOSED,
+        ),
+    )
+    if booking_item_type:
+        qs = qs.filter(booking_item_type=(booking_item_type or '').strip())
+    return qs.exists()
+
+
+def _tenant_booking_edit_guard_errors(booking, request, *, has_table=None):
+    """Block header edits that affect an existing shipment (doc §3.2.3, §3.8)."""
+    if booking is None or not _tenant_booking_has_active_shipment(booking):
+        return []
+    if has_table is None:
+        has_table = set(connection.introspection.table_names()).__contains__
+    errors = []
+    posted_client = (request.POST.get('client_account') or '').strip()
+    if posted_client and str(booking.client_account_id) != posted_client:
+        errors.append(
+            'Client account cannot be changed while a shipment is in progress for this booking.'
+        )
+    posted_trip = (request.POST.get('trip_type') or '').strip()
+    if posted_trip and (booking.trip_type or '') != posted_trip:
+        errors.append('Trip type cannot be changed while a shipment exists for this booking.')
+    posted_order = (request.POST.get('order_type') or '').strip()
+    if posted_order and (booking.order_type or '') != posted_order:
+        errors.append('Order type cannot be changed while a shipment exists for this booking.')
+    route_lookup = (request.POST.get('route_lookup') or '').strip()
+    if route_lookup:
+        route, direction, _display = _tenant_booking_route_from_lookup(route_lookup)
+        if route and booking.route_id and route.route_id != booking.route_id:
+            errors.append('Route cannot be changed while a shipment exists for this booking.')
+    truck, driver = _tenant_booking_line_assignment(request, 1, has_table)
+    if truck and booking.assigned_truck_id and truck.pk != booking.assigned_truck_id:
+        errors.append('Outbound truck cannot be changed while a shipment is in progress.')
+    if driver and booking.assigned_driver_id and driver.pk != booking.assigned_driver_id:
+        errors.append('Outbound driver cannot be changed while a shipment is in progress.')
+    return errors
+
+
+def _tenant_booking_cancel_guard_errors(booking, new_status):
+    """R3: whole booking cancel only when no shipment exists (doc §3.8)."""
+    if (
+        booking is not None
+        and new_status == TenantBooking.Status.CANCELLED
+        and TenantShipment.objects.filter(booking_id=booking.booking_id).exists()
+    ):
+        return [
+            'Booking cannot be cancelled while any shipment exists. Cancel shipments first or use item-level reversal.',
+        ]
+    return []
+
+
+def _tenant_booking_stats():
+    """List KPI counts aligned with doc §3.2.1 (derived Executed / Active)."""
+    stats_qs = TenantBooking.objects.all()
+    total = stats_qs.count()
+    cancelled = stats_qs.filter(booking_status=TenantBooking.Status.CANCELLED).count()
+    executed = 0
+    active = 0
+    for booking in stats_qs.iterator():
+        derived = _tenant_booking_derived_header_status(booking)
+        if derived == 'Executed':
+            executed += 1
+        elif derived == 'Active':
+            active += 1
+    round_count = stats_qs.filter(trip_type='Round').count()
+    outbound_items = stats_qs.filter(trip_type='Round').count()
+    outbound_items += stats_qs.exclude(trip_type='Round').count()
+    inbound_items = stats_qs.filter(trip_type='Round').count()
+    inbound_items += stats_qs.filter(route_direction='reverse').exclude(trip_type='Round').count()
+    unassigned = stats_qs.filter(
+        booking_status=TenantBooking.Status.CONFIRMED,
+        assigned_truck__isnull=True,
+    ).count()
+    return {
+        'total': total,
+        'active': active,
+        'executed': executed,
+        'cancelled': cancelled,
+        'round': round_count,
+        'inbound': inbound_items,
+        'outbound': outbound_items,
+        'unassigned_truck': unassigned,
+    }
+
+
+def _tenant_operation_action_matches(action, *needles):
+    if action is None:
+        return False
+    blob = f'{(action.action_code or "")} {(action.english_label or "")}'.lower()
+    return any(needle.lower() in blob for needle in needles)
+
+
+def _tenant_resolve_shipment_status_impact(raw_value):
+    """Map Action Master shipment_status_impact to TenantShipment.ShipmentStatus."""
+    token = (raw_value or '').strip()
+    if not token:
+        return None
+    if token in {choice[0] for choice in TenantShipment.ShipmentStatus.choices}:
+        return token
+    normalized = token.lower().replace('-', '_').replace(' ', '_')
+    alias_map = {
+        'loaded': TenantShipment.ShipmentStatus.LOADED,
+        'created': TenantShipment.ShipmentStatus.CREATED,
+        'in_transit': TenantShipment.ShipmentStatus.IN_TRANSIT,
+        'at_delivery': TenantShipment.ShipmentStatus.AT_DELIVERY,
+        'pod_submitted': TenantShipment.ShipmentStatus.POD_SUBMITTED,
+        'delivered': TenantShipment.ShipmentStatus.DELIVERED,
+        'closed': TenantShipment.ShipmentStatus.CLOSED,
+        'cancelled': TenantShipment.ShipmentStatus.CANCELLED,
+    }
+    return alias_map.get(normalized)
+
+
+def _tenant_resolve_movement_status_impact(raw_value):
+    token = (raw_value or '').strip()
+    if not token:
+        return None
+    if token in {choice[0] for choice in TenantTruckMovementLog.Status.choices}:
+        return token
+    normalized = token.lower().replace('-', '_').replace(' ', '_')
+    alias_map = {
+        'scheduled': TenantTruckMovementLog.Status.SCHEDULED,
+        'in_progress': TenantTruckMovementLog.Status.IN_PROGRESS,
+        'completed': TenantTruckMovementLog.Status.COMPLETED,
+        'cancelled': TenantTruckMovementLog.Status.CANCELLED,
+    }
+    return alias_map.get(normalized)
+
+
+def _tenant_shipment_validate_status_transition(shipment, new_status):
+    """Doc §4.6 — gate Delivered on POD compliance and COD collection."""
+    if shipment is None or not new_status:
+        return
+    if new_status != TenantShipment.ShipmentStatus.DELIVERED:
+        return
+    compliant_statuses = {
+        TenantShipment.PodStatus.COMPLIANT,
+        TenantShipment.PodStatus.HARD_COPY_RECEIVED,
+    }
+    if (shipment.pod_status or '') not in compliant_statuses:
+        raise ValidationError(
+            'Shipment cannot move to Delivered until POD is compliant '
+            '(all delivery-note documents verified).'
+        )
+    if shipment.order_type.upper() == 'COD':
+        if shipment.collection_status != TenantShipment.CollectionStatus.COLLECTED:
+            raise ValidationError(
+                'COD shipment cannot move to Delivered until payment is collected.'
+            )
+
+
+def _tenant_shipment_after_status_side_effects(shipment):
+    if shipment is None:
+        return
+    if shipment.shipment_status in {
+        TenantShipment.ShipmentStatus.DELIVERED,
+        TenantShipment.ShipmentStatus.CLOSED,
+    }:
+        _tenant_truck_movement_auto_complete_loaded_for_shipment(shipment)
+    _tenant_shipment_document_refresh_shipment_pod(shipment)
+
+
+def _tenant_operation_action_apply_booking_status_impact(booking, raw_impact):
+    if booking is None:
+        return
+    token = (raw_impact or '').strip().lower()
+    if not token:
+        return
+    if token in {'draft'}:
+        if booking.booking_status != TenantBooking.Status.CANCELLED:
+            booking.booking_status = TenantBooking.Status.DRAFT
+            booking.save(update_fields=['booking_status', 'updated_at'])
+    elif token in {'confirmed', 'in_progress', 'completed', 'active'}:
+        if booking.booking_status == TenantBooking.Status.DRAFT:
+            booking.booking_status = TenantBooking.Status.CONFIRMED
+            booking.save(update_fields=['booking_status', 'updated_at'])
+
+
+def _tenant_shipment_pod_assert_unique_source(source_document, form_errors, *, exclude_document_id=None):
+    if source_document is None:
+        return
+    qs = TenantShipmentDocument.objects.filter(source_document_id=source_document.pk)
+    if exclude_document_id:
+        qs = qs.exclude(pk=exclude_document_id)
+    if qs.exists():
+        form_errors['source_document_id'] = (
+            'A POD record already exists for this delivery note.'
+        )
+
+
+def _tenant_shipment_pod_birth_from_action_log(action_log, *, created_by_label=''):
+    """Action 7 / auto_pod_post — one POD record per delivery-note document."""
+    shipment = action_log.shipment
+    if shipment is None:
+        return None
+    source_document = (
+        TenantShipmentDocument.objects.filter(
+            shipment=shipment,
+            is_delivery_note=True,
+        )
+        .order_by('-created_at')
+        .first()
+    )
+    if source_document is None:
+        raise ValidationError(
+            'Auto POD Post requires at least one delivery-note document on the shipment.'
+        )
+    existing_pod = TenantShipmentDocument.objects.filter(
+        source_document_id=source_document.pk,
+    ).first()
+    if existing_pod is not None:
+        return existing_pod
+
+    record_no, record_sequence = _next_auto_number_for_form(
+        form_code=SHIPMENT_POD_AUTO_FORM_CODE,
+        form_label=SHIPMENT_POD_AUTO_FORM_LABEL,
+        prefix=SHIPMENT_POD_REF_PREFIX,
+    )
+    document = TenantShipmentDocument(
+        record_no=record_no,
+        record_sequence=record_sequence,
+        record_date=timezone.localdate(),
+        document_type='pod',
+        document_ref_no=source_document.document_ref_no,
+        document_date=source_document.document_date or timezone.localdate(),
+        physical_location='With Driver',
+        page_count=source_document.page_count or 1,
+        status=TenantShipmentDocument.Status.DRAFT,
+        source_document=source_document,
+        created_by_label=(created_by_label or '')[:200],
+    )
+    _tenant_shipment_document_apply_foreign_keys(
+        document,
+        booking=shipment.booking if shipment.booking_id else None,
+        shipment=shipment,
+    )
+    document.save()
+
+    line_payload = _tenant_shipment_pod_build_line_rows_from_source(source_document)
+    TenantShipmentPodPage.objects.filter(document=document).delete()
+    for idx, row in enumerate(line_payload, start=1):
+        if not isinstance(row, dict):
+            continue
+        source_page = _tenant_shipment_pod_resolve_line_source_page(
+            row.get('doc_page'),
+            source_document,
+            {},
+        )
+        TenantShipmentPodPage.objects.create(
+            document=document,
+            line_no=idx,
+            source_page=source_page,
+            doc_page=_tenant_shipment_pod_page_label(source_page) if source_page else row.get('doc_page', ''),
+            source=row.get('source') or 'Action Log',
+            action_log=row.get('action_log') or action_log.log_no,
+            physical_location=row.get('physical_location') or 'With Driver',
+            soft_copy_status=row.get('soft_copy_status') or 'Not Collected',
+            digital_evidence_status=row.get('digital_evidence_status') or 'Not Collected',
+            map_url=row.get('map_url') or '',
+            attachment_label=row.get('attachment_label') or '',
+        )
+
+    if _tenant_operation_action_matches(action_log.operation_action, 'upload pod', 'a7', 'action 7'):
+        shipment.pod_type = TenantShipment.PodType.DIGITAL
+        shipment.save(update_fields=['pod_type', 'updated_at'])
+
+    return document
+
+
+def _tenant_shipment_document_guard_mutable(document, *, new_status=None):
+    """Doc §6 — edit/delete only while header is Draft (anti-delete when Verified)."""
+    if document is None:
+        return {}
+    errors = {}
+    if document.status == TenantShipmentDocument.Status.VERIFIED:
+        errors['status'] = (
+            'Verified documents cannot be edited or deleted. '
+            'Reject the record or create a replacement document.'
+        )
+    elif new_status and new_status != document.status:
+        if document.status not in {
+            TenantShipmentDocument.Status.DRAFT,
+            TenantShipmentDocument.Status.PENDING,
+            TenantShipmentDocument.Status.UPLOADED,
+        }:
+            errors['status'] = 'Document status cannot be changed after it has left Draft.'
+    return errors
+
+
+def _tenant_surcharge_sales_guard_status(existing_surcharge, new_status, form_errors, request):
+    """Doc §5 — state machine and SIR-only Invoiced."""
+    if new_status == TenantShipmentSurcharge.Status.INVOICED:
+        form_errors['status'] = (
+            'Invoiced status is assigned automatically when the surcharge is included '
+            'in a Sales Invoice Report.'
+        )
+    if existing_surcharge is None:
+        return
+    prior = existing_surcharge.status
+    if prior == TenantShipmentSurcharge.Status.INVOICED:
+        form_errors['status'] = 'Invoiced surcharges cannot be modified.'
+    elif prior == TenantShipmentSurcharge.Status.CANCELLED:
+        form_errors['status'] = 'Cancelled surcharges cannot be modified.'
+    elif prior == TenantShipmentSurcharge.Status.CONFIRMED:
+        if new_status == TenantShipmentSurcharge.Status.DRAFT:
+            form_errors['status'] = 'Confirmed surcharges cannot revert to Draft.'
+        if new_status not in {
+            TenantShipmentSurcharge.Status.CONFIRMED,
+            TenantShipmentSurcharge.Status.CANCELLED,
+        }:
+            form_errors['status'] = (
+                'Confirmed surcharges may only be cancelled (not edited to another status).'
+            )
+    if new_status == TenantShipmentSurcharge.Status.CONFIRMED:
+        if not (existing_surcharge.reason or '').strip() and not (request.POST.get('notes') or '').strip():
+            form_errors['notes'] = 'Reason is required before confirming.'
+        if not existing_surcharge.attachment_file and not request.FILES.get('attachment_file'):
+            form_errors['attachment_file'] = 'Attachment is required before confirming.'
+
+
+def _tenant_document_handover_sync_page_custody(handover, source_document):
+    """Doc §8 — handover lines update per-page custody on DN/POD pages."""
+    if handover is None or source_document is None:
+        return
+    status_to_location = {
+        'ReceivedOK': 'In Company',
+        'Missing': '',
+        'Rejected': 'In Company',
+    }
+    for line in handover.lines.select_related('source_page').order_by('line_no'):
+        custody = status_to_location.get((line.page_status or '').strip(), 'In Company')
+        if (line.physical_location or '').strip():
+            custody = line.physical_location.strip()
+        if line.source_page_id:
+            TenantShipmentPodPage.objects.filter(pk=line.source_page_id).update(
+                physical_location=custody[:120],
+                updated_at=timezone.now(),
+            )
+        doc_page = source_document.document_pages.filter(line_no=line.line_no).first()
+        if doc_page is not None and custody:
+            allowed = {choice[0] for choice in TenantShipmentDocumentPage.SignerLocation.choices}
+            if custody in allowed:
+                doc_page.signer_location = custody
+                doc_page.save(update_fields=['signer_location', 'updated_at'])
+
+
+def _tenant_operation_action_log_apply_side_effects(action_log, *, created_by_label=''):
+    """
+    Apply Action Master impacts after log save (doc Ch.2–4).
+    Atomic shipment + movement birth when auto_post flags or Confirm Loaded action.
+    """
+    action = action_log.operation_action
+    if action is None:
+        return
+
+    booking = action_log.booking
+    shipment = action_log.shipment
+    truck_movement = action_log.truck_movement
+    log_date = action_log.log_date
+    shipment_date = log_date.date() if log_date else timezone.localdate()
+
+    if booking is not None and _tenant_operation_action_matches(action, 'start job', 'a1', 'action 1'):
+        if booking.execution_date is None:
+            booking.execution_date = shipment_date
+            booking.save(update_fields=['execution_date', 'updated_at'])
+
+    if booking is not None and (action.booking_status_impact or '').strip():
+        _tenant_operation_action_apply_booking_status_impact(
+            booking,
+            action.booking_status_impact,
+        )
+
+    if booking is not None and shipment is None and action.auto_shipment_post:
+        booking_item_type_hint = (getattr(action_log, '_birth_booking_item_type', None) or '').strip()
+        target_line = _tenant_shipment_match_booking_line(
+            booking,
+            booking_item_type=booking_item_type_hint,
+        )
+        if target_line is None:
+            for line in _tenant_shipment_booking_line_rows(booking):
+                if not _tenant_shipment_has_active_duplicate(booking, line['booking_item_type']):
+                    target_line = line
+                    break
+        if target_line is None:
+            raise ValidationError(
+                'Auto Shipment Post requires a confirmed booking line without an active shipment.'
+            )
+        shipment = _tenant_shipment_birth_from_booking_line(
+            booking,
+            target_line,
+            shipment_date=shipment_date,
+            created_by_label=created_by_label,
+        )
+        action_log.shipment = shipment
+        action_log.truck = shipment.truck
+        action_log.driver = shipment.driver
+        action_log.save(update_fields=['shipment', 'truck', 'driver', 'updated_at'])
+
+    if shipment is not None and truck_movement is None and action.auto_movement_post:
+        truck_movement = _tenant_truck_movement_birth_for_shipment(
+            shipment,
+            movement_date=shipment_date,
+            created_by_label=created_by_label,
+        )
+        action_log.truck_movement = truck_movement
+        action_log.save(update_fields=['truck_movement', 'updated_at'])
+
+    if shipment is not None and action.auto_pod_post:
+        pod_document = _tenant_shipment_pod_birth_from_action_log(
+            action_log,
+            created_by_label=created_by_label,
+        )
+        if (
+            pod_document is not None
+            and _tenant_operation_action_matches(action, 'upload pod', 'a7', 'action 7')
+        ):
+            _tenant_shipment_pod_apply_posting_effects(
+                document=pod_document,
+                source_document=pod_document.source_document,
+                shipment=shipment,
+                header_physical_location='with_driver',
+            )
+            pod_document.save(update_fields=['status', 'physical_location', 'updated_at'])
+
+    if shipment is not None and (action.shipment_status_impact or '').strip():
+        new_status = _tenant_resolve_shipment_status_impact(action.shipment_status_impact)
+        if new_status:
+            _tenant_shipment_validate_status_transition(shipment, new_status)
+            shipment.shipment_status = new_status
+            shipment.save(update_fields=['shipment_status', 'updated_at'])
+            _tenant_shipment_after_status_side_effects(shipment)
+
+    if (
+        shipment is not None
+        and shipment.order_type.upper() == 'COD'
+        and _tenant_operation_action_matches(action, 'collect payment', 'a9', 'action 9')
+    ):
+        shipment.collection_status = TenantShipment.CollectionStatus.COLLECTED
+        shipment.save(update_fields=['collection_status', 'updated_at'])
+
+    if truck_movement is not None and (action.movement_status_impact or '').strip():
+        movement_status = _tenant_resolve_movement_status_impact(action.movement_status_impact)
+        if movement_status:
+            truck_movement.status = movement_status
+            truck_movement.save(update_fields=['status', 'updated_at'])
+
+    if (
+        shipment is not None
+        and action.hard_copy_collection
+        and _tenant_operation_action_matches(action, 'upload pod', 'a7', 'action 7', 'confirm loaded', 'a4')
+    ):
+        shipment.pod_type = TenantShipment.PodType.HARD
+        shipment.save(update_fields=['pod_type', 'updated_at'])
+
+
+def _tenant_shipment_birth_from_booking_line(booking, matched_line, *, shipment_date=None, created_by_label=''):
+    """Action 4 atomic shipment birth (doc §4.4) from booking line."""
+    if booking is None or matched_line is None:
+        raise ValidationError('Booking line is required to create a shipment.')
+    if booking.booking_status != TenantBooking.Status.CONFIRMED:
+        raise ValidationError('Only active (confirmed) bookings can spawn a shipment.')
+    client = booking.client_account
+    if client is None:
+        raise ValidationError('Booking client account is required.')
+
+    shipment_form_data = {
+        'order_type': matched_line.get('order_type') or booking.order_type or '',
+        'booking_item': matched_line.get('booking_item') or '',
+        'booking_item_type': matched_line.get('booking_item_type') or '',
+        'booking_item_route': matched_line.get('route_display') or '',
+        'sourcing_mode': matched_line.get('sourcing_mode') or TenantShipment.SourcingMode.IN_SOURCE,
+        'loading_address': str(matched_line.get('loading_address_id') or booking.loading_address_id or ''),
+        'delivery_address': str(matched_line.get('delivery_address_id') or booking.delivery_address_id or ''),
+        'cargo_id': str(matched_line.get('cargo_id') or booking.cargo_id or ''),
+        'cod_amount': str(matched_line.get('cod_amount') or booking.booking_line_cod_amount or 0),
+    }
+    _tenant_shipment_apply_booking_line_to_form(shipment_form_data, matched_line, booking)
+
+    loading_address = None
+    delivery_address = None
+    cargo = None
+    if shipment_form_data['loading_address']:
+        loading_address = TenantAddressMaster.active_objects.filter(
+            pk=shipment_form_data['loading_address'],
+            client_account=client,
+        ).first()
+    if shipment_form_data['delivery_address']:
+        delivery_address = TenantAddressMaster.active_objects.filter(
+            pk=shipment_form_data['delivery_address'],
+            client_account=client,
+        ).first()
+    if shipment_form_data['cargo_id']:
+        cargo = TenantCargoMaster.active_objects.filter(
+            pk=shipment_form_data['cargo_id'],
+            client_account=client,
+        ).first()
+
+    truck = matched_line.get('truck')
+    driver = matched_line.get('driver')
+    cargo_qty = Decimal(str(matched_line.get('cargo_qty') or booking.cargo_qty or 0))
+    cargo_weight = Decimal(str(matched_line.get('cargo_weight') or booking.cargo_weight or 0))
+    cod_amount = Decimal(str(shipment_form_data.get('cod_amount') or 0))
+    shipment_date = shipment_date or timezone.localdate()
+
+    form_errors, normalized_order_type = _tenant_shipment_validate_submission(
+        shipment_form_data=shipment_form_data,
+        selected_client=client,
+        selected_booking=booking,
+        matched_line=matched_line,
+        truck=truck,
+        driver=driver,
+        loading_address=loading_address,
+        delivery_address=delivery_address,
+        cargo=cargo,
+        cargo_qty=cargo_qty,
+        cargo_weight=cargo_weight,
+        cod_amount=cod_amount,
+        shipment_date=shipment_date,
+    )
+    if form_errors:
+        raise ValidationError('; '.join(form_errors.values()))
+    if normalized_order_type != 'COD':
+        cod_amount = Decimal('0')
+
+    shipment_no, shipment_sequence = _next_auto_number_for_form(
+        form_code=SHIPMENT_AUTO_FORM_CODE,
+        form_label=SHIPMENT_AUTO_FORM_LABEL,
+        prefix=SHIPMENT_REF_PREFIX,
+    )
+    sales_order_ref = ''
+    sales_order_item_ref = ''
+    if booking.price_list:
+        sales_order_ref = booking.price_list.price_list_code or ''
+    if booking.service_item:
+        sales_order_item_ref = (
+            f'{booking.service_item.service_code} - {booking.service_item.english_name}'
+        )
+
+    pod_type = _normalize_shipment_pod_type(
+        matched_line.get('pod_type') or booking.pod_type,
+        default=TenantShipment.PodType.SOFT,
+    )
+    pod_status = booking.pod_status or TenantShipment.PodStatus.NOT_COMPLIANT
+    if pod_status not in {choice[0] for choice in TenantShipment.PodStatus.choices}:
+        pod_status = TenantShipment.PodStatus.NOT_COMPLIANT
+
+    shipment = TenantShipment(
+        shipment_no=shipment_no,
+        shipment_sequence=shipment_sequence,
+        shipment_date=shipment_date,
+        booking_item_ref=(shipment_form_data['booking_item'] or '')[:64],
+        booking_item_type=shipment_form_data['booking_item_type'],
+        sourcing_mode=shipment_form_data['sourcing_mode'],
+        trip_type=(booking.trip_type or '')[:20],
+        route_display=(shipment_form_data['booking_item_route'] or '')[:120],
+        order_type=normalized_order_type,
+        sales_order_ref=sales_order_ref[:64],
+        sales_order_item_ref=sales_order_item_ref[:64],
+        pod_type=pod_type,
+        pod_status=pod_status,
+        pod_doc_count=int(matched_line.get('pod_doc_count') or 0),
+        cod_amount=cod_amount,
+        shipment_status=TenantShipment.ShipmentStatus.LOADED,
+        collection_status=TenantShipment.CollectionStatus.PENDING,
+        created_by_label=(created_by_label or '')[:200],
+    )
+    _tenant_shipment_apply_foreign_keys(
+        shipment,
+        booking=booking,
+        client_account=client,
+        driver=driver,
+        truck=truck,
+        loading_address=loading_address,
+        delivery_address=delivery_address,
+        cargo=cargo,
+        cargo_booking_item=(booking.cargo_booking_item or '')[:20],
+        cargo_weight=cargo_weight,
+        cargo_unit=(matched_line.get('cargo_unit') or booking.cargo_unit or '')[:50],
+        cargo_qty=cargo_qty,
+    )
+    shipment.full_clean()
+    shipment.save()
+    return shipment
+
+
+def _tenant_truck_movement_birth_for_shipment(shipment, *, movement_date=None, created_by_label=''):
+    """Truck movement born with shipment at Confirm Loaded (doc §4.4)."""
+    existing = (
+        TenantTruckMovementLog.objects.filter(shipment_id=shipment.pk)
+        .exclude(status=TenantTruckMovementLog.Status.CANCELLED)
+        .order_by('-created_at')
+        .first()
+    )
+    if existing is not None:
+        return existing
+    movement_date = movement_date or shipment.shipment_date or timezone.localdate()
+    movement_no, movement_sequence = _next_auto_number_for_form(
+        form_code=TRUCK_MOVEMENT_LOG_AUTO_FORM_CODE,
+        form_label=TRUCK_MOVEMENT_LOG_AUTO_FORM_LABEL,
+        prefix=TRUCK_MOVEMENT_LOG_REF_PREFIX,
+    )
+    movement = TenantTruckMovementLog(
+        movement_no=movement_no,
+        movement_sequence=movement_sequence,
+        movement_date=movement_date,
+        movement_source='Loaded',
+        status=TenantTruckMovementLog.Status.IN_PROGRESS,
+        booking=shipment.booking,
+        shipment=shipment,
+        truck=shipment.truck,
+        driver=shipment.driver,
+        start_time=timezone.now(),
+        created_by_label=(created_by_label or '')[:200],
+    )
+    movement.save()
+    return movement
+
+
+def _tenant_shipment_manual_create_allowed():
+    """Portal may create shipments manually; driver/action path uses Action Master auto_shipment_post."""
+    return True
+
+
+def _tenant_shipment_ui_lock_flags(shipment):
+    """Doc §4.7 — which sections may be edited on the shipment form."""
+    if shipment is None:
+        return {
+            'lock_loading_address': False,
+            'lock_delivery_address': False,
+            'lock_cargo': False,
+            'lock_all_operational': False,
+            'can_delete': False,
+        }
+    status = shipment.shipment_status
+    terminal = {
+        TenantShipment.ShipmentStatus.CLOSED,
+        TenantShipment.ShipmentStatus.CANCELLED,
+    }
+    post_delivery = terminal | {
+        TenantShipment.ShipmentStatus.AT_DELIVERY,
+        TenantShipment.ShipmentStatus.POD_SUBMITTED,
+        TenantShipment.ShipmentStatus.DELIVERED,
+    }
+    return {
+        'lock_loading_address': status != TenantShipment.ShipmentStatus.CREATED,
+        'lock_delivery_address': status in post_delivery,
+        'lock_cargo': status != TenantShipment.ShipmentStatus.CREATED,
+        'lock_all_operational': status in terminal,
+        'can_delete': status == TenantShipment.ShipmentStatus.CREATED,
+    }
+
+
+def _tenant_operation_action_log_booking_line_birth_options(booking=None):
+    """Confirmed booking lines that do not yet have an active shipment (for Confirm Loaded)."""
+    options = []
+    booking_qs = TenantBooking.objects.filter(booking_status=TenantBooking.Status.CONFIRMED)
+    if booking is not None:
+        booking_qs = booking_qs.filter(pk=booking.booking_id)
+    for row in booking_qs.select_related('client_account', 'service_item')[:200]:
+        for line in _tenant_shipment_booking_line_rows(row):
+            if _tenant_shipment_has_active_duplicate(row, line['booking_item_type']):
+                continue
+            service_label = line.get('booking_item') or row.booking_no
+            options.append(
+                {
+                    'booking_id': str(row.booking_id),
+                    'booking_no': row.booking_no,
+                    'booking_item_type': line['booking_item_type'],
+                    'booking_item': service_label,
+                    'label': f'{row.booking_no} · {line["booking_item_type"]} · {service_label}',
+                }
+            )
+    return options
+
+
+def _tenant_shipment_edit_guard_errors(shipment, *, loading_address, delivery_address, cargo_obj, truck, driver):
+    """State-gated edits per doc §4.7 (server-side on existing fields only)."""
+    if shipment is None:
+        return {}
+    errors = {}
+    status = shipment.shipment_status
+
+    if status in {
+        TenantShipment.ShipmentStatus.AT_DELIVERY,
+        TenantShipment.ShipmentStatus.POD_SUBMITTED,
+        TenantShipment.ShipmentStatus.DELIVERED,
+        TenantShipment.ShipmentStatus.CLOSED,
+        TenantShipment.ShipmentStatus.CANCELLED,
+    }:
+        if loading_address and shipment.loading_address_id != getattr(loading_address, 'pk', None):
+            errors['loading_address'] = 'Loading address cannot be changed at this shipment status.'
+        if delivery_address and shipment.delivery_address_id != getattr(delivery_address, 'pk', None):
+            errors['delivery_address'] = 'Delivery address cannot be changed after arrival at delivery.'
+    elif loading_address and shipment.loading_address_id != getattr(loading_address, 'pk', None):
+        errors['loading_address'] = 'Loading address cannot be changed after the shipment has loaded.'
+
+    if status not in {
+        TenantShipment.ShipmentStatus.LOADED,
+        TenantShipment.ShipmentStatus.CREATED,
+    }:
+        if cargo_obj and shipment.cargo_id != getattr(cargo_obj, 'pk', None):
+            errors['cargo_id'] = 'Cargo cannot be changed after the shipment has loaded.'
+        if truck and shipment.truck_id != getattr(truck, 'pk', None):
+            errors['booking_no'] = 'Truck cannot be changed after the shipment has loaded.'
+        if driver and shipment.driver_id != getattr(driver, 'pk', None):
+            errors['booking_no'] = 'Driver cannot be changed after the shipment has loaded.'
+
+    return errors
+
+
+def _tenant_booking_is_scheduled_post(request):
+    return _first_post_value(request, 'is_scheduled') in ('on', '1', 'true', 'yes', 'True')
+
+
+def _tenant_booking_status_from_request(request, *, default=TenantBooking.Status.DRAFT):
+    """Map save_action / UI status to stored booking_status (Confirmed = doc Active)."""
+    save_action = (request.POST.get('save_action') or '').strip().lower()
+    if save_action == 'confirm':
+        return TenantBooking.Status.CONFIRMED
+    if save_action == 'draft':
+        return TenantBooking.Status.DRAFT
+    raw = (request.POST.get('booking_status') or default).strip()
+    if raw in {TenantBooking.Status.CONFIRMED, 'Active'}:
+        return TenantBooking.Status.CONFIRMED
+    if raw == TenantBooking.Status.CANCELLED:
+        return TenantBooking.Status.CANCELLED
+    return TenantBooking.Status.DRAFT
+
+
+def _tenant_booking_display_status(booking_status):
+    if booking_status == TenantBooking.Status.CONFIRMED:
+        return 'Active'
+    return booking_status or TenantBooking.Status.DRAFT
 
 
 def _tenant_booking_route_from_lookup(route_lookup):
@@ -10275,30 +11167,64 @@ def _tenant_booking_derive_sell_price(price_list, service_item, trip_type, has_t
     return Decimal('0')
 
 
-def _tenant_booking_scheduling_conflict(*, execution_date, truck, driver, exclude_booking_id=None):
-    if execution_date is None or truck is None or driver is None:
+def _tenant_booking_scheduling_conflict(
+    *,
+    booking_date,
+    truck,
+    driver,
+    backload_truck=None,
+    backload_driver=None,
+    exclude_booking_id=None,
+):
+    """Same truck+driver already on an Active (Confirmed) booking for this planning date."""
+    if booking_date is None:
         return False
-    qs = TenantBooking.objects.filter(
-        booking_status=TenantBooking.Status.CONFIRMED,
-        execution_date=execution_date,
-        assigned_truck=truck,
-        assigned_driver=driver,
-    )
-    if exclude_booking_id:
-        qs = qs.exclude(pk=exclude_booking_id)
-    return qs.exists()
+
+    def _pair_conflict(assigned_truck, assigned_driver):
+        if assigned_truck is None or assigned_driver is None:
+            return False
+        qs = TenantBooking.objects.filter(
+            booking_status=TenantBooking.Status.CONFIRMED,
+            booking_date=booking_date,
+            assigned_truck=assigned_truck,
+            assigned_driver=assigned_driver,
+        )
+        if exclude_booking_id:
+            qs = qs.exclude(pk=exclude_booking_id)
+        if qs.exists():
+            return True
+        qs = TenantBooking.objects.filter(
+            booking_status=TenantBooking.Status.CONFIRMED,
+            booking_date=booking_date,
+            booking_line_backload_truck=assigned_truck,
+            booking_line_backload_driver=assigned_driver,
+        )
+        if exclude_booking_id:
+            qs = qs.exclude(pk=exclude_booking_id)
+        return qs.exists()
+
+    if _pair_conflict(truck, driver):
+        return True
+    return _pair_conflict(backload_truck, backload_driver)
 
 
 def _tenant_booking_validate_submission(request, *, booking_id=None, has_table=None):
-    """BK-001 matched-field validations (Draft save vs Confirm)."""
+    """BK-001 matched-field validations (Draft save vs Confirm / Active)."""
     if has_table is None:
         has_table = set(connection.introspection.table_names()).__contains__
 
     errors = []
-    booking_status = (request.POST.get('booking_status') or TenantBooking.Status.DRAFT).strip()
+    booking_status = _tenant_booking_status_from_request(request)
     is_confirm = booking_status == TenantBooking.Status.CONFIRMED
+    is_scheduled = _tenant_booking_is_scheduled_post(request)
     sourcing_mode = _tenant_booking_normalize_sourcing_mode(request.POST.get('sourcing_mode'))
     order_type = (request.POST.get('order_type') or '').strip()
+    today = timezone.localdate()
+    booking_date = parse_date((request.POST.get('booking_date') or '').strip())
+    if not is_scheduled:
+        booking_date = today
+    elif booking_date is None:
+        booking_date = today
 
     client = TenantClientAccount.objects.filter(
         account_id=(request.POST.get('client_account') or '').strip(),
@@ -10343,8 +11269,13 @@ def _tenant_booking_validate_submission(request, *, booking_id=None, has_table=N
                 errors.append('Selected service is not linked to the selected price list.')
 
     trip_type = (request.POST.get('trip_type') or '').strip()
+    if is_confirm and not order_type:
+        errors.append('Order type is required before confirming a booking.')
     if is_confirm and not trip_type:
         errors.append('Trip type is required before confirming a booking.')
+    if is_confirm and is_scheduled:
+        if booking_date <= today:
+            errors.append('Scheduled bookings must have a booking date after today.')
 
     route_lookup = (request.POST.get('route_lookup') or '').strip()
     route, route_direction, route_display = _tenant_booking_route_from_lookup(route_lookup)
@@ -10353,9 +11284,8 @@ def _tenant_booking_validate_submission(request, *, booking_id=None, has_table=N
     if is_confirm and route_lookup and route is None:
         errors.append('Please select a valid route.')
 
-    execution_date = parse_date((request.POST.get('execution_date') or '').strip())
-    if is_confirm and execution_date is None:
-        errors.append('Execution date is required before confirming a booking.')
+    # Execution date is system-filled when the driver fires Start Job (A1), not on booking confirm.
+    execution_date = None
 
     truck, driver = _tenant_booking_line_assignment(request, 1, has_table)
     backload_truck, backload_driver = _tenant_booking_line_assignment(request, 2, has_table)
@@ -10413,6 +11343,20 @@ def _tenant_booking_validate_submission(request, *, booking_id=None, has_table=N
             errors.append('Cargo quantity must be greater than zero.')
         if cargo_weight < 0:
             errors.append('Cargo weight (ton) cannot be negative.')
+        cargo_unit_raw = (request.POST.get('cargo_unit_1') or '').strip()
+        if not cargo_unit_raw:
+            errors.append('Cargo unit is required before confirming a booking.')
+        elif not cargo_unit_raw.isdigit():
+            errors.append('Cargo unit must contain digits only.')
+
+    if is_confirm and order_type == 'COD':
+        outbound_cod = _decimal_from_request(request, 'booking_line_cod_amount_1')
+        if outbound_cod <= 0:
+            errors.append('COD amount is required on the outbound booking line.')
+        if trip_type == 'Round':
+            backload_cod = _decimal_from_request(request, 'booking_line_cod_amount_2')
+            if backload_cod <= 0:
+                errors.append('COD amount is required on the backload booking line.')
 
     if is_confirm and price_list and service_item:
         derived_sell = _tenant_booking_derive_sell_price(
@@ -10437,16 +11381,34 @@ def _tenant_booking_validate_submission(request, *, booking_id=None, has_table=N
             'Confirm is blocked until purchase order fields are available.'
         )
 
-    if is_confirm and execution_date and truck and driver:
+    if is_confirm and booking_date:
         if _tenant_booking_scheduling_conflict(
-            execution_date=execution_date,
+            booking_date=booking_date,
             truck=truck,
             driver=driver,
+            backload_truck=backload_truck,
+            backload_driver=backload_driver,
             exclude_booking_id=booking_id,
         ):
             errors.append(
-                'Another confirmed booking already uses the same execution date, truck, and driver.'
+                'Another active booking already uses the same booking date, truck, and driver.'
             )
+
+    posted_sell_price = _decimal_from_request(request, 'sell_price')
+    derived_sell_price = _tenant_booking_derive_sell_price(
+        price_list,
+        service_item,
+        trip_type,
+        has_table,
+    ) if price_list and service_item else Decimal('0')
+    if is_confirm and posted_sell_price <= 0 and (derived_sell_price is None or derived_sell_price <= 0):
+        errors.append('Sell price is required before confirming a booking.')
+    sell_price = posted_sell_price if posted_sell_price > 0 else (derived_sell_price or Decimal('0'))
+
+    booking_row = None
+    if booking_id:
+        booking_row = TenantBooking.objects.filter(pk=booking_id).first()
+    errors.extend(_tenant_booking_cancel_guard_errors(booking_row, booking_status))
 
     return errors, {
         'client': client,
@@ -10456,13 +11418,12 @@ def _tenant_booking_validate_submission(request, *, booking_id=None, has_table=N
         'route_direction': route_direction,
         'route_display': route_display,
         'execution_date': execution_date,
+        'booking_date': booking_date,
+        'booking_status': booking_status,
+        'is_scheduled': is_scheduled,
         'sourcing_mode': sourcing_mode,
-        'derived_sell_price': _tenant_booking_derive_sell_price(
-            price_list,
-            service_item,
-            trip_type,
-            has_table,
-        ) if price_list and service_item else Decimal('0'),
+        'sell_price': sell_price,
+        'derived_sell_price': derived_sell_price,
         'truck': truck,
         'driver': driver,
     }
@@ -10474,7 +11435,7 @@ def _tenant_booking_line_assignment(request, line_no, has_table):
     if line_no == 1 and not truck_id:
         truck_id = _first_post_value(request, 'assigned_truck_id', 'assigned_truck')
     if truck_id and has_table('tenant_truck_master'):
-        truck = TruckMaster.objects.select_related('default_driver_id').filter(
+        truck = TruckMaster.active_objects.select_related('default_driver_id').filter(
             pk=truck_id
         ).first()
 
@@ -10483,7 +11444,7 @@ def _tenant_booking_line_assignment(request, line_no, has_table):
     if line_no == 1 and not driver_id:
         driver_id = _first_post_value(request, 'assigned_driver_id', 'assigned_driver')
     if driver_id and has_table('tenant_driver_master'):
-        driver = DriverMaster.objects.filter(
+        driver = DriverMaster.active_objects.filter(
             pk=driver_id
         ).first()
     if driver is None and truck and truck.default_driver_id:
@@ -10522,14 +11483,16 @@ def _tenant_booking_extra_payload(request):
     cargo_weight = _decimal_from_request(request, 'cargo_weight_1')
     cargo_qty = _decimal_from_request(request, 'cargo_qty_1')
     cargo_unit = (request.POST.get('cargo_unit_1') or '').strip()
-    if cargo:
-        if not cargo_unit:
-            cargo_unit = cargo.uom or ''
+    if cargo and not cargo_unit:
+        cargo_uom = (cargo.uom or '').strip()
+        if cargo_uom.isdigit():
+            cargo_unit = cargo_uom
     cargo_booking_item = (request.POST.get('cargo_booking_item_1') or '').strip()
     if not cargo_booking_item and (request.POST.get('trip_type') or '').strip():
         cargo_booking_item = 'Outbound'
     total_cargo_weight = cargo_weight
     return {
+        'is_scheduled': _tenant_booking_is_scheduled_post(request),
         'assigned_truck': truck,
         'assigned_driver': driver,
         'booking_line_cod_amount': _decimal_from_request(
@@ -10776,11 +11739,10 @@ class TenantOperationBookingCreateView(View):
             route = validated['route']
             route_direction = validated['route_direction']
             route_display = validated['route_display']
-            execution_date = validated['execution_date']
-            sell_price = validated['derived_sell_price']
+            sell_price = validated['sell_price']
             sourcing_mode = validated['sourcing_mode']
-
-            booking_date = parse_date((request.POST.get('booking_date') or '').strip()) or timezone.localdate()
+            booking_date = validated.get('booking_date') or timezone.localdate()
+            booking_status = validated['booking_status']
             extra_payload = _tenant_booking_extra_payload(request)
 
             with db_transaction.atomic():
@@ -10794,8 +11756,8 @@ class TenantOperationBookingCreateView(View):
                     booking_sequence=booking_sequence,
                     creation_date=timezone.localdate(),
                     booking_date=booking_date,
-                    execution_date=execution_date,
-                    booking_status=(request.POST.get('booking_status') or TenantBooking.Status.DRAFT).strip(),
+                    execution_date=None,
+                    booking_status=booking_status,
                     client_account=client,
                     price_list=price_list,
                     service_item=service_item,
@@ -10807,16 +11769,17 @@ class TenantOperationBookingCreateView(View):
                     sell_price=sell_price,
                     sourcing_mode=sourcing_mode,
                     pod_type=(request.POST.get('pod_type') or '').strip(),
-                    pod_status=(request.POST.get('pod_status') or '').strip(),
+                    pod_status='',
                     **extra_payload,
                     created_by_label=(context.get('display_name') or '').strip(),
                 )
                 if request.FILES.get('booking_attachment'):
                     booking.booking_attachment = request.FILES['booking_attachment']
                     booking.save(update_fields=['booking_attachment', 'updated_at'])
+            status_label = _tenant_booking_display_status(booking.booking_status)
             messages.success(
                 request,
-                f'{booking.booking_no} completed successfully.',
+                f'{booking.booking_no} saved ({status_label}).',
                 extra_tags='tenant',
             )
             return _tenant_redirect(request, 'iroad_tenants:tenant_operation_booking_list')
@@ -10860,12 +11823,19 @@ class TenantOperationBookingEditView(View):
                 messages.error(request, 'Booking not found.', extra_tags='tenant')
                 return _tenant_redirect(request, 'iroad_tenants:tenant_operation_booking_list')
             context.update(_tenant_booking_form_options_context(tenant_registry, booking=booking))
+            has_any_shipment = TenantShipment.objects.filter(booking_id=booking.booking_id).exists()
             context.update(
                 {
                     'preview_booking_no': booking.booking_no,
                     'booking_creation_date': booking.creation_date,
                     'booking_is_edit': True,
                     'booking': booking,
+                    'booking_has_active_shipment': _tenant_booking_has_active_shipment(booking),
+                    'booking_derived_status': _tenant_booking_derived_header_status(booking),
+                    'booking_can_cancel': (
+                        booking.booking_status != TenantBooking.Status.CANCELLED
+                        and not has_any_shipment
+                    ),
                 }
             )
             return render(request, self.template_name, context)
@@ -10900,6 +11870,9 @@ class TenantOperationBookingEditView(View):
                 booking_id=booking.booking_id,
                 has_table=has_table,
             )
+            validation_errors.extend(
+                _tenant_booking_edit_guard_errors(booking, request, has_table=has_table)
+            )
             if validation_errors:
                 for error in validation_errors:
                     messages.error(request, error, extra_tags='tenant')
@@ -10910,9 +11883,8 @@ class TenantOperationBookingEditView(View):
             route_direction = validated['route_direction']
             route_display = validated['route_display']
 
-            booking.booking_date = parse_date((request.POST.get('booking_date') or '').strip()) or booking.booking_date
-            booking.execution_date = validated['execution_date']
-            booking.booking_status = (request.POST.get('booking_status') or TenantBooking.Status.DRAFT).strip()
+            booking.booking_date = validated.get('booking_date') or booking.booking_date
+            booking.booking_status = validated['booking_status']
             booking.client_account = client
             booking.price_list = validated['price_list']
             booking.service_item = validated['service_item']
@@ -10921,16 +11893,20 @@ class TenantOperationBookingEditView(View):
             booking.route_display = route_display
             booking.order_type = (request.POST.get('order_type') or '').strip()
             booking.trip_type = (request.POST.get('trip_type') or '').strip()
-            booking.sell_price = validated['derived_sell_price']
+            booking.sell_price = validated['sell_price']
             booking.sourcing_mode = validated['sourcing_mode']
             booking.pod_type = (request.POST.get('pod_type') or '').strip()
-            booking.pod_status = (request.POST.get('pod_status') or '').strip()
             for field_name, field_value in _tenant_booking_extra_payload(request).items():
                 setattr(booking, field_name, field_value)
             if request.FILES.get('booking_attachment'):
                 booking.booking_attachment = request.FILES['booking_attachment']
             booking.save()
-            messages.success(request, f'{booking.booking_no} updated successfully.', extra_tags='tenant')
+            status_label = _tenant_booking_display_status(booking.booking_status)
+            messages.success(
+                request,
+                f'{booking.booking_no} updated ({status_label}).',
+                extra_tags='tenant',
+            )
             return redirect('iroad_tenants:tenant_operation_booking_detail', booking_id=booking.booking_id)
         finally:
             connection.set_schema_to_public()
@@ -10979,6 +11955,7 @@ class TenantOperationBookingListView(View):
             start_index = booking_page_obj.start_index() if booking_page_obj.paginator.count else 0
             booking_rows = []
             for idx, booking in enumerate(booking_page_obj.object_list, start=start_index):
+                has_any_shipment = TenantShipment.objects.filter(booking_id=booking.booking_id).exists()
                 booking_rows.append(
                     {
                         'sn': idx,
@@ -10990,6 +11967,13 @@ class TenantOperationBookingListView(View):
                         'client_name': booking.client_account.display_name,
                         'route_text': booking.route_display or '-',
                         'trip_type': booking.trip_type or '-',
+                        'derived_status': _tenant_booking_derived_header_status(booking),
+                        'db_status': booking.booking_status,
+                        'has_active_shipment': _tenant_booking_has_active_shipment(booking),
+                        'can_cancel': (
+                            booking.booking_status != TenantBooking.Status.CANCELLED
+                            and not has_any_shipment
+                        ),
                         'sales_order_no': booking.price_list.price_list_code if booking.price_list else '-',
                         'truck_no': booking.assigned_truck.truck_code if booking.assigned_truck else '-',
                         'sales_report': '-',
@@ -11002,16 +11986,7 @@ class TenantOperationBookingListView(View):
                     'booking_rows': booking_rows,
                     'booking_page_obj': booking_page_obj,
                     'booking_search_query': search_q,
-                    'booking_stats': {
-                        'total': stats_qs.count(),
-                        'active': stats_qs.exclude(booking_status=TenantBooking.Status.CANCELLED).count(),
-                        'executed': 0,
-                        'cancelled': stats_qs.filter(booking_status=TenantBooking.Status.CANCELLED).count(),
-                        'round': stats_qs.filter(trip_type='Round').count(),
-                        'inbound': stats_qs.filter(route_direction='reverse').count(),
-                        'outbound': stats_qs.filter(route_direction='forward').count(),
-                        'unassigned_truck': stats_qs.filter(assigned_truck__isnull=True).count(),
-                    },
+                    'booking_stats': _tenant_booking_stats(),
                     'tenant_schema_name': tenant_registry.schema_name,
                 }
             )
@@ -11107,6 +12082,14 @@ class TenantOperationBookingDetailView(View):
                     is_backload = line_type == 'Backload'
                     line_truck = booking.booking_line_backload_truck if is_backload else booking.assigned_truck
                     line_driver = booking.booking_line_backload_driver if is_backload else booking.assigned_driver
+                    line_shipment = (
+                        TenantShipment.objects.filter(
+                            booking_id=booking.booking_id,
+                            booking_item_type=line_type,
+                        )
+                        .order_by('-created_at')
+                        .first()
+                    )
                     booking_lines.append(
                         {
                             'sn': idx,
@@ -11126,6 +12109,7 @@ class TenantOperationBookingDetailView(View):
                                 if is_backload
                                 else booking.booking_line_pod_doc_count
                             ),
+                            'shipment': line_shipment,
                         }
                     )
 
@@ -11133,6 +12117,7 @@ class TenantOperationBookingDetailView(View):
                 {
                     'booking': booking,
                     'booking_lines': booking_lines,
+                    'booking_derived_status': _tenant_booking_derived_header_status(booking),
                     'tenant_schema_name': tenant_registry.schema_name,
                 }
             )
@@ -11256,22 +12241,23 @@ class TenantOperationShipmentListView(View):
                     if shipment.booking_id
                     else None
                 )
+                shipment.ui_locks = _tenant_shipment_ui_lock_flags(shipment)
             stats_qs = TenantShipment.objects.all()
             context.update(
                 {
                     'shipment_records': shipment_records,
                     'shipment_stats': {
-                        'active': stats_qs.exclude(
-                            shipment_status=TenantShipment.ShipmentStatus.CANCELLED,
+                        'active': stats_qs.filter(
+                            shipment_status__in=_tenant_shipment_active_statuses(),
                         ).count(),
                         'delivered': stats_qs.filter(
                             shipment_status=TenantShipment.ShipmentStatus.DELIVERED,
                         ).count(),
-                        'credit': stats_qs.filter(cod_amount__lte=0).exclude(
-                            shipment_status=TenantShipment.ShipmentStatus.CANCELLED,
+                        'credit': stats_qs.filter(cod_amount__lte=0).filter(
+                            shipment_status__in=_tenant_shipment_active_statuses(),
                         ).count(),
-                        'cod': stats_qs.filter(cod_amount__gt=0).exclude(
-                            shipment_status=TenantShipment.ShipmentStatus.CANCELLED,
+                        'cod': stats_qs.filter(cod_amount__gt=0).filter(
+                            shipment_status__in=_tenant_shipment_active_statuses(),
                         ).count(),
                         'inbound': stats_qs.filter(booking_item_type__iexact='Inbound').count(),
                         'outbound': stats_qs.filter(booking_item_type__iexact='Outbound').count(),
@@ -11552,6 +12538,48 @@ def _tenant_shipment_match_booking_line(booking, *, booking_item='', booking_ite
     return lines[0]
 
 
+def _tenant_shipment_active_statuses():
+    return {
+        TenantShipment.ShipmentStatus.LOADED,
+        TenantShipment.ShipmentStatus.CREATED,
+        TenantShipment.ShipmentStatus.IN_TRANSIT,
+        TenantShipment.ShipmentStatus.AT_DELIVERY,
+        TenantShipment.ShipmentStatus.POD_SUBMITTED,
+        TenantShipment.ShipmentStatus.DELIVERED,
+    }
+
+
+def _tenant_shipment_apply_booking_line_to_form(shipment_form_data, matched_line, selected_booking):
+    """Inherit booking line values (doc §4.3) — order type COD/Credit from booking, not header dropdown."""
+    if matched_line:
+        shipment_form_data['order_type'] = matched_line.get('order_type') or ''
+        shipment_form_data['booking_item'] = matched_line.get('booking_item') or ''
+        shipment_form_data['booking_item_type'] = matched_line.get('booking_item_type') or ''
+        shipment_form_data['booking_item_route'] = matched_line.get('route_display') or ''
+        shipment_form_data['sourcing_mode'] = matched_line.get('sourcing_mode') or shipment_form_data.get(
+            'sourcing_mode',
+            TenantShipment.SourcingMode.IN_SOURCE,
+        )
+        if not shipment_form_data.get('loading_address') and matched_line.get('loading_address_id'):
+            shipment_form_data['loading_address'] = str(matched_line['loading_address_id'])
+        if not shipment_form_data.get('delivery_address') and matched_line.get('delivery_address_id'):
+            shipment_form_data['delivery_address'] = str(matched_line['delivery_address_id'])
+        if not shipment_form_data.get('cargo_id') and matched_line.get('cargo_id'):
+            shipment_form_data['cargo_id'] = str(matched_line['cargo_id'])
+        if not (shipment_form_data.get('cargo_weight') or '').strip() and matched_line.get('cargo_weight') is not None:
+            shipment_form_data['cargo_weight'] = str(matched_line['cargo_weight'])
+        if not (shipment_form_data.get('cargo_unit') or '').strip() and matched_line.get('cargo_unit'):
+            shipment_form_data['cargo_unit'] = str(matched_line['cargo_unit'])
+        if not (shipment_form_data.get('cargo_qty') or '').strip() and matched_line.get('cargo_qty') is not None:
+            shipment_form_data['cargo_qty'] = str(matched_line['cargo_qty'])
+        if not (shipment_form_data.get('cod_amount') or '').strip() and matched_line.get('cod_amount') is not None:
+            shipment_form_data['cod_amount'] = str(matched_line['cod_amount'])
+        if not (shipment_form_data.get('pod_doc_count') or '').strip() and matched_line.get('pod_doc_count') is not None:
+            shipment_form_data['pod_doc_count'] = str(matched_line['pod_doc_count'])
+    elif selected_booking is not None:
+        shipment_form_data['order_type'] = selected_booking.order_type or ''
+
+
 def _tenant_shipment_resolve_booking(selected_client, *, booking_id='', booking_no=''):
     """Resolve booking from FK id (preferred) or legacy booking number."""
     if selected_client is None:
@@ -11642,13 +12670,19 @@ def _tenant_shipment_normalize_order_type(raw_value):
 
 
 def _tenant_shipment_has_active_duplicate(booking, booking_item_type, *, exclude_shipment_id=None):
+    """One non-terminal shipment per booking line (doc §4.1 cardinality)."""
     booking_item_type = (booking_item_type or '').strip()
     if booking is None or not booking_item_type:
         return False
     qs = TenantShipment.objects.filter(
         booking_id=booking.booking_id,
         booking_item_type=booking_item_type,
-    ).exclude(shipment_status=TenantShipment.ShipmentStatus.CANCELLED)
+    ).exclude(
+        shipment_status__in=(
+            TenantShipment.ShipmentStatus.CANCELLED,
+            TenantShipment.ShipmentStatus.CLOSED,
+        ),
+    )
     if exclude_shipment_id:
         qs = qs.exclude(pk=exclude_shipment_id)
     return qs.exists()
@@ -11682,7 +12716,13 @@ def _tenant_shipment_validate_submission(
         if selected_booking is None:
             form_errors['booking_no'] = 'Booking must be confirmed and belong to the selected Client Account.'
     if selected_booking is not None and selected_booking.booking_status != TenantBooking.Status.CONFIRMED:
-        form_errors['booking_no'] = 'Only confirmed bookings can be used to create a shipment.'
+        form_errors['booking_no'] = 'Only active (confirmed) bookings can be used to create a shipment.'
+    if (
+        selected_booking is not None
+        and selected_client is not None
+        and selected_booking.client_account_id != selected_client.account_id
+    ):
+        form_errors['client_account'] = 'Client account must match the selected booking.'
     if not (shipment_form_data.get('booking_item') or '').strip():
         form_errors['booking_item'] = 'Booking item is required.'
     if not (shipment_form_data.get('booking_item_type') or '').strip():
@@ -11721,6 +12761,8 @@ def _tenant_shipment_validate_submission(
     )
     if order_type == 'COD' and cod_amount <= 0:
         form_errors['cod_amount'] = 'COD Amount is required and must be greater than zero.'
+    if order_type != 'COD' and cod_amount > 0:
+        cod_amount = Decimal('0')
     if truck is None:
         form_errors['booking_no'] = form_errors.get(
             'booking_no',
@@ -11763,6 +12805,8 @@ def _tenant_shipment_form_data_from_instance(shipment):
         'pod_doc_count': str(shipment.pod_doc_count or 0),
         'pod_status': shipment.pod_status,
         'cod_amount': str(shipment.cod_amount or ''),
+        'collection_status': shipment.collection_status,
+        'shipment_status': shipment.shipment_status,
         'truck_display': (shipment.truck.truck_code if shipment.truck_id and shipment.truck else '') or '',
         'driver_display': shipment.driver.driver_code if shipment.driver_id and shipment.driver else '',
         'loading_address': (
@@ -11834,7 +12878,7 @@ class TenantOperationShipmentCreateView(View):
             return response
         try:
             shipment_form_data = {
-                'order_type': (request.POST.get('order_type') or request.POST.get('booking_order_type') or '').strip(),
+                'order_type': (request.POST.get('booking_order_type') or '').strip(),
                 'shipment_date': (request.POST.get('shipment_date') or '').strip(),
                 'client_account': (request.POST.get('client_account') or '').strip(),
                 'booking_id': (request.POST.get('booking_id') or '').strip(),
@@ -11868,6 +12912,27 @@ class TenantOperationShipmentCreateView(View):
             if selected_booking is not None:
                 shipment_form_data['booking_id'] = str(selected_booking.booking_id)
                 shipment_form_data['booking_no'] = selected_booking.booking_no
+
+            matched_line = _tenant_shipment_match_booking_line(
+                selected_booking,
+                booking_item=shipment_form_data['booking_item'],
+                booking_item_type=shipment_form_data['booking_item_type'],
+            )
+            _tenant_shipment_apply_booking_line_to_form(
+                shipment_form_data,
+                matched_line,
+                selected_booking,
+            )
+            truck = None
+            selected_driver = None
+            if matched_line:
+                truck = matched_line.get('truck')
+                selected_driver = matched_line.get('driver')
+            elif selected_booking is not None:
+                truck, selected_driver = _tenant_shipment_line_truck_driver(
+                    selected_booking,
+                    shipment_form_data['booking_item_type'],
+                )
 
             loading_address = None
             if selected_client is not None and shipment_form_data['loading_address']:
@@ -11915,27 +12980,6 @@ class TenantOperationShipmentCreateView(View):
                     form_errors['cod_amount'] = 'COD Amount must be 0 or greater.'
                     cod_amount = Decimal('0')
 
-            matched_line = _tenant_shipment_match_booking_line(
-                selected_booking,
-                booking_item=shipment_form_data['booking_item'],
-                booking_item_type=shipment_form_data['booking_item_type'],
-            )
-            truck = None
-            selected_driver = None
-            if matched_line:
-                shipment_form_data['order_type'] = matched_line['order_type']
-                shipment_form_data['booking_item'] = matched_line['booking_item']
-                shipment_form_data['booking_item_type'] = matched_line['booking_item_type']
-                shipment_form_data['booking_item_route'] = matched_line['route_display']
-                shipment_form_data['sourcing_mode'] = matched_line['sourcing_mode']
-                truck = matched_line.get('truck')
-                selected_driver = matched_line.get('driver')
-            elif selected_booking is not None:
-                truck, selected_driver = _tenant_shipment_line_truck_driver(
-                    selected_booking,
-                    shipment_form_data['booking_item_type'],
-                )
-
             validation_errors, normalized_order_type = _tenant_shipment_validate_submission(
                 shipment_form_data=shipment_form_data,
                 selected_client=selected_client,
@@ -11953,6 +12997,8 @@ class TenantOperationShipmentCreateView(View):
             )
             form_errors.update(validation_errors)
             shipment_form_data['order_type'] = normalized_order_type
+            if normalized_order_type != 'COD':
+                cod_amount = Decimal('0')
 
             pod_doc_count = _int_from_request(request, 'pod_doc_count', default=0)
             if matched_line:
@@ -12034,6 +13080,7 @@ class TenantOperationShipmentCreateView(View):
                 pod_status=pod_status,
                 pod_doc_count=pod_doc_count,
                 cod_amount=cod_amount,
+                shipment_status=TenantShipment.ShipmentStatus.LOADED,
                 collection_status=TenantShipment.CollectionStatus.PENDING,
                 created_by_label=(context.get('display_name') or '').strip(),
             )
@@ -12190,6 +13237,8 @@ class TenantOperationShipmentEditView(View):
                     'preview_shipment_no': shipment.shipment_no,
                     'shipment_creation_date': shipment.shipment_date,
                     'shipment_form_data': _tenant_shipment_form_data_from_instance(shipment),
+                    'shipment_field_locks': _tenant_shipment_ui_lock_flags(shipment),
+                    'shipment_status_display': shipment.shipment_status,
                 }
             )
             return render(request, self.template_name, context)
@@ -12218,7 +13267,7 @@ class TenantOperationShipmentEditView(View):
                 return _tenant_redirect(request, 'iroad_tenants:tenant_operation_shipment_list')
 
             shipment_form_data = {
-                'order_type': (request.POST.get('order_type') or request.POST.get('booking_order_type') or '').strip(),
+                'order_type': (request.POST.get('booking_order_type') or '').strip(),
                 'shipment_date': (request.POST.get('shipment_date') or '').strip(),
                 'client_account': (request.POST.get('client_account') or '').strip(),
                 'booking_id': (request.POST.get('booking_id') or '').strip(),
@@ -12244,14 +13293,47 @@ class TenantOperationShipmentEditView(View):
                 account_id=shipment_form_data['client_account'],
                 status=TenantClientAccount.Status.ACTIVE,
             ).first()
+            if shipment.booking_id:
+                posted_booking_id = (shipment_form_data.get('booking_id') or '').strip()
+                if posted_booking_id and posted_booking_id != str(shipment.booking_id):
+                    form_errors['booking_no'] = (
+                        'Booking link cannot be changed after the shipment is created.'
+                    )
+                shipment_form_data['booking_id'] = str(shipment.booking_id)
             selected_booking = _tenant_shipment_resolve_booking(
                 selected_client,
                 booking_id=shipment_form_data['booking_id'],
                 booking_no=shipment_form_data['booking_no'],
             )
+            if shipment.booking_id and selected_booking is None:
+                selected_booking = TenantBooking.objects.filter(
+                    pk=shipment.booking_id,
+                    booking_status=TenantBooking.Status.CONFIRMED,
+                ).first()
             if selected_booking is not None:
                 shipment_form_data['booking_id'] = str(selected_booking.booking_id)
                 shipment_form_data['booking_no'] = selected_booking.booking_no
+
+            matched_line = _tenant_shipment_match_booking_line(
+                selected_booking,
+                booking_item=shipment_form_data['booking_item'],
+                booking_item_type=shipment_form_data['booking_item_type'],
+            )
+            _tenant_shipment_apply_booking_line_to_form(
+                shipment_form_data,
+                matched_line,
+                selected_booking,
+            )
+            truck = None
+            selected_driver = None
+            if matched_line:
+                truck = matched_line.get('truck')
+                selected_driver = matched_line.get('driver')
+            elif selected_booking is not None:
+                truck, selected_driver = _tenant_shipment_line_truck_driver(
+                    selected_booking,
+                    shipment_form_data['booking_item_type'],
+                )
 
             loading_address = None
             if selected_client is not None and shipment_form_data['loading_address']:
@@ -12299,27 +13381,6 @@ class TenantOperationShipmentEditView(View):
                     form_errors['cod_amount'] = 'COD Amount must be 0 or greater.'
                     cod_amount = Decimal('0')
 
-            matched_line = _tenant_shipment_match_booking_line(
-                selected_booking,
-                booking_item=shipment_form_data['booking_item'],
-                booking_item_type=shipment_form_data['booking_item_type'],
-            )
-            truck = None
-            selected_driver = None
-            if matched_line:
-                shipment_form_data['order_type'] = matched_line['order_type']
-                shipment_form_data['booking_item'] = matched_line['booking_item']
-                shipment_form_data['booking_item_type'] = matched_line['booking_item_type']
-                shipment_form_data['booking_item_route'] = matched_line['route_display']
-                shipment_form_data['sourcing_mode'] = matched_line['sourcing_mode']
-                truck = matched_line.get('truck')
-                selected_driver = matched_line.get('driver')
-            elif selected_booking is not None:
-                truck, selected_driver = _tenant_shipment_line_truck_driver(
-                    selected_booking,
-                    shipment_form_data['booking_item_type'],
-                )
-
             validation_errors, normalized_order_type = _tenant_shipment_validate_submission(
                 shipment_form_data=shipment_form_data,
                 selected_client=selected_client,
@@ -12337,7 +13398,19 @@ class TenantOperationShipmentEditView(View):
                 exclude_shipment_id=shipment.shipment_id,
             )
             form_errors.update(validation_errors)
+            form_errors.update(
+                _tenant_shipment_edit_guard_errors(
+                    shipment,
+                    loading_address=loading_address,
+                    delivery_address=delivery_address,
+                    cargo_obj=cargo_obj,
+                    truck=truck,
+                    driver=selected_driver,
+                )
+            )
             shipment_form_data['order_type'] = normalized_order_type
+            if normalized_order_type != 'COD':
+                cod_amount = Decimal('0')
 
             pod_doc_count = _int_from_request(request, 'pod_doc_count', default=0)
             if matched_line:
@@ -12362,6 +13435,8 @@ class TenantOperationShipmentEditView(View):
                         'shipment_creation_date': shipment.shipment_date,
                         'shipment_form_data': shipment_form_data,
                         'form_errors': form_errors,
+                        'shipment_field_locks': _tenant_shipment_ui_lock_flags(shipment),
+                        'shipment_status_display': shipment.shipment_status,
                     }
                 )
                 messages.error(request, 'Please fix the highlighted errors.', extra_tags='tenant')
@@ -12493,8 +13568,10 @@ class TenantOperationShipmentUpdateView(View):
             shipment.pod_status = (request.POST.get('pod_status') or shipment.pod_status).strip()
             shipment.pod_doc_count = _int_from_request(request, 'pod_doc_count', default=shipment.pod_doc_count)
             try:
+                _tenant_shipment_validate_status_transition(shipment, shipment.shipment_status)
                 shipment.full_clean()
                 shipment.save()
+                _tenant_shipment_after_status_side_effects(shipment)
                 if (
                     previous_status != TenantShipment.ShipmentStatus.IN_TRANSIT
                     and shipment.shipment_status == TenantShipment.ShipmentStatus.IN_TRANSIT
@@ -12607,7 +13684,7 @@ def _tenant_shipment_document_form_data_from_post(request):
         ),
         'physical_location': (request.POST.get('physical_location') or '').strip(),
         'page_count': (request.POST.get('page_count') or '').strip(),
-        'status': (request.POST.get('status') or TenantShipmentDocument.Status.PENDING).strip(),
+        'status': (request.POST.get('status') or TenantShipmentDocument.Status.DRAFT).strip(),
         'notes': (request.POST.get('notes') or '').strip(),
     }
 
@@ -13075,6 +14152,7 @@ def _tenant_document_handover_apply_posting_effects(*, handover, source_document
             status=TenantShipmentDocument.Status.VERIFIED,
             updated_at=timezone.now(),
         )
+    _tenant_document_handover_sync_page_custody(handover, source_document)
     handover.status = TenantDocumentHandover.Status.POSTED
     if shipment is not None:
         shipment.pod_type = TenantShipment.PodType.HARD
@@ -13319,8 +14397,15 @@ class TenantOperationShipmentDocumentsListView(View):
 class TenantOperationShipmentDocumentsCreateView(View):
     template_name = 'iroad_tenants/Operation_management/Shipment_Document/Shipment-documents.html'
     line_completion_statuses = {'Completed', 'Not Completed'}
-    line_signer_locations = {'With Driver', 'In Company', 'With Client'}
+    line_signer_locations = {
+        'Not Collected',
+        'With Driver',
+        'Submitted to Receiver',
+        'In Company',
+        'With Client',
+    }
     header_status_choices = {
+        TenantShipmentDocument.Status.DRAFT,
         TenantShipmentDocument.Status.PENDING,
         TenantShipmentDocument.Status.UPLOADED,
         TenantShipmentDocument.Status.VERIFIED,
@@ -13442,7 +14527,7 @@ class TenantOperationShipmentDocumentsCreateView(View):
                 'record_date': timezone.localdate().isoformat(),
                 'document_date': timezone.localdate().isoformat(),
                 'page_count': '1',
-                'status': TenantShipmentDocument.Status.PENDING,
+                'status': TenantShipmentDocument.Status.DRAFT,
             },
             'shipment_document_form_errors': form_errors or {},
             'shipment_document_booking_options': booking_options,
@@ -13729,6 +14814,10 @@ class TenantOperationShipmentDocumentsEditView(TenantOperationShipmentDocumentsC
                 return _tenant_redirect(request, 'iroad_tenants:tenant_operation_shipment_documents_list')
 
             form_data = _tenant_shipment_document_form_data_from_post(request)
+            guard_errors = _tenant_shipment_document_guard_mutable(
+                document,
+                new_status=(form_data.get('status') or '').strip(),
+            )
             (
                 form_errors,
                 line_errors,
@@ -13738,6 +14827,7 @@ class TenantOperationShipmentDocumentsEditView(TenantOperationShipmentDocumentsC
                 booking,
                 shipment,
             ) = self._validate_shipment_document_submission(request, form_data)
+            form_errors.update(guard_errors)
             page_count = max(len(line_rows), 1)
 
             if form_errors or line_errors or record_date is None or document_date is None:
@@ -13865,6 +14955,14 @@ class TenantOperationShipmentDocumentsDeleteView(View):
             document = TenantShipmentDocument.objects.filter(pk=document_id).first()
             if document is None:
                 messages.error(request, 'Shipment document not found.', extra_tags='tenant')
+                return _tenant_redirect(request, 'iroad_tenants:tenant_operation_shipment_documents_list')
+            guard_errors = _tenant_shipment_document_guard_mutable(document)
+            if guard_errors:
+                messages.error(
+                    request,
+                    guard_errors.get('status', 'This document cannot be deleted.'),
+                    extra_tags='tenant',
+                )
                 return _tenant_redirect(request, 'iroad_tenants:tenant_operation_shipment_documents_list')
             record_no = document.record_no
             shipment = document.shipment
@@ -14271,6 +15369,9 @@ class TenantOperationShipmentPodCreateView(View):
                 existing_document = TenantShipmentDocument.objects.prefetch_related('pod_pages').filter(
                     record_no=form_data['existing_record_no']
                 ).first()
+
+            if source_document is not None and existing_document is None:
+                _tenant_shipment_pod_assert_unique_source(source_document, form_errors)
 
             if form_errors:
                 context.update(
@@ -15741,6 +16842,20 @@ def _tenant_surcharge_sales_validate_submission(request, form_data, *, existing_
     upload = request.FILES.get('attachment_file')
     if upload is None and existing_surcharge is None:
         form_errors['attachment_file'] = 'Attachment is required.'
+
+    _tenant_surcharge_sales_guard_status(
+        existing_surcharge,
+        form_data.get('status'),
+        form_errors,
+        request,
+    )
+    if (
+        form_data.get('status') == TenantShipmentSurcharge.Status.CONFIRMED
+        and not form_errors.get('attachment_file')
+        and upload is None
+        and (existing_surcharge is None or not existing_surcharge.attachment_file)
+    ):
+        form_errors['attachment_file'] = 'Attachment is required before confirming.'
 
     currency = (form_data.get('currency_code') or '').strip()[:8]
     if not currency and shipment is not None:
@@ -20730,29 +21845,12 @@ class TruckMasterDetailView(View):
                     if cobj:
                         reg_country_display = f'{cobj.country_code} — {cobj.name_en}'
 
+            truck_ref_q = Q(truck=truck) | Q(truck_ref=truck.truck_code) | Q(truck_ref=str(truck.truck_id))
             movement_log_rows = list(
-                TenantTruckMovementLog.objects.filter(truck=truck)
-                .select_related(
-                    'truck',
-                    'driver',
-                    'shipment',
-                    'booking',
-                    'from_location_point',
-                    'to_location_point',
-                )
+                TenantTruckMovementLog.objects.filter(truck_ref_q)
+                .select_related('truck', 'driver', 'shipment', 'booking')
                 .order_by('-movement_date', '-created_at')[:100]
             )
-            for movement in movement_log_rows:
-                movement.from_location = (
-                    movement.from_location_point.display_label
-                    if movement.from_location_point_id and movement.from_location_point
-                    else ''
-                )
-                movement.to_location = (
-                    movement.to_location_point.display_label
-                    if movement.to_location_point_id and movement.to_location_point
-                    else ''
-                )
 
             truck_location_display = '—'
             for m in movement_log_rows:
@@ -20775,14 +21873,20 @@ class TruckMasterDetailView(View):
                             break
 
             truck_shipment_rows = []
-            for s in (
-                TenantShipment.objects.filter(truck=truck)
-                .select_related('loading_address', 'delivery_address')
-                .order_by('-shipment_date', '-created_at')[:100]
-            ):
-                truck_shipment_rows.append(
-                    {'shipment': s, 'route': _tenant_shipment_route_display(s)}
-                )
+            for s in TenantShipment.objects.filter(truck=truck).order_by(
+                '-shipment_date', '-created_at'
+            )[:100]:
+                route = (s.route_display or '').strip()
+                if not route:
+                    fl = (s.from_location or '').strip()
+                    tl = (s.to_location or '').strip()
+                    if fl and tl:
+                        route = f'{fl} → {tl}'
+                    elif fl or tl:
+                        route = fl or tl
+                    else:
+                        route = '—'
+                truck_shipment_rows.append({'shipment': s, 'route': route})
 
             default_driver_display = '—'
             dd = truck.default_driver_id
@@ -21569,47 +22673,32 @@ class DriverMasterDetailView(View):
             else:
                 assigned_trucks_display = '—'
 
+            driver_ref_q = Q(driver=driver) | Q(driver_ref=driver.driver_code) | Q(
+                driver_ref=str(driver.driver_id)
+            )
             driver_shipment_rows = []
             for s in (
-                TenantShipment.objects.filter(driver=driver)
-                .select_related('truck', 'loading_address', 'delivery_address')
+                TenantShipment.objects.filter(driver_ref_q)
+                .select_related('truck')
                 .order_by('-shipment_date', '-created_at')[:100]
             ):
-                driver_shipment_rows.append(
-                    {'shipment': s, 'route': _tenant_shipment_route_display(s)}
-                )
+                route = (s.route_display or '').strip()
+                if not route:
+                    fl = (s.from_location or '').strip()
+                    tl = (s.to_location or '').strip()
+                    if fl and tl:
+                        route = f'{fl} → {tl}'
+                    elif fl or tl:
+                        route = fl or tl
+                    else:
+                        route = '—'
+                driver_shipment_rows.append({'shipment': s, 'route': route})
 
             driver_movement_rows = list(
-                TenantTruckMovementLog.objects.filter(driver=driver)
-                .select_related(
-                    'truck',
-                    'driver',
-                    'shipment',
-                    'booking',
-                    'from_location_point',
-                    'to_location_point',
-                )
+                TenantTruckMovementLog.objects.filter(driver_ref_q)
+                .select_related('truck', 'driver', 'shipment', 'booking')
                 .order_by('-movement_date', '-created_at')[:100]
             )
-            for movement in driver_movement_rows:
-                movement.from_location = (
-                    movement.from_location_point.display_label
-                    if movement.from_location_point_id and movement.from_location_point
-                    else ''
-                )
-                movement.to_location = (
-                    movement.to_location_point.display_label
-                    if movement.to_location_point_id and movement.to_location_point
-                    else ''
-                )
-                movement.truck_ref = (
-                    movement.truck.truck_code if movement.truck_id and movement.truck else ''
-                )
-                movement.shipment_ref = (
-                    movement.shipment.shipment_no
-                    if movement.shipment_id and movement.shipment
-                    else ''
-                )
 
             primary_treasury = (
                 DriverTreasury.objects.filter(
@@ -26872,10 +27961,19 @@ def _eligible_confirmed_surcharges_for_report(*, booking_refs, booking_date_from
         if rows:
             return rows
 
+    converted_surcharge_ids = set(
+        str(x)
+        for x in SalesInvoiceReportSurcharge.objects.filter(
+            report__status=SalesInvoiceReport.Status.CONVERTED,
+            surcharge_trx_ref__isnull=False,
+        ).values_list('surcharge_trx_ref', flat=True)
+    )
+
     # Fallback to TenantShipmentSurcharge.
     qs = (
         TenantShipmentSurcharge.objects.select_related('shipment')
         .filter(shipment__booking_no__in=list(booking_nos))
+        .filter(status=TenantShipmentSurcharge.Status.CONFIRMED)
         .exclude(shipment__shipment_status=TenantShipment.ShipmentStatus.CANCELLED)
         .order_by('created_at')
     )
@@ -26883,6 +27981,8 @@ def _eligible_confirmed_surcharges_for_report(*, booking_refs, booking_date_from
         qs = qs.filter(created_at__date__gte=booking_date_from, created_at__date__lte=booking_date_to)
     rows = []
     for s in qs:
+        if str(s.surcharge_id) in converted_surcharge_ids:
+            continue
         booking_ref = booking_id_by_no.get(shipment_booking_no(s.shipment))
         rows.append(
             {
@@ -27020,6 +28120,22 @@ def _resolve_manual_shipment_for_report(report, value, *, booking_nos=None):
     return qs.first()
 
 
+def _tenant_surcharge_mark_invoiced_for_converted_report(report):
+    """Doc §5 — Invoiced is system-assigned when SIR is converted to sales invoice."""
+    surcharge_ids = list(
+        report.surcharge_lines.exclude(surcharge_trx_ref__isnull=True).values_list(
+            'surcharge_trx_ref',
+            flat=True,
+        )
+    )
+    if not surcharge_ids:
+        return 0
+    return TenantShipmentSurcharge.objects.filter(
+        pk__in=surcharge_ids,
+        status=TenantShipmentSurcharge.Status.CONFIRMED,
+    ).update(status=TenantShipmentSurcharge.Status.INVOICED, updated_at=timezone.now())
+
+
 def _resolve_manual_surcharge_for_report(report, value, *, booking_nos=None):
     value = str(value or '').strip()
     if not value:
@@ -27030,7 +28146,7 @@ def _resolve_manual_surcharge_for_report(report, value, *, booking_nos=None):
     qs = (
         TenantShipmentSurcharge.objects.select_related('shipment')
         .exclude(shipment__shipment_status=TenantShipment.ShipmentStatus.CANCELLED)
-        .filter(pk=parsed_uuid)
+        .filter(pk=parsed_uuid, status=TenantShipmentSurcharge.Status.CONFIRMED)
     )
     if booking_nos:
         qs = qs.filter(shipment__booking_no__in=list(booking_nos))

@@ -25,6 +25,13 @@
         </div>
       </div>
 
+      {% if not shipment_is_edit %}
+      <div class="alert alert-light border shadow-sm mb-3" role="note">
+        <strong>Two ways to create a shipment:</strong>
+        (1) this form — manual office create linked to a confirmed booking line; or
+        (2) driver / Action Log — when the action has <strong>Auto Shipment Post</strong> enabled in Action Master.
+      </div>
+      {% endif %}
       <!-- Shipment Form -->
       <form id="shipmentForm" method="post">
         {% csrf_token %}
@@ -55,17 +62,17 @@
                 />
                 <span class="field-hint">Auto-generated when shipment is executed</span>
               </div>
+              {% if shipment_is_edit %}
               <div class="field">
-                <label for="orderType" class="form-label">Order Type</label>
-                <select class="form-select" id="orderType" name="order_type">
-                  <option value="" {% if not shipment_form_data.order_type %}selected{% endif %} disabled>
-                    -Select order type-
-                  </option>
-                  <option value="Delivery" {% if shipment_form_data.order_type == 'Delivery' %}selected{% endif %}>Delivery</option>
-                  <option value="Pickup" {% if shipment_form_data.order_type == 'Pickup' %}selected{% endif %}>Pickup</option>
-                  <option value="Return" {% if shipment_form_data.order_type == 'Return' %}selected{% endif %}>Return</option>
-                </select>
+                <label class="form-label">Shipment Status</label>
+                <input type="text" class="form-control" value="{{ shipment_status_display|default:shipment_form_data.shipment_status }}" readonly />
+                <span class="field-hint">Updated by Operation Action Log impacts</span>
               </div>
+              <div class="field">
+                <label class="form-label">Order Type (Credit / COD)</label>
+                <input type="text" class="form-control" value="{{ shipment_form_data.order_type|default:'—' }}" readonly />
+              </div>
+              {% endif %}
               <div class="field">
                 <label for="shipmentDate" class="form-label"
                   >Shipment Date <span class="required">*</span></label
@@ -293,9 +300,20 @@
                   step="0.01"
                   min="0"
                   value="{{ shipment_form_data.cod_amount|default:'' }}"
+                  {% if shipment_is_edit %}readonly{% endif %}
                 />
                 {% if form_errors.cod_amount %}<div class="invalid-feedback d-block">{{ form_errors.cod_amount }}</div>{% endif %}
-                <span class="field-hint">Required when order type is COD</span>
+                <span class="field-hint">Inherited from booking line; read-only on shipment</span>
+              </div>
+              <div class="field">
+                <label class="form-label">COD Payment Status</label>
+                <input
+                  type="text"
+                  class="form-control"
+                  value="{% if shipment_form_data.order_type == 'COD' or shipment_form_data.cod_amount %}{{ shipment_form_data.collection_status|default:'Pending' }}{% else %}Not Applicable{% endif %}"
+                  readonly
+                />
+                <span class="field-hint">Pending until collected via Action Log (COD)</span>
               </div>
               <div class="field">
                 <label for="shipmentTruckDisplay" class="form-label">Truck</label>
@@ -351,7 +369,10 @@
                     <tr>
                       <td>1</td>
                       <td>
-                        <select class="form-select {% if form_errors.loading_address %}is-invalid{% endif %}" name="loading_address_1">
+                        <select class="form-select {% if form_errors.loading_address %}is-invalid{% endif %}"{% if not shipment_field_locks.lock_loading_address %} name="loading_address_1"{% endif %}{% if shipment_field_locks.lock_loading_address %} disabled{% endif %}>
+                        {% if shipment_field_locks.lock_loading_address %}
+                        <input type="hidden" name="loading_address_1" value="{{ shipment_form_data.loading_address|default:'' }}" />
+                        {% endif %}
                           <option value="" {% if not shipment_form_data.loading_address %}selected{% endif %} disabled>
                             -Select loading address-
                           </option>
@@ -400,7 +421,10 @@
                     <tr>
                       <td>1</td>
                       <td>
-                        <select class="form-select {% if form_errors.delivery_address %}is-invalid{% endif %}" name="delivery_address_1">
+                        <select class="form-select {% if form_errors.delivery_address %}is-invalid{% endif %}"{% if not shipment_field_locks.lock_delivery_address %} name="delivery_address_1"{% endif %}{% if shipment_field_locks.lock_delivery_address %} disabled{% endif %}>
+                        {% if shipment_field_locks.lock_delivery_address %}
+                        <input type="hidden" name="delivery_address_1" value="{{ shipment_form_data.delivery_address|default:'' }}" />
+                        {% endif %}
                           <option value="" {% if not shipment_form_data.delivery_address %}selected{% endif %} disabled>
                             -Select delivery address-
                           </option>
@@ -463,7 +487,10 @@
                         />
                       </td>
                       <td>
-                        <select class="form-select {% if form_errors.cargo_id %}is-invalid{% endif %}" id="cargoSelect" name="cargo_id_1">
+                        <select class="form-select {% if form_errors.cargo_id %}is-invalid{% endif %}" id="cargoSelect"{% if not shipment_field_locks.lock_cargo %} name="cargo_id_1"{% endif %}{% if shipment_field_locks.lock_cargo %} disabled{% endif %}>
+                        {% if shipment_field_locks.lock_cargo %}
+                        <input type="hidden" name="cargo_id_1" value="{{ shipment_form_data.cargo_id|default:'' }}" />
+                        {% endif %}
                           <option value="" {% if not shipment_form_data.cargo_id %}selected{% endif %} disabled>
                             -Select cargo-
                           </option>

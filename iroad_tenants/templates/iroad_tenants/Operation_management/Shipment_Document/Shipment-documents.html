@@ -201,7 +201,7 @@
           <div class="page-header-left">
             <h1 class="page-title">{% if shipment_document_is_edit %}Edit Shipment Document{% else %}Shipment Documents{% endif %}</h1>
             <p class="page-subtitle">
-              {% if shipment_document_is_edit %}Update shipping documentation and attachment lines.{% else %}Manage and upload required shipping documentation and attachments.{% endif %}
+              {% if shipment_document_is_edit %}Update document blueprint and page custody for this shipment.{% else %}Define which documents this shipment must produce (Layer 0 of the POD pipeline).{% endif %}
             </p>
           </div>
         </div>
@@ -219,7 +219,7 @@
             <div class="form-card-header-text">
               <h2 class="form-card-title">Header Fields</h2>
               <p class="form-card-desc">
-                Primary document identification and properties.
+                Anchor to one shipment; booking and item are derived from that shipment.
               </p>
             </div>
           </div>
@@ -247,7 +247,7 @@
                       readonly
                     />
                   </div>
-                  <span class="field-hint">Auto-generated system record</span>
+                  <span class="field-hint">Auto-generated (REC- prefix), immutable</span>
                 </div>
                 <div class="field">
                   <label for="recordDate" class="form-label"
@@ -300,6 +300,7 @@
                       {% endfor %}
                     </div>
                     {% if shipment_document_form_errors.booking_id %}<div class="invalid-feedback d-block">{{ shipment_document_form_errors.booking_id }}</div>{% endif %}
+                    <span class="field-hint">Must match the selected shipment’s booking</span>
                   </div>
                 </div>
               </div>
@@ -316,10 +317,11 @@
                       class="form-control has-icon"
                       id="bookingItem"
                       value="{{ shipment_document_form_data.booking_item|default:'' }}"
-                      placeholder="Select shipment to load booking item"
+                      placeholder="Filled from shipment line (read-only)"
                       readonly
                     />
                     {% if shipment_document_form_errors.booking_item %}<div class="invalid-feedback d-block">{{ shipment_document_form_errors.booking_item }}</div>{% endif %}
+                    <span class="field-hint">Derived from shipment — not saved separately</span>
                   </div>
                 </div>
                 <div class="field">
@@ -343,7 +345,7 @@
                     {% endfor %}
                   </select>
                   {% if shipment_document_form_errors.shipment_id %}<div class="invalid-feedback d-block">{{ shipment_document_form_errors.shipment_id }}</div>{% endif %}
-                  <span class="field-hint">Parent shipment for this document (FK)</span>
+                  <span class="field-hint">Required anchor — one document record per shipment + type</span>
                 </div>
                 <div class="field">
                   <label for="documentType" class="form-label"
@@ -354,12 +356,19 @@
                     <option value="" {% if not shipment_document_form_data.document_type %}selected{% endif %} disabled>
                       -Select Document Type-
                     </option>
+                    <option value="Bill of Lading" {% if shipment_document_form_data.document_type == 'Bill of Lading' %}selected{% endif %}>Bill of Lading</option>
                     <option value="Delivery Note" {% if shipment_document_form_data.document_type == 'Delivery Note' %}selected{% endif %}>Delivery Note</option>
+                    <option value="Commercial Invoice" {% if shipment_document_form_data.document_type == 'Commercial Invoice' %}selected{% endif %}>Commercial Invoice</option>
+                    <option value="Packing List" {% if shipment_document_form_data.document_type == 'Packing List' %}selected{% endif %}>Packing List</option>
+                    <option value="Certificate of Origin" {% if shipment_document_form_data.document_type == 'Certificate of Origin' %}selected{% endif %}>Certificate of Origin</option>
+                    <option value="Customs Declaration" {% if shipment_document_form_data.document_type == 'Customs Declaration' %}selected{% endif %}>Customs Declaration</option>
+                    <option value="Other" {% if shipment_document_form_data.document_type == 'Other' %}selected{% endif %}>Other</option>
                     <option value="Waybill" {% if shipment_document_form_data.document_type == 'Waybill' %}selected{% endif %}>Waybill</option>
                     <option value="Manifest" {% if shipment_document_form_data.document_type == 'Manifest' %}selected{% endif %}>Manifest</option>
                     <option value="Custom Dec." {% if shipment_document_form_data.document_type == 'Custom Dec.' %}selected{% endif %}>Custom Dec.</option>
                   </select>
                   {% if shipment_document_form_errors.document_type %}<div class="invalid-feedback d-block">{{ shipment_document_form_errors.document_type }}</div>{% endif %}
+                  <span class="field-hint">POD compliance follows Is Delivery Note?, not type alone</span>
                 </div>
               </div>
             </div>
@@ -410,7 +419,7 @@
                   <div class="setting-row" style="padding-top: 2rem">
                     <div class="setting-row-info">
                       <label class="form-label mb-0">Is Delivery Note?</label>
-                      <span class="field-hint d-block">If Yes, page count sets mandatory POD proof on shipment</span>
+                      <span class="field-hint d-block">If Yes, this document gates POD compliance and updates shipment POD doc count</span>
                     </div>
                     <label class="setting-toggle">
                       <input type="checkbox" id="isDeliveryNote" name="is_delivery_note" {% if shipment_document_form_data.is_delivery_note %}checked{% endif %} />
@@ -431,8 +440,9 @@
                     id="physicalLocation"
                     name="physical_location"
                     value="{{ shipment_document_form_data.physical_location|default:'' }}"
-                    placeholder="Enter physical location"
+                    placeholder="e.g. Warehouse A — Shelf 12"
                   />
+                  <span class="field-hint">Header-level storage note (optional)</span>
                 </div>
               </div>
             </div>
@@ -460,18 +470,19 @@
                     />
                   </div>
                   {% if shipment_document_form_errors.page_count %}<div class="invalid-feedback d-block">{{ shipment_document_form_errors.page_count }}</div>{% endif %}
-                  <span class="field-hint">Auto-calculated from subform line rows (OP-DOC total_pages)</span>
+                  <span class="field-hint">Matches number of page rows below</span>
                 </div>
                 <div class="field">
                   <label for="status" class="form-label">Status</label>
                   <select class="form-select {% if shipment_document_form_errors.status %}is-invalid{% endif %}" id="status" name="status" required>
-                    <option value="Pending" {% if shipment_document_form_data.status|default:'Pending' == 'Pending' %}selected{% endif %}>Pending</option>
+                    <option value="Draft" {% if shipment_document_form_data.status|default:'Draft' == 'Draft' %}selected{% endif %}>Draft</option>
+                    <option value="Pending" {% if shipment_document_form_data.status == 'Pending' %}selected{% endif %}>Pending</option>
                     <option value="Uploaded" {% if shipment_document_form_data.status == 'Uploaded' %}selected{% endif %}>Uploaded</option>
                     <option value="Verified" {% if shipment_document_form_data.status == 'Verified' %}selected{% endif %}>Verified</option>
                     <option value="Rejected" {% if shipment_document_form_data.status == 'Rejected' %}selected{% endif %}>Rejected</option>
                   </select>
                   {% if shipment_document_form_errors.status %}<div class="invalid-feedback d-block">{{ shipment_document_form_errors.status }}</div>{% endif %}
-                  <span class="field-hint">Verified sets shipment POD to Hard Copy Received when all DN docs are verified; Rejected requires notes</span>
+                  <span class="field-hint">Draft = mutable; Verified counts for DN compliance; Rejected requires notes</span>
                 </div>
               </div>
               <div class="fields-grid cols-1">
@@ -482,7 +493,7 @@
                     id="notes"
                     name="notes"
                     rows="3"
-                    placeholder="Instructions for driver (optional)"
+                    placeholder="Rejection reason or internal notes (required if Rejected)"
                   >{{ shipment_document_form_data.notes|default:'' }}</textarea>
                 </div>
               </div>
@@ -499,7 +510,7 @@
             <div class="form-card-header-text">
               <h2 class="form-card-title">Subform Line Fields</h2>
               <p class="form-card-desc">
-                Line items detailing specific pages and attachments.
+                One row per physical page — chain of custody and soft copy per page.
               </p>
             </div>
           </div>
@@ -514,8 +525,8 @@
                     <th>Doc Ref No</th>
                     <th>Extra Ref</th>
                     <th>Page No</th>
-                    <th data-sd-status-header>Status</th>
-                    <th>Signer Location</th>
+                    <th data-sd-status-header>Completion</th>
+                    <th>Physical Location</th>
                     <th>Attachment</th>
                     <th style="width: 90px">Actions</th>
                   </tr>
@@ -534,7 +545,7 @@
                 Add Line
               </button>
               <span class="text-muted small"
-                >One row per physical page. Upload reference copy and signer location per page.</span
+                >One row per page. Physical location tracks custody; soft copy required per row.</span
               >
             </div>
           </div>
@@ -772,7 +783,7 @@
         }
         if (!location || !location.value) {
           event.preventDefault();
-          alert("Line " + (i + 1) + ": Signer location is required.");
+          alert("Line " + (i + 1) + ": Physical location (custody) is required.");
           return;
         }
         var hasFile = attachment && attachment.files && attachment.files.length;

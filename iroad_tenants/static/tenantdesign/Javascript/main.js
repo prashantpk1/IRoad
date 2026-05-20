@@ -602,16 +602,18 @@ function initShipmentDocumentLines() {
       <td data-label="Page No">
         <input type="number" class="form-control form-control-sm" name="line_page_no[]" data-field="pageNo" min="1" placeholder="Page No" required />
       </td>
-      <td data-label="Status" data-status-cell>
+      <td data-label="Completion" data-status-cell>
         <select class="form-select form-select-sm" name="line_status[]" data-field="status">
           <option value="Not Completed" selected>Not Completed</option>
           <option value="Completed">Completed</option>
         </select>
       </td>
-      <td data-label="Signer Location">
+      <td data-label="Physical Location">
         <select class="form-select form-select-sm" name="line_physical_location[]" data-field="physicalLocation" required>
-          <option value="" selected disabled>-Select location-</option>
+          <option value="" selected disabled>-Select custody-</option>
+          <option value="Not Collected">Not Collected</option>
           <option value="With Driver">With Driver</option>
+          <option value="Submitted to Receiver">Submitted to Receiver</option>
           <option value="In Company">In Company</option>
           <option value="With Client">With Client</option>
         </select>

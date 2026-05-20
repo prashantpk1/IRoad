@@ -20,7 +20,10 @@
         <div class="page-header-row">
           <div class="page-header-left">
             <h1 class="page-title">Shipment List</h1>
-            <p class="page-subtitle">View and manage all shipments.</p>
+            <p class="page-subtitle">
+              View and manage shipments. Create manually with <strong>Add Shipment</strong>, or automatically when a driver
+              action with <strong>Auto Shipment Post</strong> enabled is logged.
+            </p>
           </div>
           <div class="page-header-right">
             <div class="eal-header-actions">
@@ -28,6 +31,10 @@
                 <i class="bi bi-download"></i>
                 <span>Export</span>
               </button>
+              <a href="{% url 'iroad_tenants:tenant_operation_action_log_create' %}" class="eal-btn eal-btn-outline">
+                <i class="bi bi-journal-check"></i>
+                <span>Action Log</span>
+              </a>
               <a href="{% url 'iroad_tenants:tenant_operation_shipment_create' %}" class="eal-btn eal-btn-primary">
                 <i class="bi bi-plus-lg"></i>
                 <span>Add Shipment</span>
@@ -253,8 +260,16 @@
                         <li><a class="dropdown-item" href="{% url 'iroad_tenants:tenant_operation_shipment_detail' shipment.shipment_id %}"><i class="bi bi-eye text-info me-2"></i> View</a></li>
                         <li><a class="dropdown-item" href="{% url 'iroad_tenants:tenant_shipment_print' shipment.shipment_id %}" target="_blank" rel="noopener"><i class="bi bi-printer text-success me-2"></i> Print</a></li>
                         <li><a class="dropdown-item" href="{% url 'iroad_tenants:tenant_operation_shipment_update' shipment.shipment_id %}"><i class="bi bi-arrow-repeat text-secondary me-2"></i> Update</a></li>
+                        {% if not shipment.ui_locks.lock_delivery_address %}
                         <li><a class="dropdown-item" href="{% url 'iroad_tenants:tenant_operation_shipment_edit' shipment.shipment_id %}#shipment-address-section"><i class="bi bi-pin-map text-success me-2"></i> Update Address</a></li>
+                        {% else %}
+                        <li><span class="dropdown-item text-muted"><i class="bi bi-pin-map me-2"></i> Update Address (locked)</span></li>
+                        {% endif %}
+                        {% if not shipment.ui_locks.lock_cargo %}
                         <li><a class="dropdown-item" href="{% url 'iroad_tenants:tenant_operation_shipment_edit' shipment.shipment_id %}#shipment-cargo-section"><i class="bi bi-box-seam text-warning me-2"></i> Update Cargo</a></li>
+                        {% else %}
+                        <li><span class="dropdown-item text-muted"><i class="bi bi-box-seam me-2"></i> Update Cargo (locked)</span></li>
+                        {% endif %}
                         <li>
                           {% if shipment.booking_action_id %}
                           <a class="dropdown-item" href="{% url 'iroad_tenants:tenant_operation_booking_assign_truck' shipment.booking_action_id %}"><i class="bi bi-truck text-info me-2"></i> Update Truck</a>
@@ -262,6 +277,7 @@
                           <a class="dropdown-item" href="{% url 'iroad_tenants:tenant_operation_shipment_edit' shipment.shipment_id %}#shipment-booking-section"><i class="bi bi-truck text-info me-2"></i> Update Truck</a>
                           {% endif %}
                         </li>
+                        {% if shipment.ui_locks.can_delete %}
                         <li><hr class="dropdown-divider" /></li>
                         <li>
                           <form method="post" action="{% url 'iroad_tenants:tenant_operation_shipment_delete' shipment.shipment_id %}" onsubmit="return confirm('Delete shipment {{ shipment.shipment_no }}?');">
@@ -269,6 +285,7 @@
                             <button type="submit" class="dropdown-item text-danger"><i class="bi bi-trash3 me-2"></i> Delete</button>
                           </form>
                         </li>
+                        {% endif %}
                       </ul>
                     </div>
                   </td>

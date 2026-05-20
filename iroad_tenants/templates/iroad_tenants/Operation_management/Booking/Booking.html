@@ -29,6 +29,19 @@
       <!-- Booking Form -->
       <form id="bookingForm" method="post" enctype="multipart/form-data">
         {% csrf_token %}
+        {% if booking_has_active_shipment %}
+        <div class="alert alert-warning border-0 shadow-sm mb-3" role="status">
+          A shipment is in progress for this booking. Client, route, trip type, order type, and line truck/driver cannot be changed until the shipment is closed or cancelled.
+        </div>
+        {% if booking_is_edit %}
+        <input type="hidden" name="client_account" value="{{ booking_form_data.client_account }}" />
+        <input type="hidden" name="sales_order_no" value="{{ booking_form_data.sales_order_no }}" />
+        <input type="hidden" name="service_lookup" value="{{ booking_form_data.service_lookup }}" />
+        <input type="hidden" name="route_lookup" value="{{ booking_form_data.route_lookup }}" />
+        <input type="hidden" name="order_type" value="{{ booking_form_data.order_type }}" />
+        <input type="hidden" name="trip_type" value="{{ booking_form_data.trip_type }}" />
+        {% endif %}
+        {% endif %}
         <!-- Section 1: Booking Information (Header) -->
         <div class="form-card" data-section="1">
           <div class="form-card-header">
@@ -89,44 +102,52 @@
               </div>
               <div class="fields-grid cols-3">
                 <div class="field">
-                  <label class="form-label d-block">Is it a scheduled?</label>
+                  <label class="form-label d-block">Is it scheduled?</label>
                   <label class="setting-toggle">
-                    <input type="checkbox" id="isScheduled" checked />
+                    <input
+                      type="checkbox"
+                      id="isScheduled"
+                      name="is_scheduled"
+                      {% if booking_form_data.is_scheduled %}checked{% endif %}
+                    />
                     <span class="toggle-track"></span>
                     <span class="toggle-label">Scheduled</span>
                   </label>
+                  <span class="field-hint">Off = booking date is today. On = pick a future booking date.</span>
                 </div>
                 <div class="field">
                   <label for="executionDate" class="form-label"
-                    >Execution Date
-                    <span class="required">*</span>
-                  </label>
+                    >Execution Date</label
+                  >
                   <input
                     type="date"
                     class="form-control"
                     id="executionDate"
-                    name="execution_date"
                     value="{{ booking_form_data.execution_date|default:'' }}"
+                    readonly
+                    tabindex="-1"
+                    aria-readonly="true"
                   />
                   <span class="field-hint"
-                    >Planned execution date; required before Confirm</span
+                    >Filled automatically when the driver starts the job (Action 1). Empty until then.</span
                   >
                 </div>
                 <div class="field">
-                  <label for="bookingStatus" class="form-label"
-                    >Booking Status
-                    <span class="required">*</span>
-                  </label>
-                  <select
-                    class="form-select"
-                    id="bookingStatus"
-                    name="booking_status"
-                    required
-                  >
-                    <option value="Draft" {% if booking_form_data.booking_status == 'Draft' or not booking_form_data.booking_status %}selected{% endif %}>Draft</option>
-                    <option value="Confirmed" {% if booking_form_data.booking_status == 'Confirmed' %}selected{% endif %}>Confirmed</option>
+                  <label for="bookingStatus" class="form-label">Booking Status</label>
+                  {% if booking_is_edit %}
+                  <select class="form-select" id="bookingStatus" name="booking_status">
+                    <option value="Draft" {% if booking_form_data.booking_status == 'Draft' %}selected{% endif %}>Draft</option>
+                    <option value="Confirmed" {% if booking_form_data.booking_status == 'Confirmed' %}selected{% endif %}>Active</option>
                     <option value="Cancelled" {% if booking_form_data.booking_status == 'Cancelled' %}selected{% endif %}>Cancelled</option>
                   </select>
+                  {% if booking_derived_status %}
+                  <span class="field-hint d-block mt-1">Operational status (derived): <strong>{{ booking_derived_status }}</strong>{% if booking_derived_status == 'Executed' %} — set automatically when all lines are executed{% endif %}</span>
+                  {% endif %}
+                  {% else %}
+                  <input type="hidden" id="bookingStatus" name="booking_status" value="Draft" />
+                  <p class="form-control-plaintext mb-0" id="bookingStatusDisplay">Draft</p>
+                  <span class="field-hint">Use Save as Draft or Confirm Booking below.</span>
+                  {% endif %}
                 </div>
               </div>
               <div class="fields-grid cols-2">
@@ -139,26 +160,24 @@
                     {% for pod_type in booking_pod_type_options %}
                     <option value="{{ pod_type|lower }}" {% if booking_form_data.pod_type == pod_type|lower %}selected{% endif %}>{{ pod_type }}</option>
                     {% empty %}
-                    <option value="signature" {% if booking_form_data.pod_type == 'signature' %}selected{% endif %}>Signature</option>
-                    <option value="photo" {% if booking_form_data.pod_type == 'photo' %}selected{% endif %}>Photo</option>
                     <option value="digital" {% if booking_form_data.pod_type == 'digital' %}selected{% endif %}>Digital</option>
+                    <option value="soft" {% if booking_form_data.pod_type == 'soft' %}selected{% endif %}>Soft</option>
+                    <option value="hard" {% if booking_form_data.pod_type == 'hard' %}selected{% endif %}>Hard</option>
                     {% endfor %}
                   </select>
                 </div>
                 <div class="field">
                   <label for="podStatus" class="form-label">POD Status</label>
-                  <select class="form-select" id="podStatus" name="pod_status">
-                    <option value="" selected disabled>
-                      -Select POD status-
-                    </option>
-                    {% for pod_status in booking_pod_status_options %}
-                    <option value="{{ pod_status|lower }}" {% if booking_form_data.pod_status == pod_status|lower %}selected{% endif %}>{{ pod_status }}</option>
-                    {% empty %}
-                    <option value="pending" {% if booking_form_data.pod_status == 'pending' %}selected{% endif %}>Pending</option>
-                    <option value="received" {% if booking_form_data.pod_status == 'received' %}selected{% endif %}>Received</option>
-                    <option value="verified" {% if booking_form_data.pod_status == 'verified' %}selected{% endif %}>Verified</option>
-                    {% endfor %}
-                  </select>
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="podStatus"
+                    value="{% if booking_form_data.pod_status %}{{ booking_form_data.pod_status|title }}{% else %}Pending{% endif %}"
+                    readonly
+                    tabindex="-1"
+                    aria-readonly="true"
+                  />
+                  <span class="field-hint">Derived when POD is recorded (Phase 2). Not editable on booking.</span>
                 </div>
               </div>
               <div style="display: none">
@@ -200,6 +219,7 @@
                     id="clientAccount"
                     name="client_account"
                     required
+                    {% if booking_has_active_shipment %}disabled{% endif %}
                   >
                     <option value="" selected disabled>
                       -Select client account-
@@ -224,6 +244,7 @@
                     id="salesOrderNo"
                     name="sales_order_no"
                     required
+                    {% if booking_has_active_shipment %}disabled{% endif %}
                   >
                     <option value="" selected disabled>
                       -Select price list-
@@ -250,6 +271,7 @@
                     id="salesOrderLine"
                     name="service_lookup"
                     required
+                    {% if booking_has_active_shipment %}disabled{% endif %}
                   >
                     <option value="" selected disabled>-Select service-</option>
                     {% for service_item in booking_service_options %}
@@ -281,6 +303,7 @@
                     id="routeDisplay"
                     name="route_lookup"
                     required
+                    {% if booking_has_active_shipment %}disabled{% endif %}
                   >
                     <option value="" selected disabled>-Select route-</option>
                     {% for route in booking_routes %}
@@ -317,6 +340,7 @@
                     id="orderType"
                     name="order_type"
                     required
+                    {% if booking_has_active_shipment %}disabled{% endif %}
                   >
                     <option value="" selected disabled>
                       -Select order type-
@@ -336,6 +360,7 @@
                     id="tripTypeDisplay"
                     name="trip_type"
                     required
+                    {% if booking_has_active_shipment %}disabled{% endif %}
                   >
                     <option value="" selected disabled>
                       -Select trip type-
@@ -601,7 +626,17 @@
                         />
                       </td>
                       <td>
-                        <input type="text" class="form-control" name="cargo_unit_1" value="{{ booking_form_data.cargo_unit_1|default:'' }}" />
+                        <input
+                          type="number"
+                          class="form-control cargo-unit-input"
+                          name="cargo_unit_1"
+                          min="1"
+                          step="1"
+                          inputmode="numeric"
+                          pattern="[0-9]*"
+                          placeholder="Digits only"
+                          value="{{ booking_form_data.cargo_unit_1|default:'' }}"
+                        />
                       </td>
                       <td>
                         <input
@@ -721,13 +756,46 @@
             </button>
           </div>
           <div class="form-actions-right">
-            <button type="submit" class="btn btn-primary">
+            {% if booking_is_edit and booking_can_cancel %}
+            <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#cancelBookingModal">
+              <i class="bi bi-x-circle"></i>
+              Cancel booking
+            </button>
+            {% endif %}
+            <button type="submit" name="save_action" value="draft" class="btn btn-outline-secondary">
+              <i class="bi bi-save"></i>
+              Save as Draft
+            </button>
+            <button type="submit" name="save_action" value="confirm" class="btn btn-primary">
               <i class="bi bi-check-circle"></i>
-              {% if booking_is_edit %}Update Booking{% else %}Save Booking{% endif %}
+              Confirm Booking
             </button>
           </div>
         </div>
       </form>
+
+      {% if booking_is_edit and booking_can_cancel %}
+      <div class="modal fade" id="cancelBookingModal" tabindex="-1" aria-labelledby="cancelBookingModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h2 class="modal-title h5" id="cancelBookingModalLabel">Cancel booking</h2>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              Cancel <strong>{{ preview_booking_no }}</strong>? This is only allowed when no shipment has been created (R3).
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Keep booking</button>
+              <form method="post" action="{% url 'iroad_tenants:tenant_operation_booking_cancel' booking.booking_id %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger">Confirm cancel</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
 
 <!-- Bootstrap 5 JS -->
 {% endblock %}
@@ -740,12 +808,41 @@
       (function () {
         var sourcing = document.getElementById("sourcingMode");
         var bookingStatus = document.getElementById("bookingStatus");
-        var executionDate = document.getElementById("executionDate");
+        var bookingStatusDisplay = document.getElementById("bookingStatusDisplay");
         var orderTypeSelect = document.getElementById("orderType");
+        var isScheduled = document.getElementById("isScheduled");
 
         var bookingDate = document.getElementById("bookingDate");
+        function todayIso() {
+          return new Date().toISOString().slice(0, 10);
+        }
+        function tomorrowIso() {
+          var d = new Date();
+          d.setDate(d.getDate() + 1);
+          return d.toISOString().slice(0, 10);
+        }
+        function syncScheduledBookingDate() {
+          if (!bookingDate) return;
+          if (isScheduled && isScheduled.checked) {
+            bookingDate.readOnly = false;
+            bookingDate.removeAttribute("readonly");
+            bookingDate.min = tomorrowIso();
+            if (!bookingDate.value || bookingDate.value <= todayIso()) {
+              bookingDate.value = tomorrowIso();
+            }
+          } else {
+            bookingDate.readOnly = true;
+            bookingDate.setAttribute("readonly", "readonly");
+            bookingDate.removeAttribute("min");
+            bookingDate.value = todayIso();
+          }
+        }
         if (bookingDate && !bookingDate.value) {
-          bookingDate.value = new Date().toISOString().slice(0, 10);
+          bookingDate.value = todayIso();
+        }
+        syncScheduledBookingDate();
+        if (isScheduled) {
+          isScheduled.addEventListener("change", syncScheduledBookingDate);
         }
         var codValidationMsg = document.getElementById("codValidationMsg");
         if (codValidationMsg) {
@@ -817,6 +914,14 @@
 
         if (cargoTableBody) {
           cargoTableBody.addEventListener("input", updateCargoTotals);
+          cargoTableBody.addEventListener("input", function (event) {
+            var unitInput = event.target.closest(".cargo-unit-input");
+            if (!unitInput) return;
+            var digitsOnly = (unitInput.value || "").replace(/\D/g, "");
+            if (unitInput.value !== digitsOnly) {
+              unitInput.value = digitsOnly;
+            }
+          });
           updateCargoTotals();
         }
 
@@ -1118,23 +1223,20 @@
           return truckOptions.filter(truckMatchesBookingSourcing);
         }
 
-        function syncExecutionDateRequired() {
-          if (!executionDate || !bookingStatus) return;
-          var isConfirm = bookingStatus.value === "Confirmed";
-          if (isConfirm) {
-            executionDate.setAttribute("required", "required");
-          } else {
-            executionDate.removeAttribute("required");
-          }
-        }
-
-        function validateBookingBeforeSubmit() {
+        function validateBookingBeforeSubmit(isConfirm) {
           if (!bookingForm) return true;
-          var isConfirm = bookingStatus && bookingStatus.value === "Confirmed";
+          if (typeof isConfirm === "undefined") {
+            isConfirm = bookingStatus && bookingStatus.value === "Confirmed";
+          }
           var errors = [];
           if (isConfirm) {
-            if (executionDate && !executionDate.value) {
-              errors.push("Execution date is required before confirming.");
+            if (orderTypeSelect && !orderTypeSelect.value) {
+              errors.push("Order type is required before confirming a booking.");
+            }
+            if (isScheduled && isScheduled.checked && bookingDate) {
+              if (bookingDate.value <= todayIso()) {
+                errors.push("Scheduled bookings must have a booking date after today.");
+              }
             }
             if (orderTypeSelect && sourcing && orderTypeSelect.value === "COD" && sourcing.value === "External") {
               errors.push("COD with external sourcing is blocked until purchase order fields are available.");
@@ -1151,6 +1253,13 @@
                 errors.push("Driver is required on booking line " + (idx + 1) + " before confirm.");
               }
             });
+            if (orderTypeSelect && orderTypeSelect.value === "COD") {
+              bookingForm.querySelectorAll(".booking-line-cod-input").forEach(function (codInput, idx) {
+                if (Number(codInput.value || "0") <= 0) {
+                  errors.push("COD amount is required on booking line " + (idx + 1) + ".");
+                }
+              });
+            }
             var loadingAddress = document.querySelector("select[name='loading_address_1']");
             var deliveryAddress = document.querySelector("select[name='delivery_address_1']");
             if (loadingAddress && !loadingAddress.value) {
@@ -1307,7 +1416,9 @@
           var rowsHtml = "";
           currentBookingLineTypes.forEach(function (lineType, idx) {
             var routeLabelForLine = selectedRouteText || "-";
-            var statusLabelForLine = bookingLineStatusValues[lineType] || "Draft";
+            var headerStatus = bookingStatus ? bookingStatus.value : "Draft";
+            var statusLabelForLine = bookingLineStatusValues[lineType]
+              || (headerStatus === "Confirmed" ? "Planned" : "Draft");
             if (tripType === "Round" && lineType === "Backload") {
               routeLabelForLine = reverseRouteText || selectedRouteText || "-";
             }
@@ -1405,18 +1516,29 @@
           }
         }
         var bookingForm = document.getElementById("bookingForm");
-        if (bookingStatus) {
-          bookingStatus.addEventListener("change", syncExecutionDateRequired);
-          syncExecutionDateRequired();
-        }
         if (sourcing) {
           sourcing.addEventListener("change", rebuildBookingLines);
         }
         if (bookingForm) {
           bookingForm.addEventListener("submit", function (event) {
+            syncScheduledBookingDate();
             syncBookingForeignKeyFields();
-            syncExecutionDateRequired();
-            if (!validateBookingBeforeSubmit()) {
+            var action = event.submitter ? (event.submitter.value || "") : "";
+            var isConfirm = action === "confirm";
+            if (bookingStatus) {
+              var isStatusSelect = bookingStatus.tagName === "SELECT";
+              if (isStatusSelect && bookingStatus.value === "Cancelled") {
+                /* keep Cancelled when chosen on edit */
+              } else if (isConfirm) {
+                bookingStatus.value = "Confirmed";
+              } else if (action === "draft") {
+                bookingStatus.value = "Draft";
+              }
+            }
+            if (bookingStatusDisplay) {
+              bookingStatusDisplay.textContent = isConfirm ? "Active" : "Draft";
+            }
+            if (!validateBookingBeforeSubmit(isConfirm)) {
               event.preventDefault();
             }
           });

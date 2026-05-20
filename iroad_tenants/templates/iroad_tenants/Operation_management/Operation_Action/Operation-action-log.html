@@ -326,9 +326,24 @@
                 </div>
               </div>
               <div class="field">
-                <label for="bookingItemLookup" class="form-label">Booking Item</label>
+                <label for="bookingLineBirthLookup" class="form-label">Booking line (Auto Shipment Post)</label>
+                <select class="form-select" id="bookingLineBirthLookup" name="booking_item_type">
+                  <option value="">-Select line when action has Auto Shipment Post-</option>
+                  {% for line in booking_line_birth_options %}
+                  <option
+                    value="{{ line.booking_item_type }}"
+                    data-booking-id="{{ line.booking_id }}"
+                    data-booking-no="{{ line.booking_no }}"
+                    {% if action_log_form.booking_item_type == line.booking_item_type %}selected{% endif %}
+                  >{{ line.label }}</option>
+                  {% endfor %}
+                </select>
+                <span class="field-hint">Used when the selected action has Auto Shipment Post enabled in Action Master. One active shipment per line.</span>
+              </div>
+              <div class="field">
+                <label for="bookingItemLookup" class="form-label">Existing shipment line</label>
                 <select class="form-select{% if action_log_form_errors.shipment_id %} is-invalid{% endif %}" id="bookingItemLookup">
-                  <option value="">-Select booking item-</option>
+                  <option value="">-Select existing shipment-</option>
                   {% for shipment in shipment_options %}
                   <option
                     value="{{ shipment.shipment_id }}"
@@ -560,6 +575,7 @@
         var truckSelect = document.getElementById("truckLookup");
         var driverSelect = document.getElementById("driverLookup");
         var bookingItemSelect = document.getElementById("bookingItemLookup");
+        var bookingLineBirthSelect = document.getElementById("bookingLineBirthLookup");
 
         function selectedOption(selectEl) {
           if (!selectEl || selectEl.selectedIndex < 0) return null;
@@ -674,6 +690,24 @@
           syncBookingFromShipment();
         }
 
+        function syncBookingFromBirthLine() {
+          var lineOption = selectedOption(bookingLineBirthSelect);
+          if (!lineOption || !lineOption.value) return;
+          if (bookingInput) {
+            bookingInput.value = lineOption.getAttribute("data-booking-no") || "";
+          }
+          if (bookingIdInput) {
+            bookingIdInput.value = lineOption.getAttribute("data-booking-id") || "";
+          }
+          if (shipmentSelect) {
+            shipmentSelect.value = "";
+          }
+          if (bookingItemSelect) {
+            bookingItemSelect.value = "";
+          }
+          applyBookingLookup();
+        }
+
         function syncBookingFromShipment() {
           var shipmentOption = selectedOption(shipmentSelect);
           if (!shipmentOption || !shipmentOption.value) return;
@@ -738,6 +772,9 @@
             }
             hideBookingMenu();
           });
+        }
+        if (bookingLineBirthSelect) {
+          bookingLineBirthSelect.addEventListener("change", syncBookingFromBirthLine);
         }
         if (shipmentSelect) {
           shipmentSelect.addEventListener("change", syncBookingFromShipment);

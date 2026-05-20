@@ -129,6 +129,7 @@ from .views import (
     TenantPriceListMasterDetailView,
     TenantPriceListMasterEditView,
     TenantOperationBookingAssignTruckView,
+    TenantOperationBookingCancelView,
     TenantOperationBookingCreateView,
     TenantOperationBookingDetailView,
     TenantOperationBookingEditView,
@@ -845,6 +846,11 @@ urlpatterns = [
         'operations/booking/<uuid:booking_id>/edit/',
         TenantOperationBookingEditView.as_view(),
         name='tenant_operation_booking_edit',
+    ),
+    path(
+        'operations/booking/<uuid:booking_id>/cancel/',
+        TenantOperationBookingCancelView.as_view(),
+        name='tenant_operation_booking_cancel',
     ),
     path(
         'operations/booking/<uuid:booking_id>/assign-truck/',

@@ -42,6 +42,18 @@
         </div>
       </div>
 
+      {% if action_log_birth %}
+      <div class="alert alert-success border-0 shadow-sm mb-4" role="status">
+        <strong>Shipment created.</strong>
+        {% if action_log_birth.shipment_no %}
+        <a href="{% url 'iroad_tenants:tenant_operation_shipment_detail' action_log_birth.shipment_id %}">Shipment {{ action_log_birth.shipment_no }}</a>
+        {% endif %}
+        {% if action_log_birth.movement_no %}
+        · Truck movement {{ action_log_birth.movement_no }}
+        {% endif %}
+      </div>
+      {% endif %}
+
       <div class="row g-4">
         <div class="col-lg-8">
           <div class="form-card" data-section="1">
