@@ -68,14 +68,21 @@
             <div class="input-icon-wrapper"><i class="bi bi-person"></i><input type="text" name="created_by_label" class="form-control has-icon" id="createdBy" value="{{ form_data.created_by_label|default:display_name }}" readonly /></div>
           </div>
           <div class="field">
-            <label for="statusToggle" class="form-label">Status</label>
-            <div class="setting-toggle">
-              <label class="toggle-switch">
-                <input id="statusToggle" type="checkbox" name="status" {% if form_data.status|default:'Active' == 'Active' %}checked{% endif %} {% if is_view_mode %}disabled{% endif %}/>
-                <span class="toggle-slider"></span>
-              </label>
-              <span class="toggle-label">{% if form_data.status|default:'Active' == 'Active' %}Active{% else %}Inactive{% endif %}</span>
-            </div>
+            <label for="statusToggle" class="form-label d-block mb-2">Status</label>
+            <label class="setting-toggle" for="statusToggle">
+              <input
+                type="checkbox"
+                id="statusToggle"
+                name="status"
+                {% if form_data.status|default:'Active' == 'Active' %}checked{% endif %}
+                {% if is_view_mode %}disabled{% endif %}
+                data-initial-status="{{ form_data.status|default:'Active' }}"
+              />
+              <span class="toggle-track" aria-hidden="true"></span>
+              <span class="toggle-label">
+                {% if form_data.status|default:'Active' == 'Active' %}Active{% elif form_data.status == 'Draft' %}Draft{% else %}Inactive{% endif %}
+              </span>
+            </label>
           </div>
         </div>
       </div>
@@ -135,12 +142,31 @@
 
 {% block extra_js %}
 <script>
-  document.querySelectorAll(".setting-toggle input").forEach((input) => {
-    const label = input.closest(".setting-toggle").querySelector(".toggle-label");
-    if (!label) return;
-    const updateLabel = () => (label.textContent = input.checked ? "Active" : "Inactive");
-    updateLabel();
-    input.addEventListener("change", updateLabel);
+  document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll(".setting-toggle input").forEach(function (input) {
+      var label = input.closest(".setting-toggle") && input.closest(".setting-toggle").querySelector(".toggle-label");
+      if (!label) return;
+      var initialStatus = (input.getAttribute("data-initial-status") || "Active").trim();
+      function updateLabel() {
+        if (input.checked) {
+          label.textContent = "Active";
+          label.classList.remove("text-muted");
+        } else if (initialStatus === "Draft") {
+          label.textContent = "Draft";
+          label.classList.add("text-muted");
+        } else {
+          label.textContent = "Inactive";
+          label.classList.remove("text-muted");
+        }
+      }
+      input.addEventListener("change", function () {
+        if (initialStatus === "Draft") {
+          initialStatus = "Inactive";
+        }
+        updateLabel();
+      });
+      updateLabel();
+    });
   });
 </script>
 {% endblock %}

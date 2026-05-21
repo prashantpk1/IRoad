@@ -1,9 +1,15 @@
 from django import forms
+from django.core.exceptions import ValidationError
 
+from iroad_tenants.driver_treasury_ops import (
+    validate_shipment_for_treasury,
+    validate_transaction_type_category,
+)
 from tenant_workspace.models import (
     DriverTreasury,
     DriverTreasuryTransaction,
     DriverMaster,
+    TenantShipment,
 )
 
 
@@ -39,6 +45,15 @@ class DriverTreasuryForm(forms.ModelForm):
             raise forms.ValidationError(
                 'Driver is required'
             )
+        if not self.instance.pk:
+            if DriverTreasury.objects.filter(
+                driver=driver,
+                status=DriverTreasury.Status.ACTIVE,
+            ).exists():
+                raise forms.ValidationError(
+                    'This driver already has an active treasury wallet. '
+                    'Edit the existing treasury or set it inactive first.'
+                )
         return driver
 
 
@@ -46,15 +61,18 @@ class DriverTreasuryTransactionForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Only Active treasuries selectable
-        self.fields[
-            'driver_treasury'
-        ].queryset = (
-            DriverTreasury.active_objects.all()
+        self.fields['driver_treasury'].queryset = (
+            DriverTreasury.active_objects.select_related('driver')
         )
-        self.fields[
-            'driver_treasury'
-        ].empty_label = '— Select Treasury —'
+        self.fields['driver_treasury'].empty_label = '— Select Treasury —'
+        self.fields['shipment'].queryset = (
+            TenantShipment.objects.select_related('driver')
+            .order_by('-shipment_date', '-created_at')
+        )
+        self.fields['shipment'].empty_label = '— None —'
+        self.fields['shipment'].label_from_instance = (
+            lambda obj: obj.shipment_no
+        )
 
     class Meta:
         model = DriverTreasuryTransaction
@@ -64,7 +82,7 @@ class DriverTreasuryTransactionForm(forms.ModelForm):
             'transaction_type',
             'transaction_category',
             'amount',
-            'related_shipment',
+            'shipment',
             'description',
         ]
         widgets = {
@@ -90,8 +108,8 @@ class DriverTreasuryTransactionForm(forms.ModelForm):
                     'step': '0.01',
                 }
             ),
-            'related_shipment': forms.TextInput(
-                attrs={'class': 'form-control'}
+            'shipment': forms.Select(
+                attrs={'class': 'form-select'}
             ),
             'description': forms.Textarea(
                 attrs={
@@ -101,11 +119,41 @@ class DriverTreasuryTransactionForm(forms.ModelForm):
             ),
         }
 
+    def clean(self):
+        cleaned = super().clean()
+        txn_type = cleaned.get('transaction_type')
+        txn_category = cleaned.get('transaction_category')
+        if txn_type and txn_category:
+            try:
+                validate_transaction_type_category(txn_type, txn_category)
+            except ValidationError as exc:
+                if hasattr(exc, 'error_dict'):
+                    for field, msgs in exc.error_dict.items():
+                        self.add_error(field, msgs)
+                else:
+                    self.add_error(None, exc)
+        try:
+            validate_shipment_for_treasury(
+                cleaned.get('shipment'),
+                cleaned.get('driver_treasury'),
+            )
+        except ValidationError as exc:
+            if hasattr(exc, 'error_dict'):
+                for field, msgs in exc.error_dict.items():
+                    self.add_error(field, msgs)
+            else:
+                self.add_error('shipment', exc)
+        return cleaned
+
     def clean_amount(self):
         amount = self.cleaned_data.get('amount')
         if amount is not None and amount < 0:
             raise forms.ValidationError(
                 'Amount must be 0 or greater'
+            )
+        if amount is not None and amount == 0:
+            raise forms.ValidationError(
+                'Amount must be greater than zero'
             )
         return amount
 

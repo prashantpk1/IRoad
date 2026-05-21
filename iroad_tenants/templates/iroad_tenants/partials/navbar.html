@@ -8,13 +8,24 @@
           >
             <i class="bi bi-list"></i>
           </button>
-          <div class="header-search">
+          <form
+            class="header-search"
+            method="get"
+            action="{% url 'iroad_tenants:tenant_dashboard_search_results' %}"
+            role="search"
+            data-tenant-global-search-form
+          >
+            <input type="hidden" name="scope" value="navbar" />
             <i class="bi bi-search"></i>
             <input
-              type="text"
+              type="search"
+              name="q"
+              data-tenant-global-search
+              data-search-scope="navbar"
               placeholder="Search shipments, clients, addresses..."
+              autocomplete="off"
             />
-          </div>
+          </form>
         </div>
         <div class="header-datetime">
           <span class="header-date" id="headerDate"
@@ -26,9 +37,13 @@
           <button class="header-icon-btn" title="Switch Language">
             <i class="bi bi-translate"></i>
           </button>
-          <button class="header-icon-btn" title="Notifications">
+          <button class="header-icon-btn" title="Notifications" id="headerNotificationBtn" data-notification-badge>
             <i class="bi bi-bell"></i>
-            <span class="badge">3</span>
+            {% if tenant_notification_unread_count %}
+            <span class="badge" data-notification-count>{{ tenant_notification_unread_count }}</span>
+            {% else %}
+            <span class="badge d-none" data-notification-count>0</span>
+            {% endif %}
           </button>
           <div class="header-divider"></div>
           <div class="header-user-wrapper">

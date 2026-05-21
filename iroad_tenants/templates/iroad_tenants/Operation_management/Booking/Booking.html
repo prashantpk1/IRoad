@@ -123,13 +123,11 @@
                     type="date"
                     class="form-control"
                     id="executionDate"
+                    name="execution_date"
                     value="{{ booking_form_data.execution_date|default:'' }}"
-                    readonly
-                    tabindex="-1"
-                    aria-readonly="true"
                   />
-                  <span class="field-hint"
-                    >Filled automatically when the driver starts the job (Action 1). Empty until then.</span
+                  <span class="field-hint" id="executionDateHint"
+                    >Not scheduled: today (auto). Scheduled: pick the planned execution date.</span
                   >
                 </div>
                 <div class="field">
@@ -387,12 +385,31 @@
                     placeholder="Enter or derive sell price"
                   />
                 </div>
+                <div class="field">
+                  <label class="form-label">Sales Report</label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    readonly
+                    tabindex="-1"
+                    aria-readonly="true"
+                    value="{% if booking_sales_report.sales_report_no %}{{ booking_sales_report.sales_report_no }}{% else %}—{% endif %}"
+                  />
+                  <span class="field-hint">Auto-linked when included in a Sales Invoice Report.</span>
+                </div>
+                <div class="field">
+                  <label class="form-label">Sales Report Status</label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    readonly
+                    tabindex="-1"
+                    aria-readonly="true"
+                    value="{% if booking_sales_report.sales_report_status %}{{ booking_sales_report.sales_report_status }}{% else %}—{% endif %}"
+                  />
+                  <span class="field-hint">Pending · Submitted · Invoiced (derived).</span>
+                </div>
               </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Section 5: Address -->
         <div class="form-card" data-section="5">
           <div class="form-card-header">
             <div class="form-card-icon amber">
@@ -714,6 +731,16 @@
                   <label for="bookingAttachment" class="form-label"
                     >Attachment</label
                   >
+                  {% if booking and booking.booking_attachment %}
+                  <p class="mb-2 small">
+                    Current:
+                    <a
+                      href="{{ booking.booking_attachment.url }}"
+                      target="_blank"
+                      rel="noopener"
+                    >{{ booking.booking_attachment.name|cut:"booking_attachments/" }}</a>
+                  </p>
+                  {% endif %}
                   <input
                     type="file"
                     class="form-control"
@@ -721,7 +748,9 @@
                     name="booking_attachment"
                   />
                   {% if booking and booking.booking_attachment %}
-                  <span class="field-hint">Current: {{ booking.booking_attachment.name }}</span>
+                  <span class="field-hint"
+                    >Optional when editing — leave empty to keep the current file.</span
+                  >
                   {% endif %}
                 </div>
               </div>
@@ -811,6 +840,8 @@
         var bookingStatusDisplay = document.getElementById("bookingStatusDisplay");
         var orderTypeSelect = document.getElementById("orderType");
         var isScheduled = document.getElementById("isScheduled");
+        var executionDateEl = document.getElementById("executionDate");
+        var executionDateHint = document.getElementById("executionDateHint");
 
         var bookingDate = document.getElementById("bookingDate");
         function todayIso() {
@@ -820,6 +851,33 @@
           var d = new Date();
           d.setDate(d.getDate() + 1);
           return d.toISOString().slice(0, 10);
+        }
+        function syncExecutionDateField() {
+          if (!executionDateEl) return;
+          var scheduled = isScheduled && isScheduled.checked;
+          if (scheduled) {
+            executionDateEl.readOnly = false;
+            executionDateEl.removeAttribute("readonly");
+            executionDateEl.removeAttribute("tabindex");
+            executionDateEl.setAttribute("aria-readonly", "false");
+            executionDateEl.min = (bookingDate && bookingDate.value) ? bookingDate.value : tomorrowIso();
+            if (executionDateHint) {
+              executionDateHint.textContent =
+                "Scheduled: enter the planned execution date (on or after booking date).";
+            }
+          } else {
+            executionDateEl.readOnly = true;
+            executionDateEl.setAttribute("readonly", "readonly");
+            executionDateEl.setAttribute("tabindex", "-1");
+            executionDateEl.setAttribute("aria-readonly", "true");
+            executionDateEl.removeAttribute("min");
+            executionDateEl.removeAttribute("required");
+            executionDateEl.value = todayIso();
+            if (executionDateHint) {
+              executionDateHint.textContent =
+                "Not scheduled: execution date is set to today.";
+            }
+          }
         }
         function syncScheduledBookingDate() {
           if (!bookingDate) return;
@@ -836,6 +894,7 @@
             bookingDate.removeAttribute("min");
             bookingDate.value = todayIso();
           }
+          syncExecutionDateField();
         }
         if (bookingDate && !bookingDate.value) {
           bookingDate.value = todayIso();
@@ -843,6 +902,9 @@
         syncScheduledBookingDate();
         if (isScheduled) {
           isScheduled.addEventListener("change", syncScheduledBookingDate);
+        }
+        if (bookingDate) {
+          bookingDate.addEventListener("change", syncExecutionDateField);
         }
         var codValidationMsg = document.getElementById("codValidationMsg");
         if (codValidationMsg) {
@@ -1163,7 +1225,9 @@
         }
 
         function updateBookingLineSelectors() {
-          var bookingLineOptions = fallbackBookingLineTypes;
+          var bookingLineOptions = currentBookingLineTypes.length
+            ? currentBookingLineTypes.slice()
+            : fallbackBookingLineTypes.slice();
           var selectors = [
             "select[name='loading_booking_item_1']",
             "select[name='delivery_booking_item_1']",
@@ -1183,7 +1247,11 @@
               selectEl.appendChild(opt);
             });
             selectEl.disabled = bookingLineOptions.length === 0;
-            if (!selectEl.disabled && previousValue) {
+            if (
+              !selectEl.disabled
+              && previousValue
+              && bookingLineOptions.indexOf(previousValue) !== -1
+            ) {
               selectEl.value = previousValue;
             }
             if (selectEl.value && selectEl.selectedIndex > 0) {
@@ -1197,12 +1265,34 @@
           });
         }
 
-        function buildOptionsHtml(options, placeholder) {
-          var html = "<option value='' selected disabled>" + placeholder + "</option>";
+        function buildOptionsHtml(options, placeholder, selectedValue) {
+          var html = "<option value='' disabled" + (!selectedValue ? " selected" : "") + ">" + placeholder + "</option>";
           options.forEach(function (opt) {
-            html += "<option value='" + opt.value + "'>" + opt.label + "</option>";
+            var selected = selectedValue && String(opt.value) === String(selectedValue) ? " selected" : "";
+            html += "<option value='" + opt.value + "'" + selected + ">" + opt.label + "</option>";
           });
           return html;
+        }
+
+        function escapeHtmlAttr(value) {
+          return String(value || "")
+            .replace(/&/g, "&amp;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;");
+        }
+
+        function pickBookingLineField(previousValues, savedValues, field) {
+          var previous = previousValues ? previousValues[field] : "";
+          if (previous !== undefined && previous !== null && String(previous).length > 0) {
+            return previous;
+          }
+          var saved = savedValues ? savedValues[field] : "";
+          if (saved !== undefined && saved !== null && String(saved).length > 0) {
+            return saved;
+          }
+          return "";
         }
 
         function getBookingSourcingMode() {
@@ -1238,6 +1328,20 @@
                 errors.push("Scheduled bookings must have a booking date after today.");
               }
             }
+            if (isScheduled && isScheduled.checked && executionDateEl && !executionDateEl.value) {
+              errors.push("Execution date is required for scheduled bookings before confirm.");
+            }
+            if (
+              isScheduled &&
+              isScheduled.checked &&
+              executionDateEl &&
+              executionDateEl.value &&
+              bookingDate &&
+              bookingDate.value &&
+              executionDateEl.value < bookingDate.value
+            ) {
+              errors.push("Execution date cannot be before the booking date.");
+            }
             if (orderTypeSelect && sourcing && orderTypeSelect.value === "COD" && sourcing.value === "External") {
               errors.push("COD with external sourcing is blocked until purchase order fields are available.");
             }
@@ -1268,6 +1372,21 @@
             if (deliveryAddress && !deliveryAddress.value) {
               errors.push("Delivery address is required before confirm.");
             }
+            var tripType = tripTypeSelect ? (tripTypeSelect.value || "") : "";
+            var allowedItems = tripType === "Round" ? ["Outbound", "Backload"] : (tripType ? ["Outbound"] : []);
+            [
+              "select[name='loading_booking_item_1']",
+              "select[name='delivery_booking_item_1']",
+              "select[name='cargo_booking_item_1']",
+            ].forEach(function (selector) {
+              var itemSelect = document.querySelector(selector);
+              if (!itemSelect || !itemSelect.value) return;
+              if (allowedItems.length && allowedItems.indexOf(itemSelect.value) === -1) {
+                errors.push(
+                  "Booking item '" + itemSelect.value + "' is not valid for a " + tripType + " trip.",
+                );
+              }
+            });
             var cargoSelect = document.querySelector("select[name='cargo_id_1']");
             var cargoQty = document.querySelector("input[name='cargo_qty_1']");
             var cargoWeight = document.querySelector("input[name='cargo_weight_1']");
@@ -1351,18 +1470,18 @@
             var index = String(idx + 1);
             var values = valuesByIndex[index] || {};
             var selectedValues = selectedBookingLineValues[index] || {};
-            values.truck = values.truck || selectedValues.truck;
-            values.driver = values.driver || selectedValues.driver;
-            values.cod = values.cod || selectedValues.cod;
-            values.podDocs = values.podDocs || selectedValues.podDocs;
+            var truckValue = pickBookingLineField(values, selectedValues, "truck");
+            var driverValue = pickBookingLineField(values, selectedValues, "driver");
+            var codValue = pickBookingLineField(values, selectedValues, "cod");
+            var podValue = pickBookingLineField(values, selectedValues, "podDocs");
             var truckSelect = tbody.querySelector("select[name='booking_line_truck_" + index + "']");
             var driverSelect = tbody.querySelector("select[name='booking_line_driver_" + index + "']");
             var codInput = tbody.querySelector("input[name='booking_line_cod_amount_" + index + "']");
             var podDocsInput = tbody.querySelector("input[name='booking_line_pod_doc_count_" + index + "']");
-            if (truckSelect && values.truck) truckSelect.value = values.truck;
-            if (driverSelect && values.driver) driverSelect.value = values.driver;
-            if (codInput && values.cod) codInput.value = values.cod;
-            if (podDocsInput && values.podDocs) podDocsInput.value = values.podDocs;
+            if (truckSelect && truckValue) truckSelect.value = truckValue;
+            if (driverSelect && driverValue) driverSelect.value = driverValue;
+            if (codInput && codValue !== "") codInput.value = codValue;
+            if (podDocsInput && podValue !== "") podDocsInput.value = podValue;
           });
         }
 
@@ -1415,6 +1534,13 @@
           }
           var rowsHtml = "";
           currentBookingLineTypes.forEach(function (lineType, idx) {
+            var lineNo = String(idx + 1);
+            var previousValues = previousLineValues[lineNo] || {};
+            var savedValues = selectedBookingLineValues[lineNo] || {};
+            var truckValue = pickBookingLineField(previousValues, savedValues, "truck");
+            var driverValue = pickBookingLineField(previousValues, savedValues, "driver");
+            var codValue = pickBookingLineField(previousValues, savedValues, "cod");
+            var podValue = pickBookingLineField(previousValues, savedValues, "podDocs");
             var routeLabelForLine = selectedRouteText || "-";
             var headerStatus = bookingStatus ? bookingStatus.value : "Draft";
             var statusLabelForLine = bookingLineStatusValues[lineType]
@@ -1428,10 +1554,10 @@
               + "<td>" + lineType + "</td>"
               + "<td><span class='status-badge status-active'>" + statusLabelForLine + "</span></td>"
               + "<td>" + routeLabelForLine + "</td>"
-              + "<td><select class='form-select form-select-sm booking-line-truck-select' name='booking_line_truck_" + (idx + 1) + "'>" + buildOptionsHtml(filteredTruckOptions(), "-Select truck-") + "</select></td>"
-              + "<td><select class='form-select form-select-sm booking-line-driver-select' name='booking_line_driver_" + (idx + 1) + "'>" + buildOptionsHtml(driverOptions, "-Select driver-") + "</select></td>"
-              + "<td class='cod-col'><input type='number' min='0' step='0.01' name='booking_line_cod_amount_" + (idx + 1) + "' class='form-control form-control-sm booking-line-cod-input' value='' /></td>"
-              + "<td><input type='number' min='0' name='booking_line_pod_doc_count_" + (idx + 1) + "' class='form-control form-control-sm booking-line-pod-doc-input' value='' /></td>"
+              + "<td><select class='form-select form-select-sm booking-line-truck-select' name='booking_line_truck_" + lineNo + "'>" + buildOptionsHtml(filteredTruckOptions(), "-Select truck-", truckValue) + "</select></td>"
+              + "<td><select class='form-select form-select-sm booking-line-driver-select' name='booking_line_driver_" + lineNo + "'>" + buildOptionsHtml(driverOptions, "-Select driver-", driverValue) + "</select></td>"
+              + "<td class='cod-col'><input type='number' min='0' step='0.01' name='booking_line_cod_amount_" + lineNo + "' class='form-control form-control-sm booking-line-cod-input' value='" + escapeHtmlAttr(codValue) + "' /></td>"
+              + "<td><input type='number' min='0' name='booking_line_pod_doc_count_" + lineNo + "' class='form-control form-control-sm booking-line-pod-doc-input' value='" + escapeHtmlAttr(podValue) + "' /></td>"
               + "</tr>";
           });
           tbody.innerHTML = rowsHtml;
@@ -1511,8 +1637,18 @@
             }
             if (serviceSelect.value) {
               syncRouteFromService();
+            } else if (tripTypeSelect && tripTypeSelect.value) {
+              rebuildBookingLines();
             }
             deriveSellPrice();
+          } else if (tripTypeSelect && tripTypeSelect.value) {
+            rebuildBookingLines();
+          }
+          if (bookingLinesTable) {
+            var finalTbody = bookingLinesTable.querySelector("tbody");
+            if (finalTbody) {
+              applyBookingLineValues(finalTbody, collectBookingLineValues(finalTbody));
+            }
           }
         }
         var bookingForm = document.getElementById("bookingForm");

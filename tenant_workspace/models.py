@@ -174,6 +174,11 @@ def operation_action_media_upload_to(instance, filename):
     return _random_prefixed_stored_name('tenant_operation_action_media', 'OAM', filename)
 
 
+def booking_attachment_upload_to(instance, filename):
+    """``booking_attachments/BA_<32_hex>.ext`` per upload."""
+    return _random_prefixed_stored_name('booking_attachments', 'BA', filename)
+
+
 class AutoNumberConfiguration(models.Model):
     """Per-tenant auto numbering settings by form code."""
 
@@ -606,6 +611,68 @@ class TenantClientContractSetting(models.Model):
 
     def __str__(self):
         return 'Client contract settings'
+
+
+class TenantInAppNotification(models.Model):
+    """In-app notification row for tenant portal bell (per tenant schema)."""
+
+    class Category(models.TextChoices):
+        CONTRACT_PRE_EXPIRY = 'contract_pre_expiry', 'Contract Pre-Expiry'
+        CONTRACT_POST_EXPIRY = 'contract_post_expiry', 'Contract Post-Expiry'
+        CONTRACT_GRACE = 'contract_grace', 'Contract Grace Period'
+
+    notification_id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False,
+    )
+    recipient_key = models.CharField(
+        max_length=64,
+        db_index=True,
+        help_text="'owner' for tenant-owner session, else TenantUser UUID.",
+    )
+    recipient_user = models.ForeignKey(
+        'TenantUser',
+        on_delete=models.CASCADE,
+        related_name='in_app_notifications',
+        null=True,
+        blank=True,
+    )
+    category = models.CharField(max_length=32, choices=Category.choices)
+    title = models.CharField(max_length=255)
+    message = models.TextField()
+    href = models.CharField(max_length=500, blank=True, default='')
+    contract = models.ForeignKey(
+        TenantClientContract,
+        on_delete=models.CASCADE,
+        related_name='in_app_notifications',
+        null=True,
+        blank=True,
+    )
+    source_key = models.CharField(max_length=128)
+    is_read = models.BooleanField(default=False, db_index=True)
+    read_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'tenant_in_app_notifications'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(
+                fields=['recipient_key', 'is_read'],
+                name='tenant_notif_rcpt_read_idx',
+            ),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['recipient_key', 'source_key'],
+                name='tenant_notif_rcpt_source_uniq',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.recipient_key} · {self.title}'
 
 
 class TenantAddressMaster(models.Model):
@@ -1891,10 +1958,9 @@ class DriverTreasury(models.Model):
     def recalculate_balance(self):
         """
         Recalculate current_balance from all transactions.
-        Credit adds, Debit subtracts.
-        Call after any transaction save or delete.
+        Debit increases wallet (cash in); Credit decreases (cash out).
         """
-        from django.db.models import Sum, Case, When, F
+        from django.db.models import Sum
         credits = self.transactions.filter(
             transaction_type=
             DriverTreasuryTransaction.TransactionType.CREDIT
@@ -1909,7 +1975,7 @@ class DriverTreasury(models.Model):
             total=Sum('amount')
         )['total'] or Decimal('0.00')
 
-        self.current_balance = credits - debits
+        self.current_balance = debits - credits
         self.save(update_fields=['current_balance'])
 
     def clean(self):
@@ -1967,13 +2033,19 @@ class DriverTreasuryTransaction(models.Model):
         max_digits=14,
         decimal_places=2,
     )
-    related_shipment = models.CharField(
-        max_length=100,
+    shipment = models.ForeignKey(
+        'TenantShipment',
+        on_delete=models.PROTECT,
+        related_name='treasury_transactions',
+        null=True,
         blank=True,
-        default='',
-        help_text=(
-            'TODO: FK to Shipment when module built'
-        ),
+    )
+    operation_action_log = models.ForeignKey(
+        'TenantOperationActionLog',
+        on_delete=models.SET_NULL,
+        related_name='treasury_transactions',
+        null=True,
+        blank=True,
     )
     description = models.TextField(
         blank=True,
@@ -1987,6 +2059,27 @@ class DriverTreasuryTransaction(models.Model):
         ordering = ['-transaction_date', '-created_at']
         verbose_name = 'Driver Treasury Transaction'
         verbose_name_plural = 'Driver Treasury Transactions'
+        indexes = [
+            models.Index(
+                fields=['shipment'],
+                name='tenant_dtt_shipment_idx',
+            ),
+            models.Index(
+                fields=['operation_action_log'],
+                name='tenant_dtt_action_log_idx',
+            ),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['driver_treasury', 'shipment', 'transaction_category'],
+                condition=models.Q(
+                    transaction_category='Client Collection',
+                    transaction_type='Debit',
+                    shipment__isnull=False,
+                ),
+                name='tenant_dtt_unique_cod_per_wallet_shipment',
+            ),
+        ]
 
     def __str__(self):
         return (
@@ -2006,6 +2099,19 @@ class DriverTreasuryTransaction(models.Model):
             errors['transaction_date'] = (
                 'Transaction date is required'
             )
+        if self.shipment_id and self.driver_treasury_id:
+            shipment_driver_id = getattr(self.shipment, 'driver_id', None)
+            treasury_driver_id = getattr(
+                self.driver_treasury, 'driver_id', None
+            )
+            if (
+                shipment_driver_id
+                and treasury_driver_id
+                and shipment_driver_id != treasury_driver_id
+            ):
+                errors['shipment'] = (
+                    'Shipment driver must match the treasury wallet driver.'
+                )
         if errors:
             raise ValidationError(errors)
 
@@ -2722,6 +2828,10 @@ class SalesInvoiceReport(models.Model):
         help_text='FK-ready reference to Sales Invoice (model pending).',
     )
     remarks = models.TextField(blank=True, default='')
+    auto_post = models.BooleanField(
+        default=False,
+        help_text='When enabled, child lines are populated from the operational eligibility sweep.',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     created_by = models.CharField(max_length=200, blank=True, default='')
@@ -2800,11 +2910,12 @@ class SalesInvoiceReportBooking(models.Model):
         on_delete=models.CASCADE,
         related_name='booking_lines',
     )
-    booking_ref = models.UUIDField(
+    booking = models.ForeignKey(
+        'TenantBooking',
+        on_delete=models.PROTECT,
+        related_name='sales_invoice_report_lines',
         null=True,
         blank=True,
-        db_index=True,
-        help_text='FK-ready reference to Booking (model pending).',
     )
     so_ref = models.CharField(max_length=120, blank=True, default='')
     service_name = models.CharField(max_length=200, blank=True, default='')
@@ -2814,7 +2925,7 @@ class SalesInvoiceReportBooking(models.Model):
         max_length=30,
         blank=True,
         default='',
-        help_text='Snapshot of booking execution status (expects Executed).',
+        help_text='Snapshot of booking execution status at line capture.',
     )
 
     class Meta:
@@ -2823,14 +2934,14 @@ class SalesInvoiceReportBooking(models.Model):
         constraints = [
             models.UniqueConstraint(fields=['report', 'line_no'], name='sir_booking_line_no_uq'),
             models.UniqueConstraint(
-                fields=['report', 'booking_ref'],
-                condition=Q(booking_ref__isnull=False),
+                fields=['report', 'booking'],
+                condition=Q(booking__isnull=False),
                 name='sir_unique_booking_per_report_uq',
             ),
         ]
         indexes = [
             models.Index(fields=['report', 'line_no'], name='sir_booking_report_line_idx'),
-            models.Index(fields=['booking_ref'], name='sir_booking_ref_idx'),
+            models.Index(fields=['booking'], name='sir_booking_fk_idx'),
         ]
 
     def clean(self):
@@ -2858,20 +2969,28 @@ class SalesInvoiceReportSurcharge(models.Model):
         on_delete=models.CASCADE,
         related_name='surcharge_lines',
     )
-    surcharge_trx_ref = models.UUIDField(
+    surcharge = models.ForeignKey(
+        'TenantShipmentSurcharge',
+        on_delete=models.PROTECT,
+        related_name='sales_invoice_report_lines',
         null=True,
         blank=True,
-        db_index=True,
-        help_text='FK-ready reference to Surcharge Sales Transaction (model pending).',
     )
-    booking_ref = models.UUIDField(
+    booking = models.ForeignKey(
+        'TenantBooking',
+        on_delete=models.PROTECT,
+        related_name='sales_invoice_report_surcharge_lines',
         null=True,
         blank=True,
-        db_index=True,
-        help_text='FK-ready reference to Booking (model pending).',
+    )
+    shipment = models.ForeignKey(
+        'TenantShipment',
+        on_delete=models.PROTECT,
+        related_name='sales_invoice_report_surcharge_lines',
+        null=True,
+        blank=True,
     )
     surcharge_type = models.CharField(max_length=120, blank=True, default='')
-    shipment_ref = models.CharField(max_length=120, blank=True, default='')
     service_name = models.CharField(max_length=200, blank=True, default='')
     amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
 
@@ -2883,7 +3002,7 @@ class SalesInvoiceReportSurcharge(models.Model):
         ]
         indexes = [
             models.Index(fields=['report', 'line_no'], name='sir_surcharge_report_line_idx'),
-            models.Index(fields=['surcharge_trx_ref'], name='sir_surcharge_trx_ref_idx'),
+            models.Index(fields=['surcharge'], name='sir_surcharge_fk_idx'),
         ]
 
     def save(self, *args, **kwargs):
@@ -2904,19 +3023,27 @@ class SalesInvoiceReportShipment(models.Model):
         on_delete=models.CASCADE,
         related_name='shipment_lines',
     )
-    shipment_ref = models.UUIDField(
+    shipment = models.ForeignKey(
+        'TenantShipment',
+        on_delete=models.PROTECT,
+        related_name='sales_invoice_report_lines',
         null=True,
         blank=True,
-        db_index=True,
-        help_text='FK-ready reference to Shipment (model pending).',
     )
-    booking_ref = models.CharField(max_length=120, blank=True, default='')
+    booking = models.ForeignKey(
+        'TenantBooking',
+        on_delete=models.PROTECT,
+        related_name='sales_invoice_report_shipment_lines',
+        null=True,
+        blank=True,
+    )
     shipment_date = models.DateField(null=True, blank=True)
     from_location = models.CharField(max_length=200, blank=True, default='')
     to_location = models.CharField(max_length=200, blank=True, default='')
     truck_plate = models.CharField(max_length=120, blank=True, default='')
     customer_ref_docs = models.TextField(blank=True, default='')
     pod_date = models.DateField(null=True, blank=True)
+    pod_status = models.CharField(max_length=30, blank=True, default='')
 
     class Meta:
         db_table = 'tenant_sales_invoice_report_shipment'
@@ -2926,7 +3053,7 @@ class SalesInvoiceReportShipment(models.Model):
         ]
         indexes = [
             models.Index(fields=['report', 'line_no'], name='sir_shipment_report_line_idx'),
-            models.Index(fields=['shipment_ref'], name='sir_shipment_ref_idx'),
+            models.Index(fields=['shipment'], name='sir_shipment_fk_idx'),
         ]
 
 
@@ -3279,12 +3406,25 @@ class TenantBooking(models.Model):
     total_cargo_weight = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     container_no = models.CharField(max_length=120, blank=True, default='')
     booking_attachment = models.FileField(
-        upload_to='booking_attachments/',
+        upload_to=booking_attachment_upload_to,
         blank=True,
         null=True,
         max_length=500,
     )
     booking_instructions = models.TextField(blank=True, default='')
+    sales_invoice_report = models.ForeignKey(
+        'SalesInvoiceReport',
+        on_delete=models.SET_NULL,
+        related_name='linked_bookings',
+        null=True,
+        blank=True,
+    )
+    sales_report_status = models.CharField(
+        max_length=30,
+        blank=True,
+        default='',
+        help_text='Derived from linked Sales Invoice Report (Pending/Submitted/Invoiced).',
+    )
     created_by_label = models.CharField(max_length=200, blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -3724,13 +3864,18 @@ class TenantShipmentDocument(models.Model):
         document_page_model = apps.get_model('tenant_workspace', 'TenantShipmentDocumentPage')
         pod_page_model = apps.get_model('tenant_workspace', 'TenantShipmentPodPage')
         pod_page_model.objects.filter(document=self).delete()
+        shipment = self.shipment if self.shipment_id else None
         for page in document_page_model.objects.filter(document=self).order_by('line_no'):
+            action_log = None
+            extra_ref = (page.extra_ref or '').strip()
+            if extra_ref:
+                action_log = resolve_operation_action_log_for_pod(extra_ref, shipment=shipment)
             pod_page_model.objects.create(
                 document=self,
                 line_no=page.line_no,
                 doc_page=str(page.physical_page_no),
                 source=page.doc_ref_no,
-                action_log=page.extra_ref,
+                action_log=action_log,
                 physical_location=page.signer_location,
                 soft_copy_status=page.completion_status,
                 attachment_label=page.attachment_label,
@@ -3804,6 +3949,28 @@ class TenantShipmentDocumentPage(models.Model):
         return f'{self.document.record_no} / Page {self.physical_page_no}'
 
 
+def resolve_operation_action_log_for_pod(ref, *, shipment=None):
+    """Resolve a log_no or UUID string to TenantOperationActionLog for POD lines."""
+    from django.apps import apps
+
+    value = str(ref or '').strip()
+    if not value:
+        return None
+    action_log_model = apps.get_model('tenant_workspace', 'TenantOperationActionLog')
+    try:
+        parsed_id = uuid.UUID(value)
+        match = action_log_model.objects.filter(pk=parsed_id).first()
+        if match is not None:
+            return match
+    except ValueError:
+        pass
+    if shipment is not None:
+        match = action_log_model.objects.filter(log_no=value, shipment=shipment).first()
+        if match is not None:
+            return match
+    return action_log_model.objects.filter(log_no=value).first()
+
+
 class TenantShipmentPodPage(models.Model):
     """Line-level POD page tracking rows under a shipment POD document."""
 
@@ -3823,7 +3990,13 @@ class TenantShipmentPodPage(models.Model):
     )
     doc_page = models.CharField(max_length=64, blank=True, default='')
     source = models.CharField(max_length=64, blank=True, default='')
-    action_log = models.CharField(max_length=120, blank=True, default='')
+    action_log = models.ForeignKey(
+        'TenantOperationActionLog',
+        on_delete=models.SET_NULL,
+        related_name='pod_page_lines',
+        null=True,
+        blank=True,
+    )
     physical_location = models.CharField(max_length=120, blank=True, default='')
     soft_copy_status = models.CharField(max_length=64, blank=True, default='')
     digital_evidence_status = models.CharField(max_length=64, blank=True, default='')

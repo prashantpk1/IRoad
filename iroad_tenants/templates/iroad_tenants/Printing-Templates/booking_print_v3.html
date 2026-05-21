@@ -16,7 +16,7 @@
   <table>
     <tbody>
       <tr><th>Report No</th><td>{{ report.report_no }}</td><th>Line No</th><td>{{ booking_line.line_no }}</td></tr>
-      <tr><th>Booking Ref</th><td>{{ booking_line.booking_ref|default:'-' }}</td><th>SO Ref</th><td>{{ booking_line.so_ref|default:'-' }}</td></tr>
+      <tr><th>Booking Ref</th><td>{% if booking_line.booking %}{{ booking_line.booking.booking_no }}{% else %}-{% endif %}</td><th>SO Ref</th><td>{{ booking_line.so_ref|default:'-' }}</td></tr>
       <tr><th>Service</th><td>{{ booking_line.service_name|default:'-' }}</td><th>Trip Type</th><td>{{ booking_line.trip_type|default:'-' }}</td></tr>
       <tr><th>Booking Status Snapshot</th><td>{{ booking_line.booking_status|default:'-' }}</td><th>Sell Price</th><td class="num">{{ booking_line.sell_price }}</td></tr>
     </tbody>

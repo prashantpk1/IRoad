@@ -4,6 +4,10 @@
 {% block title %}Truck Master | iRoad{% endblock %}
 {% block breadcrumb %}{% endblock %}
 
+{% block extra_css %}
+{% include 'iroad_tenants/partials/eal_list_live_search_css.html' %}
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
   <nav aria-label="breadcrumb">
@@ -82,17 +86,36 @@
   data-eal-filterable-table
   data-eal-empty-colspan="9"
   data-eal-empty-filter-message="No trucks match the selected search/filter criteria."
+  data-eal-global-search-columns="1,2,3,4,5,6,7"
 >
-  <form method="get" class="eal-toolbar eal-toolbar--inline-filters eal-toolbar--tm-list">
+  <div class="eal-toolbar eal-toolbar--inline-filters eal-toolbar--tm-list">
     <div class="eal-toolbar-left w-100">
       <div class="eal-toolbar-filters-row">
         <div class="eal-search eal-search--toolbar-grow">
           <i class="bi bi-search"></i>
-          <input type="text" name="q" value="{{ search_q }}" placeholder="Search truck code, plate, owner..." />
+          <input
+            type="search"
+            id="truckMasterSearch"
+            data-eal-global-search
+            value="{{ search_q|default:'' }}"
+            autocomplete="off"
+            placeholder="Search truck code, plate, owner..."
+            aria-label="Search trucks"
+          />
+          <button
+            type="button"
+            class="eal-search-clear-btn"
+            id="truckMasterSearchClear"
+            title="Clear search"
+            aria-label="Clear search"
+            hidden
+          >
+            <i class="bi bi-x-lg"></i>
+          </button>
         </div>
       </div>
     </div>
-  </form>
+  </div>
 
   <div class="eal-table-wrap">
     <table class="eal-table">
@@ -198,42 +221,54 @@
             {% endif %}
           </td>
           <td>
-            <div class="eal-actions-cell justify-content-end">
-              <a
-                href="{% url 'iroad_tenants:truck_master_detail' row.truck_id %}"
-                class="eal-row-btn"
-                title="View"
-              >
-                <i class="bi bi-eye"></i>
-              </a>
-              <a
-                href="{% url 'iroad_tenants:truck_master_edit' row.truck_id %}"
-                class="eal-row-btn"
-                title="Edit"
-              >
-                <i class="bi bi-pencil"></i>
-              </a>
-              {% if row.status == 'Active' %}
+            <div class="dropdown eal-actions-cell">
               <button
+                class="eal-row-btn"
                 type="button"
-                class="eal-row-btn danger tm-status-trigger"
-                title="Deactivate"
-                data-truck-id="{{ row.truck_id }}"
-                data-new-status="Inactive"
+                data-bs-toggle="dropdown"
+                data-bs-boundary="viewport"
+                aria-expanded="false"
+                title="Actions"
               >
-                <i class="bi bi-trash3"></i>
+                <i class="bi bi-three-dots-vertical"></i>
               </button>
-              {% else %}
-              <button
-                type="button"
-                class="eal-row-btn tm-status-trigger"
-                title="Activate"
-                data-truck-id="{{ row.truck_id }}"
-                data-new-status="Active"
+              <ul
+                class="dropdown-menu dropdown-menu-end shadow-sm"
+                style="border-radius: 8px; border-color: #e2e8f0; min-width: 180px;"
               >
-                <i class="bi bi-arrow-counterclockwise"></i>
-              </button>
-              {% endif %}
+                <li>
+                  <a class="dropdown-item" href="{% url 'iroad_tenants:truck_master_edit' row.truck_id %}">
+                    <i class="bi bi-pencil text-primary me-2"></i>Edit
+                  </a>
+                </li>
+                <li>
+                  <a class="dropdown-item" href="{% url 'iroad_tenants:truck_master_detail' row.truck_id %}">
+                    <i class="bi bi-eye text-info me-2"></i>View
+                  </a>
+                </li>
+                <li><hr class="dropdown-divider" /></li>
+                <li>
+                  {% if row.status == 'Active' %}
+                  <button
+                    type="button"
+                    class="dropdown-item text-danger tm-status-trigger"
+                    data-truck-id="{{ row.truck_id }}"
+                    data-new-status="Inactive"
+                  >
+                    <i class="bi bi-trash3 me-2"></i>Deactivate
+                  </button>
+                  {% else %}
+                  <button
+                    type="button"
+                    class="dropdown-item tm-status-trigger"
+                    data-truck-id="{{ row.truck_id }}"
+                    data-new-status="Active"
+                  >
+                    <i class="bi bi-arrow-counterclockwise me-2"></i>Activate
+                  </button>
+                  {% endif %}
+                </li>
+              </ul>
             </div>
           </td>
         </tr>
@@ -346,6 +381,8 @@
 
 {% block extra_js %}
 {{ block.super }}
+{% url 'iroad_tenants:truck_master' as truck_master_list_url %}
+{% include 'iroad_tenants/partials/eal_list_live_search_js.html' with list_url=truck_master_list_url search_input_id='truckMasterSearch' clear_btn_id='truckMasterSearchClear' %}
 <script>
 (function () {
   var selectAll = document.getElementById("tmListSelectAll");

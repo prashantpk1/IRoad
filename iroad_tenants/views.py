@@ -31,6 +31,7 @@ from django_tenants.utils import schema_context
 import os
 import uuid
 from superadmin.billing_helpers import (
+    build_dual_currency_display,
     generate_invoice_pdf_bytes,
     calculate_pro_rata_credit,
     complete_order_payment_as_system,
@@ -71,13 +72,18 @@ from superadmin.tenant_portal_auth import (
     get_tenant_portal_cookie_payload,
 )
 from superadmin.communication_helpers import send_named_notification_email
-from superadmin.support_ticket_display import support_ticket_created_by_display_map
+from superadmin.support_ticket_display import (
+    support_ticket_assignee_display,
+    support_ticket_assignee_display_parts,
+    support_ticket_created_by_display_map,
+)
 from tenant_workspace.ops_display import (
     address_label,
     client_account_label,
     driver_label,
     location_label,
     shipment_booking_no,
+    shipment_route_endpoints,
 )
 from tenant_workspace.models import (
     AutoNumberConfiguration,
@@ -132,6 +138,16 @@ from tenant_workspace.models import (
 )
 from iroad_tenants.models import TenantPaymentCard, TenantRegistry
 from iroad_tenants.tenant_dashboard_overview import build_tenant_dashboard_overview
+from iroad_tenants.tenant_dashboard_search import (
+    _empty_results,
+    build_dashboard_search_routes,
+    build_result_sections,
+    count_dashboard_search_results,
+    get_search_scope_meta,
+    pick_global_search_redirect,
+    run_dashboard_search,
+    summarize_dashboard_search,
+)
 from iroad_tenants.forms_tenant_address import TenantAddressMasterForm
 from iroad_tenants.forms_tenant_cargo import TenantCargoCategoryForm, TenantCargoMasterForm
 from iroad_tenants.forms_tenant_location import TenantLocationMasterForm
@@ -139,6 +155,15 @@ from iroad_tenants.forms_tenant_route import TenantRouteMasterForm
 from iroad_tenants.forms_truck_type import TruckTypeMasterForm
 from iroad_tenants.forms_driver import DriverAttachmentForm, DriverSettingsForm
 from iroad_tenants.forms_driver_master import DriverMasterForm
+from iroad_tenants.driver_treasury_ops import (
+    DRIVER_TREASURY_AUTO_FORM_CODE,
+    DRIVER_TREASURY_AUTO_FORM_LABEL,
+    DRIVER_TREASURY_REF_PREFIX,
+    DRIVER_TXN_AUTO_FORM_CODE,
+    DRIVER_TXN_AUTO_FORM_LABEL,
+    DRIVER_TXN_REF_PREFIX,
+    post_cod_collection_for_action9,
+)
 from iroad_tenants.forms_driver_treasury import (
     DriverTreasuryForm,
     DriverTreasuryTransactionForm,
@@ -401,6 +426,9 @@ OPERATION_ACTION_LOG_REF_PREFIX = 'LOG'
 SURCHARGE_SALES_AUTO_FORM_CODE = 'surcharge-sales-transaction'
 SURCHARGE_SALES_AUTO_FORM_LABEL = 'Surcharge Sales Transaction'
 SURCHARGE_SALES_REF_PREFIX = 'SST'
+SUPPORT_TICKET_MASTER_AUTO_FORM_CODE = 'support-ticket-master'
+SUPPORT_TICKET_MASTER_AUTO_FORM_LABEL = 'Support Ticket Master'
+SUPPORT_TICKET_REF_PREFIX = 'TKT'
 SERVICE_ITEM_CATEGORY_OPTIONS = (
     'Service Category 1',
     'Service Category 2',
@@ -736,7 +764,7 @@ def _tenant_context_from_session(request):
             try:
                 tenant_user = TenantUser.all_objects.filter(pk=reference_id).first()
                 if tenant_user:
-                    if getattr(tenant_user, 'is_deleted', False):
+                    if not tenant_user.is_active_user:
                         connection.set_schema_to_public()
                         revoke_tenant_session_key(str(tenant.tenant_id), str(tenant_jti))
                         _clear_tenant_bootstrap_session(request)
@@ -835,7 +863,83 @@ class TenantDashboardView(View):
         context['tenant_dashboard'] = build_tenant_dashboard_overview(
             context['tenant'],
         )
+        context['dashboard_search_routes'] = build_dashboard_search_routes()
         return render(request, 'iroad_tenants/index.html', context)
+
+
+class TenantDashboardSearchView(View):
+    """JSON API: navbar / dashboard search opens the results page."""
+
+    def get(self, request):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+
+        q = (request.GET.get('q') or '').strip()
+        scope = (request.GET.get('scope') or 'navbar').strip()
+        if not q:
+            return JsonResponse({'results': [], 'redirect': None})
+
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        schema_name = tenant_registry.schema_name if tenant_registry else ''
+        try:
+            redirect_url = pick_global_search_redirect(
+                schema_name,
+                q,
+                scope=scope,
+            )
+            return JsonResponse({
+                'results': [],
+                'redirect': redirect_url,
+            })
+        finally:
+            connection.set_schema_to_public()
+
+
+class TenantDashboardSearchResultsView(View):
+    """Search results page — same dashboard shell and card styling."""
+
+    template_name = 'iroad_tenants/dashboard_search_results.html'
+
+    def get(self, request):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+
+        q = (request.GET.get('q') or '').strip()
+        scope = (request.GET.get('scope') or 'navbar').strip()
+        tenant = context['tenant']
+        scope_meta = get_search_scope_meta(scope)
+        results = _empty_results()
+        total_count = 0
+
+        if q:
+            tenant_registry = _activate_tenant_workspace_schema(request)
+            schema_name = tenant_registry.schema_name if tenant_registry else ''
+            try:
+                results = run_dashboard_search(
+                    schema_name,
+                    q,
+                    tenant_id=tenant.pk,
+                    scope=scope,
+                )
+                total_count = count_dashboard_search_results(results)
+            finally:
+                connection.set_schema_to_public()
+
+        context.update({
+            'query': q,
+            'scope': scope,
+            'scope_meta': scope_meta,
+            'results': results,
+            'result_sections': build_result_sections(results, scope) if q else [],
+            'total_count': total_count,
+            'search_summary': summarize_dashboard_search(results, scope) if q else [],
+            'dashboard_search_routes': build_dashboard_search_routes(),
+        })
+        return render(request, self.template_name, context)
 
 
 class TenantSupportTicketListView(View):
@@ -857,6 +961,7 @@ class TenantSupportTicketListView(View):
         ).select_related(
             'category',
             'assigned_to',
+            'assigned_to__role',
             'tenant',
         ).order_by('-created_at')
 
@@ -872,7 +977,16 @@ class TenantSupportTicketListView(View):
         tickets_list = list(tickets_qs)
         created_by_labels = support_ticket_created_by_display_map(tickets_list)
         for ticket in tickets_list:
-            ticket.created_by_display = created_by_labels.get(ticket.pk, '-')
+            created_parts = created_by_labels.get(
+                ticket.pk,
+                {'username': '-', 'role': '-'},
+            )
+            ticket.created_by_username = created_parts.get('username', '-')
+            ticket.created_by_role = created_parts.get('role', '-')
+            assignee_parts = support_ticket_assignee_display_parts(ticket)
+            ticket.assigned_to_username = assignee_parts['username']
+            ticket.assigned_to_role = assignee_parts['role']
+            ticket.assigned_to_display = support_ticket_assignee_display(ticket)
 
         total_count = SupportTicket.objects.filter(tenant=tenant).count()
         open_count = SupportTicket.objects.filter(
@@ -955,7 +1069,7 @@ class TenantSupportTicketCreateView(View):
 
         actor_id = _current_tenant_actor_id(request) or str(tenant.tenant_id)
         ticket = SupportTicket.objects.create(
-            ticket_no=SupportTicket.generate_ticket_no(),
+            ticket_no=_allocate_tenant_support_ticket_no(request),
             tenant=tenant,
             subject=subject,
             category=category,
@@ -984,6 +1098,127 @@ class TenantSupportTicketCreateView(View):
         return redirect('iroad_tenants:tenant_support_ticket_detail', ticket_id=ticket.ticket_id)
 
 
+class TenantSupportTicketEditView(View):
+    template_name = 'iroad_tenants/Support_Management/Support-ticket-master-edit.html'
+
+    def get(self, request, ticket_id):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+
+        ticket = SupportTicket.objects.select_related('category').filter(
+            ticket_id=ticket_id,
+            tenant=context['tenant'],
+        ).first()
+        if ticket is None:
+            messages.error(request, 'Ticket not found.', extra_tags='tenant')
+            return redirect('iroad_tenants:tenant_support_ticket_list')
+        if ticket.status == 'Closed':
+            messages.error(
+                request,
+                'Closed tickets cannot be edited.',
+                extra_tags='tenant',
+            )
+            return redirect(
+                'iroad_tenants:tenant_support_ticket_detail',
+                ticket_id=ticket.ticket_id,
+            )
+
+        context.update({
+            'ticket': ticket,
+            'is_ticket_edit': True,
+            'categories': SupportCategory.objects.filter(
+                is_active=True,
+            ).order_by('name_en'),
+        })
+        return render(request, self.template_name, context)
+
+    def post(self, request, ticket_id):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+
+        ticket = SupportTicket.objects.filter(
+            ticket_id=ticket_id,
+            tenant=context['tenant'],
+        ).first()
+        if ticket is None:
+            messages.error(request, 'Ticket not found.', extra_tags='tenant')
+            return redirect('iroad_tenants:tenant_support_ticket_list')
+        if ticket.status == 'Closed':
+            messages.error(
+                request,
+                'Closed tickets cannot be edited.',
+                extra_tags='tenant',
+            )
+            return redirect(
+                'iroad_tenants:tenant_support_ticket_detail',
+                ticket_id=ticket.ticket_id,
+            )
+
+        subject = (request.POST.get('subject') or '').strip()
+        category_id = (request.POST.get('category_id') or '').strip()
+        if not subject:
+            messages.error(request, 'Subject is required.', extra_tags='tenant')
+            return redirect(
+                'iroad_tenants:tenant_support_ticket_edit',
+                ticket_id=ticket.ticket_id,
+            )
+        category = SupportCategory.objects.filter(
+            category_id=category_id,
+            is_active=True,
+        ).first()
+        if category is None:
+            messages.error(request, 'Invalid category selected.', extra_tags='tenant')
+            return redirect(
+                'iroad_tenants:tenant_support_ticket_edit',
+                ticket_id=ticket.ticket_id,
+            )
+
+        ticket.subject = subject
+        ticket.category = category
+        ticket.save(update_fields=['subject', 'category'])
+        messages.success(request, 'Ticket updated successfully.', extra_tags='tenant')
+        return redirect('iroad_tenants:tenant_support_ticket_list')
+
+
+class TenantSupportTicketDeleteView(View):
+    def post(self, request, ticket_id):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+
+        ticket = SupportTicket.objects.filter(
+            ticket_id=ticket_id,
+            tenant=context['tenant'],
+        ).first()
+        if ticket is None:
+            messages.error(request, 'Ticket not found.', extra_tags='tenant')
+            return redirect('iroad_tenants:tenant_support_ticket_list')
+        if ticket.status == 'Closed':
+            messages.error(
+                request,
+                'Closed tickets cannot be deleted.',
+                extra_tags='tenant',
+            )
+            return redirect('iroad_tenants:tenant_support_ticket_list')
+
+        ticket_no = ticket.ticket_no
+        ticket.delete()
+        messages.success(
+            request,
+            f'Support ticket {ticket_no} deleted successfully.',
+            extra_tags='tenant',
+        )
+        return redirect('iroad_tenants:tenant_support_ticket_list')
+
+
 class TenantSupportTicketDetailView(View):
     template_name = 'iroad_tenants/Support_Management/Support-ticket-master-edit.html'
 
@@ -996,6 +1231,7 @@ class TenantSupportTicketDetailView(View):
 
         ticket = SupportTicket.objects.select_related(
             'category',
+            'assigned_to',
         ).filter(
             ticket_id=ticket_id,
             tenant=context['tenant'],
@@ -1008,10 +1244,16 @@ class TenantSupportTicketDetailView(View):
             is_internal=False,
         ).order_by('created_at')
 
+        assignee_parts = support_ticket_assignee_display_parts(ticket)
+        is_view_only = (request.GET.get('mode') or '').strip().lower() == 'view'
         context.update({
             'ticket': ticket,
             'replies': replies,
             'is_ticket_detail': True,
+            'is_view_only': is_view_only,
+            'assigned_to_display': support_ticket_assignee_display(ticket),
+            'assigned_to_username': assignee_parts['username'],
+            'assigned_to_role': assignee_parts['role'],
         })
         return render(request, self.template_name, context)
 
@@ -1961,6 +2203,13 @@ class TenantSubscriptionPlanView(View):
     _PLAN_ACTIONS = {'New_Subscription', 'Renewal', 'Upgrade', 'Downgrade'}
 
     def _resolve_payment_method(self, tenant, currency_code):
+        """
+        Resolve an online gateway for tenant self-service subscription checkout.
+
+        Orders keep their plan currency (e.g. USD); when the default gateway only
+        lists SAR, tenants with a saved card may still checkout using that gateway
+        (totals use FX snapshots on the order).
+        """
         has_default_card = TenantPaymentCard.objects.filter(
             tenant_profile=tenant,
             is_active=True,
@@ -1968,12 +2217,21 @@ class TenantSubscriptionPlanView(View):
         ).exists()
         if not has_default_card:
             return None
-        # Card-based subscription flow uses online gateway only.
-        return PaymentMethod.objects.filter(
+
+        online_methods = PaymentMethod.objects.filter(
             is_active=True,
             method_type='Online_Gateway',
+        ).order_by('display_order')
+
+        online_for_currency = online_methods.filter(
             supported_currencies__contains=[currency_code],
-        ).order_by('display_order').first()
+        ).first()
+        if online_for_currency:
+            return online_for_currency
+
+        # Card on file: allow the primary online gateway even when the plan currency
+        # is not listed on that method (e.g. USD plan, SAR-only Wallet gateway).
+        return online_methods.first()
 
     def _load_plan_context(self, tenant):
         current_plan = tenant.current_plan
@@ -2005,11 +2263,13 @@ class TenantSubscriptionPlanView(View):
             is_admin_only_cycle=False,
             plan__is_active=True,
             plan__is_deleted=False,
+            plan__is_admin_only_plan=False,
         ).values_list('plan_id', flat=True).distinct()
         plans = list(
             SubscriptionPlan.objects.filter(
                 is_active=True,
                 is_deleted=False,
+                is_admin_only_plan=False,
                 plan_id__in=eligible_plan_ids,
             )
             .order_by('plan_name_en')
@@ -2020,9 +2280,32 @@ class TenantSubscriptionPlanView(View):
             .order_by('plan__plan_name_en', 'number_of_cycles', 'currency__currency_code')
         )
         pricing_map = {}
+        currencies_by_plan: dict[str, list[str]] = {}
         for row in pricing_rows:
-            key = (str(row.plan_id), row.currency_id)
+            plan_key = str(row.plan_id)
+            cur = row.currency_id
+            key = (plan_key, cur)
             pricing_map.setdefault(key, {})[int(row.number_of_cycles)] = row
+            currencies_by_plan.setdefault(plan_key, [])
+            if cur not in currencies_by_plan[plan_key]:
+                currencies_by_plan[plan_key].append(cur)
+
+        def _resolve_plan_pricing(plan_id):
+            """Prefer tenant billing currency; fall back to any priced currency."""
+            plan_key = str(plan_id)
+            lookup_order = []
+            if selected_currency:
+                lookup_order.append(selected_currency)
+            for cur in currencies_by_plan.get(plan_key, []):
+                if cur not in lookup_order:
+                    lookup_order.append(cur)
+            for cur in lookup_order:
+                cycles = pricing_map.get((plan_key, cur), {})
+                monthly_row = cycles.get(1)
+                yearly_row = cycles.get(12)
+                if monthly_row or yearly_row:
+                    return monthly_row, yearly_row, cur
+            return None, None, selected_currency or ''
 
         current_monthly_price = None
         if current_plan and selected_currency:
@@ -2034,9 +2317,7 @@ class TenantSubscriptionPlanView(View):
 
         plan_cards = []
         for plan in plans:
-            prices_for_currency = pricing_map.get((str(plan.plan_id), selected_currency), {})
-            monthly_row = prices_for_currency.get(1)
-            yearly_row = prices_for_currency.get(12)
+            monthly_row, yearly_row, card_currency = _resolve_plan_pricing(plan.plan_id)
             if not monthly_row and not yearly_row:
                 continue
 
@@ -2054,7 +2335,12 @@ class TenantSubscriptionPlanView(View):
             if is_current:
                 action_type = 'Renewal'
                 action_label = 'Renew Plan'
-            elif current_plan and current_monthly_price is not None and monthly_row:
+            elif (
+                current_plan
+                and current_monthly_price is not None
+                and monthly_row
+                and card_currency == selected_currency
+            ):
                 if monthly_row.price >= current_monthly_price:
                     action_type = 'Upgrade'
                     action_label = 'Upgrade Plan'
@@ -2069,7 +2355,7 @@ class TenantSubscriptionPlanView(View):
                     'yearly_row': yearly_row,
                     'default_cycle': default_cycle,
                     'default_price': default_row.price if default_row else Decimal('0.00'),
-                    'currency_code': selected_currency,
+                    'currency_code': card_currency,
                     'is_current': is_current,
                     'action_type': action_type,
                     'action_label': action_label,
@@ -2184,11 +2470,42 @@ class TenantSubscriptionPlanView(View):
 
         payment_method = self._resolve_payment_method(tenant, currency.currency_code)
         if payment_method is None:
-            messages.error(
-                request,
-                'Add a default payment card first. Offline bank transfer is not supported here.',
-                extra_tags='tenant',
-            )
+            has_default_card = TenantPaymentCard.objects.filter(
+                tenant_profile=tenant,
+                is_active=True,
+                is_default=True,
+            ).exists()
+            has_online = PaymentMethod.objects.filter(
+                is_active=True,
+                method_type='Online_Gateway',
+            ).exists()
+            has_offline_for_currency = PaymentMethod.objects.filter(
+                is_active=True,
+                method_type='Offline_Bank',
+                supported_currencies__contains=[currency.currency_code],
+            ).exists()
+            if not has_default_card:
+                if has_offline_for_currency and not has_online:
+                    msg = (
+                        'Add a default payment card to subscribe online. '
+                        'Bank transfer is not available on this page.'
+                    )
+                else:
+                    msg = (
+                        'Add a default payment card before you can subscribe '
+                        'or change plans online.'
+                    )
+            elif not has_online:
+                msg = (
+                    'Online payment is not configured. '
+                    'Please contact support.'
+                )
+            else:
+                msg = (
+                    f'No online payment method is available for '
+                    f'{currency.currency_code}. Please contact support.'
+                )
+            messages.error(request, msg, extra_tags='tenant')
             return _tenant_redirect(request, 'iroad_tenants:tenant_subscription_plan')
 
         tax_rate = tax.rate_percent or Decimal('0.00')
@@ -2265,6 +2582,19 @@ class TenantSubscriptionBillingView(View):
     """Tenant subscription billing page with live data."""
 
     @staticmethod
+    def _organization_base_currency(request):
+        """Tenant workspace organization profile base currency (e.g. SAR)."""
+        registry = _activate_tenant_workspace_schema(request)
+        if registry is None:
+            return 'SAR'
+        try:
+            org = OrganizationProfile.objects.order_by('-updated_at').first()
+            code = (getattr(org, 'base_currency_code', '') or '').strip().upper()
+            return code or 'SAR'
+        finally:
+            connection.set_schema_to_public()
+
+    @staticmethod
     def _parse_expiry(expiry_value):
         raw = (expiry_value or '').strip()
         if '/' not in raw:
@@ -2307,6 +2637,8 @@ class TenantSubscriptionBillingView(View):
             .first()
         ) or 'SAR'
 
+        base_currency = self._organization_base_currency(request)
+
         current_price = Decimal('0.00')
         if current_plan:
             current_pricing = PlanPricingCycle.objects.filter(
@@ -2323,18 +2655,57 @@ class TenantSubscriptionBillingView(View):
             .order_by('-issue_date')[:20]
         )
         start_of_year = timezone.now().date().replace(month=1, day=1)
-        total_spent_ytd = sum(
+        ytd_invoices = [
+            inv
+            for inv in invoices
+            if inv.issue_date
+            and inv.issue_date.date() >= start_of_year
+            and inv.status in ('Issued', 'Paid')
+        ]
+        total_spent_ytd_base = sum(
+            (
+                inv.base_currency_equivalent_amount
+                for inv in ytd_invoices
+                if inv.base_currency_equivalent_amount
+            ),
+            Decimal('0.00'),
+        )
+        total_spent_plan_currency = sum(
             (
                 inv.grand_total
-                for inv in invoices
-                if inv.issue_date
-                and inv.issue_date.date() >= start_of_year
-                and inv.status in ('Issued', 'Paid')
+                for inv in ytd_invoices
+                if inv.currency_id
+                and inv.currency
+                and inv.currency.currency_code == active_currency
             ),
             Decimal('0.00'),
         )
 
         next_payment_due = tenant.subscription_expiry_date
+
+        next_payment_display = build_dual_currency_display(
+            current_price,
+            active_currency,
+            base_currency,
+        )
+        total_spent_display = build_dual_currency_display(
+            total_spent_plan_currency,
+            active_currency,
+            base_currency,
+            base_equiv_amount=total_spent_ytd_base if total_spent_ytd_base > 0 else None,
+        )
+        for inv in invoices:
+            inv_code = (
+                inv.currency.currency_code
+                if inv.currency_id and inv.currency
+                else active_currency
+            )
+            inv.billing_display = build_dual_currency_display(
+                inv.grand_total,
+                inv_code,
+                base_currency,
+                base_equiv_amount=inv.base_currency_equivalent_amount,
+            )
         cards = list(
             TenantPaymentCard.objects.filter(
                 tenant_profile=tenant,
@@ -2367,9 +2738,11 @@ class TenantSubscriptionBillingView(View):
                 'current_cycle_label': 'Yearly Billing' if current_cycle == 12 else 'Monthly Billing',
                 'current_price': current_price,
                 'active_currency': active_currency,
+                'base_currency': base_currency,
+                'next_payment_display': next_payment_display,
+                'total_spent_display': total_spent_display,
                 'next_payment_due': next_payment_due,
                 'invoices': invoices,
-                'total_spent_ytd': total_spent_ytd,
                 'default_card': default_card,
                 'payment_cards': cards,
             }
@@ -2613,9 +2986,106 @@ class TenantInvoiceExportAllView(View):
         return response
 
 
+def _audit_list_filter_params(request):
+    """GET query params for audit list filters (excludes page)."""
+    params = {}
+    for key in ('date_from', 'date_to', 'module', 'performed_by'):
+        val = (request.GET.get(key) or '').strip()
+        if val:
+            params[key] = val
+    return params
+
+
+def _parse_audit_list_filters(request):
+    """Parse shared audit list filter GET params."""
+    date_from_str = (request.GET.get('date_from') or '').strip()
+    date_to_str = (request.GET.get('date_to') or '').strip()
+    module_filter = (request.GET.get('module') or '').strip()
+    performed_by_filter = (request.GET.get('performed_by') or '').strip()
+    date_from = parse_date(date_from_str) if date_from_str else None
+    date_to = parse_date(date_to_str) if date_to_str else None
+    if date_from and date_to and date_from > date_to:
+        date_from, date_to = date_to, date_from
+        date_from_str, date_to_str = date_to_str, date_from_str
+    filter_params = _audit_list_filter_params(request)
+    return {
+        'date_from_str': date_from_str,
+        'date_to_str': date_to_str,
+        'date_from': date_from,
+        'date_to': date_to,
+        'module_filter': module_filter,
+        'performed_by_filter': performed_by_filter,
+        'filter_params': filter_params,
+        'filters_active': bool(filter_params),
+        'filters_qs': urlencode(filter_params) if filter_params else '',
+    }
+
+
+def _login_session_events_filter_params(request):
+    return _audit_list_filter_params(request)
+
+
+def _login_session_events_filters_active(request):
+    return bool(_audit_list_filter_params(request))
+
+
+def _audit_event_matches_filters(event, *, date_from, date_to, module_filter, performed_by_filter, module_matches=None):
+    ts = event.get('timestamp')
+    if date_from or date_to:
+        if ts is None:
+            return False
+        event_date = ts.date() if hasattr(ts, 'date') else None
+        if event_date is None:
+            return False
+        if date_from and event_date < date_from:
+            return False
+        if date_to and event_date > date_to:
+            return False
+    if module_filter:
+        if module_matches is not None:
+            if not module_matches(event, module_filter):
+                return False
+        elif module_filter == 'auth':
+            if (event.get('module') or '').strip() != 'Authentication':
+                return False
+        elif module_filter == 'security':
+            if (event.get('module') or '').strip() != 'Security':
+                return False
+    if performed_by_filter:
+        haystack = (event.get('performed_by') or '').lower()
+        if performed_by_filter.lower() not in haystack:
+            return False
+    return True
+
+
+def _login_session_event_matches_filters(event, *, date_from, date_to, module_filter, performed_by_filter):
+    return _audit_event_matches_filters(
+        event,
+        date_from=date_from,
+        date_to=date_to,
+        module_filter=module_filter,
+        performed_by_filter=performed_by_filter,
+    )
+
+
+def _role_permission_module_matches(event, module_filter):
+    module = (event.get('module') or '').strip().lower()
+    if module_filter == 'roles':
+        return module == 'roles'
+    if module_filter == 'permissions':
+        return module != 'roles'
+    return True
+
+
 def _build_login_session_events_context(request):
     auth_payload = get_tenant_portal_cookie_payload(request) or {}
     tenant_id = str(auth_payload.get('tenant_id') or '').strip()
+
+    audit_filters = _parse_audit_list_filters(request)
+    date_from = audit_filters['date_from']
+    date_to = audit_filters['date_to']
+    module_filter = audit_filters['module_filter']
+    performed_by_filter = audit_filters['performed_by_filter']
 
     events = []
 
@@ -2641,9 +3111,6 @@ def _build_login_session_events_context(request):
             }
         )
 
-    successful_logins = 0
-    failed_attempts = 0
-
     # Tenant user login history and failed attempts from tenant workspace schema.
     tenant_registry = _activate_tenant_workspace_schema(request)
     if tenant_registry is not None:
@@ -2658,7 +3125,6 @@ def _build_login_session_events_context(request):
             )
             for user in users:
                 if user.get('last_login_at'):
-                    successful_logins += 1
                     events.append(
                         {
                             'timestamp': user.get('last_login_at'),
@@ -2668,7 +3134,6 @@ def _build_login_session_events_context(request):
                             'event_type': 'login_success',
                         }
                     )
-                failed_attempts += int(user.get('login_attempts') or 0)
                 if int(user.get('login_attempts') or 0) > 0:
                     events.append(
                         {
@@ -2682,12 +3147,32 @@ def _build_login_session_events_context(request):
         finally:
             connection.set_schema_to_public()
 
+    if audit_filters['filters_active']:
+        events = [
+            event
+            for event in events
+            if _audit_event_matches_filters(
+                event,
+                date_from=date_from,
+                date_to=date_to,
+                module_filter=module_filter,
+                performed_by_filter=performed_by_filter,
+            )
+        ]
+
     events.sort(key=lambda row: row.get('timestamp') or timezone.now(), reverse=True)
     paginator = Paginator(events, 10)
     page_obj = paginator.get_page(request.GET.get('page'))
 
     active_sessions = sum(1 for event in events if event.get('event_type') == 'active_session')
     total_events = len(events)
+    successful_logins = sum(1 for event in events if event.get('event_type') == 'login_success')
+    failed_attempts = 0
+    for event in events:
+        if event.get('event_type') != 'failed_attempt':
+            continue
+        match = re.search(r'\((\d+)\)', event.get('action') or '')
+        failed_attempts += int(match.group(1)) if match else 1
 
     rows = []
     start_index = (page_obj.number - 1) * paginator.per_page
@@ -2709,10 +3194,17 @@ def _build_login_session_events_context(request):
         'login_session_failed_attempts': failed_attempts,
         'login_session_rows': rows,
         'login_session_page_obj': page_obj,
+        'login_session_filter_date_from': audit_filters['date_from_str'],
+        'login_session_filter_date_to': audit_filters['date_to_str'],
+        'login_session_filter_module': module_filter,
+        'login_session_filter_performed_by': performed_by_filter,
+        'login_session_filters_active': audit_filters['filters_active'],
+        'login_session_filters_qs': audit_filters['filters_qs'],
     }
 
 
 def _build_role_permission_changes_context(request):
+    audit_filters = _parse_audit_list_filters(request)
     rows = []
     total_changes = 0
     active_roles = 0
@@ -2746,13 +3238,6 @@ def _build_role_permission_changes_context(request):
             active_roles = TenantRole.objects.filter(
                 status=TenantRole.Status.ACTIVE
             ).count()
-            permissions_updated = TenantRolePermission.objects.count()
-            # This card is labeled "Roles Deleted" in UI; use non-active roles
-            # as the closest live indicator since hard deletes are not tracked.
-            roles_deleted = TenantRole.objects.exclude(
-                status=TenantRole.Status.ACTIVE
-            ).count()
-            total_changes = len(role_events) + len(permission_events)
 
             raw_events = []
             for event in role_events:
@@ -2791,6 +3276,28 @@ def _build_role_permission_changes_context(request):
                     }
                 )
 
+            if audit_filters['filters_active']:
+                raw_events = [
+                    event
+                    for event in raw_events
+                    if _audit_event_matches_filters(
+                        event,
+                        date_from=audit_filters['date_from'],
+                        date_to=audit_filters['date_to'],
+                        module_filter=audit_filters['module_filter'],
+                        performed_by_filter=audit_filters['performed_by_filter'],
+                        module_matches=_role_permission_module_matches,
+                    )
+                ]
+
+            total_changes = len(raw_events)
+            permissions_updated = sum(
+                1 for event in raw_events if 'Permission' in (event.get('action') or '')
+            )
+            roles_deleted = sum(
+                1 for event in raw_events if (event.get('action') or '') == 'Role Disabled'
+            )
+
             raw_events.sort(
                 key=lambda item: item.get('timestamp') or timezone.now(),
                 reverse=True,
@@ -2818,13 +3325,19 @@ def _build_role_permission_changes_context(request):
         'role_permission_roles_deleted': roles_deleted,
         'role_permission_rows': rows,
         'role_permission_page_obj': page_obj,
+        'role_permission_filter_date_from': audit_filters['date_from_str'],
+        'role_permission_filter_date_to': audit_filters['date_to_str'],
+        'role_permission_filter_module': audit_filters['module_filter'],
+        'role_permission_filter_performed_by': audit_filters['performed_by_filter'],
+        'role_permission_filters_active': audit_filters['filters_active'],
+        'role_permission_filters_qs': audit_filters['filters_qs'],
     }
 
 
 def _build_critical_account_changes_context(request):
     auth_payload = get_tenant_portal_cookie_payload(request) or {}
     tenant_id = str(auth_payload.get('tenant_id') or '').strip()
-    search_query = (request.GET.get('search') or '').strip()
+    audit_filters = _parse_audit_list_filters(request)
     if not tenant_id:
         empty_page = Paginator([], 10).get_page(1)
         return {
@@ -2834,7 +3347,12 @@ def _build_critical_account_changes_context(request):
             'critical_account_critical_alerts': 0,
             'critical_account_rows': [],
             'critical_account_page_obj': empty_page,
-            'critical_account_search_query': search_query,
+            'critical_account_filter_date_from': audit_filters['date_from_str'],
+            'critical_account_filter_date_to': audit_filters['date_to_str'],
+            'critical_account_filter_module': audit_filters['module_filter'],
+            'critical_account_filter_performed_by': audit_filters['performed_by_filter'],
+            'critical_account_filters_active': audit_filters['filters_active'],
+            'critical_account_filters_qs': audit_filters['filters_qs'],
         }
 
     tenant_actor_label = 'Tenant Admin'
@@ -2914,15 +3432,31 @@ def _build_critical_account_changes_context(request):
         tenant_scope_q |= Q(record_id__in=tenant_user_ids)
 
     critical_qs = AuditLog.objects.filter(module_scope_q & tenant_scope_q).select_related('admin')
-    if search_query:
-        critical_qs = critical_qs.filter(
-            Q(action_type__icontains=search_query)
-            | Q(module_name__icontains=search_query)
-            | Q(record_id__icontains=search_query)
-            | Q(admin__email__icontains=search_query)
-            | Q(admin__first_name__icontains=search_query)
-            | Q(admin__last_name__icontains=search_query)
+    if audit_filters['date_from']:
+        critical_qs = critical_qs.filter(timestamp__date__gte=audit_filters['date_from'])
+    if audit_filters['date_to']:
+        critical_qs = critical_qs.filter(timestamp__date__lte=audit_filters['date_to'])
+    module_filter = audit_filters['module_filter']
+    if module_filter == 'billing':
+        critical_qs = critical_qs.filter(billing_terms)
+    elif module_filter == 'security':
+        critical_qs = critical_qs.filter(security_terms)
+    elif module_filter == 'tenant':
+        critical_qs = critical_qs.exclude(billing_terms).exclude(security_terms)
+    if audit_filters['performed_by_filter']:
+        performed_q = (
+            Q(admin__email__icontains=audit_filters['performed_by_filter'])
+            | Q(admin__first_name__icontains=audit_filters['performed_by_filter'])
+            | Q(admin__last_name__icontains=audit_filters['performed_by_filter'])
         )
+        matching_user_ids = [
+            user_id
+            for user_id, label in tenant_user_map.items()
+            if audit_filters['performed_by_filter'].lower() in label.lower()
+        ]
+        if matching_user_ids:
+            performed_q |= Q(record_id__in=matching_user_ids)
+        critical_qs = critical_qs.filter(performed_q)
     critical_qs = critical_qs.order_by('-timestamp')
     paginator = Paginator(critical_qs, 10)
     page_obj = paginator.get_page(request.GET.get('page'))
@@ -2977,7 +3511,12 @@ def _build_critical_account_changes_context(request):
         'critical_account_critical_alerts': critical_alerts,
         'critical_account_rows': rows,
         'critical_account_page_obj': page_obj,
-        'critical_account_search_query': search_query,
+        'critical_account_filter_date_from': audit_filters['date_from_str'],
+        'critical_account_filter_date_to': audit_filters['date_to_str'],
+        'critical_account_filter_module': audit_filters['module_filter'],
+        'critical_account_filter_performed_by': audit_filters['performed_by_filter'],
+        'critical_account_filters_active': audit_filters['filters_active'],
+        'critical_account_filters_qs': audit_filters['filters_qs'],
     }
 
 
@@ -4892,6 +5431,7 @@ class TenantSalesInvoiceReportCreateView(View):
                     **bundle,
                     'is_edit': False,
                     'page_title': 'Create Sales Invoice Report',
+                    'auto_post_enabled': False,
                     'lock_state': 'editable',
                     'booking_lines': [],
                     'surcharge_lines': [],
@@ -4914,6 +5454,7 @@ class TenantSalesInvoiceReportCreateView(View):
             clear_tenant_portal_cookie(response, request=request)
             return response
         try:
+            auto_post = _post_flag_enabled(request.POST, 'auto_post')
             bundle = _sales_invoice_report_forms_with_preview(data=request.POST)
             form = bundle['report_form']
             if not form.is_valid():
@@ -4922,6 +5463,7 @@ class TenantSalesInvoiceReportCreateView(View):
                         **bundle,
                         'is_edit': False,
                         'page_title': 'Create Sales Invoice Report',
+                        'auto_post_enabled': auto_post,
                         'lock_state': 'editable',
                         'booking_lines': [],
                         'surcharge_lines': [],
@@ -4932,7 +5474,6 @@ class TenantSalesInvoiceReportCreateView(View):
                 messages.error(request, 'Please fix the highlighted errors.', extra_tags='tenant')
                 return render(request, self.template_name, context)
 
-            auto_post = _post_flag_enabled(request.POST, 'auto_post')
             try:
                 obj = _create_sales_invoice_report_with_auto_number(
                     form=form,
@@ -4946,6 +5487,7 @@ class TenantSalesInvoiceReportCreateView(View):
                         **bundle,
                         'is_edit': False,
                         'page_title': 'Create Sales Invoice Report',
+                        'auto_post_enabled': auto_post,
                         'lock_state': 'editable',
                         'booking_lines': [],
                         'surcharge_lines': [],
@@ -5017,9 +5559,15 @@ class TenantSalesInvoiceReportDetailView(View):
             context.update(
                 {
                     'report': report,
-                    'booking_lines': report.booking_lines.all().order_by('line_no'),
-                    'surcharge_lines': report.surcharge_lines.all().order_by('line_no'),
-                    'shipment_lines': report.shipment_lines.all().order_by('line_no'),
+                    'booking_lines': report.booking_lines.select_related(
+                        'booking', 'booking__service_item', 'booking__sales_invoice_report'
+                    ).order_by('line_no'),
+                    'surcharge_lines': report.surcharge_lines.select_related(
+                        'surcharge', 'surcharge__shipment', 'booking', 'shipment'
+                    ).order_by('line_no'),
+                    'shipment_lines': report.shipment_lines.select_related(
+                        'shipment', 'shipment__truck', 'booking', 'booking__sales_invoice_report'
+                    ).order_by('line_no'),
                     'status_timeline': status_timeline,
                     'lock_state': _sales_invoice_report_lock_state(report.status),
                     'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
@@ -5051,9 +5599,15 @@ class TenantSalesInvoiceReportPrintView(View):
             if not report:
                 return JsonResponse({'error': 'Sales Invoice Report not found'}, status=404)
 
-            booking_lines = list(report.booking_lines.all().order_by('line_no'))
-            surcharge_lines = list(report.surcharge_lines.all().order_by('line_no'))
-            shipment_lines = list(report.shipment_lines.all().order_by('line_no'))
+            booking_lines = list(
+                report.booking_lines.select_related('booking').order_by('line_no')
+            )
+            surcharge_lines = list(
+                report.surcharge_lines.select_related('surcharge', 'shipment').order_by('line_no')
+            )
+            shipment_lines = list(
+                report.shipment_lines.select_related('shipment', 'booking').order_by('line_no')
+            )
             total_amount = (report.total_freight_amount or Decimal('0')) + (
                 report.total_surcharge_amount or Decimal('0')
             )
@@ -5327,11 +5881,18 @@ class TenantSalesInvoiceReportUpdateView(View):
                 {
                     **bundle,
                     'report': report,
-                    'booking_lines': report.booking_lines.all().order_by('line_no'),
-                    'surcharge_lines': report.surcharge_lines.all().order_by('line_no'),
-                    'shipment_lines': report.shipment_lines.all().order_by('line_no'),
+                    'booking_lines': report.booking_lines.select_related(
+                        'booking', 'booking__service_item', 'booking__sales_invoice_report'
+                    ).order_by('line_no'),
+                    'surcharge_lines': report.surcharge_lines.select_related(
+                        'surcharge', 'surcharge__shipment', 'booking', 'shipment'
+                    ).order_by('line_no'),
+                    'shipment_lines': report.shipment_lines.select_related(
+                        'shipment', 'shipment__truck', 'booking'
+                    ).order_by('line_no'),
                     'is_edit': True,
                     'page_title': f'Edit {report.report_no}',
+                    'auto_post_enabled': report.auto_post,
                     'lock_state': _sales_invoice_report_lock_state(report.status),
                     'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
                 }
@@ -5351,6 +5912,7 @@ class TenantSalesInvoiceReportUpdateView(View):
             clear_tenant_portal_cookie(response, request=request)
             return response
         try:
+            auto_post = _post_flag_enabled(request.POST, 'auto_post')
             report = SalesInvoiceReport.objects.filter(pk=report_id).first()
             if not report:
                 messages.error(request, 'Sales Invoice Report not found.', extra_tags='tenant')
@@ -5371,11 +5933,18 @@ class TenantSalesInvoiceReportUpdateView(View):
                     {
                         **bundle,
                         'report': report,
-                        'booking_lines': report.booking_lines.all().order_by('line_no'),
-                        'surcharge_lines': report.surcharge_lines.all().order_by('line_no'),
-                        'shipment_lines': report.shipment_lines.all().order_by('line_no'),
+                        'booking_lines': report.booking_lines.select_related(
+                            'booking', 'booking__service_item', 'booking__sales_invoice_report'
+                        ).order_by('line_no'),
+                        'surcharge_lines': report.surcharge_lines.select_related(
+                            'surcharge', 'surcharge__shipment', 'booking', 'shipment'
+                        ).order_by('line_no'),
+                        'shipment_lines': report.shipment_lines.select_related(
+                            'shipment', 'shipment__truck', 'booking'
+                        ).order_by('line_no'),
                         'is_edit': True,
                         'page_title': f'Edit {report.report_no}',
+                        'auto_post_enabled': auto_post,
                         'lock_state': _sales_invoice_report_lock_state(report.status),
                         'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
                     }
@@ -5383,7 +5952,6 @@ class TenantSalesInvoiceReportUpdateView(View):
                 messages.error(request, 'Please fix the highlighted errors.', extra_tags='tenant')
                 return render(request, self.template_name, context)
 
-            auto_post = _post_flag_enabled(request.POST, 'auto_post')
             try:
                 with db_transaction.atomic():
                     obj = form.save(commit=False)
@@ -5392,6 +5960,7 @@ class TenantSalesInvoiceReportUpdateView(View):
                     obj.report_sequence = original.report_sequence
                     obj.total_freight_amount = original.total_freight_amount
                     obj.total_surcharge_amount = original.total_surcharge_amount
+                    obj.auto_post = auto_post
                     if original.status == SalesInvoiceReport.Status.VERIFIED:
                         # Verified reports are partially locked: keep header scope immutable.
                         obj.client_id = original.client_id
@@ -5417,11 +5986,18 @@ class TenantSalesInvoiceReportUpdateView(View):
                     {
                         **bundle,
                         'report': report,
-                        'booking_lines': report.booking_lines.all().order_by('line_no'),
-                        'surcharge_lines': report.surcharge_lines.all().order_by('line_no'),
-                        'shipment_lines': report.shipment_lines.all().order_by('line_no'),
+                        'booking_lines': report.booking_lines.select_related(
+                            'booking', 'booking__service_item', 'booking__sales_invoice_report'
+                        ).order_by('line_no'),
+                        'surcharge_lines': report.surcharge_lines.select_related(
+                            'surcharge', 'surcharge__shipment', 'booking', 'shipment'
+                        ).order_by('line_no'),
+                        'shipment_lines': report.shipment_lines.select_related(
+                            'shipment', 'shipment__truck', 'booking'
+                        ).order_by('line_no'),
                         'is_edit': True,
                         'page_title': f'Edit {report.report_no}',
+                        'auto_post_enabled': auto_post,
                         'lock_state': _sales_invoice_report_lock_state(report.status),
                         'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
                     }
@@ -5480,6 +6056,24 @@ class TenantSalesInvoiceReportStatusUpdateView(View):
                 report.sales_invoice_ref = uuid.uuid4()
             report.updated_by = (context.get('display_name') or '').strip()
             report.save(update_fields=['status', 'sales_invoice_ref', 'updated_by', 'updated_at'])
+            if next_status in {
+                SalesInvoiceReport.Status.VERIFIED,
+                SalesInvoiceReport.Status.CONVERTED,
+            }:
+                linked_count = _tenant_booking_sync_sales_report_backlinks(report)
+                shipment_linked = _tenant_shipment_sync_sales_report_backlinks(report)
+                if linked_count:
+                    messages.info(
+                        request,
+                        f'{linked_count} booking(s) linked to {report.report_no}.',
+                        extra_tags='tenant',
+                    )
+                if shipment_linked:
+                    messages.info(
+                        request,
+                        f'{shipment_linked} shipment(s) linked to {report.report_no}.',
+                        extra_tags='tenant',
+                    )
             if next_status == SalesInvoiceReport.Status.CONVERTED:
                 invoiced_count = _tenant_surcharge_mark_invoiced_for_converted_report(report)
                 if invoiced_count:
@@ -5725,7 +6319,7 @@ class TenantOperationBookingCreateView(View):
                     booking_sequence=booking_sequence,
                     creation_date=timezone.localdate(),
                     booking_date=booking_date,
-                    execution_date=None,
+                    execution_date=validated.get('execution_date'),
                     booking_status=booking_status,
                     client_account=client,
                     price_list=price_list,
@@ -5781,6 +6375,9 @@ class TenantOperationBookingListView(View):
                 'client_account',
                 'price_list',
                 'service_item',
+                'route',
+                'route__origin_point',
+                'route__destination_point',
                 'assigned_truck',
                 'assigned_driver',
             )
@@ -5789,41 +6386,22 @@ class TenantOperationBookingListView(View):
                     Q(booking_no__icontains=search_q)
                     | Q(client_account__display_name__icontains=search_q)
                     | Q(route_display__icontains=search_q)
-                    | Q(price_list__price_list_code__icontains=search_q)
+                    | Q(trip_type__icontains=search_q)
+                    | Q(assigned_truck__truck_code__icontains=search_q)
+                    | Q(route__route_label__icontains=search_q)
+                    | Q(route__origin_point__display_label__icontains=search_q)
+                    | Q(route__destination_point__display_label__icontains=search_q)
                 )
 
-            stats_qs = TenantBooking.objects.all()
             booking_page_obj = Paginator(qs.order_by('-created_at'), 10).get_page(
                 request.GET.get('page') or 1
             )
             start_index = booking_page_obj.start_index() if booking_page_obj.paginator.count else 0
-            booking_rows = []
-            for idx, booking in enumerate(booking_page_obj.object_list, start=start_index):
-                has_any_shipment = TenantShipment.objects.filter(booking_id=booking.booking_id).exists()
-                booking_rows.append(
-                    {
-                        'sn': idx,
-                        'booking_id': booking.booking_id,
-                        'booking_no': booking.booking_no,
-                        'creation_date': booking.creation_date,
-                        'booking_date': booking.booking_date,
-                        'execution_date': booking.execution_date,
-                        'client_name': booking.client_account.display_name,
-                        'route_text': booking.route_display or '-',
-                        'trip_type': booking.trip_type or '-',
-                        'derived_status': _tenant_booking_derived_header_status(booking),
-                        'db_status': booking.booking_status,
-                        'has_active_shipment': _tenant_booking_has_active_shipment(booking),
-                        'can_cancel': (
-                            booking.booking_status != TenantBooking.Status.CANCELLED
-                            and not has_any_shipment
-                        ),
-                        'sales_order_no': booking.price_list.price_list_code if booking.price_list else '-',
-                        'truck_no': booking.assigned_truck.truck_code if booking.assigned_truck else '-',
-                        'sales_report': '-',
-                        'sales_report_status': '-',
-                    }
-                )
+            booking_rows = _tenant_booking_build_list_rows(
+                booking_page_obj.object_list,
+                start_index=start_index,
+                can_delete=context.get('is_tenant_admin'),
+            )
 
             context.update(
                 {
@@ -6401,7 +6979,7 @@ class TenantOperationShipmentDocumentsCreateView(View):
                 status = line.soft_copy_status or 'Not Completed'
                 has_meaningful_value = any([
                     line.source,
-                    line.action_log,
+                    line.action_log_id,
                     line.doc_page,
                     line.physical_location,
                     line.attachment_label,
@@ -6413,7 +6991,7 @@ class TenantOperationShipmentDocumentsCreateView(View):
                 line_rows.append(
                     {
                         'doc_ref_no': line.source or '',
-                        'extra_ref': line.action_log or '',
+                        'extra_ref': line.action_log.log_no if line.action_log_id else '',
                         'page_no': line.doc_page or '',
                         'status': status,
                         'physical_location': line.physical_location or '',
@@ -6854,8 +7432,15 @@ class TenantOperationShipmentPodCreateView(View):
         if not pod_form_data.get('receiver_user_id') and default_receiver_user_id:
             pod_form_data['receiver_user_id'] = default_receiver_user_id
         if line_rows is None and document is not None:
-            line_rows = list(document.pod_pages.select_related('source_page').order_by('line_no'))
+            line_rows = list(
+                document.pod_pages.select_related('source_page', 'action_log').order_by('line_no')
+            )
         source_document = None
+        linked_shipment = None
+        if document is not None and document.shipment_id:
+            linked_shipment = document.shipment
+        elif form_data and form_data.get('shipment_id'):
+            linked_shipment = TenantShipment.objects.filter(pk=form_data['shipment_id']).first()
         if document is not None and document.source_document_id:
             source_document = document.source_document
         return {
@@ -6866,6 +7451,11 @@ class TenantOperationShipmentPodCreateView(View):
             'delivery_note_options': delivery_note_options,
             'delivery_note_pages_json': json.dumps(_tenant_shipment_pod_delivery_note_pages_map()),
             'pod_line_page_options': _tenant_shipment_pod_line_page_options(source_document),
+            'pod_action_log_options': _tenant_shipment_pod_action_log_option_rows(
+                shipment=linked_shipment,
+            )
+            if linked_shipment
+            else _tenant_shipment_pod_action_log_option_rows(),
             'user_options': user_options,
             'default_receiver_user_id': default_receiver_user_id,
             'pod_page_rows': line_rows or [],
@@ -6898,7 +7488,7 @@ class TenantOperationShipmentPodCreateView(View):
                     .prefetch_related(
                         Prefetch(
                             'pod_pages',
-                            queryset=TenantShipmentPodPage.objects.select_related('source_page').order_by('line_no'),
+                            queryset=TenantShipmentPodPage.objects.select_related('source_page', 'action_log').order_by('line_no'),
                         )
                     )
                     .filter(record_no=record_no)
@@ -7028,18 +7618,36 @@ class TenantOperationShipmentPodCreateView(View):
                     doc_page_label = raw_doc_page
                 else:
                     doc_page_label = ''
+                action_log = _tenant_shipment_pod_resolve_action_log(
+                    row.get('action_log_id') or row.get('action_log'),
+                    shipment=shipment,
+                    form_errors=form_errors,
+                    line_no=idx,
+                )
                 values = {
                     'source_page': source_page,
                     'doc_page': doc_page_label,
                     'source': str(row.get('source') or '').strip(),
-                    'action_log': str(row.get('action_log') or '').strip(),
+                    'action_log': action_log,
                     'physical_location': str(row.get('physical_location') or '').strip(),
                     'soft_copy_status': str(row.get('soft_copy_status') or '').strip(),
                     'digital_evidence_status': str(row.get('digital_evidence_status') or '').strip(),
                     'map_url': str(row.get('map_url') or '').strip(),
                     'attachment_label': str(row.get('attachment_label') or '').strip(),
                 }
-                if not any(values.values()):
+                if not any(
+                    [
+                        values['source_page'],
+                        values['doc_page'],
+                        values['source'],
+                        values['action_log'],
+                        values['physical_location'],
+                        values['soft_copy_status'],
+                        values['digital_evidence_status'],
+                        values['map_url'],
+                        values['attachment_label'],
+                    ]
+                ):
                     continue
                 if not values['doc_page']:
                     continue
@@ -7171,7 +7779,16 @@ class TenantOperationShipmentPodDetailView(View):
             clear_tenant_portal_cookie(response, request=request)
             return response
         try:
-            document = TenantShipmentDocument.objects.prefetch_related('pod_pages').filter(record_no=record_no).first()
+            document = (
+                TenantShipmentDocument.objects.prefetch_related(
+                    Prefetch(
+                        'pod_pages',
+                        queryset=TenantShipmentPodPage.objects.select_related('action_log').order_by('line_no'),
+                    )
+                )
+                .filter(record_no=record_no)
+                .first()
+            )
             shipment = None
             if document is not None and document.shipment_id:
                 shipment = document.shipment
@@ -10232,6 +10849,51 @@ class TenantOperationBookingCancelView(View):
             connection.set_schema_to_public()
 
 
+class TenantOperationBookingDeleteView(View):
+    """Permanently delete a booking when no dependent records exist."""
+
+    def post(self, request, booking_id):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        if not context.get('is_tenant_admin'):
+            messages.error(request, 'Only tenant admin can delete bookings.', extra_tags='tenant')
+            return _tenant_redirect(request, 'iroad_tenants:tenant_dashboard')
+
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        if tenant_registry is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        try:
+            booking = TenantBooking.objects.filter(pk=booking_id).first()
+            if booking is None:
+                messages.error(request, 'Booking not found.', extra_tags='tenant')
+                return _tenant_redirect(request, 'iroad_tenants:tenant_operation_booking_list')
+
+            delete_errors = _tenant_booking_delete_guard_errors(booking)
+            if delete_errors:
+                for error in delete_errors:
+                    messages.error(request, error, extra_tags='tenant')
+                return redirect('iroad_tenants:tenant_operation_booking_edit', booking_id=booking_id)
+
+            booking_no = booking.booking_no
+            attachment = booking.booking_attachment
+            if attachment:
+                attachment.delete(save=False)
+            booking.delete()
+            messages.success(
+                request,
+                f'Booking {booking_no} deleted successfully.',
+                extra_tags='tenant',
+            )
+            return _tenant_redirect(request, 'iroad_tenants:tenant_operation_booking_list')
+        finally:
+            connection.set_schema_to_public()
+
+
 class TenantOperationActionLogEditView(View):
     template_name = 'iroad_tenants/Operation_management/Operation_Action/Operation-action-log.html'
 
@@ -10803,17 +11465,26 @@ def _tenant_booking_form_options_context(tenant_registry, booking=None):
             'sell_price': str(booking.sell_price or ''),
             'booking_line_truck_1': str(booking.assigned_truck_id or ''),
             'booking_line_driver_1': str(booking.assigned_driver_id or ''),
-            'booking_line_cod_amount_1': str(booking.booking_line_cod_amount or ''),
-            'booking_line_pod_doc_count_1': str(booking.booking_line_pod_doc_count or ''),
+            'booking_line_cod_amount_1': str(booking.booking_line_cod_amount),
+            'booking_line_pod_doc_count_1': str(booking.booking_line_pod_doc_count),
             'booking_line_truck_2': str(booking.booking_line_backload_truck_id or ''),
             'booking_line_driver_2': str(booking.booking_line_backload_driver_id or ''),
-            'booking_line_cod_amount_2': str(booking.booking_line_backload_cod_amount or ''),
-            'booking_line_pod_doc_count_2': str(booking.booking_line_backload_pod_doc_count or ''),
-            'loading_booking_item_1': booking.loading_booking_item,
+            'booking_line_cod_amount_2': str(booking.booking_line_backload_cod_amount),
+            'booking_line_pod_doc_count_2': str(booking.booking_line_backload_pod_doc_count),
+            'loading_booking_item_1': _tenant_booking_normalize_booking_item(
+                booking.trip_type,
+                booking.loading_booking_item,
+            ),
             'loading_address_1': str(booking.loading_address_id or ''),
-            'delivery_booking_item_1': booking.delivery_booking_item,
+            'delivery_booking_item_1': _tenant_booking_normalize_booking_item(
+                booking.trip_type,
+                booking.delivery_booking_item,
+            ),
             'delivery_address_1': str(booking.delivery_address_id or ''),
-            'cargo_booking_item_1': booking.cargo_booking_item,
+            'cargo_booking_item_1': _tenant_booking_normalize_booking_item(
+                booking.trip_type,
+                booking.cargo_booking_item,
+            ),
             'cargo_id_1': str(booking.cargo_id or ''),
             'cargo_weight_1': str(booking.cargo_weight or ''),
             'cargo_unit_1': booking.cargo_unit,
@@ -10845,8 +11516,28 @@ def _tenant_booking_form_options_context(tenant_registry, booking=None):
         'booking_pod_type_options': ('Digital', 'Soft', 'Hard'),
         'booking_pod_status_options': ('Pending', 'Received', 'Verified'),
         'booking_form_data': form_data,
+        'booking_sales_report': _tenant_booking_sales_report_linkage(booking),
         'tenant_schema_name': tenant_registry.schema_name,
     }
+
+
+def _tenant_booking_line_types_for_trip(trip_type):
+    trip_type = (trip_type or '').strip()
+    if trip_type == 'Round':
+        return ('Outbound', 'Backload')
+    if trip_type:
+        return ('Outbound',)
+    return ()
+
+
+def _tenant_booking_normalize_booking_item(trip_type, booking_item, *, default='Outbound'):
+    booking_item = (booking_item or '').strip()
+    allowed = _tenant_booking_line_types_for_trip(trip_type)
+    if not allowed:
+        return booking_item or default
+    if booking_item in allowed:
+        return booking_item
+    return allowed[0]
 
 
 def _tenant_booking_shipment_line_key(booking, booking_item_type):
@@ -10911,6 +11602,32 @@ def _tenant_booking_line_status_map(booking):
     if not status_map:
         status_map = {'Outbound': 'Draft', 'Backload': 'Draft'}
     return status_map
+
+
+def _tenant_booking_derived_pod_status(booking):
+    """Doc §3.3: readonly POD status derived from linked shipment POD states."""
+    if booking is None:
+        return TenantShipment.PodStatus.PENDING
+    stored = (booking.pod_status or '').strip()
+    if stored:
+        return stored
+    shipment_statuses = list(
+        TenantShipment.objects.filter(booking_id=booking.booking_id)
+        .exclude(shipment_status=TenantShipment.ShipmentStatus.CANCELLED)
+        .values_list('pod_status', flat=True)
+    )
+    if not shipment_statuses:
+        return TenantShipment.PodStatus.PENDING
+    statuses = [(status or '').strip() for status in shipment_statuses if (status or '').strip()]
+    if not statuses:
+        return TenantShipment.PodStatus.PENDING
+    if TenantShipment.PodStatus.NOT_COMPLIANT in statuses:
+        return TenantShipment.PodStatus.NOT_COMPLIANT
+    if all(status == TenantShipment.PodStatus.COMPLIANT for status in statuses):
+        return TenantShipment.PodStatus.COMPLIANT
+    if TenantShipment.PodStatus.HARD_COPY_RECEIVED in statuses:
+        return TenantShipment.PodStatus.HARD_COPY_RECEIVED
+    return TenantShipment.PodStatus.PENDING
 
 
 def _tenant_booking_derived_header_status(booking):
@@ -10981,6 +11698,101 @@ def _tenant_booking_edit_guard_errors(booking, request, *, has_table=None):
     return errors
 
 
+def _tenant_booking_delete_guard_errors(booking):
+    """Hard delete only when no dependent operational records exist."""
+    if booking is None:
+        return ['Booking not found.']
+    errors = []
+    if TenantShipment.objects.filter(booking_id=booking.booking_id).exists():
+        errors.append('Booking cannot be deleted while any shipment exists.')
+    if booking.shipment_surcharges.exists():
+        errors.append('Booking cannot be deleted while surcharge records exist.')
+    if booking.shipment_documents.exists():
+        errors.append('Booking cannot be deleted while shipment document records exist.')
+    if booking.document_handovers.exists():
+        errors.append('Booking cannot be deleted while document handover records exist.')
+    return errors
+
+
+def _tenant_booking_route_endpoint_label(location):
+    """Human-readable location name for route chips (display label, not location code)."""
+    if location is None:
+        return ''
+    label = (getattr(location, 'display_label', '') or '').strip()
+    if label:
+        return label
+    return (getattr(location, 'location_code', '') or '').strip()
+
+
+def _tenant_booking_route_chip(booking):
+    """Route pill labels for booking list (origin ↔ destination display names)."""
+    title = (booking.route_display or '').strip()
+    origin_label = ''
+    dest_label = ''
+    route = getattr(booking, 'route', None)
+    direction = (getattr(booking, 'route_direction', '') or 'forward').strip().lower()
+    is_reverse = direction == 'reverse'
+    if route is not None:
+        route_title = (getattr(route, 'route_label', '') or '').strip()
+        if route_title:
+            title = route_title
+        forward_origin = _tenant_booking_route_endpoint_label(getattr(route, 'origin_point', None))
+        forward_dest = _tenant_booking_route_endpoint_label(getattr(route, 'destination_point', None))
+        if is_reverse:
+            origin_label, dest_label = forward_dest, forward_origin
+        else:
+            origin_label, dest_label = forward_origin, forward_dest
+        if not title and forward_origin and forward_dest:
+            title = f'{forward_origin} — {forward_dest}'
+            if is_reverse:
+                title = f'{forward_dest} — {forward_origin}'
+    if (not origin_label or not dest_label) and title:
+        parts = re.split(r'\s+(?:to|—|–|-)\s+', title, maxsplit=1, flags=re.IGNORECASE)
+        if len(parts) == 2:
+            if not origin_label:
+                origin_label = parts[0].strip()
+            if not dest_label:
+                dest_label = parts[1].strip()
+            if is_reverse:
+                origin_label, dest_label = dest_label, origin_label
+    if not origin_label and not dest_label:
+        return None
+    if not title:
+        title = f'{origin_label} — {dest_label}'
+    return {
+        'origin': origin_label or '—',
+        'destination': dest_label or '—',
+        'title': title,
+        'route_label': title,
+    }
+
+
+def _tenant_booking_build_list_rows(bookings, *, start_index, can_delete=False):
+    rows = []
+    for idx, booking in enumerate(bookings, start=start_index):
+        rows.append(
+            {
+                'sn': idx,
+                'booking_id': booking.booking_id,
+                'booking_no': booking.booking_no,
+                'creation_date': booking.creation_date,
+                'booking_date': booking.booking_date,
+                'execution_date': booking.execution_date,
+                'client_name': booking.client_account.display_name if booking.client_account else '-',
+                'route_chip': _tenant_booking_route_chip(booking),
+                'route_text': booking.route_display or '-',
+                'trip_type': booking.trip_type or '-',
+                'derived_status': _tenant_booking_derived_header_status(booking),
+                'db_status': booking.booking_status,
+                'has_active_shipment': _tenant_booking_has_active_shipment(booking),
+                'can_delete': can_delete and not _tenant_booking_delete_guard_errors(booking),
+                'truck_no': booking.assigned_truck.truck_code if booking.assigned_truck else '',
+                'truck_unassigned': booking.assigned_truck_id is None,
+            }
+        )
+    return rows
+
+
 def _tenant_booking_cancel_guard_errors(booking, new_status):
     """R3: whole booking cancel only when no shipment exists (doc §3.8)."""
     if (
@@ -10994,38 +11806,165 @@ def _tenant_booking_cancel_guard_errors(booking, new_status):
     return []
 
 
+def _tenant_booking_line_is_inbound(line_type):
+    return (line_type or '').strip() in {'Backload', 'Inbound'}
+
+
+def _tenant_booking_line_has_truck(booking, line_type):
+    if _tenant_booking_line_is_inbound(line_type):
+        return bool(booking.booking_line_backload_truck_id)
+    return bool(booking.assigned_truck_id)
+
+
 def _tenant_booking_stats():
     """List KPI counts aligned with doc §3.2.1 (derived Executed / Active)."""
-    stats_qs = TenantBooking.objects.all()
+    stats_qs = TenantBooking.objects.select_related(
+        'route',
+        'route__origin_point',
+        'route__destination_point',
+    ).all()
     total = stats_qs.count()
-    cancelled = stats_qs.filter(booking_status=TenantBooking.Status.CANCELLED).count()
-    executed = 0
-    active = 0
+    active = executed = cancelled = draft = 0
+    round_count = inbound_items = outbound_items = unassigned = 0
+
     for booking in stats_qs.iterator():
         derived = _tenant_booking_derived_header_status(booking)
         if derived == 'Executed':
             executed += 1
         elif derived == 'Active':
             active += 1
-    round_count = stats_qs.filter(trip_type='Round').count()
-    outbound_items = stats_qs.filter(trip_type='Round').count()
-    outbound_items += stats_qs.exclude(trip_type='Round').count()
-    inbound_items = stats_qs.filter(trip_type='Round').count()
-    inbound_items += stats_qs.filter(route_direction='reverse').exclude(trip_type='Round').count()
-    unassigned = stats_qs.filter(
-        booking_status=TenantBooking.Status.CONFIRMED,
-        assigned_truck__isnull=True,
-    ).count()
+        elif derived == 'Cancelled':
+            cancelled += 1
+        elif derived == 'Draft':
+            draft += 1
+
+        if booking.trip_type == 'Round':
+            round_count += 1
+
+        missing_truck = False
+        for line in _tenant_shipment_booking_line_rows(booking):
+            line_type = line['booking_item_type']
+            line_status = _tenant_booking_line_operational_status(booking, line_type)
+            if line_status == 'Cancelled':
+                continue
+            if _tenant_booking_line_is_inbound(line_type):
+                inbound_items += 1
+            else:
+                outbound_items += 1
+            if not _tenant_booking_line_has_truck(booking, line_type):
+                missing_truck = True
+
+        if derived not in {'Cancelled'} and missing_truck:
+            unassigned += 1
+
     return {
         'total': total,
         'active': active,
         'executed': executed,
         'cancelled': cancelled,
+        'draft': draft,
         'round': round_count,
         'inbound': inbound_items,
         'outbound': outbound_items,
         'unassigned_truck': unassigned,
     }
+
+
+def _tenant_booking_sales_report_status_label(report_status):
+    """Map SIR status to booking Sales Report Status (doc Ch.3 / Ch.12)."""
+    status = (report_status or '').strip()
+    if status == SalesInvoiceReport.Status.CONVERTED:
+        return 'Invoiced'
+    if status == SalesInvoiceReport.Status.VERIFIED:
+        return 'Submitted'
+    if status == SalesInvoiceReport.Status.DRAFT:
+        return 'Pending'
+    return ''
+
+
+def _tenant_booking_sales_report_linkage(booking):
+    """Resolve Sales Report no + derived status for booking header display."""
+    empty = {
+        'sales_report_no': '',
+        'sales_report_status': '',
+        'sales_report_id': None,
+    }
+    if booking is None:
+        return empty
+
+    report = None
+    if getattr(booking, 'sales_invoice_report_id', None):
+        report = getattr(booking, 'sales_invoice_report', None)
+        if report is None:
+            report = SalesInvoiceReport.objects.filter(pk=booking.sales_invoice_report_id).first()
+
+    if report is None:
+        status_rank = {
+            SalesInvoiceReport.Status.CONVERTED: 0,
+            SalesInvoiceReport.Status.VERIFIED: 1,
+            SalesInvoiceReport.Status.DRAFT: 2,
+        }
+        lines = list(
+            SalesInvoiceReportBooking.objects.filter(booking_id=booking.booking_id)
+            .select_related('report')
+        )
+        if lines:
+            best_line = min(
+                lines,
+                key=lambda row: (
+                    status_rank.get(getattr(row.report, 'status', ''), 99),
+                    -(getattr(row.report, 'updated_at', timezone.now()).timestamp()),
+                ),
+            )
+            report = best_line.report
+
+    if report is None:
+        stored_status = (getattr(booking, 'sales_report_status', '') or '').strip()
+        if stored_status:
+            empty['sales_report_status'] = stored_status
+        return empty
+
+    status_label = _tenant_booking_sales_report_status_label(report.status)
+    stored_status = (getattr(booking, 'sales_report_status', '') or '').strip()
+    return {
+        'sales_report_no': report.report_no,
+        'sales_report_status': status_label or stored_status,
+        'sales_report_id': report.report_id,
+    }
+
+
+def _tenant_booking_sync_sales_report_backlinks(report):
+    """Write Sales Report backlink + derived status onto included bookings (Ch.12 §12.5.3)."""
+    if report is None:
+        return 0
+    status_label = _tenant_booking_sales_report_status_label(report.status)
+    booking_ids = list(
+        report.booking_lines.exclude(booking__isnull=True).values_list('booking_id', flat=True)
+    )
+    if not booking_ids:
+        return 0
+    return TenantBooking.objects.filter(booking_id__in=booking_ids).update(
+        sales_invoice_report_id=report.report_id,
+        sales_report_status=status_label,
+        updated_at=timezone.now(),
+    )
+
+
+def _tenant_shipment_sync_sales_report_backlinks(report):
+    """Write Sales Report backlink onto included shipments (Ch.12 §12.5.3)."""
+    if report is None:
+        return 0
+    status_label = _tenant_booking_sales_report_status_label(report.status)
+    shipment_ids = list(
+        report.shipment_lines.exclude(shipment__isnull=True).values_list('shipment_id', flat=True)
+    )
+    if not shipment_ids:
+        return 0
+    return TenantShipment.objects.filter(shipment_id__in=shipment_ids).update(
+        sales_invoice_ref=report.report_no,
+        sales_invoice_status=status_label,
+        updated_at=timezone.now(),
+    )
 
 
 def _tenant_operation_action_matches(action, *needles):
@@ -11480,10 +12419,11 @@ def _tenant_operation_action_log_apply_side_effects(action_log, *, created_by_la
     log_date = action_log.log_date
     shipment_date = log_date.date() if log_date else timezone.localdate()
 
-    if booking is not None and _tenant_operation_action_matches(action, 'start job', 'a1', 'action 1'):
-        if booking.execution_date is None:
-            booking.execution_date = shipment_date
-            booking.save(update_fields=['execution_date', 'updated_at'])
+    # Start Job (A1) execution date stamp — disabled until driver API is implemented.
+    # if booking is not None and _tenant_operation_action_matches(action, 'start job', 'a1', 'action 1'):
+    #     if booking.execution_date is None:
+    #         booking.execution_date = shipment_date
+    #         booking.save(update_fields=['execution_date', 'updated_at'])
 
     if booking is not None and (action.booking_status_impact or '').strip():
         _tenant_operation_action_apply_booking_status_impact(
@@ -11558,6 +12498,10 @@ def _tenant_operation_action_log_apply_side_effects(action_log, *, created_by_la
     ):
         shipment.collection_status = TenantShipment.CollectionStatus.COLLECTED
         shipment.save(update_fields=['collection_status', 'updated_at'])
+        post_cod_collection_for_action9(
+            shipment=shipment,
+            action_log=action_log,
+        )
 
     if truck_movement is not None and (action.movement_status_impact or '').strip():
         movement_status = _tenant_resolve_movement_status_impact(action.movement_status_impact)
@@ -12071,8 +13015,15 @@ def _tenant_booking_validate_submission(request, *, booking_id=None, has_table=N
     if is_confirm and route_lookup and route is None:
         errors.append('Please select a valid route.')
 
-    # Execution date is system-filled when the driver fires Start Job (A1), not on booking confirm.
-    execution_date = None
+    # Not scheduled → execution date is today. Scheduled → user enters execution date on the form.
+    if not is_scheduled:
+        execution_date = today
+    else:
+        execution_date = parse_date((request.POST.get('execution_date') or '').strip())
+        if is_confirm and execution_date is None:
+            errors.append('Execution date is required for scheduled bookings.')
+        if execution_date and booking_date and execution_date < booking_date:
+            errors.append('Execution date cannot be before the booking date.')
 
     truck, driver = _tenant_booking_line_assignment(request, 1, has_table)
     backload_truck, backload_driver = _tenant_booking_line_assignment(request, 2, has_table)
@@ -12112,6 +13063,31 @@ def _tenant_booking_validate_submission(request, *, booking_id=None, has_table=N
             ).exists()
             if client and not delivery_ok:
                 errors.append('Delivery address must belong to the selected client account.')
+
+    allowed_line_types = _tenant_booking_line_types_for_trip(trip_type)
+    loading_booking_item = (request.POST.get('loading_booking_item_1') or '').strip()
+    delivery_booking_item = (request.POST.get('delivery_booking_item_1') or '').strip()
+    cargo_booking_item = (request.POST.get('cargo_booking_item_1') or '').strip()
+    if trip_type and allowed_line_types:
+        for label, item_value in (
+            ('Loading', loading_booking_item),
+            ('Delivery', delivery_booking_item),
+            ('Cargo', cargo_booking_item),
+        ):
+            if item_value and item_value not in allowed_line_types:
+                errors.append(
+                    f'{label} booking item must be one of: {", ".join(allowed_line_types)}.'
+                )
+        if trip_type != 'Round':
+            for label, item_value in (
+                ('Loading', loading_booking_item),
+                ('Delivery', delivery_booking_item),
+                ('Cargo', cargo_booking_item),
+            ):
+                if item_value == 'Backload':
+                    errors.append(
+                        f'{label} booking item cannot be Backload on a one-way trip.'
+                    )
 
     cargo_id = _first_post_value(request, 'cargo_id_1', 'cargo_id', 'cargo')
     cargo_qty = _decimal_from_request(request, 'cargo_qty_1')
@@ -12274,9 +13250,19 @@ def _tenant_booking_extra_payload(request):
         cargo_uom = (cargo.uom or '').strip()
         if cargo_uom.isdigit():
             cargo_unit = cargo_uom
-    cargo_booking_item = (request.POST.get('cargo_booking_item_1') or '').strip()
-    if not cargo_booking_item and (request.POST.get('trip_type') or '').strip():
-        cargo_booking_item = 'Outbound'
+    trip_type = (request.POST.get('trip_type') or '').strip()
+    loading_booking_item = _tenant_booking_normalize_booking_item(
+        trip_type,
+        request.POST.get('loading_booking_item_1'),
+    )
+    delivery_booking_item = _tenant_booking_normalize_booking_item(
+        trip_type,
+        request.POST.get('delivery_booking_item_1'),
+    )
+    cargo_booking_item = _tenant_booking_normalize_booking_item(
+        trip_type,
+        request.POST.get('cargo_booking_item_1'),
+    )
     total_cargo_weight = cargo_weight
     return {
         'is_scheduled': _tenant_booking_is_scheduled_post(request),
@@ -12300,9 +13286,9 @@ def _tenant_booking_extra_payload(request):
             request,
             'booking_line_pod_doc_count_2',
         ),
-        'loading_booking_item': (request.POST.get('loading_booking_item_1') or '').strip(),
+        'loading_booking_item': loading_booking_item,
         'loading_address': loading_address,
-        'delivery_booking_item': (request.POST.get('delivery_booking_item_1') or '').strip(),
+        'delivery_booking_item': delivery_booking_item,
         'delivery_address': delivery_address,
         'cargo_booking_item': cargo_booking_item,
         'cargo': cargo,
@@ -12543,7 +13529,7 @@ class TenantOperationBookingCreateView(View):
                     booking_sequence=booking_sequence,
                     creation_date=timezone.localdate(),
                     booking_date=booking_date,
-                    execution_date=None,
+                    execution_date=validated.get('execution_date'),
                     booking_status=booking_status,
                     client_account=client,
                     price_list=price_list,
@@ -12671,6 +13657,7 @@ class TenantOperationBookingEditView(View):
             route_display = validated['route_display']
 
             booking.booking_date = validated.get('booking_date') or booking.booking_date
+            booking.execution_date = validated.get('execution_date')
             booking.booking_status = validated['booking_status']
             booking.client_account = client
             booking.price_list = validated['price_list']
@@ -12724,6 +13711,9 @@ class TenantOperationBookingListView(View):
                 'client_account',
                 'price_list',
                 'service_item',
+                'route',
+                'route__origin_point',
+                'route__destination_point',
                 'assigned_truck',
                 'assigned_driver',
             )
@@ -12732,41 +13722,22 @@ class TenantOperationBookingListView(View):
                     Q(booking_no__icontains=search_q)
                     | Q(client_account__display_name__icontains=search_q)
                     | Q(route_display__icontains=search_q)
-                    | Q(price_list__price_list_code__icontains=search_q)
+                    | Q(trip_type__icontains=search_q)
+                    | Q(assigned_truck__truck_code__icontains=search_q)
+                    | Q(route__route_label__icontains=search_q)
+                    | Q(route__origin_point__display_label__icontains=search_q)
+                    | Q(route__destination_point__display_label__icontains=search_q)
                 )
 
-            stats_qs = TenantBooking.objects.all()
             booking_page_obj = Paginator(qs.order_by('-created_at'), 10).get_page(
                 request.GET.get('page') or 1
             )
             start_index = booking_page_obj.start_index() if booking_page_obj.paginator.count else 0
-            booking_rows = []
-            for idx, booking in enumerate(booking_page_obj.object_list, start=start_index):
-                has_any_shipment = TenantShipment.objects.filter(booking_id=booking.booking_id).exists()
-                booking_rows.append(
-                    {
-                        'sn': idx,
-                        'booking_id': booking.booking_id,
-                        'booking_no': booking.booking_no,
-                        'creation_date': booking.creation_date,
-                        'booking_date': booking.booking_date,
-                        'execution_date': booking.execution_date,
-                        'client_name': booking.client_account.display_name,
-                        'route_text': booking.route_display or '-',
-                        'trip_type': booking.trip_type or '-',
-                        'derived_status': _tenant_booking_derived_header_status(booking),
-                        'db_status': booking.booking_status,
-                        'has_active_shipment': _tenant_booking_has_active_shipment(booking),
-                        'can_cancel': (
-                            booking.booking_status != TenantBooking.Status.CANCELLED
-                            and not has_any_shipment
-                        ),
-                        'sales_order_no': booking.price_list.price_list_code if booking.price_list else '-',
-                        'truck_no': booking.assigned_truck.truck_code if booking.assigned_truck else '-',
-                        'sales_report': '-',
-                        'sales_report_status': '-',
-                    }
-                )
+            booking_rows = _tenant_booking_build_list_rows(
+                booking_page_obj.object_list,
+                start_index=start_index,
+                can_delete=context.get('is_tenant_admin'),
+            )
 
             context.update(
                 {
@@ -12783,26 +13754,68 @@ class TenantOperationBookingListView(View):
 
 
 def _tenant_booking_activity_entries(booking):
-    """Timeline entries for booking detail sidebar (created / updated)."""
+    """Timeline entries for booking detail sidebar."""
     entries = []
+    seen = set()
+
+    def add_entry(title, timestamp, actor='', color='#5051f9'):
+        if timestamp is None:
+            return
+        dedupe_key = (title, timestamp)
+        if dedupe_key in seen:
+            return
+        seen.add(dedupe_key)
+        entries.append(
+            {
+                'title': title,
+                'timestamp': timestamp,
+                'actor': (actor or '').strip() or 'System',
+                'color': color,
+            }
+        )
+
+    action_logs = (
+        TenantOperationActionLog.objects.filter(
+            Q(booking_id=booking.booking_id)
+            | Q(shipment__booking_id=booking.booking_id)
+        )
+        .select_related('operation_action', 'shipment')
+        .order_by('-log_date', '-created_at')[:30]
+    )
+    for log in action_logs:
+        label = _tenant_operation_action_log_action_label(log)
+        if log.shipment_id and log.shipment:
+            label = f'{label} ({log.shipment.shipment_no})'
+        add_entry(
+            label,
+            log.log_date or log.created_at,
+            log.created_by_label,
+            '#5051f9',
+        )
+
+    for shipment in TenantShipment.objects.filter(booking_id=booking.booking_id).order_by('-created_at'):
+        add_entry(
+            f'Shipment {shipment.shipment_no} — {shipment.shipment_status}',
+            shipment.created_at,
+            shipment.created_by_label,
+            '#17a2b8',
+        )
+
+    if booking.booking_status == TenantBooking.Status.CONFIRMED:
+        add_entry('Booking Confirmed', booking.updated_at, booking.created_by_label, '#28a745')
+    elif booking.booking_status == TenantBooking.Status.CANCELLED:
+        add_entry('Booking Cancelled', booking.updated_at, booking.created_by_label, '#6c757d')
+
     created_at = getattr(booking, 'created_at', None)
     updated_at = getattr(booking, 'updated_at', None)
     if created_at and updated_at:
         seconds_since_create = (updated_at - created_at).total_seconds()
-        if seconds_since_create >= 1:
-            entries.append({
-                'title': 'Updated',
-                'timestamp': updated_at,
-                'actor': booking.created_by_label or 'System',
-                'color': '#28a745',
-            })
+        if seconds_since_create >= 1 and booking.booking_status == TenantBooking.Status.DRAFT:
+            add_entry('Booking Updated', updated_at, booking.created_by_label, '#ffc107')
     if created_at:
-        entries.append({
-            'title': 'Created',
-            'timestamp': created_at,
-            'actor': booking.created_by_label or 'System',
-            'color': '#dc3545',
-        })
+        add_entry('Booking Created', created_at, booking.created_by_label, '#dc3545')
+
+    entries.sort(key=lambda item: item['timestamp'], reverse=True)
     return entries
 
 
@@ -12905,6 +13918,19 @@ class TenantOperationBookingDetailView(View):
                     'booking': booking,
                     'booking_lines': booking_lines,
                     'booking_derived_status': _tenant_booking_derived_header_status(booking),
+                    'booking_derived_pod_status': _tenant_booking_derived_pod_status(booking),
+                    'booking_sales_report': _tenant_booking_sales_report_linkage(booking),
+                    'booking_has_active_shipment': _tenant_booking_has_active_shipment(booking),
+                    'activity_log': _tenant_booking_activity_entries(booking),
+                    'back_to_list_url': reverse('iroad_tenants:tenant_operation_booking_list'),
+                    'edit_booking_url': reverse(
+                        'iroad_tenants:tenant_operation_booking_edit',
+                        kwargs={'booking_id': booking.booking_id},
+                    ),
+                    'assign_truck_url': reverse(
+                        'iroad_tenants:tenant_operation_booking_assign_truck',
+                        kwargs={'booking_id': booking.booking_id},
+                    ),
                     'tenant_schema_name': tenant_registry.schema_name,
                 }
             )
@@ -12947,6 +13973,16 @@ class TenantOperationBookingAssignTruckView(View):
             if booking is None:
                 messages.error(request, 'Booking not found.', extra_tags='tenant')
                 return _tenant_redirect(request, 'iroad_tenants:tenant_operation_booking_list')
+            if booking.booking_status == TenantBooking.Status.CANCELLED:
+                messages.error(request, 'Cancelled bookings cannot be reassigned.', extra_tags='tenant')
+                return redirect('iroad_tenants:tenant_operation_booking_detail', booking_id=booking.booking_id)
+            if _tenant_booking_has_active_shipment(booking):
+                messages.error(
+                    request,
+                    'Truck cannot be reassigned while a shipment is in progress.',
+                    extra_tags='tenant',
+                )
+                return redirect('iroad_tenants:tenant_operation_booking_detail', booking_id=booking.booking_id)
             context.update(
                 {
                     'booking': booking,
@@ -12978,6 +14014,16 @@ class TenantOperationBookingAssignTruckView(View):
             if booking is None:
                 messages.error(request, 'Booking not found.', extra_tags='tenant')
                 return _tenant_redirect(request, 'iroad_tenants:tenant_operation_booking_list')
+            if booking.booking_status == TenantBooking.Status.CANCELLED:
+                messages.error(request, 'Cancelled bookings cannot be reassigned.', extra_tags='tenant')
+                return redirect('iroad_tenants:tenant_operation_booking_detail', booking_id=booking.booking_id)
+            if _tenant_booking_has_active_shipment(booking):
+                messages.error(
+                    request,
+                    'Truck cannot be reassigned while a shipment is in progress.',
+                    extra_tags='tenant',
+                )
+                return redirect('iroad_tenants:tenant_operation_booking_detail', booking_id=booking.booking_id)
             truck = TruckMaster.active_objects.select_related('default_driver_id').filter(
                 pk=(request.POST.get('truck_id') or '').strip()
             ).first()
@@ -13016,6 +14062,7 @@ class TenantOperationShipmentListView(View):
                     'truck',
                     'driver',
                     'booking',
+                    'booking__client_account',
                     'client_account',
                     'loading_address',
                     'delivery_address',
@@ -13029,6 +14076,10 @@ class TenantOperationShipmentListView(View):
                     else None
                 )
                 shipment.ui_locks = _tenant_shipment_ui_lock_flags(shipment)
+                client = shipment.client_account
+                if client is None and shipment.booking_id and shipment.booking:
+                    client = shipment.booking.client_account
+                shipment.client_display = client_account_label(client) or '-'
             stats_qs = TenantShipment.objects.all()
             context.update(
                 {
@@ -14474,6 +15525,7 @@ def _tenant_shipment_document_linkage_options():
                 'booking_id': booking_id,
                 'booking_no': booking_no,
                 'booking_item': booking_item,
+                'pod_doc_count': int(shipment.pod_doc_count or 0),
             }
         )
         if booking_id and booking_id not in seen_booking_ids:
@@ -14824,13 +15876,69 @@ def _tenant_shipment_pod_apply_posting_effects(*, document, source_document, shi
         _tenant_shipment_document_refresh_shipment_pod(shipment)
 
 
+def _tenant_shipment_pod_action_log_option_rows(*, shipment=None, booking=None, limit=300):
+    """Selectable operation action logs for POD page lines (FK-backed)."""
+    qs = TenantOperationActionLog.objects.select_related('operation_action').order_by(
+        '-log_date',
+        '-created_at',
+    )
+    if shipment is not None:
+        booking_id = shipment.booking_id if shipment.booking_id else None
+        if booking_id:
+            qs = qs.filter(Q(shipment=shipment) | Q(booking_id=booking_id))
+        else:
+            qs = qs.filter(shipment=shipment)
+    elif booking is not None:
+        qs = qs.filter(booking=booking)
+    rows = []
+    for log in qs[:limit]:
+        rows.append(
+            {
+                'log_id': str(log.log_id),
+                'log_no': log.log_no,
+                'label': f'{log.log_no} — {_tenant_operation_action_log_action_label(log)}',
+                'shipment_id': str(log.shipment_id) if log.shipment_id else '',
+            }
+        )
+    return rows
+
+
+def _tenant_shipment_pod_resolve_action_log(raw_value, *, shipment=None, form_errors=None, line_no=None):
+    """Resolve posted action_log_id / log_no to TenantOperationActionLog."""
+    value = str(raw_value or '').strip()
+    if not value:
+        return None
+    prefix = f'Line {line_no}: ' if line_no else ''
+    try:
+        parsed_id = uuid.UUID(value)
+        match = TenantOperationActionLog.objects.filter(pk=parsed_id).first()
+        if match is not None:
+            return match
+    except ValueError:
+        match = None
+    if match is None and shipment is not None:
+        match = TenantOperationActionLog.objects.filter(log_no=value, shipment=shipment).first()
+    if match is None:
+        match = TenantOperationActionLog.objects.filter(log_no=value).first()
+    if match is None:
+        if form_errors is not None:
+            form_errors.setdefault(
+                'pod_pages',
+                f'{prefix}Select a valid operation action log.'.strip(),
+            )
+        return None
+    return match
+
+
 def _tenant_shipment_pod_build_line_rows_from_source(source_document):
     """Auto-populate POD page lines from the source delivery-note document."""
     if source_document is None:
         return []
     existing_pages = list(source_document.document_pages.order_by('line_no'))
     if not existing_pages:
-        existing_pages = list(source_document.pod_pages.order_by('line_no'))
+        existing_pages = list(
+            source_document.pod_pages.select_related('action_log').order_by('line_no')
+        )
     if existing_pages:
         rows = []
         for line in existing_pages:
@@ -14839,6 +15947,7 @@ def _tenant_shipment_pod_build_line_rows_from_source(source_document):
                     {
                         'doc_page': str(line.pk),
                         'source': line.doc_ref_no or 'Action Log',
+                        'action_log_id': '',
                         'action_log': line.extra_ref or '',
                         'physical_location': line.signer_location or '',
                         'soft_copy_status': line.completion_status or 'Not Collected',
@@ -14848,11 +15957,17 @@ def _tenant_shipment_pod_build_line_rows_from_source(source_document):
                     }
                 )
                 continue
+            action_log_id = ''
+            action_log_no = ''
+            if line.action_log_id:
+                action_log_id = str(line.action_log_id)
+                action_log_no = line.action_log.log_no if line.action_log else ''
             rows.append(
                 {
                     'doc_page': str(line.pk),
                     'source': line.source or 'Action Log',
-                    'action_log': line.action_log or '',
+                    'action_log_id': action_log_id,
+                    'action_log': action_log_no,
                     'physical_location': line.physical_location or '',
                     'soft_copy_status': line.soft_copy_status or 'Not Collected',
                     'digital_evidence_status': line.digital_evidence_status or 'Not Collected',
@@ -14866,6 +15981,7 @@ def _tenant_shipment_pod_build_line_rows_from_source(source_document):
         {
             'doc_page': f'Page-{page_no}',
             'source': 'Action Log',
+            'action_log_id': '',
             'action_log': '',
             'physical_location': '',
             'soft_copy_status': 'Not Collected',
@@ -15327,7 +16443,7 @@ class TenantOperationShipmentDocumentsCreateView(View):
                 status = line.soft_copy_status or 'Not Completed'
                 has_meaningful_value = any([
                     line.source,
-                    line.action_log,
+                    line.action_log_id,
                     line.doc_page,
                     line.physical_location,
                     line.attachment_label,
@@ -15339,7 +16455,7 @@ class TenantOperationShipmentDocumentsCreateView(View):
                 line_rows.append(
                     {
                         'doc_ref_no': line.source or '',
-                        'extra_ref': line.action_log or '',
+                        'extra_ref': line.action_log.log_no if line.action_log_id else '',
                         'page_no': line.doc_page or '',
                         'status': status,
                         'physical_location': line.physical_location or '',
@@ -16071,8 +17187,15 @@ class TenantOperationShipmentPodCreateView(View):
         if not pod_form_data.get('receiver_user_id') and default_receiver_user_id:
             pod_form_data['receiver_user_id'] = default_receiver_user_id
         if line_rows is None and document is not None:
-            line_rows = list(document.pod_pages.select_related('source_page').order_by('line_no'))
+            line_rows = list(
+                document.pod_pages.select_related('source_page', 'action_log').order_by('line_no')
+            )
         source_document = None
+        linked_shipment = None
+        if document is not None and document.shipment_id:
+            linked_shipment = document.shipment
+        elif form_data and form_data.get('shipment_id'):
+            linked_shipment = TenantShipment.objects.filter(pk=form_data['shipment_id']).first()
         if document is not None and document.source_document_id:
             source_document = document.source_document
         return {
@@ -16083,6 +17206,11 @@ class TenantOperationShipmentPodCreateView(View):
             'delivery_note_options': delivery_note_options,
             'delivery_note_pages_json': json.dumps(_tenant_shipment_pod_delivery_note_pages_map()),
             'pod_line_page_options': _tenant_shipment_pod_line_page_options(source_document),
+            'pod_action_log_options': _tenant_shipment_pod_action_log_option_rows(
+                shipment=linked_shipment,
+            )
+            if linked_shipment
+            else _tenant_shipment_pod_action_log_option_rows(),
             'user_options': user_options,
             'default_receiver_user_id': default_receiver_user_id,
             'pod_page_rows': line_rows or [],
@@ -16115,7 +17243,7 @@ class TenantOperationShipmentPodCreateView(View):
                     .prefetch_related(
                         Prefetch(
                             'pod_pages',
-                            queryset=TenantShipmentPodPage.objects.select_related('source_page').order_by('line_no'),
+                            queryset=TenantShipmentPodPage.objects.select_related('source_page', 'action_log').order_by('line_no'),
                         )
                     )
                     .filter(record_no=record_no)
@@ -16245,18 +17373,36 @@ class TenantOperationShipmentPodCreateView(View):
                     doc_page_label = raw_doc_page
                 else:
                     doc_page_label = ''
+                action_log = _tenant_shipment_pod_resolve_action_log(
+                    row.get('action_log_id') or row.get('action_log'),
+                    shipment=shipment,
+                    form_errors=form_errors,
+                    line_no=idx,
+                )
                 values = {
                     'source_page': source_page,
                     'doc_page': doc_page_label,
                     'source': str(row.get('source') or '').strip(),
-                    'action_log': str(row.get('action_log') or '').strip(),
+                    'action_log': action_log,
                     'physical_location': str(row.get('physical_location') or '').strip(),
                     'soft_copy_status': str(row.get('soft_copy_status') or '').strip(),
                     'digital_evidence_status': str(row.get('digital_evidence_status') or '').strip(),
                     'map_url': str(row.get('map_url') or '').strip(),
                     'attachment_label': str(row.get('attachment_label') or '').strip(),
                 }
-                if not any(values.values()):
+                if not any(
+                    [
+                        values['source_page'],
+                        values['doc_page'],
+                        values['source'],
+                        values['action_log'],
+                        values['physical_location'],
+                        values['soft_copy_status'],
+                        values['digital_evidence_status'],
+                        values['map_url'],
+                        values['attachment_label'],
+                    ]
+                ):
                     continue
                 if not values['doc_page']:
                     continue
@@ -16388,7 +17534,16 @@ class TenantOperationShipmentPodDetailView(View):
             clear_tenant_portal_cookie(response, request=request)
             return response
         try:
-            document = TenantShipmentDocument.objects.prefetch_related('pod_pages').filter(record_no=record_no).first()
+            document = (
+                TenantShipmentDocument.objects.prefetch_related(
+                    Prefetch(
+                        'pod_pages',
+                        queryset=TenantShipmentPodPage.objects.select_related('action_log').order_by('line_no'),
+                    )
+                )
+                .filter(record_no=record_no)
+                .first()
+            )
             shipment = None
             if document is not None and document.shipment_id:
                 shipment = document.shipment
@@ -20033,6 +21188,11 @@ class TenantClientContractView(View):
                     created_by_label=(context.get('display_name') or '').strip(),
                     client_account=account,
                 )
+            from iroad_tenants.tenant_notifications import (
+                sync_all_contract_notification_recipients,
+            )
+
+            sync_all_contract_notification_recipients()
             messages.success(
                 request,
                 f'Contract {contract_no} created for {account.account_no}.',
@@ -20246,6 +21406,11 @@ class TenantClientContractEditView(View):
                             contract.contract_attachment.delete(save=False)
                         contract.contract_attachment = upload
                     contract.save()
+                from iroad_tenants.tenant_notifications import (
+                    sync_all_contract_notification_recipients,
+                )
+
+                sync_all_contract_notification_recipients()
             except Exception:
                 logger.exception('Tenant client contract update failed')
                 context.update(
@@ -20514,6 +21679,11 @@ class TenantClientContractSettingsView(View):
             settings_obj.notification_frequency = freq
             settings_obj.notification_audience = audience
             settings_obj.save()
+            from iroad_tenants.tenant_notifications import (
+                sync_all_contract_notification_recipients,
+            )
+
+            sync_all_contract_notification_recipients()
             messages.success(
                 request,
                 'Client contract settings saved for this workspace.',
@@ -22677,18 +23847,24 @@ class TruckMasterDetailView(View):
                     if cobj:
                         reg_country_display = f'{cobj.country_code} — {cobj.name_en}'
 
-            truck_ref_q = Q(truck=truck) | Q(truck_ref=truck.truck_code) | Q(truck_ref=str(truck.truck_id))
             movement_log_rows = list(
-                TenantTruckMovementLog.objects.filter(truck_ref_q)
-                .select_related('truck', 'driver', 'shipment', 'booking')
+                TenantTruckMovementLog.objects.filter(truck=truck)
+                .select_related(
+                    'truck',
+                    'driver',
+                    'shipment',
+                    'booking',
+                    'from_location_point',
+                    'to_location_point',
+                )
                 .order_by('-movement_date', '-created_at')[:100]
             )
 
             truck_location_display = '—'
             for m in movement_log_rows:
                 if m.status == TenantTruckMovementLog.Status.IN_PROGRESS:
-                    a = (m.from_location or '').strip()
-                    b = (m.to_location or '').strip()
+                    a = location_label(m.from_location_point).strip()
+                    b = location_label(m.to_location_point).strip()
                     if a and b:
                         truck_location_display = f'{a} → {b}'
                     elif b:
@@ -22699,19 +23875,24 @@ class TruckMasterDetailView(View):
             if truck_location_display == '—':
                 for m in movement_log_rows:
                     if m.status == TenantTruckMovementLog.Status.COMPLETED:
-                        loc = (m.to_location or m.from_location or '').strip()
+                        loc = (
+                            location_label(m.to_location_point)
+                            or location_label(m.from_location_point)
+                        ).strip()
                         if loc:
                             truck_location_display = loc
                             break
 
             truck_shipment_rows = []
-            for s in TenantShipment.objects.filter(truck=truck).order_by(
+            for s in TenantShipment.objects.select_related(
+                'loading_address',
+                'delivery_address',
+            ).filter(truck=truck).order_by(
                 '-shipment_date', '-created_at'
             )[:100]:
                 route = (s.route_display or '').strip()
                 if not route:
-                    fl = (s.from_location or '').strip()
-                    tl = (s.to_location or '').strip()
+                    fl, tl = shipment_route_endpoints(s)
                     if fl and tl:
                         route = f'{fl} → {tl}'
                     elif fl or tl:
@@ -23505,19 +24686,15 @@ class DriverMasterDetailView(View):
             else:
                 assigned_trucks_display = '—'
 
-            driver_ref_q = Q(driver=driver) | Q(driver_ref=driver.driver_code) | Q(
-                driver_ref=str(driver.driver_id)
-            )
             driver_shipment_rows = []
             for s in (
-                TenantShipment.objects.filter(driver_ref_q)
-                .select_related('truck')
+                TenantShipment.objects.filter(driver=driver)
+                .select_related('truck', 'loading_address', 'delivery_address')
                 .order_by('-shipment_date', '-created_at')[:100]
             ):
                 route = (s.route_display or '').strip()
                 if not route:
-                    fl = (s.from_location or '').strip()
-                    tl = (s.to_location or '').strip()
+                    fl, tl = shipment_route_endpoints(s)
                     if fl and tl:
                         route = f'{fl} → {tl}'
                     elif fl or tl:
@@ -23527,8 +24704,15 @@ class DriverMasterDetailView(View):
                 driver_shipment_rows.append({'shipment': s, 'route': route})
 
             driver_movement_rows = list(
-                TenantTruckMovementLog.objects.filter(driver_ref_q)
-                .select_related('truck', 'driver', 'shipment', 'booking')
+                TenantTruckMovementLog.objects.filter(driver=driver)
+                .select_related(
+                    'truck',
+                    'driver',
+                    'shipment',
+                    'booking',
+                    'from_location_point',
+                    'to_location_point',
+                )
                 .order_by('-movement_date', '-created_at')[:100]
             )
 
@@ -23582,15 +24766,6 @@ class DriverMasterDetailView(View):
             return render(request, self.template_name, context)
         finally:
             connection.set_schema_to_public()
-
-
-DRIVER_TREASURY_AUTO_FORM_CODE = 'driver-treasury'
-DRIVER_TREASURY_AUTO_FORM_LABEL = 'Driver Treasury'
-DRIVER_TREASURY_REF_PREFIX = 'DTR'
-
-DRIVER_TXN_AUTO_FORM_CODE = 'driver-treasury-transaction'
-DRIVER_TXN_AUTO_FORM_LABEL = 'Driver Treasury Transactions'
-DRIVER_TXN_REF_PREFIX = 'DTT'
 
 
 def _tenant_driver_treasury_access(request, context):
@@ -24060,6 +25235,8 @@ class DriverTreasuryTransactionListView(View):
             qs = DriverTreasuryTransaction.objects.select_related(
                 'driver_treasury',
                 'driver_treasury__driver',
+                'shipment',
+                'operation_action_log',
             )
             search_q = (request.GET.get('q') or '').strip()
             if search_q:
@@ -24228,8 +25405,12 @@ class DriverTreasuryTransactionListView(View):
             if not trx:
                 messages.error(request, 'Transaction not found.', extra_tags='tenant')
             else:
-                trx.delete()
-                messages.success(request, 'Transaction deleted.', extra_tags='tenant')
+                messages.error(
+                    request,
+                    'Treasury transactions cannot be deleted. Post a corrective '
+                    'Custody Collection or Client Collection entry instead.',
+                    extra_tags='tenant',
+                )
         finally:
             connection.set_schema_to_public()
 
@@ -24256,10 +25437,19 @@ class DriverTreasuryTransactionCreateView(View):
             return response
 
         try:
-            initial = {}
+            initial = {
+                'transaction_date': timezone.localtime().strftime('%Y-%m-%dT%H:%M'),
+            }
             treasury_id = (request.GET.get('treasury_id') or '').strip()
             if treasury_id:
                 initial['driver_treasury'] = treasury_id
+            shipment_no = (request.GET.get('shipment_no') or '').strip()
+            if shipment_no:
+                ship = TenantShipment.objects.filter(
+                    shipment_no__iexact=shipment_no,
+                ).first()
+                if ship:
+                    initial['shipment'] = ship.pk
             form = DriverTreasuryTransactionForm(initial=initial)
             context.update(
                 {
@@ -24355,62 +25545,22 @@ class DriverTreasuryTransactionEditView(View):
                 messages.error(request, 'Transaction not found.', extra_tags='tenant')
                 return _tenant_redirect(request, 'iroad_tenants:driver_transaction_list')
 
-            form = DriverTreasuryTransactionForm(instance=transaction)
-            context.update(
-                {
-                    'form': form,
-                    'transaction': transaction,
-                    'is_edit': True,
-                    'page_title': 'Edit Transaction',
-                    'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
-                }
+            messages.info(
+                request,
+                'Treasury transactions are append-only. View the record or post '
+                'a new corrective entry.',
+                extra_tags='tenant',
             )
-            return render(request, self.template_name, context)
+            return _tenant_redirect(
+                request,
+                'iroad_tenants:driver_transaction_detail',
+                transaction_id=transaction_id,
+            )
         finally:
             connection.set_schema_to_public()
 
     def post(self, request, transaction_id):
-        context = _tenant_context_from_session(request)
-        denied = _tenant_driver_treasury_access(request, context)
-        if denied:
-            return denied
-
-        tenant_registry = _activate_tenant_workspace_schema(request)
-        if tenant_registry is None:
-            response = redirect('login')
-            clear_tenant_portal_cookie(response, request=request)
-            return response
-
-        try:
-            transaction = self._load(transaction_id)
-            if not transaction:
-                messages.error(request, 'Transaction not found.', extra_tags='tenant')
-                return _tenant_redirect(request, 'iroad_tenants:driver_transaction_list')
-
-            immutable_no = transaction.transaction_no
-            immutable_seq = transaction.transaction_sequence
-            form = DriverTreasuryTransactionForm(request.POST, instance=transaction)
-            if not form.is_valid():
-                context.update(
-                    {
-                        'form': form,
-                        'transaction': transaction,
-                        'is_edit': True,
-                        'page_title': 'Edit Transaction',
-                        'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
-                    }
-                )
-                messages.error(request, 'Please fix the highlighted errors.', extra_tags='tenant')
-                return render(request, self.template_name, context)
-
-            obj = form.save(commit=False)
-            obj.transaction_no = immutable_no
-            obj.transaction_sequence = immutable_seq
-            obj.save()
-            messages.success(request, 'Transaction updated.', extra_tags='tenant')
-            return _tenant_redirect(request, 'iroad_tenants:driver_transaction_list')
-        finally:
-            connection.set_schema_to_public()
+        return self.get(request, transaction_id)
 
 
 class DriverTreasuryTransactionDetailView(View):
@@ -24432,6 +25582,8 @@ class DriverTreasuryTransactionDetailView(View):
             transaction = DriverTreasuryTransaction.objects.select_related(
                 'driver_treasury',
                 'driver_treasury__driver',
+                'shipment',
+                'operation_action_log',
             ).filter(pk=transaction_id).first()
             if not transaction:
                 messages.error(request, 'Transaction not found.', extra_tags='tenant')
@@ -25982,6 +27134,7 @@ class TenantAutoNumberConfigurationView(View):
         OPERATION_ACTION_AUTO_FORM_CODE: OPERATION_ACTION_AUTO_FORM_LABEL,
         OPERATION_ACTION_LOG_AUTO_FORM_CODE: OPERATION_ACTION_LOG_AUTO_FORM_LABEL,
         SURCHARGE_SALES_AUTO_FORM_CODE: SURCHARGE_SALES_AUTO_FORM_LABEL,
+        SUPPORT_TICKET_MASTER_AUTO_FORM_CODE: SUPPORT_TICKET_MASTER_AUTO_FORM_LABEL,
     }
 
     FORM_PREFIXES = {
@@ -26013,6 +27166,7 @@ class TenantAutoNumberConfigurationView(View):
         OPERATION_ACTION_AUTO_FORM_CODE: OPERATION_ACTION_REF_PREFIX,
         OPERATION_ACTION_LOG_AUTO_FORM_CODE: OPERATION_ACTION_LOG_REF_PREFIX,
         SURCHARGE_SALES_AUTO_FORM_CODE: SURCHARGE_SALES_REF_PREFIX,
+        SUPPORT_TICKET_MASTER_AUTO_FORM_CODE: SUPPORT_TICKET_REF_PREFIX,
     }
 
     @staticmethod
@@ -26154,6 +27308,7 @@ class TenantAutoNumberConfigurationView(View):
         try:
             requested_form_code = self._resolve_auto_number_form_code_from_get(request)
             config = self._load_config(requested_form_code)
+            _ensure_support_ticket_sequence_floor(request, requested_form_code)
             base_next_number = self._load_sequence_next_number(requested_form_code, config)
         finally:
             connection.set_schema_to_public()
@@ -26217,6 +27372,15 @@ class TenantAutoNumberConfigurationView(View):
                         request.POST.get('next_number'),
                         sequence_format=sequence_format,
                     )
+                    if selected_form == SUPPORT_TICKET_MASTER_AUTO_FORM_CODE:
+                        auth_payload = get_tenant_portal_cookie_payload(request) or {}
+                        tenant_id = auth_payload.get('tenant_id')
+                        floor = _max_support_ticket_sequence_for_tenant(tenant_id) + 1
+                        if floor > 1 and next_number < floor:
+                            raise ValueError(
+                                f'Next Number cannot be less than {floor} '
+                                '(already assigned to an existing support ticket).'
+                            )
 
                     config.number_of_digits = int(digits_raw)
                     config.sequence_format = sequence_format
@@ -27586,6 +28750,8 @@ class TenantUsersAdministrationEditView(View):
             tenant_user.status = form_data['status']
             tenant_user.role_name = form_data['roles'][0]
             tenant_user.save()
+            if tenant_user.status == TenantUser.Status.INACTIVE:
+                tenant_user._revoke_tenant_workspace_redis_sessions_best_effort()
 
             messages.success(request, 'Tenant user updated successfully.', extra_tags='tenant')
             return _tenant_redirect(request, 'iroad_tenants:tenant_users_administration')
@@ -27625,6 +28791,8 @@ class TenantUsersAdministrationToggleStatusView(View):
                 else TenantUser.Status.ACTIVE
             )
             tenant_user.save(update_fields=['status', 'updated_at'])
+            if tenant_user.status == TenantUser.Status.INACTIVE:
+                tenant_user._revoke_tenant_workspace_redis_sessions_best_effort()
             messages.success(request, f'User status changed to {tenant_user.status}.', extra_tags='tenant')
             return _tenant_redirect(request, 'iroad_tenants:tenant_users_administration')
         finally:
@@ -28370,6 +29538,73 @@ def _sync_tenant_ref_if_config_changed(profile):
         profile.save(update_fields=['tenant_ref_no', 'updated_at'])
 
 
+def _parse_auto_number_sequence_from_ref(ref_value, *, sequence_format=None):
+    """Extract the numeric sequence from a rendered ref (e.g. TKT-00017)."""
+    view = TenantAutoNumberConfigurationView()
+    return view._parse_next_number(ref_value, sequence_format=sequence_format)
+
+
+def _max_support_ticket_sequence_for_tenant(tenant_id):
+    """Highest sequence value already used for this tenant's ticket numbers."""
+    max_seq = 0
+    if not tenant_id:
+        return max_seq
+    tickets = SupportTicket.objects.filter(tenant_id=tenant_id).values_list(
+        'ticket_no',
+        flat=True,
+    )
+    for ticket_no in tickets:
+        try:
+            max_seq = max(max_seq, _parse_auto_number_sequence_from_ref(ticket_no))
+        except ValueError:
+            continue
+    return max_seq
+
+
+def _ensure_support_ticket_sequence_floor(request, form_code):
+    """
+    Keep support-ticket sequence at or above max(existing ticket) + 1 for this tenant.
+    """
+    if form_code != SUPPORT_TICKET_MASTER_AUTO_FORM_CODE:
+        return
+    auth_payload = get_tenant_portal_cookie_payload(request) or {}
+    tenant_id = auth_payload.get('tenant_id')
+    if not tenant_id:
+        return
+    floor = _max_support_ticket_sequence_for_tenant(tenant_id) + 1
+    if floor < 1:
+        floor = 1
+    sequence, _ = AutoNumberSequence.objects.get_or_create(
+        form_code=form_code,
+        defaults={'next_number': floor},
+    )
+    if int(sequence.next_number or 1) < floor:
+        sequence.next_number = floor
+        sequence.save(update_fields=['next_number', 'updated_at'])
+
+
+def _allocate_tenant_support_ticket_no(request):
+    """Allocate ticket_no from tenant auto-number config (fallback: legacy generator)."""
+    tenant_registry = _activate_tenant_workspace_schema(request)
+    if tenant_registry is None:
+        return SupportTicket.generate_ticket_no()
+    try:
+        _ensure_support_ticket_sequence_floor(request, SUPPORT_TICKET_MASTER_AUTO_FORM_CODE)
+        for _ in range(25):
+            ticket_no, _ = _next_auto_number_for_form(
+                SUPPORT_TICKET_MASTER_AUTO_FORM_CODE,
+                SUPPORT_TICKET_MASTER_AUTO_FORM_LABEL,
+                SUPPORT_TICKET_REF_PREFIX,
+            )
+            if not SupportTicket.objects.filter(ticket_no=ticket_no).exists():
+                return ticket_no
+    except Exception:
+        pass
+    finally:
+        connection.set_schema_to_public()
+    return SupportTicket.generate_ticket_no()
+
+
 def _render_tenant_ref_no(sequence, config, prefix='ORG'):
     n = int(sequence or 1)
     digits = max(1, int(config.number_of_digits or 4))
@@ -28564,6 +29799,7 @@ def _sales_invoice_report_manual_lookup_options():
             {
                 'value': booking.booking_no,
                 'label': f'{booking.booking_no} - {_tenant_booking_service_label(booking)}',
+                'id': str(booking.booking_id),
             }
         )
 
@@ -28573,6 +29809,7 @@ def _sales_invoice_report_manual_lookup_options():
             {
                 'value': shipment.shipment_no,
                 'label': f'{shipment.shipment_no} - {shipment_booking_no(shipment)}',
+                'id': str(shipment.shipment_id),
             }
         )
 
@@ -28582,10 +29819,12 @@ def _sales_invoice_report_manual_lookup_options():
         .exclude(shipment__shipment_status=TenantShipment.ShipmentStatus.CANCELLED)
         .order_by('-created_at')[:500]
     ):
+        trx_no = (surcharge.transaction_no or '').strip() or f'SST-{str(surcharge.surcharge_id)[:8].upper()}'
         surcharge_options.append(
             {
-                'value': str(surcharge.surcharge_id),
-                'label': f'SST-{str(surcharge.surcharge_id)[:8].upper()} - {surcharge.shipment.shipment_no}',
+                'value': trx_no,
+                'label': f'{trx_no} - {surcharge.shipment.shipment_no}',
+                'id': str(surcharge.surcharge_id),
             }
         )
 
@@ -28593,314 +29832,366 @@ def _sales_invoice_report_manual_lookup_options():
         'booking_lookup_options': booking_options,
         'shipment_lookup_options': shipment_options,
         'surcharge_lookup_options': surcharge_options,
+        'sir_lookup_maps_json': json.dumps(
+            {
+                'bookings': {
+                    opt['value']: opt.get('id', '')
+                    for opt in booking_options
+                    if opt.get('value')
+                },
+                'shipments': {
+                    opt['value']: opt.get('id', '')
+                    for opt in shipment_options
+                    if opt.get('value')
+                },
+                'surcharges': {
+                    opt['value']: opt.get('id', '')
+                    for opt in surcharge_options
+                    if opt.get('value')
+                },
+            }
+        ),
+    }
+
+
+def _sir_booking_ids_on_converted_reports():
+    return set(
+        SalesInvoiceReportBooking.objects.filter(
+            report__status=SalesInvoiceReport.Status.CONVERTED,
+            booking__isnull=False,
+        ).values_list('booking_id', flat=True)
+    )
+
+
+def _sir_surcharge_ids_on_converted_reports():
+    return set(
+        SalesInvoiceReportSurcharge.objects.filter(
+            report__status=SalesInvoiceReport.Status.CONVERTED,
+            surcharge__isnull=False,
+        ).values_list('surcharge_id', flat=True)
+    )
+
+
+def _tenant_shipment_cod_settled_for_sir(shipment):
+    order_type = ''
+    if shipment.booking_id and getattr(shipment, 'booking', None):
+        order_type = (shipment.booking.order_type or '').strip().lower()
+    if not order_type:
+        order_type = (getattr(shipment, 'order_type', '') or '').strip().lower()
+    if order_type != 'cod':
+        return True
+    return shipment.collection_status == TenantShipment.CollectionStatus.COLLECTED
+
+
+def _tenant_shipment_eligible_for_sir(shipment):
+    if shipment.shipment_status == TenantShipment.ShipmentStatus.CANCELLED:
+        return False
+    if shipment.shipment_status != TenantShipment.ShipmentStatus.CLOSED:
+        return False
+    if shipment.pod_status != TenantShipment.PodStatus.COMPLIANT:
+        return False
+    return _tenant_shipment_cod_settled_for_sir(shipment)
+
+
+def _tenant_booking_eligible_for_sir(booking):
+    if booking.booking_status == TenantBooking.Status.CANCELLED:
+        return False
+    return booking.booking_status == TenantBooking.Status.CONFIRMED
+
+
+def _sir_booking_row_snapshot(booking, *, line_no):
+    return {
+        'line_no': line_no,
+        'booking_id': booking.booking_id,
+        'booking_no': booking.booking_no,
+        'booking_date': booking.booking_date,
+        'so_ref': '',
+        'service_name': _tenant_booking_service_label(booking),
+        'trip_type': booking.trip_type or '',
+        'sell_price': booking.sell_price or 0,
+        'booking_status': booking.booking_status,
+        'sales_report_status': _tenant_booking_sales_report_status_for_line(booking),
+    }
+
+
+def _tenant_booking_sales_report_status_for_line(booking):
+    if getattr(booking, 'sales_report_status', ''):
+        return (booking.sales_report_status or '').strip()
+    if getattr(booking, 'sales_invoice_report_id', None):
+        report = getattr(booking, 'sales_invoice_report', None)
+        if report:
+            return _tenant_booking_sales_report_status_label(report.status)
+    return 'Pending'
+
+
+def _sir_shipment_row_snapshot(shipment, *, line_no):
+    truck_plate = ''
+    if shipment.truck is not None:
+        truck_plate = (shipment.truck.plate_number or shipment.truck.truck_code or '').strip()
+    booking = shipment.booking if shipment.booking_id else None
+    from_location, to_location = shipment_route_endpoints(shipment)
+    return {
+        'line_no': line_no,
+        'shipment_id': shipment.shipment_id,
+        'shipment_no': shipment.shipment_no,
+        'booking_id': booking.booking_id if booking else None,
+        'booking_no': booking.booking_no if booking else '',
+        'shipment_date': shipment.shipment_date,
+        'from_location': from_location,
+        'to_location': to_location,
+        'truck_plate': truck_plate,
+        'customer_ref_docs': shipment.purchase_order_ref or '',
+        'pod_date': None,
+        'pod_status': shipment.pod_status or '',
+    }
+
+
+def _sir_surcharge_row_snapshot(surcharge, *, line_no):
+    shipment = surcharge.shipment
+    booking = surcharge.booking or (shipment.booking if shipment and shipment.booking_id else None)
+    trx_no = (surcharge.transaction_no or '').strip() or f'SST-{str(surcharge.surcharge_id)[:8].upper()}'
+    return {
+        'line_no': line_no,
+        'surcharge_id': surcharge.surcharge_id,
+        'transaction_no': trx_no,
+        'transaction_date': surcharge.transaction_date,
+        'booking_id': booking.booking_id if booking else None,
+        'shipment_id': shipment.shipment_id if shipment else None,
+        'shipment_no': shipment.shipment_no if shipment else '',
+        'surcharge_type': surcharge.item_label or '',
+        'service_name': surcharge.item_label or '',
+        'amount': surcharge.subtotal or 0,
+        'qty': surcharge.qty or 0,
+        'unit_price': surcharge.unit_price or 0,
+        'status': surcharge.status,
+    }
+
+
+def _sir_eligible_operational_rows(*, client_id, booking_date_from, booking_date_to, currency):
+    """Ch.12 §12.4 sweep: confirmed bookings with closed, POD-compliant, billable shipments."""
+    client_obj, _client_refs = _sales_invoice_report_client_refs(client_id)
+    if client_obj is None:
+        return {'bookings': [], 'shipments': [], 'surcharges': []}
+
+    converted_booking_ids = _sir_booking_ids_on_converted_reports()
+    converted_surcharge_ids = _sir_surcharge_ids_on_converted_reports()
+
+    booking_qs = (
+        TenantBooking.objects.select_related('service_item', 'sales_invoice_report')
+        .filter(
+            client_account=client_obj,
+            booking_date__gte=booking_date_from,
+            booking_date__lte=booking_date_to,
+            client_account__status=TenantClientAccount.Status.ACTIVE,
+            booking_status=TenantBooking.Status.CONFIRMED,
+        )
+        .order_by('booking_date', 'created_at')
+    )
+
+    shipment_qs = (
+        _tenant_active_shipments_qs()
+        .select_related(
+            'truck',
+            'booking',
+            'booking__sales_invoice_report',
+            'loading_address',
+            'delivery_address',
+        )
+        .filter(booking__in=booking_qs)
+        .order_by('shipment_date', 'created_at')
+    )
+
+    eligible_shipments = []
+    eligible_booking_ids = set()
+    for shipment in shipment_qs:
+        if not _tenant_shipment_eligible_for_sir(shipment):
+            continue
+        if not shipment.booking_id:
+            continue
+        if shipment.booking_id in converted_booking_ids:
+            continue
+        eligible_shipments.append(shipment)
+        eligible_booking_ids.add(shipment.booking_id)
+
+    booking_rows = []
+    seen_booking_ids = set()
+    for booking in booking_qs:
+        if booking.booking_id not in eligible_booking_ids:
+            continue
+        if booking.booking_id in seen_booking_ids:
+            continue
+        seen_booking_ids.add(booking.booking_id)
+        booking_rows.append(_sir_booking_row_snapshot(booking, line_no=len(booking_rows) + 1))
+
+    shipment_rows = [
+        _sir_shipment_row_snapshot(shipment, line_no=index + 1)
+        for index, shipment in enumerate(eligible_shipments)
+    ]
+
+    eligible_shipment_ids = [row['shipment_id'] for row in shipment_rows if row.get('shipment_id')]
+    surcharge_qs = (
+        TenantShipmentSurcharge.objects.select_related('shipment', 'shipment__booking', 'booking')
+        .filter(
+            shipment_id__in=eligible_shipment_ids,
+            status=TenantShipmentSurcharge.Status.CONFIRMED,
+        )
+        .exclude(shipment__shipment_status=TenantShipment.ShipmentStatus.CANCELLED)
+        .order_by('transaction_date', 'created_at')
+    )
+    if booking_date_from and booking_date_to:
+        surcharge_qs = surcharge_qs.filter(
+            transaction_date__gte=booking_date_from,
+            transaction_date__lte=booking_date_to,
+        )
+
+    surcharge_rows = []
+    for surcharge in surcharge_qs:
+        if surcharge.surcharge_id in converted_surcharge_ids:
+            continue
+        surcharge_rows.append(
+            _sir_surcharge_row_snapshot(surcharge, line_no=len(surcharge_rows) + 1)
+        )
+
+    return {
+        'bookings': booking_rows,
+        'shipments': shipment_rows,
+        'surcharges': surcharge_rows,
     }
 
 
 def _eligible_executed_bookings_for_report(*, client_id, booking_date_from, booking_date_to, currency):
-    """
-    Fetch source bookings eligible for Sales Invoice Report auto-load.
-    Returns list[dict] snapshots ready for SalesInvoiceReportBooking rows.
-    """
-    client_obj, _client_refs = _sales_invoice_report_client_refs(client_id)
-    converted_booking_ids = set(
-        str(x)
-        for x in SalesInvoiceReportBooking.objects.filter(
-            report__status=SalesInvoiceReport.Status.CONVERTED,
-            booking_ref__isnull=False,
-        ).values_list('booking_ref', flat=True)
+    return _sir_eligible_operational_rows(
+        client_id=client_id,
+        booking_date_from=booking_date_from,
+        booking_date_to=booking_date_to,
+        currency=currency,
+    )['bookings']
+
+
+def _eligible_confirmed_surcharges_for_report(*, booking_ids, booking_date_from=None, booking_date_to=None):
+    if not booking_ids:
+        return []
+    rows = _sir_eligible_operational_rows(
+        client_id=None,
+        booking_date_from=booking_date_from,
+        booking_date_to=booking_date_to,
+        currency='',
     )
-
-    if client_obj is not None:
-        qs = (
-            TenantBooking.objects.select_related('service_item')
-            .filter(
-                client_account=client_obj,
-                booking_date__gte=booking_date_from,
-                booking_date__lte=booking_date_to,
-                client_account__status=TenantClientAccount.Status.ACTIVE,
-            )
-            .exclude(booking_status=TenantBooking.Status.CANCELLED)
-            .order_by('booking_date', 'created_at')
-        )
-
-        rows = []
-        seen_booking_refs = set()
-        for booking in qs:
-            booking_pk = str(booking.booking_id)
-            if booking_pk in converted_booking_ids or booking_pk in seen_booking_refs:
-                continue
-            seen_booking_refs.add(booking_pk)
-            rows.append(
-                {
-                    'line_no': len(rows) + 1,
-                    'booking_ref': booking.booking_id,
-                    'so_ref': '',
-                    'service_name': _tenant_booking_service_label(booking),
-                    'trip_type': booking.trip_type or '',
-                    'sell_price': booking.sell_price or 0,
-                    'booking_status': 'Executed',
-                }
-            )
-        if rows:
-            return rows
-
-    # Primary path: legacy/optional Booking model.
-    BookingModel = _safe_get_tenant_model('Booking')
-    if BookingModel is not None:
-        qs = BookingModel.objects.filter(client_id=client_id)
-        qs = _apply_active_flag_filters(
-            qs,
-            BookingModel,
-            status_values=['active', 'true', 'executed', 'confirmed'],
-        )
-        if _model_has_field(BookingModel, 'booking_status'):
-            qs = qs.exclude(booking_status__iexact='cancelled')
-        if hasattr(BookingModel, 'booking_date'):
-            qs = qs.filter(booking_date__gte=booking_date_from, booking_date__lte=booking_date_to)
-        if currency and hasattr(BookingModel, 'currency'):
-            qs = qs.filter(currency=currency)
-
-        if hasattr(BookingModel, 'booking_id'):
-            qs = qs.exclude(booking_id__in=list(converted_booking_ids))
-        elif hasattr(BookingModel, 'id'):
-            qs = qs.exclude(id__in=list(converted_booking_ids))
-
-        rows = []
-        seen_booking_refs = set()
-        for b in qs.order_by('booking_date'):
-            booking_pk = getattr(b, 'booking_id', None) or getattr(b, 'id', None)
-            if booking_pk in seen_booking_refs:
-                continue
-            seen_booking_refs.add(booking_pk)
-            rows.append(
-                {
-                    'line_no': len(rows) + 1,
-                    'booking_ref': booking_pk,
-                    'so_ref': getattr(b, 'sales_order_no', '') or '',
-                    'service_name': getattr(b, 'service_name', '') or '',
-                    'trip_type': getattr(b, 'trip_type', '') or '',
-                    'sell_price': getattr(b, 'sell_price', 0) or 0,
-                    'booking_status': 'Executed',
-                }
-            )
-        if rows:
-            return rows
-
-    # Fallback path: derive eligible booking snapshots from active TenantShipment rows.
-    client_obj, client_refs = _sales_invoice_report_client_refs(client_id)
-    if client_obj is None:
+    # When called with booking_ids only, re-run sweep is expensive; filter surcharges by bookings.
+    booking_uuid_refs = [value for value in (_coerce_uuid(x) for x in booking_ids) if value]
+    if not booking_uuid_refs:
         return []
 
-    qs = _tenant_active_shipments_qs().filter(
-        shipment_date__gte=booking_date_from,
-        shipment_date__lte=booking_date_to,
+    converted_surcharge_ids = _sir_surcharge_ids_on_converted_reports()
+    shipment_ids = list(
+        _tenant_active_shipments_qs()
+        .filter(booking_id__in=booking_uuid_refs)
+        .values_list('shipment_id', flat=True)
     )
-    client_ref_q = _client_ref_q(client_refs)
-    if client_ref_q:
-        qs = qs.filter(client_ref_q)
-    qs = qs.order_by('shipment_date', 'created_at')
-    if currency:
-        # TenantShipment currently has no explicit currency column; keep hook for forward compatibility.
-        pass
-
-    booking_nos = [str(sh.booking_no or '').strip() for sh in qs if (sh.booking_no or '').strip()]
-    booking_by_no = {
-        booking.booking_no: booking
-        for booking in (
-            TenantBooking.objects.select_related('service_item')
-            .filter(
-                booking_no__in=booking_nos,
-                client_account=client_obj,
-                client_account__status=TenantClientAccount.Status.ACTIVE,
-            )
-            .exclude(booking_status=TenantBooking.Status.CANCELLED)
-        )
-    }
-
-    rows = []
-    seen_booking_refs = set()
-    for sh in qs:
-        booking_no = str((sh.booking_no or '').strip())
-        booking = booking_by_no.get(booking_no)
-        if booking is None:
-            continue
-        booking_ref = str(booking.booking_id)
-        if booking_ref in converted_booking_ids or booking_ref in seen_booking_refs:
-            continue
-        seen_booking_refs.add(booking_ref)
-        rows.append(
-            {
-                'line_no': len(rows) + 1,
-                'booking_ref': booking.booking_id,
-                'so_ref': sh.sales_order_ref or '',
-                'service_name': _tenant_booking_service_label(booking) or sh.booking_item_ref or '',
-                'trip_type': booking.trip_type or sh.trip_type or '',
-                'sell_price': booking.sell_price or 0,
-                'booking_status': 'Executed',
-            }
-        )
-    return rows
-
-
-def _eligible_confirmed_surcharges_for_report(*, booking_refs, booking_date_from=None, booking_date_to=None):
-    if not booking_refs:
-        return []
-    booking_refs_str = set(str(x) for x in booking_refs if x)
-    booking_uuid_refs = [value for value in (_coerce_uuid(x) for x in booking_refs_str) if value]
-    booking_id_by_no = {
-        booking.booking_no: booking.booking_id
-        for booking in TenantBooking.objects.filter(booking_id__in=booking_uuid_refs)
-        .exclude(booking_status=TenantBooking.Status.CANCELLED)
-    }
-    booking_nos = set(booking_id_by_no.keys())
-
-    SurchargeModel = _safe_get_tenant_model('SurchargeSalesTransaction')
-    if SurchargeModel is not None:
-        qs = SurchargeModel.objects.all()
-        qs = _apply_active_flag_filters(
-            qs,
-            SurchargeModel,
-            status_values=['active', 'true', 'confirmed'],
-        )
-        if hasattr(SurchargeModel, 'booking_ref'):
-            qs = qs.filter(booking_ref__in=booking_refs)
-        if booking_date_from and booking_date_to:
-            if _model_has_field(SurchargeModel, 'transaction_date'):
-                qs = qs.filter(transaction_date__gte=booking_date_from, transaction_date__lte=booking_date_to)
-            elif _model_has_field(SurchargeModel, 'trx_date'):
-                qs = qs.filter(trx_date__gte=booking_date_from, trx_date__lte=booking_date_to)
-            elif _model_has_field(SurchargeModel, 'created_at'):
-                qs = qs.filter(created_at__date__gte=booking_date_from, created_at__date__lte=booking_date_to)
-
-        rows = []
-        seen_refs = set()
-        for s in qs.order_by('id'):
-            trx_ref = getattr(s, 'id', None)
-            if trx_ref in seen_refs:
-                continue
-            seen_refs.add(trx_ref)
-            rows.append(
-                {
-                    'line_no': len(rows) + 1,
-                    'surcharge_trx_ref': trx_ref,
-                    'booking_ref': getattr(s, 'booking_ref', None),
-                    'surcharge_type': getattr(s, 'surcharge_type', '') or '',
-                    'shipment_ref': str(getattr(s, 'shipment_ref', '') or ''),
-                    'service_name': getattr(s, 'service_name', '') or '',
-                    'amount': getattr(s, 'amount', 0) or 0,
-                }
-            )
-        if rows:
-            return rows
-
-    converted_surcharge_ids = set(
-        str(x)
-        for x in SalesInvoiceReportSurcharge.objects.filter(
-            report__status=SalesInvoiceReport.Status.CONVERTED,
-            surcharge_trx_ref__isnull=False,
-        ).values_list('surcharge_trx_ref', flat=True)
-    )
-
-    # Fallback to TenantShipmentSurcharge.
     qs = (
-        TenantShipmentSurcharge.objects.select_related('shipment')
-        .filter(shipment__booking_no__in=list(booking_nos))
-        .filter(status=TenantShipmentSurcharge.Status.CONFIRMED)
+        TenantShipmentSurcharge.objects.select_related('shipment', 'shipment__booking', 'booking')
+        .filter(shipment_id__in=shipment_ids, status=TenantShipmentSurcharge.Status.CONFIRMED)
         .exclude(shipment__shipment_status=TenantShipment.ShipmentStatus.CANCELLED)
-        .order_by('created_at')
+        .order_by('transaction_date', 'created_at')
     )
     if booking_date_from and booking_date_to:
-        qs = qs.filter(created_at__date__gte=booking_date_from, created_at__date__lte=booking_date_to)
-    rows = []
-    for s in qs:
-        if str(s.surcharge_id) in converted_surcharge_ids:
-            continue
-        booking_ref = booking_id_by_no.get(shipment_booking_no(s.shipment))
-        rows.append(
-            {
-                'line_no': len(rows) + 1,
-                'surcharge_trx_ref': s.surcharge_id,
-                'booking_ref': booking_ref,
-                'surcharge_type': s.item_label or '',
-                'shipment_ref': s.shipment.shipment_no or '',
-                'service_name': s.item_label or '',
-                'amount': s.subtotal or 0,
-            }
+        qs = qs.filter(
+            transaction_date__gte=booking_date_from,
+            transaction_date__lte=booking_date_to,
         )
+    rows = []
+    for surcharge in qs:
+        if not _tenant_shipment_eligible_for_sir(surcharge.shipment):
+            continue
+        if surcharge.surcharge_id in converted_surcharge_ids:
+            continue
+        rows.append(_sir_surcharge_row_snapshot(surcharge, line_no=len(rows) + 1))
     return rows
 
 
-def _related_shipments_for_report(*, booking_refs, booking_date_from=None, booking_date_to=None):
-    if not booking_refs:
+def _related_shipments_for_report(*, booking_ids, booking_date_from=None, booking_date_to=None):
+    if not booking_ids:
         return []
-    booking_refs_str = set(str(x) for x in booking_refs if x)
-    booking_uuid_refs = [value for value in (_coerce_uuid(x) for x in booking_refs_str) if value]
-    booking_nos = set(
-        TenantBooking.objects.filter(booking_id__in=booking_uuid_refs)
-        .exclude(booking_status=TenantBooking.Status.CANCELLED)
-        .values_list('booking_no', flat=True)
-    )
+    booking_uuid_refs = [value for value in (_coerce_uuid(x) for x in booking_ids) if value]
+    if not booking_uuid_refs:
+        return []
 
-    ShipmentModel = _safe_get_tenant_model('Shipment')
-    if ShipmentModel is not None:
-        qs = ShipmentModel.objects.all()
-        qs = _apply_active_flag_filters(qs, ShipmentModel, status_values=['active', 'true'])
-        if hasattr(ShipmentModel, 'booking_ref'):
-            qs = qs.filter(booking_ref__in=booking_refs)
-        if booking_date_from and booking_date_to and hasattr(ShipmentModel, 'shipment_date'):
-            qs = qs.filter(shipment_date__gte=booking_date_from, shipment_date__lte=booking_date_to)
-
-        rows = []
-        seen_refs = set()
-        for sh in qs.order_by('shipment_date'):
-            shipment_ref = getattr(sh, 'id', None)
-            if shipment_ref in seen_refs:
-                continue
-            seen_refs.add(shipment_ref)
-            rows.append(
-                {
-                    'line_no': len(rows) + 1,
-                    'shipment_ref': shipment_ref,
-                    'booking_ref': str(getattr(sh, 'booking_ref', '') or ''),
-                    'shipment_date': getattr(sh, 'shipment_date', None),
-                    'from_location': getattr(sh, 'from_location', '') or '',
-                    'to_location': getattr(sh, 'to_location', '') or '',
-                    'truck_plate': getattr(sh, 'truck_plate', '') or '',
-                    'customer_ref_docs': getattr(sh, 'customer_ref_docs', '') or '',
-                    'pod_date': getattr(sh, 'pod_date', None),
-                }
-            )
-        if rows:
-            return rows
-
-    # Fallback to TenantShipment.
     qs = (
         _tenant_active_shipments_qs()
-        .select_related('truck')
-        .filter(booking_no__in=list(booking_nos))
+        .select_related('truck', 'booking', 'loading_address', 'delivery_address')
+        .filter(booking_id__in=booking_uuid_refs)
         .order_by('shipment_date', 'created_at')
     )
     if booking_date_from and booking_date_to:
-        qs = qs.filter(shipment_date__gte=booking_date_from, shipment_date__lte=booking_date_to)
-    rows = []
-    for sh in qs:
-        truck_plate = ''
-        if sh.truck is not None:
-            truck_plate = (sh.truck.plate_number or sh.truck.truck_code or '').strip()
-        rows.append(
-            {
-                'line_no': len(rows) + 1,
-                'shipment_ref': sh.shipment_id,
-                'booking_ref': sh.booking_no or '',
-                'shipment_date': sh.shipment_date,
-                'from_location': sh.from_location or '',
-                'to_location': sh.to_location or '',
-                'truck_plate': truck_plate,
-                'customer_ref_docs': sh.purchase_order_ref or '',
-                'pod_date': None,
-            }
+        qs = qs.filter(
+            shipment_date__gte=booking_date_from,
+            shipment_date__lte=booking_date_to,
         )
+    rows = []
+    for shipment in qs:
+        if not _tenant_shipment_eligible_for_sir(shipment):
+            continue
+        rows.append(_sir_shipment_row_snapshot(shipment, line_no=len(rows) + 1))
     return rows
+
+
+def _sir_bulk_create_child_lines(report, *, bookings, shipments, surcharges):
+    report.booking_lines.all().delete()
+    report.surcharge_lines.all().delete()
+    report.shipment_lines.all().delete()
+
+    SalesInvoiceReportBooking.objects.bulk_create(
+        [
+            SalesInvoiceReportBooking(
+                report=report,
+                line_no=row['line_no'],
+                booking_id=row['booking_id'],
+                so_ref=row.get('so_ref') or '',
+                service_name=row.get('service_name') or '',
+                trip_type=row.get('trip_type') or '',
+                sell_price=row.get('sell_price') or 0,
+                booking_status=row.get('booking_status') or '',
+            )
+            for row in bookings
+            if row.get('booking_id')
+        ]
+    )
+    SalesInvoiceReportShipment.objects.bulk_create(
+        [
+            SalesInvoiceReportShipment(
+                report=report,
+                line_no=row['line_no'],
+                shipment_id=row['shipment_id'],
+                booking_id=row.get('booking_id'),
+                shipment_date=row.get('shipment_date'),
+                from_location=row.get('from_location') or '',
+                to_location=row.get('to_location') or '',
+                truck_plate=row.get('truck_plate') or '',
+                customer_ref_docs=row.get('customer_ref_docs') or '',
+                pod_date=row.get('pod_date'),
+                pod_status=row.get('pod_status') or '',
+            )
+            for row in shipments
+            if row.get('shipment_id')
+        ]
+    )
+    SalesInvoiceReportSurcharge.objects.bulk_create(
+        [
+            SalesInvoiceReportSurcharge(
+                report=report,
+                line_no=row['line_no'],
+                surcharge_id=row['surcharge_id'],
+                booking_id=row.get('booking_id'),
+                shipment_id=row.get('shipment_id'),
+                surcharge_type=row.get('surcharge_type') or '',
+                service_name=row.get('service_name') or '',
+                amount=row.get('amount') or 0,
+            )
+            for row in surcharges
+            if row.get('surcharge_id')
+        ]
+    )
+    report.recalculate_totals(save=True)
 
 
 def _manual_post_list(post_data, key):
@@ -28922,15 +30213,15 @@ def _resolve_manual_booking_for_report(report, value):
     if parsed_uuid:
         lookup_q |= Q(pk=parsed_uuid)
     return (
-        TenantBooking.objects.select_related('service_item')
+        TenantBooking.objects.select_related('service_item', 'sales_invoice_report')
         .filter(
             lookup_q,
             client_account=report.client,
             client_account__status=TenantClientAccount.Status.ACTIVE,
             booking_date__gte=report.booking_date_from,
             booking_date__lte=report.booking_date_to,
+            booking_status=TenantBooking.Status.CONFIRMED,
         )
-        .exclude(booking_status=TenantBooking.Status.CANCELLED)
         .first()
     )
 
@@ -28943,7 +30234,7 @@ def _resolve_manual_shipment_for_report(report, value, *, booking_nos=None):
     parsed_uuid = _coerce_uuid(value)
     if parsed_uuid:
         lookup_q |= Q(pk=parsed_uuid)
-    qs = _tenant_active_shipments_qs().select_related('truck').filter(lookup_q)
+    qs = _tenant_active_shipments_qs().select_related('truck', 'booking').filter(lookup_q)
     if booking_nos:
         qs = qs.filter(booking_no__in=list(booking_nos))
     client_ref_q = _client_ref_q(_sales_invoice_report_client_refs(report.client_id)[1])
@@ -28953,12 +30244,9 @@ def _resolve_manual_shipment_for_report(report, value, *, booking_nos=None):
 
 
 def _tenant_surcharge_mark_invoiced_for_converted_report(report):
-    """Doc §5 — Invoiced is system-assigned when SIR is converted to sales invoice."""
+    """Ch.12 §12.5 — mark included surcharges Invoiced when report is converted."""
     surcharge_ids = list(
-        report.surcharge_lines.exclude(surcharge_trx_ref__isnull=True).values_list(
-            'surcharge_trx_ref',
-            flat=True,
-        )
+        report.surcharge_lines.exclude(surcharge__isnull=True).values_list('surcharge_id', flat=True)
     )
     if not surcharge_ids:
         return 0
@@ -28968,24 +30256,39 @@ def _tenant_surcharge_mark_invoiced_for_converted_report(report):
     ).update(status=TenantShipmentSurcharge.Status.INVOICED, updated_at=timezone.now())
 
 
-def _resolve_manual_surcharge_for_report(report, value, *, booking_nos=None):
+def _resolve_manual_surcharge_for_report(report, value, *, booking_ids=None):
     value = str(value or '').strip()
     if not value:
         return None
+    lookup_q = Q()
     parsed_uuid = _coerce_uuid(value)
-    if parsed_uuid is None:
-        return None
+    if parsed_uuid:
+        lookup_q |= Q(pk=parsed_uuid)
+    lookup_q |= Q(transaction_no__iexact=value)
     qs = (
-        TenantShipmentSurcharge.objects.select_related('shipment')
+        TenantShipmentSurcharge.objects.select_related('shipment', 'shipment__booking', 'booking')
         .exclude(shipment__shipment_status=TenantShipment.ShipmentStatus.CANCELLED)
-        .filter(pk=parsed_uuid, status=TenantShipmentSurcharge.Status.CONFIRMED)
+        .filter(lookup_q, status=TenantShipmentSurcharge.Status.CONFIRMED)
     )
-    if booking_nos:
-        qs = qs.filter(shipment__booking_no__in=list(booking_nos))
-    client_ref_q = _client_ref_q(_sales_invoice_report_client_refs(report.client_id)[1], field_prefix='shipment__')
+    if booking_ids:
+        booking_uuid_refs = [v for v in (_coerce_uuid(x) for x in booking_ids) if v]
+        if booking_uuid_refs:
+            qs = qs.filter(
+                Q(booking_id__in=booking_uuid_refs)
+                | Q(shipment__booking_id__in=booking_uuid_refs)
+            )
+    client_ref_q = _client_ref_q(
+        _sales_invoice_report_client_refs(report.client_id)[1],
+        field_prefix='shipment__',
+    )
     if client_ref_q:
         qs = qs.filter(client_ref_q)
-    return qs.first()
+    surcharge = qs.first()
+    if surcharge is None:
+        return None
+    if not _tenant_shipment_eligible_for_sir(surcharge.shipment):
+        return None
+    return surcharge
 
 
 def _manual_sales_invoice_report_rows_from_post(report, post_data):
@@ -28995,121 +30298,126 @@ def _manual_sales_invoice_report_rows_from_post(report, post_data):
     surcharge_rows = []
 
     booking_refs = _manual_post_list(post_data, 'manual_booking_ref[]')
+    booking_ids = _manual_post_list(post_data, 'manual_booking_id[]')
     seen_booking_ids = set()
     for index, booking_ref in enumerate(booking_refs):
         service_name = _list_value(_manual_post_list(post_data, 'manual_booking_service_name[]'), index)
         trip_type = _list_value(_manual_post_list(post_data, 'manual_booking_trip_type[]'), index)
         sell_price = _list_value(_manual_post_list(post_data, 'manual_booking_sell_price[]'), index)
-        if not any([booking_ref, service_name, trip_type, sell_price]):
+        booking_id_raw = _list_value(booking_ids, index)
+        if not any([booking_ref, booking_id_raw, service_name, trip_type, sell_price]):
             continue
-        booking = _resolve_manual_booking_for_report(report, booking_ref)
+        booking = None
+        parsed_booking_id = _coerce_uuid(booking_id_raw)
+        if parsed_booking_id:
+            booking = (
+                TenantBooking.objects.select_related('service_item', 'sales_invoice_report')
+                .filter(
+                    pk=parsed_booking_id,
+                    client_account=report.client,
+                    booking_date__gte=report.booking_date_from,
+                    booking_date__lte=report.booking_date_to,
+                )
+                .exclude(booking_status=TenantBooking.Status.CANCELLED)
+                .first()
+            )
+        if booking is None and booking_ref:
+            booking = _resolve_manual_booking_for_report(report, booking_ref)
         if booking is None:
-            errors.append(f'Booking row {index + 1}: select an active booking for this client and booking period.')
+            errors.append(f'Booking row {index + 1}: select a confirmed booking for this client and period.')
             continue
-        booking_id = str(booking.booking_id)
-        if booking_id in seen_booking_ids:
+        if not _tenant_booking_eligible_for_sir(booking):
+            errors.append(f'Booking row {index + 1}: only confirmed bookings can be added.')
+            continue
+        if booking.booking_id in seen_booking_ids:
             errors.append(f'Booking row {index + 1}: duplicate booking is not allowed.')
             continue
-        seen_booking_ids.add(booking_id)
-        booking_rows.append(
-            {
-                'line_no': len(booking_rows) + 1,
-                'booking_ref': booking.booking_id,
-                'so_ref': '',
-                'service_name': _tenant_booking_service_label(booking),
-                'trip_type': booking.trip_type or trip_type or '',
-                'sell_price': booking.sell_price or Decimal('0'),
-                'booking_status': 'Executed',
-            }
-        )
+        seen_booking_ids.add(booking.booking_id)
+        booking_rows.append(_sir_booking_row_snapshot(booking, line_no=len(booking_rows) + 1))
 
-    selected_booking_nos = {
-        booking.booking_no
-        for booking in TenantBooking.objects.filter(booking_id__in=[row['booking_ref'] for row in booking_rows])
-    }
+    selected_booking_ids = [row['booking_id'] for row in booking_rows]
 
     shipment_refs = _manual_post_list(post_data, 'manual_shipment_ref[]')
+    shipment_ids = _manual_post_list(post_data, 'manual_shipment_id[]')
     shipment_booking_refs = _manual_post_list(post_data, 'manual_shipment_booking_ref[]')
     seen_shipment_ids = set()
     for index, shipment_ref in enumerate(shipment_refs):
+        shipment_id_raw = _list_value(shipment_ids, index)
         booking_ref = _list_value(shipment_booking_refs, index)
         if not any(
             [
                 shipment_ref,
+                shipment_id_raw,
                 booking_ref,
                 _list_value(_manual_post_list(post_data, 'manual_shipment_route[]'), index),
-                _list_value(_manual_post_list(post_data, 'manual_shipment_truck[]'), index),
-                _list_value(_manual_post_list(post_data, 'manual_shipment_customer_ref[]'), index),
             ]
         ):
             continue
-        shipment = _resolve_manual_shipment_for_report(
-            report,
-            shipment_ref,
-            booking_nos=selected_booking_nos or None,
-        )
+        shipment = None
+        parsed_shipment_id = _coerce_uuid(shipment_id_raw)
+        if parsed_shipment_id:
+            shipment = (
+                _tenant_active_shipments_qs()
+                .select_related('truck', 'booking', 'loading_address', 'delivery_address')
+                .filter(pk=parsed_shipment_id, booking_id__in=selected_booking_ids or None)
+                .first()
+            )
         if shipment is None:
-            errors.append(f'Shipment row {index + 1}: select an active shipment linked to the selected booking.')
+            selected_booking_nos = list(
+                TenantBooking.objects.filter(booking_id__in=selected_booking_ids).values_list(
+                    'booking_no', flat=True
+                )
+            )
+            shipment = _resolve_manual_shipment_for_report(
+                report,
+                shipment_ref,
+                booking_nos=selected_booking_nos or None,
+            )
+        if shipment is None:
+            errors.append(f'Shipment row {index + 1}: select a billable shipment linked to the selected booking.')
             continue
-        shipment_id = str(shipment.shipment_id)
-        if shipment_id in seen_shipment_ids:
+        if not _tenant_shipment_eligible_for_sir(shipment):
+            errors.append(
+                f'Shipment row {index + 1}: shipment must be Closed with Compliant POD'
+                f'{" and COD collected" if (shipment.booking and (shipment.booking.order_type or "").lower() == "cod") else ""}.'
+            )
+            continue
+        if shipment.shipment_id in seen_shipment_ids:
             errors.append(f'Shipment row {index + 1}: duplicate shipment is not allowed.')
             continue
-        seen_shipment_ids.add(shipment_id)
-        truck_plate = ''
-        if shipment.truck is not None:
-            truck_plate = (shipment.truck.plate_number or shipment.truck.truck_code or '').strip()
-        shipment_rows.append(
-            {
-                'line_no': len(shipment_rows) + 1,
-                'shipment_ref': shipment.shipment_id,
-                'booking_ref': shipment_booking_no(shipment),
-                'shipment_date': shipment.shipment_date,
-                'from_location': shipment.from_location or '',
-                'to_location': shipment.to_location or '',
-                'truck_plate': truck_plate,
-                'customer_ref_docs': shipment.purchase_order_ref or '',
-                'pod_date': None,
-            }
-        )
+        seen_shipment_ids.add(shipment.shipment_id)
+        shipment_rows.append(_sir_shipment_row_snapshot(shipment, line_no=len(shipment_rows) + 1))
 
     surcharge_refs = _manual_post_list(post_data, 'manual_surcharge_ref[]')
+    surcharge_ids = _manual_post_list(post_data, 'manual_surcharge_id[]')
     seen_surcharge_ids = set()
     for index, surcharge_ref in enumerate(surcharge_refs):
-        shipment_ref = _list_value(_manual_post_list(post_data, 'manual_surcharge_shipment_ref[]'), index)
+        surcharge_id_raw = _list_value(surcharge_ids, index)
         amount = _list_value(_manual_post_list(post_data, 'manual_surcharge_amount[]'), index)
-        if not any([surcharge_ref, shipment_ref, amount]):
+        if not any([surcharge_ref, surcharge_id_raw, amount]):
             continue
-        surcharge = _resolve_manual_surcharge_for_report(
-            report,
-            surcharge_ref,
-            booking_nos=selected_booking_nos or None,
-        )
+        surcharge = None
+        parsed_surcharge_id = _coerce_uuid(surcharge_id_raw)
+        if parsed_surcharge_id:
+            surcharge = (
+                TenantShipmentSurcharge.objects.select_related('shipment', 'shipment__booking', 'booking')
+                .filter(pk=parsed_surcharge_id, status=TenantShipmentSurcharge.Status.CONFIRMED)
+                .first()
+            )
         if surcharge is None:
-            errors.append(f'Surcharge row {index + 1}: select an active surcharge linked to the selected booking/shipment.')
+            surcharge = _resolve_manual_surcharge_for_report(
+                report,
+                surcharge_ref,
+                booking_ids=selected_booking_ids or None,
+            )
+        if surcharge is None:
+            errors.append(f'Surcharge row {index + 1}: select a confirmed surcharge for the selected shipment.')
             continue
-        surcharge_id = str(surcharge.surcharge_id)
-        if surcharge_id in seen_surcharge_ids:
+        if surcharge.surcharge_id in seen_surcharge_ids:
             errors.append(f'Surcharge row {index + 1}: duplicate surcharge is not allowed.')
             continue
-        seen_surcharge_ids.add(surcharge_id)
-        booking_ref = (
-            TenantBooking.objects.filter(pk=surcharge.shipment.booking_id)
-            .exclude(booking_status=TenantBooking.Status.CANCELLED)
-            .values_list('booking_id', flat=True)
-            .first()
-        )
-        surcharge_rows.append(
-            {
-                'line_no': len(surcharge_rows) + 1,
-                'surcharge_trx_ref': surcharge.surcharge_id,
-                'booking_ref': booking_ref,
-                'surcharge_type': surcharge.item_label or '',
-                'shipment_ref': surcharge.shipment.shipment_no or '',
-                'service_name': surcharge.item_label or '',
-                'amount': surcharge.subtotal or Decimal('0'),
-            }
-        )
+        seen_surcharge_ids.add(surcharge.surcharge_id)
+        surcharge_rows.append(_sir_surcharge_row_snapshot(surcharge, line_no=len(surcharge_rows) + 1))
 
     if errors:
         raise ValidationError(errors)
@@ -29123,19 +30431,12 @@ def _manual_sales_invoice_report_rows_from_post(report, post_data):
 
 def _replace_sales_invoice_report_children_from_manual_post(report, post_data):
     rows = _manual_sales_invoice_report_rows_from_post(report, post_data)
-    report.booking_lines.all().delete()
-    report.surcharge_lines.all().delete()
-    report.shipment_lines.all().delete()
-    SalesInvoiceReportBooking.objects.bulk_create(
-        [SalesInvoiceReportBooking(report=report, **row) for row in rows['bookings']]
+    _sir_bulk_create_child_lines(
+        report,
+        bookings=rows['bookings'],
+        shipments=rows['shipments'],
+        surcharges=rows['surcharges'],
     )
-    SalesInvoiceReportSurcharge.objects.bulk_create(
-        [SalesInvoiceReportSurcharge(report=report, **row) for row in rows['surcharges']]
-    )
-    SalesInvoiceReportShipment.objects.bulk_create(
-        [SalesInvoiceReportShipment(report=report, **row) for row in rows['shipments']]
-    )
-    report.recalculate_totals(save=True)
     return {
         'bookings_loaded': len(rows['bookings']),
         'surcharges_loaded': len(rows['surcharges']),
@@ -29143,7 +30444,6 @@ def _replace_sales_invoice_report_children_from_manual_post(report, post_data):
         'total_freight_amount': report.total_freight_amount,
         'total_surcharge_amount': report.total_surcharge_amount,
     }
-
 
 def _sales_invoice_report_preview_payload(*, client_id, booking_date_from, booking_date_to, currency):
     if not client_id:
@@ -29154,23 +30454,15 @@ def _sales_invoice_report_preview_payload(*, client_id, booking_date_from, booki
         raise ValidationError('Booking date from cannot be later than booking date to.')
     currency = (currency or 'SAR').strip()
 
-    rows = _eligible_executed_bookings_for_report(
+    sweep = _sir_eligible_operational_rows(
         client_id=client_id,
         booking_date_from=booking_date_from,
         booking_date_to=booking_date_to,
         currency=currency,
     )
-    booking_refs = [r.get('booking_ref') for r in rows if r.get('booking_ref')]
-    surcharge_rows = _eligible_confirmed_surcharges_for_report(
-        booking_refs=booking_refs,
-        booking_date_from=booking_date_from,
-        booking_date_to=booking_date_to,
-    )
-    shipment_rows = _related_shipments_for_report(
-        booking_refs=booking_refs,
-        booking_date_from=booking_date_from,
-        booking_date_to=booking_date_to,
-    )
+    rows = sweep['bookings']
+    shipment_rows = sweep['shipments']
+    surcharge_rows = sweep['surcharges']
     total_freight = sum(Decimal(str(r.get('sell_price') or 0)) for r in rows)
     total_surcharge = sum(Decimal(str(r.get('amount') or 0)) for r in surcharge_rows)
 
@@ -29198,44 +30490,25 @@ def _refresh_sales_invoice_report_children(report: SalesInvoiceReport):
     if report.is_fully_locked:
         raise ValidationError('Converted reports are locked and cannot be refreshed.')
 
-    bookings = _eligible_executed_bookings_for_report(
+    sweep = _sir_eligible_operational_rows(
         client_id=report.client_id,
         booking_date_from=report.booking_date_from,
         booking_date_to=report.booking_date_to,
         currency=report.currency,
     )
-    booking_refs = [row['booking_ref'] for row in bookings if row.get('booking_ref')]
-    surcharges = _eligible_confirmed_surcharges_for_report(
-        booking_refs=booking_refs,
-        booking_date_from=report.booking_date_from,
-        booking_date_to=report.booking_date_to,
-    )
-    shipments = _related_shipments_for_report(
-        booking_refs=booking_refs,
-        booking_date_from=report.booking_date_from,
-        booking_date_to=report.booking_date_to,
-    )
 
     with db_transaction.atomic():
-        report.booking_lines.all().delete()
-        report.surcharge_lines.all().delete()
-        report.shipment_lines.all().delete()
-
-        SalesInvoiceReportBooking.objects.bulk_create(
-            [SalesInvoiceReportBooking(report=report, **row) for row in bookings]
+        _sir_bulk_create_child_lines(
+            report,
+            bookings=sweep['bookings'],
+            shipments=sweep['shipments'],
+            surcharges=sweep['surcharges'],
         )
-        SalesInvoiceReportSurcharge.objects.bulk_create(
-            [SalesInvoiceReportSurcharge(report=report, **row) for row in surcharges]
-        )
-        SalesInvoiceReportShipment.objects.bulk_create(
-            [SalesInvoiceReportShipment(report=report, **row) for row in shipments]
-        )
-        report.recalculate_totals(save=True)
 
     return {
-        'bookings_loaded': len(bookings),
-        'surcharges_loaded': len(surcharges),
-        'shipments_loaded': len(shipments),
+        'bookings_loaded': len(sweep['bookings']),
+        'surcharges_loaded': len(sweep['surcharges']),
+        'shipments_loaded': len(sweep['shipments']),
         'total_freight_amount': report.total_freight_amount,
         'total_surcharge_amount': report.total_surcharge_amount,
     }
@@ -29266,6 +30539,7 @@ def _create_sales_invoice_report_with_auto_number(
         obj.total_surcharge_amount = Decimal('0')
         obj.created_by = (created_by or '').strip()
         obj.updated_by = (created_by or '').strip()
+        obj.auto_post = auto_post
         obj.full_clean()
         obj.save()
         if auto_post:
@@ -29541,3 +30815,86 @@ def _apply_organization_profile_post(request, profile):
     # critical format rules when values are provided.
     if profile.cr_number and not profile.cr_number.isdigit():
         raise ValueError('CR Number must be numeric.')
+
+
+class TenantNotificationMarkReadView(View):
+    """Mark one in-app notification as read (tenant bell panel)."""
+
+    def post(self, request, notification_id):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            return JsonResponse({'ok': False, 'error': 'unauthorized'}, status=401)
+
+        auth_payload = get_tenant_portal_cookie_payload(request) or {}
+        tenant_id = auth_payload.get('tenant_id')
+        tenant_jti = auth_payload.get('jti')
+        if not tenant_id or not tenant_jti:
+            return JsonResponse({'ok': False, 'error': 'unauthorized'}, status=401)
+
+        session_data = get_tenant_session(str(tenant_id), str(tenant_jti)) or {}
+        from iroad_tenants.tenant_notifications import (
+            mark_all_read,
+            mark_notification_read,
+            resolve_recipient_from_session,
+            run_with_tenant_schema,
+            unread_count_for_recipient,
+        )
+
+        recipient_key, _tenant_user_id = resolve_recipient_from_session(
+            tenant_id=str(tenant_id),
+            reference_id=str(session_data.get('reference_id') or ''),
+        )
+
+        def _mark(_registry):
+            if (request.POST.get('action') or '').strip() == 'mark_all':
+                count = mark_all_read(recipient_key=recipient_key)
+                return {'ok': True, 'marked_all': count}
+            ok = mark_notification_read(
+                recipient_key=recipient_key,
+                notification_id=notification_id,
+            )
+            return {
+                'ok': ok,
+                'unread_count': unread_count_for_recipient(recipient_key),
+            }
+
+        result = run_with_tenant_schema(request, _mark)
+        if result is None:
+            return JsonResponse({'ok': False, 'error': 'unauthorized'}, status=401)
+        return JsonResponse(result)
+
+
+class TenantNotificationMarkAllReadView(View):
+    """Mark all in-app notifications read for the current portal recipient."""
+
+    def post(self, request):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            return JsonResponse({'ok': False, 'error': 'unauthorized'}, status=401)
+
+        auth_payload = get_tenant_portal_cookie_payload(request) or {}
+        tenant_id = auth_payload.get('tenant_id')
+        tenant_jti = auth_payload.get('jti')
+        if not tenant_id or not tenant_jti:
+            return JsonResponse({'ok': False, 'error': 'unauthorized'}, status=401)
+
+        session_data = get_tenant_session(str(tenant_id), str(tenant_jti)) or {}
+        from iroad_tenants.tenant_notifications import (
+            mark_all_read,
+            resolve_recipient_from_session,
+            run_with_tenant_schema,
+        )
+
+        recipient_key, _tenant_user_id = resolve_recipient_from_session(
+            tenant_id=str(tenant_id),
+            reference_id=str(session_data.get('reference_id') or ''),
+        )
+
+        def _mark_all(_registry):
+            count = mark_all_read(recipient_key=recipient_key)
+            return {'ok': True, 'marked_all': count, 'unread_count': 0}
+
+        result = run_with_tenant_schema(request, _mark_all)
+        if result is None:
+            return JsonResponse({'ok': False, 'error': 'unauthorized'}, status=401)
+        return JsonResponse(result)

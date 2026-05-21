@@ -38,92 +38,41 @@
         </div>
 
         <!-- Filter Panel -->
-        <div class="collapse mt-3" id="filterCollapse">
-          <div
+        <div class="collapse mt-3{% if critical_account_filters_active %} show{% endif %}" id="filterCollapse">
+          <form
+            method="get"
+            action="{% url 'iroad_tenants:tenant_critical_account_changes' %}"
             class="p-3 border rounded shadow-sm"
             style="background-color: #ffffff"
           >
             <div class="row g-3">
               <div class="col-md-3">
-                <label
-                  class="form-label"
-                  style="
-                    font-size: 12px;
-                    font-weight: 500;
-                    color: #64748b;
-                    text-transform: uppercase;
-                    margin-bottom: 4px;
-                  "
-                  >From Date</label
-                >
-                <input type="date" class="form-control" />
+                <label class="form-label" for="criticalAccountDateFrom" style="font-size: 12px; font-weight: 500; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">From Date</label>
+                <input type="date" class="form-control" id="criticalAccountDateFrom" name="date_from" value="{{ critical_account_filter_date_from|default:'' }}" />
               </div>
               <div class="col-md-3">
-                <label
-                  class="form-label"
-                  style="
-                    font-size: 12px;
-                    font-weight: 500;
-                    color: #64748b;
-                    text-transform: uppercase;
-                    margin-bottom: 4px;
-                  "
-                  >To Date</label
-                >
-                <input type="date" class="form-control" />
+                <label class="form-label" for="criticalAccountDateTo" style="font-size: 12px; font-weight: 500; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">To Date</label>
+                <input type="date" class="form-control" id="criticalAccountDateTo" name="date_to" value="{{ critical_account_filter_date_to|default:'' }}" />
               </div>
               <div class="col-md-3">
-                <label
-                  class="form-label"
-                  style="
-                    font-size: 12px;
-                    font-weight: 500;
-                    color: #64748b;
-                    text-transform: uppercase;
-                    margin-bottom: 4px;
-                  "
-                  >Module</label
-                >
-                <select class="form-select">
-                  <option value="">All Modules</option>
-                  <option value="billing">Billing Settings</option>
-                  <option value="security">Security Settings</option>
-                  <option value="tenant">Tenant Config</option>
+                <label class="form-label" for="criticalAccountModule" style="font-size: 12px; font-weight: 500; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">Module</label>
+                <select class="form-select" id="criticalAccountModule" name="module">
+                  <option value="" {% if not critical_account_filter_module %}selected{% endif %}>All Modules</option>
+                  <option value="billing" {% if critical_account_filter_module == 'billing' %}selected{% endif %}>Billing Settings</option>
+                  <option value="security" {% if critical_account_filter_module == 'security' %}selected{% endif %}>Security Settings</option>
+                  <option value="tenant" {% if critical_account_filter_module == 'tenant' %}selected{% endif %}>Tenant Config</option>
                 </select>
               </div>
               <div class="col-md-3">
-                <label
-                  class="form-label"
-                  style="
-                    font-size: 12px;
-                    font-weight: 500;
-                    color: #64748b;
-                    text-transform: uppercase;
-                    margin-bottom: 4px;
-                  "
-                  >Performed By</label
-                >
-                <input
-                  type="text"
-                  class="form-control"
-                  placeholder="Search user..."
-                />
+                <label class="form-label" for="criticalAccountPerformedBy" style="font-size: 12px; font-weight: 500; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">Performed By</label>
+                <input type="search" class="form-control" id="criticalAccountPerformedBy" name="performed_by" value="{{ critical_account_filter_performed_by|default:'' }}" placeholder="Search user&hellip;" autocomplete="off" />
               </div>
             </div>
             <div class="d-flex justify-content-end gap-2 mt-3">
-              <button
-                type="button"
-                class="eal-btn eal-btn-outline"
-                data-bs-toggle="collapse"
-                data-bs-target="#filterCollapse"
-              >
-                Cancel
-              </button>
-              <button type="button" class="eal-btn eal-btn-primary">
-                Apply Filters
-              </button>
+              <a href="{% url 'iroad_tenants:tenant_critical_account_changes' %}" class="eal-btn eal-btn-outline">Clear Filters</a>
+              <button type="submit" class="eal-btn eal-btn-primary">Apply Filters</button>
             </div>
-          </div>
+          </form>
         </div>
       </div>
 
@@ -173,24 +122,33 @@
         data-eal-filterable-table
         data-eal-empty-colspan="6"
         data-eal-empty-filter-message="No rows match the selected search/filter criteria."
+        data-eal-global-search-columns="1,2,3,4,5"
         data-eal-action-dropdowns="0"
       >
         <!-- Toolbar -->
         <div class="eal-toolbar">
           <div class="eal-toolbar-left">
-            <form method="get" class="eal-search">
+            <div class="eal-search">
               <i class="bi bi-search"></i>
               <input
-                type="text"
-                name="search"
-                value="{{ critical_account_search_query }}"
+                type="search"
+                id="criticalAccountSearch"
+                data-eal-global-search
+                autocomplete="off"
                 placeholder="Search events&hellip;"
+                aria-label="Search events"
               />
-              <button type="submit" class="btn btn-sm btn-link text-decoration-none">Search</button>
-              {% if critical_account_search_query %}
-              <a href="{% url 'iroad_tenants:tenant_audit_critical_account_changes' %}" class="btn btn-sm btn-link text-decoration-none">Clear</a>
-              {% endif %}
-            </form>
+              <button
+                type="button"
+                class="eal-search-clear-btn"
+                id="criticalAccountSearchClear"
+                title="Clear search"
+                aria-label="Clear search"
+                hidden
+              >
+                <i class="bi bi-x-lg"></i>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -249,7 +207,7 @@
           </div>
           <div class="eal-pagination-controls">
             {% if critical_account_page_obj.has_previous %}
-            <a class="eal-page-btn" title="Previous" href="?page={{ critical_account_page_obj.previous_page_number }}{% if critical_account_search_query %}&amp;search={{ critical_account_search_query|urlencode }}{% endif %}">
+            <a class="eal-page-btn" title="Previous" href="?{% if critical_account_filters_qs %}{{ critical_account_filters_qs }}&amp;{% endif %}page={{ critical_account_page_obj.previous_page_number }}">
               <i class="bi bi-chevron-left"></i>
             </a>
             {% else %}
@@ -261,7 +219,7 @@
             <button class="eal-page-btn active">{{ critical_account_page_obj.number }}</button>
 
             {% if critical_account_page_obj.has_next %}
-            <a class="eal-page-btn" title="Next" href="?page={{ critical_account_page_obj.next_page_number }}{% if critical_account_search_query %}&amp;search={{ critical_account_search_query|urlencode }}{% endif %}">
+            <a class="eal-page-btn" title="Next" href="?{% if critical_account_filters_qs %}{{ critical_account_filters_qs }}&amp;{% endif %}page={{ critical_account_page_obj.next_page_number }}">
               <i class="bi bi-chevron-right"></i>
             </a>
             {% else %}
@@ -274,4 +232,58 @@
       </div>
   </div>
 </div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  .eal-search .eal-search-clear-btn {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: #94a3b8;
+    cursor: pointer;
+    line-height: 1;
+  }
+  .eal-search .eal-search-clear-btn:hover {
+    background: #e2e8f0;
+    color: #64748b;
+  }
+  .eal-search .eal-search-clear-btn[hidden] {
+    display: none !important;
+  }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  var inp = document.getElementById("criticalAccountSearch");
+  var btn = document.getElementById("criticalAccountSearchClear");
+  if (!inp) return;
+
+  function syncClear() {
+    if (!btn) return;
+    btn.hidden = !(inp.value || "").trim();
+  }
+
+  inp.addEventListener("input", syncClear);
+  syncClear();
+
+  if (btn) {
+    btn.addEventListener("click", function () {
+      inp.value = "";
+      inp.dispatchEvent(new Event("input", { bubbles: true }));
+      syncClear();
+      inp.focus();
+    });
+  }
+})();
+</script>
 {% endblock %}

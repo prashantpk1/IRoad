@@ -38,91 +38,40 @@
         </div>
 
         <!-- Filter Panel -->
-        <div class="collapse mt-3" id="filterCollapse">
-          <div
+        <div class="collapse mt-3{% if role_permission_filters_active %} show{% endif %}" id="filterCollapse">
+          <form
+            method="get"
+            action="{% url 'iroad_tenants:tenant_role_permission_changes' %}"
             class="p-3 border rounded shadow-sm"
             style="background-color: #ffffff"
           >
             <div class="row g-3">
               <div class="col-md-3">
-                <label
-                  class="form-label"
-                  style="
-                    font-size: 12px;
-                    font-weight: 500;
-                    color: #64748b;
-                    text-transform: uppercase;
-                    margin-bottom: 4px;
-                  "
-                  >From Date</label
-                >
-                <input type="date" class="form-control" />
+                <label class="form-label" for="rolePermissionDateFrom" style="font-size: 12px; font-weight: 500; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">From Date</label>
+                <input type="date" class="form-control" id="rolePermissionDateFrom" name="date_from" value="{{ role_permission_filter_date_from|default:'' }}" />
               </div>
               <div class="col-md-3">
-                <label
-                  class="form-label"
-                  style="
-                    font-size: 12px;
-                    font-weight: 500;
-                    color: #64748b;
-                    text-transform: uppercase;
-                    margin-bottom: 4px;
-                  "
-                  >To Date</label
-                >
-                <input type="date" class="form-control" />
+                <label class="form-label" for="rolePermissionDateTo" style="font-size: 12px; font-weight: 500; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">To Date</label>
+                <input type="date" class="form-control" id="rolePermissionDateTo" name="date_to" value="{{ role_permission_filter_date_to|default:'' }}" />
               </div>
               <div class="col-md-3">
-                <label
-                  class="form-label"
-                  style="
-                    font-size: 12px;
-                    font-weight: 500;
-                    color: #64748b;
-                    text-transform: uppercase;
-                    margin-bottom: 4px;
-                  "
-                  >Module</label
-                >
-                <select class="form-select">
-                  <option value="">All Modules</option>
-                  <option value="roles">Roles</option>
-                  <option value="permissions">Permissions</option>
+                <label class="form-label" for="rolePermissionModule" style="font-size: 12px; font-weight: 500; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">Module</label>
+                <select class="form-select" id="rolePermissionModule" name="module">
+                  <option value="" {% if not role_permission_filter_module %}selected{% endif %}>All Modules</option>
+                  <option value="roles" {% if role_permission_filter_module == 'roles' %}selected{% endif %}>Roles</option>
+                  <option value="permissions" {% if role_permission_filter_module == 'permissions' %}selected{% endif %}>Permissions</option>
                 </select>
               </div>
               <div class="col-md-3">
-                <label
-                  class="form-label"
-                  style="
-                    font-size: 12px;
-                    font-weight: 500;
-                    color: #64748b;
-                    text-transform: uppercase;
-                    margin-bottom: 4px;
-                  "
-                  >Performed By</label
-                >
-                <input
-                  type="text"
-                  class="form-control"
-                  placeholder="Search user..."
-                />
+                <label class="form-label" for="rolePermissionPerformedBy" style="font-size: 12px; font-weight: 500; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">Performed By</label>
+                <input type="search" class="form-control" id="rolePermissionPerformedBy" name="performed_by" value="{{ role_permission_filter_performed_by|default:'' }}" placeholder="Search user&hellip;" autocomplete="off" />
               </div>
             </div>
             <div class="d-flex justify-content-end gap-2 mt-3">
-              <button
-                type="button"
-                class="eal-btn eal-btn-outline"
-                data-bs-toggle="collapse"
-                data-bs-target="#filterCollapse"
-              >
-                Cancel
-              </button>
-              <button type="button" class="eal-btn eal-btn-primary">
-                Apply Filters
-              </button>
+              <a href="{% url 'iroad_tenants:tenant_role_permission_changes' %}" class="eal-btn eal-btn-outline">Clear Filters</a>
+              <button type="submit" class="eal-btn eal-btn-primary">Apply Filters</button>
             </div>
-          </div>
+          </form>
         </div>
       </div>
 
@@ -180,7 +129,24 @@
           <div class="eal-toolbar-left">
             <div class="eal-search">
               <i class="bi bi-search"></i>
-              <input type="text" data-eal-global-search placeholder="Search events&hellip;" />
+              <input
+                type="search"
+                id="rolePermissionTableSearch"
+                data-eal-global-search
+                autocomplete="off"
+                placeholder="Search events&hellip;"
+                aria-label="Search events"
+              />
+              <button
+                type="button"
+                class="eal-search-clear-btn"
+                id="rolePermissionTableSearchClear"
+                title="Clear search"
+                aria-label="Clear search"
+                hidden
+              >
+                <i class="bi bi-x-lg"></i>
+              </button>
             </div>
           </div>
         </div>
@@ -240,7 +206,7 @@
           </div>
           <div class="eal-pagination-controls">
             {% if role_permission_page_obj.has_previous %}
-            <a class="eal-page-btn" title="Previous" href="?page={{ role_permission_page_obj.previous_page_number }}">
+            <a class="eal-page-btn" title="Previous" href="?{% if role_permission_filters_qs %}{{ role_permission_filters_qs }}&amp;{% endif %}page={{ role_permission_page_obj.previous_page_number }}">
               <i class="bi bi-chevron-left"></i>
             </a>
             {% else %}
@@ -252,7 +218,7 @@
             <button class="eal-page-btn active">{{ role_permission_page_obj.number }}</button>
 
             {% if role_permission_page_obj.has_next %}
-            <a class="eal-page-btn" title="Next" href="?page={{ role_permission_page_obj.next_page_number }}">
+            <a class="eal-page-btn" title="Next" href="?{% if role_permission_filters_qs %}{{ role_permission_filters_qs }}&amp;{% endif %}page={{ role_permission_page_obj.next_page_number }}">
               <i class="bi bi-chevron-right"></i>
             </a>
             {% else %}
@@ -265,4 +231,55 @@
       </div>
   </div>
 </div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  .eal-search .eal-search-clear-btn {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: #94a3b8;
+    cursor: pointer;
+    line-height: 1;
+  }
+  .eal-search .eal-search-clear-btn:hover {
+    background: #e2e8f0;
+    color: #64748b;
+  }
+  .eal-search .eal-search-clear-btn[hidden] {
+    display: none !important;
+  }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  var inp = document.getElementById("rolePermissionTableSearch");
+  var btn = document.getElementById("rolePermissionTableSearchClear");
+  if (!inp) return;
+  function syncClear() {
+    if (!btn) return;
+    btn.hidden = !(inp.value || "").trim();
+  }
+  inp.addEventListener("input", syncClear);
+  syncClear();
+  if (btn) {
+    btn.addEventListener("click", function () {
+      inp.value = "";
+      inp.dispatchEvent(new Event("input", { bubbles: true }));
+      syncClear();
+      inp.focus();
+    });
+  }
+})();
+</script>
 {% endblock %}

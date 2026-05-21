@@ -87,18 +87,15 @@
           {% if form.amount.errors %}<div class="text-danger small">{{ form.amount.errors }}</div>{% endif %}
         </div>
         <div class="field">
-          <label class="form-label" for="{{ form.related_shipment.id_for_label }}">
-            Related Shipment
-            <span class="badge bg-warning text-dark ms-1" style="font-size:0.7rem;">Under Development</span>
-          </label>
-          {{ form.related_shipment }}
-          {% if form.related_shipment.errors %}<div class="text-danger small">{{ form.related_shipment.errors }}</div>{% endif %}
+          <label class="form-label" for="{{ form.shipment.id_for_label }}">Related Shipment</label>
+          {{ form.shipment }}
+          {% if form.shipment.errors %}<div class="text-danger small">{{ form.shipment.errors }}</div>{% endif %}
         </div>
         <div class="field" style="grid-column: 1 / -1;">
           <label class="form-label" for="{{ form.description.id_for_label }}">Description</label>
           {{ form.description }}
           {% if form.description.errors %}<div class="text-danger small">{{ form.description.errors }}</div>{% endif %}
-          <small class="text-muted">Balance auto-update and advanced reference linking are <strong>Under Development</strong>.</small>
+          <small class="text-muted">Enter a shipment number to link this entry. Wallet balance updates when you save.</small>
         </div>
       </div>
     </div>

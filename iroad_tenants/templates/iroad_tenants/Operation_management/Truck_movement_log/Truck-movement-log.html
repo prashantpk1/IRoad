@@ -575,15 +575,15 @@
     function syncTruckAndDriverFromShipment(fallbackBookingOption) {
       const shipmentOption = selectedOption(shipmentSelect);
       const hasShipment = shipmentOption && shipmentOption.value;
-      const truckRef = (hasShipment ? shipmentOption.getAttribute("data-truck-ref") : "") ||
-        (fallbackBookingOption ? fallbackBookingOption.getAttribute("data-truck-ref") : "");
-      const driverRef = (hasShipment ? shipmentOption.getAttribute("data-driver-ref") : "") ||
-        (fallbackBookingOption ? fallbackBookingOption.getAttribute("data-driver-ref") : "");
+      const truckRef = (hasShipment ? shipmentOption.getAttribute("data-truck-id") : "") ||
+        (fallbackBookingOption ? fallbackBookingOption.getAttribute("data-truck-id") : "");
+      const driverRef = (hasShipment ? shipmentOption.getAttribute("data-driver-id") : "") ||
+        (fallbackBookingOption ? fallbackBookingOption.getAttribute("data-driver-id") : "");
       setSelectValue(truckSelect, truckRef || "");
       setSelectValue(driverSelect, driverRef || "");
       if (!driverRef && truckSelect) {
         const truckOption = selectedOption(truckSelect);
-        setSelectValue(driverSelect, truckOption ? truckOption.getAttribute("data-default-driver-ref") : "");
+        setSelectValue(driverSelect, truckOption ? truckOption.getAttribute("data-default-driver-id") : "");
       }
     }
 
@@ -608,17 +608,28 @@
         if (isMatch) matchedShipments.push(option);
       });
 
-      const currentShipment = selectedOption(shipmentSelect);
-      if (!currentShipment || !currentShipment.value || currentShipment.hidden || currentShipment.disabled) {
-        const preferredShipmentRef = bookingOption ? (bookingOption.getAttribute("data-shipment-ref") || "") : "";
-        const preferredShipment = matchedShipments.find(function (option) {
-          return option.value === preferredShipmentRef;
+      if (resolvedBookingNo) {
+        const currentShipment = selectedOption(shipmentSelect);
+        if (!currentShipment || !currentShipment.value || currentShipment.hidden || currentShipment.disabled) {
+          const preferredShipmentRef = bookingOption
+            ? (bookingOption.getAttribute("data-shipment-id") || "")
+            : "";
+          const preferredShipment = matchedShipments.find(function (option) {
+            return option.value === preferredShipmentRef;
+          });
+          shipmentSelect.value = preferredShipment
+            ? preferredShipment.value
+            : (matchedShipments.length ? matchedShipments[0].value : "");
+        }
+        syncTruckAndDriverFromShipment(bookingOption);
+      } else {
+        Array.prototype.forEach.call(shipmentSelect.options, function (option, index) {
+          if (index === 0) return;
+          option.hidden = false;
+          option.disabled = false;
         });
-        shipmentSelect.value = preferredShipment
-          ? preferredShipment.value
-          : (matchedShipments.length ? matchedShipments[0].value : "");
+        shipmentSelect.value = "";
       }
-      syncTruckAndDriverFromShipment(bookingOption);
     }
 
     function syncBookingFromShipment() {
@@ -695,7 +706,9 @@
         applyBookingLookup();
         hideBookingMenu();
       });
-      applyBookingLookup();
+      if (String(bookingInput.value || "").trim()) {
+        applyBookingLookup();
+      }
     }
 
     if (bookingMenu && bookingInput) {
@@ -728,7 +741,9 @@
 
     if (shipmentSelect) {
       shipmentSelect.addEventListener("change", syncBookingFromShipment);
-      syncBookingFromShipment();
+      if (shipmentSelect.value) {
+        syncBookingFromShipment();
+      }
     }
     if (truckSelect) {
       truckSelect.addEventListener("change", function () {

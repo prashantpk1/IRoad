@@ -75,15 +75,21 @@ from .views import (
     TenantClientContractEditView,
     TenantClientContractListView,
     TenantClientContractSettingsView,
+    TenantNotificationMarkAllReadView,
+    TenantNotificationMarkReadView,
     TenantClientContractView,
     TenantClientDetailsView,
     TenantCriticalAccountChangesView,
     TenantSubscriptionBillingView,
     TenantSubscriptionPlanView,
     TenantSupportTicketCreateView,
+    TenantSupportTicketDeleteView,
     TenantSupportTicketDetailView,
+    TenantSupportTicketEditView,
     TenantSupportTicketListView,
     TenantDashboardView,
+    TenantDashboardSearchView,
+    TenantDashboardSearchResultsView,
     TenantUsersAdministrationDeleteView,
     TenantUsersAdministrationEditView,
     TenantUsersAdministrationExportView,
@@ -130,6 +136,7 @@ from .views import (
     TenantPriceListMasterEditView,
     TenantOperationBookingAssignTruckView,
     TenantOperationBookingCancelView,
+    TenantOperationBookingDeleteView,
     TenantOperationBookingCreateView,
     TenantOperationBookingDetailView,
     TenantOperationBookingEditView,
@@ -193,6 +200,16 @@ app_name = 'iroad_tenants'
 urlpatterns = [
     path('dashboard/', TenantDashboardView.as_view(), name='tenant_dashboard'),
     path(
+        'dashboard/search/',
+        TenantDashboardSearchView.as_view(),
+        name='tenant_dashboard_search',
+    ),
+    path(
+        'dashboard/search/results/',
+        TenantDashboardSearchResultsView.as_view(),
+        name='tenant_dashboard_search_results',
+    ),
+    path(
         'administration/support/tickets/',
         TenantSupportTicketListView.as_view(),
         name='tenant_support_ticket_list',
@@ -206,6 +223,16 @@ urlpatterns = [
         'administration/support/tickets/<uuid:ticket_id>/',
         TenantSupportTicketDetailView.as_view(),
         name='tenant_support_ticket_detail',
+    ),
+    path(
+        'administration/support/tickets/<uuid:ticket_id>/edit/',
+        TenantSupportTicketEditView.as_view(),
+        name='tenant_support_ticket_edit',
+    ),
+    path(
+        'administration/support/tickets/<uuid:ticket_id>/delete/',
+        TenantSupportTicketDeleteView.as_view(),
+        name='tenant_support_ticket_delete',
     ),
     path(
         'administration/organization-profile/',
@@ -451,6 +478,16 @@ urlpatterns = [
         'crm/clients/contracts/settings/',
         TenantClientContractSettingsView.as_view(),
         name='tenant_client_contract_settings',
+    ),
+    path(
+        'notifications/<uuid:notification_id>/read/',
+        TenantNotificationMarkReadView.as_view(),
+        name='tenant_notification_mark_read',
+    ),
+    path(
+        'notifications/read-all/',
+        TenantNotificationMarkAllReadView.as_view(),
+        name='tenant_notification_mark_all_read',
     ),
     path(
         'crm/clients/details/',
@@ -852,6 +889,11 @@ urlpatterns = [
         'operations/booking/<uuid:booking_id>/cancel/',
         TenantOperationBookingCancelView.as_view(),
         name='tenant_operation_booking_cancel',
+    ),
+    path(
+        'operations/booking/<uuid:booking_id>/delete/',
+        TenantOperationBookingDeleteView.as_view(),
+        name='tenant_operation_booking_delete',
     ),
     path(
         'operations/booking/<uuid:booking_id>/assign-truck/',

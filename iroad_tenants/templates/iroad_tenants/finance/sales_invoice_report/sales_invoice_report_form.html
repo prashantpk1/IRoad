@@ -96,8 +96,14 @@
   </nav>
   <div class="page-header-row">
     <div class="page-header-left">
-      <h1 class="page-title">Create Sales Invoice Report</h1>
-      <p class="page-subtitle">Select client account and booking period to build the billing worksheet.</p>
+      <h1 class="page-title">{{ page_title }}</h1>
+      <p class="page-subtitle">
+        {% if is_edit %}
+        Update {{ report.report_no }} — client, booking period, and worksheet lines.
+        {% else %}
+        Select client account and booking period to build the billing worksheet.
+        {% endif %}
+      </p>
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
@@ -154,7 +160,7 @@
             <label class="form-label">Auto Post</label>
             <div class="form-check form-switch mt-2">
               <input type="hidden" name="auto_post" value="0">
-              <input class="form-check-input" type="checkbox" id="sirAutoPost" name="auto_post" value="1">
+              <input class="form-check-input" type="checkbox" id="sirAutoPost" name="auto_post" value="1"{% if auto_post_enabled %} checked{% endif %}>
               <label class="form-check-label" for="sirAutoPost">Auto Post</label>
             </div>
             <span class="field-hint">If enabled, system fetches matching active bookings, shipments, and surcharges for the selected period.</span>
@@ -187,6 +193,7 @@
                 <th>Service Item</th>
                 <th>Trip Type</th>
                 <th>Sell Price</th>
+                <th>Sales Report Status</th>
               </tr>
             </thead>
             <tbody id="sirBookingsBody">
@@ -194,12 +201,13 @@
               <tr>
                 <td class="booking-sn">{{ r.line_no }}</td>
                 <td>
+                  <input type="hidden" name="manual_booking_id[]" value="{% if r.booking_id %}{{ r.booking_id }}{% elif r.booking %}{{ r.booking.booking_id }}{% endif %}">
                   <div class="lookup-input-wrap">
                     <i class="bi bi-search lookup-input-icon"></i>
-                    <input type="text" class="form-control form-control-sm lookup-input" name="manual_booking_ref[]" placeholder="Search booking..." aria-label="Booking lookup" list="sirBookingLookupOptions" value="{{ r.booking_ref|default:'' }}">
+                    <input type="text" class="form-control form-control-sm lookup-input sir-booking-lookup" name="manual_booking_ref[]" placeholder="Search booking..." aria-label="Booking lookup" list="sirBookingLookupOptions" value="{% if r.booking %}{{ r.booking.booking_no }}{% endif %}">
                   </div>
                 </td>
-                <td><input type="date" class="form-control form-control-sm" name="manual_booking_date[]" value="{{ report_form.booking_date_from.value|default:'' }}" readonly></td>
+                <td><input type="date" class="form-control form-control-sm" name="manual_booking_date[]" value="{% if r.booking %}{{ r.booking.booking_date|date:'Y-m-d' }}{% else %}{{ report_form.booking_date_from.value|default:'' }}{% endif %}" readonly></td>
                 <td>
                   <div class="lookup-input-wrap">
                     <i class="bi bi-search lookup-input-icon"></i>
@@ -214,14 +222,16 @@
                   </select>
                 </td>
                 <td><input type="number" class="form-control form-control-sm text-end" name="manual_booking_sell_price[]" placeholder="0.00" step="0.01" value="{{ r.sell_price|default:'' }}" readonly></td>
+                <td><input type="text" class="form-control form-control-sm" value="{% if r.booking %}{{ r.booking.sales_report_status|default:'Pending' }}{% else %}Pending{% endif %}" readonly></td>
               </tr>
               {% empty %}
               <tr>
                 <td class="booking-sn">1</td>
                 <td>
+                  <input type="hidden" name="manual_booking_id[]" value="">
                   <div class="lookup-input-wrap">
                     <i class="bi bi-search lookup-input-icon"></i>
-                    <input type="text" class="form-control form-control-sm lookup-input" name="manual_booking_ref[]" placeholder="Search booking..." aria-label="Booking lookup" list="sirBookingLookupOptions">
+                    <input type="text" class="form-control form-control-sm lookup-input sir-booking-lookup" name="manual_booking_ref[]" placeholder="Search booking..." aria-label="Booking lookup" list="sirBookingLookupOptions">
                   </div>
                 </td>
                 <td><input type="date" class="form-control form-control-sm" name="manual_booking_date[]" readonly></td>
@@ -239,6 +249,7 @@
                   </select>
                 </td>
                 <td><input type="number" class="form-control form-control-sm text-end" name="manual_booking_sell_price[]" placeholder="0.00" step="0.01" readonly></td>
+                <td><input type="text" class="form-control form-control-sm" value="Pending" readonly></td>
               </tr>
               {% endfor %}
             </tbody>
@@ -269,7 +280,7 @@
                 <th>Route</th>
                 <th>Truck</th>
                 <th>Customer Ref</th>
-                <th>POD Date</th>
+                <th>POD Status</th>
               </tr>
             </thead>
             <tbody id="sirShipmentsBody">
@@ -277,43 +288,45 @@
               <tr>
                 <td class="shipment-sn">{{ r.line_no }}</td>
                 <td>
+                  <input type="hidden" name="manual_shipment_id[]" value="{% if r.shipment_id %}{{ r.shipment_id }}{% elif r.shipment %}{{ r.shipment.shipment_id }}{% endif %}">
                   <div class="lookup-input-wrap">
                     <i class="bi bi-search lookup-input-icon"></i>
-                    <input type="text" class="form-control form-control-sm lookup-input" name="manual_shipment_booking_ref[]" placeholder="Search booking..." aria-label="Booking lookup" list="sirBookingLookupOptions" value="{{ r.booking_ref|default:'' }}">
+                    <input type="text" class="form-control form-control-sm lookup-input" name="manual_shipment_booking_ref[]" placeholder="Search booking..." aria-label="Booking lookup" list="sirBookingLookupOptions" value="{% if r.booking %}{{ r.booking.booking_no }}{% elif r.shipment.booking %}{{ r.shipment.booking.booking_no }}{% endif %}" readonly>
                   </div>
                 </td>
                 <td>
                   <div class="lookup-input-wrap">
                     <i class="bi bi-search lookup-input-icon"></i>
-                    <input type="text" class="form-control form-control-sm lookup-input" name="manual_shipment_ref[]" placeholder="Search shipment..." aria-label="Shipment lookup" list="sirShipmentLookupOptions" value="{{ r.shipment_ref|default:'' }}">
+                    <input type="text" class="form-control form-control-sm lookup-input sir-shipment-lookup" name="manual_shipment_ref[]" placeholder="Search shipment..." aria-label="Shipment lookup" list="sirShipmentLookupOptions" value="{% if r.shipment %}{{ r.shipment.shipment_no }}{% endif %}">
                   </div>
                 </td>
                 <td><input type="date" class="form-control form-control-sm" name="manual_shipment_date[]" value="{{ r.shipment_date|default:'' }}" readonly></td>
                 <td><input type="text" class="form-control form-control-sm" name="manual_shipment_route[]" placeholder="Route" value="{{ r.from_location|default:'' }}{% if r.to_location %} → {{ r.to_location }}{% endif %}" readonly></td>
                 <td><input type="text" class="form-control form-control-sm" name="manual_shipment_truck[]" placeholder="Truck" value="{{ r.truck_plate|default:'' }}" readonly></td>
                 <td><input type="text" class="form-control form-control-sm" name="manual_shipment_customer_ref[]" placeholder="Customer ref" value="{{ r.customer_ref_docs|default:'' }}" readonly></td>
-                <td><input type="date" class="form-control form-control-sm" name="manual_shipment_pod_date[]" value="{{ r.pod_date|default:'' }}" readonly></td>
+                <td><input type="text" class="form-control form-control-sm" name="manual_shipment_pod_status[]" value="{% if r.pod_status %}{{ r.pod_status }}{% elif r.shipment %}{{ r.shipment.pod_status }}{% endif %}" readonly></td>
               </tr>
               {% empty %}
               <tr>
                 <td class="shipment-sn">1</td>
                 <td>
+                  <input type="hidden" name="manual_shipment_id[]" value="">
                   <div class="lookup-input-wrap">
                     <i class="bi bi-search lookup-input-icon"></i>
-                    <input type="text" class="form-control form-control-sm lookup-input" name="manual_shipment_booking_ref[]" placeholder="Search booking..." aria-label="Booking lookup" list="sirBookingLookupOptions">
+                    <input type="text" class="form-control form-control-sm lookup-input" name="manual_shipment_booking_ref[]" placeholder="Search booking..." aria-label="Booking lookup" list="sirBookingLookupOptions" readonly>
                   </div>
                 </td>
                 <td>
                   <div class="lookup-input-wrap">
                     <i class="bi bi-search lookup-input-icon"></i>
-                    <input type="text" class="form-control form-control-sm lookup-input" name="manual_shipment_ref[]" placeholder="Search shipment..." aria-label="Shipment lookup" list="sirShipmentLookupOptions">
+                    <input type="text" class="form-control form-control-sm lookup-input sir-shipment-lookup" name="manual_shipment_ref[]" placeholder="Search shipment..." aria-label="Shipment lookup" list="sirShipmentLookupOptions">
                   </div>
                 </td>
                 <td><input type="date" class="form-control form-control-sm" name="manual_shipment_date[]" readonly></td>
                 <td><input type="text" class="form-control form-control-sm" name="manual_shipment_route[]" placeholder="Route" readonly></td>
                 <td><input type="text" class="form-control form-control-sm" name="manual_shipment_truck[]" placeholder="Truck" readonly></td>
                 <td><input type="text" class="form-control form-control-sm" name="manual_shipment_customer_ref[]" placeholder="Customer ref" readonly></td>
-                <td><input type="date" class="form-control form-control-sm" name="manual_shipment_pod_date[]" readonly></td>
+                <td><input type="text" class="form-control form-control-sm" name="manual_shipment_pod_status[]" placeholder="POD status" readonly></td>
               </tr>
               {% endfor %}
             </tbody>
@@ -352,16 +365,17 @@
               <tr>
                 <td class="surcharge-sn">{{ r.line_no }}</td>
                 <td>
+                  <input type="hidden" name="manual_surcharge_id[]" value="{% if r.surcharge_id %}{{ r.surcharge_id }}{% elif r.surcharge %}{{ r.surcharge.surcharge_id }}{% endif %}">
                   <div class="lookup-input-wrap">
                     <i class="bi bi-search lookup-input-icon"></i>
-                    <input type="text" class="form-control form-control-sm lookup-input" name="manual_surcharge_ref[]" placeholder="Search transaction..." aria-label="Transaction lookup" list="sirTransactionLookupOptions" value="{{ r.surcharge_trx_ref|default:'' }}">
+                    <input type="text" class="form-control form-control-sm lookup-input sir-surcharge-lookup" name="manual_surcharge_ref[]" placeholder="Search transaction..." aria-label="Transaction lookup" list="sirTransactionLookupOptions" value="{% if r.surcharge %}{{ r.surcharge.transaction_no|default:r.surcharge.surcharge_id }}{% endif %}">
                   </div>
                 </td>
-                <td><input type="date" class="form-control form-control-sm" name="manual_surcharge_date[]" readonly></td>
+                <td><input type="date" class="form-control form-control-sm" name="manual_surcharge_date[]" value="{% if r.surcharge %}{{ r.surcharge.transaction_date|date:'Y-m-d' }}{% endif %}" readonly></td>
                 <td>
                   <div class="lookup-input-wrap">
                     <i class="bi bi-search lookup-input-icon"></i>
-                    <input type="text" class="form-control form-control-sm lookup-input" name="manual_surcharge_shipment_ref[]" placeholder="Search shipment..." aria-label="Shipment lookup" list="sirShipmentLookupOptions" value="{{ r.shipment_ref|default:'' }}">
+                    <input type="text" class="form-control form-control-sm lookup-input" name="manual_surcharge_shipment_ref[]" placeholder="Search shipment..." aria-label="Shipment lookup" list="sirShipmentLookupOptions" value="{% if r.shipment %}{{ r.shipment.shipment_no }}{% elif r.surcharge.shipment %}{{ r.surcharge.shipment.shipment_no }}{% endif %}" readonly>
                   </div>
                 </td>
                 <td>
@@ -372,17 +386,18 @@
                     <option value="other" {% if r.surcharge_type == 'other' %}selected{% endif %}>Other</option>
                   </select>
                 </td>
-                <td><input type="number" class="form-control form-control-sm text-end" name="manual_surcharge_qty[]" placeholder="0" step="1" min="0" readonly></td>
-                <td><input type="number" class="form-control form-control-sm text-end" name="manual_surcharge_price[]" placeholder="0.00" step="0.01" readonly></td>
+                <td><input type="number" class="form-control form-control-sm text-end" name="manual_surcharge_qty[]" placeholder="0" step="1" min="0" value="{% if r.surcharge %}{{ r.surcharge.qty }}{% endif %}" readonly></td>
+                <td><input type="number" class="form-control form-control-sm text-end" name="manual_surcharge_price[]" placeholder="0.00" step="0.01" value="{% if r.surcharge %}{{ r.surcharge.unit_price }}{% endif %}" readonly></td>
                 <td><input type="number" class="form-control form-control-sm text-end" name="manual_surcharge_amount[]" placeholder="0.00" step="0.01" value="{{ r.amount|default:'' }}" readonly></td>
               </tr>
               {% empty %}
               <tr>
                 <td class="surcharge-sn">1</td>
                 <td>
+                  <input type="hidden" name="manual_surcharge_id[]" value="">
                   <div class="lookup-input-wrap">
                     <i class="bi bi-search lookup-input-icon"></i>
-                    <input type="text" class="form-control form-control-sm lookup-input" name="manual_surcharge_ref[]" placeholder="Search transaction..." aria-label="Transaction lookup" list="sirTransactionLookupOptions">
+                    <input type="text" class="form-control form-control-sm lookup-input sir-surcharge-lookup" name="manual_surcharge_ref[]" placeholder="Search transaction..." aria-label="Transaction lookup" list="sirTransactionLookupOptions">
                   </div>
                 </td>
                 <td><input type="date" class="form-control form-control-sm" name="manual_surcharge_date[]" readonly></td>
@@ -428,9 +443,6 @@
         <div class="eal-stat-card"><div class="eal-stat-icon amber"><i class="bi bi-cash-stack"></i></div><div><div class="eal-stat-value" id="id_total_surcharge_amount_display">{{ report_form.total_surcharge_amount.value|default:"0.00" }}</div><div class="eal-stat-label">Surcharges amount</div></div></div>
         <div class="eal-stat-card"><div class="eal-stat-icon purple"><i class="bi bi-wallet2"></i></div><div><div class="eal-stat-value" id="sirCombinedTotal">0.00</div><div class="eal-stat-label">Total</div></div></div>
       </div>
-      <div class="cd-empty mt-3">
-        <strong>Under Development:</strong> Approval workflow timeline, finance audit logs, printable PDF preview, comments/attachments.
-      </div>
     </div>
   </div>
 
@@ -472,42 +484,78 @@
 
 {% block extra_js %}
 {{ block.super }}
+<script type="application/json" id="sirLookupMaps">{{ sir_lookup_maps_json|default:"{}"|safe }}</script>
 <script>
 (function () {
+  var lookupMaps = {};
+  try {
+    lookupMaps = JSON.parse(document.getElementById("sirLookupMaps").textContent || "{}");
+  } catch (e) {
+    lookupMaps = {};
+  }
+  function syncHiddenId(row, visibleSelector, hiddenName, mapKey) {
+    if (!row) return;
+    var visible = row.querySelector(visibleSelector);
+    var hidden = row.querySelector('input[name="' + hiddenName + '"]');
+    if (!visible || !hidden) return;
+    var maps = lookupMaps[mapKey] || {};
+    hidden.value = maps[(visible.value || "").trim()] || hidden.value || "";
+  }
   function safeText(v) { return (v === null || v === undefined || v === "") ? "—" : String(v); }
   function safeAttr(v) {
     if (v === null || v === undefined) return "";
     return String(v).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
+  function bindSirRowLookupSync(root) {
+    if (!root) return;
+    Array.prototype.slice.call(root.querySelectorAll("tr")).forEach(function (row) {
+      var bookingInput = row.querySelector(".sir-booking-lookup");
+      if (bookingInput) {
+        bookingInput.addEventListener("change", function () { syncHiddenId(row, ".sir-booking-lookup", "manual_booking_id[]", "bookings"); });
+        bookingInput.addEventListener("blur", function () { syncHiddenId(row, ".sir-booking-lookup", "manual_booking_id[]", "bookings"); });
+      }
+      var shipmentInput = row.querySelector(".sir-shipment-lookup");
+      if (shipmentInput) {
+        shipmentInput.addEventListener("change", function () { syncHiddenId(row, ".sir-shipment-lookup", "manual_shipment_id[]", "shipments"); });
+        shipmentInput.addEventListener("blur", function () { syncHiddenId(row, ".sir-shipment-lookup", "manual_shipment_id[]", "shipments"); });
+      }
+      var surchargeInput = row.querySelector(".sir-surcharge-lookup");
+      if (surchargeInput) {
+        surchargeInput.addEventListener("change", function () { syncHiddenId(row, ".sir-surcharge-lookup", "manual_surcharge_id[]", "surcharges"); });
+        surchargeInput.addEventListener("blur", function () { syncHiddenId(row, ".sir-surcharge-lookup", "manual_surcharge_id[]", "surcharges"); });
+      }
+    });
+  }
   function buildEmptyRow(kind) {
     if (kind === "bookings") {
       return '<tr>'
         + '<td class="booking-sn">1</td>'
-        + '<td><div class="lookup-input-wrap"><i class="bi bi-search lookup-input-icon"></i><input type="text" class="form-control form-control-sm lookup-input" name="manual_booking_ref[]" placeholder="Search booking..." list="sirBookingLookupOptions"></div></td>'
+        + '<td><input type="hidden" name="manual_booking_id[]" value=""><div class="lookup-input-wrap"><i class="bi bi-search lookup-input-icon"></i><input type="text" class="form-control form-control-sm lookup-input sir-booking-lookup" name="manual_booking_ref[]" placeholder="Search booking..." list="sirBookingLookupOptions"></div></td>'
         + '<td><input type="date" class="form-control form-control-sm" name="manual_booking_date[]" readonly></td>'
         + '<td><div class="lookup-input-wrap"><i class="bi bi-search lookup-input-icon"></i><input type="text" class="form-control form-control-sm lookup-input" name="manual_booking_service_name[]" placeholder="Search service item..." list="sirServiceItemLookupOptions"></div></td>'
         + '<td><select class="form-select form-select-sm" name="manual_booking_trip_type[]"><option value="" selected disabled>-Select type-</option><option value="one-way">One-Way</option><option value="round">Round</option></select></td>'
         + '<td><input type="number" class="form-control form-control-sm text-end" name="manual_booking_sell_price[]" placeholder="0.00" step="0.01" readonly></td>'
+        + '<td><input type="text" class="form-control form-control-sm" value="Pending" readonly></td>'
         + '</tr>';
     }
     if (kind === "shipments") {
       return '<tr>'
         + '<td class="shipment-sn">1</td>'
-        + '<td><div class="lookup-input-wrap"><i class="bi bi-search lookup-input-icon"></i><input type="text" class="form-control form-control-sm lookup-input" name="manual_shipment_booking_ref[]" placeholder="Search booking..." list="sirBookingLookupOptions"></div></td>'
-        + '<td><div class="lookup-input-wrap"><i class="bi bi-search lookup-input-icon"></i><input type="text" class="form-control form-control-sm lookup-input" name="manual_shipment_ref[]" placeholder="Search shipment..." list="sirShipmentLookupOptions"></div></td>'
+        + '<td><input type="hidden" name="manual_shipment_id[]" value=""><div class="lookup-input-wrap"><i class="bi bi-search lookup-input-icon"></i><input type="text" class="form-control form-control-sm lookup-input" name="manual_shipment_booking_ref[]" placeholder="Search booking..." list="sirBookingLookupOptions" readonly></div></td>'
+        + '<td><div class="lookup-input-wrap"><i class="bi bi-search lookup-input-icon"></i><input type="text" class="form-control form-control-sm lookup-input sir-shipment-lookup" name="manual_shipment_ref[]" placeholder="Search shipment..." list="sirShipmentLookupOptions"></div></td>'
         + '<td><input type="date" class="form-control form-control-sm" name="manual_shipment_date[]" readonly></td>'
         + '<td><input type="text" class="form-control form-control-sm" name="manual_shipment_route[]" placeholder="Route" readonly></td>'
         + '<td><input type="text" class="form-control form-control-sm" name="manual_shipment_truck[]" placeholder="Truck" readonly></td>'
         + '<td><input type="text" class="form-control form-control-sm" name="manual_shipment_customer_ref[]" placeholder="Customer ref" readonly></td>'
-        + '<td><input type="date" class="form-control form-control-sm" name="manual_shipment_pod_date[]" readonly></td>'
+        + '<td><input type="text" class="form-control form-control-sm" name="manual_shipment_pod_status[]" placeholder="POD status" readonly></td>'
         + '</tr>';
     }
     if (kind === "surcharges") {
       return '<tr>'
         + '<td class="surcharge-sn">1</td>'
-        + '<td><div class="lookup-input-wrap"><i class="bi bi-search lookup-input-icon"></i><input type="text" class="form-control form-control-sm lookup-input" name="manual_surcharge_ref[]" placeholder="Search transaction..." list="sirTransactionLookupOptions"></div></td>'
+        + '<td><input type="hidden" name="manual_surcharge_id[]" value=""><div class="lookup-input-wrap"><i class="bi bi-search lookup-input-icon"></i><input type="text" class="form-control form-control-sm lookup-input sir-surcharge-lookup" name="manual_surcharge_ref[]" placeholder="Search transaction..." list="sirTransactionLookupOptions"></div></td>'
         + '<td><input type="date" class="form-control form-control-sm" name="manual_surcharge_date[]" readonly></td>'
-        + '<td><div class="lookup-input-wrap"><i class="bi bi-search lookup-input-icon"></i><input type="text" class="form-control form-control-sm lookup-input" name="manual_surcharge_shipment_ref[]" placeholder="Search shipment..." list="sirShipmentLookupOptions"></div></td>'
+        + '<td><div class="lookup-input-wrap"><i class="bi bi-search lookup-input-icon"></i><input type="text" class="form-control form-control-sm lookup-input" name="manual_surcharge_shipment_ref[]" placeholder="Search shipment..." list="sirShipmentLookupOptions" readonly></div></td>'
         + '<td><select class="form-select form-select-sm" name="manual_surcharge_type[]" disabled><option value="" selected disabled>-Select type-</option><option value="fuel">Fuel</option><option value="detention">Detention</option><option value="other">Other</option></select></td>'
         + '<td><input type="number" class="form-control form-control-sm text-end" name="manual_surcharge_qty[]" placeholder="0" step="1" min="0" readonly></td>'
         + '<td><input type="number" class="form-control form-control-sm text-end" name="manual_surcharge_price[]" placeholder="0.00" step="0.01" readonly></td>'
@@ -525,6 +573,7 @@
       body.innerHTML = rows.map(rowBuilder).join("");
     }
     initLookupInputsIn(body);
+    bindSirRowLookupSync(body);
   }
 
   var messageEl = document.getElementById("sirDynamicMessage");
@@ -615,11 +664,11 @@
         }
 
         renderRows("sirBookingsBody", data.bookings, "bookings", function (r) {
-          var bookingDate = safeAttr((fromEl && fromEl.value) || "");
+          var bookingDate = safeAttr(r.booking_date || ((fromEl && fromEl.value) || ""));
           var tripType = (r.trip_type || "").toString().toLowerCase();
           return '<tr>'
             + '<td class="booking-sn">' + safeText(r.line_no) + '</td>'
-            + '<td><div class="lookup-input-wrap"><i class="bi bi-search lookup-input-icon"></i><input type="text" class="form-control form-control-sm lookup-input" name="manual_booking_ref[]" placeholder="Search booking..." list="sirBookingLookupOptions" value="' + safeAttr(r.booking_ref) + '"></div></td>'
+            + '<td><input type="hidden" name="manual_booking_id[]" value="' + safeAttr(r.booking_id) + '"><div class="lookup-input-wrap"><i class="bi bi-search lookup-input-icon"></i><input type="text" class="form-control form-control-sm lookup-input sir-booking-lookup" name="manual_booking_ref[]" placeholder="Search booking..." list="sirBookingLookupOptions" value="' + safeAttr(r.booking_no) + '"></div></td>'
             + '<td><input type="date" class="form-control form-control-sm" name="manual_booking_date[]" value="' + bookingDate + '" readonly></td>'
             + '<td><div class="lookup-input-wrap"><i class="bi bi-search lookup-input-icon"></i><input type="text" class="form-control form-control-sm lookup-input" name="manual_booking_service_name[]" placeholder="Search service item..." list="sirServiceItemLookupOptions" value="' + safeAttr(r.service_name) + '"></div></td>'
             + '<td><select class="form-select form-select-sm" name="manual_booking_trip_type[]">'
@@ -628,23 +677,24 @@
               + '<option value="round" ' + (tripType === 'round' ? 'selected' : '') + '>Round</option>'
             + '</select></td>'
             + '<td><input type="number" class="form-control form-control-sm text-end" name="manual_booking_sell_price[]" placeholder="0.00" step="0.01" value="' + safeAttr(r.sell_price) + '" readonly></td>'
+            + '<td><input type="text" class="form-control form-control-sm" value="' + safeAttr(r.sales_report_status || "Pending") + '" readonly></td>'
             + '</tr>';
         });
         renderRows("sirSurchargesBody", data.surcharges, "surcharges", function (r) {
           var st = (r.surcharge_type || "").toString().toLowerCase();
           return '<tr>'
             + '<td class="surcharge-sn">' + safeText(r.line_no) + '</td>'
-            + '<td><div class="lookup-input-wrap"><i class="bi bi-search lookup-input-icon"></i><input type="text" class="form-control form-control-sm lookup-input" name="manual_surcharge_ref[]" placeholder="Search transaction..." list="sirTransactionLookupOptions" value="' + safeAttr(r.surcharge_trx_ref) + '"></div></td>'
-            + '<td><input type="date" class="form-control form-control-sm" name="manual_surcharge_date[]" readonly></td>'
-            + '<td><div class="lookup-input-wrap"><i class="bi bi-search lookup-input-icon"></i><input type="text" class="form-control form-control-sm lookup-input" name="manual_surcharge_shipment_ref[]" placeholder="Search shipment..." list="sirShipmentLookupOptions" value="' + safeAttr(r.shipment_ref) + '"></div></td>'
+            + '<td><input type="hidden" name="manual_surcharge_id[]" value="' + safeAttr(r.surcharge_id) + '"><div class="lookup-input-wrap"><i class="bi bi-search lookup-input-icon"></i><input type="text" class="form-control form-control-sm lookup-input sir-surcharge-lookup" name="manual_surcharge_ref[]" placeholder="Search transaction..." list="sirTransactionLookupOptions" value="' + safeAttr(r.transaction_no) + '"></div></td>'
+            + '<td><input type="date" class="form-control form-control-sm" name="manual_surcharge_date[]" value="' + safeAttr(r.transaction_date) + '" readonly></td>'
+            + '<td><div class="lookup-input-wrap"><i class="bi bi-search lookup-input-icon"></i><input type="text" class="form-control form-control-sm lookup-input" name="manual_surcharge_shipment_ref[]" placeholder="Search shipment..." list="sirShipmentLookupOptions" value="' + safeAttr(r.shipment_no) + '" readonly></div></td>'
             + '<td><select class="form-select form-select-sm" name="manual_surcharge_type[]" disabled>'
               + '<option value="" ' + (st ? '' : 'selected ') + 'disabled>-Select type-</option>'
               + '<option value="fuel" ' + (st === 'fuel' ? 'selected' : '') + '>Fuel</option>'
               + '<option value="detention" ' + (st === 'detention' ? 'selected' : '') + '>Detention</option>'
               + '<option value="other" ' + (st === 'other' ? 'selected' : '') + '>Other</option>'
             + '</select></td>'
-            + '<td><input type="number" class="form-control form-control-sm text-end" name="manual_surcharge_qty[]" placeholder="0" step="1" min="0" readonly></td>'
-            + '<td><input type="number" class="form-control form-control-sm text-end" name="manual_surcharge_price[]" placeholder="0.00" step="0.01" readonly></td>'
+            + '<td><input type="number" class="form-control form-control-sm text-end" name="manual_surcharge_qty[]" placeholder="0" step="1" min="0" value="' + safeAttr(r.qty) + '" readonly></td>'
+            + '<td><input type="number" class="form-control form-control-sm text-end" name="manual_surcharge_price[]" placeholder="0.00" step="0.01" value="' + safeAttr(r.unit_price) + '" readonly></td>'
             + '<td><input type="number" class="form-control form-control-sm text-end" name="manual_surcharge_amount[]" placeholder="0.00" step="0.01" value="' + safeAttr(r.amount) + '" readonly></td>'
             + '</tr>';
         });
@@ -652,13 +702,13 @@
           var route = (r.from_location || "") + ((r.to_location || "") ? " → " + r.to_location : "");
           return '<tr>'
             + '<td class="shipment-sn">' + safeText(r.line_no) + '</td>'
-            + '<td><div class="lookup-input-wrap"><i class="bi bi-search lookup-input-icon"></i><input type="text" class="form-control form-control-sm lookup-input" name="manual_shipment_booking_ref[]" placeholder="Search booking..." list="sirBookingLookupOptions" value="' + safeAttr(r.booking_ref) + '"></div></td>'
-            + '<td><div class="lookup-input-wrap"><i class="bi bi-search lookup-input-icon"></i><input type="text" class="form-control form-control-sm lookup-input" name="manual_shipment_ref[]" placeholder="Search shipment..." list="sirShipmentLookupOptions" value="' + safeAttr(r.shipment_ref) + '"></div></td>'
+            + '<td><input type="hidden" name="manual_shipment_id[]" value="' + safeAttr(r.shipment_id) + '"><div class="lookup-input-wrap"><i class="bi bi-search lookup-input-icon"></i><input type="text" class="form-control form-control-sm lookup-input" name="manual_shipment_booking_ref[]" placeholder="Search booking..." list="sirBookingLookupOptions" value="' + safeAttr(r.booking_no) + '" readonly></div></td>'
+            + '<td><div class="lookup-input-wrap"><i class="bi bi-search lookup-input-icon"></i><input type="text" class="form-control form-control-sm lookup-input sir-shipment-lookup" name="manual_shipment_ref[]" placeholder="Search shipment..." list="sirShipmentLookupOptions" value="' + safeAttr(r.shipment_no) + '"></div></td>'
             + '<td><input type="date" class="form-control form-control-sm" name="manual_shipment_date[]" value="' + safeAttr(r.shipment_date) + '" readonly></td>'
             + '<td><input type="text" class="form-control form-control-sm" name="manual_shipment_route[]" placeholder="Route" value="' + safeAttr(route) + '" readonly></td>'
             + '<td><input type="text" class="form-control form-control-sm" name="manual_shipment_truck[]" placeholder="Truck" value="' + safeAttr(r.truck_plate) + '" readonly></td>'
             + '<td><input type="text" class="form-control form-control-sm" name="manual_shipment_customer_ref[]" placeholder="Customer ref" value="' + safeAttr(r.customer_ref_docs) + '" readonly></td>'
-            + '<td><input type="date" class="form-control form-control-sm" name="manual_shipment_pod_date[]" value="' + safeAttr(r.pod_date) + '" readonly></td>'
+            + '<td><input type="text" class="form-control form-control-sm" name="manual_shipment_pod_status[]" value="' + safeAttr(r.pod_status) + '" readonly></td>'
             + '</tr>';
         });
 
@@ -785,6 +835,20 @@
   }
 
   initLookupInputsIn(document);
+  bindSirRowLookupSync(document);
+  var sirForm = document.getElementById("sirForm");
+  if (sirForm) {
+    sirForm.addEventListener("submit", function () {
+      bindSirRowLookupSync(document);
+    });
+  }
+
+  if (autoPostEl && autoPostEl.checked) {
+    var savedBookingRow = document.querySelector("#sirBookingsBody input[name='manual_booking_id[]']");
+    if (!savedBookingRow) {
+      maybeAutoLoad();
+    }
+  }
 })();
 </script>
 {% endblock %}

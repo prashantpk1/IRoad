@@ -5,6 +5,33 @@
 {% block title %}{% translate "Cargo Master List" %} | iRoad{% endblock %}
 {% block breadcrumb %}{% endblock %}
 
+{% block extra_css %}
+<style>
+  .eal-search .eal-search-clear-btn {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: #94a3b8;
+    cursor: pointer;
+    line-height: 1;
+  }
+  .eal-search .eal-search-clear-btn:hover {
+    background: #e2e8f0;
+    color: #64748b;
+  }
+  .eal-search .eal-search-clear-btn[hidden] {
+    display: none !important;
+  }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
   <nav aria-label="breadcrumb">
@@ -73,19 +100,37 @@
   data-eal-filterable-table
   data-eal-empty-colspan="9"
   data-eal-empty-filter-message="{% translate 'No cargo records match the selected search/filter criteria.' %}"
+  data-eal-global-search-columns="0,1,2,3,4,5,6,7"
 >
-  <form method="get" class="eal-toolbar">
-    
+  <div class="eal-toolbar">
     <div class="eal-toolbar-left">
       <div class="d-flex flex-wrap align-items-end gap-3 w-100">
         <div class="eal-search flex-grow-1" style="min-width: 220px">
           <i class="bi bi-search"></i>
-          <input type="text" name="q" value="{{ search_q }}" placeholder="{% translate 'Search cargo...' %}" />
+          <input
+            type="search"
+            id="cargoMasterSearch"
+            data-eal-global-search
+            value="{{ search_q|default:'' }}"
+            autocomplete="off"
+            placeholder="{% translate 'Search cargo...' %}"
+            aria-label="{% translate 'Search cargo' %}"
+          />
+          <button
+            type="button"
+            class="eal-search-clear-btn"
+            id="cargoMasterSearchClear"
+            title="{% translate 'Clear search' %}"
+            aria-label="{% translate 'Clear search' %}"
+            hidden
+          >
+            <i class="bi bi-x-lg"></i>
+          </button>
         </div>
         <div class="d-flex flex-wrap align-items-end gap-2">
           <div>
             <label class="form-label small mb-0 text-muted" for="cargoListStatus">{% translate "Status" %}</label>
-            <select name="status" id="cargoListStatus" class="form-select form-select-sm" style="min-width: 10rem">
+            <select id="cargoListStatus" data-query-param="status" class="form-select form-select-sm" style="min-width: 10rem">
               <option value="active" {% if filter_status == '' or filter_status == 'active' %}selected{% endif %}>{% translate "Active" %}</option>
               <option value="all" {% if filter_status == 'all' %}selected{% endif %}>{% translate "All" %}</option>
               <option value="inactive" {% if filter_status == 'inactive' %}selected{% endif %}>{% translate "Inactive" %}</option>
@@ -93,20 +138,19 @@
           </div>
           <div>
             <label class="form-label small mb-0 text-muted" for="cargoListClient">{% translate "Client" %}</label>
-            <select name="client" id="cargoListClient" class="form-select form-select-sm" style="min-width: 12rem">
+            <select id="cargoListClient" data-query-param="client" class="form-select form-select-sm" style="min-width: 12rem">
               <option value="">{% translate "All clients" %}</option>
               {% for ca in client_filter_choices %}
-              <option value="{{ ca.account_id }}" {% if filter_client_id and ca.account_id|stringformat:'s' == filter_client_id %}selected{% endif %}>
+              <option value="{{ ca.account_id }}" {% if filter_client_value and ca.account_id|stringformat:'s' == filter_client_value %}selected{% endif %}>
                 {{ ca.display_name }} ({{ ca.account_no }})
               </option>
               {% endfor %}
             </select>
           </div>
-          <button type="submit" class="btn btn-sm btn-primary mb-1">{% translate "Apply" %}</button>
         </div>
       </div>
     </div>
-  </form>
+  </div>
 
   <div class="eal-table-wrap">
     <table class="eal-table">
@@ -219,4 +263,9 @@
   </div>
   {% endif %}
 </div>
+{% endblock %}
+
+{% block extra_js %}
+{% url 'iroad_tenants:tenant_cargo_master_list' as cargo_list_url %}
+{% include 'iroad_tenants/partials/eal_list_live_search_js.html' with list_url=cargo_list_url search_input_id='cargoMasterSearch' clear_btn_id='cargoMasterSearchClear' filter_select_ids='cargoListStatus,cargoListClient' %}
 {% endblock %}

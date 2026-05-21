@@ -1,0 +1,152 @@
+{% extends 'iroad_tenants/base.html' %}
+
+{% block title %}{{ scope_meta.title }}{% endblock %}
+
+{% block content %}
+      <div class="dashboard-toolbar">
+        <div class="toolbar-left">
+          <div class="page-title">{{ scope_meta.title }}</div>
+          <div class="toolbar-subtitle">
+            {% if query %}
+              {{ scope_meta.subtitle }} — {{ total_count }} result{{ total_count|pluralize }} for &ldquo;{{ query }}&rdquo;
+            {% else %}
+              {{ scope_meta.subtitle }}
+            {% endif %}
+          </div>
+        </div>
+        <div class="toolbar-right">
+          <a href="{% url 'iroad_tenants:tenant_dashboard' %}" class="vt-btn text-decoration-none">
+            <i class="bi bi-arrow-left me-1"></i> Dashboard
+          </a>
+        </div>
+      </div>
+
+      <form
+        class="overview-topbar db-fade"
+        method="get"
+        action="{% url 'iroad_tenants:tenant_dashboard_search_results' %}"
+        data-tenant-search-results-form
+      >
+        <input type="hidden" name="scope" value="{{ scope }}" />
+        <div class="overview-search">
+          <i class="bi bi-search"></i>
+          <input
+            type="search"
+            name="q"
+            value="{{ query }}"
+            placeholder="{{ scope_meta.placeholder }}"
+            autocomplete="off"
+            autofocus
+          />
+        </div>
+      </form>
+
+      {% if not query %}
+        <div class="db-card db-fade p-5 text-center mt-3">
+          <div class="mb-3">
+            <i class="bi bi-search text-primary" style="font-size: 2.5rem"></i>
+          </div>
+          <h2 class="h5 fw-bold mb-2">Start searching</h2>
+          <p class="text-muted mb-0 mx-auto" style="max-width: 520px">
+            {{ scope_meta.empty_hint }}
+          </p>
+        </div>
+      {% elif total_count == 0 %}
+        <div class="db-card db-fade p-5 text-center mt-3">
+          <div class="mb-3">
+            <i class="bi bi-folder2-open text-muted" style="font-size: 2.5rem"></i>
+          </div>
+          <h2 class="h5 fw-bold mb-2">No matches found</h2>
+          <p class="text-muted mb-0 mx-auto" style="max-width: 520px">
+            We could not find anything in <strong>{{ scope_meta.subtitle }}</strong> matching &ldquo;{{ query }}&rdquo;.
+            {{ scope_meta.empty_hint }}
+          </p>
+        </div>
+      {% else %}
+        {% if search_summary %}
+          <div class="fih-metrics-grid db-fade mt-3 tenant-search-summary">
+            <div class="fih-metric blue">
+              <div class="fih-m-title">TOTAL MATCHES</div>
+              <div class="fih-m-val">{{ total_count }}</div>
+            </div>
+            {% for chip in search_summary %}
+              <a href="#search-{{ chip.key }}" class="fih-metric {{ chip.tone }} text-decoration-none tenant-search-chip">
+                <div class="fih-m-title">{{ chip.title|upper }}</div>
+                <div class="fih-m-val">{{ chip.count }}</div>
+              </a>
+            {% endfor %}
+          </div>
+        {% endif %}
+
+        {% for section in result_sections %}
+          <div class="db-card db-fade mt-4 p-0 tenant-search-section" id="search-{{ section.key }}">
+            <div class="db-card-header px-4 pt-3 pb-2">
+              <div>
+                <div class="db-card-title">
+                  <i class="bi {{ section.icon }} me-2 text-primary"></i>
+                  {{ section.title }}
+                </div>
+                <div class="db-card-subtitle">
+                  {{ section.count }} match{{ section.count|pluralize:"es" }}
+                </div>
+              </div>
+            </div>
+
+            <div class="eal-table-card border-0 shadow-none mb-0">
+              <div class="eal-table-wrap">
+                <table class="eal-table tenant-search-results-table mb-0">
+                  <thead>
+                    <tr>
+                      <th class="tenant-search-col-sn">SN</th>
+                      {% for col in section.columns %}
+                        <th>{{ col.label }}</th>
+                      {% endfor %}
+                      <th class="text-end tenant-search-col-action">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for row in section.rows %}
+                      <tr class="tenant-search-results-row">
+                        <td class="text-muted">{{ row.sn }}</td>
+                        {% for col in section.columns %}
+                          <td>
+                            {% if col.key == 'ref' %}
+                              <a href="{{ row.url }}" class="eal-entity-id text-decoration-none">{{ row.ref }}</a>
+                            {% elif col.key == 'status' and row.status %}
+                              {% if row.status == 'Active' or row.status == 'Confirmed' or row.status == 'Completed' or row.status == 'Compliant' or row.status == 'Verified' or row.status == 'Delivered' %}
+                                <span class="status-badge active">{{ row.status }}</span>
+                              {% elif row.status == 'Draft' or row.status == 'New' or row.status == 'Pending' or row.status == 'Scheduled' %}
+                                <span class="status-badge pending">{{ row.status }}</span>
+                              {% elif row.status == 'Cancelled' or row.status == 'Inactive' or row.status == 'Not Compliant' %}
+                                <span class="status-badge inactive">{{ row.status }}</span>
+                              {% elif row.status == 'In Progress' or row.status == 'In_Progress' or row.status == 'In Transit' or row.status == 'Loaded' %}
+                                <span class="status-badge in-transit">{{ row.status|cut:"_" }}</span>
+                              {% else %}
+                                <span class="status-badge pending">{{ row.status }}</span>
+                              {% endif %}
+                            {% elif col.key == 'name' %}
+                              <div class="eal-name-cell">
+                                <span class="eal-name-text">{{ row.name|default:"—" }}</span>
+                              </div>
+                            {% elif col.key == 'detail' %}
+                              <span class="text-muted small">{{ row.detail|default:"—" }}</span>
+                            {% else %}
+                              {{ row|default:"—" }}
+                            {% endif %}
+                          </td>
+                        {% endfor %}
+                        <td class="text-end">
+                          <a href="{{ row.url }}" class="eal-row-btn" title="Open">
+                            <i class="bi bi-eye"></i>
+                          </a>
+                        </td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      {% endif %}
+{% endblock %}

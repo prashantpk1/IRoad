@@ -5,6 +5,10 @@
 {% block title %}{% translate "Price List Master List" %} | iRoad Admin{% endblock %}
 {% block breadcrumb %}{% endblock %}
 
+{% block extra_css %}
+{% include 'iroad_tenants/partials/eal_list_live_search_css.html' %}
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
   <nav aria-label="breadcrumb">
@@ -82,17 +86,36 @@
   data-eal-filterable-table
   data-eal-empty-colspan="9"
   data-eal-empty-filter-message="{% translate 'No price lists match the selected search/filter criteria.' %}"
+  data-eal-global-search-columns="1,2,3,4,5,6,7"
 >
-  <form method="get" class="eal-toolbar eal-toolbar--inline-filters">
+  <div class="eal-toolbar eal-toolbar--inline-filters">
     <div class="eal-toolbar-left w-100">
       <div class="eal-toolbar-filters-row">
         <div class="eal-search eal-search--toolbar-grow">
           <i class="bi bi-search"></i>
-          <input type="text" name="q" value="{{ search_q }}" placeholder="{% translate 'Search price lists…' %}" />
+          <input
+            type="search"
+            id="priceListMasterSearch"
+            data-eal-global-search
+            value="{{ search_q|default:'' }}"
+            autocomplete="off"
+            placeholder="{% translate 'Search price lists…' %}"
+            aria-label="{% translate 'Search price lists' %}"
+          />
+          <button
+            type="button"
+            class="eal-search-clear-btn"
+            id="priceListMasterSearchClear"
+            title="{% translate 'Clear search' %}"
+            aria-label="{% translate 'Clear search' %}"
+            hidden
+          >
+            <i class="bi bi-x-lg"></i>
+          </button>
         </div>
         <div class="eal-toolbar-filter-pair">
           <label class="form-label mb-0 small text-nowrap text-muted" for="plListStatus">{% translate "Status" %}</label>
-          <select name="status" id="plListStatus" class="form-select form-select-sm">
+          <select id="plListStatus" data-query-param="status" class="form-select form-select-sm">
             <option value="all" {% if filter_status == 'all' %}selected{% endif %}>{% translate "All" %}</option>
             <option value="draft" {% if filter_status == 'draft' %}selected{% endif %}>{% translate "Draft" %}</option>
             <option value="active" {% if filter_status == 'active' %}selected{% endif %}>{% translate "Active" %}</option>
@@ -101,7 +124,7 @@
         </div>
         <div class="eal-toolbar-filter-pair">
           <label class="form-label mb-0 small text-nowrap text-muted" for="plListClient">{% translate "Client" %}</label>
-          <select name="client" id="plListClient" class="form-select form-select-sm">
+          <select id="plListClient" data-query-param="client" class="form-select form-select-sm">
             <option value="">{% translate "All clients" %}</option>
             {% for ca in client_filter_choices %}
             <option value="{{ ca.account_id }}" {% if filter_client_id and ca.account_id|stringformat:'s' == filter_client_id %}selected{% endif %}>
@@ -110,10 +133,9 @@
             {% endfor %}
           </select>
         </div>
-        <button type="submit" class="btn btn-sm btn-primary eal-toolbar-apply">{% translate "Apply" %}</button>
       </div>
     </div>
-  </form>
+  </div>
 
   <div class="eal-table-wrap">
     <table class="eal-table">
@@ -238,4 +260,6 @@
 
 {% block extra_js %}
 {{ block.super }}
+{% url 'iroad_tenants:tenant_price_list_master_list' as price_list_list_url %}
+{% include 'iroad_tenants/partials/eal_list_live_search_js.html' with list_url=price_list_list_url search_input_id='priceListMasterSearch' clear_btn_id='priceListMasterSearchClear' filter_select_ids='plListStatus,plListClient' %}
 {% endblock extra_js %}

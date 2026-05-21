@@ -57,7 +57,38 @@
   <div class="form-card-header"><div class="form-card-icon green"><i class="bi bi-calendar-check"></i></div><div class="form-card-header-text"><h2 class="form-card-title">Bookings</h2></div></div>
   <div class="form-card-body">
     <div class="eal-table-wrap">
-      <table class="eal-table"><thead><tr><th>SN</th><th>Booking</th><th>Booking Date</th><th>Service Item</th><th>Trip Type</th><th>Sell Price</th></tr></thead><tbody>{% for r in booking_lines %}<tr><td>{{ r.line_no }}</td><td>{{ r.booking_ref|default:"—" }}</td><td>{{ report.booking_date_from|date:"d M Y" }}</td><td>{{ r.service_name }}</td><td>{{ r.trip_type }}</td><td>{{ r.sell_price }}</td></tr>{% empty %}<tr><td colspan="6" class="text-muted text-center">No booking lines.</td></tr>{% endfor %}</tbody></table>
+      <table class="eal-table">
+        <thead>
+          <tr>
+            <th>SN</th>
+            <th>Booking</th>
+            <th>Booking Date</th>
+            <th>Service Item</th>
+            <th>Trip Type</th>
+            <th>Sell Price</th>
+            <th>Sales Report Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in booking_lines %}
+          <tr>
+            <td>{{ r.line_no }}</td>
+            <td>
+              {% if r.booking %}
+              <a href="{% url 'iroad_tenants:tenant_operation_booking_detail' r.booking.booking_id %}">{{ r.booking.booking_no }}</a>
+              {% else %}—{% endif %}
+            </td>
+            <td>{% if r.booking %}{{ r.booking.booking_date|date:"d M Y" }}{% else %}—{% endif %}</td>
+            <td>{{ r.service_name|default:"—" }}</td>
+            <td>{{ r.trip_type|default:"—" }}</td>
+            <td>{{ r.sell_price }}</td>
+            <td>{{ r.booking.sales_report_status|default:"Pending" }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="7" class="text-muted text-center">No booking lines.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
   </div>
 </div>
@@ -66,7 +97,46 @@
   <div class="form-card-header"><div class="form-card-icon blue"><i class="bi bi-truck"></i></div><div class="form-card-header-text"><h2 class="form-card-title">Related Shipments</h2></div></div>
   <div class="form-card-body">
     <div class="eal-table-wrap">
-      <table class="eal-table"><thead><tr><th>SN</th><th>Booking</th><th>Shipment</th><th>Shipment Date</th><th>Route</th><th>Truck</th><th>Customer Ref</th><th>POD Date</th></tr></thead><tbody>{% for r in shipment_lines %}<tr><td>{{ r.line_no }}</td><td>{{ r.booking_ref|default:"—" }}</td><td>{{ r.shipment_ref|default:"—" }}</td><td>{{ r.shipment_date|default:"—" }}</td><td>{{ r.from_location }}{% if r.to_location %} → {{ r.to_location }}{% endif %}</td><td>{{ r.truck_plate }}</td><td>{{ r.customer_ref_docs|default:"—" }}</td><td>{{ r.pod_date|default:"—" }}</td></tr>{% empty %}<tr><td colspan="8" class="text-muted text-center">No shipment lines.</td></tr>{% endfor %}</tbody></table>
+      <table class="eal-table">
+        <thead>
+          <tr>
+            <th>SN</th>
+            <th>Booking</th>
+            <th>Shipment</th>
+            <th>Shipment Date</th>
+            <th>Route</th>
+            <th>Truck</th>
+            <th>Customer Ref</th>
+            <th>POD Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in shipment_lines %}
+          <tr>
+            <td>{{ r.line_no }}</td>
+            <td>
+              {% if r.booking %}
+              <a href="{% url 'iroad_tenants:tenant_operation_booking_detail' r.booking.booking_id %}">{{ r.booking.booking_no }}</a>
+              {% elif r.shipment.booking %}
+              <a href="{% url 'iroad_tenants:tenant_operation_booking_detail' r.shipment.booking.booking_id %}">{{ r.shipment.booking.booking_no }}</a>
+              {% else %}—{% endif %}
+            </td>
+            <td>
+              {% if r.shipment %}
+              <a href="{% url 'iroad_tenants:tenant_operation_shipment_detail' r.shipment.shipment_id %}">{{ r.shipment.shipment_no }}</a>
+              {% else %}—{% endif %}
+            </td>
+            <td>{{ r.shipment_date|date:"d M Y"|default:"—" }}</td>
+            <td>{{ r.from_location }}{% if r.to_location %} → {{ r.to_location }}{% endif %}</td>
+            <td>{{ r.truck_plate|default:"—" }}</td>
+            <td>{{ r.customer_ref_docs|default:"—" }}</td>
+            <td>{{ r.pod_status|default:r.shipment.pod_status|default:"—" }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="8" class="text-muted text-center">No shipment lines.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
   </div>
 </div>
@@ -75,7 +145,44 @@
   <div class="form-card-header"><div class="form-card-icon amber"><i class="bi bi-plus-circle"></i></div><div class="form-card-header-text"><h2 class="form-card-title">Related Surcharges</h2></div></div>
   <div class="form-card-body">
     <div class="eal-table-wrap">
-      <table class="eal-table"><thead><tr><th>SN</th><th>Transaction No</th><th>Transaction Date</th><th>Shipment</th><th>Type</th><th>Amount</th></tr></thead><tbody>{% for r in surcharge_lines %}<tr><td>{{ r.line_no }}</td><td>{{ r.surcharge_trx_ref|default:"—" }}</td><td>—</td><td>{{ r.shipment_ref|default:"—" }}</td><td>{{ r.surcharge_type }}</td><td>{{ r.amount }}</td></tr>{% empty %}<tr><td colspan="6" class="text-muted text-center">No surcharge lines.</td></tr>{% endfor %}</tbody></table>
+      <table class="eal-table">
+        <thead>
+          <tr>
+            <th>SN</th>
+            <th>Transaction No</th>
+            <th>Transaction Date</th>
+            <th>Shipment</th>
+            <th>Type</th>
+            <th>Amount</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in surcharge_lines %}
+          <tr>
+            <td>{{ r.line_no }}</td>
+            <td>
+              {% if r.surcharge %}
+              {{ r.surcharge.transaction_no|default:r.surcharge.surcharge_id }}
+              {% else %}—{% endif %}
+            </td>
+            <td>{% if r.surcharge %}{{ r.surcharge.transaction_date|date:"d M Y" }}{% else %}—{% endif %}</td>
+            <td>
+              {% if r.shipment %}
+              <a href="{% url 'iroad_tenants:tenant_operation_shipment_detail' r.shipment.shipment_id %}">{{ r.shipment.shipment_no }}</a>
+              {% elif r.surcharge.shipment %}
+              <a href="{% url 'iroad_tenants:tenant_operation_shipment_detail' r.surcharge.shipment.shipment_id %}">{{ r.surcharge.shipment.shipment_no }}</a>
+              {% else %}—{% endif %}
+            </td>
+            <td>{{ r.surcharge_type|default:"—" }}</td>
+            <td>{{ r.amount }}</td>
+            <td>{% if r.surcharge %}{{ r.surcharge.status }}{% else %}—{% endif %}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="7" class="text-muted text-center">No surcharge lines.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
   </div>
 </div>
@@ -92,31 +199,6 @@
       <div class="eal-stat-card"><div class="eal-stat-icon green"><i class="bi bi-currency-dollar"></i></div><div><div class="eal-stat-value">{{ report.total_freight_amount }}</div><div class="eal-stat-label">Freight amount</div></div></div>
       <div class="eal-stat-card"><div class="eal-stat-icon amber"><i class="bi bi-cash-stack"></i></div><div><div class="eal-stat-value">{{ report.total_surcharge_amount }}</div><div class="eal-stat-label">Surcharges amount</div></div></div>
       <div class="eal-stat-card"><div class="eal-stat-icon purple"><i class="bi bi-wallet2"></i></div><div><div class="eal-stat-value">{{ report.total_freight_amount|add:report.total_surcharge_amount }}</div><div class="eal-stat-label">Total</div></div></div>
-    </div>
-  </div>
-</div>
-
-<div class="form-card">
-  <div class="form-card-header"><div class="form-card-header-text"><h2 class="form-card-title">Workflow & Finance Extensions</h2></div></div>
-  <div class="form-card-body">
-    <div class="d-flex gap-2 flex-wrap mb-3">
-      {% for s in status_timeline %}
-      <span class="status-badge {% if s.active %}active{% else %}inactive{% endif %}">{{ s.label }}</span>
-      {% endfor %}
-    </div>
-    {% if report.status != 'Converted' %}
-    <form method="post" action="{% url 'iroad_tenants:sales_invoice_report_status_update' report.report_id %}" class="d-flex gap-2 mb-3">
-      {% csrf_token %}
-      <select name="status" class="form-select form-select-sm" style="max-width:220px;">
-        <option value="Draft" {% if report.status == 'Draft' %}selected{% endif %}>Draft</option>
-        <option value="Verified" {% if report.status == 'Verified' %}selected{% endif %}>Verified</option>
-        <option value="Converted" {% if report.status == 'Converted' %}selected{% endif %}>Converted</option>
-      </select>
-      <button class="btn btn-sm btn-primary" type="submit">Update Status</button>
-    </form>
-    {% endif %}
-    <div class="cd-empty">
-      <strong>Under Development:</strong> invoice conversion history, audit trail, printable PDF preview, comments and attachments, accounting integration.
     </div>
   </div>
 </div>

@@ -4,12 +4,17 @@
 
 {% block extra_css %}
 <style>
-      /* Booking list: force 8 cards as 2 rows (4 + 4) on desktop */
+      /* Booking list: KPI cards — 3 columns on desktop (9 cards) */
       .eal-stats-row.booking-stats {
         display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 16px;
         align-items: stretch;
+      }
+      @media (min-width: 1200px) {
+        .eal-stats-row.booking-stats {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
       }
       @media (max-width: 991.98px) {
         .eal-stats-row.booking-stats {
@@ -45,6 +50,16 @@
         align-items: center;
         justify-content: center;
         flex-shrink: 0;
+      }
+      .pl-route-chip > span:not(.pl-route-arrow) {
+        max-width: 140px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .eal-stat-icon.draft {
+        background: #f1f5f9;
+        color: #64748b;
       }
     </style>
 {% endblock %}
@@ -123,6 +138,15 @@
           </div>
         </div>
         <div class="eal-stat-card">
+          <div class="eal-stat-icon draft">
+            <i class="bi bi-file-earmark"></i>
+          </div>
+          <div>
+            <div class="eal-stat-value">{{ booking_stats.draft|default:0 }}</div>
+            <div class="eal-stat-label">Draft</div>
+          </div>
+        </div>
+        <div class="eal-stat-card">
           <div class="eal-stat-icon purple">
             <i class="bi bi-arrow-repeat"></i>
           </div>
@@ -165,14 +189,19 @@
         <!-- Table Card -->
         <div class="eal-table-card">
           <!-- Toolbar -->
-          <div class="eal-toolbar">
+          <form method="get" class="eal-toolbar">
             <div class="eal-toolbar-left">
               <div class="eal-search">
                 <i class="bi bi-search"></i>
-                <input type="text" name="search" value="{{ booking_search_query|default:'' }}" placeholder="Search bookings&hellip;" />
+                <input
+                  type="text"
+                  name="search"
+                  value="{{ booking_search_query|default:'' }}"
+                  placeholder="Search bookings&hellip;"
+                />
               </div>
             </div>
-          </div>
+          </form>
 
           <!-- Table -->
           <div class="eal-table-wrap">
@@ -194,10 +223,7 @@
               </thead>
               <tbody>
                 {% for row in booking_rows %}
-                <tr
-                  data-sales-report="{{ row.sales_report|default:'-' }}"
-                  data-sales-report-status="{{ row.sales_report_status|default:'-' }}"
-                >
+                <tr>
                   <td>{{ row.sn }}</td>
                   <td><span class="eal-entity-id">{{ row.booking_no }}</span></td>
                   <td>{{ row.creation_date|date:"d M Y"|default:"-" }}</td>
@@ -208,7 +234,19 @@
                       <span class="eal-name-text">{{ row.client_name }}</span>
                     </div>
                   </td>
-                  <td>{{ row.route_text }}</td>
+                  <td>
+                    {% if row.route_chip %}
+                    <div class="pl-route-chip" title="{{ row.route_chip.title }}">
+                      <span>{{ row.route_chip.origin }}</span>
+                      <span class="pl-route-arrow" aria-hidden="true">
+                        <i class="bi bi-arrow-left-right"></i>
+                      </span>
+                      <span>{{ row.route_chip.destination }}</span>
+                    </div>
+                    {% else %}
+                    <span class="text-muted">{{ row.route_text }}</span>
+                    {% endif %}
+                  </td>
                   <td>{{ row.trip_type }}</td>
                   <td>
                     {% if row.derived_status == 'Executed' %}
@@ -221,7 +259,13 @@
                     <span class="status-badge pending">{{ row.derived_status|default:row.db_status }}</span>
                     {% endif %}
                   </td>
-                  <td><span>{{ row.truck_no }}</span></td>
+                  <td>
+                    {% if row.truck_unassigned %}
+                    <span class="text-muted">Unassigned</span>
+                    {% else %}
+                    <span>{{ row.truck_no }}</span>
+                    {% endif %}
+                  </td>
                   <td>
                     <div class="dropdown eal-actions-cell">
                       <button
@@ -238,25 +282,11 @@
                         style="border-radius: 8px; border-color: #e2e8f0"
                       >
                         <li>
-                          {% if row.has_active_shipment %}
-                          <span class="dropdown-item text-muted" title="Cannot edit while a shipment is in progress"
-                            ><i class="bi bi-pencil me-2"></i> Edit (locked)</span
-                          >
-                          {% else %}
                           <a class="dropdown-item" href="{% url 'iroad_tenants:tenant_operation_booking_edit' row.booking_id %}"
                             ><i class="bi bi-pencil text-primary me-2"></i>
                             Edit</a
                           >
-                          {% endif %}
                         </li>
-                        {% if row.can_cancel %}
-                        <li>
-                          <form method="post" action="{% url 'iroad_tenants:tenant_operation_booking_cancel' row.booking_id %}" onsubmit="return confirm('Cancel booking {{ row.booking_no }}? This cannot be undone if no shipments exist.');">
-                            {% csrf_token %}
-                            <button type="submit" class="dropdown-item text-danger"><i class="bi bi-x-circle me-2"></i> Cancel booking</button>
-                          </form>
-                        </li>
-                        {% endif %}
                         <li>
                           <a class="dropdown-item" href="{% url 'iroad_tenants:tenant_operation_booking_detail' row.booking_id %}"
                             ><i class="bi bi-eye text-info me-2"></i> View</a
@@ -268,13 +298,28 @@
                             Assign Truck</a
                           >
                         </li>
+                        {% if row.can_delete %}
+                        <li><hr class="dropdown-divider" /></li>
+                        <li>
+                          <form
+                            method="post"
+                            action="{% url 'iroad_tenants:tenant_operation_booking_delete' row.booking_id %}"
+                            onsubmit="return confirm('Delete booking {{ row.booking_no }} permanently? This cannot be undone.');"
+                          >
+                            {% csrf_token %}
+                            <button type="submit" class="dropdown-item text-danger">
+                              <i class="bi bi-trash me-2"></i> Delete
+                            </button>
+                          </form>
+                        </li>
+                        {% endif %}
                       </ul>
                     </div>
                   </td>
                 </tr>
                 {% empty %}
                 <tr>
-                  <td colspan="12" class="text-center text-muted py-4">
+                  <td colspan="11" class="text-center text-muted py-4">
                     No bookings found.
                   </td>
                 </tr>
@@ -297,16 +342,88 @@
               {% endif %}
             </div>
             <div class="eal-pagination-controls">
-              <button class="eal-page-btn" title="Previous" {% if not booking_page_obj.has_previous %}disabled{% endif %}>
+              {% if booking_page_obj.has_previous %}
+              <a
+                class="eal-page-btn"
+                title="Previous"
+                href="?{% if booking_search_query %}search={{ booking_search_query|urlencode }}&{% endif %}page={{ booking_page_obj.previous_page_number }}"
+              >
+                <i class="bi bi-chevron-left"></i>
+              </a>
+              {% else %}
+              <button class="eal-page-btn" title="Previous" disabled>
                 <i class="bi bi-chevron-left"></i>
               </button>
-              <button class="eal-page-btn active">{{ booking_page_obj.number|default:1 }}</button>
-              <button class="eal-page-btn" title="Next" {% if not booking_page_obj.has_next %}disabled{% endif %}>
+              {% endif %}
+              {% for page_num in booking_page_obj.paginator.page_range %}
+              {% if page_num == booking_page_obj.number %}
+              <span class="eal-page-btn active">{{ page_num }}</span>
+              {% else %}
+              <a
+                class="eal-page-btn"
+                href="?{% if booking_search_query %}search={{ booking_search_query|urlencode }}&{% endif %}page={{ page_num }}"
+              >{{ page_num }}</a>
+              {% endif %}
+              {% endfor %}
+              {% if booking_page_obj.has_next %}
+              <a
+                class="eal-page-btn"
+                title="Next"
+                href="?{% if booking_search_query %}search={{ booking_search_query|urlencode }}&{% endif %}page={{ booking_page_obj.next_page_number }}"
+              >
+                <i class="bi bi-chevron-right"></i>
+              </a>
+              {% else %}
+              <button class="eal-page-btn" title="Next" disabled>
                 <i class="bi bi-chevron-right"></i>
               </button>
+              {% endif %}
             </div>
           </div>
         </div>
-        <!-- ========== END TABLE UI DESIGN ========== -->
       </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  (function () {
+    var searchInput = document.querySelector(".eal-search input[name='search']");
+    if (!searchInput) return;
+    var timer = null;
+
+    function buildListUrl(searchValue, page) {
+      var params = new URLSearchParams();
+      var query = (searchValue || "").trim();
+      if (query) {
+        params.set("search", query);
+      }
+      if (page && page > 1) {
+        params.set("page", String(page));
+      }
+      var qs = params.toString();
+      return window.location.pathname + (qs ? "?" + qs : "");
+    }
+
+    function submitSearch() {
+      window.location.href = buildListUrl(searchInput.value, 1);
+    }
+
+    searchInput.addEventListener("input", function () {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(submitSearch, 400);
+    });
+    searchInput.addEventListener("keydown", function (event) {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        window.clearTimeout(timer);
+        submitSearch();
+      }
+    });
+    searchInput.closest("form").addEventListener("submit", function (event) {
+      event.preventDefault();
+      window.clearTimeout(timer);
+      submitSearch();
+    });
+  })();
+</script>
 {% endblock %}

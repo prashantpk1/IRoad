@@ -115,7 +115,27 @@
           <div class="cd-grid-row">
             <div class="cd-field">
               <span class="cd-field-label">Related Shipment</span>
-              <span class="cd-field-value">{{ transaction.related_shipment|default:"N/A" }}</span>
+              <span class="cd-field-value">
+                {% if transaction.shipment_id %}
+                <a href="{% url 'iroad_tenants:tenant_operation_shipment_detail' transaction.shipment_id %}" class="text-decoration-none">
+                  {{ transaction.shipment.shipment_no }}
+                </a>
+                {% else %}
+                N/A
+                {% endif %}
+              </span>
+            </div>
+            <div class="cd-field">
+              <span class="cd-field-label">Linked Action Log</span>
+              <span class="cd-field-value">
+                {% if transaction.operation_action_log_id %}
+                <a href="{% url 'iroad_tenants:tenant_operation_action_log_detail' transaction.operation_action_log_id %}" class="text-decoration-none">
+                  {{ transaction.operation_action_log.log_no }}
+                </a>
+                {% else %}
+                N/A
+                {% endif %}
+              </span>
             </div>
           </div>
         </div>

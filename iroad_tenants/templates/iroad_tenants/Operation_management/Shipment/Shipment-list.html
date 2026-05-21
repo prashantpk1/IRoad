@@ -239,7 +239,7 @@
                   </td>
                   <td>
                     <div class="eal-name-cell">
-                      <span class="eal-name-text">{{ shipment.client_account_ref|default:"-" }}</span>
+                      <span class="eal-name-text">{{ shipment.client_display|default:"-" }}</span>
                     </div>
                   </td>
                   <td>
@@ -262,13 +262,9 @@
                         <li><a class="dropdown-item" href="{% url 'iroad_tenants:tenant_operation_shipment_update' shipment.shipment_id %}"><i class="bi bi-arrow-repeat text-secondary me-2"></i> Update</a></li>
                         {% if not shipment.ui_locks.lock_delivery_address %}
                         <li><a class="dropdown-item" href="{% url 'iroad_tenants:tenant_operation_shipment_edit' shipment.shipment_id %}#shipment-address-section"><i class="bi bi-pin-map text-success me-2"></i> Update Address</a></li>
-                        {% else %}
-                        <li><span class="dropdown-item text-muted"><i class="bi bi-pin-map me-2"></i> Update Address (locked)</span></li>
                         {% endif %}
                         {% if not shipment.ui_locks.lock_cargo %}
                         <li><a class="dropdown-item" href="{% url 'iroad_tenants:tenant_operation_shipment_edit' shipment.shipment_id %}#shipment-cargo-section"><i class="bi bi-box-seam text-warning me-2"></i> Update Cargo</a></li>
-                        {% else %}
-                        <li><span class="dropdown-item text-muted"><i class="bi bi-box-seam me-2"></i> Update Cargo (locked)</span></li>
                         {% endif %}
                         <li>
                           {% if shipment.booking_action_id %}
