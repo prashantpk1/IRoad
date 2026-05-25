@@ -345,31 +345,37 @@
           </div>
         </div>
 
-        <!-- Section 5: Loading Address Lines -->
+        <!-- Section 5: Address -->
         <div class="form-card" id="shipment-address-section" data-section="5">
           <div class="form-card-header">
             <div class="form-card-icon green">
               <i class="bi bi-geo-alt"></i>
             </div>
             <div class="form-card-header-text">
-              <h2 class="form-card-title">Loading Address Lines</h2>
+              <h2 class="form-card-title">Address</h2>
+              <p class="form-card-desc">Pickup and delivery locations for this shipment line.</p>
             </div>
           </div>
           <div class="form-card-body">
-            <div class="eal-table-card">
-              <div class="eal-table-wrap">
-                <table class="eal-table" id="loadingAddressTable">
-                  <thead>
-                    <tr>
-                      <th>SN</th>
-                      <th>Loading Address</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td>1</td>
-                      <td>
-                        <select class="form-select {% if form_errors.loading_address %}is-invalid{% endif %}"{% if not shipment_field_locks.lock_loading_address %} name="loading_address_1"{% endif %}{% if shipment_field_locks.lock_loading_address %} disabled{% endif %}>
+            <div class="field-group">
+              <h3 class="field-group-title">
+                <i class="bi bi-box-arrow-in-down"></i>
+                Loading Address
+              </h3>
+              <div class="eal-table-card">
+                <div class="eal-table-wrap">
+                  <table class="eal-table ops-form-table" id="loadingAddressTable">
+                    <thead>
+                      <tr>
+                        <th class="ops-col-sn">SN</th>
+                        <th class="ops-col-address">Loading Address</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td class="ops-col-sn">1</td>
+                        <td class="ops-col-address">
+                          <select class="form-select {% if form_errors.loading_address %}is-invalid{% endif %}"{% if not shipment_field_locks.lock_loading_address %} name="loading_address_1"{% endif %}{% if shipment_field_locks.lock_loading_address %} disabled{% endif %}>
                         {% if shipment_field_locks.lock_loading_address %}
                         <input type="hidden" name="loading_address_1" value="{{ shipment_form_data.loading_address|default:'' }}" />
                         {% endif %}
@@ -388,40 +394,33 @@
                           {% endfor %}
                         </select>
                         {% if form_errors.loading_address %}<div class="invalid-feedback d-block">{{ form_errors.loading_address }}</div>{% endif %}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
 
-        <!-- Section 6: Delivery Address Lines -->
-        <div class="form-card" id="shipment-delivery-address-section" data-section="6">
-          <div class="form-card-header">
-            <div class="form-card-icon blue">
-              <i class="bi bi-signpost-2"></i>
-            </div>
-            <div class="form-card-header-text">
-              <h2 class="form-card-title">Delivery Address Lines</h2>
-            </div>
-          </div>
-          <div class="form-card-body">
-            <div class="eal-table-card">
-              <div class="eal-table-wrap">
-                <table class="eal-table" id="deliveryAddressTable">
-                  <thead>
-                    <tr>
-                      <th>SN</th>
-                      <th>Delivery Address</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td>1</td>
-                      <td>
-                        <select class="form-select {% if form_errors.delivery_address %}is-invalid{% endif %}"{% if not shipment_field_locks.lock_delivery_address %} name="delivery_address_1"{% endif %}{% if shipment_field_locks.lock_delivery_address %} disabled{% endif %}>
+            <div class="field-group">
+              <h3 class="field-group-title">
+                <i class="bi bi-box-arrow-up-right"></i>
+                Delivery Address
+              </h3>
+              <div class="eal-table-card">
+                <div class="eal-table-wrap">
+                  <table class="eal-table ops-form-table" id="deliveryAddressTable">
+                    <thead>
+                      <tr>
+                        <th class="ops-col-sn">SN</th>
+                        <th class="ops-col-address">Delivery Address</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td class="ops-col-sn">1</td>
+                        <td class="ops-col-address">
+                          <select class="form-select {% if form_errors.delivery_address %}is-invalid{% endif %}"{% if not shipment_field_locks.lock_delivery_address %} name="delivery_address_1"{% endif %}{% if shipment_field_locks.lock_delivery_address %} disabled{% endif %}>
                         {% if shipment_field_locks.lock_delivery_address %}
                         <input type="hidden" name="delivery_address_1" value="{{ shipment_form_data.delivery_address|default:'' }}" />
                         {% endif %}
@@ -440,43 +439,45 @@
                           {% endfor %}
                         </select>
                         {% if form_errors.delivery_address %}<div class="invalid-feedback d-block">{{ form_errors.delivery_address }}</div>{% endif %}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Section 7: Cargo Information -->
-        <div class="form-card" id="shipment-cargo-section" data-section="7">
+        <!-- Section 6: Cargo Information -->
+        <div class="form-card" id="shipment-cargo-section" data-section="6">
           <div class="form-card-header">
             <div class="form-card-icon amber">
               <i class="bi bi-box-seam"></i>
             </div>
             <div class="form-card-header-text">
               <h2 class="form-card-title">Cargo Information</h2>
+              <p class="form-card-desc">Weight is total tonnage for the line; totals update automatically.</p>
             </div>
           </div>
           <div class="form-card-body">
             <div class="eal-table-card">
               <div class="eal-table-wrap">
-                <table class="eal-table" id="cargoTable">
+                <table class="eal-table ops-form-table" id="cargoTable">
                   <thead>
                     <tr>
-                      <th>SN</th>
-                      <th>Booking Item</th>
-                      <th>Cargo</th>
-                      <th>Weight (Ton)</th>
-                      <th>Unit</th>
-                      <th>QTY</th>
+                      <th class="ops-col-sn">SN</th>
+                      <th class="ops-col-booking-item">Booking Item</th>
+                      <th class="ops-col-cargo">Cargo</th>
+                      <th class="ops-col-weight">Weight (Ton)</th>
+                      <th class="ops-col-unit">Unit</th>
+                      <th class="ops-col-qty">QTY</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr>
-                      <td>1</td>
-                      <td>
+                      <td class="ops-col-sn">1</td>
+                      <td class="ops-col-booking-item">
                         <input
                           type="text"
                           class="form-control"
@@ -486,7 +487,7 @@
                           readonly
                         />
                       </td>
-                      <td>
+                      <td class="ops-col-cargo">
                         <select class="form-select {% if form_errors.cargo_id %}is-invalid{% endif %}" id="cargoSelect"{% if not shipment_field_locks.lock_cargo %} name="cargo_id_1"{% endif %}{% if shipment_field_locks.lock_cargo %} disabled{% endif %}>
                         {% if shipment_field_locks.lock_cargo %}
                         <input type="hidden" name="cargo_id_1" value="{{ shipment_form_data.cargo_id|default:'' }}" />
@@ -508,7 +509,7 @@
                         </select>
                         {% if form_errors.cargo_id %}<div class="invalid-feedback d-block">{{ form_errors.cargo_id }}</div>{% endif %}
                       </td>
-                      <td>
+                      <td class="ops-col-weight">
                         <input
                           type="number"
                           class="form-control shipment-cargo-weight"
@@ -519,10 +520,10 @@
                           value="{{ shipment_form_data.cargo_weight|default:'0' }}"
                         />
                       </td>
-                      <td>
+                      <td class="ops-col-unit">
                         <input type="text" class="form-control" id="cargoUnit" name="cargo_unit_1" value="{{ shipment_form_data.cargo_unit|default:'' }}" />
                       </td>
-                      <td>
+                      <td class="ops-col-qty">
                         <input
                           type="number"
                           class="form-control shipment-cargo-qty"
@@ -550,6 +551,7 @@
                   value="{{ shipment_form_data.cargo_qty|default:'0' }}"
                   readonly
                 />
+                <span class="field-hint">Sum of cargo line quantities.</span>
               </div>
               <div class="field">
                 <label for="totalCargoWeight" class="form-label"
@@ -559,9 +561,10 @@
                   type="number"
                   class="form-control"
                   id="totalCargoWeight"
-                  value="0.00"
+                  value="{{ shipment_form_data.cargo_weight|default:'0.00' }}"
                   readonly
                 />
+                <span class="field-hint">Sum of weight (ton) values — not weight × QTY.</span>
               </div>
             </div>
           </div>
@@ -1020,7 +1023,7 @@
             var qty = parseCargoNumber(qtyInput && qtyInput.value);
             var weight = parseCargoNumber(weightInput && weightInput.value);
             qtyTotal += qty;
-            weightTotal += qty * weight;
+            weightTotal += weight;
           });
           totalCargoUnitQty.value = qtyTotal.toFixed(2);
           totalCargoWeight.value = weightTotal.toFixed(2);

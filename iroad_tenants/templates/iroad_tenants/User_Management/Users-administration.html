@@ -20,6 +20,28 @@
     color: #64748b;
     line-height: 1.35;
   }
+  .eal-search .eal-search-clear-btn {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: #94a3b8;
+    cursor: pointer;
+    line-height: 1;
+  }
+  .eal-search .eal-search-clear-btn:hover {
+    background: #e2e8f0;
+    color: #64748b;
+  }
+  .eal-search .eal-search-clear-btn[hidden] {
+    display: none !important;
+  }
 </style>
 {% endblock %}
 
@@ -87,20 +109,32 @@
   data-eal-filterable-table
   data-eal-empty-colspan="9"
   data-eal-empty-filter-message="No users match the selected search/filter criteria."
+  data-eal-global-search-columns="1,2,3,4,5,6,7"
 >
   <div class="eal-toolbar">
     <div class="eal-toolbar-left">
-      <form method="get" action="{% url 'iroad_tenants:tenant_users_administration' %}">
-        <div class="eal-search">
-          <i class="bi bi-search"></i>
-          <input
-            type="text"
-            name="q"
-            value="{{ search_query|default:'' }}"
-            placeholder="Search users by name, email, or role&hellip;"
-          />
-        </div>
-      </form>
+      <div class="eal-search">
+        <i class="bi bi-search"></i>
+        <input
+          type="search"
+          id="usersAdminSearch"
+          data-eal-global-search
+          value="{{ search_query|default:'' }}"
+          autocomplete="off"
+          placeholder="Search users by name, email, or role&hellip;"
+          aria-label="Search users by name, email, or role"
+        />
+        <button
+          type="button"
+          class="eal-search-clear-btn"
+          id="usersAdminSearchClear"
+          title="Clear search"
+          aria-label="Clear search"
+          hidden
+        >
+          <i class="bi bi-x-lg"></i>
+        </button>
+      </div>
     </div>
   </div>
 
@@ -238,4 +272,49 @@
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  var inp = document.getElementById("usersAdminSearch");
+  var btn = document.getElementById("usersAdminSearchClear");
+  var listUrl = "{% url 'iroad_tenants:tenant_users_administration' %}";
+  if (!inp) return;
+
+  function hasServerQ() {
+    try {
+      return new URLSearchParams(window.location.search).has("q");
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function syncClear() {
+    if (!btn) return;
+    var v = (inp.value || "").trim();
+    btn.hidden = !(v || hasServerQ());
+  }
+
+  inp.addEventListener("input", syncClear);
+  syncClear();
+
+  if ((inp.value || "").trim()) {
+    inp.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+
+  if (btn) {
+    btn.addEventListener("click", function () {
+      if (hasServerQ()) {
+        window.location.href = listUrl;
+        return;
+      }
+      inp.value = "";
+      inp.dispatchEvent(new Event("input", { bubbles: true }));
+      syncClear();
+      inp.focus();
+    });
+  }
+})();
+</script>
 {% endblock %}

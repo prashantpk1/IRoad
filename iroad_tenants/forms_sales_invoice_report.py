@@ -81,7 +81,7 @@ class SalesInvoiceReportBookingForm(forms.ModelForm):
         model = SalesInvoiceReportBooking
         fields = [
             'line_no',
-            'booking_ref',
+            'booking',
             'so_ref',
             'service_name',
             'trip_type',
@@ -90,7 +90,7 @@ class SalesInvoiceReportBookingForm(forms.ModelForm):
         ]
         widgets = {
             'line_no': forms.NumberInput(attrs={'class': 'form-control'}),
-            'booking_ref': forms.TextInput(attrs={'class': 'form-control'}),
+            'booking': forms.HiddenInput(),
             'so_ref': forms.TextInput(attrs={'class': 'form-control'}),
             'service_name': forms.TextInput(attrs={'class': 'form-control'}),
             'trip_type': forms.TextInput(attrs={'class': 'form-control'}),
@@ -104,19 +104,19 @@ class SalesInvoiceReportSurchargeForm(forms.ModelForm):
         model = SalesInvoiceReportSurcharge
         fields = [
             'line_no',
-            'surcharge_trx_ref',
-            'booking_ref',
+            'surcharge',
+            'booking',
+            'shipment',
             'surcharge_type',
-            'shipment_ref',
             'service_name',
             'amount',
         ]
         widgets = {
             'line_no': forms.NumberInput(attrs={'class': 'form-control'}),
-            'surcharge_trx_ref': forms.TextInput(attrs={'class': 'form-control'}),
-            'booking_ref': forms.TextInput(attrs={'class': 'form-control'}),
+            'surcharge': forms.HiddenInput(),
+            'booking': forms.HiddenInput(),
+            'shipment': forms.HiddenInput(),
             'surcharge_type': forms.TextInput(attrs={'class': 'form-control'}),
-            'shipment_ref': forms.TextInput(attrs={'class': 'form-control'}),
             'service_name': forms.TextInput(attrs={'class': 'form-control'}),
             'amount': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
         }
@@ -127,23 +127,25 @@ class SalesInvoiceReportShipmentForm(forms.ModelForm):
         model = SalesInvoiceReportShipment
         fields = [
             'line_no',
-            'shipment_ref',
-            'booking_ref',
+            'shipment',
+            'booking',
             'shipment_date',
             'from_location',
             'to_location',
             'truck_plate',
             'customer_ref_docs',
             'pod_date',
+            'pod_status',
         ]
         widgets = {
             'line_no': forms.NumberInput(attrs={'class': 'form-control'}),
-            'shipment_ref': forms.TextInput(attrs={'class': 'form-control'}),
-            'booking_ref': forms.TextInput(attrs={'class': 'form-control'}),
+            'shipment': forms.HiddenInput(),
+            'booking': forms.HiddenInput(),
             'shipment_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
             'from_location': forms.TextInput(attrs={'class': 'form-control'}),
             'to_location': forms.TextInput(attrs={'class': 'form-control'}),
             'truck_plate': forms.TextInput(attrs={'class': 'form-control'}),
             'customer_ref_docs': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
             'pod_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'pod_status': forms.TextInput(attrs={'class': 'form-control', 'readonly': 'readonly'}),
         }

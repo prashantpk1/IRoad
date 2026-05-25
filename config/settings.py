@@ -174,6 +174,8 @@ TEMPLATES = [
                 'superadmin.context_processors.internal_alert_notifications',
                 'iroad_tenants.context_processors.tenant_system_banners',
                 'iroad_tenants.context_processors.tenant_web_push_config',
+                'iroad_tenants.context_processors.tenant_dashboard_search_routes',
+                'iroad_tenants.context_processors.tenant_in_app_notifications',
             ],
             # Explicit path so {% load cms_locale %} works even if auto-discovery
             # of app templatetags packages fails (e.g. import/shadowing issues).

@@ -5,6 +5,10 @@
 {% block title %}Route Master List | iRoad{% endblock %}
 {% block breadcrumb %}{% endblock %}
 
+{% block extra_css %}
+{% include 'iroad_tenants/partials/eal_list_live_search_css.html' %}
+{% endblock %}
+
 {% block content %}
       <div class="page-header">
         <nav aria-label="breadcrumb">
@@ -36,14 +40,37 @@
   <div class="eal-stat-card"><div class="eal-stat-icon blue"><i class="bi bi-coin"></i></div><div><div class="eal-stat-value">{{ route_stats.with_toll_gates|default:0 }}</div><div class="eal-stat-label">With Toll Gates</div></div></div>
       </div>
 
-      <div class="eal-table-card">
+      <div
+        class="eal-table-card"
+        data-eal-filterable-table
+        data-eal-empty-colspan="10"
+        data-eal-empty-filter-message="No routes match the selected search or filters."
+        data-eal-global-search-columns="1,2,3,4,5,6,7,8"
+      >
         <div class="eal-toolbar">
           <div class="eal-toolbar-left">
-      <form method="get" class="eal-search">
-        <i class="bi bi-search"></i>
-        <input type="text" name="q" value="{{ search_q|default:'' }}" placeholder="Search routes..." />
-        
-      </form>
+            <div class="eal-search">
+              <i class="bi bi-search"></i>
+              <input
+                type="search"
+                id="routeMasterSearch"
+                data-eal-global-search
+                value="{{ search_q|default:'' }}"
+                autocomplete="off"
+                placeholder="Search routes..."
+                aria-label="Search routes"
+              />
+              <button
+                type="button"
+                class="eal-search-clear-btn"
+                id="routeMasterSearchClear"
+                title="Clear search"
+                aria-label="Clear search"
+                hidden
+              >
+                <i class="bi bi-x-lg"></i>
+              </button>
+            </div>
             <div class="eal-chip-group">
               <a class="eal-chip {% if route_scope == 'all' %}active{% endif %}" href="{% url 'iroad_tenants:tenant_route_master_list' %}?scope=all{% if search_q %}&q={{ search_q|urlencode }}{% endif %}">All</a>
         <a class="eal-chip {% if route_scope == 'domestic' %}active{% endif %}" href="{% url 'iroad_tenants:tenant_route_master_list' %}?scope=domestic{% if search_q %}&q={{ search_q|urlencode }}{% endif %}"><i class="bi bi-geo-alt"></i> Domestic</a>
@@ -73,7 +100,7 @@
                   <td>{{ route.estimated_duration_h }}</td>
                   <td>
                     <div class="dropdown eal-actions-cell">
-                      <button class="eal-row-btn" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Actions"><i class="bi bi-three-dots-vertical"></i></button>
+                      <button class="eal-row-btn" type="button" data-bs-toggle="dropdown" data-bs-boundary="viewport" aria-expanded="false" title="Actions"><i class="bi bi-three-dots-vertical"></i></button>
                       <ul class="dropdown-menu dropdown-menu-end shadow-sm" style="border-radius: 8px; border-color: #e2e8f0">
                         <li><a class="dropdown-item" href="{% url 'iroad_tenants:tenant_route_master_edit' route.route_id %}"><i class="bi bi-pencil text-primary me-2"></i> Edit</a></li>
                         <li><a class="dropdown-item" href="{% url 'iroad_tenants:tenant_route_master_detail' route.route_id %}"><i class="bi bi-eye text-info me-2"></i> View</a></li>
@@ -122,6 +149,8 @@
 {% endblock %}
 
 {% block extra_js %}
+{% url 'iroad_tenants:tenant_route_master_list' as route_list_url %}
+{% include 'iroad_tenants/partials/eal_list_live_search_js.html' with list_url=route_list_url search_input_id='routeMasterSearch' clear_btn_id='routeMasterSearchClear' %}
     <script>
       (function () {
         const panel = document.getElementById("routeDetailPanel");

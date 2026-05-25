@@ -27,65 +27,34 @@
 
       <div class="overview-shell" data-section="overview">
         <div class="overview-topbar db-fade">
-          <div class="overview-search">
+          <form
+            class="overview-search"
+            method="get"
+            action="{% url 'iroad_tenants:tenant_dashboard_search_results' %}"
+            data-dashboard-hub-search-form="overview"
+          >
+            <input type="hidden" name="scope" value="overview" />
             <i class="bi bi-search"></i>
             <input
-              type="text"
+              type="search"
+              name="q"
+              data-dashboard-hub-search="overview"
               placeholder="Search invoices, support tickets, or resource logs..."
+              autocomplete="off"
             />
-          </div>
+          </form>
           <!-- <span class="overview-secure-pill">Environment Secured &amp; Monitored</span> -->
         </div>
 
         <div class="overview-actions db-fade">
-          <div class="fih-action-card">
-            <div class="fih-icon text-primary">
-              <i class="bi bi-bar-chart-line"></i>
-            </div>
-            <div class="fih-label">Upgrade Plan</div>
-          </div>
-          <div class="fih-action-card">
-            <div class="fih-icon text-primary">
-              <i class="bi bi-cart-dash"></i>
-            </div>
-            <div class="fih-label">Downgrade Plan</div>
-          </div>
-          <div class="fih-action-card">
-            <div class="fih-icon text-primary">
-              <i class="bi bi-receipt"></i>
-            </div>
-            <div class="fih-label">Billing Logs</div>
-          </div>
-          <div class="fih-action-card">
-            <div class="fih-icon text-primary">
-              <i class="bi bi-journal-check"></i>
-            </div>
-            <div class="fih-label">Payment Logs</div>
-          </div>
-          <div class="fih-action-card">
-            <div class="fih-icon text-success">
-              <i class="bi bi-person-plus"></i>
-            </div>
-            <div class="fih-label">Add Users</div>
-          </div>
-          <div class="fih-action-card">
-            <div class="fih-icon text-success">
-              <i class="bi bi-people"></i>
-            </div>
-            <div class="fih-label">Users</div>
-          </div>
-          <div class="fih-action-card">
-            <div class="fih-icon text-teal">
-              <i class="bi bi-ticket-detailed"></i>
-            </div>
-            <div class="fih-label">Create Support Ticket</div>
-          </div>
-          <div class="fih-action-card">
-            <div class="fih-icon text-teal">
-              <i class="bi bi-life-preserver"></i>
-            </div>
-            <div class="fih-label">Support Ticket</div>
-          </div>
+          {% for action in tenant_dashboard.overview_actions %}
+            <a href="{{ action.url }}" class="fih-action-card text-decoration-none">
+              <div class="fih-icon {{ action.tone }}">
+                <i class="bi {{ action.icon }}"></i>
+              </div>
+              <div class="fih-label">{{ action.label }}</div>
+            </a>
+          {% endfor %}
         </div>
 
         <div class="db-card db-fade quota-analytics-card">
@@ -113,14 +82,24 @@
                 <div class="quota-bars-wrap">
                   <div class="quota-grid-lines"></div>
                   {% for m in tenant_dashboard.chart_months %}
-                    <div class="quota-month-group">
+                    <div class="quota-month-group" tabindex="0">
                       <div
                         class="quota-bar truck"
-                        style="height: {{ m.truck_pct }}%"
+                        data-quota-bar-tip
+                        data-series="truck"
+                        data-series-label="Total Trucks"
+                        data-count="{{ m.truck_count }}"
+                        data-month="{{ m.label }}"
+                        style="height: {{ m.truck_height_px }}px"
                       ></div>
                       <div
                         class="quota-bar driver"
-                        style="height: {{ m.driver_pct }}%"
+                        data-quota-bar-tip
+                        data-series="driver"
+                        data-series-label="Active Drivers"
+                        data-count="{{ m.driver_count }}"
+                        data-month="{{ m.label }}"
+                        style="height: {{ m.driver_height_px }}px"
                       ></div>
                       <span class="quota-month-label">{{ m.label }}</span>
                     </div>
@@ -139,18 +118,30 @@
                   Global Package Consumption Mix (%)
                 </div>
               </div>
-              <div class="quota-donut-wrap">
+              {{ tenant_dashboard.donut_segments|json_script:"quota-donut-data" }}
+              <div
+                class="quota-donut-wrap"
+                data-quota-donut-chart
+                data-donut-json-id="quota-donut-data"
+                data-donut-tip-kind="quota"
+              >
                 <div
                   class="quota-donut"
                   style="{{ tenant_dashboard.donut_style }}"
                 ></div>
               </div>
-              <div class="quota-legend multi">
-                <span><i class="dot purple"></i> Users</span>
-                <span><i class="dot indigo"></i> Trucks</span>
-                <span><i class="dot green"></i> Driver</span>
-                <span><i class="dot cyan"></i> Shipments</span>
-                <span><i class="dot amber"></i> Storage GB</span>
+              <div class="quota-legend multi" data-donut-legend-for="quota-donut-data">
+                {% for seg in tenant_dashboard.donut_segments %}
+                  <span
+                    class="quota-donut-legend-item"
+                    data-quota-donut-legend
+                    data-segment-key="{{ seg.key }}"
+                  >
+                    <i class="dot" style="background: {{ seg.color }}"></i>
+                    {{ seg.label }}
+                    <span class="quota-legend-pct">{{ seg.pct_label }}</span>
+                  </span>
+                {% endfor %}
               </div>
             </div>
           </div>
@@ -224,74 +215,33 @@
 
       <div class="operations-hub-shell" data-section="operations-hub">
         <div class="overview-topbar db-fade">
-          <div class="overview-search">
+          <form
+            class="overview-search"
+            method="get"
+            action="{% url 'iroad_tenants:tenant_dashboard_search_results' %}"
+            data-dashboard-hub-search-form="operations"
+          >
+            <input type="hidden" name="scope" value="operations" />
             <i class="bi bi-search"></i>
             <input
-              type="text"
-              placeholder="Search invoices, support tickets, or resource logs..."
+              type="search"
+              name="q"
+              data-dashboard-hub-search="operations"
+              placeholder="Search bookings, shipments, movements, or POD..."
+              autocomplete="off"
             />
-          </div>
+          </form>
           <!-- <span class="overview-secure-pill">Environment Secured &amp; Monitored</span> -->
         </div>
         <div class="ops-action-grid">
-          <div class="fih-action-card">
-            <div class="fih-icon text-primary">
-              <i class="bi bi-calendar-plus"></i>
-            </div>
-            <div class="fih-label">Create Booking</div>
-          </div>
-          <div class="fih-action-card">
-            <div class="fih-icon text-primary">
-              <i class="bi bi-journal-check"></i>
-            </div>
-            <div class="fih-label">Bookings</div>
-          </div>
-          <div class="fih-action-card">
-            <div class="fih-icon text-primary">
-              <i class="bi bi-box-seam"></i>
-            </div>
-            <div class="fih-label">Create Shipments</div>
-          </div>
-          <div class="fih-action-card">
-            <div class="fih-icon text-primary">
-              <i class="bi bi-truck-front"></i>
-            </div>
-            <div class="fih-label">Shipments</div>
-          </div>
-          <div class="fih-action-card">
-            <div class="fih-icon text-success">
-              <i class="bi bi-cloud-arrow-up"></i>
-            </div>
-            <div class="fih-label">Upload POD</div>
-          </div>
-          <div class="fih-action-card">
-            <div class="fih-icon text-success">
-              <i class="bi bi-file-earmark-check"></i>
-            </div>
-            <div class="fih-label">PODs</div>
-          </div>
-          <div class="fih-action-card">
-            <div class="fih-icon text-teal">
-              <i class="bi bi-file-earmark-arrow-up"></i>
-            </div>
-            <div class="fih-label">Receive Hard POD</div>
-          </div>
-          <div class="fih-action-card">
-            <div class="fih-icon text-purple"><i class="bi bi-truck"></i></div>
-            <div class="fih-label">Create Movements</div>
-          </div>
-          <div class="fih-action-card">
-            <div class="fih-icon text-purple">
-              <i class="bi bi-arrow-repeat"></i>
-            </div>
-            <div class="fih-label">Movements</div>
-          </div>
-          <div class="fih-action-card">
-            <div class="fih-icon text-teal">
-              <i class="bi bi-pie-chart"></i>
-            </div>
-            <div class="fih-label">Reports</div>
-          </div>
+          {% for action in tenant_dashboard.ops.actions %}
+            <a href="{{ action.url }}" class="fih-action-card text-decoration-none">
+              <div class="fih-icon {{ action.tone }}">
+                <i class="bi {{ action.icon }}"></i>
+              </div>
+              <div class="fih-label">{{ action.label }}</div>
+            </a>
+          {% endfor %}
         </div>
 
         <div class="db-card p-0 fih-tabs-card db-fade">
@@ -311,15 +261,15 @@
               <div class="fih-metrics-grid">
                 <div class="fih-metric green">
                   <div class="fih-m-title">ACTIVE BOOKINGS</div>
-                  <div class="fih-m-val count-up" data-target="84">0</div>
+                  <div class="fih-m-val count-up" data-target="{{ tenant_dashboard.ops.bookings.active }}">{{ tenant_dashboard.ops.bookings.active }}</div>
                 </div>
                 <div class="fih-metric blue">
                   <div class="fih-m-title">EXECUTED BOOKINGS</div>
-                  <div class="fih-m-val count-up" data-target="312">0</div>
+                  <div class="fih-m-val count-up" data-target="{{ tenant_dashboard.ops.bookings.executed }}">{{ tenant_dashboard.ops.bookings.executed }}</div>
                 </div>
                 <div class="fih-metric red">
                   <div class="fih-m-title">CANCELLED BOOKINGS</div>
-                  <div class="fih-m-val count-up" data-target="12">0</div>
+                  <div class="fih-m-val count-up" data-target="{{ tenant_dashboard.ops.bookings.cancelled }}">{{ tenant_dashboard.ops.bookings.cancelled }}</div>
                 </div>
               </div>
             </div>
@@ -329,15 +279,15 @@
               <div class="fih-metrics-grid">
                 <div class="fih-metric green">
                   <div class="fih-m-title">ACTIVE SHIPMENTS</div>
-                  <div class="fih-m-val count-up" data-target="124">0</div>
+                  <div class="fih-m-val count-up" data-target="{{ tenant_dashboard.ops.shipments.active }}">{{ tenant_dashboard.ops.shipments.active }}</div>
                 </div>
                 <div class="fih-metric blue">
                   <div class="fih-m-title">EXECUTED SHIPMENTS</div>
-                  <div class="fih-m-val count-up" data-target="942">0</div>
+                  <div class="fih-m-val count-up" data-target="{{ tenant_dashboard.ops.shipments.executed }}">{{ tenant_dashboard.ops.shipments.executed }}</div>
                 </div>
                 <div class="fih-metric red">
                   <div class="fih-m-title">CANCELLED SHIPMENTS</div>
-                  <div class="fih-m-val count-up" data-target="24">0</div>
+                  <div class="fih-m-val count-up" data-target="{{ tenant_dashboard.ops.shipments.cancelled }}">{{ tenant_dashboard.ops.shipments.cancelled }}</div>
                 </div>
               </div>
             </div>
@@ -347,11 +297,11 @@
               <div class="fih-metrics-grid">
                 <div class="fih-metric green">
                   <div class="fih-m-title">COMPLETED POD</div>
-                  <div class="fih-m-val count-up" data-target="856">0</div>
+                  <div class="fih-m-val count-up" data-target="{{ tenant_dashboard.ops.shipments.pod_complete }}">{{ tenant_dashboard.ops.shipments.pod_complete }}</div>
                 </div>
                 <div class="fih-metric orange">
                   <div class="fih-m-title">INCOMPLETE POD</div>
-                  <div class="fih-m-val count-up" data-target="35">0</div>
+                  <div class="fih-m-val count-up" data-target="{{ tenant_dashboard.ops.shipments.pod_incomplete }}">{{ tenant_dashboard.ops.shipments.pod_incomplete }}</div>
                 </div>
               </div>
             </div>
@@ -604,100 +554,30 @@
                     </tr>
                   </thead>
                   <tbody>
-                    <tr>
-                      <td>
-                        <div class="lom-meta m-0">BOK-2026-440</div>
-                      </td>
-                      <td>
-                        <div class="lom-meta m-0">SHP-2026-1284</div>
-                      </td>
-                      <td>
-                        <div class="lom-meta m-0">
-                          <span style="color: #94a3b8">2 MINS AGO</span>
-                        </div>
-                      </td>
-                      <td>
-                        <div class="lom-badge blue d-inline-block">LOADED</div>
-                      </td>
-                      <td>
-                        <div class="lom-text">
-                          Yanbu Industrial
-                          <i class="bi bi-arrow-right"></i> Riyadh - Al Sulay
-                          Warehouse
-                        </div>
-                      </td>
-                      <td>
-                        <div class="lom-meta m-0">22101 RBA</div>
-                      </td>
-                      <td>
-                        <div class="lom-meta m-0">Driver Ahmed</div>
-                      </td>
-                      <td style="text-align: right">
-                        <div class="lom-badge blue d-inline-block">ON ROAD</div>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>
-                        <div class="lom-meta m-0">BOK-2026-438</div>
-                      </td>
-                      <td>
-                        <div class="lom-meta m-0">SHP-2026-1290</div>
-                      </td>
-                      <td>
-                        <div class="lom-meta m-0">
-                          <span style="color: #94a3b8">15 MINS AGO</span>
-                        </div>
-                      </td>
-                      <td>
-                        <div class="lom-badge blue d-inline-block">EMPTY</div>
-                      </td>
-                      <td>
-                        <div class="lom-text">
-                          Jeddah Port <i class="bi bi-arrow-right"></i> Riyadh
-                          Dry Port
-                        </div>
-                      </td>
-                      <td>
-                        <div class="lom-meta m-0">9901 KSA</div>
-                      </td>
-                      <td>
-                        <div class="lom-meta m-0">Driver Khalid</div>
-                      </td>
-                      <td style="text-align: right">
-                        <div class="lom-badge blue d-inline-block">ON ROAD</div>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>
-                        <div class="lom-meta m-0">BOK-2026-435</div>
-                      </td>
-                      <td>
-                        <div class="lom-meta m-0">SHP-2026-1305</div>
-                      </td>
-                      <td>
-                        <div class="lom-meta m-0">
-                          <span style="color: #94a3b8">1 H AGO</span>
-                        </div>
-                      </td>
-                      <td>
-                        <div class="lom-badge blue d-inline-block">LOADED</div>
-                      </td>
-                      <td>
-                        <div class="lom-text">
-                          Dammam Port <i class="bi bi-arrow-right"></i> Jubail
-                          Industrial
-                        </div>
-                      </td>
-                      <td>
-                        <div class="lom-meta m-0">1234 ABC</div>
-                      </td>
-                      <td>
-                        <div class="lom-meta m-0">Driver Mohammed</div>
-                      </td>
-                      <td style="text-align: right">
-                        <div class="lom-badge blue d-inline-block">ON ROAD</div>
-                      </td>
-                    </tr>
+                    {% for row in tenant_dashboard.ops.live_trips %}
+                      <tr>
+                        <td><div class="lom-meta m-0">{{ row.booking_no }}</div></td>
+                        <td><div class="lom-meta m-0">{{ row.shipment_no }}</div></td>
+                        <td>
+                          <div class="lom-meta m-0">
+                            <span style="color: #94a3b8">{{ row.time_ago }}</span>
+                          </div>
+                        </td>
+                        <td>
+                          <div class="lom-badge blue d-inline-block">{{ row.trip_type|upper }}</div>
+                        </td>
+                        <td><div class="lom-text">{{ row.route }}</div></td>
+                        <td><div class="lom-meta m-0">{{ row.truck }}</div></td>
+                        <td><div class="lom-meta m-0">{{ row.driver }}</div></td>
+                        <td style="text-align: right">
+                          <div class="lom-badge blue d-inline-block">{{ row.status }}</div>
+                        </td>
+                      </tr>
+                    {% empty %}
+                      <tr>
+                        <td colspan="8" class="text-center text-muted py-4">No active shipments</td>
+                      </tr>
+                    {% endfor %}
                   </tbody>
                 </table>
               </div>
@@ -718,74 +598,28 @@
                     </tr>
                   </thead>
                   <tbody>
-                    <tr>
-                      <td>
-                        <div class="lom-meta m-0">MOV-24001</div>
-                      </td>
-                      <td>
-                        <div class="lom-meta m-0">
-                          <span style="color: #94a3b8">2 H AGO</span>
-                        </div>
-                      </td>
-                      <td>
-                        <div class="lom-badge blue d-inline-block">LOADED</div>
-                      </td>
-                      <td>
-                        <div class="lom-meta m-0">22101 RBA</div>
-                      </td>
-                      <td>
-                        <div class="lom-meta m-0">Driver Ahmed</div>
-                      </td>
-                      <td style="text-align: right">
-                        <div class="lom-badge blue d-inline-block">
-                          IN TRANSIT
-                        </div>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>
-                        <div class="lom-meta m-0">MOV-24002</div>
-                      </td>
-                      <td>
-                        <div class="lom-meta m-0">
-                          <span style="color: #94a3b8">3 H AGO</span>
-                        </div>
-                      </td>
-                      <td>
-                        <div class="lom-badge green d-inline-block">EMPTY</div>
-                      </td>
-                      <td>
-                        <div class="lom-meta m-0">9901 KSA</div>
-                      </td>
-                      <td>
-                        <div class="lom-meta m-0">Driver Khalid</div>
-                      </td>
-                      <td style="text-align: right">
-                        <div class="lom-badge green d-inline-block">AT PICKUP</div>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>
-                        <div class="lom-meta m-0">MOV-24003</div>
-                      </td>
-                      <td>
-                        <div class="lom-meta m-0">
-                          <span style="color: #94a3b8">1 H AGO</span>
-                        </div>
-                      </td>
-                      <td>
-                        <div class="lom-badge blue d-inline-block">LOADED</div>
-                      </td>
-                      <td>
-                        <div class="lom-meta m-0">1234 ABC</div>
-                      </td>
-                      <td>
-                        <div class="lom-meta m-0">Driver Mohammed</div>
-                      </td>
-                      <td style="text-align: right">
-                        <div class="lom-badge blue d-inline-block">IN TRANSIT</div>
-                      </td>
-                    </tr>
+                    {% for row in tenant_dashboard.ops.live_movements %}
+                      <tr>
+                        <td><div class="lom-meta m-0">{{ row.movement_no }}</div></td>
+                        <td>
+                          <div class="lom-meta m-0">
+                            <span style="color: #94a3b8">{{ row.time_ago }}</span>
+                          </div>
+                        </td>
+                        <td>
+                          <div class="lom-badge blue d-inline-block">{{ row.movement_source }}</div>
+                        </td>
+                        <td><div class="lom-meta m-0">{{ row.truck }}</div></td>
+                        <td><div class="lom-meta m-0">{{ row.driver }}</div></td>
+                        <td style="text-align: right">
+                          <div class="lom-badge blue d-inline-block">{{ row.status }}</div>
+                        </td>
+                      </tr>
+                    {% empty %}
+                      <tr>
+                        <td colspan="6" class="text-center text-muted py-4">No movement logs</td>
+                      </tr>
+                    {% endfor %}
                   </tbody>
                 </table>
               </div>
@@ -804,74 +638,34 @@
                     </tr>
                   </thead>
                   <tbody>
-                    <tr>
-                      <td>
-                        <div
-                          class="lom-icon purple mx-auto"
-                          style="width: 36px; height: 36px; font-size: 14px"
-                        >
-                          <i class="bi bi-calendar-event"></i>
-                        </div>
-                      </td>
-                      <td>
-                        <div class="lom-text">SABIC AGRI-NUTRIENTS</div>
-                      </td>
-                      <td>
-                        <div class="lom-meta m-0">
-                          BOK-2026-440 |
-                          <span style="color: #94a3b8">2 MINS AGO</span>
-                        </div>
-                      </td>
-                      <td style="text-align: right">
-                        <button class="lom-badge purple-btn">
-                          ALLOCATE FLEET
-                        </button>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>
-                        <div
-                          class="lom-icon purple mx-auto"
-                          style="width: 36px; height: 36px; font-size: 14px"
-                        >
-                          <i class="bi bi-calendar-event"></i>
-                        </div>
-                      </td>
-                      <td><div class="lom-text">ARAMCO CHEMICALS</div></td>
-                      <td>
-                        <div class="lom-meta m-0">
-                          BOK-2026-438 |
-                          <span style="color: #94a3b8">15 MINS AGO</span>
-                        </div>
-                      </td>
-                      <td style="text-align: right">
-                        <button class="lom-badge purple-btn">
-                          ALLOCATE FLEET
-                        </button>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>
-                        <div
-                          class="lom-icon purple mx-auto"
-                          style="width: 36px; height: 36px; font-size: 14px"
-                        >
-                          <i class="bi bi-calendar-event"></i>
-                        </div>
-                      </td>
-                      <td><div class="lom-text">MA'ADEN PHOSPHATE</div></td>
-                      <td>
-                        <div class="lom-meta m-0">
-                          BOK-2026-435 |
-                          <span style="color: #94a3b8">1 H AGO</span>
-                        </div>
-                      </td>
-                      <td style="text-align: right">
-                        <button class="lom-badge purple-btn">
-                          ALLOCATE FLEET
-                        </button>
-                      </td>
-                    </tr>
+                    {% for row in tenant_dashboard.ops.recent_bookings %}
+                      <tr>
+                        <td>
+                          <div
+                            class="lom-icon purple mx-auto"
+                            style="width: 36px; height: 36px; font-size: 14px"
+                          >
+                            <i class="bi bi-calendar-event"></i>
+                          </div>
+                        </td>
+                        <td><div class="lom-text">{{ row.client_name }}</div></td>
+                        <td>
+                          <div class="lom-meta m-0">
+                            {{ row.booking_no }} |
+                            <span style="color: #94a3b8">{{ row.time_ago }}</span>
+                          </div>
+                        </td>
+                        <td style="text-align: right">
+                          <a href="{{ row.detail_url }}" class="lom-badge purple-btn text-decoration-none">
+                            VIEW
+                          </a>
+                        </td>
+                      </tr>
+                    {% empty %}
+                      <tr>
+                        <td colspan="4" class="text-center text-muted py-4">No recent bookings</td>
+                      </tr>
+                    {% endfor %}
                   </tbody>
                 </table>
               </div>
@@ -890,76 +684,34 @@
                     </tr>
                   </thead>
                   <tbody>
-                    <tr>
-                      <td>
-                        <div
-                          class="lom-icon green mx-auto"
-                          style="width: 36px; height: 36px; font-size: 14px"
-                        >
-                          <i class="bi bi-box-seam"></i>
-                        </div>
-                      </td>
-                      <td>
-                        <div class="lom-text">
-                          Riyadh Hub <i class="bi bi-arrow-right"></i> Jeddah
-                          Seaport
-                        </div>
-                      </td>
-                      <td>
-                        <div class="lom-meta m-0">
-                          SHP-2026-1284 |
-                          <span style="color: #94a3b8">DISPATCHED TODAY</span>
-                        </div>
-                      </td>
-                      <td style="text-align: right">
-                        <div class="lom-badge green d-inline-block">
-                          DISPATCHED
-                        </div>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>
-                        <div
-                          class="lom-icon green mx-auto"
-                          style="width: 36px; height: 36px; font-size: 14px"
-                        >
-                          <i class="bi bi-box-seam"></i>
-                        </div>
-                      </td>
-                      <td>
-                        <div class="lom-text">
-                          Dammam DH <i class="bi bi-arrow-right"></i> Jubail
-                          Site
-                        </div>
-                      </td>
-                      <td><div class="lom-meta m-0">SHP-2026-1290</div></td>
-                      <td style="text-align: right">
-                        <div class="lom-badge green d-inline-block">
-                          DISPATCHED
-                        </div>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>
-                        <div
-                          class="lom-icon green mx-auto"
-                          style="width: 36px; height: 36px; font-size: 14px"
-                        >
-                          <i class="bi bi-box-seam"></i>
-                        </div>
-                      </td>
-                      <td>
-                        <div class="lom-text">
-                          Rabigh WH <i class="bi bi-arrow-right"></i> KAUST Site
-                        </div>
-                      </td>
-                      <td><div class="lom-meta m-0">SHP-2026-1305</div></td>
-                      <td style="text-align: right">
-                        <div class="lom-badge green d-inline-block">
-                          DISPATCHED
-                        </div>
-                      </td>
-                    </tr>
+                    {% for row in tenant_dashboard.ops.recent_shipments %}
+                      <tr>
+                        <td>
+                          <div
+                            class="lom-icon green mx-auto"
+                            style="width: 36px; height: 36px; font-size: 14px"
+                          >
+                            <i class="bi bi-box-seam"></i>
+                          </div>
+                        </td>
+                        <td><div class="lom-text">{{ row.route }}</div></td>
+                        <td>
+                          <div class="lom-meta m-0">
+                            {{ row.shipment_no }} |
+                            <span style="color: #94a3b8">{{ row.time_ago }}</span>
+                          </div>
+                        </td>
+                        <td style="text-align: right">
+                          <a href="{{ row.detail_url }}" class="lom-badge green d-inline-block text-decoration-none">
+                            {{ row.status }}
+                          </a>
+                        </td>
+                      </tr>
+                    {% empty %}
+                      <tr>
+                        <td colspan="4" class="text-center text-muted py-4">No recent shipments</td>
+                      </tr>
+                    {% endfor %}
                   </tbody>
                 </table>
               </div>
@@ -978,82 +730,34 @@
                     </tr>
                   </thead>
                   <tbody>
-                    <tr>
-                      <td>
-                        <div
-                          class="lom-icon orange mx-auto"
-                          style="width: 36px; height: 36px; font-size: 14px"
-                        >
-                          <i class="bi bi-file-earmark-check"></i>
-                        </div>
-                      </td>
-                      <td>
-                        <div class="lom-text">
-                          SAUDI CEMENT CO. | RABIGH SITE
-                        </div>
-                      </td>
-                      <td>
-                        <div class="lom-meta m-0">
-                          <span class="lom-meta-red">TRP-0982</span> |
-                          <span style="color: #94a3b8">DELIVERED 48H AGO</span>
-                        </div>
-                      </td>
-                      <td style="text-align: right">
-                        <button class="lom-badge orange-btn">
-                          FORCE UPLOAD
-                        </button>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>
-                        <div
-                          class="lom-icon orange mx-auto"
-                          style="width: 36px; height: 36px; font-size: 14px"
-                        >
-                          <i class="bi bi-file-earmark-check"></i>
-                        </div>
-                      </td>
-                      <td>
-                        <div class="lom-text">
-                          EL-SEIF CONST. | RIYADH METRO S3
-                        </div>
-                      </td>
-                      <td>
-                        <div class="lom-meta m-0">
-                          <span class="lom-meta-red">TRP-1105</span> |
-                          <span style="color: #94a3b8">DELIVERED 12H AGO</span>
-                        </div>
-                      </td>
-                      <td style="text-align: right">
-                        <button class="lom-badge orange-btn">
-                          FORCE UPLOAD
-                        </button>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>
-                        <div
-                          class="lom-icon orange mx-auto"
-                          style="width: 36px; height: 36px; font-size: 14px"
-                        >
-                          <i class="bi bi-file-earmark-check"></i>
-                        </div>
-                      </td>
-                      <td>
-                        <div class="lom-text">ARAMCO SITE | SHAYBAH DH</div>
-                      </td>
-                      <td>
-                        <div class="lom-meta m-0">
-                          <span class="lom-meta-red">TRP-1150</span> |
-                          <span style="color: #94a3b8">DELIVERED 6H AGO</span>
-                        </div>
-                      </td>
-                      <td style="text-align: right">
-                        <button class="lom-badge orange-btn">
-                          FORCE UPLOAD
-                        </button>
-                      </td>
-                    </tr>
+                    {% for row in tenant_dashboard.ops.pending_pod %}
+                      <tr>
+                        <td>
+                          <div
+                            class="lom-icon orange mx-auto"
+                            style="width: 36px; height: 36px; font-size: 14px"
+                          >
+                            <i class="bi bi-file-earmark-check"></i>
+                          </div>
+                        </td>
+                        <td><div class="lom-text">{{ row.client_site }}</div></td>
+                        <td>
+                          <div class="lom-meta m-0">
+                            <span class="lom-meta-red">{{ row.shipment_no }}</span> |
+                            <span style="color: #94a3b8">{{ row.time_ago }}</span>
+                          </div>
+                        </td>
+                        <td style="text-align: right">
+                          <a href="{{ row.detail_url }}" class="lom-badge orange-btn text-decoration-none">
+                            UPLOAD POD
+                          </a>
+                        </td>
+                      </tr>
+                    {% empty %}
+                      <tr>
+                        <td colspan="4" class="text-center text-muted py-4">No pending POD</td>
+                      </tr>
+                    {% endfor %}
                   </tbody>
                 </table>
               </div>
@@ -1071,58 +775,50 @@
       >
         <!-- 1. Search Bars -->
         <div class="fih-search-row db-fade">
-          <div class="fih-search-box">
+          <form
+            class="fih-search-box"
+            method="get"
+            action="{% url 'iroad_tenants:tenant_dashboard_search_results' %}"
+            data-fleet-top-search-form="truck"
+          >
+            <input type="hidden" name="scope" value="fleet_truck" />
             <i class="bi bi-search"></i>
             <input
-              type="text"
+              type="search"
+              name="q"
+              data-fleet-top-search="truck"
               placeholder="Truck Search (Plate, VIN, Brand)..."
+              autocomplete="off"
             />
-          </div>
-          <div class="fih-search-box">
+          </form>
+          <form
+            class="fih-search-box"
+            method="get"
+            action="{% url 'iroad_tenants:tenant_dashboard_search_results' %}"
+            data-fleet-top-search-form="driver"
+          >
+            <input type="hidden" name="scope" value="fleet_driver" />
             <i class="bi bi-search"></i>
             <input
-              type="text"
+              type="search"
+              name="q"
+              data-fleet-top-search="driver"
               placeholder="Driver Search (Name, IQAMA, License)..."
+              autocomplete="off"
             />
-          </div>
+          </form>
         </div>
 
         <!-- 2. Action Cards -->
         <div class="fih-actions-row db-fade">
-          <div class="fih-action-card">
-            <div class="fih-icon text-primary"><i class="bi bi-truck"></i></div>
-            <div class="fih-label">ADD TRUCK</div>
-          </div>
-          <div class="fih-action-card">
-            <div class="fih-icon text-purple">
-              <i class="bi bi-file-earmark-plus"></i>
-            </div>
-            <div class="fih-label">ADD TRUCK ATT</div>
-          </div>
-          <div class="fih-action-card">
-            <div class="fih-icon text-primary">
-              <i class="bi bi-list-ul"></i>
-            </div>
-            <div class="fih-label">TRUCKS</div>
-          </div>
-          <div class="fih-action-card">
-            <div class="fih-icon text-success">
-              <i class="bi bi-person-plus"></i>
-            </div>
-            <div class="fih-label">ADD DRIVER</div>
-          </div>
-          <div class="fih-action-card">
-            <div class="fih-icon text-teal">
-              <i class="bi bi-person-vcard"></i>
-            </div>
-            <div class="fih-label">ADD DRIVER ATT</div>
-          </div>
-          <div class="fih-action-card">
-            <div class="fih-icon text-success">
-              <i class="bi bi-people"></i>
-            </div>
-            <div class="fih-label">DRIVERS</div>
-          </div>
+          {% for action in tenant_dashboard.fleet.actions %}
+            <a href="{{ action.url }}" class="fih-action-card text-decoration-none">
+              <div class="fih-icon {{ action.tone }}">
+                <i class="bi {{ action.icon }}"></i>
+              </div>
+              <div class="fih-label">{{ action.label }}</div>
+            </a>
+          {% endfor %}
         </div>
 
         <!-- 3. Tabs & Content -->
@@ -1143,19 +839,19 @@
               <div class="fih-metrics-grid">
                 <div class="fih-metric blue">
                   <div class="fih-m-title">TOTAL FLEET</div>
-                  <div class="fih-m-val count-up" data-target="124">0</div>
+                  <div class="fih-m-val count-up" data-target="{{ tenant_dashboard.fleet.truck_metrics.total }}">{{ tenant_dashboard.fleet.truck_metrics.total }}</div>
                 </div>
                 <div class="fih-metric green">
                   <div class="fih-m-title">AVAILABLE</div>
-                  <div class="fih-m-val count-up" data-target="38">0</div>
+                  <div class="fih-m-val count-up" data-target="{{ tenant_dashboard.fleet.truck_metrics.available }}">{{ tenant_dashboard.fleet.truck_metrics.available }}</div>
                 </div>
                 <div class="fih-metric orange">
                   <div class="fih-m-title">LOADED</div>
-                  <div class="fih-m-val count-up" data-target="74">0</div>
+                  <div class="fih-m-val count-up" data-target="{{ tenant_dashboard.fleet.truck_metrics.loaded }}">{{ tenant_dashboard.fleet.truck_metrics.loaded }}</div>
                 </div>
                 <div class="fih-metric red">
                   <div class="fih-m-title">SUSPENDED</div>
-                  <div class="fih-m-val count-up" data-target="12">0</div>
+                  <div class="fih-m-val count-up" data-target="{{ tenant_dashboard.fleet.truck_metrics.suspended }}">{{ tenant_dashboard.fleet.truck_metrics.suspended }}</div>
                 </div>
               </div>
             </div>
@@ -1165,19 +861,19 @@
               <div class="fih-metrics-grid">
                 <div class="fih-metric blue">
                   <div class="fih-m-title">TOTAL DRIVERS</div>
-                  <div class="fih-m-val count-up" data-target="145">0</div>
+                  <div class="fih-m-val count-up" data-target="{{ tenant_dashboard.fleet.driver_metrics.total }}">{{ tenant_dashboard.fleet.driver_metrics.total }}</div>
                 </div>
                 <div class="fih-metric green">
                   <div class="fih-m-title">AVAILABLE</div>
-                  <div class="fih-m-val count-up" data-target="18">0</div>
+                  <div class="fih-m-val count-up" data-target="{{ tenant_dashboard.fleet.driver_metrics.available }}">{{ tenant_dashboard.fleet.driver_metrics.available }}</div>
                 </div>
                 <div class="fih-metric orange">
                   <div class="fih-m-title">LOADED</div>
-                  <div class="fih-m-val count-up" data-target="112">0</div>
+                  <div class="fih-m-val count-up" data-target="{{ tenant_dashboard.fleet.driver_metrics.loaded }}">{{ tenant_dashboard.fleet.driver_metrics.loaded }}</div>
                 </div>
                 <div class="fih-metric red">
                   <div class="fih-m-title">SUSPENDED</div>
-                  <div class="fih-m-val count-up" data-target="15">0</div>
+                  <div class="fih-m-val count-up" data-target="{{ tenant_dashboard.fleet.driver_metrics.suspended }}">{{ tenant_dashboard.fleet.driver_metrics.suspended }}</div>
                 </div>
               </div>
             </div>
@@ -1187,19 +883,19 @@
               <div class="fih-metrics-grid">
                 <div class="fih-metric red">
                   <div class="fih-m-title">TRUCK EXPIRED DOCS</div>
-                  <div class="fih-m-val count-up" data-target="5">0</div>
+                  <div class="fih-m-val count-up" data-target="{{ tenant_dashboard.fleet.compliance.truck_expired }}">{{ tenant_dashboard.fleet.compliance.truck_expired }}</div>
                 </div>
                 <div class="fih-metric orange">
                   <div class="fih-m-title">TRUCK NEAR EXPIRY</div>
-                  <div class="fih-m-val count-up" data-target="14">0</div>
+                  <div class="fih-m-val count-up" data-target="{{ tenant_dashboard.fleet.compliance.truck_near_expiry }}">{{ tenant_dashboard.fleet.compliance.truck_near_expiry }}</div>
                 </div>
                 <div class="fih-metric red">
                   <div class="fih-m-title">DRIVER EXPIRED DOCS</div>
-                  <div class="fih-m-val count-up" data-target="3">0</div>
+                  <div class="fih-m-val count-up" data-target="{{ tenant_dashboard.fleet.compliance.driver_expired }}">{{ tenant_dashboard.fleet.compliance.driver_expired }}</div>
                 </div>
                 <div class="fih-metric orange">
                   <div class="fih-m-title">DRIVER NEAR EXPIRY</div>
-                  <div class="fih-m-val count-up" data-target="8">0</div>
+                  <div class="fih-m-val count-up" data-target="{{ tenant_dashboard.fleet.compliance.driver_near_expiry }}">{{ tenant_dashboard.fleet.compliance.driver_near_expiry }}</div>
                 </div>
               </div>
             </div>
@@ -1245,71 +941,40 @@
               </div>
               <div class="quota-chart-area">
                 <div class="quota-y-axis">
-                  <span>160</span>
-                  <span>140</span>
-                  <span>120</span>
-                  <span>100</span>
-                  <span>80</span>
-                  <span>60</span>
-                  <span>40</span>
-                  <span>20</span>
-                  <span>0</span>
+                  {% for tick in tenant_dashboard.fleet.chart_y_ticks %}
+                    <span>{{ tick }}</span>
+                  {% endfor %}
                 </div>
                 <div class="quota-bars-wrap">
                   <div class="quota-grid-lines"></div>
-                  <!-- Dec -->
-                  <div class="quota-month-group">
-                    <div
-                      class="quota-bar"
-                      style="height: 68.75%; background-color: #5051f9"
-                    ></div>
-                    <div
-                      class="quota-bar"
-                      style="height: 81.25%; background-color: #10b981"
-                    ></div>
-                    <span class="quota-month-label">Dec</span>
-                  </div>
-                  <!-- Jan -->
-                  <div class="quota-month-group">
-                    <div
-                      class="quota-bar"
-                      style="height: 71.87%; background-color: #5051f9"
-                    ></div>
-                    <div
-                      class="quota-bar"
-                      style="height: 84.37%; background-color: #10b981"
-                    ></div>
-                    <span class="quota-month-label">Jan</span>
-                  </div>
-                  <!-- Feb -->
-                  <div class="quota-month-group">
-                    <div
-                      class="quota-bar"
-                      style="height: 75%; background-color: #5051f9"
-                    ></div>
-                    <div
-                      class="quota-bar"
-                      style="height: 87.5%; background-color: #10b981"
-                    ></div>
-                    <span class="quota-month-label">Feb</span>
-                  </div>
-                  <!-- Mar -->
-                  <div class="quota-month-group">
-                    <div
-                      class="quota-bar"
-                      style="height: 78.12%; background-color: #5051f9"
-                    ></div>
-                    <div
-                      class="quota-bar"
-                      style="height: 90.62%; background-color: #10b981"
-                    ></div>
-                    <span class="quota-month-label">Mar</span>
-                  </div>
+                  {% for m in tenant_dashboard.fleet.chart_months %}
+                    <div class="quota-month-group" tabindex="0">
+                      <div
+                        class="quota-bar truck"
+                        data-quota-bar-tip
+                        data-series="truck"
+                        data-series-label="Total Trucks"
+                        data-count="{{ m.truck_count }}"
+                        data-month="{{ m.label }}"
+                        style="height: {{ m.truck_height_px }}px"
+                      ></div>
+                      <div
+                        class="quota-bar driver"
+                        data-quota-bar-tip
+                        data-series="driver"
+                        data-series-label="Active Drivers"
+                        data-count="{{ m.driver_count }}"
+                        data-month="{{ m.label }}"
+                        style="height: {{ m.driver_height_px }}px"
+                      ></div>
+                      <span class="quota-month-label">{{ m.label }}</span>
+                    </div>
+                  {% endfor %}
                 </div>
               </div>
               <div class="quota-legend justify-content-center mt-3">
                 <span
-                  ><i class="dot" style="background: #5051f9"></i> Total
+                  ><i class="dot truck"></i> Total
                   Trucks</span
                 >
                 <span
@@ -1336,30 +1001,34 @@
                   GLOBAL STATUS DISTRIBUTION (%)
                 </div>
               </div>
+              {{ tenant_dashboard.fleet.fleet_donut_segments|json_script:"fleet-donut-data" }}
               <div
                 class="quota-donut-wrap"
-                style="
-                  min-height: 200px;
-                  display: flex;
-                  align-items: center;
-                  justify-content: center;
-                "
+                data-quota-donut-chart
+                data-donut-json-id="fleet-donut-data"
+                data-donut-tip-kind="fleet"
               >
-                <div class="fih-donut"></div>
+                <div
+                  class="fih-donut quota-donut"
+                  style="{{ tenant_dashboard.fleet.fleet_donut_style }}"
+                ></div>
               </div>
-              <div class="quota-legend justify-content-center mt-3">
-                <span style="font-size: 9px"
-                  ><i class="dot" style="background: #10b981"></i> Available
-                  (READY)</span
-                >
-                <span style="font-size: 9px"
-                  ><i class="dot" style="background: #f59e0b"></i> Loaded (IN
-                  TRIP)</span
-                >
-                <span style="font-size: 9px"
-                  ><i class="dot" style="background: #ef4444"></i> Suspended
-                  (OFF-RD)</span
-                >
+              <div
+                class="quota-legend multi justify-content-center mt-3"
+                data-donut-legend-for="fleet-donut-data"
+              >
+                {% for seg in tenant_dashboard.fleet.fleet_donut_segments %}
+                  <span
+                    class="quota-donut-legend-item"
+                    data-quota-donut-legend
+                    data-segment-key="{{ seg.key }}"
+                    style="font-size: 9px"
+                  >
+                    <i class="dot" style="background: {{ seg.color }}"></i>
+                    {{ seg.label }}
+                    <span class="quota-legend-pct">{{ seg.pct_label }}</span>
+                  </span>
+                {% endfor %}
               </div>
             </div>
           </div>
@@ -1374,9 +1043,11 @@
             <div class="fih-search-box fi-list-search-box">
               <i class="bi bi-search"></i>
               <input
-                type="text"
-                data-truck-hub-search
+                type="search"
+                data-hub-table-filter="truck"
+                data-hub-search-submit-scope="fleet_truck"
                 placeholder="Search by any truck table value"
+                autocomplete="off"
               />
             </div>
           </div>
@@ -1419,187 +1090,56 @@
                     </tr>
                   </thead>
                   <tbody>
-                    <tr data-truck-hub-row>
-                      <td>
-                        <div class="eal-name-cell">
-                          <span class="fi-truck-icon fi-truck-icon--sm"
-                            ><i class="bi bi-truck-front" aria-hidden="true"></i
-                          ></span>
-                          <div>
-                            <span class="eal-entity-id">TRK-9901</span>
-                            <!-- <div class="eal-pi-number">Mercedes Actros</div> -->
+                    {% for row in tenant_dashboard.fleet.truck_rows %}
+                      <tr
+                        data-truck-hub-row
+                        data-detail-url="{{ row.detail_url }}"
+                        tabindex="0"
+                        role="link"
+                        aria-label="View truck {{ row.truck_code }}"
+                      >
+                        <td>
+                          <div class="eal-name-cell">
+                            <span class="fi-truck-icon fi-truck-icon--sm"
+                              ><i class="bi bi-truck-front" aria-hidden="true"></i
+                            ></span>
+                            <div>
+                              <a
+                                href="{{ row.detail_url }}"
+                                class="eal-entity-id text-decoration-none"
+                                title="View truck detail"
+                              >{{ row.truck_code }}</a>
+                            </div>
                           </div>
-                        </div>
-                      </td>
-                      <td>
-                        <strong>J H A 9921</strong>
-                        <div class="eal-pi-number">Internal</div>
-                      </td>
-                      <td>
-                        <span class="status-badge success">Available</span>
-                      </td>
-                      <td>
-                        <span class="eal-pi-number">Ready for dispatch</span>
-                      </td>
-                      <td>
-                        <div class="eal-actions-cell">
-                          <button type="button" class="eal-row-btn" title="View">
-                            <i class="bi bi-eye"></i>
-                          </button>
-                          <button
-                            type="button"
-                            class="eal-row-btn"
-                            title="Location"
-                          >
-                            <i class="bi bi-geo-alt"></i>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                    <tr data-truck-hub-row>
-                      <td>
-                        <div class="eal-name-cell">
-                          <span class="fi-truck-icon fi-truck-icon--sm"
-                            ><i class="bi bi-truck-front" aria-hidden="true"></i
-                          ></span>
-                          <div>
-                            <span class="eal-entity-id">TRK-8844</span>
-                            <!-- <div class="eal-pi-number">Volvo FH</div> -->
+                        </td>
+                        <td>
+                          <strong>{{ row.plate_number }}</strong>
+                          <div class="eal-pi-number">{{ row.sourcing_label }}</div>
+                        </td>
+                        <td>
+                          <span class="status-badge {{ row.badge_class }}">{{ row.badge_label }}</span>
+                        </td>
+                        <td>
+                          <span class="eal-pi-number">{{ row.ops_hint }}</span>
+                        </td>
+                        <td>
+                          <div class="eal-actions-cell">
+                            <a
+                              href="{{ row.detail_url }}"
+                              class="eal-row-btn"
+                              title="View truck detail"
+                              aria-label="View truck {{ row.truck_code }}"
+                            >
+                              <i class="bi bi-eye"></i>
+                            </a>
                           </div>
-                        </div>
-                      </td>
-                      <td>
-                        <strong>R R M 4410</strong>
-                        <div class="eal-pi-number">Internal</div>
-                      </td>
-                      <td>
-                        <span class="status-badge expired">Loaded</span>
-                      </td>
-                      <td><span class="eal-pi-number">On active trip</span></td>
-                      <td>
-                        <div class="eal-actions-cell">
-                          <button type="button" class="eal-row-btn" title="View">
-                            <i class="bi bi-eye"></i>
-                          </button>
-                          <button
-                            type="button"
-                            class="eal-row-btn"
-                            title="Location"
-                          >
-                            <i class="bi bi-geo-alt"></i>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                    <tr data-truck-hub-row>
-                      <td>
-                        <div class="eal-name-cell">
-                          <span class="fi-truck-icon fi-truck-icon--sm"
-                            ><i class="bi bi-truck-front" aria-hidden="true"></i
-                          ></span>
-                          <div>
-                            <span class="eal-entity-id">TRK-7712</span>
-                            <!-- <div class="eal-pi-number">Scania R450</div> -->
-                          </div>
-                        </div>
-                      </td>
-                      <td>
-                        <strong>K S A 2201</strong>
-                        <div class="eal-pi-number">Internal</div>
-                      </td>
-                      <td>
-                        <span class="status-badge success">Available</span>
-                      </td>
-                      <td>
-                        <span class="eal-pi-number">In service</span>
-                      </td>
-                      <td>
-                        <div class="eal-actions-cell">
-                          <button type="button" class="eal-row-btn" title="View">
-                            <i class="bi bi-eye"></i>
-                          </button>
-                          <button
-                            type="button"
-                            class="eal-row-btn"
-                            title="Location"
-                          >
-                            <i class="bi bi-geo-alt"></i>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                    <tr data-truck-hub-row>
-                      <td>
-                        <div class="eal-name-cell">
-                          <span class="fi-truck-icon fi-truck-icon--sm"
-                            ><i class="bi bi-truck-front" aria-hidden="true"></i
-                          ></span>
-                          <div>
-                            <span class="eal-entity-id">TRK-6603</span>
-                            <!-- <div class="eal-pi-number">MAN TGX</div> -->
-                          </div>
-                        </div>
-                      </td>
-                      <td>
-                        <strong>D M M 1188</strong>
-                        <div class="eal-pi-number">Internal</div>
-                      </td>
-                      <td>
-                        <span class="status-badge inactive">Suspended</span>
-                      </td>
-                      <td>
-                        <span class="eal-pi-number">Compliance hold</span>
-                      </td>
-                      <td>
-                        <div class="eal-actions-cell">
-                          <button type="button" class="eal-row-btn" title="View">
-                            <i class="bi bi-eye"></i>
-                          </button>
-                          <button
-                            type="button"
-                            class="eal-row-btn"
-                            title="Location"
-                          >
-                            <i class="bi bi-geo-alt"></i>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                    <tr data-truck-hub-row>
-                      <td>
-                        <div class="eal-name-cell">
-                          <span class="fi-truck-icon fi-truck-icon--sm"
-                            ><i class="bi bi-truck-front" aria-hidden="true"></i
-                          ></span>
-                          <div>
-                            <span class="eal-entity-id">TRK-5510</span>
-                            <!-- <div class="eal-pi-number">Mercedes Axor</div> -->
-                          </div>
-                        </div>
-                      </td>
-                      <td>
-                        <strong>H J K 9033</strong>
-                        <div class="eal-pi-number">Internal</div>
-                      </td>
-                      <td>
-                        <span class="status-badge expired">Loaded</span>
-                      </td>
-                      <td><span class="eal-pi-number">Awaiting unloading</span></td>
-                      <td>
-                        <div class="eal-actions-cell">
-                          <button type="button" class="eal-row-btn" title="View">
-                            <i class="bi bi-eye"></i>
-                          </button>
-                          <button
-                            type="button"
-                            class="eal-row-btn"
-                            title="Location"
-                          >
-                            <i class="bi bi-geo-alt"></i>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
+                        </td>
+                      </tr>
+                    {% empty %}
+                      <tr>
+                        <td colspan="5" class="text-center text-muted py-4">No trucks found</td>
+                      </tr>
+                    {% endfor %}
                   </tbody>
                 </table>
               </div>
@@ -1617,9 +1157,11 @@
             <div class="fih-search-box fi-list-search-box">
               <i class="bi bi-search"></i>
               <input
-                type="text"
-                data-driver-hub-search
+                type="search"
+                data-hub-table-filter="driver"
+                data-hub-search-submit-scope="fleet_driver"
                 placeholder="Search by any driver table value"
+                autocomplete="off"
               />
             </div>
           </div>
@@ -1672,176 +1214,53 @@
                     </tr>
                   </thead>
                   <tbody>
-                    <tr data-driver-hub-row>
-                      <td>
-                        <div class="fi-drv-meta">
-                          <span class="eal-entity-id">DRV-1001</span>
-                          <!-- <div class="eal-pi-number">Jeddah</div> -->
-                        </div>
-                      </td>
-                      <td>
-                        <span class="fi-drv-legal-name">1088224401</span>
-                      </td>
-                      <td>
-                        <span class="fi-drv-legal-name">Ahmed Mansour</span>
-                      </td>
-                      <td>
-                        <span class="eal-pi-number">On active trip</span>
-                      </td>
-                      <td>
-                        <span class="status-badge expired">Loaded</span>
-                      </td>
-                      <td>
-                        <div class="eal-actions-cell">
-                          <button type="button" class="eal-row-btn" title="View">
-                            <i class="bi bi-eye"></i>
-                          </button>
-                          <button
-                            type="button"
-                            class="eal-row-btn"
-                            title="Location"
-                          >
-                            <i class="bi bi-geo-alt"></i>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                    <tr data-driver-hub-row>
-                      <td>
-                        <div class="fi-drv-meta">
-                          <span class="eal-entity-id">DRV-1002</span>
-                          <!-- <div class="eal-pi-number">Dammam</div> -->
-                        </div>
-                      </td>
-                      <td>
-                        <span class="fi-drv-legal-name">1077112290</span>
-                      </td>
-                      <td>
-                        <span class="fi-drv-legal-name">Sami Al-Otaibi</span>
-                      </td>
-                      <td>
-                        <span class="eal-pi-number">Ready for assignment</span>
-                      </td>
-                      <td>
-                        <span class="status-badge success">Available</span>
-                      </td>
-                      <td>
-                        <div class="eal-actions-cell">
-                          <button type="button" class="eal-row-btn" title="View">
-                            <i class="bi bi-eye"></i>
-                          </button>
-                          <button
-                            type="button"
-                            class="eal-row-btn"
-                            title="Location"
-                          >
-                            <i class="bi bi-geo-alt"></i>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                    <tr data-driver-hub-row>
-                      <td>
-                        <div class="fi-drv-meta">
-                          <span class="eal-entity-id">DRV-1003</span>
-                          <!-- <div class="eal-pi-number">Yanbu</div> -->
-                        </div>
-                      </td>
-                      <td>
-                        <span class="fi-drv-legal-name">1055883311</span>
-                      </td>
-                      <td>
-                        <span class="fi-drv-legal-name">Omar Muhammad</span>
-                      </td>
-                      <td>
-                        <span class="eal-pi-number">Compliance hold</span>
-                      </td>
-                      <td>
-                        <span class="status-badge inactive">Suspended</span>
-                      </td>
-                      <td>
-                        <div class="eal-actions-cell">
-                          <button type="button" class="eal-row-btn" title="View">
-                            <i class="bi bi-eye"></i>
-                          </button>
-                          <button
-                            type="button"
-                            class="eal-row-btn"
-                            title="Location"
-                          >
-                            <i class="bi bi-geo-alt"></i>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                    <tr data-driver-hub-row>
-                      <td>
-                        <div class="fi-drv-meta">
-                          <span class="eal-entity-id">DRV-1004</span>
-                          <!-- <div class="eal-pi-number">Riyadh</div> -->
-                        </div>
-                      </td>
-                      <td>
-                        <span class="fi-drv-legal-name">1022990088</span>
-                      </td>
-                      <td>
-                        <span class="fi-drv-legal-name">Fahad Al-Anzi</span>
-                      </td>
-                      <td>
-                        <span class="eal-pi-number">On active trip</span>
-                      </td>
-                      <td>
-                        <span class="status-badge expired">Loaded</span>
-                      </td>
-                      <td>
-                        <div class="eal-actions-cell">
-                          <button type="button" class="eal-row-btn" title="View">
-                            <i class="bi bi-eye"></i>
-                          </button>
-                          <button
-                            type="button"
-                            class="eal-row-btn"
-                            title="Location"
-                          >
-                            <i class="bi bi-geo-alt"></i>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                    <tr data-driver-hub-row>
-                      <td>
-                        <div class="fi-drv-meta">
-                          <span class="eal-entity-id">DRV-1005</span>
-                          <!-- <div class="eal-pi-number">Abha</div> -->
-                        </div>
-                      </td>
-                      <td>
-                        <span class="fi-drv-legal-name">1044332211</span>
-                      </td>
-                      <td>
-                        <span class="fi-drv-legal-name">Yousef Sharif</span>
-                      </td>
-                      <td>
-                        <span class="eal-pi-number">Ready for assignment</span>
-                      </td>
-                      <td>
-                        <span class="status-badge success">Available</span>
-                      </td>
-                      <td>
-                        <div class="eal-actions-cell">
-                          <button type="button" class="eal-row-btn" title="View">
-                            <i class="bi bi-eye"></i>
-                          </button>
-                          <button
-                            type="button"
-                            class="eal-row-btn"
-                            title="Location"
-                          >
-                            <i class="bi bi-geo-alt"></i>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
+                    {% for row in tenant_dashboard.fleet.driver_rows %}
+                      <tr
+                        data-driver-hub-row
+                        data-detail-url="{{ row.detail_url }}"
+                        tabindex="0"
+                        role="link"
+                        aria-label="View driver {{ row.driver_code }}"
+                      >
+                        <td>
+                          <div class="fi-drv-meta">
+                            <a
+                              href="{{ row.detail_url }}"
+                              class="eal-entity-id text-decoration-none"
+                              title="View driver detail"
+                            >{{ row.driver_code }}</a>
+                          </div>
+                        </td>
+                        <td>
+                          <span class="fi-drv-legal-name">{{ row.driver_id_label }}</span>
+                        </td>
+                        <td>
+                          <span class="fi-drv-legal-name">{{ row.english_name }}</span>
+                        </td>
+                        <td>
+                          <span class="eal-pi-number">{{ row.ops_hint }}</span>
+                        </td>
+                        <td>
+                          <span class="status-badge {{ row.badge_class }}">{{ row.badge_label }}</span>
+                        </td>
+                        <td>
+                          <div class="eal-actions-cell">
+                            <a
+                              href="{{ row.detail_url }}"
+                              class="eal-row-btn"
+                              title="View driver detail"
+                              aria-label="View driver {{ row.driver_code }}"
+                            >
+                              <i class="bi bi-eye"></i>
+                            </a>
+                          </div>
+                        </td>
+                      </tr>
+                    {% empty %}
+                      <tr>
+                        <td colspan="6" class="text-center text-muted py-4">No drivers found</td>
+                      </tr>
+                    {% endfor %}
                   </tbody>
                 </table>
               </div>

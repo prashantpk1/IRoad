@@ -591,46 +591,30 @@
           </button>
         </div>
 
-        <!-- Preferences Popup -->
-        <div class="preferences-popup" id="preferencesPopup">
-          <h4 class="preferences-title">Preferences</h4>
-          <div class="ce-item">
-            <div class="preference-label">
-              <span>Allow Notifications</span>
-              <i
-                class="bi bi-info-circle"
-                title="Enable or disable all notifications"
-              ></i>
-            </div>
-            <label class="toggle-switch">
-              <input type="checkbox" id="allowNotifications" checked />
-              <span class="toggle-slider">
-                <span class="toggle-text-on">Enable</span>
-                <span class="toggle-text-off">Disable</span>
-              </span>
-            </label>
-          </div>
-          <div class="preference-item">
-            <label class="preference-checkbox">
-              <input type="checkbox" checked />
-              <span class="checkmark"></span>
-              <span>Record Comments</span>
-            </label>
-          </div>
-          <div class="preference-item">
-            <label class="preference-checkbox">
-              <input type="checkbox" checked />
-              <span class="checkmark"></span>
-              <span>Blueprint Transitions</span>
-            </label>
-          </div>
-          <button class="btn btn-primary preferences-done" id="preferencesDone">
-            Done
+        
+
+        {% if tenant_notification_items %}
+        <div class="notification-list" id="tenantNotificationList">
+          {% for item in tenant_notification_items %}
+          <a
+            href="{{ item.href|default:'#' }}"
+            class="notification-card{% if not item.is_read %} is-unread{% endif %}"
+            data-notification-id="{{ item.notification_id }}"
+            data-mark-read-url="{% url 'iroad_tenants:tenant_notification_mark_read' item.notification_id %}"
+          >
+            <div class="notification-card-title">{{ item.title }}</div>
+            <div class="notification-card-body">{{ item.message }}</div>
+            <div class="notification-card-time">{{ item.created_at|timesince }} ago</div>
+          </a>
+          {% endfor %}
+        </div>
+        <div class="notification-panel-actions">
+          <button type="button" class="btn btn-sm btn-outline-secondary" id="tenantNotificationMarkAllRead" data-mark-all-url="{% url 'iroad_tenants:tenant_notification_mark_all_read' %}">
+            Mark all read
           </button>
         </div>
-
-        <!-- Empty State -->
-        <div class="notification-empty">
+        {% else %}
+        <div class="notification-empty" id="tenantNotificationEmpty">
           <div class="empty-icon">
             <i class="bi bi-bell"></i>
             <span class="sparkle sparkle-1">&#10022;</span>
@@ -640,6 +624,7 @@
           <h4 class="empty-title">No notifications</h4>
           <p class="empty-text">You are yet to receive notifications</p>
         </div>
+        {% endif %}
 
       </div>
     </div>

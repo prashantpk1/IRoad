@@ -494,6 +494,45 @@ def convert_amount_between_currencies(amount, from_code, to_code):
     return (in_base / fx_to).quantize(Decimal('0.01'))
 
 
+def build_dual_currency_display(
+    amount,
+    amount_currency_code,
+    base_currency_code,
+    *,
+    base_equiv_amount=None,
+):
+    """
+    Billing UI: primary line in organization base currency (e.g. SAR),
+    secondary line in invoice/plan currency when it differs (e.g. USD).
+    """
+    base_currency_code = (base_currency_code or 'SAR').strip().upper() or 'SAR'
+    amount_currency_code = (
+        (amount_currency_code or base_currency_code).strip().upper()
+        or base_currency_code
+    )
+    original_amount = Decimal(amount or '0').quantize(Decimal('0.01'))
+
+    if base_equiv_amount is not None and Decimal(base_equiv_amount) > 0:
+        primary_amount = Decimal(base_equiv_amount).quantize(Decimal('0.01'))
+    elif amount_currency_code == base_currency_code:
+        primary_amount = original_amount
+    else:
+        primary_amount = convert_amount_between_currencies(
+            original_amount,
+            amount_currency_code,
+            base_currency_code,
+        )
+
+    show_secondary = amount_currency_code != base_currency_code
+    return {
+        'primary_currency': base_currency_code,
+        'primary_amount': primary_amount,
+        'secondary_currency': amount_currency_code if show_secondary else '',
+        'secondary_amount': original_amount if show_secondary else None,
+        'show_secondary': show_secondary,
+    }
+
+
 def resolve_upgrade_credit_basis_price(plan, target_currency_code):
     """
     One-cycle list price of `plan` in `target_currency_code` for upgrade

@@ -3,6 +3,7 @@
    ============================================ */
 
 document.addEventListener("DOMContentLoaded", function () {
+  initQuotaChartTooltips();
   initViewToggle();
   initOperationsHubTabs();
   initSurveillanceTabs();
@@ -12,8 +13,9 @@ document.addEventListener("DOMContentLoaded", function () {
   initPurchaseIntelligenceHub();
   initVendorSettlementsTabs();
   initFiListHubTabs();
-  initTruckHubSearch();
-  initDriverHubSearch();
+  initFleetHubDetailNavigation();
+  initHubTableSearchEnter();
+  initFleetTopSearchForms();
   initFiDriversHubTabs();
   initFihFleetMap();
   initSalesOperationsTabs();
@@ -294,42 +296,98 @@ function initFiListHubTabs() {
   setTab("recent");
 }
 
-/* ── Fleet Integrity Hub: Truck search ── */
-function initTruckHubSearch() {
-  var input = document.querySelector("[data-truck-hub-search]");
-  var rows = document.querySelectorAll("[data-truck-hub-row]");
-  if (!input || !rows.length) return;
+/* ── Fleet hub tables: filter locally; Enter opens scoped search results ── */
+function initHubTableSearchEnter() {
+  document.querySelectorAll("[data-hub-table-filter]").forEach(function (input) {
+    var kind = input.getAttribute("data-hub-table-filter") || "";
+    var table =
+      kind === "truck"
+        ? document.querySelector("[data-truck-hub-table]")
+        : document.querySelector("[data-driver-hub-table]");
+    if (!table) return;
 
-  function applyFilter() {
-    var query = input.value.trim().toLowerCase();
+    var rowSelector =
+      kind === "truck" ? "tr[data-truck-hub-row]" : "tr[data-driver-hub-row]";
+    var rows = table.querySelectorAll(rowSelector);
 
-    rows.forEach(function (row) {
-      var rowText = row.textContent.toLowerCase().replace(/\s+/g, " ").trim();
-      row.style.display = !query || rowText.indexOf(query) !== -1 ? "" : "none";
+    function applyFilter() {
+      var query = input.value.trim().toLowerCase();
+      rows.forEach(function (row) {
+        var rowText = row.textContent.toLowerCase().replace(/\s+/g, " ").trim();
+        row.style.display = !query || rowText.indexOf(query) !== -1 ? "" : "none";
+      });
+    }
+
+    input.addEventListener("input", applyFilter);
+
+    input.addEventListener("keydown", function (e) {
+      if (e.key !== "Enter") return;
+      var q = input.value.trim();
+      if (!q) return;
+      e.preventDefault();
+      var scope = input.getAttribute("data-hub-search-submit-scope") || "all";
+      if (window.iroadTenantSearch && window.iroadTenantSearch.go) {
+        window.iroadTenantSearch.go(q, scope);
+        return;
+      }
+      var form = input.closest("form");
+      if (form) form.submit();
     });
-  }
 
-  input.addEventListener("input", applyFilter);
-  applyFilter();
+    applyFilter();
+  });
 }
 
-/* ── Fleet Integrity Hub: Driver search ── */
-function initDriverHubSearch() {
-  var input = document.querySelector("[data-driver-hub-search]");
-  var rows = document.querySelectorAll("[data-driver-hub-row]");
-  if (!input || !rows.length) return;
+/* ── Fleet top search bars (above Trucks/Driver hub): Enter → results page ── */
+function initFleetTopSearchForms() {
+  document.querySelectorAll("[data-fleet-top-search-form]").forEach(function (form) {
+    var input = form.querySelector("[data-fleet-top-search]");
+    if (!input) return;
 
-  function applyFilter() {
-    var query = input.value.trim().toLowerCase();
-
-    rows.forEach(function (row) {
-      var rowText = row.textContent.toLowerCase().replace(/\s+/g, " ").trim();
-      row.style.display = !query || rowText.indexOf(query) !== -1 ? "" : "none";
+    form.addEventListener("submit", function (e) {
+      var q = input.value.trim();
+      if (!q) {
+        e.preventDefault();
+        return;
+      }
+      var scopeInput = form.querySelector('input[name="scope"]');
+      var scope = scopeInput ? scopeInput.value : "all";
+      if (window.iroadTenantSearch && window.iroadTenantSearch.go) {
+        e.preventDefault();
+        window.iroadTenantSearch.go(q, scope);
+      }
     });
-  }
+  });
+}
 
-  input.addEventListener("input", applyFilter);
-  applyFilter();
+/* ── Fleet hub rows: click row (except links) → detail page ── */
+function initFleetHubDetailNavigation() {
+  document
+    .querySelectorAll(
+      "tr[data-truck-hub-row][data-detail-url], tr[data-driver-hub-row][data-detail-url]",
+    )
+    .forEach(function (row) {
+      function goToDetail() {
+        var url = (row.getAttribute("data-detail-url") || "").trim();
+        if (url && url !== "#") {
+          window.location.href = url;
+        }
+      }
+
+      row.addEventListener("click", function (e) {
+        if (e.target.closest("a, button, input, select, textarea, label")) {
+          return;
+        }
+        goToDetail();
+      });
+
+      row.addEventListener("keydown", function (e) {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        if (e.target.closest("a, button, input, select, textarea")) return;
+        e.preventDefault();
+        goToDetail();
+      });
+    });
 }
 
 /* ── Fleet Integrity Hub: Recent Drivers / Driver Att. ── */
@@ -519,4 +577,298 @@ function initPaymentsCashierTabs() {
   });
 
   setTab("statistics");
+}
+
+/* ── Quota charts: floating tooltips on bar + donut hover ── */
+function initQuotaChartTooltips() {
+  var bars = document.querySelectorAll("[data-quota-bar-tip]");
+  var donutCharts = document.querySelectorAll("[data-quota-donut-chart]");
+  if (!bars.length && !donutCharts.length) {
+    return;
+  }
+
+  var tip = document.querySelector(".quota-chart-tooltip");
+  if (!tip) {
+    tip = document.createElement("div");
+    tip.className = "quota-chart-tooltip";
+    tip.setAttribute("role", "tooltip");
+    document.body.appendChild(tip);
+  }
+
+  function loadDonutSegments(jsonId) {
+    var el = document.getElementById(jsonId || "quota-donut-data");
+    if (!el || !el.textContent) {
+      return [];
+    }
+    try {
+      var parsed = JSON.parse(el.textContent);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (err) {
+      return [];
+    }
+  }
+
+  function buildDonutArcs(segments) {
+    var arcs = [];
+    var total = 0;
+    segments.forEach(function (seg) {
+      total += Math.max(0, parseFloat(seg.weight) || 0);
+    });
+    if (total <= 0) {
+      return arcs;
+    }
+    var cursor = 0;
+    segments.forEach(function (seg) {
+      var w = Math.max(0, parseFloat(seg.weight) || 0);
+      if (w <= 0) {
+        return;
+      }
+      var span = (w / total) * 360;
+      arcs.push({
+        seg: seg,
+        start: cursor,
+        end: cursor + span,
+      });
+      cursor += span;
+    });
+    return arcs;
+  }
+
+  function formatCount(raw) {
+    var n = parseInt(String(raw || "0"), 10);
+    return Number.isNaN(n) ? "0" : n.toLocaleString();
+  }
+
+  function positionTip(clientX, clientY) {
+    tip.style.left = clientX + "px";
+    tip.style.top = clientY - 14 + "px";
+  }
+
+  var activeLegendScope = null;
+
+  function hideTip() {
+    tip.classList.remove("is-visible");
+    if (activeLegendScope) {
+      activeLegendScope
+        .querySelectorAll("[data-quota-donut-legend].is-active")
+        .forEach(function (el) {
+          el.classList.remove("is-active");
+        });
+      activeLegendScope = null;
+    }
+  }
+
+  function showDonutSegmentTip(seg, clientX, clientY, legendEl, tipKind, legendScope) {
+    if (!seg) {
+      return;
+    }
+    var label = seg.label || "";
+    var used = seg.used_display != null ? String(seg.used_display) : formatCount(seg.used);
+    var total = seg.total_display != null ? String(seg.total_display) : "0";
+    var pct = seg.pct_label || "";
+    var dotStyle = seg.color ? ' style="background:' + seg.color + '"' : "";
+    var countLine =
+      tipKind === "fleet"
+        ? "Trucks: <b>" + used + "</b> / " + total
+        : "Used: <b>" + used + "</b> / " + total;
+    var pctLine =
+      tipKind === "fleet"
+        ? "Share: <b>" + pct + "</b> of fleet"
+        : "Quota: <b>" + pct + "</b>";
+    tip.innerHTML =
+      "<strong>" +
+      label +
+      "</strong>" +
+      '<div class="tip-line"><span class="tip-dot"' +
+      dotStyle +
+      "></span>" +
+      countLine +
+      "</div>" +
+      (pct ? '<div class="tip-line">' + pctLine + "</div>" : "");
+    tip.classList.add("is-visible");
+    positionTip(clientX, clientY);
+    if (legendScope) {
+      legendScope
+        .querySelectorAll("[data-quota-donut-legend].is-active")
+        .forEach(function (el) {
+          el.classList.remove("is-active");
+        });
+      activeLegendScope = legendScope;
+      if (legendEl) {
+        legendEl.classList.add("is-active");
+      } else if (seg.key) {
+        legendScope
+          .querySelectorAll('[data-quota-donut-legend][data-segment-key="' + seg.key + '"]')
+          .forEach(function (el) {
+            el.classList.add("is-active");
+          });
+      }
+    }
+  }
+
+  function showBarTip(bar, clientX, clientY) {
+    var month = bar.getAttribute("data-month") || "";
+    var seriesLabel = bar.getAttribute("data-series-label") || "Count";
+    var count = formatCount(bar.getAttribute("data-count"));
+    var series = bar.getAttribute("data-series") || "";
+    tip.innerHTML =
+      "<strong>" +
+      month +
+      "</strong>" +
+      '<div class="tip-line"><span class="tip-dot ' +
+      series +
+      '"></span>' +
+      seriesLabel +
+      ": <b>" +
+      count +
+      "</b></div>";
+    tip.classList.add("is-visible");
+    positionTip(clientX, clientY);
+  }
+
+  function showMonthTip(group, clientX, clientY) {
+    var monthLabel = "";
+    var trucks = 0;
+    var drivers = 0;
+    group.querySelectorAll("[data-quota-bar-tip]").forEach(function (bar) {
+      if (!monthLabel) {
+        monthLabel = bar.getAttribute("data-month") || "";
+      }
+      var c = parseInt(bar.getAttribute("data-count") || "0", 10);
+      if (bar.getAttribute("data-series") === "truck") {
+        trucks = c;
+      }
+      if (bar.getAttribute("data-series") === "driver") {
+        drivers = c;
+      }
+    });
+    tip.innerHTML =
+      "<strong>" +
+      monthLabel +
+      "</strong>" +
+      '<div class="tip-line"><span class="tip-dot truck"></span>Total Trucks: <b>' +
+      formatCount(trucks) +
+      "</b></div>" +
+      '<div class="tip-line"><span class="tip-dot driver"></span>Active Drivers: <b>' +
+      formatCount(drivers) +
+      "</b></div>";
+    tip.classList.add("is-visible");
+    positionTip(clientX, clientY);
+  }
+
+  function segmentAtAngle(deg, arcs) {
+    if (!arcs.length) {
+      return null;
+    }
+    var a = ((deg % 360) + 360) % 360;
+    for (var i = 0; i < arcs.length; i++) {
+      var arc = arcs[i];
+      if (a >= arc.start && a < arc.end) {
+        return arc.seg;
+      }
+    }
+    return arcs[arcs.length - 1].seg;
+  }
+
+  function donutHitSegment(wrap, clientX, clientY, arcs) {
+    var donut = wrap.querySelector(".quota-donut");
+    if (!donut) {
+      return null;
+    }
+    var rect = donut.getBoundingClientRect();
+    var cx = rect.left + rect.width / 2;
+    var cy = rect.top + rect.height / 2;
+    var dx = clientX - cx;
+    var dy = clientY - cy;
+    var dist = Math.sqrt(dx * dx + dy * dy);
+    var outerR = rect.width / 2;
+    var innerR = outerR * 0.68;
+    if (dist < innerR || dist > outerR) {
+      return null;
+    }
+    var deg = (Math.atan2(dx, -dy) * 180) / Math.PI;
+    return segmentAtAngle(deg, arcs);
+  }
+
+  bars.forEach(function (bar) {
+    bar.addEventListener("mouseenter", function (e) {
+      showBarTip(bar, e.clientX, e.clientY);
+    });
+    bar.addEventListener("mousemove", function (e) {
+      if (tip.classList.contains("is-visible")) {
+        positionTip(e.clientX, e.clientY);
+      }
+    });
+    bar.addEventListener("mouseleave", hideTip);
+    bar.addEventListener("focus", function (e) {
+      showBarTip(bar, e.clientX, e.clientY);
+    });
+    bar.addEventListener("blur", hideTip);
+  });
+
+  document.querySelectorAll(".quota-month-group").forEach(function (group) {
+    group.addEventListener("mouseenter", function (e) {
+      if (e.target.closest("[data-quota-bar-tip]")) {
+        return;
+      }
+      showMonthTip(group, e.clientX, e.clientY);
+    });
+    group.addEventListener("mousemove", function (e) {
+      if (tip.classList.contains("is-visible") && !e.target.closest("[data-quota-bar-tip]")) {
+        positionTip(e.clientX, e.clientY);
+      }
+    });
+    group.addEventListener("mouseleave", hideTip);
+  });
+
+  donutCharts.forEach(function (wrap) {
+    var jsonId = wrap.getAttribute("data-donut-json-id") || "quota-donut-data";
+    var tipKind = wrap.getAttribute("data-donut-tip-kind") || "quota";
+    var segments = loadDonutSegments(jsonId);
+    var arcs = buildDonutArcs(segments);
+    var segmentByKey = {};
+    segments.forEach(function (seg) {
+      if (seg && seg.key) {
+        segmentByKey[seg.key] = seg;
+      }
+    });
+    var legendScope =
+      document.querySelector('[data-donut-legend-for="' + jsonId + '"]') || wrap.parentElement;
+
+    wrap.addEventListener("mousemove", function (e) {
+      var seg = donutHitSegment(wrap, e.clientX, e.clientY, arcs);
+      if (!seg) {
+        hideTip();
+        return;
+      }
+      showDonutSegmentTip(seg, e.clientX, e.clientY, null, tipKind, legendScope);
+    });
+    wrap.addEventListener("mouseleave", hideTip);
+
+    if (!legendScope) {
+      return;
+    }
+
+    legendScope.querySelectorAll("[data-quota-donut-legend]").forEach(function (item) {
+      var key = item.getAttribute("data-segment-key");
+      var seg = key ? segmentByKey[key] : null;
+      if (!seg) {
+        return;
+      }
+
+      function onLegendHover(e) {
+        showDonutSegmentTip(seg, e.clientX, e.clientY, item, tipKind, legendScope);
+      }
+
+      item.addEventListener("mouseenter", onLegendHover);
+      item.addEventListener("mousemove", function (e) {
+        if (tip.classList.contains("is-visible")) {
+          positionTip(e.clientX, e.clientY);
+        }
+      });
+      item.addEventListener("mouseleave", hideTip);
+      item.addEventListener("focus", onLegendHover);
+      item.addEventListener("blur", hideTip);
+    });
+  });
 }

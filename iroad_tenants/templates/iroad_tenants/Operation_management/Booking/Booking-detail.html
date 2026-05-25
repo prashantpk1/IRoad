@@ -15,6 +15,42 @@
       position: static;
     }
   }
+  .booking-cargo-totals {
+    padding: 14px 20px;
+    border-top: 1px solid #e5e7eb;
+    background: #f8fafc;
+  }
+  .booking-cargo-totals-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px 24px;
+    max-width: 520px;
+    margin-left: auto;
+  }
+  .booking-cargo-total-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .booking-cargo-total-label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .booking-cargo-total-value {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #111827;
+  }
+  @media (max-width: 575.98px) {
+    .booking-cargo-totals-grid {
+      max-width: none;
+      margin-left: 0;
+      grid-template-columns: 1fr;
+    }
+  }
 </style>
 {% endblock %}
 
@@ -27,7 +63,7 @@
       <li class="breadcrumb-item">Operations</li>
       <li class="breadcrumb-item">Operations Management</li>
       <li class="breadcrumb-item">
-        <a href="{{ back_to_list_url }}">Booking List</a>
+        <a href="{% url 'iroad_tenants:tenant_operation_booking_list' %}">Booking List</a>
       </li>
       <li class="breadcrumb-item active" aria-current="page">Booking Detail</li>
     </ol>
@@ -42,15 +78,17 @@
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
-        <a href="{{ back_to_list_url }}" class="eal-btn eal-btn-outline">
+        <a href="{% url 'iroad_tenants:tenant_operation_booking_list' %}" class="eal-btn eal-btn-outline">
           <i class="bi bi-arrow-left"></i>
           <span>Back to List</span>
         </a>
-        <a href="{{ assign_truck_url }}" class="eal-btn eal-btn-outline">
+        {% if booking.booking_status != 'Cancelled' and not booking_has_active_shipment %}
+        <a href="{% url 'iroad_tenants:tenant_operation_booking_assign_truck' booking.booking_id %}" class="eal-btn eal-btn-outline">
           <i class="bi bi-truck"></i>
           <span>Assign Truck</span>
         </a>
-        <a href="{{ edit_booking_url }}" class="eal-btn eal-btn-primary">
+        {% endif %}
+        <a href="{% url 'iroad_tenants:tenant_operation_booking_edit' booking.booking_id %}" class="eal-btn eal-btn-primary">
           <i class="bi bi-pencil-square"></i>
           <span>Edit</span>
         </a>
@@ -127,10 +165,6 @@
               {% endif %}
             </p>
           </div>
-          <div class="field">
-            <label class="form-label">Sourcing Mode</label>
-            <p class="detail-view-value">{{ booking.sourcing_mode|default:"—" }}</p>
-          </div>
         </div>
         <p class="small text-uppercase fw-semibold text-secondary mb-3 mt-4" style="letter-spacing: 0.06em">
           POD
@@ -143,10 +177,12 @@
           <div class="field">
             <label class="form-label">POD Status</label>
             <p class="detail-view-value">
-              {% if booking.pod_status == 'Compliant' %}
-              <span class="status-badge active">{{ booking.pod_status }}</span>
-              {% elif booking.pod_status %}
-              <span class="status-badge pending">{{ booking.pod_status }}</span>
+              {% if booking_derived_pod_status == 'Compliant' %}
+              <span class="status-badge active">{{ booking_derived_pod_status }}</span>
+              {% elif booking_derived_pod_status == 'Not Compliant' %}
+              <span class="status-badge inactive">{{ booking_derived_pod_status }}</span>
+              {% elif booking_derived_pod_status %}
+              <span class="status-badge pending">{{ booking_derived_pod_status }}</span>
               {% else %}
               —
               {% endif %}
@@ -226,11 +262,31 @@
           </div>
           <div class="field">
             <label class="form-label">Sales Report</label>
-            <p class="detail-view-value">—</p>
+            <p class="detail-view-value">
+              {% if booking_sales_report.sales_report_no %}
+              <a href="{% url 'iroad_tenants:sales_invoice_report_detail' booking_sales_report.sales_report_id %}">
+                {{ booking_sales_report.sales_report_no }}
+              </a>
+              {% else %}
+              —
+              {% endif %}
+            </p>
           </div>
           <div class="field">
             <label class="form-label">Sales Report Status</label>
-            <p class="detail-view-value">—</p>
+            <p class="detail-view-value">
+              {% if booking_sales_report.sales_report_status %}
+              {% if booking_sales_report.sales_report_status == 'Invoiced' %}
+              <span class="status-badge active">{{ booking_sales_report.sales_report_status }}</span>
+              {% elif booking_sales_report.sales_report_status == 'Submitted' %}
+              <span class="status-badge in-transit">{{ booking_sales_report.sales_report_status }}</span>
+              {% else %}
+              <span class="status-badge pending">{{ booking_sales_report.sales_report_status }}</span>
+              {% endif %}
+              {% else %}
+              —
+              {% endif %}
+            </p>
           </div>
         </div>
       </div>
@@ -316,10 +372,12 @@
         <div class="detail-field" style="padding: 10px 0">
           <span class="detail-field-label">POD Status</span>
           <span class="detail-field-value">
-            {% if booking.pod_status == 'Compliant' %}
-            <span class="status-badge active">{{ booking.pod_status }}</span>
-            {% elif booking.pod_status %}
-            <span class="status-badge pending">{{ booking.pod_status }}</span>
+            {% if booking_derived_pod_status == 'Compliant' %}
+            <span class="status-badge active">{{ booking_derived_pod_status }}</span>
+            {% elif booking_derived_pod_status == 'Not Compliant' %}
+            <span class="status-badge inactive">{{ booking_derived_pod_status }}</span>
+            {% elif booking_derived_pod_status %}
+            <span class="status-badge pending">{{ booking_derived_pod_status }}</span>
             {% else %}
             —
             {% endif %}
@@ -487,20 +545,21 @@
           <p class="form-card-desc">Cargo item, weight, quantity, and totals.</p>
         </div>
       </div>
-      <div class="form-card-body">
-        <div class="eal-table-wrap" style="box-shadow: none; border-radius: 0">
+      <div class="form-card-body" style="padding: 0">
+        <div class="eal-table-wrap">
           <table class="eal-table mb-0">
             <thead>
               <tr>
                 <th style="width: 60px">SN</th>
                 <th>Booking Item</th>
                 <th>Cargo</th>
-                <th>Weight (Ton)</th>
-                <th>Unit</th>
-                <th>QTY</th>
+                <th style="width: 140px">Weight (Ton)</th>
+                <th style="width: 100px">Unit</th>
+                <th style="width: 120px">QTY</th>
               </tr>
             </thead>
             <tbody>
+              {% if booking.cargo or booking.cargo_booking_item %}
               <tr>
                 <td class="text-muted">1</td>
                 <td>{{ booking.cargo_booking_item|default:"—" }}</td>
@@ -511,21 +570,28 @@
                   —
                   {% endif %}
                 </td>
-                <td>{{ booking.cargo_weight|floatformat:2 }}</td>
+                <td>{{ booking.cargo_weight|floatformat:2|default:"—" }}</td>
                 <td>{{ booking.cargo_unit|default:"—" }}</td>
-                <td>{{ booking.cargo_qty|floatformat:2 }}</td>
+                <td>{{ booking.cargo_qty|floatformat:2|default:"—" }}</td>
               </tr>
+              {% else %}
+              <tr>
+                <td colspan="6" class="text-center text-muted py-4">No cargo linked to this booking.</td>
+              </tr>
+              {% endif %}
             </tbody>
           </table>
         </div>
-        <div class="fields-grid cols-2" style="margin-top: 20px">
-          <div class="field">
-            <label class="form-label">Total Cargo Unit QTY</label>
-            <p class="detail-view-value">{{ booking.total_cargo_qty|floatformat:2 }}</p>
-          </div>
-          <div class="field">
-            <label class="form-label">Total Cargo Weight</label>
-            <p class="detail-view-value">{{ booking.total_cargo_weight|floatformat:2 }}</p>
+        <div class="booking-cargo-totals">
+          <div class="booking-cargo-totals-grid">
+            <div class="booking-cargo-total-item">
+              <span class="booking-cargo-total-label">Total Cargo Unit QTY</span>
+              <span class="booking-cargo-total-value">{{ booking.total_cargo_qty|floatformat:2|default:"0.00" }}</span>
+            </div>
+            <div class="booking-cargo-total-item">
+              <span class="booking-cargo-total-label">Total Cargo Weight</span>
+              <span class="booking-cargo-total-value">{{ booking.total_cargo_weight|floatformat:2|default:"0.00" }}</span>
+            </div>
           </div>
         </div>
       </div>

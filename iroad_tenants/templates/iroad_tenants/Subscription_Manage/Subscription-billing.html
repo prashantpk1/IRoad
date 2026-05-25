@@ -44,6 +44,30 @@
     justify-content: flex-end;
     margin-bottom: 8px;
   }
+  .bill-overview-value {
+    display: block;
+    line-height: 1.25;
+  }
+  .bill-overview-alt-currency {
+    display: block;
+    margin-top: 4px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #5051f9;
+    letter-spacing: -0.2px;
+  }
+  .bill-amount-primary {
+    display: block;
+    font-weight: 600;
+    color: var(--text-dark);
+  }
+  .bill-amount-secondary {
+    display: block;
+    margin-top: 3px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #5051f9;
+  }
 </style>
 {% endblock %}
 
@@ -89,7 +113,16 @@
           </div>
           <div class="bill-overview-info">
             <span class="bill-overview-label">Next Payment</span>
-            <span class="bill-overview-value">{{ active_currency }} {{ current_price }}</span>
+            <span class="bill-overview-value">
+              {{ next_payment_display.primary_currency }}
+              {{ next_payment_display.primary_amount|floatformat:2 }}
+            </span>
+            {% if next_payment_display.show_secondary %}
+            <span class="bill-overview-alt-currency">
+              {{ next_payment_display.secondary_currency }}
+              {{ next_payment_display.secondary_amount|floatformat:2 }}
+            </span>
+            {% endif %}
             <span class="bill-overview-sub">Due on {% if next_payment_due %}{{ next_payment_due|date:"M j, Y" }}{% else %}--{% endif %}</span>
           </div>
         </div>
@@ -113,7 +146,16 @@
           </div>
           <div class="bill-overview-info">
             <span class="bill-overview-label">Total Spent (YTD)</span>
-            <span class="bill-overview-value">{{ active_currency }} {{ total_spent_ytd }}</span>
+            <span class="bill-overview-value">
+              {{ total_spent_display.primary_currency }}
+              {{ total_spent_display.primary_amount|floatformat:2 }}
+            </span>
+            {% if total_spent_display.show_secondary %}
+            <span class="bill-overview-alt-currency">
+              {{ total_spent_display.secondary_currency }}
+              {{ total_spent_display.secondary_amount|floatformat:2 }}
+            </span>
+            {% endif %}
             <span class="bill-overview-sub">{{ invoices|length }} invoices</span>
           </div>
         </div>
@@ -192,11 +234,15 @@
                   <td>{{ invoice.issue_date|date:"M j, Y" }}</td>
                   <td>{% if invoice.order.projected_plan %}{{ invoice.order.projected_plan.plan_name_en }}{% elif current_plan %}{{ current_plan.plan_name_en }}{% else %}--{% endif %}</td>
                   <td class="bill-amount">
-                    {{ invoice.display_amount_currency|default:invoice.currency.currency_code }} {{ invoice.display_amount_value|default:invoice.grand_total }}
-                    {% if invoice.is_cross_currency_amount %}
-                    <div class="small text-muted">
-                      Converted from {{ invoice.display_source_currency }} {{ invoice.display_source_amount }} using internal FX.
-                    </div>
+                    <span class="bill-amount-primary">
+                      {{ invoice.billing_display.primary_currency }}
+                      {{ invoice.billing_display.primary_amount|floatformat:2 }}
+                    </span>
+                    {% if invoice.billing_display.show_secondary %}
+                    <span class="bill-amount-secondary">
+                      {{ invoice.billing_display.secondary_currency }}
+                      {{ invoice.billing_display.secondary_amount|floatformat:2 }}
+                    </span>
                     {% endif %}
                   </td>
                   <td>

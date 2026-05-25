@@ -5,6 +5,10 @@
 {% block title %}Location Master List | iRoad{% endblock %}
 {% block breadcrumb %}{% endblock %}
 
+{% block extra_css %}
+{% include 'iroad_tenants/partials/eal_list_live_search_css.html' %}
+{% endblock %}
+
 {% block content %}
       <div class="page-header">
         <nav aria-label="breadcrumb">
@@ -41,19 +45,37 @@
   data-eal-filterable-table
   data-eal-empty-colspan="11"
   data-eal-empty-filter-message="{% translate 'No locations match the selected search/filter criteria.' %}"
+  data-eal-global-search-columns="1,2,3,4,5,6,7,8,9"
 >
-  <form method="get" class="eal-toolbar">
-    
+  <div class="eal-toolbar">
     <div class="eal-toolbar-left">
       <div class="d-flex flex-wrap align-items-end gap-3 w-100">
         <div class="eal-search flex-grow-1" style="min-width: 220px">
           <i class="bi bi-search"></i>
-          <input type="text" name="q" value="{{ search_q }}" placeholder="{% translate 'Search locations...' %}" />
-          </div>
+          <input
+            type="search"
+            id="locationMasterSearch"
+            data-eal-global-search
+            value="{{ search_q|default:'' }}"
+            autocomplete="off"
+            placeholder="{% translate 'Search locations...' %}"
+            aria-label="{% translate 'Search locations' %}"
+          />
+          <button
+            type="button"
+            class="eal-search-clear-btn"
+            id="locationMasterSearchClear"
+            title="{% translate 'Clear search' %}"
+            aria-label="{% translate 'Clear search' %}"
+            hidden
+          >
+            <i class="bi bi-x-lg"></i>
+          </button>
+        </div>
         <div class="d-flex flex-wrap align-items-end gap-2">
           <div>
             <label class="form-label small mb-0 text-muted" for="locListStatus">{% translate "Status" %}</label>
-            <select name="status" id="locListStatus" class="form-select form-select-sm" style="min-width: 10rem">
+            <select id="locListStatus" data-query-param="status" class="form-select form-select-sm" style="min-width: 10rem">
               <option value="all" {% if filter_status == 'all' %}selected{% endif %}>{% translate "All" %}</option>
               <option value="active" {% if filter_status == 'active' %}selected{% endif %}>{% translate "Active" %}</option>
               <option value="inactive" {% if filter_status == 'inactive' %}selected{% endif %}>{% translate "Inactive" %}</option>
@@ -61,17 +83,16 @@
           </div>
           <div>
             <label class="form-label small mb-0 text-muted" for="locListServiceable">{% translate "Serviceable" %}</label>
-            <select name="serviceable" id="locListServiceable" class="form-select form-select-sm" style="min-width: 10rem">
+            <select id="locListServiceable" data-query-param="serviceable" class="form-select form-select-sm" style="min-width: 10rem">
               <option value="all" {% if filter_serviceable == 'all' %}selected{% endif %}>{% translate "All" %}</option>
               <option value="yes" {% if filter_serviceable == 'yes' %}selected{% endif %}>{% translate "Serviceable" %}</option>
               <option value="no" {% if filter_serviceable == 'no' %}selected{% endif %}>{% translate "Non-serviceable" %}</option>
             </select>
           </div>
-          <button type="submit" class="btn btn-sm btn-primary mb-1">{% translate "Apply" %}</button>
         </div>
-          </div>
-          </div>
-  </form>
+      </div>
+    </div>
+  </div>
 
         <div class="eal-table-wrap">
           <table class="eal-table">
@@ -117,7 +138,7 @@
                 </td>
                 <td>
                   <div class="dropdown eal-actions-cell">
-              <button class="eal-row-btn" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Actions">
+              <button class="eal-row-btn" type="button" data-bs-toggle="dropdown" data-bs-boundary="viewport" aria-expanded="false" title="Actions">
                       <i class="bi bi-three-dots-vertical"></i>
                     </button>
               <ul class="dropdown-menu dropdown-menu-end shadow-sm" style="border-radius: 8px; border-color: #e2e8f0">
@@ -174,6 +195,8 @@
 {% endblock %}
 
 {% block extra_js %}
+{% url 'iroad_tenants:tenant_location_master_list' as location_list_url %}
+{% include 'iroad_tenants/partials/eal_list_live_search_js.html' with list_url=location_list_url search_input_id='locationMasterSearch' clear_btn_id='locationMasterSearchClear' filter_select_ids='locListStatus,locListServiceable' %}
     <script>
       (function () {
         const panel = document.getElementById("locationDetailPanel");

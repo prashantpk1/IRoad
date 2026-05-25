@@ -38,8 +38,10 @@
         </div>
 
         <!-- Filter Panel -->
-        <div class="collapse mt-3" id="filterCollapse">
-          <div
+        <div class="collapse mt-3{% if login_session_filters_active %} show{% endif %}" id="filterCollapse">
+          <form
+            method="get"
+            action="{% url 'iroad_tenants:tenant_login_session_events' %}"
             class="p-3 border rounded shadow-sm"
             style="background-color: #ffffff"
           >
@@ -47,6 +49,7 @@
               <div class="col-md-3">
                 <label
                   class="form-label"
+                  for="loginSessionDateFrom"
                   style="
                     font-size: 12px;
                     font-weight: 500;
@@ -56,11 +59,18 @@
                   "
                   >From Date</label
                 >
-                <input type="date" class="form-control" />
+                <input
+                  type="date"
+                  class="form-control"
+                  id="loginSessionDateFrom"
+                  name="date_from"
+                  value="{{ login_session_filter_date_from|default:'' }}"
+                />
               </div>
               <div class="col-md-3">
                 <label
                   class="form-label"
+                  for="loginSessionDateTo"
                   style="
                     font-size: 12px;
                     font-weight: 500;
@@ -70,11 +80,18 @@
                   "
                   >To Date</label
                 >
-                <input type="date" class="form-control" />
+                <input
+                  type="date"
+                  class="form-control"
+                  id="loginSessionDateTo"
+                  name="date_to"
+                  value="{{ login_session_filter_date_to|default:'' }}"
+                />
               </div>
               <div class="col-md-3">
                 <label
                   class="form-label"
+                  for="loginSessionModule"
                   style="
                     font-size: 12px;
                     font-weight: 500;
@@ -84,15 +101,16 @@
                   "
                   >Module</label
                 >
-                <select class="form-select">
-                  <option value="">All Modules</option>
-                  <option value="auth">Authentication</option>
-                  <option value="security">Security</option>
+                <select class="form-select" id="loginSessionModule" name="module">
+                  <option value="" {% if not login_session_filter_module %}selected{% endif %}>All Modules</option>
+                  <option value="auth" {% if login_session_filter_module == 'auth' %}selected{% endif %}>Authentication</option>
+                  <option value="security" {% if login_session_filter_module == 'security' %}selected{% endif %}>Security</option>
                 </select>
               </div>
               <div class="col-md-3">
                 <label
                   class="form-label"
+                  for="loginSessionPerformedBy"
                   style="
                     font-size: 12px;
                     font-weight: 500;
@@ -103,26 +121,25 @@
                   >Performed By</label
                 >
                 <input
-                  type="text"
+                  type="search"
                   class="form-control"
-                  placeholder="Search user..."
+                  id="loginSessionPerformedBy"
+                  name="performed_by"
+                  value="{{ login_session_filter_performed_by|default:'' }}"
+                  placeholder="Search user&hellip;"
+                  autocomplete="off"
                 />
               </div>
             </div>
             <div class="d-flex justify-content-end gap-2 mt-3">
-              <button
-                type="button"
-                class="eal-btn eal-btn-outline"
-                data-bs-toggle="collapse"
-                data-bs-target="#filterCollapse"
-              >
-                Cancel
-              </button>
-              <button type="button" class="eal-btn eal-btn-primary">
+              <a href="{% url 'iroad_tenants:tenant_login_session_events' %}" class="eal-btn eal-btn-outline">
+                Clear Filters
+              </a>
+              <button type="submit" class="eal-btn eal-btn-primary">
                 Apply Filters
               </button>
             </div>
-          </div>
+          </form>
         </div>
       </div>
 
@@ -180,7 +197,24 @@
           <div class="eal-toolbar-left">
             <div class="eal-search">
               <i class="bi bi-search"></i>
-              <input type="text" data-eal-global-search placeholder="Search events&hellip;" />
+              <input
+                type="search"
+                id="loginSessionTableSearch"
+                data-eal-global-search
+                autocomplete="off"
+                placeholder="Search events&hellip;"
+                aria-label="Search events"
+              />
+              <button
+                type="button"
+                class="eal-search-clear-btn"
+                id="loginSessionTableSearchClear"
+                title="Clear search"
+                aria-label="Clear search"
+                hidden
+              >
+                <i class="bi bi-x-lg"></i>
+              </button>
             </div>
           </div>
         </div>
@@ -240,7 +274,7 @@
           </div>
           <div class="eal-pagination-controls">
             {% if login_session_page_obj.has_previous %}
-            <a class="eal-page-btn" title="Previous" href="?page={{ login_session_page_obj.previous_page_number }}">
+            <a class="eal-page-btn" title="Previous" href="?{% if login_session_filters_qs %}{{ login_session_filters_qs }}&amp;{% endif %}page={{ login_session_page_obj.previous_page_number }}">
               <i class="bi bi-chevron-left"></i>
             </a>
             {% else %}
@@ -252,7 +286,7 @@
             <button class="eal-page-btn active">{{ login_session_page_obj.number }}</button>
 
             {% if login_session_page_obj.has_next %}
-            <a class="eal-page-btn" title="Next" href="?page={{ login_session_page_obj.next_page_number }}">
+            <a class="eal-page-btn" title="Next" href="?{% if login_session_filters_qs %}{{ login_session_filters_qs }}&amp;{% endif %}page={{ login_session_page_obj.next_page_number }}">
               <i class="bi bi-chevron-right"></i>
             </a>
             {% else %}
@@ -265,4 +299,55 @@
       </div>
   </div>
 </div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  .eal-search .eal-search-clear-btn {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: #94a3b8;
+    cursor: pointer;
+    line-height: 1;
+  }
+  .eal-search .eal-search-clear-btn:hover {
+    background: #e2e8f0;
+    color: #64748b;
+  }
+  .eal-search .eal-search-clear-btn[hidden] {
+    display: none !important;
+  }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  var inp = document.getElementById("loginSessionTableSearch");
+  var btn = document.getElementById("loginSessionTableSearchClear");
+  if (!inp) return;
+  function syncClear() {
+    if (!btn) return;
+    btn.hidden = !(inp.value || "").trim();
+  }
+  inp.addEventListener("input", syncClear);
+  syncClear();
+  if (btn) {
+    btn.addEventListener("click", function () {
+      inp.value = "";
+      inp.dispatchEvent(new Event("input", { bubbles: true }));
+      syncClear();
+      inp.focus();
+    });
+  }
+})();
+</script>
 {% endblock %}

@@ -380,7 +380,7 @@
                   <td>{{ row.line_no }}</td>
                   <td>{{ row.doc_page|default:"-" }}</td>
                   <td>{{ row.source|default:"-" }}</td>
-                  <td>{{ row.action_log|default:"-" }}</td>
+                  <td>{% if row.action_log %}{{ row.action_log.log_no }}{% else %}-{% endif %}</td>
                   <td>{{ row.physical_location|default:"-" }}</td>
                   <td>{{ row.soft_copy_status|default:"-" }}</td>
                   <td>{{ row.digital_evidence_status|default:"-" }}</td>

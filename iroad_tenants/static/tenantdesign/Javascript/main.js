@@ -20,8 +20,84 @@ document.addEventListener("DOMContentLoaded", function () {
     initDocumentHandoverVerificationLines();
     initBookingLinesRoute();
     initOperationActionLogMedia();
+    initTenantGlobalSearch();
   });
 });
+
+/* ── Navbar global search (shipments, clients, addresses) ── */
+function initTenantGlobalSearch() {
+  var input = document.querySelector("[data-tenant-global-search]");
+  if (!input) return;
+
+  var apiUrl = input.getAttribute("data-search-api") || "";
+  var pending = null;
+
+  var form = input.closest("[data-tenant-global-search-form]");
+
+  function runSearch() {
+    var q = input.value.trim();
+    if (!q) return;
+
+    var scope = input.getAttribute("data-search-scope") || "navbar";
+    if (window.iroadTenantSearch && window.iroadTenantSearch.go) {
+      window.iroadTenantSearch.go(q, scope);
+      return;
+    }
+
+    if (form) {
+      form.submit();
+      return;
+    }
+
+    if (!apiUrl) return;
+
+    if (pending) pending.abort();
+    pending = new AbortController();
+
+    fetch(
+      apiUrl +
+        "?q=" +
+        encodeURIComponent(q) +
+        "&scope=" +
+        encodeURIComponent(scope),
+      {
+        signal: pending.signal,
+        headers: { Accept: "application/json" },
+        credentials: "same-origin",
+      }
+    )
+      .then(function (res) {
+        return res.json();
+      })
+      .then(function (data) {
+        if (data && data.redirect) {
+          window.location.href = data.redirect;
+        }
+      })
+      .catch(function () {});
+  }
+
+  if (form) {
+    form.addEventListener("submit", function (e) {
+      var q = input.value.trim();
+      if (!q) {
+        e.preventDefault();
+        return;
+      }
+      if (window.iroadTenantSearch && window.iroadTenantSearch.go) {
+        e.preventDefault();
+        runSearch();
+      }
+    });
+  }
+
+  input.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      runSearch();
+    }
+  });
+}
 
 /* ============================================
    Sales Order - Order Lines (sub-table)
@@ -680,10 +756,53 @@ function initShipmentDocumentLines() {
     }
   }
 
+  const shipmentSelect = document.getElementById("shipmentRef");
+  const formEl = document.getElementById("shipmentDocumentForm");
+  const isEditForm = formEl && formEl.getAttribute("data-sd-is-edit") === "true";
+  const hasServerInitialLines = initialLines.length > 0;
+
+  function expectedPageCountFromShipmentOption(opt) {
+    if (!opt || !opt.value) return 1;
+    const raw = parseInt(opt.getAttribute("data-pod-doc-count") || "0", 10);
+    return Math.max(Number.isFinite(raw) ? raw : 0, 1);
+  }
+
+  const MAX_SD_PAGE_ROWS = 50;
+  let pageCountSyncLock = false;
+
+  function populateSdLinesFromPageCount(count) {
+    let target = Math.max(parseInt(String(count), 10) || 1, 1);
+    if (target > MAX_SD_PAGE_ROWS) {
+      target = MAX_SD_PAGE_ROWS;
+    }
+    getRows().forEach(function (tr) {
+      tr.remove();
+    });
+    for (let i = 0; i < target; i += 1) {
+      createLineRow();
+    }
+  }
+
+  function syncPageCountFromShipment() {
+    if (pageCountSyncLock || isEditForm || hasServerInitialLines || !shipmentSelect) return;
+    const opt = shipmentSelect.options[shipmentSelect.selectedIndex];
+    if (!opt || !opt.value) return;
+    pageCountSyncLock = true;
+    try {
+      populateSdLinesFromPageCount(expectedPageCountFromShipmentOption(opt));
+    } finally {
+      pageCountSyncLock = false;
+    }
+  }
+
+  window.syncShipmentDocumentPageCount = syncPageCountFromShipment;
+
   if (initialLines.length) {
     initialLines.forEach(function (lineData) {
       createLineRow(lineData);
     });
+  } else if (shipmentSelect && shipmentSelect.value) {
+    syncPageCountFromShipment();
   } else {
     createLineRow();
   }
@@ -1705,6 +1824,85 @@ function initNotificationPanel() {
         }
       });
     }
+
+    initTenantNotificationActions();
+  }
+}
+
+function getCsrfToken() {
+  var match = document.cookie.match(/csrftoken=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : "";
+}
+
+function updateNotificationBadge(count) {
+  var badge = document.querySelector("[data-notification-count]");
+  if (!badge) return;
+  var n = parseInt(count, 10) || 0;
+  badge.textContent = String(n);
+  if (n > 0) {
+    badge.classList.remove("d-none");
+  } else {
+    badge.classList.add("d-none");
+  }
+}
+
+function initTenantNotificationActions() {
+  var list = document.getElementById("tenantNotificationList");
+  if (!list) return;
+
+  list.addEventListener("click", function (e) {
+    var card = e.target.closest("[data-mark-read-url]");
+    if (!card) return;
+    var url = card.getAttribute("data-mark-read-url");
+    if (!url) return;
+    fetch(url, {
+      method: "POST",
+      headers: {
+        "X-CSRFToken": getCsrfToken(),
+        "X-Requested-With": "XMLHttpRequest",
+      },
+      credentials: "same-origin",
+    })
+      .then(function (r) {
+        return r.json();
+      })
+      .then(function (data) {
+        if (data && data.ok) {
+          card.classList.remove("is-unread");
+          if (typeof data.unread_count !== "undefined") {
+            updateNotificationBadge(data.unread_count);
+          }
+        }
+      })
+      .catch(function () {});
+  });
+
+  var markAllBtn = document.getElementById("tenantNotificationMarkAllRead");
+  if (markAllBtn) {
+    markAllBtn.addEventListener("click", function () {
+      var url = markAllBtn.getAttribute("data-mark-all-url");
+      if (!url) return;
+      fetch(url, {
+        method: "POST",
+        headers: {
+          "X-CSRFToken": getCsrfToken(),
+          "X-Requested-With": "XMLHttpRequest",
+        },
+        credentials: "same-origin",
+      })
+        .then(function (r) {
+          return r.json();
+        })
+        .then(function (data) {
+          if (data && data.ok) {
+            list.querySelectorAll(".notification-card").forEach(function (c) {
+              c.classList.remove("is-unread");
+            });
+            updateNotificationBadge(0);
+          }
+        })
+        .catch(function () {});
+    });
   }
 }
 

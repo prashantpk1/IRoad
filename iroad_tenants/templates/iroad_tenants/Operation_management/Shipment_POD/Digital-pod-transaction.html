@@ -461,7 +461,9 @@
                       </select>
                     </td>
                     <td>
-                      <input type="text" class="form-control form-control-sm pod-line-action-log" value="{{ row.action_log }}" placeholder="Enter action log reference" />
+                      <select class="form-select form-select-sm pod-line-action-log" data-selected="{{ row.action_log_id|default:'' }}">
+                        <option value="" {% if not row.action_log_id %}selected{% endif %} disabled>- Select Action Log -</option>
+                      </select>
                     </td>
                     <td>
                       <select class="form-select form-select-sm pod-line-location">
@@ -507,7 +509,11 @@
                         <option value="Manual">Manual</option>
                       </select>
                     </td>
-                    <td><input type="text" class="form-control form-control-sm pod-line-action-log" placeholder="Enter action log reference" /></td>
+                    <td>
+                      <select class="form-select form-select-sm pod-line-action-log" data-selected="">
+                        <option value="" selected disabled>- Select Action Log -</option>
+                      </select>
+                    </td>
                     <td>
                       <select class="form-select form-select-sm pod-line-location">
                         <option value="" selected disabled>- Select Location -</option>
@@ -573,6 +579,7 @@
 
 {% block extra_js %}
 <script id="deliveryNotePagesData" type="application/json">{{ delivery_note_pages_json|safe }}</script>
+{{ pod_action_log_options|json_script:"pod-action-log-options" }}
 <script>
       document.addEventListener("DOMContentLoaded", function () {
         let deliveryNotePagesMap = {};
@@ -582,6 +589,15 @@
             deliveryNotePagesMap = JSON.parse(deliveryNotePagesNode.textContent);
           } catch (error) {
             deliveryNotePagesMap = {};
+          }
+        }
+        let podActionLogOptions = [];
+        const podActionLogOptionsNode = document.getElementById("pod-action-log-options");
+        if (podActionLogOptionsNode && podActionLogOptionsNode.textContent) {
+          try {
+            podActionLogOptions = JSON.parse(podActionLogOptionsNode.textContent) || [];
+          } catch (error) {
+            podActionLogOptions = [];
           }
         }
         // ── POD Type Toggle (Soft / Hard) ──────────────
@@ -687,6 +703,43 @@
           });
         }
 
+        function getSelectedShipmentId() {
+          return shipmentRefSelect ? shipmentRefSelect.value || "" : "";
+        }
+
+        function filteredActionLogOptions(shipmentId) {
+          if (!shipmentId) return podActionLogOptions;
+          const filtered = podActionLogOptions.filter(function (opt) {
+            return !opt.shipment_id || opt.shipment_id === shipmentId;
+          });
+          return filtered.length ? filtered : podActionLogOptions;
+        }
+
+        function fillActionLogSelect(select, selectedValue) {
+          if (!select) return;
+          const shipmentId = getSelectedShipmentId();
+          const options = filteredActionLogOptions(shipmentId);
+          const currentValue =
+            selectedValue || select.getAttribute("data-selected") || select.value || "";
+          select.innerHTML =
+            '<option value="" disabled>- Select Action Log -</option>';
+          options.forEach(function (opt) {
+            select.add(new Option(opt.label, opt.log_id));
+          });
+          if (currentValue) {
+            ensureSelectOption(select, currentValue);
+            select.setAttribute("data-selected", currentValue);
+          } else {
+            select.value = "";
+          }
+        }
+
+        function syncAllActionLogSelects() {
+          document.querySelectorAll(".pod-line-action-log").forEach(function (select) {
+            fillActionLogSelect(select);
+          });
+        }
+
         function filterSourceDocumentsForShipment() {
           if (!sourceDocumentSelect || !shipmentRefSelect) return;
           const selectedShipment = shipmentRefSelect.value || "";
@@ -723,7 +776,7 @@
             '<option value="" disabled>- Select DOC Page -</option>' +
             "</select></td>" +
             '<td><select class="form-select form-select-sm pod-line-source"><option value="Action Log" selected>Action Log</option><option value="Manual">Manual</option></select></td>' +
-            '<td><input type="text" class="form-control form-control-sm pod-line-action-log" placeholder="Enter action log reference" /></td>' +
+            '<td><select class="form-select form-select-sm pod-line-action-log"><option value="" disabled>- Select Action Log -</option></select></td>' +
             '<td><select class="form-select form-select-sm pod-line-location"><option value="" selected disabled>- Select Location -</option><option value="With Driver">With Driver</option><option value="With Admin">With Admin</option><option value="Out of Company">Out of Company</option></select></td>' +
             '<td><select class="form-select form-select-sm pod-line-soft-status"><option value="Not Collected" selected>Not Collected</option><option value="Collected">Collected</option></select></td>' +
             '<td><select class="form-select form-select-sm pod-line-digital-status"><option value="Not Collected" selected>Not Collected</option><option value="Collected">Collected</option></select></td>' +
@@ -755,6 +808,7 @@
             podLinesBody.appendChild(row);
             const docPageSelect = row.querySelector(".pod-line-doc-page");
             fillDocPageSelect(docPageSelect, page.page_id);
+            fillActionLogSelect(row.querySelector(".pod-line-action-log"));
             attachPodLineDeleteHandler(row);
             if (docLocationSelect && docLocationSelect.value) {
               syncPodPageLocations(docLocationSelect.value);
@@ -779,6 +833,7 @@
             podLinesBody.appendChild(row);
             const docPageSelect = row.querySelector(".pod-line-doc-page");
             fillDocPageSelect(docPageSelect, docPageValue);
+            fillActionLogSelect(row.querySelector(".pod-line-action-log"));
             attachPodLineDeleteHandler(row);
             if (docLocationSelect && docLocationSelect.value) {
               syncPodPageLocations(docLocationSelect.value);
@@ -827,6 +882,7 @@
               bookingItemInput.value = bookingItem;
             }
             filterSourceDocumentsForShipment();
+            syncAllActionLogSelects();
           }
           shipmentRefSelect.addEventListener("change", syncShipmentFields);
           docNoInput.addEventListener("change", function () {
@@ -850,6 +906,7 @@
           pageCountInput.addEventListener("input", syncAllDocPageOptions);
         }
         syncAllDocPageOptions();
+        syncAllActionLogSelects();
 
         // ── POD Status → Lifecycle Tracker ─────────────
         const podStatusSelect = document.getElementById("podStatus");
@@ -1024,7 +1081,7 @@
               '<option value="" selected disabled>- Select DOC Page -</option>' +
               "</select></td>" +
               '<td><select class="form-select form-select-sm pod-line-source"><option value="Action Log" selected>Action Log</option><option value="Manual">Manual</option></select></td>' +
-              '<td><input type="text" class="form-control form-control-sm pod-line-action-log" placeholder="Enter action log reference" /></td>' +
+              '<td><select class="form-select form-select-sm pod-line-action-log"><option value="" disabled>- Select Action Log -</option></select></td>' +
               '<td><select class="form-select form-select-sm pod-line-location"><option value="" selected disabled>- Select Location -</option><option value="With Driver">With Driver</option><option value="With Admin">With Admin</option><option value="Out of Company">Out of Company</option></select></td>' +
               '<td><select class="form-select form-select-sm pod-line-soft-status"><option value="Not Collected" selected>Not Collected</option><option value="Collected">Collected</option></select></td>' +
               '<td><select class="form-select form-select-sm pod-line-digital-status"><option value="Not Collected" selected>Not Collected</option><option value="Collected">Collected</option></select></td>' +
@@ -1034,6 +1091,7 @@
 
             podLinesBody.appendChild(newRow);
             fillDocPageSelect(newRow.querySelector(".pod-line-doc-page"));
+            fillActionLogSelect(newRow.querySelector(".pod-line-action-log"));
             if (docLocationSelect) {
               syncPodPageLocations(docLocationSelect.value);
             }
@@ -1066,7 +1124,7 @@
               payload.push({
                 doc_page: (row.querySelector(".pod-line-doc-page") || {}).value || "",
                 source: (row.querySelector(".pod-line-source") || {}).value || "",
-                action_log: (row.querySelector(".pod-line-action-log") || {}).value || "",
+                action_log_id: (row.querySelector(".pod-line-action-log") || {}).value || "",
                 physical_location: (row.querySelector(".pod-line-location") || {}).value || "",
                 soft_copy_status: (row.querySelector(".pod-line-soft-status") || {}).value || "",
                 digital_evidence_status: (row.querySelector(".pod-line-digital-status") || {}).value || "",
