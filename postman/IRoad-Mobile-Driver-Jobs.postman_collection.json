@@ -1,0 +1,2120 @@
+{
+	"info": {
+		"_postman_id": "a7b8c9d0-e1f2-3456-a789-joblist123456",
+		"name": "IRoad Mobile Driver — Job List Module",
+		"description": "# IRoad Mobile — Job List Module\n\n## Prerequisites\n1. Import **IRoad Mobile Driver Jobs — Local** environment.\n2. Set `base_url`, `email`, `password`, optional `tenant_id`.\n3. Run **Setup → Login**.\n4. Run **Testing Flows → Flow A** (Collection Runner).\n\n## Auth & tenant\n| Item | Rule |\n|------|------|\n| **Authorization** | `Bearer {{access_token}}` |\n| **Capability** | `mobile.driver.jobs` |\n| **X-Tenant-ID** | Optional; must match JWT if sent |\n\n## Docs\n- `mobile_api/docs/driver_job_list.md`\n- `postman/README-Jobs.md`",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{access_token}}",
+				"type": "string"
+			}
+		]
+	},
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"if (!pm.environment.get('access_token') && !pm.request.url.path.join('/').includes('login')) {",
+					"    console.warn('access_token empty — run Setup → Login first');",
+					"}"
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://127.0.0.1:8000"
+		},
+		{
+			"key": "api_prefix",
+			"value": "/api/v1/mobile"
+		}
+	],
+	"item": [
+		{
+			"name": "Setup",
+			"description": "JWT automation — run Login before job list calls.",
+			"item": [
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+									"const j = pm.response.json();",
+									"pm.test('status === 1', () => pm.expect(j.status).to.eql(1));",
+									"if (j.status === 1 && j.data) {",
+									"    if (j.data.access_token) pm.environment.set('access_token', j.data.access_token);",
+									"    if (j.data.refresh_token) pm.environment.set('refresh_token', j.data.refresh_token);",
+									"    if (j.data.driver && j.data.driver.driver_id) pm.environment.set('driver_id', j.data.driver.driver_id);",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\",\n  \"device_platform\": \"{{device_platform}}\",\n  \"device_id\": \"{{fcm_token}}\",\n  \"device_name\": \"{{device_name}}\"\n}"
+						},
+						"url": "{{base_url}}{{api_prefix}}/driver/auth/login/",
+						"description": "**POST** · No auth · Saves tokens + driver_id."
+					},
+					"response": []
+				},
+				{
+					"name": "Refresh Token",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"const j = pm.response.json();",
+									"if (j.status === 1 && j.data) {",
+									"    if (j.data.access_token) pm.environment.set('access_token', j.data.access_token);",
+									"    if (j.data.refresh_token) pm.environment.set('refresh_token', j.data.refresh_token);",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"refresh_token\": \"{{refresh_token}}\"}"
+						},
+						"url": "{{base_url}}{{api_prefix}}/driver/auth/refresh/"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "00 — Summary",
+			"item": [
+				{
+					"name": "GET Job Summary",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							}
+						],
+						"url": "{{base_url}}{{api_prefix}}/driver/jobs/summary/",
+						"description": "| Method | GET |\n| URL | `/api/v1/mobile/driver/jobs/summary/` |\n| Auth | Bearer |\n| Capability | `mobile.driver.jobs` |"
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+									"const j = pm.response.json();",
+									"pm.test('status === 1', () => pm.expect(j.status).to.eql(1));",
+									"pm.test('counters object', () => {",
+									"    const c = j.data.counters;",
+									"    pm.expect(c).to.have.all.keys('active_shipments','completed_shipments','cancelled_shipments','active_movements','completed_movements','cancelled_movements','pod_pending','cod_pending');",
+									"});",
+									"if (j.data && j.data.counters) {",
+									"    pm.environment.set('jobs_active_shipments', String(j.data.counters.active_shipments));",
+									"}"
+								]
+							}
+						}
+					],
+					"response": [
+						{
+							"name": "200 Summary",
+							"status": "OK",
+							"code": 200,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\n  \"status\": 1,\n  \"message\": \"Job summary loaded successfully.\",\n  \"message_key\": \"mobile.jobs.summary_success\",\n  \"data\": {\n    \"counters\": {\n      \"active_shipments\": 12,\n      \"completed_shipments\": 45,\n      \"cancelled_shipments\": 2,\n      \"active_movements\": 5,\n      \"completed_movements\": 30,\n      \"cancelled_movements\": 1,\n      \"pod_pending\": 3,\n      \"cod_pending\": 2\n    },\n    \"entity_types\": [\n      \"shipment\",\n      \"movement\"\n    ]\n  }\n}"
+						},
+						{
+							"name": "401 Unauthorized",
+							"status": "Unauthorized",
+							"code": 401,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\n  \"status\": 2,\n  \"message\": \"Unauthorized access. Please login to continue.\",\n  \"message_key\": \"mobile.auth.unauthorized\",\n  \"data\": {\n    \"error_code\": \"unauthorized\"\n  }\n}"
+						},
+						{
+							"name": "403 Jobs denied",
+							"status": "Forbidden",
+							"code": 403,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\n  \"status\": 2,\n  \"message\": \"You do not have access to driver jobs.\",\n  \"message_key\": \"mobile.auth.jobs_denied\",\n  \"data\": {\n    \"error_code\": \"jobs_denied\"\n  }\n}"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "01 — Shipment Lists",
+			"description": "Paginated shipment job cards.",
+			"item": [
+				{
+					"name": "GET Shipments — All (query tab)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							}
+						],
+						"url": "{{base_url}}{{api_prefix}}/driver/jobs/shipments/?tab=active&page=1&page_size={{jobs_page_size}}&sort={{jobs_sort}}",
+						"description": "General list; query tab/queue/q/sort."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+									"const j = pm.response.json();",
+									"pm.test('status === 1', () => pm.expect(j.status).to.eql(1));",
+									"pm.test('paginated items array', () => {",
+									"    pm.expect(j.data).to.have.property('items');",
+									"    pm.expect(j.data.items).to.be.an('array');",
+									"});",
+									"pm.test('pagination_mode present', () => {",
+									"    pm.expect(j.data).to.have.property('pagination_mode');",
+									"});",
+									"if (j.data.pagination_mode === 'cursor') {",
+									"    pm.test('cursor fields', () => {",
+									"        pm.expect(j.data).to.have.property('has_more');",
+									"    });",
+									"    if (j.data.next_cursor) pm.environment.set('jobs_next_cursor', j.data.next_cursor);",
+									"}",
+									"pm.test('list meta present', () => {",
+									"    pm.expect(j.data).to.have.property('meta');",
+									"    pm.expect(j.data.meta).to.have.property('entity_type');",
+									"});",
+									"if (j.data.items && j.data.items[0]) {",
+									"    const card = j.data.items[0];",
+									"    pm.environment.set('last_job_id', card.job_id || '');",
+									"    pm.environment.set('last_job_type', card.job_type || '');",
+									"}"
+								]
+							}
+						}
+					],
+					"response": [
+						{
+							"name": "200 Paginated list",
+							"status": "OK",
+							"code": 200,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\n  \"status\": 1,\n  \"message\": \"Shipment jobs loaded successfully.\",\n  \"message_key\": \"mobile.jobs.shipments_success\",\n  \"data\": {\n    \"items\": [\n      {\n        \"job_id\": \"660e8400-e29b-41d4-a716-446655440001\",\n        \"job_type\": \"shipment\",\n        \"job_no\": \"SH-2026-001\",\n        \"shipment_no\": \"SH-2026-001\",\n        \"current_status\": \"In Transit\",\n        \"route_summary\": \"Riyadh \\u2192 Jeddah\",\n        \"latest_action_summary\": null,\n        \"next_action_hint\": \"Submit proof of delivery\",\n        \"pod_status\": \"Pending\",\n        \"needs_pod\": true,\n        \"is_active\": true\n      }\n    ],\n    \"total_records\": 42,\n    \"total_pages\": 5,\n    \"current_page\": 1,\n    \"page_size\": 10,\n    \"meta\": {\n      \"tab\": \"active\",\n      \"queue\": \"none\",\n      \"sort\": \"updated_desc\",\n      \"entity_type\": \"shipment\",\n      \"tab_locked\": true,\n      \"queue_locked\": false,\n      \"search\": \"\",\n      \"date_from\": \"\",\n      \"date_to\": \"\",\n      \"date_field\": \"updated\",\n      \"include_actions\": true\n    }\n  },\n  \"meta\": {\n    \"locale\": \"en\",\n    \"api_version\": \"1.0\"\n  }\n}"
+						},
+						{
+							"name": "401 Unauthorized",
+							"status": "Unauthorized",
+							"code": 401,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\n  \"status\": 2,\n  \"message\": \"Unauthorized access. Please login to continue.\",\n  \"message_key\": \"mobile.auth.unauthorized\",\n  \"data\": {\n    \"error_code\": \"unauthorized\"\n  }\n}"
+						}
+					]
+				},
+				{
+					"name": "GET Shipments — Active (locked)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							}
+						],
+						"url": "{{base_url}}{{api_prefix}}/driver/jobs/shipments/active/?page=1&page_size={{jobs_page_size}}&tab=cancelled",
+						"description": "Path locks tab=active."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+									"const j = pm.response.json();",
+									"pm.test('status === 1', () => pm.expect(j.status).to.eql(1));",
+									"pm.test('paginated items array', () => {",
+									"    pm.expect(j.data).to.have.property('items');",
+									"    pm.expect(j.data.items).to.be.an('array');",
+									"});",
+									"pm.test('pagination_mode present', () => {",
+									"    pm.expect(j.data).to.have.property('pagination_mode');",
+									"});",
+									"if (j.data.pagination_mode === 'cursor') {",
+									"    pm.test('cursor fields', () => {",
+									"        pm.expect(j.data).to.have.property('has_more');",
+									"    });",
+									"    if (j.data.next_cursor) pm.environment.set('jobs_next_cursor', j.data.next_cursor);",
+									"}",
+									"pm.test('list meta present', () => {",
+									"    pm.expect(j.data).to.have.property('meta');",
+									"    pm.expect(j.data.meta).to.have.property('entity_type');",
+									"});",
+									"if (j.data.items && j.data.items[0]) {",
+									"    const card = j.data.items[0];",
+									"    pm.environment.set('last_job_id', card.job_id || '');",
+									"    pm.environment.set('last_job_type', card.job_type || '');",
+									"}"
+								]
+							}
+						}
+					],
+					"response": [
+						{
+							"name": "200 Paginated list",
+							"status": "OK",
+							"code": 200,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\n  \"status\": 1,\n  \"message\": \"Shipment jobs loaded successfully.\",\n  \"message_key\": \"mobile.jobs.shipments_success\",\n  \"data\": {\n    \"items\": [\n      {\n        \"job_id\": \"660e8400-e29b-41d4-a716-446655440001\",\n        \"job_type\": \"shipment\",\n        \"job_no\": \"SH-2026-001\",\n        \"shipment_no\": \"SH-2026-001\",\n        \"current_status\": \"In Transit\",\n        \"route_summary\": \"Riyadh \\u2192 Jeddah\",\n        \"latest_action_summary\": null,\n        \"next_action_hint\": \"Submit proof of delivery\",\n        \"pod_status\": \"Pending\",\n        \"needs_pod\": true,\n        \"is_active\": true\n      }\n    ],\n    \"total_records\": 42,\n    \"total_pages\": 5,\n    \"current_page\": 1,\n    \"page_size\": 10,\n    \"meta\": {\n      \"tab\": \"active\",\n      \"queue\": \"none\",\n      \"sort\": \"updated_desc\",\n      \"entity_type\": \"shipment\",\n      \"tab_locked\": true,\n      \"queue_locked\": false,\n      \"search\": \"\",\n      \"date_from\": \"\",\n      \"date_to\": \"\",\n      \"date_field\": \"updated\",\n      \"include_actions\": true\n    }\n  },\n  \"meta\": {\n    \"locale\": \"en\",\n    \"api_version\": \"1.0\"\n  }\n}"
+						},
+						{
+							"name": "401 Unauthorized",
+							"status": "Unauthorized",
+							"code": 401,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\n  \"status\": 2,\n  \"message\": \"Unauthorized access. Please login to continue.\",\n  \"message_key\": \"mobile.auth.unauthorized\",\n  \"data\": {\n    \"error_code\": \"unauthorized\"\n  }\n}"
+						}
+					]
+				},
+				{
+					"name": "GET Shipments — Completed (locked)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							}
+						],
+						"url": "{{base_url}}{{api_prefix}}/driver/jobs/shipments/completed/?page=1&page_size={{jobs_page_size}}",
+						"description": "Delivered / Closed."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+									"const j = pm.response.json();",
+									"pm.test('status === 1', () => pm.expect(j.status).to.eql(1));",
+									"pm.test('paginated items array', () => {",
+									"    pm.expect(j.data).to.have.property('items');",
+									"    pm.expect(j.data.items).to.be.an('array');",
+									"});",
+									"pm.test('pagination_mode present', () => {",
+									"    pm.expect(j.data).to.have.property('pagination_mode');",
+									"});",
+									"if (j.data.pagination_mode === 'cursor') {",
+									"    pm.test('cursor fields', () => {",
+									"        pm.expect(j.data).to.have.property('has_more');",
+									"    });",
+									"    if (j.data.next_cursor) pm.environment.set('jobs_next_cursor', j.data.next_cursor);",
+									"}",
+									"pm.test('list meta present', () => {",
+									"    pm.expect(j.data).to.have.property('meta');",
+									"    pm.expect(j.data.meta).to.have.property('entity_type');",
+									"});",
+									"if (j.data.items && j.data.items[0]) {",
+									"    const card = j.data.items[0];",
+									"    pm.environment.set('last_job_id', card.job_id || '');",
+									"    pm.environment.set('last_job_type', card.job_type || '');",
+									"}"
+								]
+							}
+						}
+					],
+					"response": [
+						{
+							"name": "200 Paginated list",
+							"status": "OK",
+							"code": 200,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\n  \"status\": 1,\n  \"message\": \"Shipment jobs loaded successfully.\",\n  \"message_key\": \"mobile.jobs.shipments_success\",\n  \"data\": {\n    \"items\": [\n      {\n        \"job_id\": \"660e8400-e29b-41d4-a716-446655440001\",\n        \"job_type\": \"shipment\",\n        \"job_no\": \"SH-2026-001\",\n        \"shipment_no\": \"SH-2026-001\",\n        \"current_status\": \"In Transit\",\n        \"route_summary\": \"Riyadh \\u2192 Jeddah\",\n        \"latest_action_summary\": null,\n        \"next_action_hint\": \"Submit proof of delivery\",\n        \"pod_status\": \"Pending\",\n        \"needs_pod\": true,\n        \"is_active\": true\n      }\n    ],\n    \"total_records\": 42,\n    \"total_pages\": 5,\n    \"current_page\": 1,\n    \"page_size\": 10,\n    \"meta\": {\n      \"tab\": \"active\",\n      \"queue\": \"none\",\n      \"sort\": \"updated_desc\",\n      \"entity_type\": \"shipment\",\n      \"tab_locked\": true,\n      \"queue_locked\": false,\n      \"search\": \"\",\n      \"date_from\": \"\",\n      \"date_to\": \"\",\n      \"date_field\": \"updated\",\n      \"include_actions\": true\n    }\n  },\n  \"meta\": {\n    \"locale\": \"en\",\n    \"api_version\": \"1.0\"\n  }\n}"
+						},
+						{
+							"name": "401 Unauthorized",
+							"status": "Unauthorized",
+							"code": 401,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\n  \"status\": 2,\n  \"message\": \"Unauthorized access. Please login to continue.\",\n  \"message_key\": \"mobile.auth.unauthorized\",\n  \"data\": {\n    \"error_code\": \"unauthorized\"\n  }\n}"
+						}
+					]
+				},
+				{
+					"name": "GET Shipments — Cancelled (locked)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							}
+						],
+						"url": "{{base_url}}{{api_prefix}}/driver/jobs/shipments/cancelled/?page=1&page_size={{jobs_page_size}}",
+						"description": "Cancelled only."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+									"const j = pm.response.json();",
+									"pm.test('status === 1', () => pm.expect(j.status).to.eql(1));",
+									"pm.test('paginated items array', () => {",
+									"    pm.expect(j.data).to.have.property('items');",
+									"    pm.expect(j.data.items).to.be.an('array');",
+									"});",
+									"pm.test('pagination_mode present', () => {",
+									"    pm.expect(j.data).to.have.property('pagination_mode');",
+									"});",
+									"if (j.data.pagination_mode === 'cursor') {",
+									"    pm.test('cursor fields', () => {",
+									"        pm.expect(j.data).to.have.property('has_more');",
+									"    });",
+									"    if (j.data.next_cursor) pm.environment.set('jobs_next_cursor', j.data.next_cursor);",
+									"}",
+									"pm.test('list meta present', () => {",
+									"    pm.expect(j.data).to.have.property('meta');",
+									"    pm.expect(j.data.meta).to.have.property('entity_type');",
+									"});",
+									"if (j.data.items && j.data.items[0]) {",
+									"    const card = j.data.items[0];",
+									"    pm.environment.set('last_job_id', card.job_id || '');",
+									"    pm.environment.set('last_job_type', card.job_type || '');",
+									"}"
+								]
+							}
+						}
+					],
+					"response": [
+						{
+							"name": "200 Paginated list",
+							"status": "OK",
+							"code": 200,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\n  \"status\": 1,\n  \"message\": \"Shipment jobs loaded successfully.\",\n  \"message_key\": \"mobile.jobs.shipments_success\",\n  \"data\": {\n    \"items\": [\n      {\n        \"job_id\": \"660e8400-e29b-41d4-a716-446655440001\",\n        \"job_type\": \"shipment\",\n        \"job_no\": \"SH-2026-001\",\n        \"shipment_no\": \"SH-2026-001\",\n        \"current_status\": \"In Transit\",\n        \"route_summary\": \"Riyadh \\u2192 Jeddah\",\n        \"latest_action_summary\": null,\n        \"next_action_hint\": \"Submit proof of delivery\",\n        \"pod_status\": \"Pending\",\n        \"needs_pod\": true,\n        \"is_active\": true\n      }\n    ],\n    \"total_records\": 42,\n    \"total_pages\": 5,\n    \"current_page\": 1,\n    \"page_size\": 10,\n    \"meta\": {\n      \"tab\": \"active\",\n      \"queue\": \"none\",\n      \"sort\": \"updated_desc\",\n      \"entity_type\": \"shipment\",\n      \"tab_locked\": true,\n      \"queue_locked\": false,\n      \"search\": \"\",\n      \"date_from\": \"\",\n      \"date_to\": \"\",\n      \"date_field\": \"updated\",\n      \"include_actions\": true\n    }\n  },\n  \"meta\": {\n    \"locale\": \"en\",\n    \"api_version\": \"1.0\"\n  }\n}"
+						},
+						{
+							"name": "401 Unauthorized",
+							"status": "Unauthorized",
+							"code": 401,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\n  \"status\": 2,\n  \"message\": \"Unauthorized access. Please login to continue.\",\n  \"message_key\": \"mobile.auth.unauthorized\",\n  \"data\": {\n    \"error_code\": \"unauthorized\"\n  }\n}"
+						}
+					]
+				},
+				{
+					"name": "GET Shipments — POD Pending (locked)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							}
+						],
+						"url": "{{base_url}}{{api_prefix}}/driver/jobs/shipments/pod-pending/?page=1&page_size={{jobs_page_size}}",
+						"description": "queue=pod_pending locked."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+									"const j = pm.response.json();",
+									"pm.test('status === 1', () => pm.expect(j.status).to.eql(1));",
+									"pm.test('paginated items array', () => {",
+									"    pm.expect(j.data).to.have.property('items');",
+									"    pm.expect(j.data.items).to.be.an('array');",
+									"});",
+									"pm.test('pagination_mode present', () => {",
+									"    pm.expect(j.data).to.have.property('pagination_mode');",
+									"});",
+									"if (j.data.pagination_mode === 'cursor') {",
+									"    pm.test('cursor fields', () => {",
+									"        pm.expect(j.data).to.have.property('has_more');",
+									"    });",
+									"    if (j.data.next_cursor) pm.environment.set('jobs_next_cursor', j.data.next_cursor);",
+									"}",
+									"pm.test('list meta present', () => {",
+									"    pm.expect(j.data).to.have.property('meta');",
+									"    pm.expect(j.data.meta).to.have.property('entity_type');",
+									"});",
+									"if (j.data.items && j.data.items[0]) {",
+									"    const card = j.data.items[0];",
+									"    pm.environment.set('last_job_id', card.job_id || '');",
+									"    pm.environment.set('last_job_type', card.job_type || '');",
+									"}"
+								]
+							}
+						}
+					],
+					"response": [
+						{
+							"name": "200 Paginated list",
+							"status": "OK",
+							"code": 200,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\n  \"status\": 1,\n  \"message\": \"Shipment jobs loaded successfully.\",\n  \"message_key\": \"mobile.jobs.shipments_success\",\n  \"data\": {\n    \"items\": [\n      {\n        \"job_id\": \"660e8400-e29b-41d4-a716-446655440001\",\n        \"job_type\": \"shipment\",\n        \"job_no\": \"SH-2026-001\",\n        \"shipment_no\": \"SH-2026-001\",\n        \"current_status\": \"In Transit\",\n        \"route_summary\": \"Riyadh \\u2192 Jeddah\",\n        \"latest_action_summary\": null,\n        \"next_action_hint\": \"Submit proof of delivery\",\n        \"pod_status\": \"Pending\",\n        \"needs_pod\": true,\n        \"is_active\": true\n      }\n    ],\n    \"total_records\": 42,\n    \"total_pages\": 5,\n    \"current_page\": 1,\n    \"page_size\": 10,\n    \"meta\": {\n      \"tab\": \"active\",\n      \"queue\": \"none\",\n      \"sort\": \"updated_desc\",\n      \"entity_type\": \"shipment\",\n      \"tab_locked\": true,\n      \"queue_locked\": false,\n      \"search\": \"\",\n      \"date_from\": \"\",\n      \"date_to\": \"\",\n      \"date_field\": \"updated\",\n      \"include_actions\": true\n    }\n  },\n  \"meta\": {\n    \"locale\": \"en\",\n    \"api_version\": \"1.0\"\n  }\n}"
+						},
+						{
+							"name": "401 Unauthorized",
+							"status": "Unauthorized",
+							"code": 401,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\n  \"status\": 2,\n  \"message\": \"Unauthorized access. Please login to continue.\",\n  \"message_key\": \"mobile.auth.unauthorized\",\n  \"data\": {\n    \"error_code\": \"unauthorized\"\n  }\n}"
+						}
+					]
+				},
+				{
+					"name": "GET Shipments — COD Pending (locked)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							}
+						],
+						"url": "{{base_url}}{{api_prefix}}/driver/jobs/shipments/cod-pending/?page=1&page_size={{jobs_page_size}}",
+						"description": "queue=cod_pending locked."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+									"const j = pm.response.json();",
+									"pm.test('status === 1', () => pm.expect(j.status).to.eql(1));",
+									"pm.test('paginated items array', () => {",
+									"    pm.expect(j.data).to.have.property('items');",
+									"    pm.expect(j.data.items).to.be.an('array');",
+									"});",
+									"pm.test('pagination_mode present', () => {",
+									"    pm.expect(j.data).to.have.property('pagination_mode');",
+									"});",
+									"if (j.data.pagination_mode === 'cursor') {",
+									"    pm.test('cursor fields', () => {",
+									"        pm.expect(j.data).to.have.property('has_more');",
+									"    });",
+									"    if (j.data.next_cursor) pm.environment.set('jobs_next_cursor', j.data.next_cursor);",
+									"}",
+									"pm.test('list meta present', () => {",
+									"    pm.expect(j.data).to.have.property('meta');",
+									"    pm.expect(j.data.meta).to.have.property('entity_type');",
+									"});",
+									"if (j.data.items && j.data.items[0]) {",
+									"    const card = j.data.items[0];",
+									"    pm.environment.set('last_job_id', card.job_id || '');",
+									"    pm.environment.set('last_job_type', card.job_type || '');",
+									"}"
+								]
+							}
+						}
+					],
+					"response": [
+						{
+							"name": "200 Paginated list",
+							"status": "OK",
+							"code": 200,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\n  \"status\": 1,\n  \"message\": \"Shipment jobs loaded successfully.\",\n  \"message_key\": \"mobile.jobs.shipments_success\",\n  \"data\": {\n    \"items\": [\n      {\n        \"job_id\": \"660e8400-e29b-41d4-a716-446655440001\",\n        \"job_type\": \"shipment\",\n        \"job_no\": \"SH-2026-001\",\n        \"shipment_no\": \"SH-2026-001\",\n        \"current_status\": \"In Transit\",\n        \"route_summary\": \"Riyadh \\u2192 Jeddah\",\n        \"latest_action_summary\": null,\n        \"next_action_hint\": \"Submit proof of delivery\",\n        \"pod_status\": \"Pending\",\n        \"needs_pod\": true,\n        \"is_active\": true\n      }\n    ],\n    \"total_records\": 42,\n    \"total_pages\": 5,\n    \"current_page\": 1,\n    \"page_size\": 10,\n    \"meta\": {\n      \"tab\": \"active\",\n      \"queue\": \"none\",\n      \"sort\": \"updated_desc\",\n      \"entity_type\": \"shipment\",\n      \"tab_locked\": true,\n      \"queue_locked\": false,\n      \"search\": \"\",\n      \"date_from\": \"\",\n      \"date_to\": \"\",\n      \"date_field\": \"updated\",\n      \"include_actions\": true\n    }\n  },\n  \"meta\": {\n    \"locale\": \"en\",\n    \"api_version\": \"1.0\"\n  }\n}"
+						},
+						{
+							"name": "401 Unauthorized",
+							"status": "Unauthorized",
+							"code": 401,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\n  \"status\": 2,\n  \"message\": \"Unauthorized access. Please login to continue.\",\n  \"message_key\": \"mobile.auth.unauthorized\",\n  \"data\": {\n    \"error_code\": \"unauthorized\"\n  }\n}"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "02 — Movement Lists",
+			"item": [
+				{
+					"name": "GET Movements — All",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							}
+						],
+						"url": "{{base_url}}{{api_prefix}}/driver/jobs/movements/?tab=active&page=1&page_size={{jobs_page_size}}",
+						"description": "tab=active default."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+									"const j = pm.response.json();",
+									"pm.test('status === 1', () => pm.expect(j.status).to.eql(1));",
+									"pm.test('paginated items array', () => {",
+									"    pm.expect(j.data).to.have.property('items');",
+									"    pm.expect(j.data.items).to.be.an('array');",
+									"});",
+									"pm.test('pagination_mode present', () => {",
+									"    pm.expect(j.data).to.have.property('pagination_mode');",
+									"});",
+									"if (j.data.pagination_mode === 'cursor') {",
+									"    pm.test('cursor fields', () => {",
+									"        pm.expect(j.data).to.have.property('has_more');",
+									"    });",
+									"    if (j.data.next_cursor) pm.environment.set('jobs_next_cursor', j.data.next_cursor);",
+									"}",
+									"pm.test('list meta present', () => {",
+									"    pm.expect(j.data).to.have.property('meta');",
+									"    pm.expect(j.data.meta).to.have.property('entity_type');",
+									"});",
+									"if (j.data.items && j.data.items[0]) {",
+									"    const card = j.data.items[0];",
+									"    pm.environment.set('last_job_id', card.job_id || '');",
+									"    pm.environment.set('last_job_type', card.job_type || '');",
+									"}"
+								]
+							}
+						}
+					],
+					"response": [
+						{
+							"name": "200 Paginated list",
+							"status": "OK",
+							"code": 200,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\n  \"status\": 1,\n  \"message\": \"Shipment jobs loaded successfully.\",\n  \"message_key\": \"mobile.jobs.shipments_success\",\n  \"data\": {\n    \"items\": [\n      {\n        \"job_id\": \"660e8400-e29b-41d4-a716-446655440001\",\n        \"job_type\": \"shipment\",\n        \"job_no\": \"SH-2026-001\",\n        \"shipment_no\": \"SH-2026-001\",\n        \"current_status\": \"In Transit\",\n        \"route_summary\": \"Riyadh \\u2192 Jeddah\",\n        \"latest_action_summary\": null,\n        \"next_action_hint\": \"Submit proof of delivery\",\n        \"pod_status\": \"Pending\",\n        \"needs_pod\": true,\n        \"is_active\": true\n      }\n    ],\n    \"total_records\": 42,\n    \"total_pages\": 5,\n    \"current_page\": 1,\n    \"page_size\": 10,\n    \"meta\": {\n      \"tab\": \"active\",\n      \"queue\": \"none\",\n      \"sort\": \"updated_desc\",\n      \"entity_type\": \"shipment\",\n      \"tab_locked\": true,\n      \"queue_locked\": false,\n      \"search\": \"\",\n      \"date_from\": \"\",\n      \"date_to\": \"\",\n      \"date_field\": \"updated\",\n      \"include_actions\": true\n    }\n  },\n  \"meta\": {\n    \"locale\": \"en\",\n    \"api_version\": \"1.0\"\n  }\n}"
+						}
+					]
+				},
+				{
+					"name": "GET Movements — Active",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							}
+						],
+						"url": "{{base_url}}{{api_prefix}}/driver/jobs/movements/active/?page=1&page_size={{jobs_page_size}}",
+						"description": "Scheduled / In Progress."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+									"const j = pm.response.json();",
+									"pm.test('status === 1', () => pm.expect(j.status).to.eql(1));",
+									"pm.test('paginated items array', () => {",
+									"    pm.expect(j.data).to.have.property('items');",
+									"    pm.expect(j.data.items).to.be.an('array');",
+									"});",
+									"pm.test('pagination_mode present', () => {",
+									"    pm.expect(j.data).to.have.property('pagination_mode');",
+									"});",
+									"if (j.data.pagination_mode === 'cursor') {",
+									"    pm.test('cursor fields', () => {",
+									"        pm.expect(j.data).to.have.property('has_more');",
+									"    });",
+									"    if (j.data.next_cursor) pm.environment.set('jobs_next_cursor', j.data.next_cursor);",
+									"}",
+									"pm.test('list meta present', () => {",
+									"    pm.expect(j.data).to.have.property('meta');",
+									"    pm.expect(j.data.meta).to.have.property('entity_type');",
+									"});",
+									"if (j.data.items && j.data.items[0]) {",
+									"    const card = j.data.items[0];",
+									"    pm.environment.set('last_job_id', card.job_id || '');",
+									"    pm.environment.set('last_job_type', card.job_type || '');",
+									"}"
+								]
+							}
+						}
+					],
+					"response": [
+						{
+							"name": "200 Paginated list",
+							"status": "OK",
+							"code": 200,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\n  \"status\": 1,\n  \"message\": \"Shipment jobs loaded successfully.\",\n  \"message_key\": \"mobile.jobs.shipments_success\",\n  \"data\": {\n    \"items\": [\n      {\n        \"job_id\": \"660e8400-e29b-41d4-a716-446655440001\",\n        \"job_type\": \"shipment\",\n        \"job_no\": \"SH-2026-001\",\n        \"shipment_no\": \"SH-2026-001\",\n        \"current_status\": \"In Transit\",\n        \"route_summary\": \"Riyadh \\u2192 Jeddah\",\n        \"latest_action_summary\": null,\n        \"next_action_hint\": \"Submit proof of delivery\",\n        \"pod_status\": \"Pending\",\n        \"needs_pod\": true,\n        \"is_active\": true\n      }\n    ],\n    \"total_records\": 42,\n    \"total_pages\": 5,\n    \"current_page\": 1,\n    \"page_size\": 10,\n    \"meta\": {\n      \"tab\": \"active\",\n      \"queue\": \"none\",\n      \"sort\": \"updated_desc\",\n      \"entity_type\": \"shipment\",\n      \"tab_locked\": true,\n      \"queue_locked\": false,\n      \"search\": \"\",\n      \"date_from\": \"\",\n      \"date_to\": \"\",\n      \"date_field\": \"updated\",\n      \"include_actions\": true\n    }\n  },\n  \"meta\": {\n    \"locale\": \"en\",\n    \"api_version\": \"1.0\"\n  }\n}"
+						}
+					]
+				},
+				{
+					"name": "GET Movements — Completed",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							}
+						],
+						"url": "{{base_url}}{{api_prefix}}/driver/jobs/movements/completed/?page=1&page_size={{jobs_page_size}}",
+						"description": "Completed."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+									"const j = pm.response.json();",
+									"pm.test('status === 1', () => pm.expect(j.status).to.eql(1));",
+									"pm.test('paginated items array', () => {",
+									"    pm.expect(j.data).to.have.property('items');",
+									"    pm.expect(j.data.items).to.be.an('array');",
+									"});",
+									"pm.test('pagination_mode present', () => {",
+									"    pm.expect(j.data).to.have.property('pagination_mode');",
+									"});",
+									"if (j.data.pagination_mode === 'cursor') {",
+									"    pm.test('cursor fields', () => {",
+									"        pm.expect(j.data).to.have.property('has_more');",
+									"    });",
+									"    if (j.data.next_cursor) pm.environment.set('jobs_next_cursor', j.data.next_cursor);",
+									"}",
+									"pm.test('list meta present', () => {",
+									"    pm.expect(j.data).to.have.property('meta');",
+									"    pm.expect(j.data.meta).to.have.property('entity_type');",
+									"});",
+									"if (j.data.items && j.data.items[0]) {",
+									"    const card = j.data.items[0];",
+									"    pm.environment.set('last_job_id', card.job_id || '');",
+									"    pm.environment.set('last_job_type', card.job_type || '');",
+									"}"
+								]
+							}
+						}
+					],
+					"response": [
+						{
+							"name": "200 Paginated list",
+							"status": "OK",
+							"code": 200,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\n  \"status\": 1,\n  \"message\": \"Shipment jobs loaded successfully.\",\n  \"message_key\": \"mobile.jobs.shipments_success\",\n  \"data\": {\n    \"items\": [\n      {\n        \"job_id\": \"660e8400-e29b-41d4-a716-446655440001\",\n        \"job_type\": \"shipment\",\n        \"job_no\": \"SH-2026-001\",\n        \"shipment_no\": \"SH-2026-001\",\n        \"current_status\": \"In Transit\",\n        \"route_summary\": \"Riyadh \\u2192 Jeddah\",\n        \"latest_action_summary\": null,\n        \"next_action_hint\": \"Submit proof of delivery\",\n        \"pod_status\": \"Pending\",\n        \"needs_pod\": true,\n        \"is_active\": true\n      }\n    ],\n    \"total_records\": 42,\n    \"total_pages\": 5,\n    \"current_page\": 1,\n    \"page_size\": 10,\n    \"meta\": {\n      \"tab\": \"active\",\n      \"queue\": \"none\",\n      \"sort\": \"updated_desc\",\n      \"entity_type\": \"shipment\",\n      \"tab_locked\": true,\n      \"queue_locked\": false,\n      \"search\": \"\",\n      \"date_from\": \"\",\n      \"date_to\": \"\",\n      \"date_field\": \"updated\",\n      \"include_actions\": true\n    }\n  },\n  \"meta\": {\n    \"locale\": \"en\",\n    \"api_version\": \"1.0\"\n  }\n}"
+						}
+					]
+				},
+				{
+					"name": "GET Movements — Cancelled",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							}
+						],
+						"url": "{{base_url}}{{api_prefix}}/driver/jobs/movements/cancelled/?page=1&page_size={{jobs_page_size}}",
+						"description": "Cancelled."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+									"const j = pm.response.json();",
+									"pm.test('status === 1', () => pm.expect(j.status).to.eql(1));",
+									"pm.test('paginated items array', () => {",
+									"    pm.expect(j.data).to.have.property('items');",
+									"    pm.expect(j.data.items).to.be.an('array');",
+									"});",
+									"pm.test('pagination_mode present', () => {",
+									"    pm.expect(j.data).to.have.property('pagination_mode');",
+									"});",
+									"if (j.data.pagination_mode === 'cursor') {",
+									"    pm.test('cursor fields', () => {",
+									"        pm.expect(j.data).to.have.property('has_more');",
+									"    });",
+									"    if (j.data.next_cursor) pm.environment.set('jobs_next_cursor', j.data.next_cursor);",
+									"}",
+									"pm.test('list meta present', () => {",
+									"    pm.expect(j.data).to.have.property('meta');",
+									"    pm.expect(j.data.meta).to.have.property('entity_type');",
+									"});",
+									"if (j.data.items && j.data.items[0]) {",
+									"    const card = j.data.items[0];",
+									"    pm.environment.set('last_job_id', card.job_id || '');",
+									"    pm.environment.set('last_job_type', card.job_type || '');",
+									"}"
+								]
+							}
+						}
+					],
+					"response": [
+						{
+							"name": "200 Paginated list",
+							"status": "OK",
+							"code": 200,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\n  \"status\": 1,\n  \"message\": \"Shipment jobs loaded successfully.\",\n  \"message_key\": \"mobile.jobs.shipments_success\",\n  \"data\": {\n    \"items\": [\n      {\n        \"job_id\": \"660e8400-e29b-41d4-a716-446655440001\",\n        \"job_type\": \"shipment\",\n        \"job_no\": \"SH-2026-001\",\n        \"shipment_no\": \"SH-2026-001\",\n        \"current_status\": \"In Transit\",\n        \"route_summary\": \"Riyadh \\u2192 Jeddah\",\n        \"latest_action_summary\": null,\n        \"next_action_hint\": \"Submit proof of delivery\",\n        \"pod_status\": \"Pending\",\n        \"needs_pod\": true,\n        \"is_active\": true\n      }\n    ],\n    \"total_records\": 42,\n    \"total_pages\": 5,\n    \"current_page\": 1,\n    \"page_size\": 10,\n    \"meta\": {\n      \"tab\": \"active\",\n      \"queue\": \"none\",\n      \"sort\": \"updated_desc\",\n      \"entity_type\": \"shipment\",\n      \"tab_locked\": true,\n      \"queue_locked\": false,\n      \"search\": \"\",\n      \"date_from\": \"\",\n      \"date_to\": \"\",\n      \"date_field\": \"updated\",\n      \"include_actions\": true\n    }\n  },\n  \"meta\": {\n    \"locale\": \"en\",\n    \"api_version\": \"1.0\"\n  }\n}"
+						}
+					]
+				},
+				{
+					"name": "GET Movements — Empty Moves",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							}
+						],
+						"url": "{{base_url}}{{api_prefix}}/driver/jobs/movements/empty/?page=1&page_size={{jobs_page_size}}",
+						"description": "empty_move queue."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+									"const j = pm.response.json();",
+									"pm.test('status === 1', () => pm.expect(j.status).to.eql(1));",
+									"pm.test('paginated items array', () => {",
+									"    pm.expect(j.data).to.have.property('items');",
+									"    pm.expect(j.data.items).to.be.an('array');",
+									"});",
+									"pm.test('pagination_mode present', () => {",
+									"    pm.expect(j.data).to.have.property('pagination_mode');",
+									"});",
+									"if (j.data.pagination_mode === 'cursor') {",
+									"    pm.test('cursor fields', () => {",
+									"        pm.expect(j.data).to.have.property('has_more');",
+									"    });",
+									"    if (j.data.next_cursor) pm.environment.set('jobs_next_cursor', j.data.next_cursor);",
+									"}",
+									"pm.test('list meta present', () => {",
+									"    pm.expect(j.data).to.have.property('meta');",
+									"    pm.expect(j.data.meta).to.have.property('entity_type');",
+									"});",
+									"if (j.data.items && j.data.items[0]) {",
+									"    const card = j.data.items[0];",
+									"    pm.environment.set('last_job_id', card.job_id || '');",
+									"    pm.environment.set('last_job_type', card.job_type || '');",
+									"}"
+								]
+							}
+						}
+					],
+					"response": [
+						{
+							"name": "200 Paginated list",
+							"status": "OK",
+							"code": 200,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\n  \"status\": 1,\n  \"message\": \"Shipment jobs loaded successfully.\",\n  \"message_key\": \"mobile.jobs.shipments_success\",\n  \"data\": {\n    \"items\": [\n      {\n        \"job_id\": \"660e8400-e29b-41d4-a716-446655440001\",\n        \"job_type\": \"shipment\",\n        \"job_no\": \"SH-2026-001\",\n        \"shipment_no\": \"SH-2026-001\",\n        \"current_status\": \"In Transit\",\n        \"route_summary\": \"Riyadh \\u2192 Jeddah\",\n        \"latest_action_summary\": null,\n        \"next_action_hint\": \"Submit proof of delivery\",\n        \"pod_status\": \"Pending\",\n        \"needs_pod\": true,\n        \"is_active\": true\n      }\n    ],\n    \"total_records\": 42,\n    \"total_pages\": 5,\n    \"current_page\": 1,\n    \"page_size\": 10,\n    \"meta\": {\n      \"tab\": \"active\",\n      \"queue\": \"none\",\n      \"sort\": \"updated_desc\",\n      \"entity_type\": \"shipment\",\n      \"tab_locked\": true,\n      \"queue_locked\": false,\n      \"search\": \"\",\n      \"date_from\": \"\",\n      \"date_to\": \"\",\n      \"date_field\": \"updated\",\n      \"include_actions\": true\n    }\n  },\n  \"meta\": {\n    \"locale\": \"en\",\n    \"api_version\": \"1.0\"\n  }\n}"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "03 — Examples (pagination · search · filters)",
+			"item": [
+				{
+					"name": "Cursor - first page",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							}
+						],
+						"url": "{{base_url}}{{api_prefix}}/driver/jobs/shipments/active/?page_size=10",
+						"description": "Default cursor pagination."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+									"const j = pm.response.json();",
+									"pm.test('status === 1', () => pm.expect(j.status).to.eql(1));",
+									"pm.test('paginated items array', () => {",
+									"    pm.expect(j.data).to.have.property('items');",
+									"    pm.expect(j.data.items).to.be.an('array');",
+									"});",
+									"pm.test('pagination_mode present', () => {",
+									"    pm.expect(j.data).to.have.property('pagination_mode');",
+									"});",
+									"if (j.data.pagination_mode === 'cursor') {",
+									"    pm.test('cursor fields', () => {",
+									"        pm.expect(j.data).to.have.property('has_more');",
+									"    });",
+									"    if (j.data.next_cursor) pm.environment.set('jobs_next_cursor', j.data.next_cursor);",
+									"}",
+									"pm.test('list meta present', () => {",
+									"    pm.expect(j.data).to.have.property('meta');",
+									"    pm.expect(j.data.meta).to.have.property('entity_type');",
+									"});",
+									"if (j.data.items && j.data.items[0]) {",
+									"    const card = j.data.items[0];",
+									"    pm.environment.set('last_job_id', card.job_id || '');",
+									"    pm.environment.set('last_job_type', card.job_type || '');",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Cursor - next page",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							}
+						],
+						"url": "{{base_url}}{{api_prefix}}/driver/jobs/shipments/active/?page_size=10&cursor={{jobs_next_cursor}}",
+						"description": "Uses jobs_next_cursor from prior response."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+									"const j = pm.response.json();",
+									"pm.test('status === 1', () => pm.expect(j.status).to.eql(1));",
+									"pm.test('paginated items array', () => {",
+									"    pm.expect(j.data).to.have.property('items');",
+									"    pm.expect(j.data.items).to.be.an('array');",
+									"});",
+									"pm.test('pagination_mode present', () => {",
+									"    pm.expect(j.data).to.have.property('pagination_mode');",
+									"});",
+									"if (j.data.pagination_mode === 'cursor') {",
+									"    pm.test('cursor fields', () => {",
+									"        pm.expect(j.data).to.have.property('has_more');",
+									"    });",
+									"    if (j.data.next_cursor) pm.environment.set('jobs_next_cursor', j.data.next_cursor);",
+									"}",
+									"pm.test('list meta present', () => {",
+									"    pm.expect(j.data).to.have.property('meta');",
+									"    pm.expect(j.data.meta).to.have.property('entity_type');",
+									"});",
+									"if (j.data.items && j.data.items[0]) {",
+									"    const card = j.data.items[0];",
+									"    pm.environment.set('last_job_id', card.job_id || '');",
+									"    pm.environment.set('last_job_type', card.job_type || '');",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Pagination - offset page 2 (legacy)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							}
+						],
+						"url": "{{base_url}}{{api_prefix}}/driver/jobs/shipments/active/?page=2&page_size=5",
+						"description": "Offset via page= forces offset mode."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+									"const j = pm.response.json();",
+									"pm.test('status === 1', () => pm.expect(j.status).to.eql(1));",
+									"pm.test('paginated items array', () => {",
+									"    pm.expect(j.data).to.have.property('items');",
+									"    pm.expect(j.data.items).to.be.an('array');",
+									"});",
+									"pm.test('pagination_mode present', () => {",
+									"    pm.expect(j.data).to.have.property('pagination_mode');",
+									"});",
+									"if (j.data.pagination_mode === 'cursor') {",
+									"    pm.test('cursor fields', () => {",
+									"        pm.expect(j.data).to.have.property('has_more');",
+									"    });",
+									"    if (j.data.next_cursor) pm.environment.set('jobs_next_cursor', j.data.next_cursor);",
+									"}",
+									"pm.test('list meta present', () => {",
+									"    pm.expect(j.data).to.have.property('meta');",
+									"    pm.expect(j.data.meta).to.have.property('entity_type');",
+									"});",
+									"if (j.data.items && j.data.items[0]) {",
+									"    const card = j.data.items[0];",
+									"    pm.environment.set('last_job_id', card.job_id || '');",
+									"    pm.environment.set('last_job_type', card.job_type || '');",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Pagination - skip COUNT (default)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							}
+						],
+						"url": "{{base_url}}{{api_prefix}}/driver/jobs/shipments/active/?page_size=10",
+						"description": "COUNT only when include_total=1."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+									"const j = pm.response.json();",
+									"pm.test('status === 1', () => pm.expect(j.status).to.eql(1));",
+									"pm.test('paginated items array', () => {",
+									"    pm.expect(j.data).to.have.property('items');",
+									"    pm.expect(j.data.items).to.be.an('array');",
+									"});",
+									"pm.test('pagination_mode present', () => {",
+									"    pm.expect(j.data).to.have.property('pagination_mode');",
+									"});",
+									"if (j.data.pagination_mode === 'cursor') {",
+									"    pm.test('cursor fields', () => {",
+									"        pm.expect(j.data).to.have.property('has_more');",
+									"    });",
+									"    if (j.data.next_cursor) pm.environment.set('jobs_next_cursor', j.data.next_cursor);",
+									"}",
+									"pm.test('list meta present', () => {",
+									"    pm.expect(j.data).to.have.property('meta');",
+									"    pm.expect(j.data.meta).to.have.property('entity_type');",
+									"});",
+									"if (j.data.items && j.data.items[0]) {",
+									"    const card = j.data.items[0];",
+									"    pm.environment.set('last_job_id', card.job_id || '');",
+									"    pm.environment.set('last_job_type', card.job_type || '');",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Pagination - explicit COUNT",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							}
+						],
+						"url": "{{base_url}}{{api_prefix}}/driver/jobs/shipments/active/?page_size=10&include_total=1",
+						"description": "include_total=1"
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+									"const j = pm.response.json();",
+									"pm.test('status === 1', () => pm.expect(j.status).to.eql(1));",
+									"pm.test('paginated items array', () => {",
+									"    pm.expect(j.data).to.have.property('items');",
+									"    pm.expect(j.data.items).to.be.an('array');",
+									"});",
+									"pm.test('pagination_mode present', () => {",
+									"    pm.expect(j.data).to.have.property('pagination_mode');",
+									"});",
+									"if (j.data.pagination_mode === 'cursor') {",
+									"    pm.test('cursor fields', () => {",
+									"        pm.expect(j.data).to.have.property('has_more');",
+									"    });",
+									"    if (j.data.next_cursor) pm.environment.set('jobs_next_cursor', j.data.next_cursor);",
+									"}",
+									"pm.test('list meta present', () => {",
+									"    pm.expect(j.data).to.have.property('meta');",
+									"    pm.expect(j.data.meta).to.have.property('entity_type');",
+									"});",
+									"if (j.data.items && j.data.items[0]) {",
+									"    const card = j.data.items[0];",
+									"    pm.environment.set('last_job_id', card.job_id || '');",
+									"    pm.environment.set('last_job_type', card.job_type || '');",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Search - shipment_no",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							}
+						],
+						"url": "{{base_url}}{{api_prefix}}/driver/jobs/shipments/?tab=active&q={{jobs_search_shipment}}",
+						"description": "q= prefix search"
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+									"const j = pm.response.json();",
+									"pm.test('status === 1', () => pm.expect(j.status).to.eql(1));",
+									"pm.test('paginated items array', () => {",
+									"    pm.expect(j.data).to.have.property('items');",
+									"    pm.expect(j.data.items).to.be.an('array');",
+									"});",
+									"pm.test('pagination_mode present', () => {",
+									"    pm.expect(j.data).to.have.property('pagination_mode');",
+									"});",
+									"if (j.data.pagination_mode === 'cursor') {",
+									"    pm.test('cursor fields', () => {",
+									"        pm.expect(j.data).to.have.property('has_more');",
+									"    });",
+									"    if (j.data.next_cursor) pm.environment.set('jobs_next_cursor', j.data.next_cursor);",
+									"}",
+									"pm.test('list meta present', () => {",
+									"    pm.expect(j.data).to.have.property('meta');",
+									"    pm.expect(j.data.meta).to.have.property('entity_type');",
+									"});",
+									"if (j.data.items && j.data.items[0]) {",
+									"    const card = j.data.items[0];",
+									"    pm.environment.set('last_job_id', card.job_id || '');",
+									"    pm.environment.set('last_job_type', card.job_type || '');",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Search - movement_no",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							}
+						],
+						"url": "{{base_url}}{{api_prefix}}/driver/jobs/movements/?q={{jobs_search_movement}}",
+						"description": "movement or linked shipment"
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+									"const j = pm.response.json();",
+									"pm.test('status === 1', () => pm.expect(j.status).to.eql(1));",
+									"pm.test('paginated items array', () => {",
+									"    pm.expect(j.data).to.have.property('items');",
+									"    pm.expect(j.data.items).to.be.an('array');",
+									"});",
+									"pm.test('pagination_mode present', () => {",
+									"    pm.expect(j.data).to.have.property('pagination_mode');",
+									"});",
+									"if (j.data.pagination_mode === 'cursor') {",
+									"    pm.test('cursor fields', () => {",
+									"        pm.expect(j.data).to.have.property('has_more');",
+									"    });",
+									"    if (j.data.next_cursor) pm.environment.set('jobs_next_cursor', j.data.next_cursor);",
+									"}",
+									"pm.test('list meta present', () => {",
+									"    pm.expect(j.data).to.have.property('meta');",
+									"    pm.expect(j.data.meta).to.have.property('entity_type');",
+									"});",
+									"if (j.data.items && j.data.items[0]) {",
+									"    const card = j.data.items[0];",
+									"    pm.environment.set('last_job_id', card.job_id || '');",
+									"    pm.environment.set('last_job_type', card.job_type || '');",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Filter - date range",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							}
+						],
+						"url": "{{base_url}}{{api_prefix}}/driver/jobs/shipments/completed/?date_from={{jobs_date_from}}&date_to={{jobs_date_to}}&date_field=operational",
+						"description": "date_field=operational"
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+									"const j = pm.response.json();",
+									"pm.test('status === 1', () => pm.expect(j.status).to.eql(1));",
+									"pm.test('paginated items array', () => {",
+									"    pm.expect(j.data).to.have.property('items');",
+									"    pm.expect(j.data.items).to.be.an('array');",
+									"});",
+									"pm.test('pagination_mode present', () => {",
+									"    pm.expect(j.data).to.have.property('pagination_mode');",
+									"});",
+									"if (j.data.pagination_mode === 'cursor') {",
+									"    pm.test('cursor fields', () => {",
+									"        pm.expect(j.data).to.have.property('has_more');",
+									"    });",
+									"    if (j.data.next_cursor) pm.environment.set('jobs_next_cursor', j.data.next_cursor);",
+									"}",
+									"pm.test('list meta present', () => {",
+									"    pm.expect(j.data).to.have.property('meta');",
+									"    pm.expect(j.data.meta).to.have.property('entity_type');",
+									"});",
+									"if (j.data.items && j.data.items[0]) {",
+									"    const card = j.data.items[0];",
+									"    pm.environment.set('last_job_id', card.job_id || '');",
+									"    pm.environment.set('last_job_type', card.job_type || '');",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Filter - priority sort",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							}
+						],
+						"url": "{{base_url}}{{api_prefix}}/driver/jobs/shipments/pod-pending/?page=1&sort=priority_desc",
+						"description": "sort=priority_desc"
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+									"const j = pm.response.json();",
+									"pm.test('status === 1', () => pm.expect(j.status).to.eql(1));",
+									"pm.test('paginated items array', () => {",
+									"    pm.expect(j.data).to.have.property('items');",
+									"    pm.expect(j.data.items).to.be.an('array');",
+									"});",
+									"pm.test('pagination_mode present', () => {",
+									"    pm.expect(j.data).to.have.property('pagination_mode');",
+									"});",
+									"if (j.data.pagination_mode === 'cursor') {",
+									"    pm.test('cursor fields', () => {",
+									"        pm.expect(j.data).to.have.property('has_more');",
+									"    });",
+									"    if (j.data.next_cursor) pm.environment.set('jobs_next_cursor', j.data.next_cursor);",
+									"}",
+									"pm.test('list meta present', () => {",
+									"    pm.expect(j.data).to.have.property('meta');",
+									"    pm.expect(j.data.meta).to.have.property('entity_type');",
+									"});",
+									"if (j.data.items && j.data.items[0]) {",
+									"    const card = j.data.items[0];",
+									"    pm.environment.set('last_job_id', card.job_id || '');",
+									"    pm.environment.set('last_job_type', card.job_type || '');",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Performance - no actions",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							}
+						],
+						"url": "{{base_url}}{{api_prefix}}/driver/jobs/shipments/active/?page=1&include_actions=0",
+						"description": "include_actions=0"
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+									"const j = pm.response.json();",
+									"pm.test('status === 1', () => pm.expect(j.status).to.eql(1));",
+									"pm.test('paginated items array', () => {",
+									"    pm.expect(j.data).to.have.property('items');",
+									"    pm.expect(j.data.items).to.be.an('array');",
+									"});",
+									"pm.test('pagination_mode present', () => {",
+									"    pm.expect(j.data).to.have.property('pagination_mode');",
+									"});",
+									"if (j.data.pagination_mode === 'cursor') {",
+									"    pm.test('cursor fields', () => {",
+									"        pm.expect(j.data).to.have.property('has_more');",
+									"    });",
+									"    if (j.data.next_cursor) pm.environment.set('jobs_next_cursor', j.data.next_cursor);",
+									"}",
+									"pm.test('list meta present', () => {",
+									"    pm.expect(j.data).to.have.property('meta');",
+									"    pm.expect(j.data.meta).to.have.property('entity_type');",
+									"});",
+									"if (j.data.items && j.data.items[0]) {",
+									"    const card = j.data.items[0];",
+									"    pm.environment.set('last_job_id', card.job_id || '');",
+									"    pm.environment.set('last_job_type', card.job_type || '');",
+									"}"
+								]
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "04 — Errors & RBAC",
+			"description": "Manual negative tests.",
+			"item": [
+				{
+					"name": "401 — No Bearer token",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"url": "{{base_url}}{{api_prefix}}/driver/jobs/summary/"
+					},
+					"response": [
+						{
+							"name": "401 Unauthorized",
+							"status": "Unauthorized",
+							"code": 401,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\n  \"status\": 2,\n  \"message\": \"Unauthorized access. Please login to continue.\",\n  \"message_key\": \"mobile.auth.unauthorized\",\n  \"data\": {\n    \"error_code\": \"unauthorized\"\n  }\n}"
+						}
+					]
+				},
+				{
+					"name": "403 — Tenant mismatch (X-Tenant-ID)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": "{{base_url}}{{api_prefix}}/driver/jobs/summary/"
+					},
+					"response": [
+						{
+							"name": "403 Tenant mismatch",
+							"status": "Forbidden",
+							"code": 403,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\n  \"status\": 2,\n  \"message\": \"Tenant context does not match your session.\",\n  \"message_key\": \"mobile.auth.tenant_mismatch\",\n  \"data\": {\n    \"error_code\": \"tenant_mismatch\"\n  }\n}"
+						}
+					]
+				},
+				{
+					"name": "405 — POST not allowed",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{}"
+						},
+						"url": "{{base_url}}{{api_prefix}}/driver/jobs/shipments/active/"
+					},
+					"response": [
+						{
+							"name": "405 Method not allowed",
+							"status": "Method Not Allowed",
+							"code": 405,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\n  \"status\": 0,\n  \"message\": \"This jobs endpoint only supports read requests.\",\n  \"data\": {\n    \"error_code\": \"jobs_method_not_allowed\"\n  }\n}"
+						}
+					]
+				},
+				{
+					"name": "400 — offset rejected (page=)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							}
+						],
+						"url": "{{base_url}}{{api_prefix}}/driver/jobs/shipments/active/?page=2&page_size=10",
+						"description": "MOBILE_API_JOBS_ALLOW_OFFSET_PAGINATION=false rejects page=."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('offset rejected', () => { pm.expect([400,403,422]).to.include(pm.response.code); });"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "400 — tab=all blocked",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							}
+						],
+						"url": "{{base_url}}{{api_prefix}}/driver/jobs/shipments/?tab=all",
+						"description": "tab=all rejected when MOBILE_API_JOBS_DISALLOW_TAB_ALL=true (default)."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('blocked tab=all', () => { pm.expect([400,403,422]).to.include(pm.response.code); });"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "403 — Jobs RBAC (non-driver token)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							}
+						],
+						"url": "{{base_url}}{{api_prefix}}/driver/jobs/summary/",
+						"description": "Use dispatcher/admin JWT — expect 403 jobs_denied."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('403 or auth failure', () => { pm.expect([401,403]).to.include(pm.response.code); });"
+								]
+							}
+						}
+					],
+					"response": [
+						{
+							"name": "403 Jobs denied",
+							"status": "Forbidden",
+							"code": 403,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\n  \"status\": 2,\n  \"message\": \"You do not have access to driver jobs.\",\n  \"message_key\": \"mobile.auth.jobs_denied\",\n  \"data\": {\n    \"error_code\": \"jobs_denied\"\n  }\n}"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Testing Flows",
+			"description": "Collection Runner: run folder top-to-bottom.",
+			"item": [
+				{
+					"name": "Flow A — Full Job List Smoke",
+					"item": [
+						{
+							"name": "A0 Login",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+											"const j = pm.response.json();",
+											"pm.test('status === 1', () => pm.expect(j.status).to.eql(1));",
+											"if (j.status === 1 && j.data) {",
+											"    if (j.data.access_token) pm.environment.set('access_token', j.data.access_token);",
+											"    if (j.data.refresh_token) pm.environment.set('refresh_token', j.data.refresh_token);",
+											"    if (j.data.driver && j.data.driver.driver_id) pm.environment.set('driver_id', j.data.driver.driver_id);",
+											"}"
+										]
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "noauth"
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\"email\":\"{{email}}\",\"password\":\"{{password}}\"}"
+								},
+								"url": "{{base_url}}{{api_prefix}}/driver/auth/login/"
+							}
+						},
+						{
+							"name": "A1 Summary",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{access_token}}"
+									},
+									{
+										"key": "Accept-Language",
+										"value": "{{accept_language}}"
+									}
+								],
+								"url": "{{base_url}}{{api_prefix}}/driver/jobs/summary/"
+							}
+						},
+						{
+							"name": "A2 Shipments Active",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{access_token}}"
+									},
+									{
+										"key": "Accept-Language",
+										"value": "{{accept_language}}"
+									}
+								],
+								"url": "{{base_url}}{{api_prefix}}/driver/jobs/shipments/active/?page_size=10"
+							}
+						},
+						{
+							"name": "A3 Shipments POD Pending",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{access_token}}"
+									},
+									{
+										"key": "Accept-Language",
+										"value": "{{accept_language}}"
+									}
+								],
+								"url": "{{base_url}}{{api_prefix}}/driver/jobs/shipments/pod-pending/?page=1&page_size=10"
+							}
+						},
+						{
+							"name": "A4 Movements Active",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{access_token}}"
+									},
+									{
+										"key": "Accept-Language",
+										"value": "{{accept_language}}"
+									}
+								],
+								"url": "{{base_url}}{{api_prefix}}/driver/jobs/movements/active/?page=1&page_size=10"
+							}
+						},
+						{
+							"name": "A5 Movements Empty",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{access_token}}"
+									},
+									{
+										"key": "Accept-Language",
+										"value": "{{accept_language}}"
+									}
+								],
+								"url": "{{base_url}}{{api_prefix}}/driver/jobs/movements/empty/?page=1&page_size=10"
+							}
+						}
+					]
+				},
+				{
+					"name": "Flow B — All tab routes",
+					"item": [
+						{
+							"name": "B1 Summary",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{access_token}}"
+									},
+									{
+										"key": "Accept-Language",
+										"value": "{{accept_language}}"
+									}
+								],
+								"url": "{{base_url}}{{api_prefix}}/driver/jobs/summary/"
+							}
+						},
+						{
+							"name": "B2 Shipments Completed",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{access_token}}"
+									},
+									{
+										"key": "Accept-Language",
+										"value": "{{accept_language}}"
+									}
+								],
+								"url": "{{base_url}}{{api_prefix}}/driver/jobs/shipments/completed/"
+							}
+						},
+						{
+							"name": "B3 Shipments Cancelled",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{access_token}}"
+									},
+									{
+										"key": "Accept-Language",
+										"value": "{{accept_language}}"
+									}
+								],
+								"url": "{{base_url}}{{api_prefix}}/driver/jobs/shipments/cancelled/"
+							}
+						},
+						{
+							"name": "B4 Shipments COD",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{access_token}}"
+									},
+									{
+										"key": "Accept-Language",
+										"value": "{{accept_language}}"
+									}
+								],
+								"url": "{{base_url}}{{api_prefix}}/driver/jobs/shipments/cod-pending/"
+							}
+						},
+						{
+							"name": "B5 Movements Completed",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{access_token}}"
+									},
+									{
+										"key": "Accept-Language",
+										"value": "{{accept_language}}"
+									}
+								],
+								"url": "{{base_url}}{{api_prefix}}/driver/jobs/movements/completed/"
+							}
+						},
+						{
+							"name": "B6 Movements Cancelled",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{access_token}}"
+									},
+									{
+										"key": "Accept-Language",
+										"value": "{{accept_language}}"
+									}
+								],
+								"url": "{{base_url}}{{api_prefix}}/driver/jobs/movements/cancelled/"
+							}
+						}
+					]
+				},
+				{
+					"name": "Flow C — Cursor & search",
+					"item": [
+						{
+							"name": "C1 Cursor page 1",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{access_token}}"
+									},
+									{
+										"key": "Accept-Language",
+										"value": "{{accept_language}}"
+									}
+								],
+								"url": "{{base_url}}{{api_prefix}}/driver/jobs/shipments/active/?page_size=5"
+							}
+						},
+						{
+							"name": "C2 Cursor page 2",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{access_token}}"
+									},
+									{
+										"key": "Accept-Language",
+										"value": "{{accept_language}}"
+									}
+								],
+								"url": "{{base_url}}{{api_prefix}}/driver/jobs/shipments/active/?page_size=5&cursor={{jobs_next_cursor}}"
+							}
+						},
+						{
+							"name": "C3 Search shipment",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{access_token}}"
+									},
+									{
+										"key": "Accept-Language",
+										"value": "{{accept_language}}"
+									}
+								],
+								"url": "{{base_url}}{{api_prefix}}/driver/jobs/shipments/?q={{jobs_search_shipment}}&tab=active"
+							}
+						},
+						{
+							"name": "C4 Search movement",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{access_token}}"
+									},
+									{
+										"key": "Accept-Language",
+										"value": "{{accept_language}}"
+									}
+								],
+								"url": "{{base_url}}{{api_prefix}}/driver/jobs/movements/?q={{jobs_search_movement}}"
+							}
+						}
+					]
+				},
+				{
+					"name": "Flow D — Error cases (manual)",
+					"item": [
+						{
+							"name": "D1 No token",
+							"request": {
+								"auth": {
+									"type": "noauth"
+								},
+								"method": "GET",
+								"url": "{{base_url}}{{api_prefix}}/driver/jobs/summary/"
+							}
+						},
+						{
+							"name": "D2 POST jobs",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{access_token}}"
+									},
+									{
+										"key": "Accept-Language",
+										"value": "{{accept_language}}"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{}"
+								},
+								"url": "{{base_url}}{{api_prefix}}/driver/jobs/movements/"
+							}
+						}
+					]
+				}
+			]
+		}
+	]
+}

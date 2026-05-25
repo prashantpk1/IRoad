@@ -396,16 +396,13 @@ class DriverVerifyOtpView(MobileAPIView):
         email = serializer.validated_data['email']
         otp_code = serializer.validated_data['otp_code']
         body_tid = (serializer.validated_data.get('tenant_id') or '').strip()
-        tenant_schema, terr = resolve_mobile_auth_tenant_context(
-            request,
-            body_tenant_id=body_tid,
-        )
-        terr_resp = _tenant_context_error_response(self, terr or '')
-        if terr_resp is not None:
-            return terr_resp
-        req_resp = _require_explicit_auth_tenant_hint(self, tenant_schema)
-        if req_resp is not None:
-            return req_resp
+        # Public auth: optional body tenant_id only (same as reset-password).
+        # tenant_schema, terr = resolve_mobile_auth_tenant_context(
+        #     request, body_tenant_id=body_tid,
+        # )
+        tenant_schema, terr = _public_auth_tenant_from_body(body_tid)
+        if terr == 'invalid_tenant':
+            return _tenant_context_error_response(self, terr)
 
         result = driver_verify_otp(
             email=email,

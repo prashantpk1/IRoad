@@ -237,3 +237,123 @@ class MobileDashboardSecurityMiddleware:
             )
 
         return self.get_response(request)
+
+
+class MobileJobListSecurityMiddleware:
+    """
+    Defense-in-depth for ``/api/v1/mobile/driver/jobs/*`` (read-only, tenant hint check).
+    """
+
+    SAFE_METHODS = frozenset({'GET', 'HEAD', 'OPTIONS'})
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        from mobile_api.helpers.job_list_security import JOBS_API_PREFIX
+        from mobile_api.helpers.dashboard_security import resolve_tenant_schema_from_header
+
+        if not request.path.startswith(JOBS_API_PREFIX):
+            return self.get_response(request)
+
+        request.mobile_job_list_route = True
+        import time
+
+        from mobile_api.helpers.job_list_observability import SLOW_MS
+
+        started = time.perf_counter()
+
+        if request.method not in self.SAFE_METHODS:
+            return JsonResponse(
+                {
+                    'status': 0,
+                    'message': str(_('mobile.auth.jobs_method_not_allowed')),
+                    'data': {'error_code': 'jobs_method_not_allowed'},
+                },
+                status=405,
+            )
+
+        try:
+            from django.conf import settings
+
+            if not getattr(
+                settings,
+                'MOBILE_API_JOBS_MIDDLEWARE_ENFORCE_TENANT',
+                True,
+            ):
+                return _jobs_finish_request(self, request, started)
+        except Exception:
+            return _jobs_finish_request(self, request, started)
+
+        tenant_hint = (request.headers.get('X-Tenant-ID') or '').strip()
+        if not tenant_hint:
+            return _jobs_finish_request(self, request, started)
+
+        from mobile_api.helpers.auth import (
+            TOKEN_TYPE_ACCESS,
+            get_token_from_request,
+            verify_token,
+        )
+
+        token = get_token_from_request(request)
+        if not token:
+            return _jobs_finish_request(self, request, started)
+
+        try:
+            payload = verify_token(token, expected_type=TOKEN_TYPE_ACCESS)
+        except Exception:
+            return _jobs_finish_request(self, request, started)
+
+        if not payload:
+            return _jobs_finish_request(self, request, started)
+
+        token_schema = str(payload.get('tenant_schema') or '').strip()
+        hint_schema = resolve_tenant_schema_from_header(tenant_hint)
+        if hint_schema and token_schema and hint_schema != token_schema:
+            try:
+                from mobile_api.helpers.security_audit import (
+                    client_ip_from_request as _sec_ip,
+                    log_mobile_security_event,
+                )
+
+                log_mobile_security_event(
+                    'jobs_middleware_tenant_mismatch',
+                    schema=token_schema,
+                    ip=_sec_ip(request),
+                    reason=f'hint={hint_schema[:64]}',
+                )
+            except Exception:
+                pass
+            logger.warning(
+                'jobs.middleware tenant_mismatch token=%s hint=%s path=%s',
+                token_schema,
+                hint_schema,
+                request.path[:120],
+            )
+            return JsonResponse(
+                {
+                    'status': 0,
+                    'message': str(_('mobile.auth.tenant_mismatch')),
+                    'data': {'error_code': 'tenant_mismatch'},
+                },
+                status=403,
+            )
+
+        return _jobs_finish_request(self, request, started)
+
+
+def _jobs_finish_request(middleware, request, started: float):
+    """Return response and log end-to-end slow job-list requests."""
+    import time
+
+    from mobile_api.helpers.job_list_observability import SLOW_MS
+
+    response = middleware.get_response(request)
+    elapsed_ms = (time.perf_counter() - started) * 1000
+    if elapsed_ms >= SLOW_MS:
+        logger.warning(
+            'jobs.middleware slow_request path=%s ms=%.1f',
+            request.path[:120],
+            elapsed_ms,
+        )
+    return response

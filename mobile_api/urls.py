@@ -34,6 +34,22 @@ from mobile_api.views.driver_profile import (
     DriverRequestChangePasswordOtpView,
     DriverVerifyChangePasswordOtpView,
 )
+from mobile_api.views.driver_jobs import DriverJobSummaryView
+from mobile_api.views.driver_movement_jobs import (
+    DriverMovementJobListActiveView,
+    DriverMovementJobListCancelledView,
+    DriverMovementJobListCompletedView,
+    DriverMovementJobListEmptyMoveView,
+    DriverMovementJobListView,
+)
+from mobile_api.views.driver_shipment_jobs import (
+    DriverShipmentJobListActiveView,
+    DriverShipmentJobListCancelledView,
+    DriverShipmentJobListCodPendingView,
+    DriverShipmentJobListCompletedView,
+    DriverShipmentJobListPodPendingView,
+    DriverShipmentJobListView,
+)
 from mobile_api.views.mobile_operational import MobileOperationalHealthView
 
 app_name = 'mobile_api'
@@ -123,6 +139,66 @@ urlpatterns = [
         'driver/dashboard/',
         DriverDashboardView.as_view(),
         name='driver_dashboard',
+    ),
+    path(
+        'driver/jobs/summary/',
+        DriverJobSummaryView.as_view(),
+        name='driver_jobs_summary',
+    ),
+    path(
+        'driver/jobs/shipments/active/',
+        DriverShipmentJobListActiveView.as_view(),
+        name='driver_jobs_shipments_active',
+    ),
+    path(
+        'driver/jobs/shipments/completed/',
+        DriverShipmentJobListCompletedView.as_view(),
+        name='driver_jobs_shipments_completed',
+    ),
+    path(
+        'driver/jobs/shipments/cancelled/',
+        DriverShipmentJobListCancelledView.as_view(),
+        name='driver_jobs_shipments_cancelled',
+    ),
+    path(
+        'driver/jobs/shipments/pod-pending/',
+        DriverShipmentJobListPodPendingView.as_view(),
+        name='driver_jobs_shipments_pod_pending',
+    ),
+    path(
+        'driver/jobs/shipments/cod-pending/',
+        DriverShipmentJobListCodPendingView.as_view(),
+        name='driver_jobs_shipments_cod_pending',
+    ),
+    path(
+        'driver/jobs/shipments/',
+        DriverShipmentJobListView.as_view(),
+        name='driver_jobs_shipments',
+    ),
+    path(
+        'driver/jobs/movements/active/',
+        DriverMovementJobListActiveView.as_view(),
+        name='driver_jobs_movements_active',
+    ),
+    path(
+        'driver/jobs/movements/completed/',
+        DriverMovementJobListCompletedView.as_view(),
+        name='driver_jobs_movements_completed',
+    ),
+    path(
+        'driver/jobs/movements/cancelled/',
+        DriverMovementJobListCancelledView.as_view(),
+        name='driver_jobs_movements_cancelled',
+    ),
+    path(
+        'driver/jobs/movements/empty/',
+        DriverMovementJobListEmptyMoveView.as_view(),
+        name='driver_jobs_movements_empty',
+    ),
+    path(
+        'driver/jobs/movements/',
+        DriverMovementJobListView.as_view(),
+        name='driver_jobs_movements',
     ),
     path(
         'driver/profile/',

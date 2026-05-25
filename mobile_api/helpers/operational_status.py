@@ -44,6 +44,73 @@ MOVEMENT_ACTIVE_STATUSES: frozenset[str] = frozenset({
     'In Progress',
 })
 
+MOVEMENT_COMPLETED_STATUSES: frozenset[str] = frozenset({
+    'Completed',
+})
+
+MOVEMENT_CANCELLED_STATUSES: frozenset[str] = frozenset({
+    'Cancelled',
+})
+
+SHIPMENT_CANCELLED_STATUSES: frozenset[str] = frozenset({
+    'Cancelled',
+})
+
+
+def movement_active_statuses() -> tuple[str, ...]:
+    return tuple(MOVEMENT_ACTIVE_STATUSES)
+
+
+def movement_completed_statuses() -> tuple[str, ...]:
+    return tuple(MOVEMENT_COMPLETED_STATUSES)
+
+
+def movement_cancelled_statuses() -> tuple[str, ...]:
+    return tuple(MOVEMENT_CANCELLED_STATUSES)
+
+
+def shipment_cancelled_statuses() -> tuple[str, ...]:
+    return tuple(SHIPMENT_CANCELLED_STATUSES)
+
+
+def movement_terminal_statuses() -> tuple[str, ...]:
+    """Completed + cancelled movement statuses."""
+    return movement_completed_statuses() + movement_cancelled_statuses()
+
+
+def movement_active_filter_q() -> Q:
+    """In-flight movement logs (Scheduled / In Progress)."""
+    return Q(status__in=MOVEMENT_ACTIVE_STATUSES)
+
+
+def movement_completed_filter_q() -> Q:
+    return Q(status__in=MOVEMENT_COMPLETED_STATUSES)
+
+
+def movement_cancelled_filter_q() -> Q:
+    return Q(status__in=MOVEMENT_CANCELLED_STATUSES)
+
+
+def movement_empty_move_filter_q() -> Q:
+    """Empty truck moves (source or reason populated)."""
+    return Q(movement_source__iexact='empty') | Q(empty_move_reason__gt='')
+
+
+def movement_tab_filter_q(tab: str) -> Q:
+    """
+    Operational tab filter for movement job lists.
+
+    ``tab``: ``active`` | ``completed`` | ``cancelled`` | ``all``
+    """
+    key = (tab or 'active').strip().lower()
+    if key == 'active':
+        return movement_active_filter_q()
+    if key == 'completed':
+        return movement_completed_filter_q()
+    if key == 'cancelled':
+        return movement_cancelled_filter_q()
+    return Q()
+
 
 def driver_shipment_scope_q(driver) -> Q:
     """

@@ -76,13 +76,15 @@ def load_driver_welcome_context(
     org_name = ''
     company_name = ''
     tenant_id = ''
+    tenant_profile_id = None
     reg = (
         TenantRegistry.objects.select_related('tenant_profile')
         .filter(schema_name=tenant_schema)
         .first()
     )
     if reg and reg.tenant_profile:
-        tenant_id = str(reg.tenant_profile_id)
+        tenant_profile_id = str(reg.tenant_profile_id)
+        tenant_id = tenant_profile_id
         company_name = reg.tenant_profile.company_name or ''
         org_name = company_name
 

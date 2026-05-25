@@ -3426,6 +3426,11 @@ class TenantShipment(models.Model):
         choices=CollectionStatus.choices,
         default=CollectionStatus.PENDING,
     )
+    mobile_operational_rank = models.SmallIntegerField(
+        default=10,
+        db_index=True,
+        help_text='Mobile job list priority_desc sort key (lower = higher priority).',
+    )
 
     sales_invoice_ref = models.CharField(max_length=64, blank=True, default='')
     sales_invoice_status = models.CharField(max_length=32, blank=True, default='')
@@ -3469,6 +3474,14 @@ class TenantShipment(models.Model):
                 fields=['shipment_status', 'collection_status'],
                 name='tenant_ship_stat_coll_idx',
             ),
+            models.Index(
+                fields=['driver', 'shipment_no'],
+                name='tenant_ship_drv_no_idx',
+            ),
+            models.Index(
+                fields=['driver', 'mobile_operational_rank', '-updated_at'],
+                name='tenant_ship_drv_rank_upd_idx',
+            ),
         ]
 
     def apply_truck_default_driver(self):
@@ -3477,6 +3490,14 @@ class TenantShipment(models.Model):
 
     def save(self, *args, **kwargs):
         self.apply_truck_default_driver()
+        try:
+            from mobile_api.helpers.job_list_operational_rank import (
+                apply_operational_rank_on_save,
+            )
+
+            apply_operational_rank_on_save(self)
+        except Exception:
+            pass
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -4081,6 +4102,14 @@ class TenantTruckMovementLog(models.Model):
                 name='tenant_tml_drv_stat_upd_idx',
             ),
             models.Index(
+                fields=['driver', 'movement_no'],
+                name='tenant_tml_drv_mno_idx',
+            ),
+            models.Index(
+                fields=['driver', 'movement_source'],
+                name='tenant_tml_drv_src_idx',
+            ),
+            models.Index(
                 fields=['shipment', 'status', '-updated_at'],
                 name='tenant_tml_ship_stat_upd_idx',
             ),
@@ -4208,6 +4237,10 @@ class TenantOperationActionLog(models.Model):
             models.Index(
                 fields=['shipment', 'driver', '-log_date'],
                 name='tenant_oal_ship_drv_date_idx',
+            ),
+            models.Index(
+                fields=['truck_movement', 'driver', '-log_date'],
+                name='tenant_oal_move_drv_date_idx',
             ),
             models.Index(
                 fields=['driver', '-log_date'],

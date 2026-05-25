@@ -287,13 +287,19 @@ def fetch_push_receipt_projections(
     driver,
     tenant_schema: str,
     limit: int,
+    request=None,
+    tenant_profile_id: str | None = None,
 ) -> list[dict[str, Any]]:
     """Recent FCM push receipts for this driver (public schema, read as unread)."""
     if not _use_push_receipts():
         return []
 
-    tenant_profile_id = _resolve_tenant_profile_id(tenant_schema)
-    if tenant_profile_id is None:
+    profile_id = resolve_tenant_profile_id(
+        tenant_schema,
+        request=request,
+        prefetched=tenant_profile_id,
+    )
+    if profile_id is None:
         return []
 
     try:
@@ -305,7 +311,7 @@ def fetch_push_receipt_projections(
     driver_id = str(driver.driver_id)
     rows = (
         PushNotificationReceipt.objects.filter(
-            tenant_id=tenant_profile_id,
+            tenant_id=profile_id,
             user_domain='Driver',
             reference_id=driver_id,
             created_at__gte=since,

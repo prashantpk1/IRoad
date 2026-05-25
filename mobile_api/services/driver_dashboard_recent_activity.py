@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import Any
 
 from django.conf import settings
-from django.db.models import Q
+from django.db.models import Prefetch, Q
 from django.utils.translation import gettext as _
 
 from mobile_api.helpers.dashboard_activity import (
@@ -46,6 +46,20 @@ _SHIPMENT_ACTIVITY_ONLY = (
     'pod_status',
     'updated_at',
     'route_display',
+    'loading_address_id',
+    'delivery_address_id',
+)
+
+_OPERATION_ACTION_ONLY = (
+    'action_id',
+    'action_code',
+    'english_label',
+    'arabic_label',
+)
+
+_MOVEMENT_LOG_SNAPSHOT_ONLY = (
+    'movement_id',
+    'movement_no',
 )
 
 _MOVEMENT_ACTIVITY_ONLY = (
@@ -210,18 +224,36 @@ def _strip_internal_fields(item: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in item.items() if not key.startswith('_')}
 
 
+def _shipment_route_lookup_queryset():
+    """
+    ``only()`` + ``select_related`` on addresses requires FK ids on the shipment row
+    (same pattern as ``driver_dashboard_current_job``).
+    """
+    from tenant_workspace.models import TenantShipment
+
+    return (
+        TenantShipment.objects.only(*_SHIPMENT_ACTIVITY_ONLY)
+        .select_related('loading_address', 'delivery_address')
+    )
+
+
 def fetch_action_activity_candidates(*, driver, cap: int, request=None) -> list[dict[str, Any]]:
     from mobile_api.helpers.dashboard_security import action_log_queryset_for_driver
+    from tenant_workspace.models import TenantOperationAction, TenantTruckMovementLog
 
     rows = (
         action_log_queryset_for_driver(driver)
         .only(*_ACTION_LOG_ONLY)
-        .select_related(
-            'operation_action',
-            'shipment',
-            'shipment__loading_address',
-            'shipment__delivery_address',
-            'truck_movement',
+        .prefetch_related(
+            Prefetch(
+                'operation_action',
+                queryset=TenantOperationAction.objects.only(*_OPERATION_ACTION_ONLY),
+            ),
+            Prefetch('shipment', queryset=_shipment_route_lookup_queryset()),
+            Prefetch(
+                'truck_movement',
+                queryset=TenantTruckMovementLog.objects.only(*_MOVEMENT_LOG_SNAPSHOT_ONLY),
+            ),
         )
         .order_by('-log_date', '-created_at')[:cap]
     )
@@ -246,10 +278,8 @@ def fetch_movement_activity_candidates(*, driver, cap: int, request=None) -> lis
     rows = (
         movement_queryset_for_driver(driver)
         .only(*_MOVEMENT_ACTIVITY_ONLY)
-        .select_related(
-            'shipment',
-            'shipment__loading_address',
-            'shipment__delivery_address',
+        .prefetch_related(
+            Prefetch('shipment', queryset=_shipment_route_lookup_queryset()),
         )
         .order_by('-updated_at', '-created_at')[:cap]
     )
@@ -279,10 +309,8 @@ def fetch_pod_activity_candidates(
             Q(is_delivery_note=True) | Q(document_type__iexact='POD'),
         )
         .only(*_POD_DOC_ONLY)
-        .select_related(
-            'shipment',
-            'shipment__loading_address',
-            'shipment__delivery_address',
+        .prefetch_related(
+            Prefetch('shipment', queryset=_shipment_route_lookup_queryset()),
         )
         .order_by('-updated_at', '-created_at')[:cap]
     )

@@ -2,7 +2,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: iRoad\n"
 "POT-Creation-Date: 2026-04-20 00:00+0000\n"
-"PO-Revision-Date: 2026-05-20 19:09+0530\n"
+"PO-Revision-Date: 2026-05-25 10:40+0530\n"
 "Last-Translator: \n"
 "Language-Team: \n"
 "Language: ar\n"
@@ -593,6 +593,57 @@ msgstr "You do not have access to the driver dashboard."
 
 msgid "mobile.auth.dashboard_method_not_allowed"
 msgstr "This dashboard endpoint only supports read requests."
+
+msgid "mobile.auth.jobs_denied"
+msgstr "You do not have access to driver job lists."
+
+msgid "mobile.auth.jobs_method_not_allowed"
+msgstr "This job list endpoint only supports read requests."
+
+msgid "mobile.jobs.summary_success"
+msgstr "Job summary loaded successfully."
+
+msgid "mobile.jobs.shipments_success"
+msgstr "Shipment jobs loaded successfully."
+
+msgid "mobile.jobs.shipments_active_success"
+msgstr "Active shipment jobs loaded successfully."
+
+msgid "mobile.jobs.shipments_completed_success"
+msgstr "Completed shipment jobs loaded successfully."
+
+msgid "mobile.jobs.shipments_cancelled_success"
+msgstr "Cancelled shipment jobs loaded successfully."
+
+msgid "mobile.jobs.shipments_pod_pending_success"
+msgstr "POD pending shipment jobs loaded successfully."
+
+msgid "mobile.jobs.shipments_cod_pending_success"
+msgstr "COD pending shipment jobs loaded successfully."
+
+msgid "mobile.jobs.movements_success"
+msgstr "Movement jobs loaded successfully."
+
+msgid "mobile.jobs.movements_active_success"
+msgstr "Active movement jobs loaded successfully."
+
+msgid "mobile.jobs.movements_completed_success"
+msgstr "Completed movement jobs loaded successfully."
+
+msgid "mobile.jobs.movements_cancelled_success"
+msgstr "Cancelled movement jobs loaded successfully."
+
+msgid "mobile.jobs.movements_empty_success"
+msgstr "Empty move jobs loaded successfully."
+
+msgid "mobile.jobs.next_action.start_movement"
+msgstr "Start movement"
+
+msgid "mobile.jobs.next_action.complete_movement"
+msgstr "Complete movement"
+
+msgid "mobile.validation.invalid_entity_type"
+msgstr "Invalid job entity type."
 
 # Mobile API — Validation messages
 msgid "mobile.validation.failed"

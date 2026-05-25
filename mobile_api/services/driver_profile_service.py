@@ -19,6 +19,7 @@ from django.core.exceptions import ValidationError
 from django.core.files.images import get_image_dimensions
 from django.db.models import F
 from django.conf import settings as django_settings
+from django.utils import timezone
 from django.utils.translation import gettext as _
 from django_tenants.utils import schema_context
 

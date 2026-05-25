@@ -11,6 +11,11 @@ from mobile_api.services.driver_dashboard_service import (
     get_driver_dashboard,
     get_driver_dashboard_summary,
 )
+from mobile_api.services.driver_job_list_service import (
+    build_job_summary,
+    list_driver_movements,
+    list_driver_shipments,
+)
 from mobile_api.services.driver_profile_service import (
     driver_change_password,
     driver_request_change_password_otp,
@@ -30,6 +35,9 @@ __all__ = [
     'driver_verify_otp',
     'get_driver_dashboard',
     'get_driver_dashboard_summary',
+    'build_job_summary',
+    'list_driver_shipments',
+    'list_driver_movements',
     'get_driver_profile',
     'update_driver_profile_photo',
 ]

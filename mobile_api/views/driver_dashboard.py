@@ -72,7 +72,7 @@ class DriverDashboardView(_DriverDashboardBaseView):
     quick actions, notifications stub, recent activity (default limit 10).
     """
 
-    fetch_fn = get_driver_dashboard
+    fetch_fn = staticmethod(get_driver_dashboard)
     success_message_key = 'mobile.dashboard.fetch_success'
 
 
@@ -214,5 +214,5 @@ class DriverDashboardSummaryView(_DriverDashboardBaseView):
     ``variant=summary`` and a smaller recent-activity cap (default 5).
     """
 
-    fetch_fn = get_driver_dashboard_summary
+    fetch_fn = staticmethod(get_driver_dashboard_summary)
     success_message_key = 'mobile.dashboard.summary_fetch_success'

@@ -330,3 +330,90 @@ def mobile_api_dashboard_index_readiness(app_configs, **kwargs):
     return warnings
 
 
+JOB_LIST_TENANT_INDEXES = (
+    'tenant_ship_drv_no_idx',
+    'tenant_tml_drv_mno_idx',
+    'tenant_tml_drv_src_idx',
+    'tenant_oal_move_drv_date_idx',
+    'tenant_ship_drv_rank_upd_idx',
+)
+
+JOB_LIST_TENANT_MIGRATIONS = (
+    ('tenant_workspace', '0088_job_list_search_indexes'),
+    ('tenant_workspace', '0089_job_list_movement_action_log_index'),
+    ('tenant_workspace', '0090_shipment_mobile_operational_rank'),
+)
+
+
+@register(Tags.security, deploy=True)
+def mobile_api_jobs_capability_registered(app_configs, **kwargs):
+    errors: list = []
+    try:
+        from mobile_api.rbac import CAPABILITY_GROUPS
+
+        found = any(
+            cap.get('code') == 'mobile.driver.jobs'
+            for group in CAPABILITY_GROUPS
+            for cap in group.get('capabilities', [])
+        )
+        if not found:
+            errors.append(
+                Error(
+                    'RBAC capability mobile.driver.jobs is not registered.',
+                    hint='Add mobile.driver.jobs to mobile_api.rbac.CAPABILITY_GROUPS.',
+                    id='mobile_api.E041',
+                )
+            )
+    except Exception:
+        pass
+    return errors
+
+
+@register(Tags.database, deploy=True)
+def mobile_api_jobs_index_readiness(app_configs, **kwargs):
+    """Fail deploy check when job-list migrations/indexes are missing (sample schema)."""
+    from django.db import connection
+
+    from mobile_api.helpers.job_list_readiness import (
+        audit_schema,
+        list_tenant_schemas,
+    )
+
+    errors: list = []
+    warnings: list = []
+    try:
+        schemas = list_tenant_schemas()
+        if not schemas:
+            warnings.append(
+                Warning(
+                    'No tenant schemas found for job-list index audit.',
+                    id='mobile_api.W061',
+                )
+            )
+            return warnings
+        with connection.cursor() as cursor:
+            report = audit_schema(cursor, schemas[0])
+        if not report.ready:
+            for key, ok in report.migration_ok.items():
+                if not ok:
+                    errors.append(
+                        Error(
+                            f'Job list migration {key} missing on schema {report.schema}.',
+                            hint='python manage.py migrate_job_list_tenants --apply',
+                            id='mobile_api.E042',
+                        )
+                    )
+            for idx, ok in report.index_ok.items():
+                if not ok:
+                    errors.append(
+                        Error(
+                            f'Job list index {idx} missing on schema {report.schema}.',
+                            hint='python manage.py verify_job_list_readiness',
+                            id='mobile_api.E043',
+                        )
+                    )
+    except Exception:
+        pass
+    return errors + warnings
+
+

@@ -143,6 +143,7 @@ MIDDLEWARE = [
     'superadmin.middleware.TenantApiSchemaMiddleware',
     'mobile_api.middleware.MobileApiTenantGateMiddleware',
     'mobile_api.middleware.MobileDashboardSecurityMiddleware',
+    'mobile_api.middleware.MobileJobListSecurityMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'mobile_api.middleware.MobileApiSecurityHeadersMiddleware',
     # Serve /static/ when DEBUG=False (see STATICFILES_DIRS); required for styled 404 and marketing pages.
@@ -409,6 +410,7 @@ REST_FRAMEWORK = {
         'mobile_forgot_password': '5/minute',
         'mobile_verify_otp': '15/minute',
         'mobile_reset_password': '8/minute',
+        'mobile_jobs': '90/minute',
     },
 }
 
@@ -658,6 +660,18 @@ MOBILE_API_DASHBOARD_MIDDLEWARE_ENFORCE_TENANT = config(
     cast=bool,
 )
 
+# Job list security: sanitize outbound cards; middleware JWT/header tenant binding.
+MOBILE_API_JOBS_ENFORCE_OWNERSHIP_SANITIZE = config(
+    'MOBILE_API_JOBS_ENFORCE_OWNERSHIP_SANITIZE',
+    default=True,
+    cast=bool,
+)
+MOBILE_API_JOBS_MIDDLEWARE_ENFORCE_TENANT = config(
+    'MOBILE_API_JOBS_MIDDLEWARE_ENFORCE_TENANT',
+    default=True,
+    cast=bool,
+)
+
 # Mobile driver JWT: require JWT email/driver_id/role_name to match DB when present.
 MOBILE_API_JWT_STRICT_CLAIM_BINDING = config(
     'MOBILE_API_JWT_STRICT_CLAIM_BINDING',
@@ -796,4 +810,117 @@ MOBILE_API_RBAC_TENANT_ADMIN_ROLE_NAMES = config(
 # ─────────────────────────────────────────
 MOBILE_API_DEFAULT_PAGE_SIZE = 10
 MOBILE_API_MAX_PAGE_SIZE = 100
+
+# Job list cards: batched latest-action + next-action hints (disable via include_actions=0).
+MOBILE_JOB_LIST_INCLUDE_ACTIONS = config(
+    'MOBILE_JOB_LIST_INCLUDE_ACTIONS',
+    default=True,
+    cast=bool,
+)
+# Post-pagination DISTINCT ON for latest action (avoids correlated subquery on COUNT/LIST).
+MOBILE_JOB_LIST_PAGE_ACTION_BATCH = config(
+    'MOBILE_JOB_LIST_PAGE_ACTION_BATCH',
+    default=True,
+    cast=bool,
+)
+# Trust projection dicts — skip DRF re-validation on list items.
+MOBILE_JOB_LIST_FAST_SERIALIZE = config(
+    'MOBILE_JOB_LIST_FAST_SERIALIZE',
+    default=True,
+    cast=bool,
+)
+# Paginated list includes COUNT(*) unless client sends include_total=0.
+MOBILE_JOB_LIST_INCLUDE_TOTAL_DEFAULT = config(
+    'MOBILE_JOB_LIST_INCLUDE_TOTAL_DEFAULT',
+    default=False,
+    cast=bool,
+)
+
+# ─────────────────────────────────────────
+# Mobile API — Job list production hardening
+# ─────────────────────────────────────────
+MOBILE_API_JOBS_SUMMARY_CACHE_TTL_SECONDS = config(
+    'MOBILE_API_JOBS_SUMMARY_CACHE_TTL_SECONDS',
+    default=30,
+    cast=int,
+)
+# Optional short-lived list page cache (0 = disabled; prefer summary cache).
+MOBILE_API_JOBS_LIST_CACHE_TTL_SECONDS = config(
+    'MOBILE_API_JOBS_LIST_CACHE_TTL_SECONDS',
+    default=0,
+    cast=int,
+)
+MOBILE_API_JOBS_MAX_PAGE_SIZE = config(
+    'MOBILE_API_JOBS_MAX_PAGE_SIZE',
+    default=50,
+    cast=int,
+)
+MOBILE_API_JOBS_MAX_PAGE = config(
+    'MOBILE_API_JOBS_MAX_PAGE',
+    default=500,
+    cast=int,
+)
+MOBILE_API_JOBS_MAX_OFFSET_ROWS = config(
+    'MOBILE_API_JOBS_MAX_OFFSET_ROWS',
+    default=5000,
+    cast=int,
+)
+MOBILE_API_JOBS_MAX_RESPONSE_BYTES = config(
+    'MOBILE_API_JOBS_MAX_RESPONSE_BYTES',
+    default=524288,
+    cast=int,
+)
+MOBILE_API_JOBS_SLOW_REQUEST_MS = config(
+    'MOBILE_API_JOBS_SLOW_REQUEST_MS',
+    default=1200,
+    cast=int,
+)
+MOBILE_API_JOBS_METRICS_ENABLED = config(
+    'MOBILE_API_JOBS_METRICS_ENABLED',
+    default=True,
+    cast=bool,
+)
+# Reject tab=all on general list routes (large-tenant guard; locked paths unaffected).
+MOBILE_API_JOBS_DISALLOW_TAB_ALL = config(
+    'MOBILE_API_JOBS_DISALLOW_TAB_ALL',
+    default=True,
+    cast=bool,
+)
+# UNION driver scope (index-friendly) vs legacy OR filter.
+MOBILE_API_JOBS_UNION_DRIVER_SCOPE = config(
+    'MOBILE_API_JOBS_UNION_DRIVER_SCOPE',
+    default=True,
+    cast=bool,
+)
+# Default list pagination: cursor (keyset) or offset (legacy page param).
+MOBILE_API_JOBS_DEFAULT_PAGINATION = config(
+    'MOBILE_API_JOBS_DEFAULT_PAGINATION',
+    default='cursor',
+    cast=str,
+)
+MOBILE_API_JOBS_COUNT_CACHE_TTL_SECONDS = config(
+    'MOBILE_API_JOBS_COUNT_CACHE_TTL_SECONDS',
+    default=60,
+    cast=int,
+)
+MOBILE_API_JOBS_ENFORCE_PAYLOAD_LIMIT = config(
+    'MOBILE_API_JOBS_ENFORCE_PAYLOAD_LIMIT',
+    default=True,
+    cast=bool,
+)
+MOBILE_API_JOBS_STRICT_PAYLOAD = config(
+    'MOBILE_API_JOBS_STRICT_PAYLOAD',
+    default=True,
+    cast=bool,
+)
+MOBILE_API_JOBS_ALLOW_OFFSET_PAGINATION = config(
+    'MOBILE_API_JOBS_ALLOW_OFFSET_PAGINATION',
+    default=False,
+    cast=bool,
+)
+MOBILE_API_JOBS_STARTUP_READINESS_CHECK = config(
+    'MOBILE_API_JOBS_STARTUP_READINESS_CHECK',
+    default=False,
+    cast=bool,
+)
 

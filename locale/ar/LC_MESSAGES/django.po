@@ -2,7 +2,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: iRoad\n"
 "POT-Creation-Date: 2026-04-20 00:00+0000\n"
-"PO-Revision-Date: 2026-05-20 19:09+0530\n"
+"PO-Revision-Date: 2026-05-25 10:40+0530\n"
 "Last-Translator: \n"
 "Language-Team: \n"
 "Language: ar\n"
@@ -593,6 +593,57 @@ msgstr "ليس لديك صلاحية الوصول إلى لوحة تحكم ال�
 
 msgid "mobile.auth.dashboard_method_not_allowed"
 msgstr "نقطة نهاية لوحة التحكم هذه تدعم طلبات القراءة فقط."
+
+msgid "mobile.auth.jobs_denied"
+msgstr "ليس لديك صلاحية الوصول إلى قوائم الوظائف."
+
+msgid "mobile.auth.jobs_method_not_allowed"
+msgstr "نقطة نهاية قائمة الوظائف هذه تدعم طلبات القراءة فقط."
+
+msgid "mobile.jobs.summary_success"
+msgstr "تم تحميل ملخص الوظائف بنجاح."
+
+msgid "mobile.jobs.shipments_success"
+msgstr "تم تحميل وظائف الشحنات بنجاح."
+
+msgid "mobile.jobs.shipments_active_success"
+msgstr "تم تحميل وظائف الشحنات النشطة بنجاح."
+
+msgid "mobile.jobs.shipments_completed_success"
+msgstr "تم تحميل وظائف الشحنات المكتملة بنجاح."
+
+msgid "mobile.jobs.shipments_cancelled_success"
+msgstr "تم تحميل وظائف الشحنات الملغاة بنجاح."
+
+msgid "mobile.jobs.shipments_pod_pending_success"
+msgstr "تم تحميل شحنات بانتظار POD بنجاح."
+
+msgid "mobile.jobs.shipments_cod_pending_success"
+msgstr "تم تحميل شحنات COD المعلقة بنجاح."
+
+msgid "mobile.jobs.movements_success"
+msgstr "تم تحميل وظائف الحركة بنجاح."
+
+msgid "mobile.jobs.movements_active_success"
+msgstr "تم تحميل وظائف الحركة النشطة بنجاح."
+
+msgid "mobile.jobs.movements_completed_success"
+msgstr "تم تحميل وظائف الحركة المكتملة بنجاح."
+
+msgid "mobile.jobs.movements_cancelled_success"
+msgstr "تم تحميل وظائف الحركة الملغاة بنجاح."
+
+msgid "mobile.jobs.movements_empty_success"
+msgstr "تم تحميل حركات الشاحنات الفارغة بنجاح."
+
+msgid "mobile.jobs.next_action.start_movement"
+msgstr "بدء الحركة"
+
+msgid "mobile.jobs.next_action.complete_movement"
+msgstr "إكمال الحركة"
+
+msgid "mobile.validation.invalid_entity_type"
+msgstr "نوع كيان الوظيفة غير صالح."
 
 # Mobile API — Validation messages
 msgid "mobile.validation.failed"
