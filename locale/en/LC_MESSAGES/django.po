@@ -642,6 +642,105 @@ msgstr "Start movement"
 msgid "mobile.jobs.next_action.complete_movement"
 msgstr "Complete movement"
 
+msgid "mobile.jobs.execute.success"
+msgstr "Action executed successfully."
+
+msgid "mobile.jobs.execute.shipment_success"
+msgstr "Shipment action executed successfully."
+
+msgid "mobile.jobs.execute.movement_success"
+msgstr "Movement action executed successfully."
+
+msgid "mobile.jobs.execute.not_allowed"
+msgstr "This action is not allowed for the current job state."
+
+msgid "mobile.jobs.execute.validation_failed"
+msgstr "Action execution validation failed."
+
+msgid "mobile.jobs.execute.invalid_action"
+msgstr "Invalid or unknown action."
+
+msgid "mobile.jobs.execute.gps_required"
+msgstr "GPS coordinates are required for this action."
+
+msgid "mobile.jobs.execute.note_required"
+msgstr "A note is required for this action."
+
+msgid "mobile.jobs.execute.photo_required"
+msgstr "At least one photo is required for this action."
+
+msgid "mobile.jobs.execute.video_required"
+msgstr "Video attachment is required for this action."
+
+msgid "mobile.jobs.execute.invalid_cod_amount"
+msgstr "Invalid COD amount."
+
+msgid "mobile.jobs.execute.cod_amount_required"
+msgstr "COD amount is required for collect payment."
+
+msgid "mobile.jobs.detail.not_found"
+msgstr "Job not found or not assigned to you."
+
+msgid "mobile.jobs.detail.shipment_not_found"
+msgstr "Shipment not found or not assigned to you."
+
+msgid "mobile.jobs.detail.movement_not_found"
+msgstr "Movement not found or not assigned to you."
+
+msgid "mobile.jobs.detail.invalid_id"
+msgstr "Invalid job identifier."
+
+msgid "mobile.jobs.timeline.success"
+msgstr "Timeline loaded successfully."
+
+msgid "mobile.jobs.timeline.shipment_success"
+msgstr "Shipment timeline loaded successfully."
+
+msgid "mobile.jobs.timeline.movement_success"
+msgstr "Movement timeline loaded successfully."
+
+msgid "mobile.jobs.timeline.invalid_cursor"
+msgstr "Invalid or expired timeline cursor."
+
+msgid "mobile.jobs.pod.upload_success"
+msgstr "POD uploaded successfully."
+
+msgid "mobile.jobs.pod.validation_failed"
+msgstr "POD upload validation failed."
+
+msgid "mobile.jobs.pod.photo_required"
+msgstr "At least one POD photo attachment is required."
+
+msgid "mobile.jobs.pod.delivery_note_required"
+msgstr "A delivery note document must exist on the shipment before POD upload."
+
+msgid "mobile.jobs.pod.action_not_configured"
+msgstr "Upload POD action is not configured in Action Master."
+
+msgid "mobile.jobs.cod.collect_success"
+msgstr "COD collected successfully."
+
+msgid "mobile.jobs.cod.validation_failed"
+msgstr "COD collection validation failed."
+
+msgid "mobile.jobs.cod.not_cod_shipment"
+msgstr "This shipment is not a COD order."
+
+msgid "mobile.jobs.cod.already_collected"
+msgstr "COD has already been collected for this shipment."
+
+msgid "mobile.jobs.cod.action_not_configured"
+msgstr "Collect Payment action is not configured in Action Master."
+
+msgid "mobile.jobs.compliance.action_not_allowed"
+msgstr "This compliance action is not allowed for the current shipment state."
+
+msgid "mobile.jobs.compliance.action_not_configured"
+msgstr "Required compliance action is not available."
+
+msgid "mobile.jobs.compliance.shipment_terminal"
+msgstr "Cannot perform this action on a closed or cancelled shipment."
+
 msgid "mobile.validation.invalid_entity_type"
 msgstr "Invalid job entity type."
 

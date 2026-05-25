@@ -28,6 +28,7 @@ CAPABILITY_GROUPS: dict[str, tuple[str, ...]] = {
     'mobile.driver.organization': ('driver',),
     'mobile.driver.dashboard': ('driver',),
     'mobile.driver.jobs': ('driver',),
+    'mobile.driver.jobs.execute': ('driver',),
     'mobile.driver.auth_session': ('driver',),
     # Dashboard quick-action visibility (Phase 1 — metadata only; driver group)
     'mobile.driver.quick_action.continue_job': ('driver',),

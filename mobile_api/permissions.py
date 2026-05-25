@@ -192,6 +192,42 @@ class HasDriverJobsAccess(BasePermission):
         )
 
 
+class HasDriverJobsExecuteAccess(BasePermission):
+    """
+    Job **execution** gate: driver principal + ``mobile.driver.jobs.execute`` + tenant binding.
+
+    Use on POST execute / POD / COD routes. Read-only job detail continues to use
+    ``HasDriverJobsAccess``.
+    """
+
+    message = _('mobile.auth.jobs_execute_denied')
+
+    def has_permission(self, request, view):
+        if not IsMobileAuthenticated().has_permission(request, view):
+            return False
+        if not user_in_driver_group(request):
+            return False
+        cap = (
+            getattr(view, 'required_mobile_capability', None)
+            or getattr(view, 'mobile_capability', None)
+            or 'mobile.driver.jobs.execute'
+        )
+        if not request_has_capability(request, str(cap)):
+            return False
+        payload = get_mobile_jwt_payload(request)
+        tenant_schema = str(payload.get('tenant_schema') or '').strip()
+        if not tenant_schema:
+            return False
+        from mobile_api.helpers.job_execution_security import (
+            validate_jobs_execution_tenant_binding,
+        )
+
+        return validate_jobs_execution_tenant_binding(
+            request,
+            expected_schema=tenant_schema,
+        )
+
+
 # Backwards-compatible alias (older imports / docs)
 IsMobileDriver = IsDriver
 IsMobileDispatcher = IsDispatcher

@@ -203,6 +203,13 @@ DATABASES = {
     }
 }
 
+# Job Detail DB E2E: reuse dev database (migrated tenant schemas) instead of empty test_* clone.
+# Run: MOBILE_API_JOB_DETAIL_TEST_USE_DEV_DB=1 python manage.py test ... --keepdb
+if config('MOBILE_API_JOB_DETAIL_TEST_USE_DEV_DB', default=False, cast=bool):
+    DATABASES['default'].setdefault('TEST', {})
+    DATABASES['default']['TEST']['NAME'] = DATABASES['default']['NAME']
+    DATABASES['default']['TEST']['MIGRATE'] = False
+
 # PgBouncer notes (production):
 # - Keep this block disabled in local/dev by default.
 # - When enabled, point DB_HOST/DB_PORT to PgBouncer endpoint (not direct Postgres).
@@ -668,6 +675,23 @@ MOBILE_API_JOBS_ENFORCE_OWNERSHIP_SANITIZE = config(
     default=True,
     cast=bool,
 )
+# Execution: require action_id in get_allowed_driver_actions (tampering guard).
+MOBILE_API_JOBS_ENFORCE_ACTION_MEMBERSHIP = config(
+    'MOBILE_API_JOBS_ENFORCE_ACTION_MEMBERSHIP',
+    default=True,
+    cast=bool,
+)
+MOBILE_API_JOBS_EXECUTION_AUDIT_ENABLED = config(
+    'MOBILE_API_JOBS_EXECUTION_AUDIT_ENABLED',
+    default=True,
+    cast=bool,
+)
+# Optional: align shipment_status column from logs when drift detected (read paths).
+MOBILE_API_JOBS_AUTO_REPAIR_STATUS_DRIFT = config(
+    'MOBILE_API_JOBS_AUTO_REPAIR_STATUS_DRIFT',
+    default=False,
+    cast=bool,
+)
 MOBILE_API_JOBS_MIDDLEWARE_ENFORCE_TENANT = config(
     'MOBILE_API_JOBS_MIDDLEWARE_ENFORCE_TENANT',
     default=True,
@@ -871,6 +895,59 @@ MOBILE_API_JOBS_MAX_RESPONSE_BYTES = config(
     'MOBILE_API_JOBS_MAX_RESPONSE_BYTES',
     default=524288,
     cast=int,
+)
+# Job Detail snapshot (execution screen)
+MOBILE_JOB_DETAIL_TIMELINE_PREVIEW_LIMIT = config(
+    'MOBILE_JOB_DETAIL_TIMELINE_PREVIEW_LIMIT',
+    default=15,
+    cast=int,
+)
+MOBILE_JOB_DETAIL_INCLUDE_TIMELINE_DEFAULT = config(
+    'MOBILE_JOB_DETAIL_INCLUDE_TIMELINE_DEFAULT',
+    default=True,
+    cast=bool,
+)
+MOBILE_JOB_DETAIL_INCLUDE_ACTIONS_DEFAULT = config(
+    'MOBILE_JOB_DETAIL_INCLUDE_ACTIONS_DEFAULT',
+    default=True,
+    cast=bool,
+)
+# Job Detail timeline feed (cursor pagination)
+MOBILE_JOB_TIMELINE_DEFAULT_PAGE_SIZE = config(
+    'MOBILE_JOB_TIMELINE_DEFAULT_PAGE_SIZE',
+    default=20,
+    cast=int,
+)
+MOBILE_JOB_TIMELINE_MAX_PAGE_SIZE = config(
+    'MOBILE_JOB_TIMELINE_MAX_PAGE_SIZE',
+    default=50,
+    cast=int,
+)
+MOBILE_JOB_TIMELINE_MEDIA_PER_LOG = config(
+    'MOBILE_JOB_TIMELINE_MEDIA_PER_LOG',
+    default=3,
+    cast=int,
+)
+MOBILE_JOB_TIMELINE_DESCRIPTION_MAX = config(
+    'MOBILE_JOB_TIMELINE_DESCRIPTION_MAX',
+    default=120,
+    cast=int,
+)
+# Job detail: single batched action-log scan for preview + execution state.
+MOBILE_JOB_DETAIL_LOG_SCAN_LIMIT = config(
+    'MOBILE_JOB_DETAIL_LOG_SCAN_LIMIT',
+    default=120,
+    cast=int,
+)
+MOBILE_API_JOBS_DETAIL_SLOW_REQUEST_MS = config(
+    'MOBILE_API_JOBS_DETAIL_SLOW_REQUEST_MS',
+    default=1500,
+    cast=int,
+)
+MOBILE_API_JOBS_DETAIL_METRICS_ENABLED = config(
+    'MOBILE_API_JOBS_DETAIL_METRICS_ENABLED',
+    default=True,
+    cast=bool,
 )
 MOBILE_API_JOBS_SLOW_REQUEST_MS = config(
     'MOBILE_API_JOBS_SLOW_REQUEST_MS',

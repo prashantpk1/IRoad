@@ -9,6 +9,12 @@ from __future__ import annotations
 
 from django.db.models import Q
 
+from iroad_tenants.operation_runtime.shipment_execution_stage import (
+    derive_shipment_execution_stage,
+    execution_stage_operational_label,
+    is_pickup_or_loading_action,
+    shipment_allows_pickup_loading_action,
+)
 from tenant_workspace.models import (
     TenantBooking,
     TenantOperationAction,
@@ -117,12 +123,18 @@ def _booking_has_active_shipment(booking, booking_item_type=''):
     return qs.exists()
 
 
-def _executed_action_ids(*, booking=None, shipment=None, exclude_log_id=None):
+def _executed_action_ids(*, booking=None, shipment=None, movement=None, exclude_log_id=None):
     qs = TenantOperationActionLog.objects.exclude(operation_action__isnull=True)
     if exclude_log_id:
         qs = qs.exclude(log_id=exclude_log_id)
     if shipment is not None:
         qs = qs.filter(shipment_id=shipment.pk)
+    elif movement is not None:
+        from iroad_tenants.operation_runtime.movement_execution_engine import (
+            movement_executed_action_ids,
+        )
+
+        return movement_executed_action_ids(movement, exclude_log_id=exclude_log_id)
     elif booking is not None:
         qs = qs.filter(booking_id=booking.booking_id, shipment__isnull=True)
     else:
@@ -155,6 +167,7 @@ def _action_is_allowed(
     booking_item_type='',
     exclude_log_id=None,
     include_action_id=None,
+    executed_action_ids=None,
 ):
     if action is None or action.status != TenantOperationAction.Status.ACTIVE:
         return False
@@ -167,10 +180,15 @@ def _action_is_allowed(
             return booking is not None
         return shipment.shipment_status not in _TERMINAL_SHIPMENT_STATUSES
 
-    executed_ids = _executed_action_ids(
-        booking=booking,
-        shipment=shipment,
-        exclude_log_id=exclude_log_id,
+    executed_ids = (
+        executed_action_ids
+        if executed_action_ids is not None
+        else _executed_action_ids(
+            booking=booking,
+            shipment=shipment,
+            movement=movement,
+            exclude_log_id=exclude_log_id,
+        )
     )
     if action.action_id in executed_ids:
         return False
@@ -219,8 +237,12 @@ def _action_is_allowed(
                 TenantShipment.ShipmentStatus.AT_DELIVERY,
             }
 
-        if action_matches(action, 'pickup', 'arrival', 'a2', 'action 2', 'start loading', 'a3', 'action 3'):
-            return False
+        if is_pickup_or_loading_action(action):
+            return shipment_allows_pickup_loading_action(
+                action,
+                shipment,
+                exclude_log_id=exclude_log_id,
+            )
 
         if action.booking_status_impact and not impact:
             return False
@@ -268,9 +290,31 @@ def _action_is_allowed(
 
         return booking.booking_status == TenantBooking.Status.CONFIRMED
 
-    # --- Movement without shipment (rare) ---
+    # --- Movement-only (empty move / no shipment on context) ---
     if movement is not None:
-        return bool(action.auto_movement_post or action.movement_status_impact)
+        from iroad_tenants.operation_runtime.movement_execution_engine import (
+            is_movement_only_context,
+            movement_action_allowed,
+        )
+
+        if is_movement_only_context(shipment=shipment, movement=movement):
+            return movement_action_allowed(
+                action,
+                movement=movement,
+                exclude_log_id=exclude_log_id,
+                include_action_id=include_action_id,
+            )
+        if shipment is None and booking is None:
+            return movement_action_allowed(
+                action,
+                movement=movement,
+                exclude_log_id=exclude_log_id,
+                include_action_id=include_action_id,
+            )
+        return bool(
+            (action.movement_status_impact or '').strip()
+            or action.auto_movement_post
+        )
 
     return False
 
@@ -283,17 +327,37 @@ def get_allowed_actions(
     booking_item_type='',
     exclude_log_id=None,
     include_action_id=None,
+    for_mobile: bool = True,
 ):
     """
     Return TenantOperationAction queryset allowed for the current operational context.
-    """
-    actions = TenantOperationAction.objects.filter(
-        status=TenantOperationAction.Status.ACTIVE,
-    ).order_by('sequence_number', 'action_code')
 
-    allowed_ids = [
-        action.action_id
-        for action in actions
+    Uses DB-side candidate narrowing (scope, stage, executed dedupe) before the
+    policy engine pass — avoids scanning the full ACTIVE Action Config catalog.
+    """
+    from iroad_tenants.operation_runtime.allowed_actions_query import (
+        prefilter_allowed_action_candidates,
+    )
+
+    executed_ids = _executed_action_ids(
+        booking=booking,
+        shipment=shipment,
+        movement=movement,
+        exclude_log_id=exclude_log_id,
+    )
+
+    candidates = prefilter_allowed_action_candidates(
+        booking=booking,
+        shipment=shipment,
+        movement=movement,
+        booking_item_type=booking_item_type,
+        executed_action_ids=executed_ids,
+        exclude_log_id=exclude_log_id,
+        for_mobile=for_mobile,
+    )
+
+    allowed_ids: list = []
+    for action in candidates.iterator(chunk_size=64):
         if _action_is_allowed(
             action,
             booking=booking,
@@ -302,8 +366,29 @@ def get_allowed_actions(
             booking_item_type=booking_item_type,
             exclude_log_id=exclude_log_id,
             include_action_id=include_action_id,
-        )
-    ]
+            executed_action_ids=executed_ids,
+        ):
+            allowed_ids.append(action.action_id)
+
+    if include_action_id and str(include_action_id) not in {
+        str(action_id) for action_id in allowed_ids
+    }:
+        preserved = TenantOperationAction.objects.filter(
+            pk=include_action_id,
+            status=TenantOperationAction.Status.ACTIVE,
+        ).first()
+        if preserved is not None and _action_is_allowed(
+            preserved,
+            booking=booking,
+            shipment=shipment,
+            movement=movement,
+            booking_item_type=booking_item_type,
+            exclude_log_id=exclude_log_id,
+            include_action_id=include_action_id,
+            executed_action_ids=executed_ids,
+        ):
+            allowed_ids.append(preserved.action_id)
+
     if not allowed_ids:
         return TenantOperationAction.objects.none()
     return TenantOperationAction.objects.filter(action_id__in=allowed_ids).order_by(
@@ -347,6 +432,12 @@ def validate_operation_action_allowed(
     context_bits = []
     if shipment is not None:
         context_bits.append(f'shipment status is {shipment.shipment_status}')
+    elif movement is not None:
+        from iroad_tenants.operation_runtime.movement_execution_engine import (
+            movement_allowed_actions_context_label,
+        )
+
+        context_bits.append(movement_allowed_actions_context_label(movement))
     elif booking is not None:
         context_bits.append(f'booking status is {booking.booking_status}')
     else:
@@ -373,7 +464,9 @@ def action_options_payload(actions):
 
 def allowed_actions_context_label(*, booking=None, shipment=None, booking_item_type=''):
     if shipment is not None:
-        return f'Allowed actions for shipment status: {shipment.shipment_status}'
+        stage = derive_shipment_execution_stage(shipment)
+        label = execution_stage_operational_label(stage) or shipment.shipment_status
+        return f'Allowed actions for shipment execution stage: {label}'
     if booking is not None:
         line = (booking_item_type or '').strip()
         if line:

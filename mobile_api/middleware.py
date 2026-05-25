@@ -19,6 +19,7 @@ hint vs JWT, read-only verbs) and DRF ``HasDriverDashboardAccess``.
 from __future__ import annotations
 
 import logging
+import time
 
 from django.http import JsonResponse
 from django.utils.translation import gettext as _
@@ -241,19 +242,32 @@ class MobileDashboardSecurityMiddleware:
 
 class MobileJobListSecurityMiddleware:
     """
-    Defense-in-depth for ``/api/v1/mobile/driver/jobs/*`` (read-only, tenant hint check).
+    Defense-in-depth for ``/api/v1/mobile/driver/jobs/*``.
+
+    - **Read** routes: GET/HEAD/OPTIONS only + tenant hint vs JWT check.
+    - **Execution** routes (execute / upload-pod / collect-cod): allow POST with
+      the same tenant hint binding (RBAC + view guards enforce authorization).
     """
 
     SAFE_METHODS = frozenset({'GET', 'HEAD', 'OPTIONS'})
+    EXECUTION_METHODS = frozenset({'POST'})
 
     def __init__(self, get_response):
         self.get_response = get_response
 
     def __call__(self, request):
         from mobile_api.helpers.job_list_security import JOBS_API_PREFIX
+        from mobile_api.helpers.job_execution_security import (
+            is_jobs_execution_post_path,
+        )
         from mobile_api.helpers.dashboard_security import resolve_tenant_schema_from_header
+        from mobile_api.helpers.middleware_request_sim import (
+            ensure_request_observability_attrs,
+        )
 
-        if not request.path.startswith(JOBS_API_PREFIX):
+        request = ensure_request_observability_attrs(request)
+        path = request.path
+        if not path.startswith(JOBS_API_PREFIX):
             return self.get_response(request)
 
         request.mobile_job_list_route = True
@@ -262,8 +276,15 @@ class MobileJobListSecurityMiddleware:
         from mobile_api.helpers.job_list_observability import SLOW_MS
 
         started = time.perf_counter()
+        method = request.method
 
-        if request.method not in self.SAFE_METHODS:
+        is_execution_post = (
+            method in self.EXECUTION_METHODS
+            and is_jobs_execution_post_path(path)
+        )
+        if is_execution_post:
+            request.mobile_job_execution_route = True
+        elif method not in self.SAFE_METHODS:
             return JsonResponse(
                 {
                     'status': 0,
@@ -343,17 +364,43 @@ class MobileJobListSecurityMiddleware:
 
 
 def _jobs_finish_request(middleware, request, started: float):
-    """Return response and log end-to-end slow job-list requests."""
-    import time
-
+    """Return response and log end-to-end slow job-list / job-detail requests."""
+    from mobile_api.helpers.job_detail_observability import (
+        SLOW_MS as DETAIL_SLOW_MS,
+        classify_job_detail_operation,
+        record_middleware_timing,
+    )
     from mobile_api.helpers.job_list_observability import SLOW_MS
+    from mobile_api.helpers.middleware_request_sim import ensure_request_observability_attrs
 
-    response = middleware.get_response(request)
-    elapsed_ms = (time.perf_counter() - started) * 1000
-    if elapsed_ms >= SLOW_MS:
-        logger.warning(
-            'jobs.middleware slow_request path=%s ms=%.1f',
-            request.path[:120],
-            elapsed_ms,
+    request = ensure_request_observability_attrs(request)
+    path = request.path
+    method = request.method
+
+    try:
+        response = middleware.get_response(request)
+    except Exception:
+        logger.exception(
+            'jobs.middleware handler_error path=%s method=%s',
+            path[:120],
+            method,
+        )
+        raise
+
+    try:
+        elapsed_ms = (time.perf_counter() - started) * 1000
+        slow_threshold = DETAIL_SLOW_MS if '/jobs/' in path else SLOW_MS
+        op = classify_job_detail_operation(path, method)
+        record_middleware_timing(
+            operation=op,
+            elapsed_ms=elapsed_ms,
+            path=path,
+            slow_threshold_ms=slow_threshold,
+        )
+    except Exception:
+        logger.exception(
+            'jobs.middleware metrics_error path=%s method=%s',
+            path[:120],
+            method,
         )
     return response

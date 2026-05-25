@@ -164,6 +164,36 @@ from iroad_tenants.driver_treasury_ops import (
     DRIVER_TXN_REF_PREFIX,
     post_cod_collection_for_action9,
 )
+from iroad_tenants.operation_runtime.booking_impact import (
+    apply_booking_status_impact as _tenant_operation_action_apply_booking_status_impact,
+)
+from iroad_tenants.operation_runtime.idempotency import (
+    find_recent_duplicate as _tenant_operation_action_log_recent_duplicate,
+    normalize_idempotency_key as _tenant_operation_action_log_normalize_idempotency_key,
+    normalize_source_ref as _tenant_operation_action_log_normalize_source_ref,
+)
+from iroad_tenants.operation_runtime.impacts import (
+    operation_action_matches as _tenant_operation_action_matches,
+    resolve_movement_status_impact as _tenant_resolve_movement_status_impact,
+    resolve_shipment_status_impact as _tenant_resolve_shipment_status_impact,
+)
+from iroad_tenants.operation_runtime.latest_state import (
+    after_shipment_status_side_effects as _tenant_shipment_after_status_side_effects,
+    derive_latest_action_status as _tenant_shipment_derive_latest_action_status,
+    sync_shipment_status_from_action_log as _tenant_shipment_sync_status_from_action_log,
+    validate_shipment_status_transition as _tenant_shipment_validate_status_transition,
+)
+from iroad_tenants.operation_runtime.movement_ops import (
+    auto_complete_loaded_movement_for_shipment as _tenant_truck_movement_auto_complete_loaded_for_shipment,
+    birth_movement_for_shipment as _tenant_truck_movement_birth_for_shipment,
+)
+from iroad_tenants.operation_runtime.pod_action import (
+    birth_pod_from_action_log as _tenant_shipment_pod_birth_from_action_log,
+)
+from iroad_tenants.operation_runtime.side_effects import (
+    apply_execution_side_effects as _tenant_operation_action_log_apply_side_effects,
+)
+from iroad_tenants.services.action_execution_service import ActionExecutionService
 from iroad_tenants.forms_driver_treasury import (
     DriverTreasuryForm,
     DriverTreasuryTransactionForm,
@@ -8581,26 +8611,6 @@ def _tenant_truck_movement_auto_create_loaded_from_shipment(shipment, *, created
     return movement
 
 
-def _tenant_truck_movement_auto_complete_loaded_for_shipment(shipment):
-    """Complete open Loaded movement when shipment is Delivered."""
-    if shipment is None:
-        return None
-    movement = (
-        TenantTruckMovementLog.objects.filter(shipment_id=shipment.pk)
-        .exclude(status=TenantTruckMovementLog.Status.CANCELLED)
-        .order_by('-created_at')
-        .first()
-    )
-    if movement is None:
-        return None
-    if movement.status == TenantTruckMovementLog.Status.COMPLETED:
-        return movement
-    movement.status = TenantTruckMovementLog.Status.COMPLETED
-    movement.end_time = timezone.now()
-    movement.save(update_fields=['status', 'end_time', 'updated_at'])
-    return movement
-
-
 def _tenant_truck_movement_form_data_from_post(request):
     return {
         'movement_date': (request.POST.get('movement_date') or '').strip(),
@@ -10156,47 +10166,6 @@ def _update_tenant_operation_action_log_from_request(movement, request):
     movement.save()
 
 
-def _tenant_operation_action_log_normalize_idempotency_key(raw_value):
-    token = (raw_value or '').strip()
-    if not token:
-        return ''
-    return token[:128]
-
-
-def _tenant_operation_action_log_normalize_source_ref(raw_value):
-    token = (raw_value or '').strip()
-    if not token:
-        return ''
-    return token[:128]
-
-
-def _tenant_operation_action_log_recent_duplicate(
-    *,
-    shipment=None,
-    operation_action=None,
-    created_by_label='',
-    notes='',
-    source='Manual',
-    minutes=2,
-):
-    if operation_action is None:
-        return None
-    threshold = timezone.now() - timedelta(minutes=minutes)
-    qs = (
-        TenantOperationActionLog.objects.filter(
-            operation_action=operation_action,
-            source=(source or 'Manual')[:32],
-            notes=(notes or ''),
-            created_by_label=(created_by_label or '')[:200],
-            created_at__gte=threshold,
-        )
-        .order_by('-created_at')
-    )
-    if shipment is not None:
-        qs = qs.filter(shipment=shipment)
-    return qs.first()
-
-
 def _tenant_operation_action_log_create_form_context(
     *,
     display_name='',
@@ -10560,53 +10529,39 @@ class TenantOperationActionLogCreateView(View):
                     )
             try:
                 with db_transaction.atomic():
-                    log_no = ''
-                    log_sequence = 0
-                    for _ in range(10):
-                        log_no, log_sequence = _next_auto_number_for_form(
-                            form_code=OPERATION_ACTION_LOG_AUTO_FORM_CODE,
-                            form_label=OPERATION_ACTION_LOG_AUTO_FORM_LABEL,
-                            prefix=OPERATION_ACTION_LOG_REF_PREFIX,
-                        )
-                        if not TenantOperationActionLog.objects.filter(log_no=log_no).exists():
-                            break
-                    if TenantOperationActionLog.objects.filter(log_no=log_no).exists():
-                        raise ValueError(
-                            'Unable to allocate a unique Log No. Please check Auto Number Configuration.'
-                        )
-
-                    action_log = TenantOperationActionLog(
-                        log_no=log_no,
-                        idempotency_key=(idempotency_key or None),
-                        source_channel='admin_manual',
-                        source_ref=(source_ref or ''),
-                        log_sequence=log_sequence,
-                        log_date=parsed_log_date,
+                    exec_result = ActionExecutionService.execute_portal_action_log(
                         operation_action=operation_action,
-                        source=form_data['source'],
-                        notes=form_data['notes'],
+                        log_date=parsed_log_date,
                         booking=linkage['booking'],
                         shipment=linkage['shipment'],
+                        movement=linkage['truck_movement'],
                         truck=linkage['truck'],
                         driver=linkage['driver'],
-                        truck_movement=linkage['truck_movement'],
+                        tenant_user=tenant_user,
+                        created_by_label=planned_created_by_label,
+                        notes=form_data['notes'],
+                        source=form_data['source'],
+                        source_ref=source_ref,
+                        idempotency_key=idempotency_key,
+                        booking_item_type=(request.POST.get('booking_item_type') or '').strip(),
                         latitude=form_data['latitude'],
                         longitude=form_data['longitude'],
                         map_link=form_data['map_link'],
-                        created_by=tenant_user,
-                        created_by_label=planned_created_by_label,
                     )
-                    action_log._birth_booking_item_type = (
-                        request.POST.get('booking_item_type') or ''
-                    ).strip()
-                    action_log.save()
+                    action_log = exec_result.action_log
+                    if exec_result.reused_existing:
+                        messages.info(
+                            request,
+                            f'Duplicate submit ignored. Reusing Action Log {action_log.log_no}.',
+                            extra_tags='tenant',
+                        )
+                        return redirect(
+                            reverse(
+                                'iroad_tenants:tenant_operation_action_log_detail',
+                                args=[action_log.log_id],
+                            )
+                        )
                     _tenant_operation_action_log_save_media_from_request(action_log, request)
-                    _tenant_operation_action_log_apply_side_effects(
-                        action_log,
-                        created_by_label=action_log.created_by_label,
-                    )
-                    if action_log.shipment_id:
-                        _tenant_shipment_sync_status_from_action_log(action_log.shipment)
                     if action_log.shipment_id:
                         request.session['tenant_action_log_birth'] = {
                             'shipment_id': str(action_log.shipment_id),
@@ -11967,83 +11922,6 @@ def _tenant_shipment_sync_sales_report_backlinks(report):
     )
 
 
-def _tenant_operation_action_matches(action, *needles):
-    if action is None:
-        return False
-    blob = f'{(action.action_code or "")} {(action.english_label or "")}'.lower()
-    return any(needle.lower() in blob for needle in needles)
-
-
-def _tenant_resolve_shipment_status_impact(raw_value):
-    """Map Action Master shipment_status_impact to TenantShipment.ShipmentStatus."""
-    token = (raw_value or '').strip()
-    if not token:
-        return None
-    if token in {choice[0] for choice in TenantShipment.ShipmentStatus.choices}:
-        return token
-    normalized = token.lower().replace('-', '_').replace(' ', '_')
-    alias_map = {
-        'loaded': TenantShipment.ShipmentStatus.LOADED,
-        'created': TenantShipment.ShipmentStatus.CREATED,
-        'in_transit': TenantShipment.ShipmentStatus.IN_TRANSIT,
-        'at_delivery': TenantShipment.ShipmentStatus.AT_DELIVERY,
-        'pod_submitted': TenantShipment.ShipmentStatus.POD_SUBMITTED,
-        'delivered': TenantShipment.ShipmentStatus.DELIVERED,
-        'closed': TenantShipment.ShipmentStatus.CLOSED,
-        'cancelled': TenantShipment.ShipmentStatus.CANCELLED,
-    }
-    return alias_map.get(normalized)
-
-
-def _tenant_resolve_movement_status_impact(raw_value):
-    token = (raw_value or '').strip()
-    if not token:
-        return None
-    if token in {choice[0] for choice in TenantTruckMovementLog.Status.choices}:
-        return token
-    normalized = token.lower().replace('-', '_').replace(' ', '_')
-    alias_map = {
-        'scheduled': TenantTruckMovementLog.Status.SCHEDULED,
-        'in_progress': TenantTruckMovementLog.Status.IN_PROGRESS,
-        'completed': TenantTruckMovementLog.Status.COMPLETED,
-        'cancelled': TenantTruckMovementLog.Status.CANCELLED,
-    }
-    return alias_map.get(normalized)
-
-
-def _tenant_shipment_validate_status_transition(shipment, new_status):
-    """Doc §4.6 — gate Delivered on POD compliance and COD collection."""
-    if shipment is None or not new_status:
-        return
-    if new_status != TenantShipment.ShipmentStatus.DELIVERED:
-        return
-    compliant_statuses = {
-        TenantShipment.PodStatus.COMPLIANT,
-        TenantShipment.PodStatus.HARD_COPY_RECEIVED,
-    }
-    if (shipment.pod_status or '') not in compliant_statuses:
-        raise ValidationError(
-            'Shipment cannot move to Delivered until POD is compliant '
-            '(all delivery-note documents verified).'
-        )
-    if shipment.order_type.upper() == 'COD':
-        if shipment.collection_status != TenantShipment.CollectionStatus.COLLECTED:
-            raise ValidationError(
-                'COD shipment cannot move to Delivered until payment is collected.'
-            )
-
-
-def _tenant_shipment_after_status_side_effects(shipment):
-    if shipment is None:
-        return
-    if shipment.shipment_status in {
-        TenantShipment.ShipmentStatus.DELIVERED,
-        TenantShipment.ShipmentStatus.CLOSED,
-    }:
-        _tenant_truck_movement_auto_complete_loaded_for_shipment(shipment)
-    _tenant_shipment_document_refresh_shipment_pod(shipment)
-
-
 def _tenant_manual_override_action_code_for_status(shipment_status):
     normalized = re.sub(r'[^A-Z0-9]+', '_', (shipment_status or '').upper()).strip('_')
     return f'MANUAL-STATUS-{normalized or "UNKNOWN"}'[:64]
@@ -12077,39 +11955,6 @@ def _tenant_get_or_create_manual_override_action(shipment_status):
         action.shipment_status_impact = shipment_status
         action.save(update_fields=['shipment_status_impact', 'updated_at'])
     return action
-
-
-def _tenant_shipment_derive_latest_action_status(shipment):
-    if shipment is None:
-        return None
-    latest_logs = (
-        TenantOperationActionLog.objects.filter(shipment_id=shipment.pk)
-        .select_related('operation_action')
-        .exclude(operation_action__isnull=True)
-        .order_by('-log_date', '-created_at')[:50]
-    )
-    for log in latest_logs:
-        derived = _tenant_resolve_shipment_status_impact(
-            getattr(log.operation_action, 'shipment_status_impact', '')
-        )
-        if derived:
-            return derived
-    return None
-
-
-def _tenant_shipment_sync_status_from_action_log(shipment):
-    """
-    Gap 4 (hybrid): keep shipment_status column as cache, derive from latest action log.
-    """
-    if shipment is None:
-        return shipment
-    derived_status = _tenant_shipment_derive_latest_action_status(shipment)
-    if not derived_status or shipment.shipment_status == derived_status:
-        return shipment
-    shipment.shipment_status = derived_status
-    shipment.save(update_fields=['shipment_status', 'updated_at'])
-    _tenant_shipment_after_status_side_effects(shipment)
-    return shipment
 
 
 def _tenant_shipment_create_manual_override_action_log(
@@ -12220,22 +12065,6 @@ def _tenant_shipment_create_manual_override_action_log(
     return action_log
 
 
-def _tenant_operation_action_apply_booking_status_impact(booking, raw_impact):
-    if booking is None:
-        return
-    token = (raw_impact or '').strip().lower()
-    if not token:
-        return
-    if token in {'draft'}:
-        if booking.booking_status != TenantBooking.Status.CANCELLED:
-            booking.booking_status = TenantBooking.Status.DRAFT
-            booking.save(update_fields=['booking_status', 'updated_at'])
-    elif token in {'confirmed', 'in_progress', 'completed', 'active'}:
-        if booking.booking_status == TenantBooking.Status.DRAFT:
-            booking.booking_status = TenantBooking.Status.CONFIRMED
-            booking.save(update_fields=['booking_status', 'updated_at'])
-
-
 def _tenant_shipment_pod_assert_unique_source(source_document, form_errors, *, exclude_document_id=None):
     if source_document is None:
         return
@@ -12246,85 +12075,6 @@ def _tenant_shipment_pod_assert_unique_source(source_document, form_errors, *, e
         form_errors['source_document_id'] = (
             'A POD record already exists for this delivery note.'
         )
-
-
-def _tenant_shipment_pod_birth_from_action_log(action_log, *, created_by_label=''):
-    """Action 7 / auto_pod_post — one POD record per delivery-note document."""
-    shipment = action_log.shipment
-    if shipment is None:
-        return None
-    source_document = (
-        TenantShipmentDocument.objects.filter(
-            shipment=shipment,
-            is_delivery_note=True,
-        )
-        .order_by('-created_at')
-        .first()
-    )
-    if source_document is None:
-        raise ValidationError(
-            'Auto POD Post requires at least one delivery-note document on the shipment.'
-        )
-    existing_pod = TenantShipmentDocument.objects.filter(
-        source_document_id=source_document.pk,
-    ).first()
-    if existing_pod is not None:
-        return existing_pod
-
-    record_no, record_sequence = _next_auto_number_for_form(
-        form_code=SHIPMENT_POD_AUTO_FORM_CODE,
-        form_label=SHIPMENT_POD_AUTO_FORM_LABEL,
-        prefix=SHIPMENT_POD_REF_PREFIX,
-    )
-    document = TenantShipmentDocument(
-        record_no=record_no,
-        record_sequence=record_sequence,
-        record_date=timezone.localdate(),
-        document_type='pod',
-        document_ref_no=source_document.document_ref_no,
-        document_date=source_document.document_date or timezone.localdate(),
-        physical_location='With Driver',
-        page_count=source_document.page_count or 1,
-        status=TenantShipmentDocument.Status.DRAFT,
-        source_document=source_document,
-        created_by_label=(created_by_label or '')[:200],
-    )
-    _tenant_shipment_document_apply_foreign_keys(
-        document,
-        booking=shipment.booking if shipment.booking_id else None,
-        shipment=shipment,
-    )
-    document.save()
-
-    line_payload = _tenant_shipment_pod_build_line_rows_from_source(source_document)
-    TenantShipmentPodPage.objects.filter(document=document).delete()
-    for idx, row in enumerate(line_payload, start=1):
-        if not isinstance(row, dict):
-            continue
-        source_page = _tenant_shipment_pod_resolve_line_source_page(
-            row.get('doc_page'),
-            source_document,
-            {},
-        )
-        TenantShipmentPodPage.objects.create(
-            document=document,
-            line_no=idx,
-            source_page=source_page,
-            doc_page=_tenant_shipment_pod_page_label(source_page) if source_page else row.get('doc_page', ''),
-            source=row.get('source') or 'Action Log',
-            action_log=row.get('action_log') or action_log.log_no,
-            physical_location=row.get('physical_location') or 'With Driver',
-            soft_copy_status=row.get('soft_copy_status') or 'Not Collected',
-            digital_evidence_status=row.get('digital_evidence_status') or 'Not Collected',
-            map_url=row.get('map_url') or '',
-            attachment_label=row.get('attachment_label') or '',
-        )
-
-    if _tenant_operation_action_matches(action_log.operation_action, 'upload pod', 'a7', 'action 7'):
-        shipment.pod_type = TenantShipment.PodType.DIGITAL
-        shipment.save(update_fields=['pod_type', 'updated_at'])
-
-    return document
 
 
 def _tenant_shipment_document_guard_mutable(document, *, new_status=None):
@@ -12402,120 +12152,6 @@ def _tenant_document_handover_sync_page_custody(handover, source_document):
             if custody in allowed:
                 doc_page.signer_location = custody
                 doc_page.save(update_fields=['signer_location', 'updated_at'])
-
-
-def _tenant_operation_action_log_apply_side_effects(action_log, *, created_by_label=''):
-    """
-    Apply Action Master impacts after log save (doc Ch.2–4).
-    Atomic shipment + movement birth when auto_post flags or Confirm Loaded action.
-    """
-    action = action_log.operation_action
-    if action is None:
-        return
-
-    booking = action_log.booking
-    shipment = action_log.shipment
-    truck_movement = action_log.truck_movement
-    log_date = action_log.log_date
-    shipment_date = log_date.date() if log_date else timezone.localdate()
-
-    # Start Job (A1) execution date stamp — disabled until driver API is implemented.
-    # if booking is not None and _tenant_operation_action_matches(action, 'start job', 'a1', 'action 1'):
-    #     if booking.execution_date is None:
-    #         booking.execution_date = shipment_date
-    #         booking.save(update_fields=['execution_date', 'updated_at'])
-
-    if booking is not None and (action.booking_status_impact or '').strip():
-        _tenant_operation_action_apply_booking_status_impact(
-            booking,
-            action.booking_status_impact,
-        )
-
-    if booking is not None and shipment is None and action.auto_shipment_post:
-        booking_item_type_hint = (getattr(action_log, '_birth_booking_item_type', None) or '').strip()
-        target_line = _tenant_shipment_match_booking_line(
-            booking,
-            booking_item_type=booking_item_type_hint,
-        )
-        if target_line is None:
-            for line in _tenant_shipment_booking_line_rows(booking):
-                if not _tenant_shipment_has_active_duplicate(booking, line['booking_item_type']):
-                    target_line = line
-                    break
-        if target_line is None:
-            raise ValidationError(
-                'Auto Shipment Post requires a confirmed booking line without an active shipment.'
-            )
-        shipment = _tenant_shipment_birth_from_booking_line(
-            booking,
-            target_line,
-            shipment_date=shipment_date,
-            created_by_label=created_by_label,
-        )
-        action_log.shipment = shipment
-        action_log.truck = shipment.truck
-        action_log.driver = shipment.driver
-        action_log.save(update_fields=['shipment', 'truck', 'driver', 'updated_at'])
-
-    if shipment is not None and truck_movement is None and action.auto_movement_post:
-        truck_movement = _tenant_truck_movement_birth_for_shipment(
-            shipment,
-            movement_date=shipment_date,
-            created_by_label=created_by_label,
-        )
-        action_log.truck_movement = truck_movement
-        action_log.save(update_fields=['truck_movement', 'updated_at'])
-
-    if shipment is not None and action.auto_pod_post:
-        pod_document = _tenant_shipment_pod_birth_from_action_log(
-            action_log,
-            created_by_label=created_by_label,
-        )
-        if (
-            pod_document is not None
-            and _tenant_operation_action_matches(action, 'upload pod', 'a7', 'action 7')
-        ):
-            _tenant_shipment_pod_apply_posting_effects(
-                document=pod_document,
-                source_document=pod_document.source_document,
-                shipment=shipment,
-                header_physical_location='with_driver',
-            )
-            pod_document.save(update_fields=['status', 'physical_location', 'updated_at'])
-
-    if shipment is not None and (action.shipment_status_impact or '').strip():
-        new_status = _tenant_resolve_shipment_status_impact(action.shipment_status_impact)
-        if new_status:
-            _tenant_shipment_validate_status_transition(shipment, new_status)
-            shipment.shipment_status = new_status
-            shipment.save(update_fields=['shipment_status', 'updated_at'])
-            _tenant_shipment_after_status_side_effects(shipment)
-
-    if (
-        shipment is not None
-        and shipment.order_type.upper() == 'COD'
-        and _tenant_operation_action_matches(action, 'collect payment', 'a9', 'action 9')
-    ):
-        shipment.collection_status = TenantShipment.CollectionStatus.COLLECTED
-        shipment.save(update_fields=['collection_status', 'updated_at'])
-        post_cod_collection_for_action9(
-            shipment=shipment,
-            action_log=action_log,
-        )
-
-    if truck_movement is not None and (action.movement_status_impact or '').strip():
-        movement_status = _tenant_resolve_movement_status_impact(action.movement_status_impact)
-        if movement_status:
-            truck_movement.status = movement_status
-            truck_movement.save(update_fields=['status', 'updated_at'])
-
-    if (
-        shipment is not None
-        and action.hard_copy_collection
-        and _tenant_operation_action_matches(action, 'upload pod', 'a7', 'action 7', 'confirm loaded', 'a4')
-    ):
-        shipment.pod_type = TenantShipment.PodType.HARD
-        shipment.save(update_fields=['pod_type', 'updated_at'])
 
 
 def _tenant_shipment_birth_from_booking_line(booking, matched_line, *, shipment_date=None, created_by_label=''):
@@ -12646,39 +12282,6 @@ def _tenant_shipment_birth_from_booking_line(booking, matched_line, *, shipment_
     shipment.full_clean()
     shipment.save()
     return shipment
-
-
-def _tenant_truck_movement_birth_for_shipment(shipment, *, movement_date=None, created_by_label=''):
-    """Truck movement born with shipment at Confirm Loaded (doc §4.4)."""
-    existing = (
-        TenantTruckMovementLog.objects.filter(shipment_id=shipment.pk)
-        .exclude(status=TenantTruckMovementLog.Status.CANCELLED)
-        .order_by('-created_at')
-        .first()
-    )
-    if existing is not None:
-        return existing
-    movement_date = movement_date or shipment.shipment_date or timezone.localdate()
-    movement_no, movement_sequence = _next_auto_number_for_form(
-        form_code=TRUCK_MOVEMENT_LOG_AUTO_FORM_CODE,
-        form_label=TRUCK_MOVEMENT_LOG_AUTO_FORM_LABEL,
-        prefix=TRUCK_MOVEMENT_LOG_REF_PREFIX,
-    )
-    movement = TenantTruckMovementLog(
-        movement_no=movement_no,
-        movement_sequence=movement_sequence,
-        movement_date=movement_date,
-        movement_source='Loaded',
-        status=TenantTruckMovementLog.Status.IN_PROGRESS,
-        booking=shipment.booking,
-        shipment=shipment,
-        truck=shipment.truck,
-        driver=shipment.driver,
-        start_time=timezone.now(),
-        created_by_label=(created_by_label or '')[:200],
-    )
-    movement.save()
-    return movement
 
 
 def _tenant_shipment_manual_create_allowed():

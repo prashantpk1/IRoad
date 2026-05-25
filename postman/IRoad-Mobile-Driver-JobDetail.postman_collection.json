@@ -1,0 +1,1745 @@
+{
+	"info": {
+		"_postman_id": "c9d0e1f2-a3b4-5678-9012-jobdetail7890ab",
+		"name": "IRoad Mobile Driver — Job Detail Module",
+		"description": "# IRoad Mobile — Job Detail Module\n\n## Prerequisites\n1. Import **IRoad Mobile Driver Job Detail — Local** environment.\n2. Set `base_url`, `email`, `password`, optional `tenant_id`.\n3. Run **Setup → Login**.\n4. Run **00 — Resolve IDs** (sets `shipment_id` / `movement_id`).\n5. Run **08 — Smoke Flows → Flow A** in Collection Runner.\n\n## Capabilities\n| Route type | Capability |\n|------------|------------|\n| GET detail / timeline / allowed-actions | `mobile.driver.jobs` |\n| POST execute / upload-pod / collect-cod | `mobile.driver.jobs.execute` |\n\n## Docs\n- `mobile_api/docs/driver_job_detail.md`\n- `mobile_api/docs/driver_job_detail_execution.md`\n- `mobile_api/docs/driver_job_timeline.md`\n- `mobile_api/docs/driver_job_pod_cod.md`\n- `postman/README-JobDetail.md`",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{access_token}}",
+				"type": "string"
+			}
+		]
+	},
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"if (!pm.environment.get('access_token') && !pm.request.url.path.join('/').includes('login')) {",
+					"    console.warn('access_token empty — run Setup → Login first');",
+					"}"
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://127.0.0.1:8000"
+		},
+		{
+			"key": "api_prefix",
+			"value": "/api/v1/mobile"
+		}
+	],
+	"item": [
+		{
+			"name": "Setup",
+			"description": "JWT automation — run Login before all job detail calls.",
+			"item": [
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+									"const j = pm.response.json();",
+									"pm.test('status === 1', () => pm.expect(j.status).to.eql(1));",
+									"if (j.status === 1 && j.data) {",
+									"    if (j.data.access_token) pm.environment.set('access_token', j.data.access_token);",
+									"    if (j.data.refresh_token) pm.environment.set('refresh_token', j.data.refresh_token);",
+									"    if (j.data.driver && j.data.driver.driver_id) pm.environment.set('driver_id', j.data.driver.driver_id);",
+									"    if (j.data.tenant && j.data.tenant.tenant_id) pm.environment.set('tenant_id', j.data.tenant.tenant_id);",
+									"    if (j.data.tenant && j.data.tenant.schema_name) pm.environment.set('tenant_schema', j.data.tenant.schema_name);",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\",\n  \"device_platform\": \"{{device_platform}}\",\n  \"device_id\": \"{{fcm_token}}\",\n  \"device_name\": \"{{device_name}}\"\n}"
+						},
+						"url": "{{base_url}}{{api_prefix}}/driver/auth/login/",
+						"description": "**POST** · No auth · Saves `access_token`, `refresh_token`, `driver_id`, `tenant_id`."
+					}
+				},
+				{
+					"name": "Refresh Token",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"const j = pm.response.json();",
+									"if (j.status === 1 && j.data && j.data.access_token) pm.environment.set('access_token', j.data.access_token);"
+								]
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"refresh_token\": \"{{refresh_token}}\"}"
+						},
+						"url": "{{base_url}}{{api_prefix}}/driver/auth/refresh/"
+					}
+				}
+			]
+		},
+		{
+			"name": "00 — Resolve IDs",
+			"description": "Pick first active shipment/movement from job list into environment variables.",
+			"item": [
+				{
+					"name": "GET Active Shipments (pick shipment_id)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": "{{base_url}}{{api_prefix}}/driver/jobs/shipments/active/?page_size=5",
+						"description": "| Method | GET |\n| Capability | `mobile.driver.jobs` |\n| Sets | `shipment_id` |"
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+									"const j = pm.response.json();",
+									"pm.test('status === 1', () => pm.expect(j.status).to.eql(1));",
+									"if (j.data && j.data.items && j.data.items[0]) {",
+									"    pm.environment.set('shipment_id', j.data.items[0].job_id);",
+									"    pm.environment.set('last_job_type', 'shipment');",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "GET Active Movements (pick movement_id)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": "{{base_url}}{{api_prefix}}/driver/jobs/movements/active/?page_size=5",
+						"description": "| Method | GET |\n| Sets | `movement_id` |"
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+									"const j = pm.response.json();",
+									"pm.test('status === 1', () => pm.expect(j.status).to.eql(1));",
+									"if (j.data && j.data.items && j.data.items[0]) {",
+									"    pm.environment.set('movement_id', j.data.items[0].job_id);",
+									"    pm.environment.set('last_job_type', 'movement');",
+									"}"
+								]
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "01 — Job Detail (Read)",
+			"item": [
+				{
+					"name": "GET Shipment Job Detail (full)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": "{{base_url}}{{api_prefix}}/driver/jobs/shipments/{{shipment_id}}/?include_timeline=1&include_actions=1",
+						"description": "| Method | GET |\n| URL | `/api/v1/mobile/driver/jobs/shipments/{shipment_id}/` |\n| Auth | Bearer + optional `X-Tenant-ID` |\n| Capability | `mobile.driver.jobs` |\n| Query | `include_timeline=1`, `include_actions=1` (default)"
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+									"const j = pm.response.json();",
+									"pm.test('status === 1', () => pm.expect(j.status).to.eql(1));",
+									"pm.test('snapshot present', () => pm.expect(j.data.snapshot).to.be.an('object'));",
+									"const s = j.data.snapshot;",
+									"if (s.job_id) pm.environment.set('shipment_id', s.job_id);"
+								]
+							}
+						}
+					],
+					"response": [
+						{
+							"name": "401 Unauthorized",
+							"status": "Unauthorized",
+							"code": 401,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\"status\": 2, \"message_key\": \"mobile.auth.unauthorized\", \"data\": {\"error_code\": \"unauthorized\"}}"
+						},
+						{
+							"name": "403 Jobs denied",
+							"status": "Forbidden",
+							"code": 403,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\"status\": 0, \"message_key\": \"mobile.auth.jobs_denied\", \"data\": {\"error_code\": \"jobs_denied\"}}"
+						},
+						{
+							"name": "404 Job not found",
+							"status": "Not Found",
+							"code": 404,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\"status\": 0, \"message_key\": \"mobile.jobs.detail.not_found\", \"data\": {\"error_code\": \"job_not_found\"}}"
+						}
+					]
+				},
+				{
+					"name": "GET Shipment Job Detail (light)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": "{{base_url}}{{api_prefix}}/driver/jobs/shipments/{{shipment_id}}/?include_timeline=0&include_actions=0",
+						"description": "Omit timeline + allowed-actions engine for faster load."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "GET Movement Job Detail",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": "{{base_url}}{{api_prefix}}/driver/jobs/movements/{{movement_id}}/?include_timeline=1&include_actions=1",
+						"description": "| Method | GET |\n| URL | `/api/v1/mobile/driver/jobs/movements/{movement_id}/` |\n| Capability | `mobile.driver.jobs` |"
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+									"const j = pm.response.json();",
+									"pm.test('status === 1', () => pm.expect(j.status).to.eql(1));",
+									"pm.test('snapshot present', () => pm.expect(j.data.snapshot).to.be.an('object'));",
+									"const s = j.data.snapshot;",
+									"if (s.job_id) pm.environment.set('shipment_id', s.job_id);"
+								]
+							}
+						}
+					],
+					"response": [
+						{
+							"name": "404 Job not found",
+							"status": "Not Found",
+							"code": 404,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\"status\": 0, \"message_key\": \"mobile.jobs.detail.not_found\", \"data\": {\"error_code\": \"job_not_found\"}}"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "02 — Allowed Actions",
+			"item": [
+				{
+					"name": "GET Shipment Allowed Actions",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": "{{base_url}}{{api_prefix}}/driver/jobs/shipments/{{shipment_id}}/actions/",
+						"description": "| Method | GET |\n| Engine | `operation_execution.get_allowed_actions` |\n| Sets | `action_id` from `primary_action` or first action |"
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+									"const j = pm.response.json();",
+									"pm.test('status === 1', () => pm.expect(j.status).to.eql(1));",
+									"const aa = j.data.allowed_actions;",
+									"pm.test('allowed_actions block', () => pm.expect(aa).to.have.property('actions');",
+									"if (aa.primary_action && aa.primary_action.action_id) {",
+									"    pm.environment.set('action_id', aa.primary_action.action_id);",
+									"}",
+									"if (aa.actions && aa.actions[0] && aa.actions[0].action_id) {",
+									"    pm.environment.set('action_id', aa.actions[0].action_id);",
+									"}"
+								]
+							}
+						}
+					],
+					"response": [
+						{
+							"name": "404 Job not found",
+							"status": "Not Found",
+							"code": 404,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\"status\": 0, \"message_key\": \"mobile.jobs.detail.not_found\", \"data\": {\"error_code\": \"job_not_found\"}}"
+						},
+						{
+							"name": "403 Jobs denied",
+							"status": "Forbidden",
+							"code": 403,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\"status\": 0, \"message_key\": \"mobile.auth.jobs_denied\", \"data\": {\"error_code\": \"jobs_denied\"}}"
+						}
+					]
+				},
+				{
+					"name": "GET Movement Allowed Actions",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": "{{base_url}}{{api_prefix}}/driver/jobs/movements/{{movement_id}}/actions/",
+						"description": "| Method | GET |\n| Capability | `mobile.driver.jobs` |"
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+									"const j = pm.response.json();",
+									"pm.test('status === 1', () => pm.expect(j.status).to.eql(1));",
+									"const aa = j.data.allowed_actions;",
+									"pm.test('allowed_actions block', () => pm.expect(aa).to.have.property('actions');",
+									"if (aa.primary_action && aa.primary_action.action_id) {",
+									"    pm.environment.set('action_id', aa.primary_action.action_id);",
+									"}",
+									"if (aa.actions && aa.actions[0] && aa.actions[0].action_id) {",
+									"    pm.environment.set('action_id', aa.actions[0].action_id);",
+									"}"
+								]
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "03 — Timeline (cursor)",
+			"item": [
+				{
+					"name": "GET Shipment Timeline — page 1",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": "{{base_url}}{{api_prefix}}/driver/jobs/shipments/{{shipment_id}}/timeline/?page_size={{timeline_page_size}}",
+						"description": "| Method | GET |\n| Query | `page_size` (default 20, max 50) |\n| Pagination | cursor only — **no offset** |\n| Sets | `timeline_next_cursor` |"
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+									"const j = pm.response.json();",
+									"pm.test('status === 1', () => pm.expect(j.status).to.eql(1));",
+									"const t = j.data.timeline;",
+									"pm.test('cursor pagination', () => {",
+									"    pm.expect(t.pagination.mode).to.eql('cursor');",
+									"    pm.expect(t.items).to.be.an('array');",
+									"});",
+									"if (t.pagination && t.pagination.next_cursor) {",
+									"    pm.environment.set('timeline_next_cursor', t.pagination.next_cursor);",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "GET Shipment Timeline — page 2 (cursor)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": "{{base_url}}{{api_prefix}}/driver/jobs/shipments/{{shipment_id}}/timeline/?page_size={{timeline_page_size}}&cursor={{timeline_next_cursor}}",
+						"description": "Pass opaque `cursor` from page 1 `pagination.next_cursor`."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+									"const j = pm.response.json();",
+									"pm.test('status === 1', () => pm.expect(j.status).to.eql(1));"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "GET Movement Timeline — page 1",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": "{{base_url}}{{api_prefix}}/driver/jobs/movements/{{movement_id}}/timeline/?page_size={{timeline_page_size}}",
+						"description": "| Method | GET |\n| Capability | `mobile.driver.jobs` |"
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+									"const j = pm.response.json();",
+									"pm.test('status === 1', () => pm.expect(j.status).to.eql(1));",
+									"const t = j.data.timeline;",
+									"pm.test('cursor pagination', () => {",
+									"    pm.expect(t.pagination.mode).to.eql('cursor');",
+									"    pm.expect(t.items).to.be.an('array');",
+									"});",
+									"if (t.pagination && t.pagination.next_cursor) {",
+									"    pm.environment.set('timeline_next_cursor', t.pagination.next_cursor);",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "GET Timeline — invalid cursor (400)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": "{{base_url}}{{api_prefix}}/driver/jobs/shipments/{{shipment_id}}/timeline/?cursor=not-a-valid-cursor-token",
+						"description": "Expect `invalid_cursor` when cursor token is malformed."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('HTTP 400', () => pm.response.to.have.status(400));",
+									"const j = pm.response.json();",
+									"pm.test('invalid_cursor', () => pm.expect(j.data.error_code || j.message_key).to.be.ok);"
+								]
+							}
+						}
+					],
+					"response": [
+						{
+							"name": "400 Invalid cursor",
+							"status": "Bad Request",
+							"code": 400,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\"status\": 0, \"message_key\": \"mobile.jobs.timeline.invalid_cursor\", \"data\": {\"error_code\": \"invalid_cursor\"}}"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "04 — Execute Action",
+			"description": "Capability: `mobile.driver.jobs.execute`. Run **02 — Allowed Actions** first to set `action_id`.",
+			"item": [
+				{
+					"name": "POST Shipment Execute Action (JSON + GPS)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"action_id\": \"{{action_id}}\",\n  \"idempotency_key\": \"{{idempotency_key}}\",\n  \"source_ref\": \"{{source_ref}}\",\n  \"notes\": \"Postman execute — GPS captured\",\n  \"latitude\": \"{{sample_latitude}}\",\n  \"longitude\": \"{{sample_longitude}}\",\n  \"map_link\": \"{{sample_map_link}}\"\n}"
+						},
+						"url": "{{base_url}}{{api_prefix}}/driver/jobs/shipments/{{shipment_id}}/actions/execute/",
+						"description": "| Method | POST |\n| Content-Type | application/json |\n| Idempotency | `idempotency_key` + `source_ref` auto-generated in pre-request |\n| GPS | Riyadh example coordinates |"
+					},
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.environment.set('idempotency_key', pm.variables.replaceIn('{{$guid}}'));",
+									"pm.environment.set('source_ref', 'postman-' + Date.now());"
+								]
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"const code = pm.response.code;",
+									"pm.test('HTTP 200 or 403 policy', () => pm.expect([200, 403]).to.include(code));",
+									"if (code === 200) {",
+									"    const j = pm.response.json();",
+									"    pm.test('status === 1', () => pm.expect(j.status).to.eql(1));",
+									"    pm.test('execution block', () => pm.expect(j.data.execution).to.have.property('log_id'));",
+									"    if (j.data.execution.log_id) pm.environment.set('last_log_id', j.data.execution.log_id);",
+									"    const key = pm.environment.get('idempotency_key');",
+									"    if (key) pm.environment.set('saved_idempotency_key', key);",
+									"}"
+								]
+							}
+						}
+					],
+					"response": [
+						{
+							"name": "403 Execute denied",
+							"status": "Forbidden",
+							"code": 403,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\"status\": 0, \"message_key\": \"mobile.auth.jobs_execute_denied\", \"data\": {\"error_code\": \"capability_denied\"}}"
+						},
+						{
+							"name": "403 Action not allowed",
+							"status": "Forbidden",
+							"code": 403,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\"status\": 0, \"message_key\": \"mobile.jobs.execute.not_allowed\", \"data\": {\"error_code\": \"action_not_allowed\"}}"
+						},
+						{
+							"name": "404 Job not found",
+							"status": "Not Found",
+							"code": 404,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\"status\": 0, \"message_key\": \"mobile.jobs.detail.not_found\", \"data\": {\"error_code\": \"job_not_found\"}}"
+						}
+					]
+				},
+				{
+					"name": "POST Shipment Execute — idempotency replay",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"action_id\": \"{{action_id}}\",\n  \"idempotency_key\": \"{{saved_idempotency_key}}\",\n  \"source_ref\": \"{{source_ref}}\",\n  \"notes\": \"Postman execute — GPS captured\",\n  \"latitude\": \"{{sample_latitude}}\",\n  \"longitude\": \"{{sample_longitude}}\",\n  \"map_link\": \"{{sample_map_link}}\"\n}"
+						},
+						"url": "{{base_url}}{{api_prefix}}/driver/jobs/shipments/{{shipment_id}}/actions/execute/",
+						"description": "Re-send **same** `idempotency_key` (disable pre-request or copy saved key). Expect `reused_existing: true`."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+									"const j = pm.response.json();",
+									"if (j.data && j.data.execution) {",
+									"    pm.test('reused_existing true', () => pm.expect(j.data.execution.reused_existing).to.eql(true));",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "POST Shipment Execute (multipart + media_file)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "action_id",
+									"value": "{{action_id}}",
+									"type": "text"
+								},
+								{
+									"key": "idempotency_key",
+									"value": "{{idempotency_key}}",
+									"type": "text"
+								},
+								{
+									"key": "notes",
+									"value": "POD photo via Postman",
+									"type": "text"
+								},
+								{
+									"key": "latitude",
+									"value": "{{sample_latitude}}",
+									"type": "text"
+								},
+								{
+									"key": "longitude",
+									"value": "{{sample_longitude}}",
+									"type": "text"
+								},
+								{
+									"key": "media_file",
+									"type": "file",
+									"src": [],
+									"description": "Attach image file"
+								},
+								{
+									"key": "media_type",
+									"value": "photo",
+									"type": "text"
+								}
+							]
+						},
+						"url": "{{base_url}}{{api_prefix}}/driver/jobs/shipments/{{shipment_id}}/actions/execute/",
+						"description": "Multipart execute when action requires photo proof.\n\nSelect a file for `media_file` in Postman."
+					},
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.environment.set('idempotency_key', pm.variables.replaceIn('{{$guid}}'));",
+									"pm.environment.set('source_ref', 'postman-' + Date.now());"
+								]
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"const code = pm.response.code;",
+									"pm.test('HTTP 200 or 403 policy', () => pm.expect([200, 403]).to.include(code));",
+									"if (code === 200) {",
+									"    const j = pm.response.json();",
+									"    pm.test('status === 1', () => pm.expect(j.status).to.eql(1));",
+									"    pm.test('execution block', () => pm.expect(j.data.execution).to.have.property('log_id'));",
+									"    if (j.data.execution.log_id) pm.environment.set('last_log_id', j.data.execution.log_id);",
+									"    const key = pm.environment.get('idempotency_key');",
+									"    if (key) pm.environment.set('saved_idempotency_key', key);",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "POST Movement Execute Action (JSON)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"action_id\": \"{{action_id}}\",\n  \"idempotency_key\": \"{{idempotency_key}}\",\n  \"source_ref\": \"{{source_ref}}\",\n  \"notes\": \"Postman execute — GPS captured\",\n  \"latitude\": \"{{sample_latitude}}\",\n  \"longitude\": \"{{sample_longitude}}\",\n  \"map_link\": \"{{sample_map_link}}\"\n}"
+						},
+						"url": "{{base_url}}{{api_prefix}}/driver/jobs/movements/{{movement_id}}/actions/execute/",
+						"description": "| Method | POST |\n| URL | `/movements/{movement_id}/actions/execute/` |"
+					},
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.environment.set('idempotency_key', pm.variables.replaceIn('{{$guid}}'));",
+									"pm.environment.set('source_ref', 'postman-' + Date.now());"
+								]
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"const code = pm.response.code;",
+									"pm.test('HTTP 200 or 403 policy', () => pm.expect([200, 403]).to.include(code));",
+									"if (code === 200) {",
+									"    const j = pm.response.json();",
+									"    pm.test('status === 1', () => pm.expect(j.status).to.eql(1));",
+									"    pm.test('execution block', () => pm.expect(j.data.execution).to.have.property('log_id'));",
+									"    if (j.data.execution.log_id) pm.environment.set('last_log_id', j.data.execution.log_id);",
+									"    const key = pm.environment.get('idempotency_key');",
+									"    if (key) pm.environment.set('saved_idempotency_key', key);",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "POST Execute — invalid action_id (400)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"action_id\": \"00000000-0000-0000-0000-000000000099\", \"idempotency_key\": \"{{idempotency_key}}\", \"latitude\": \"{{sample_latitude}}\", \"longitude\": \"{{sample_longitude}}\"}"
+						},
+						"url": "{{base_url}}{{api_prefix}}/driver/jobs/shipments/{{shipment_id}}/actions/execute/",
+						"description": "Tampered / unknown action UUID."
+					},
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.environment.set('idempotency_key', pm.variables.replaceIn('{{$guid}}'));",
+									"pm.environment.set('source_ref', 'postman-' + Date.now());"
+								]
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('HTTP 400 or 403', () => pm.expect([400, 403]).to.include(pm.response.code));"
+								]
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "05 — Upload POD",
+			"item": [
+				{
+					"name": "POST Upload POD (multipart)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "idempotency_key",
+									"value": "{{idempotency_key}}",
+									"type": "text"
+								},
+								{
+									"key": "source_ref",
+									"value": "{{source_ref}}",
+									"type": "text"
+								},
+								{
+									"key": "notes",
+									"value": "POD upload from Postman",
+									"type": "text"
+								},
+								{
+									"key": "latitude",
+									"value": "{{sample_latitude}}",
+									"type": "text"
+								},
+								{
+									"key": "longitude",
+									"value": "{{sample_longitude}}",
+									"type": "text"
+								},
+								{
+									"key": "map_link",
+									"value": "{{sample_map_link}}",
+									"type": "text"
+								},
+								{
+									"key": "media_file",
+									"type": "file",
+									"src": [],
+									"description": "POD image (required)"
+								}
+							]
+						},
+						"url": "{{base_url}}{{api_prefix}}/driver/jobs/shipments/{{shipment_id}}/upload-pod/",
+						"description": "| Method | POST |\n| Capability | `mobile.driver.jobs.execute` |\n| Resolves | Action 7 / Upload POD from Action Master |\n| Required | `media_file` + GPS when compliance requires |\n\nAttach a JPEG/PNG to `media_file`."
+					},
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.environment.set('idempotency_key', pm.variables.replaceIn('{{$guid}}'));",
+									"pm.environment.set('source_ref', 'postman-' + Date.now());"
+								]
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"const code = pm.response.code;",
+									"pm.test('HTTP 200 or validation', () => pm.expect([200, 400, 403]).to.include(code));",
+									"if (code === 200) {",
+									"    const j = pm.response.json();",
+									"    pm.test('status === 1', () => pm.expect(j.status).to.eql(1));",
+									"    pm.expect(j.data.operation).to.eql('upload_pod');",
+									"}"
+								]
+							}
+						}
+					],
+					"response": [
+						{
+							"name": "403 Execute denied",
+							"status": "Forbidden",
+							"code": 403,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\"status\": 0, \"message_key\": \"mobile.auth.jobs_execute_denied\", \"data\": {\"error_code\": \"capability_denied\"}}"
+						},
+						{
+							"name": "404 Job not found",
+							"status": "Not Found",
+							"code": 404,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\"status\": 0, \"message_key\": \"mobile.jobs.detail.not_found\", \"data\": {\"error_code\": \"job_not_found\"}}"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "06 — Collect COD",
+			"item": [
+				{
+					"name": "POST Collect COD (JSON + GPS + amount)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"idempotency_key\": \"{{idempotency_key}}\",\n  \"source_ref\": \"{{source_ref}}\",\n  \"notes\": \"COD collected via Postman\",\n  \"latitude\": \"{{sample_latitude}}\",\n  \"longitude\": \"{{sample_longitude}}\",\n  \"map_link\": \"{{sample_map_link}}\",\n  \"cod_amount\": \"{{sample_cod_amount}}\"\n}"
+						},
+						"url": "{{base_url}}{{api_prefix}}/driver/jobs/shipments/{{shipment_id}}/collect-cod/",
+						"description": "| Method | POST |\n| Capability | `mobile.driver.jobs.execute` |\n| Resolves | Action 9 / Collect Payment |\n| Body | `cod_amount` optional — defaults to shipment COD |"
+					},
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.environment.set('idempotency_key', pm.variables.replaceIn('{{$guid}}'));",
+									"pm.environment.set('source_ref', 'postman-' + Date.now());"
+								]
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"const code = pm.response.code;",
+									"pm.test('HTTP 200 or validation', () => pm.expect([200, 400, 403]).to.include(code));",
+									"if (code === 200) {",
+									"    const j = pm.response.json();",
+									"    pm.test('status === 1', () => pm.expect(j.status).to.eql(1));",
+									"    pm.expect(j.data.operation).to.eql('collect_cod');",
+									"}"
+								]
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "07 — Error & Security Flows",
+			"item": [
+				{
+					"name": "GET Detail — no JWT (401)",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							}
+						],
+						"url": "{{base_url}}{{api_prefix}}/driver/jobs/shipments/{{shipment_id}}/"
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('HTTP 401', () => pm.response.to.have.status(401));"
+								]
+							}
+						}
+					],
+					"response": [
+						{
+							"name": "401 Unauthorized",
+							"status": "Unauthorized",
+							"code": 401,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\"status\": 2, \"message_key\": \"mobile.auth.unauthorized\", \"data\": {\"error_code\": \"unauthorized\"}}"
+						}
+					]
+				},
+				{
+					"name": "GET Detail — wrong tenant header (403)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{wrong_tenant_id}}"
+							}
+						],
+						"url": "{{base_url}}{{api_prefix}}/driver/jobs/shipments/{{shipment_id}}/",
+						"description": "JWT tenant must match `X-Tenant-ID` when hint is sent."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('HTTP 403', () => pm.response.to.have.status(403));"
+								]
+							}
+						}
+					],
+					"response": [
+						{
+							"name": "403 Tenant mismatch",
+							"status": "Forbidden",
+							"code": 403,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\"status\": 0, \"message_key\": \"mobile.auth.tenant_mismatch\", \"data\": {\"error_code\": \"tenant_mismatch\"}}"
+						}
+					]
+				},
+				{
+					"name": "GET Detail — foreign shipment (404 IDOR)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": "{{base_url}}{{api_prefix}}/driver/jobs/shipments/{{foreign_shipment_id}}/",
+						"description": "Shipment UUID not owned by authenticated driver."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('HTTP 404', () => pm.response.to.have.status(404));",
+									"const j = pm.response.json();",
+									"pm.test('job_not_found', () => pm.expect(j.message_key || j.data.error_code).to.be.ok);"
+								]
+							}
+						}
+					],
+					"response": [
+						{
+							"name": "404 Job not found",
+							"status": "Not Found",
+							"code": 404,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\"status\": 0, \"message_key\": \"mobile.jobs.detail.not_found\", \"data\": {\"error_code\": \"job_not_found\"}}"
+						}
+					]
+				},
+				{
+					"name": "GET Allowed Actions — foreign shipment (404)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							},
+							{
+								"key": "X-Tenant-ID",
+								"value": "{{tenant_id}}"
+							}
+						],
+						"url": "{{base_url}}{{api_prefix}}/driver/jobs/shipments/{{foreign_shipment_id}}/actions/",
+						"description": "Ownership guard — driver cannot read another driver's job."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('HTTP 404', () => pm.response.to.have.status(404));"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "POST Execute — foreign shipment (404)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"action_id\": \"{{action_id}}\",\n  \"idempotency_key\": \"{{idempotency_key}}\",\n  \"source_ref\": \"{{source_ref}}\",\n  \"notes\": \"Postman execute — GPS captured\",\n  \"latitude\": \"{{sample_latitude}}\",\n  \"longitude\": \"{{sample_longitude}}\",\n  \"map_link\": \"{{sample_map_link}}\"\n}"
+						},
+						"url": "{{base_url}}{{api_prefix}}/driver/jobs/shipments/{{foreign_shipment_id}}/actions/execute/",
+						"description": "IDOR attempt on execute route."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('HTTP 404', () => pm.response.to.have.status(404));"
+								]
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "08 — Smoke Flows (Collection Runner)",
+			"description": "Run folder in order after Login. Mutating steps may change tenant data — use a test driver.",
+			"item": [
+				{
+					"name": "Flow A — Read + Timeline + Actions",
+					"item": [
+						{
+							"name": "1 Pick active shipment",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{access_token}}"
+									},
+									{
+										"key": "Accept-Language",
+										"value": "{{accept_language}}"
+									},
+									{
+										"key": "X-Tenant-ID",
+										"value": "{{tenant_id}}"
+									}
+								],
+								"url": "{{base_url}}{{api_prefix}}/driver/jobs/shipments/active/?page_size=1",
+								"description": "Run Setup → Login before this flow."
+							},
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+											"const j = pm.response.json();",
+											"pm.test('status === 1', () => pm.expect(j.status).to.eql(1));",
+											"if (j.data && j.data.items && j.data.items[0]) {",
+											"    pm.environment.set('shipment_id', j.data.items[0].job_id);",
+											"    pm.environment.set('last_job_type', 'shipment');",
+											"}"
+										]
+									}
+								}
+							]
+						},
+						{
+							"name": "2 Shipment detail",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{access_token}}"
+									},
+									{
+										"key": "Accept-Language",
+										"value": "{{accept_language}}"
+									},
+									{
+										"key": "X-Tenant-ID",
+										"value": "{{tenant_id}}"
+									}
+								],
+								"url": "{{base_url}}{{api_prefix}}/driver/jobs/shipments/{{shipment_id}}/?include_timeline=0&include_actions=0",
+								"description": ""
+							},
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+											"const j = pm.response.json();",
+											"pm.test('status === 1', () => pm.expect(j.status).to.eql(1));",
+											"pm.test('snapshot present', () => pm.expect(j.data.snapshot).to.be.an('object'));",
+											"const s = j.data.snapshot;",
+											"if (s.job_id) pm.environment.set('shipment_id', s.job_id);"
+										]
+									}
+								}
+							]
+						},
+						{
+							"name": "3 Allowed actions",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{access_token}}"
+									},
+									{
+										"key": "Accept-Language",
+										"value": "{{accept_language}}"
+									},
+									{
+										"key": "X-Tenant-ID",
+										"value": "{{tenant_id}}"
+									}
+								],
+								"url": "{{base_url}}{{api_prefix}}/driver/jobs/shipments/{{shipment_id}}/actions/",
+								"description": ""
+							},
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+											"const j = pm.response.json();",
+											"pm.test('status === 1', () => pm.expect(j.status).to.eql(1));",
+											"const aa = j.data.allowed_actions;",
+											"pm.test('allowed_actions block', () => pm.expect(aa).to.have.property('actions');",
+											"if (aa.primary_action && aa.primary_action.action_id) {",
+											"    pm.environment.set('action_id', aa.primary_action.action_id);",
+											"}",
+											"if (aa.actions && aa.actions[0] && aa.actions[0].action_id) {",
+											"    pm.environment.set('action_id', aa.actions[0].action_id);",
+											"}"
+										]
+									}
+								}
+							]
+						},
+						{
+							"name": "4 Timeline page 1",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{access_token}}"
+									},
+									{
+										"key": "Accept-Language",
+										"value": "{{accept_language}}"
+									},
+									{
+										"key": "X-Tenant-ID",
+										"value": "{{tenant_id}}"
+									}
+								],
+								"url": "{{base_url}}{{api_prefix}}/driver/jobs/shipments/{{shipment_id}}/timeline/?page_size=10",
+								"description": ""
+							},
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+											"const j = pm.response.json();",
+											"pm.test('status === 1', () => pm.expect(j.status).to.eql(1));",
+											"const t = j.data.timeline;",
+											"pm.test('cursor pagination', () => {",
+											"    pm.expect(t.pagination.mode).to.eql('cursor');",
+											"    pm.expect(t.items).to.be.an('array');",
+											"});",
+											"if (t.pagination && t.pagination.next_cursor) {",
+											"    pm.environment.set('timeline_next_cursor', t.pagination.next_cursor);",
+											"}"
+										]
+									}
+								}
+							]
+						},
+						{
+							"name": "5 Timeline page 2",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{access_token}}"
+									},
+									{
+										"key": "Accept-Language",
+										"value": "{{accept_language}}"
+									},
+									{
+										"key": "X-Tenant-ID",
+										"value": "{{tenant_id}}"
+									}
+								],
+								"url": "{{base_url}}{{api_prefix}}/driver/jobs/shipments/{{shipment_id}}/timeline/?page_size=10&cursor={{timeline_next_cursor}}",
+								"description": ""
+							},
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+											"const j = pm.response.json();",
+											"pm.test('status === 1', () => pm.expect(j.status).to.eql(1));"
+										]
+									}
+								}
+							]
+						}
+					]
+				},
+				{
+					"name": "Flow B — Execute + POD + COD (mutating)",
+					"description": "**Warning:** creates action logs. Requires valid `action_id` and job state.",
+					"item": [
+						{
+							"name": "1 Resolve shipment",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{access_token}}"
+									},
+									{
+										"key": "Accept-Language",
+										"value": "{{accept_language}}"
+									},
+									{
+										"key": "X-Tenant-ID",
+										"value": "{{tenant_id}}"
+									}
+								],
+								"url": "{{base_url}}{{api_prefix}}/driver/jobs/shipments/active/?page_size=1",
+								"description": ""
+							},
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+											"const j = pm.response.json();",
+											"pm.test('status === 1', () => pm.expect(j.status).to.eql(1));",
+											"if (j.data && j.data.items && j.data.items[0]) {",
+											"    pm.environment.set('shipment_id', j.data.items[0].job_id);",
+											"    pm.environment.set('last_job_type', 'shipment');",
+											"}"
+										]
+									}
+								}
+							]
+						},
+						{
+							"name": "2 Allowed actions",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{access_token}}"
+									},
+									{
+										"key": "Accept-Language",
+										"value": "{{accept_language}}"
+									},
+									{
+										"key": "X-Tenant-ID",
+										"value": "{{tenant_id}}"
+									}
+								],
+								"url": "{{base_url}}{{api_prefix}}/driver/jobs/shipments/{{shipment_id}}/actions/",
+								"description": ""
+							},
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+											"const j = pm.response.json();",
+											"pm.test('status === 1', () => pm.expect(j.status).to.eql(1));",
+											"const aa = j.data.allowed_actions;",
+											"pm.test('allowed_actions block', () => pm.expect(aa).to.have.property('actions');",
+											"if (aa.primary_action && aa.primary_action.action_id) {",
+											"    pm.environment.set('action_id', aa.primary_action.action_id);",
+											"}",
+											"if (aa.actions && aa.actions[0] && aa.actions[0].action_id) {",
+											"    pm.environment.set('action_id', aa.actions[0].action_id);",
+											"}"
+										]
+									}
+								}
+							]
+						},
+						{
+							"name": "3 Execute primary action",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{access_token}}"
+									},
+									{
+										"key": "Accept-Language",
+										"value": "{{accept_language}}"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"action_id\": \"{{action_id}}\",\n  \"idempotency_key\": \"{{idempotency_key}}\",\n  \"source_ref\": \"{{source_ref}}\",\n  \"notes\": \"Postman execute — GPS captured\",\n  \"latitude\": \"{{sample_latitude}}\",\n  \"longitude\": \"{{sample_longitude}}\",\n  \"map_link\": \"{{sample_map_link}}\"\n}"
+								},
+								"url": "{{base_url}}{{api_prefix}}/driver/jobs/shipments/{{shipment_id}}/actions/execute/",
+								"description": ""
+							},
+							"event": [
+								{
+									"listen": "prerequest",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"pm.environment.set('idempotency_key', pm.variables.replaceIn('{{$guid}}'));",
+											"pm.environment.set('source_ref', 'postman-' + Date.now());"
+										]
+									}
+								},
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"const code = pm.response.code;",
+											"pm.test('HTTP 200 or 403 policy', () => pm.expect([200, 403]).to.include(code));",
+											"if (code === 200) {",
+											"    const j = pm.response.json();",
+											"    pm.test('status === 1', () => pm.expect(j.status).to.eql(1));",
+											"    pm.test('execution block', () => pm.expect(j.data.execution).to.have.property('log_id'));",
+											"    if (j.data.execution.log_id) pm.environment.set('last_log_id', j.data.execution.log_id);",
+											"    const key = pm.environment.get('idempotency_key');",
+											"    if (key) pm.environment.set('saved_idempotency_key', key);",
+											"}"
+										]
+									}
+								}
+							]
+						}
+					]
+				}
+			]
+		}
+	]
+}

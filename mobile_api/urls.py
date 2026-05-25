@@ -34,6 +34,26 @@ from mobile_api.views.driver_profile import (
     DriverRequestChangePasswordOtpView,
     DriverVerifyChangePasswordOtpView,
 )
+from mobile_api.views.driver_job_allowed_actions import (
+    DriverMovementAllowedActionsView,
+    DriverShipmentAllowedActionsView,
+)
+from mobile_api.views.driver_job_execute import (
+    DriverMovementExecuteActionView,
+    DriverShipmentExecuteActionView,
+)
+from mobile_api.views.driver_job_detail import (
+    DriverMovementJobDetailView,
+    DriverShipmentJobDetailView,
+)
+from mobile_api.views.driver_job_timeline import (
+    DriverMovementTimelineView,
+    DriverShipmentTimelineView,
+)
+from mobile_api.views.driver_job_pod_cod import (
+    DriverShipmentCollectCodView,
+    DriverShipmentUploadPodView,
+)
 from mobile_api.views.driver_jobs import DriverJobSummaryView
 from mobile_api.views.driver_movement_jobs import (
     DriverMovementJobListActiveView,
@@ -171,6 +191,36 @@ urlpatterns = [
         name='driver_jobs_shipments_cod_pending',
     ),
     path(
+        'driver/jobs/shipments/<uuid:shipment_id>/upload-pod/',
+        DriverShipmentUploadPodView.as_view(),
+        name='driver_jobs_shipment_upload_pod',
+    ),
+    path(
+        'driver/jobs/shipments/<uuid:shipment_id>/collect-cod/',
+        DriverShipmentCollectCodView.as_view(),
+        name='driver_jobs_shipment_collect_cod',
+    ),
+    path(
+        'driver/jobs/shipments/<uuid:shipment_id>/timeline/',
+        DriverShipmentTimelineView.as_view(),
+        name='driver_jobs_shipment_timeline',
+    ),
+    path(
+        'driver/jobs/shipments/<uuid:shipment_id>/actions/execute/',
+        DriverShipmentExecuteActionView.as_view(),
+        name='driver_jobs_shipment_execute',
+    ),
+    path(
+        'driver/jobs/shipments/<uuid:shipment_id>/actions/',
+        DriverShipmentAllowedActionsView.as_view(),
+        name='driver_jobs_shipment_actions',
+    ),
+    path(
+        'driver/jobs/shipments/<uuid:shipment_id>/',
+        DriverShipmentJobDetailView.as_view(),
+        name='driver_jobs_shipment_detail',
+    ),
+    path(
         'driver/jobs/shipments/',
         DriverShipmentJobListView.as_view(),
         name='driver_jobs_shipments',
@@ -194,6 +244,26 @@ urlpatterns = [
         'driver/jobs/movements/empty/',
         DriverMovementJobListEmptyMoveView.as_view(),
         name='driver_jobs_movements_empty',
+    ),
+    path(
+        'driver/jobs/movements/<uuid:movement_id>/timeline/',
+        DriverMovementTimelineView.as_view(),
+        name='driver_jobs_movement_timeline',
+    ),
+    path(
+        'driver/jobs/movements/<uuid:movement_id>/actions/execute/',
+        DriverMovementExecuteActionView.as_view(),
+        name='driver_jobs_movement_execute',
+    ),
+    path(
+        'driver/jobs/movements/<uuid:movement_id>/actions/',
+        DriverMovementAllowedActionsView.as_view(),
+        name='driver_jobs_movement_actions',
+    ),
+    path(
+        'driver/jobs/movements/<uuid:movement_id>/',
+        DriverMovementJobDetailView.as_view(),
+        name='driver_jobs_movement_detail',
     ),
     path(
         'driver/jobs/movements/',

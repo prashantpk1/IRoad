@@ -642,6 +642,105 @@ msgstr "بدء الحركة"
 msgid "mobile.jobs.next_action.complete_movement"
 msgstr "إكمال الحركة"
 
+msgid "mobile.jobs.execute.success"
+msgstr "تم تنفيذ الإجراء بنجاح."
+
+msgid "mobile.jobs.execute.shipment_success"
+msgstr "تم تنفيذ إجراء الشحنة بنجاح."
+
+msgid "mobile.jobs.execute.movement_success"
+msgstr "تم تنفيذ إجراء الحركة بنجاح."
+
+msgid "mobile.jobs.execute.not_allowed"
+msgstr "هذا الإجراء غير مسموح به لحالة المهمة الحالية."
+
+msgid "mobile.jobs.execute.validation_failed"
+msgstr "فشل التحقق من تنفيذ الإجراء."
+
+msgid "mobile.jobs.execute.invalid_action"
+msgstr "إجراء غير صالح أو غير معروف."
+
+msgid "mobile.jobs.execute.gps_required"
+msgstr "إحداثيات GPS مطلوبة لهذا الإجراء."
+
+msgid "mobile.jobs.execute.note_required"
+msgstr "ملاحظة مطلوبة لهذا الإجراء."
+
+msgid "mobile.jobs.execute.photo_required"
+msgstr "صورة واحدة على الأقل مطلوبة لهذا الإجراء."
+
+msgid "mobile.jobs.execute.video_required"
+msgstr "مرفق فيديو مطلوب لهذا الإجراء."
+
+msgid "mobile.jobs.execute.invalid_cod_amount"
+msgstr "مبلغ COD غير صالح."
+
+msgid "mobile.jobs.execute.cod_amount_required"
+msgstr "مبلغ COD مطلوب لتحصيل الدفع."
+
+msgid "mobile.jobs.detail.not_found"
+msgstr "المهمة غير موجودة أو غير مخصصة لك."
+
+msgid "mobile.jobs.detail.shipment_not_found"
+msgstr "الشحنة غير موجودة أو غير مخصصة لك."
+
+msgid "mobile.jobs.detail.movement_not_found"
+msgstr "الحركة غير موجودة أو غير مخصصة لك."
+
+msgid "mobile.jobs.detail.invalid_id"
+msgstr "معرف مهمة غير صالح."
+
+msgid "mobile.jobs.timeline.success"
+msgstr "تم تحميل الجدول الزمني بنجاح."
+
+msgid "mobile.jobs.timeline.shipment_success"
+msgstr "تم تحميل جدول الشحنة الزمني بنجاح."
+
+msgid "mobile.jobs.timeline.movement_success"
+msgstr "تم تحميل جدول الحركة الزمني بنجاح."
+
+msgid "mobile.jobs.timeline.invalid_cursor"
+msgstr "مؤشر جدول زمني غير صالح أو منتهي."
+
+msgid "mobile.jobs.pod.upload_success"
+msgstr "تم رفع POD بنجاح."
+
+msgid "mobile.jobs.pod.validation_failed"
+msgstr "فشل التحقق من رفع POD."
+
+msgid "mobile.jobs.pod.photo_required"
+msgstr "مطلوب مرفق صورة POD واحد على الأقل."
+
+msgid "mobile.jobs.pod.delivery_note_required"
+msgstr "يجب وجود مستند إشعار تسليم على الشحنة قبل رفع POD."
+
+msgid "mobile.jobs.pod.action_not_configured"
+msgstr "إجراء رفع POD غير مُعد في سجل الإجراءات."
+
+msgid "mobile.jobs.cod.collect_success"
+msgstr "تم تحصيل COD بنجاح."
+
+msgid "mobile.jobs.cod.validation_failed"
+msgstr "فشل التحقق من تحصيل COD."
+
+msgid "mobile.jobs.cod.not_cod_shipment"
+msgstr "هذه الشحنة ليست طلب COD."
+
+msgid "mobile.jobs.cod.already_collected"
+msgstr "تم تحصيل COD مسبقاً لهذه الشحنة."
+
+msgid "mobile.jobs.cod.action_not_configured"
+msgstr "إجراء تحصيل الدفع غير مُعد في سجل الإجراءات."
+
+msgid "mobile.jobs.compliance.action_not_allowed"
+msgstr "إجراء الامتثال هذا غير مسموح به لحالة الشحنة الحالية."
+
+msgid "mobile.jobs.compliance.action_not_configured"
+msgstr "إجراء الامتثال المطلوب غير متاح."
+
+msgid "mobile.jobs.compliance.shipment_terminal"
+msgstr "لا يمكن تنفيذ هذا الإجراء على شحنة مغلقة أو ملغاة."
+
 msgid "mobile.validation.invalid_entity_type"
 msgstr "نوع كيان الوظيفة غير صالح."
 

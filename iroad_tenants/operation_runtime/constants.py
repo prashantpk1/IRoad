@@ -1,0 +1,20 @@
+"""Shared auto-number form codes for operation action logs (portal + mobile)."""
+
+OPERATION_ACTION_LOG_AUTO_FORM_CODE = 'operation-action-log'
+OPERATION_ACTION_LOG_AUTO_FORM_LABEL = 'Action Log'
+OPERATION_ACTION_LOG_REF_PREFIX = 'LOG'
+
+TRUCK_MOVEMENT_LOG_AUTO_FORM_CODE = 'truck-movement-log'
+TRUCK_MOVEMENT_LOG_AUTO_FORM_LABEL = 'Truck Movement Log'
+TRUCK_MOVEMENT_LOG_REF_PREFIX = 'TML'
+
+SHIPMENT_POD_AUTO_FORM_CODE = 'shipment-pod'
+SHIPMENT_POD_AUTO_FORM_LABEL = 'Shipment POD'
+SHIPMENT_POD_REF_PREFIX = 'POD'
+
+SHIPMENT_AUTO_FORM_CODE = 'shipment'
+SHIPMENT_AUTO_FORM_LABEL = 'Shipment'
+SHIPMENT_REF_PREFIX = 'SH'
+
+SOURCE_CHANNEL_ADMIN_MANUAL = 'admin_manual'
+SOURCE_CHANNEL_MOBILE_DRIVER = 'mobile_driver'

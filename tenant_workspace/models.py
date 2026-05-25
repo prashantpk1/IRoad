@@ -4321,6 +4321,14 @@ class TenantOperationAction(models.Model):
         indexes = [
             models.Index(fields=['action_code'], name='tenant_op_action_code_idx'),
             models.Index(fields=['status'], name='tenant_op_action_status_idx'),
+            models.Index(
+                fields=['status', 'action_scope'],
+                name='tenant_op_act_stat_scope_idx',
+            ),
+            models.Index(
+                fields=['status', 'sequence_category'],
+                name='tenant_op_act_stat_cat_idx',
+            ),
         ]
 
     def __str__(self):
@@ -4418,6 +4426,22 @@ class TenantOperationActionLog(models.Model):
             models.Index(
                 fields=['driver', '-log_date'],
                 name='tenant_oal_driver_date_idx',
+            ),
+            models.Index(
+                fields=['shipment', 'driver', '-log_date', '-log_id'],
+                name='tenant_oal_ship_drv_dt_id_idx',
+            ),
+            models.Index(
+                fields=['truck_movement', 'driver', '-log_date', '-log_id'],
+                name='tenant_oal_move_drv_dt_id_idx',
+            ),
+            models.Index(
+                fields=['shipment', '-created_at'],
+                name='tenant_oal_ship_created_idx',
+            ),
+            models.Index(
+                fields=['truck_movement', '-created_at'],
+                name='tenant_oal_move_created_idx',
             ),
         ]
 

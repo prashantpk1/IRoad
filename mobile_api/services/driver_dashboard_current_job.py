@@ -22,6 +22,7 @@ from mobile_api.helpers.dashboard_security import (
 )
 from mobile_api.helpers.operational_status import (
     MOVEMENT_ACTIVE_STATUSES,
+    driver_movement_scope_q,
     shipment_active_statuses,
 )
 
@@ -104,15 +105,7 @@ def fetch_active_movement(*, driver, shipment) -> Any:
     base = TenantTruckMovementLog.objects.filter(
         driver_movement_scope_q(driver),
         status__in=_MOVEMENT_ACTIVE,
-    ).only(
-        'movement_id',
-        'movement_no',
-        'status',
-        'movement_date',
-        'movement_source',
-        'shipment_id',
-        'updated_at',
-    )
+    ).select_related('truck', 'shipment')
 
     if shipment is not None:
         linked = base.filter(shipment_id=shipment.pk).order_by('-updated_at').first()
