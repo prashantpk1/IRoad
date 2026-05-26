@@ -10,772 +10,420 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "X-Generator: Poedit 3.9\n"
-
 msgid "2FA Adoption Rate"
 msgstr "2FA Adoption Rate"
-
 msgid "Access Log"
 msgstr "Access Log"
-
 msgid "Accounts inactive for 30+ days (Active only)"
 msgstr "Accounts inactive for 30+ days (Active only)"
-
 msgid "Action"
 msgstr "Action"
-
 msgid "Actions"
 msgstr "Actions"
-
 msgid "Active"
 msgstr "Active"
-
 msgid "Active Sessions Monitor"
 msgstr "Active Sessions Monitor"
-
 msgid "Active Subscribers"
 msgstr "Active Subscribers"
-
 msgid "Active users per role"
 msgstr "Active users per role"
-
 msgid "Add"
 msgstr "Add"
-
 msgid "Add-ons Pricing"
 msgstr "Add-ons Pricing"
-
 msgid "Admin"
 msgstr "Admin"
-
 msgid "Admin Security"
 msgstr "Admin Security"
-
 msgid "Admin Users"
 msgstr "Admin Users"
-
 msgid "Administration"
 msgstr "Administration"
-
 msgid "Adoption"
 msgstr "Adoption"
-
 msgid "All accounts are active recently"
 msgstr "All accounts are active recently"
-
 msgid "All clear"
 msgstr "All clear"
-
 msgid "Amount"
 msgstr "Amount"
-
 msgid "Analytics"
 msgstr "Analytics"
-
 msgid "Attention Center Shortcuts"
 msgstr "Attention Center Shortcuts"
-
 msgid "Audit Log"
 msgstr "Audit Log"
-
 msgid "Awaiting Payment"
 msgstr "Awaiting Payment"
-
 msgid "Back"
 msgstr "Back"
-
 msgid "Bank Accounts"
 msgstr "Bank Accounts"
-
 msgid "Base Currency"
 msgstr "Base Currency"
-
 msgid "Cancel"
 msgstr "Cancel"
-
 msgid "Canned Responses"
 msgstr "Canned Responses"
-
 msgid "Category"
 msgstr "Category"
-
 msgid "Churned"
 msgstr "Churned"
-
 msgid "Close"
 msgstr "Close"
-
 msgid "Comm Logs"
 msgstr "Comm Logs"
-
 msgid "Communication & Alerts"
 msgstr "Communication & Alerts"
-
 msgid "Companies"
 msgstr "Companies"
-
 msgid "Company List"
 msgstr "Company List"
-
 msgid "Configuration"
 msgstr "Configuration"
-
 msgid "Countries Master"
 msgstr "Countries Master"
-
 msgid "Create"
 msgstr "Create"
-
 msgid "Created At"
 msgstr "Created At"
-
 msgid "Currencies Master"
 msgstr "Currencies Master"
-
 msgid "Currency"
 msgstr "Currency"
-
 msgid "Dashboard"
 msgstr "Dashboard"
-
 msgid "Days Since Login"
 msgstr "Days Since Login"
-
 msgid "Delete"
 msgstr "Delete"
-
 msgid "Description"
 msgstr "Description"
-
 msgid "Done"
 msgstr "Done"
-
 msgid "Dropdown Master"
 msgstr "Dropdown Master"
-
 msgid "Edit"
 msgstr "Edit"
-
 msgid "Email"
 msgstr "Email"
-
 msgid "Email Configuration"
 msgstr "Email Configuration"
-
 msgid "Email Templates"
 msgstr "Email Templates"
-
 msgid "Events Mapping"
 msgstr "Events Mapping"
-
 msgid "Exchange Rates"
 msgstr "Exchange Rates"
-
 msgid "FX Change Log"
 msgstr "FX Change Log"
-
 msgid "Failed"
 msgstr "Failed"
-
 msgid "Failed / Rejected Transactions"
 msgstr "Failed / Rejected Transactions"
-
 msgid "Fri"
 msgstr "Fri"
-
 msgid "Gateway Settings"
 msgstr "Gateway Settings"
-
 msgid "General Tax Settings"
 msgstr "General Tax Settings"
-
 msgid "Global Master Data"
 msgstr "Global Master Data"
-
 msgid "Global System Rules"
 msgstr "Global System Rules"
-
 msgid "Grand Total"
 msgstr "Grand Total"
-
 msgid "Here's what's happening with your system today"
 msgstr "Here's what's happening with your system today"
-
 msgid "Hours Old"
 msgstr "Hours Old"
-
 msgid "IP Address"
 msgstr "IP Address"
-
 msgid "Inactive"
 msgstr "Inactive"
-
 msgid "Internal Alerts"
 msgstr "Internal Alerts"
-
 msgid "LIVE DATA"
 msgstr "LIVE DATA"
-
 msgid "Languages"
 msgstr "Languages"
-
 msgid "Last Login"
 msgstr "Last Login"
-
 msgid "Legal Identity"
 msgstr "Legal Identity"
-
 msgid "Less"
 msgstr "Less"
-
 msgid "Live Sessions"
 msgstr "Live Sessions"
-
 msgid "Locked"
 msgstr "Locked"
-
 msgid "Login Activity Heatmap"
 msgstr "Login Activity Heatmap"
-
 msgid "MRR — This Month"
 msgstr "MRR — This Month"
-
 msgid "Module"
 msgstr "Module"
-
 msgid "Mon"
 msgstr "Mon"
-
 msgid "More"
 msgstr "More"
-
 msgid "My Account"
 msgstr "My Account"
-
 msgid "Name"
 msgstr "Name"
-
 msgid "Needs Approval"
 msgstr "Needs Approval"
-
 msgid "Next"
 msgstr "Next"
-
 msgid "No audit entries yet."
 msgstr "No audit entries yet."
-
 msgid "No data available"
 msgstr "No data available"
-
 msgid "No failed transactions."
 msgstr "No failed transactions."
-
 msgid "No notifications"
 msgstr "No notifications"
-
 msgid "No overdue tickets."
 msgstr "No overdue tickets."
-
 msgid "No pending orders. All clear!"
 msgstr "No pending orders. All clear!"
-
 msgid "No records found"
 msgstr "No records found"
-
 msgid "No suspended tenants."
 msgstr "No suspended tenants."
-
 msgid "Notification Templates"
 msgstr "Notification Templates"
-
 msgid "Notifications"
 msgstr "Notifications"
-
 msgid "Open"
 msgstr "Open"
-
 msgid "Over 48 Hours"
 msgstr "Over 48 Hours"
-
 msgid "Overdue"
 msgstr "Overdue"
-
 msgid "Overdue Support Tickets"
 msgstr "Overdue Support Tickets"
-
 msgid "Payment Gateways"
 msgstr "Payment Gateways"
-
 msgid "Payment Infrastructure"
 msgstr "Payment Infrastructure"
-
 msgid "Payment Methods"
 msgstr "Payment Methods"
-
 msgid "Pending"
 msgstr "Pending"
-
 msgid "Pending Activation"
 msgstr "Pending Activation"
-
 msgid "Pending Approvals"
 msgstr "Pending Approvals"
-
 msgid "Pending Bank Transfer Orders"
 msgstr "Pending Bank Transfer Orders"
-
 msgid "Pending Liquidity"
 msgstr "Pending Liquidity"
-
 msgid "Previous"
 msgstr "Previous"
-
 msgid "Promo Codes"
 msgstr "Promo Codes"
-
 msgid "Queue"
 msgstr "Queue"
-
 msgid "Recent Admin Actions"
 msgstr "Recent Admin Actions"
-
 msgid "Recently Added Users"
 msgstr "Recently Added Users"
-
 msgid "Recently Suspended Tenants"
 msgstr "Recently Suspended Tenants"
-
 msgid "Record ID"
 msgstr "Record ID"
-
 msgid "Rejected"
 msgstr "Rejected"
-
 msgid "Reports"
 msgstr "Reports"
-
 msgid "Revenue Forecast & Trend"
 msgstr "Revenue Forecast & Trend"
-
 msgid "Role"
 msgstr "Role"
-
 msgid "Role Distribution"
 msgstr "Role Distribution"
-
 msgid "Role Name"
 msgstr "Role Name"
-
 msgid "Roles Master"
 msgstr "Roles Master"
-
 msgid "Root Admin"
 msgstr "Root Admin"
-
 msgid "Sat"
 msgstr "Sat"
-
 msgid "Save"
 msgstr "Save"
-
 msgid "Search shipments, clients, addresses..."
 msgstr "Search shipments, clients, addresses..."
-
 msgid "Search..."
 msgstr "Search..."
-
 msgid "Security & Audit"
 msgstr "Security & Audit"
-
 msgid "Settings"
 msgstr "Settings"
-
 msgid "Sign out"
 msgstr "Sign out"
-
 msgid "Staff Analytics — Role Distribution"
 msgstr "Staff Analytics — Role Distribution"
-
 msgid "Staff overview and activity insights"
 msgstr "Staff overview and activity insights"
-
 msgid "Stale Accounts"
 msgstr "Stale Accounts"
-
 msgid "Subscription Receipts"
 msgstr "Subscription Receipts"
-
 msgid "Status"
 msgstr "Status"
-
 msgid "Subadmin"
 msgstr "Subadmin"
-
 msgid "Subject"
 msgstr "Subject"
-
 msgid "Subscribers CRM & Billing"
 msgstr "Subscribers CRM & Billing"
-
 msgid "Subscribers List"
 msgstr "Subscribers List"
-
 msgid "Subscription Orders"
 msgstr "Subscription Orders"
-
 msgid "Subscription Packages"
 msgstr "Subscription Packages"
-
 msgid "Subscription Plans"
 msgstr "Subscription Plans"
-
 msgid "Subscription Plans Management"
 msgstr "Subscription Plans Management"
-
 msgid "Subscription Report"
 msgstr "Subscription Report"
-
 msgid "Subscriptions"
 msgstr "Subscriptions"
-
 msgid "Sun"
 msgstr "Sun"
-
 msgid "Super Admin"
 msgstr "Super Admin"
-
 msgid "Super Admin Dashboard"
 msgstr "Super Admin Dashboard"
-
 msgid "Super Administrator"
 msgstr "Super Administrator"
-
 msgid "Support Categories"
 msgstr "Support Categories"
-
 msgid "Support Inbox"
 msgstr "Support Inbox"
-
 msgid "Support Management"
 msgstr "Support Management"
-
 msgid "Support Tickets"
 msgstr "Support Tickets"
-
 msgid "Suspended"
 msgstr "Suspended"
-
 msgid "Suspended Accounts"
 msgstr "Suspended Accounts"
-
 msgid "Suspended Billing"
 msgstr "Suspended Billing"
-
 msgid "Suspended Violation"
 msgstr "Suspended Violation"
-
 msgid "Switch Language"
 msgstr "Switch Language"
-
 msgid "System"
 msgstr "System"
-
 msgid "System Banners"
 msgstr "System Banners"
-
 msgid "System Configurations & Tax"
 msgstr "System Configurations & Tax"
-
 msgid "System Users Analytics"
 msgstr "System Users Analytics"
-
 msgid "System Users Management"
 msgstr "System Users Management"
-
 msgid "System event list is hardcoded; Super Admin cannot create new event types from UI."
 msgstr "System event list is hardcoded; Super Admin cannot create new event types from UI."
-
 msgid "System overview — real-time platform insights"
 msgstr "System overview — real-time platform insights"
-
 msgid "Tax Codes"
 msgstr "Tax Codes"
-
 msgid "Tenant Name"
 msgstr "Tenant Name"
-
 msgid "Thu"
 msgstr "Thu"
-
 msgid "Ticket Health"
 msgstr "Ticket Health"
-
 msgid "Ticket No"
 msgstr "Ticket No"
-
 msgid "Timestamp"
 msgstr "Timestamp"
-
 msgid "Total"
 msgstr "Total"
-
 msgid "Total Active Staff"
 msgstr "Total Active Staff"
-
 msgid "Total Revenue This Month"
 msgstr "Total Revenue This Month"
-
 msgid "Transactions Ledger"
 msgstr "Transactions Ledger"
-
 msgid "Tue"
 msgstr "Tue"
-
 msgid "Unassigned"
 msgstr "Unassigned"
-
 msgid "Update"
 msgstr "Update"
-
 msgid "User Count"
 msgstr "User Count"
-
 msgid "User Management"
 msgstr "User Management"
-
 msgid "Users Analytics"
 msgstr "Users Analytics"
-
 msgid "View"
 msgstr "View"
-
 msgid "View Detail"
 msgstr "View Detail"
-
 msgid "View Full Audit Log"
 msgstr "View Full Audit Log"
-
 msgid "Wed"
 msgstr "Wed"
-
 msgid "Welcome back"
 msgstr "Welcome back"
-
 msgid "You are yet to receive notifications"
 msgstr "You are yet to receive notifications"
 
 # Mobile API — Auth messages
 msgid "mobile.auth.token_expired"
 msgstr "Session expired. Please login again."
-
 msgid "mobile.auth.token_invalid"
 msgstr "Invalid authentication token. Please login again."
-
 msgid "mobile.auth.unauthorized"
 msgstr "Unauthorized access. Please login to continue."
-
 msgid "mobile.auth.forbidden"
 msgstr "You do not have permission to access this resource."
-
 msgid "mobile.auth.admin_required"
 msgstr "Admin permissions are required for this action."
-
 msgid "mobile.auth.driver_role_required"
 msgstr "This action is only available to driver mobile users with an allowed driver role."
-
 msgid "mobile.auth.dispatcher_role_required"
 msgstr "This action is only available to users with a dispatcher role."
-
 msgid "mobile.auth.capability_denied"
 msgstr "You do not have the required permission for this operation."
 
-msgid "mobile.auth.dashboard_denied"
-msgstr "You do not have access to the driver dashboard."
+msgid "mobile.jobs.execute.execution_context_required"
+msgstr "Secure execution context is required for this action."
 
-msgid "mobile.auth.dashboard_method_not_allowed"
-msgstr "This dashboard endpoint only supports read requests."
-
-msgid "mobile.auth.jobs_denied"
-msgstr "You do not have access to driver job lists."
-
-msgid "mobile.auth.jobs_method_not_allowed"
-msgstr "This job list endpoint only supports read requests."
-
-msgid "mobile.jobs.summary_success"
-msgstr "Job summary loaded successfully."
-
-msgid "mobile.jobs.shipments_success"
-msgstr "Shipment jobs loaded successfully."
-
-msgid "mobile.jobs.shipments_active_success"
-msgstr "Active shipment jobs loaded successfully."
-
-msgid "mobile.jobs.shipments_completed_success"
-msgstr "Completed shipment jobs loaded successfully."
-
-msgid "mobile.jobs.shipments_cancelled_success"
-msgstr "Cancelled shipment jobs loaded successfully."
-
-msgid "mobile.jobs.shipments_pod_pending_success"
-msgstr "POD pending shipment jobs loaded successfully."
-
-msgid "mobile.jobs.shipments_cod_pending_success"
-msgstr "COD pending shipment jobs loaded successfully."
-
-msgid "mobile.jobs.movements_success"
-msgstr "Movement jobs loaded successfully."
-
-msgid "mobile.jobs.movements_active_success"
-msgstr "Active movement jobs loaded successfully."
-
-msgid "mobile.jobs.movements_completed_success"
-msgstr "Completed movement jobs loaded successfully."
-
-msgid "mobile.jobs.movements_cancelled_success"
-msgstr "Cancelled movement jobs loaded successfully."
-
-msgid "mobile.jobs.movements_empty_success"
-msgstr "Empty move jobs loaded successfully."
-
-msgid "mobile.jobs.next_action.start_movement"
-msgstr "Start movement"
-
-msgid "mobile.jobs.next_action.complete_movement"
-msgstr "Complete movement"
-
-msgid "mobile.jobs.execute.success"
-msgstr "Action executed successfully."
-
-msgid "mobile.jobs.execute.shipment_success"
-msgstr "Shipment action executed successfully."
-
-msgid "mobile.jobs.execute.movement_success"
-msgstr "Movement action executed successfully."
-
-msgid "mobile.jobs.execute.not_allowed"
-msgstr "This action is not allowed for the current job state."
-
-msgid "mobile.jobs.execute.validation_failed"
-msgstr "Action execution validation failed."
-
-msgid "mobile.jobs.execute.invalid_action"
-msgstr "Invalid or unknown action."
-
-msgid "mobile.jobs.execute.gps_required"
-msgstr "GPS coordinates are required for this action."
-
-msgid "mobile.jobs.execute.note_required"
-msgstr "A note is required for this action."
-
-msgid "mobile.jobs.execute.photo_required"
-msgstr "At least one photo is required for this action."
-
-msgid "mobile.jobs.execute.video_required"
-msgstr "Video attachment is required for this action."
-
-msgid "mobile.jobs.execute.invalid_cod_amount"
-msgstr "Invalid COD amount."
-
-msgid "mobile.jobs.execute.cod_amount_required"
-msgstr "COD amount is required for collect payment."
-
-msgid "mobile.jobs.detail.not_found"
-msgstr "Job not found or not assigned to you."
-
-msgid "mobile.jobs.detail.shipment_not_found"
-msgstr "Shipment not found or not assigned to you."
-
-msgid "mobile.jobs.detail.movement_not_found"
-msgstr "Movement not found or not assigned to you."
-
-msgid "mobile.jobs.detail.invalid_id"
-msgstr "Invalid job identifier."
-
-msgid "mobile.jobs.timeline.success"
-msgstr "Timeline loaded successfully."
-
-msgid "mobile.jobs.timeline.shipment_success"
-msgstr "Shipment timeline loaded successfully."
-
-msgid "mobile.jobs.timeline.movement_success"
-msgstr "Movement timeline loaded successfully."
-
-msgid "mobile.jobs.timeline.invalid_cursor"
-msgstr "Invalid or expired timeline cursor."
-
-msgid "mobile.jobs.pod.upload_success"
-msgstr "POD uploaded successfully."
-
-msgid "mobile.jobs.pod.validation_failed"
-msgstr "POD upload validation failed."
-
-msgid "mobile.jobs.pod.photo_required"
-msgstr "At least one POD photo attachment is required."
-
-msgid "mobile.jobs.pod.delivery_note_required"
-msgstr "A delivery note document must exist on the shipment before POD upload."
-
-msgid "mobile.jobs.pod.action_not_configured"
-msgstr "Upload POD action is not configured in Action Master."
-
-msgid "mobile.jobs.cod.collect_success"
-msgstr "COD collected successfully."
-
-msgid "mobile.jobs.cod.validation_failed"
-msgstr "COD collection validation failed."
-
-msgid "mobile.jobs.cod.not_cod_shipment"
-msgstr "This shipment is not a COD order."
-
-msgid "mobile.jobs.cod.already_collected"
-msgstr "COD has already been collected for this shipment."
-
-msgid "mobile.jobs.cod.action_not_configured"
-msgstr "Collect Payment action is not configured in Action Master."
-
-msgid "mobile.jobs.compliance.action_not_allowed"
-msgstr "This compliance action is not allowed for the current shipment state."
-
-msgid "mobile.jobs.compliance.action_not_configured"
-msgstr "Required compliance action is not available."
-
-msgid "mobile.jobs.compliance.shipment_terminal"
-msgstr "Cannot perform this action on a closed or cancelled shipment."
-
-msgid "mobile.validation.invalid_entity_type"
-msgstr "Invalid job entity type."
-
-# Mobile API — Validation messages
+msgid "mobile.jobs.execute.execution_context_driver_mismatch"
+msgstr "Driver session does not match the execution context."
 msgid "mobile.validation.failed"
 msgstr "Validation failed. Please check your input."
-
 msgid "mobile.validation.invalid_image"
 msgstr "The file must be a valid image (JPG, JPEG, PNG, or WEBP)."
-
 msgid "mobile.validation.image_too_large"
 msgstr "Image must not exceed %(max_mb)s MB. Your file is %(size_mb)s MB."
-
 msgid "mobile.validation.invalid_otp"
 msgstr "The verification code is incorrect."
-
 msgid "mobile.validation.otp_expired"
 msgstr "The verification code has expired. Please request a new one."
-
 msgid "mobile.validation.password_too_long"
 msgstr "Password is too long (maximum 128 characters)."
 
 # Mobile API — Error messages
 msgid "mobile.error.not_found"
 msgstr "Requested resource not found."
-
 msgid "mobile.error.method_not_allowed"
 msgstr "Method not allowed."
-
 msgid "mobile.error.rate_limit"
 msgstr "Too many requests. Please try again later."
-
 msgid "mobile.error.generic"
 msgstr "Something went wrong while processing your request."
-
 msgid "mobile.error.server_error"
 msgstr "Server error. Please try again later."
 
@@ -787,286 +435,129 @@ msgstr "Data retrieved successfully."
 # Mobile API — Driver Auth
 msgid "mobile.auth.email_required"
 msgstr "Email is required."
-
 msgid "mobile.auth.email_invalid"
 msgstr "Please enter a valid email address."
-
 msgid "mobile.auth.password_required"
 msgstr "Password is required."
-
 msgid "mobile.auth.password_min_length"
 msgstr "Password must be at least 8 characters long."
-
 msgid "mobile.auth.confirm_password_required"
 msgstr "Confirm password is required."
-
 msgid "mobile.auth.passwords_do_not_match"
 msgstr "Passwords do not match."
-
 msgid "mobile.auth.otp_required"
 msgstr "OTP is required."
-
 msgid "mobile.auth.otp_invalid_length"
 msgstr "OTP must be exactly 6 digits."
-
 msgid "mobile.auth.otp_digits_only"
 msgstr "OTP must contain digits only."
-
 msgid "mobile.auth.invalid_credentials"
 msgstr "Invalid email or password."
-
 msgid "mobile.auth.invalid_tenant"
 msgstr "Unknown or inactive organization. Check your tenant ID and try again."
-
 msgid "mobile.auth.tenant_mismatch"
 msgstr "Organization in the request does not match this session. Check X-Tenant-ID or sign in again."
-
 msgid "mobile.auth.tenant_ambiguous"
 msgstr "This account exists on more than one organization. Send tenant_id (or X-Tenant-ID) and try again."
-
 msgid "mobile.auth.tenant_required"
 msgstr "Organization is required. Send tenant_id in the request body or X-Tenant-ID."
-
 msgid "mobile.auth.tenant_ambiguous_operation"
 msgstr "This action requires a specific organization because the same email or OTP exists on more than one tenant. Send tenant_id or X-Tenant-ID."
-
 msgid "mobile.auth.account_locked"
 msgstr "Too many failed sign-in attempts. Try again later or reset your password."
-
 msgid "mobile.auth.account_inactive"
 msgstr "This account is inactive. Please contact support."
-
 msgid "mobile.auth.account_deleted"
 msgstr "This account has been deleted and cannot be used."
-
 msgid "mobile.auth.account_already_deleted"
 msgstr "This account has already been deleted."
-
 msgid "mobile.auth.account_deleted_success"
 msgstr "Your account has been deleted successfully."
-
 msgid "web.auth.account_deleted"
 msgstr "This account has been deleted and cannot be used for login."
-
 msgid "mobile.auth.not_a_driver"
 msgstr "This account is not associated with a driver."
-
 msgid "mobile.auth.driver_inactive"
 msgstr "Driver account is inactive. Please contact administration."
-
 msgid "mobile.auth.login_success"
 msgstr "Login successful."
-
 msgid "mobile.auth.otp_sent"
 msgstr "OTP has been sent if the email is registered."
-
 msgid "mobile.auth.forgot_password_accepted"
 msgstr "If this email is registered for your organization, you will receive a verification code shortly."
-
 msgid "mobile.auth.otp_verify_failed"
 msgstr "We could not verify that code. Request a new code or try again."
-
 msgid "mobile.auth.reset_password_failed"
 msgstr "Password reset could not be completed. Verify your code and try again."
-
 msgid "mobile.auth.otp_not_found"
 msgstr "No active OTP found."
-
 msgid "mobile.auth.otp_expired"
 msgstr "OTP has expired. Please request a new one."
-
 msgid "mobile.auth.otp_max_attempts"
 msgstr "Maximum OTP attempts exceeded."
-
 msgid "mobile.auth.otp_wrong"
 msgstr "Incorrect OTP entered."
-
 msgid "mobile.auth.otp_verified"
 msgstr "OTP verified successfully."
-
 msgid "mobile.auth.otp_not_verified"
 msgstr "OTP must be verified before proceeding."
-
 msgid "mobile.auth.user_not_found"
 msgstr "User not found."
-
 msgid "mobile.auth.password_reset_success"
 msgstr "Password reset successful."
-
 msgid "mobile.auth.logout_success"
 msgstr "Logout successful."
-
 msgid "mobile.auth.logout_all_success"
 msgstr "You have been signed out on all devices."
-
 msgid "mobile.auth.refresh_success"
 msgstr "Session refreshed successfully."
-
 msgid "mobile.auth.refresh_invalid"
 msgstr "Invalid or expired refresh token."
-
 msgid "mobile.auth.refresh_replay"
 msgstr "This refresh token was already used. Sign in again with your email and password."
-
 msgid "mobile.auth.change_password_otp_sent"
 msgstr "Verification code sent."
-
 msgid "mobile.auth.change_password_otp_verified"
 msgstr "Verification code accepted."
-
 msgid "mobile.auth.password_changed_successfully"
 msgstr "Password updated successfully."
-
 msgid "mobile.auth.current_password_invalid"
 msgstr "Current password is incorrect."
-
 msgid "mobile.auth.change_password_requires_verified_otp"
 msgstr "You must verify the code before changing your password."
 
 # Mobile API — Driver profile & change password
 msgid "mobile.profile.send_via_required"
 msgstr "Please choose how to receive the verification code."
-
 msgid "mobile.profile.send_via_invalid"
 msgstr "Send via must be either email or mobile."
-
 msgid "mobile.profile.current_password_required"
 msgstr "Current password is required."
-
 msgid "mobile.profile.current_password_blank"
 msgstr "Current password cannot be empty."
-
 msgid "mobile.profile.photo_required"
 msgstr "Profile photo is required."
-
 msgid "mobile.profile.phone_missing_for_sms"
 msgstr "No mobile number is on file for this account. Add a phone number or choose email."
-
 msgid "mobile.profile.new_password_same_as_current"
 msgstr "New password must be different from your current password."
-
 msgid "mobile.profile.fetch_success"
 msgstr "Profile loaded successfully."
-
 msgid "mobile.profile.photo_updated"
 msgstr "Profile photo updated successfully."
-
 msgid "mobile.profile.update_success"
 msgstr "Profile updated successfully."
-
 msgid "mobile.profile.update_empty"
 msgstr "No profile fields to update. Send at least one allowed field."
-
 msgid "mobile.profile.arabic_name_required"
 msgstr "Arabic name cannot be empty when provided."
-
 msgid "mobile.profile.full_name_required"
 msgstr "Full name cannot be empty when provided."
-
 msgid "mobile.profile.full_name_too_long"
 msgstr "Full name is too long."
-
 msgid "mobile.profile.mobile_digits_only"
 msgstr "Mobile number must contain digits only."
-
-msgid "mobile.dashboard.fetch_success"
-msgstr "Dashboard loaded successfully."
-
-msgid "mobile.dashboard.summary_fetch_success"
-msgstr "Dashboard summary loaded successfully."
-
-msgid "mobile.dashboard.action.continue_job"
-msgstr "Continue active job"
-
-msgid "mobile.dashboard.action.upload_pod"
-msgstr "Upload POD"
-
-msgid "mobile.dashboard.action.view_jobs"
-msgstr "View active jobs"
-
-msgid "mobile.dashboard.action.active_movement"
-msgstr "Active movement"
-
-msgid "mobile.dashboard.action.cod"
-msgstr "COD collection"
-
-msgid "mobile.dashboard.action.empty_move"
-msgstr "Create empty move"
-
-msgid "mobile.dashboard.action.reason.no_active_job"
-msgstr "No active shipment assigned."
-
-msgid "mobile.dashboard.action.reason.pod_not_pending"
-msgstr "POD is not required right now."
-
-msgid "mobile.dashboard.action.reason.no_active_movement"
-msgstr "No active movements."
-
-msgid "mobile.dashboard.action.reason.no_cod_pending"
-msgstr "No COD collection pending."
-
-msgid "mobile.dashboard.action.reason.module_not_available"
-msgstr "Coming soon in a future update."
-
-msgid "mobile.dashboard.next_action.pod"
-msgstr "Submit proof of delivery"
-
-msgid "mobile.dashboard.next_action.transit"
-msgstr "Start or continue transit"
-
-msgid "mobile.dashboard.next_action.deliver"
-msgstr "Complete delivery"
-
-msgid "mobile.dashboard.next_action.cod"
-msgstr "Collect COD payment"
-
-msgid "mobile.dashboard.next_action.pod_review"
-msgstr "Await POD confirmation"
-
-msgid "mobile.dashboard.notifications_fetch_success"
-msgstr "Notification summary loaded."
-
-msgid "mobile.dashboard.notification.assignment_required"
-msgstr "Truck assignment required"
-
-msgid "mobile.dashboard.notification.assignment_required_body"
-msgstr "Assign a truck before starting operations."
-
-msgid "mobile.dashboard.notification.no_truck"
-msgstr "No truck assigned"
-
-msgid "mobile.dashboard.notification.pending_pod"
-msgstr "POD pending"
-
-msgid "mobile.dashboard.notification.pending_pod_body"
-msgstr "%(count)s shipment(s) need proof of delivery."
-
-msgid "mobile.dashboard.notification.cod_pending"
-msgstr "COD collection pending"
-
-msgid "mobile.dashboard.notification.cod_pending_body"
-msgstr "%(count)s shipment(s) await COD collection."
-
-msgid "mobile.dashboard.notification.push"
-msgstr "Push notification"
-
-msgid "mobile.dashboard.activity_fetch_success"
-msgstr "Recent activity loaded."
-
-msgid "mobile.dashboard.activity.action"
-msgstr "Operation action"
-
-msgid "mobile.dashboard.activity.shipment %(shipment_no)s — %(status)s"
-msgstr "Shipment %(shipment_no)s — %(status)s"
-
-msgid "mobile.dashboard.activity.movement %(movement_no)s — %(status)s"
-msgstr "Movement %(movement_no)s — %(status)s"
-
-msgid "mobile.dashboard.activity.pod %(record_no)s — %(status)s"
-msgstr "POD %(record_no)s — %(status)s"
-
 msgid "mobile.profile.mobile_number_required"
 msgstr "Driver mobile number cannot be empty when provided."
-
 msgid "mobile.profile.field_too_long"
 msgstr "This field exceeds the maximum allowed length."

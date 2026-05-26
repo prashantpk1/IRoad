@@ -36,7 +36,7 @@ from mobile_api.response_envelope import build_meta
 
 class MobileApiPagination(PageNumberPagination):
     """
-    Standard pagination for all Mobile API list endpoints.
+    Standard pagination envelope for future mobile list endpoints.
     """
     page_query_param = 'page'
     page_size_query_param = 'page_size'
