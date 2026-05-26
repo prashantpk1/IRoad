@@ -72,16 +72,6 @@ class MobileUserThrottle(UserRateThrottle):
     scope = 'user'
 
 
-class MobileJobListThrottle(UserRateThrottle):
-    """
-    Driver job list feeds (shipments, movements, summary).
-
-    Stricter than generic ``user`` throttle to protect DB on large tenants.
-    Rate: see REST_FRAMEWORK ``mobile_jobs``.
-    """
-    scope = 'mobile_jobs'
-
-
 class MobileAnonThrottle(AnonRateThrottle):
     """
     Standard throttle for unauthenticated endpoints.

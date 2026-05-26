@@ -26,16 +26,7 @@ CAPABILITY_GROUPS: dict[str, tuple[str, ...]] = {
     # Driver self-service (requires driver principal + driver role policy)
     'mobile.driver.profile': ('driver',),
     'mobile.driver.organization': ('driver',),
-    'mobile.driver.dashboard': ('driver',),
-    'mobile.driver.jobs': ('driver',),
-    'mobile.driver.jobs.execute': ('driver',),
     'mobile.driver.auth_session': ('driver',),
-    # Dashboard quick-action visibility (Phase 1 — metadata only; driver group)
-    'mobile.driver.quick_action.continue_job': ('driver',),
-    'mobile.driver.quick_action.upload_pod': ('driver',),
-    'mobile.driver.quick_action.active_movements': ('driver',),
-    'mobile.driver.quick_action.cod_collection': ('driver',),
-    'mobile.driver.quick_action.empty_move': ('driver',),
     # Operational / back-office style mobile modules (dispatcher + tenant admin)
     'mobile.operations.read': ('dispatcher', 'tenant_admin'),
     'mobile.operations.write': ('dispatcher', 'tenant_admin'),

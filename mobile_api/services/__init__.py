@@ -1,4 +1,4 @@
-"""Service exports for mobile API."""
+"""Service exports for mobile API (auth + profile only; execution services imported directly)."""
 
 from mobile_api.services.driver_auth_service import (
     driver_forgot_password,
@@ -6,15 +6,6 @@ from mobile_api.services.driver_auth_service import (
     driver_logout,
     driver_reset_password,
     driver_verify_otp,
-)
-from mobile_api.services.driver_dashboard_service import (
-    get_driver_dashboard,
-    get_driver_dashboard_summary,
-)
-from mobile_api.services.driver_job_list_service import (
-    build_job_summary,
-    list_driver_movements,
-    list_driver_shipments,
 )
 from mobile_api.services.driver_profile_service import (
     driver_change_password,
@@ -33,11 +24,6 @@ __all__ = [
     'driver_reset_password',
     'driver_verify_change_password_otp',
     'driver_verify_otp',
-    'get_driver_dashboard',
-    'get_driver_dashboard_summary',
-    'build_job_summary',
-    'list_driver_shipments',
-    'list_driver_movements',
     'get_driver_profile',
     'update_driver_profile_photo',
 ]

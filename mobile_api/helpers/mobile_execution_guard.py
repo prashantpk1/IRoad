@@ -3,34 +3,45 @@ Thread-local guard for mobile driver action execution.
 
 ``ActionExecutionService.execute_driver_action`` with ``SOURCE_CHANNEL_MOBILE_DRIVER``
 must run inside an active guard so internal/celery/management callers cannot bypass
-ownership + allowed-actions checks performed in ``DriverJobExecuteService``.
+driver-scoped authorization at the mobile boundary.
 """
 
 from __future__ import annotations
 
 import contextvars
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any
+from dataclasses import dataclass
+from typing import Any
 
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext as _
 
 from iroad_tenants.operation_runtime.constants import SOURCE_CHANNEL_MOBILE_DRIVER
 
-if TYPE_CHECKING:
-    from mobile_api.helpers.job_execution_security import SecureJobExecutionContext
 
-_guard: contextvars.ContextVar[SecureJobExecutionContext | None] = contextvars.ContextVar(
+@dataclass(frozen=True)
+class MobileExecutionContext:
+    """Bound mobile principal for one driver action execution."""
+
+    driver: Any
+    tenant_user: Any
+    tenant_schema: str
+    driver_id: str
+    user_id: str
+    jwt_driver_id: str | None = None
+
+
+_guard: contextvars.ContextVar[MobileExecutionContext | None] = contextvars.ContextVar(
     'mobile_execution_guard',
     default=None,
 )
 
 
 class MobileExecutionGuardError(ValidationError):
-    """Raised when mobile execution runs without a secure execution context."""
+    """Raised when mobile execution runs without an active execution context."""
 
 
-def get_active_mobile_execution_context() -> SecureJobExecutionContext | None:
+def get_active_mobile_execution_context() -> MobileExecutionContext | None:
     return _guard.get()
 
 
@@ -44,10 +55,8 @@ def assert_mobile_execution_guard_allows(
     shipment=None,
     movement=None,
     source_channel: str = SOURCE_CHANNEL_MOBILE_DRIVER,
-) -> SecureJobExecutionContext:
-    """
-    Ensure mobile-channel execution was authorized through the Job Detail pipeline.
-    """
+) -> MobileExecutionContext:
+    """Ensure mobile-channel execution was opened with ``mobile_execution_guard``."""
     channel = (source_channel or '').strip()
     if channel != SOURCE_CHANNEL_MOBILE_DRIVER:
         return get_active_mobile_execution_context()  # type: ignore[return-value]
@@ -74,7 +83,7 @@ def assert_mobile_execution_guard_allows(
 
 
 @contextmanager
-def mobile_execution_guard(ctx: SecureJobExecutionContext):
+def mobile_execution_guard(ctx: MobileExecutionContext):
     """Activate guard for one mobile execute transaction (per-thread/async task)."""
     token = _guard.set(ctx)
     try:

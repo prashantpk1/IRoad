@@ -3630,14 +3630,6 @@ class TenantShipment(models.Model):
 
     def save(self, *args, **kwargs):
         self.apply_truck_default_driver()
-        try:
-            from mobile_api.helpers.job_list_operational_rank import (
-                apply_operational_rank_on_save,
-            )
-
-            apply_operational_rank_on_save(self)
-        except Exception:
-            pass
         super().save(*args, **kwargs)
 
     def __str__(self):

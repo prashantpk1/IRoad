@@ -142,8 +142,6 @@ MIDDLEWARE = [
     'django_tenants.middleware.main.TenantMainMiddleware',
     'superadmin.middleware.TenantApiSchemaMiddleware',
     'mobile_api.middleware.MobileApiTenantGateMiddleware',
-    'mobile_api.middleware.MobileDashboardSecurityMiddleware',
-    'mobile_api.middleware.MobileJobListSecurityMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'mobile_api.middleware.MobileApiSecurityHeadersMiddleware',
     # Serve /static/ when DEBUG=False (see STATICFILES_DIRS); required for styled 404 and marketing pages.
@@ -202,13 +200,6 @@ DATABASES = {
         'PORT': config('DB_PORT', default='5432'),
     }
 }
-
-# Job Detail DB E2E: reuse dev database (migrated tenant schemas) instead of empty test_* clone.
-# Run: MOBILE_API_JOB_DETAIL_TEST_USE_DEV_DB=1 python manage.py test ... --keepdb
-if config('MOBILE_API_JOB_DETAIL_TEST_USE_DEV_DB', default=False, cast=bool):
-    DATABASES['default'].setdefault('TEST', {})
-    DATABASES['default']['TEST']['NAME'] = DATABASES['default']['NAME']
-    DATABASES['default']['TEST']['MIGRATE'] = False
 
 # PgBouncer notes (production):
 # - Keep this block disabled in local/dev by default.
@@ -363,18 +354,14 @@ SUBSCRIPTION_EXPIRY_GRACE_DAYS = config(
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'
 SESSION_COOKIE_AGE = 86400  # 24hrs max — Redis TTL controls real expiry
 
-# ─────────────────────────────────────────
 # Mobile API — response contract
-# ─────────────────────────────────────────
 MOBILE_API_CONTRACT_VERSION = config(
     'MOBILE_API_CONTRACT_VERSION',
     default='1.0',
     cast=str,
 ).strip() or '1.0'
 
-# ─────────────────────────────────────────
 # Mobile API — Django REST Framework
-# ─────────────────────────────────────────
 REST_FRAMEWORK = {
     # Rendering
     'DEFAULT_RENDERER_CLASSES': [
@@ -419,13 +406,10 @@ REST_FRAMEWORK = {
         'mobile_forgot_password': '5/minute',
         'mobile_verify_otp': '15/minute',
         'mobile_reset_password': '8/minute',
-        'mobile_jobs': '90/minute',
     },
 }
 
-# ─────────────────────────────────────────
 # Mobile API — CORS Settings
-# ─────────────────────────────────────────
 # Production: set CORS_ALLOW_ALL_ORIGINS=False and CORS_ALLOWED_ORIGINS to explicit
 # https:// origins for any browser-based clients (never use '*' with credentials).
 _cors_origins_raw = config('CORS_ALLOWED_ORIGINS', default='', cast=str).strip()
@@ -464,9 +448,7 @@ CORS_ALLOW_HEADERS = [
     'x-api-key',
 ]
 
-# ─────────────────────────────────────────
 # Mobile API — JWT Settings
-# ─────────────────────────────────────────
 MOBILE_API_ACCESS_TOKEN_TTL_SECONDS = config(
     'MOBILE_API_ACCESS_TOKEN_TTL_SECONDS',
     default=3600,
@@ -587,117 +569,6 @@ MOBILE_API_LOGIN_BURST_FAIL_CLOSED_ON_CACHE_ERROR = config(
     cast=bool,
 )
 
-# Driver home dashboard (recent activity row cap; keep low for mobile latency).
-MOBILE_API_DASHBOARD_RECENT_ACTIVITY_LIMIT = config(
-    'MOBILE_API_DASHBOARD_RECENT_ACTIVITY_LIMIT',
-    default=10,
-    cast=int,
-)
-MOBILE_API_DASHBOARD_SUMMARY_RECENT_ACTIVITY_LIMIT = config(
-    'MOBILE_API_DASHBOARD_SUMMARY_RECENT_ACTIVITY_LIMIT',
-    default=5,
-    cast=int,
-)
-# Notification summary (inbox + push receipts + ephemeral operational hints).
-MOBILE_API_DASHBOARD_NOTIFICATION_ITEMS_LIMIT = config(
-    'MOBILE_API_DASHBOARD_NOTIFICATION_ITEMS_LIMIT',
-    default=8,
-    cast=int,
-)
-MOBILE_API_DASHBOARD_NOTIFICATION_SUMMARY_ITEMS_LIMIT = config(
-    'MOBILE_API_DASHBOARD_NOTIFICATION_SUMMARY_ITEMS_LIMIT',
-    default=5,
-    cast=int,
-)
-MOBILE_API_DASHBOARD_NOTIFICATIONS_PUSH_LOOKBACK_DAYS = config(
-    'MOBILE_API_DASHBOARD_NOTIFICATIONS_PUSH_LOOKBACK_DAYS',
-    default=14,
-    cast=int,
-)
-MOBILE_API_DASHBOARD_NOTIFICATIONS_USE_PUSH_RECEIPTS = config(
-    'MOBILE_API_DASHBOARD_NOTIFICATIONS_USE_PUSH_RECEIPTS',
-    default=True,
-    cast=bool,
-)
-# Performance: skip nested DRF re-validation when True (payload built by services).
-MOBILE_API_DASHBOARD_FAST_SERIALIZE = config(
-    'MOBILE_API_DASHBOARD_FAST_SERIALIZE',
-    default=True,
-    cast=bool,
-)
-# Summary poll: skip POD document source query (saves 1 round-trip).
-MOBILE_API_DASHBOARD_SUMMARY_SKIP_POD_ACTIVITY = config(
-    'MOBILE_API_DASHBOARD_SUMMARY_SKIP_POD_ACTIVITY',
-    default=True,
-    cast=bool,
-)
-# Optional Redis cache for full/summary dashboard (0 = disabled; 20s recommended).
-MOBILE_API_DASHBOARD_CACHE_TTL_SECONDS = config(
-    'MOBILE_API_DASHBOARD_CACHE_TTL_SECONDS',
-    default=20,
-    cast=int,
-)
-MOBILE_API_DASHBOARD_SLICE_CACHE_TTL_SECONDS = config(
-    'MOBILE_API_DASHBOARD_SLICE_CACHE_TTL_SECONDS',
-    default=20,
-    cast=int,
-)
-MOBILE_API_DASHBOARD_MOVEMENT_SCOPE_PK_CAP = config(
-    'MOBILE_API_DASHBOARD_MOVEMENT_SCOPE_PK_CAP',
-    default=500,
-    cast=int,
-)
-MOBILE_API_DASHBOARD_SLOW_REQUEST_MS = config(
-    'MOBILE_API_DASHBOARD_SLOW_REQUEST_MS',
-    default=800,
-    cast=int,
-)
-MOBILE_API_DASHBOARD_SHIPMENT_SCOPE_PK_CAP = config(
-    'MOBILE_API_DASHBOARD_SHIPMENT_SCOPE_PK_CAP',
-    default=500,
-    cast=int,
-)
-# Dashboard security: sanitize outbound IDs; middleware JWT/header tenant binding.
-MOBILE_API_DASHBOARD_ENFORCE_OWNERSHIP_SANITIZE = config(
-    'MOBILE_API_DASHBOARD_ENFORCE_OWNERSHIP_SANITIZE',
-    default=True,
-    cast=bool,
-)
-MOBILE_API_DASHBOARD_MIDDLEWARE_ENFORCE_TENANT = config(
-    'MOBILE_API_DASHBOARD_MIDDLEWARE_ENFORCE_TENANT',
-    default=True,
-    cast=bool,
-)
-
-# Job list security: sanitize outbound cards; middleware JWT/header tenant binding.
-MOBILE_API_JOBS_ENFORCE_OWNERSHIP_SANITIZE = config(
-    'MOBILE_API_JOBS_ENFORCE_OWNERSHIP_SANITIZE',
-    default=True,
-    cast=bool,
-)
-# Execution: require action_id in get_allowed_driver_actions (tampering guard).
-MOBILE_API_JOBS_ENFORCE_ACTION_MEMBERSHIP = config(
-    'MOBILE_API_JOBS_ENFORCE_ACTION_MEMBERSHIP',
-    default=True,
-    cast=bool,
-)
-MOBILE_API_JOBS_EXECUTION_AUDIT_ENABLED = config(
-    'MOBILE_API_JOBS_EXECUTION_AUDIT_ENABLED',
-    default=True,
-    cast=bool,
-)
-# Optional: align shipment_status column from logs when drift detected (read paths).
-MOBILE_API_JOBS_AUTO_REPAIR_STATUS_DRIFT = config(
-    'MOBILE_API_JOBS_AUTO_REPAIR_STATUS_DRIFT',
-    default=False,
-    cast=bool,
-)
-MOBILE_API_JOBS_MIDDLEWARE_ENFORCE_TENANT = config(
-    'MOBILE_API_JOBS_MIDDLEWARE_ENFORCE_TENANT',
-    default=True,
-    cast=bool,
-)
-
 # Mobile driver JWT: require JWT email/driver_id/role_name to match DB when present.
 MOBILE_API_JWT_STRICT_CLAIM_BINDING = config(
     'MOBILE_API_JWT_STRICT_CLAIM_BINDING',
@@ -805,9 +676,7 @@ MOBILE_API_PASSWORD_RESET_TIMING_JITTER_MS = config(
     cast=int,
 )
 
-# ─────────────────────────────────────────
 # Mobile API — RBAC (role groups + capabilities)
-# ─────────────────────────────────────────
 # CSV of TenantUser.role_name values (case-insensitive) that count as **driver**
 # mobile principals when ``driver_id`` is present in the JWT. When blank,
 # built-in defaults apply and entries from MOBILE_API_DRIVER_ROLE_ALLOWLIST are unioned.
@@ -830,176 +699,4 @@ MOBILE_API_RBAC_TENANT_ADMIN_ROLE_NAMES = config(
     default='',
     cast=str,
 ).strip()
-
-# ─────────────────────────────────────────
-# Mobile API — Pagination
-# ─────────────────────────────────────────
-MOBILE_API_DEFAULT_PAGE_SIZE = 10
-MOBILE_API_MAX_PAGE_SIZE = 100
-
-# Job list cards: batched latest-action + next-action hints (disable via include_actions=0).
-MOBILE_JOB_LIST_INCLUDE_ACTIONS = config(
-    'MOBILE_JOB_LIST_INCLUDE_ACTIONS',
-    default=True,
-    cast=bool,
-)
-# Post-pagination DISTINCT ON for latest action (avoids correlated subquery on COUNT/LIST).
-MOBILE_JOB_LIST_PAGE_ACTION_BATCH = config(
-    'MOBILE_JOB_LIST_PAGE_ACTION_BATCH',
-    default=True,
-    cast=bool,
-)
-# Trust projection dicts — skip DRF re-validation on list items.
-MOBILE_JOB_LIST_FAST_SERIALIZE = config(
-    'MOBILE_JOB_LIST_FAST_SERIALIZE',
-    default=True,
-    cast=bool,
-)
-# Paginated list includes COUNT(*) unless client sends include_total=0.
-MOBILE_JOB_LIST_INCLUDE_TOTAL_DEFAULT = config(
-    'MOBILE_JOB_LIST_INCLUDE_TOTAL_DEFAULT',
-    default=False,
-    cast=bool,
-)
-
-# ─────────────────────────────────────────
-# Mobile API — Job list production hardening
-# ─────────────────────────────────────────
-MOBILE_API_JOBS_SUMMARY_CACHE_TTL_SECONDS = config(
-    'MOBILE_API_JOBS_SUMMARY_CACHE_TTL_SECONDS',
-    default=30,
-    cast=int,
-)
-# Optional short-lived list page cache (0 = disabled; prefer summary cache).
-MOBILE_API_JOBS_LIST_CACHE_TTL_SECONDS = config(
-    'MOBILE_API_JOBS_LIST_CACHE_TTL_SECONDS',
-    default=0,
-    cast=int,
-)
-MOBILE_API_JOBS_MAX_PAGE_SIZE = config(
-    'MOBILE_API_JOBS_MAX_PAGE_SIZE',
-    default=50,
-    cast=int,
-)
-MOBILE_API_JOBS_MAX_PAGE = config(
-    'MOBILE_API_JOBS_MAX_PAGE',
-    default=500,
-    cast=int,
-)
-MOBILE_API_JOBS_MAX_OFFSET_ROWS = config(
-    'MOBILE_API_JOBS_MAX_OFFSET_ROWS',
-    default=5000,
-    cast=int,
-)
-MOBILE_API_JOBS_MAX_RESPONSE_BYTES = config(
-    'MOBILE_API_JOBS_MAX_RESPONSE_BYTES',
-    default=524288,
-    cast=int,
-)
-# Job Detail snapshot (execution screen)
-MOBILE_JOB_DETAIL_TIMELINE_PREVIEW_LIMIT = config(
-    'MOBILE_JOB_DETAIL_TIMELINE_PREVIEW_LIMIT',
-    default=15,
-    cast=int,
-)
-MOBILE_JOB_DETAIL_INCLUDE_TIMELINE_DEFAULT = config(
-    'MOBILE_JOB_DETAIL_INCLUDE_TIMELINE_DEFAULT',
-    default=True,
-    cast=bool,
-)
-MOBILE_JOB_DETAIL_INCLUDE_ACTIONS_DEFAULT = config(
-    'MOBILE_JOB_DETAIL_INCLUDE_ACTIONS_DEFAULT',
-    default=True,
-    cast=bool,
-)
-# Job Detail timeline feed (cursor pagination)
-MOBILE_JOB_TIMELINE_DEFAULT_PAGE_SIZE = config(
-    'MOBILE_JOB_TIMELINE_DEFAULT_PAGE_SIZE',
-    default=20,
-    cast=int,
-)
-MOBILE_JOB_TIMELINE_MAX_PAGE_SIZE = config(
-    'MOBILE_JOB_TIMELINE_MAX_PAGE_SIZE',
-    default=50,
-    cast=int,
-)
-MOBILE_JOB_TIMELINE_MEDIA_PER_LOG = config(
-    'MOBILE_JOB_TIMELINE_MEDIA_PER_LOG',
-    default=3,
-    cast=int,
-)
-MOBILE_JOB_TIMELINE_DESCRIPTION_MAX = config(
-    'MOBILE_JOB_TIMELINE_DESCRIPTION_MAX',
-    default=120,
-    cast=int,
-)
-# Job detail: single batched action-log scan for preview + execution state.
-MOBILE_JOB_DETAIL_LOG_SCAN_LIMIT = config(
-    'MOBILE_JOB_DETAIL_LOG_SCAN_LIMIT',
-    default=120,
-    cast=int,
-)
-MOBILE_API_JOBS_DETAIL_SLOW_REQUEST_MS = config(
-    'MOBILE_API_JOBS_DETAIL_SLOW_REQUEST_MS',
-    default=1500,
-    cast=int,
-)
-MOBILE_API_JOBS_DETAIL_METRICS_ENABLED = config(
-    'MOBILE_API_JOBS_DETAIL_METRICS_ENABLED',
-    default=True,
-    cast=bool,
-)
-MOBILE_API_JOBS_SLOW_REQUEST_MS = config(
-    'MOBILE_API_JOBS_SLOW_REQUEST_MS',
-    default=1200,
-    cast=int,
-)
-MOBILE_API_JOBS_METRICS_ENABLED = config(
-    'MOBILE_API_JOBS_METRICS_ENABLED',
-    default=True,
-    cast=bool,
-)
-# Reject tab=all on general list routes (large-tenant guard; locked paths unaffected).
-MOBILE_API_JOBS_DISALLOW_TAB_ALL = config(
-    'MOBILE_API_JOBS_DISALLOW_TAB_ALL',
-    default=True,
-    cast=bool,
-)
-# UNION driver scope (index-friendly) vs legacy OR filter.
-MOBILE_API_JOBS_UNION_DRIVER_SCOPE = config(
-    'MOBILE_API_JOBS_UNION_DRIVER_SCOPE',
-    default=True,
-    cast=bool,
-)
-# Default list pagination: cursor (keyset) or offset (legacy page param).
-MOBILE_API_JOBS_DEFAULT_PAGINATION = config(
-    'MOBILE_API_JOBS_DEFAULT_PAGINATION',
-    default='cursor',
-    cast=str,
-)
-MOBILE_API_JOBS_COUNT_CACHE_TTL_SECONDS = config(
-    'MOBILE_API_JOBS_COUNT_CACHE_TTL_SECONDS',
-    default=60,
-    cast=int,
-)
-MOBILE_API_JOBS_ENFORCE_PAYLOAD_LIMIT = config(
-    'MOBILE_API_JOBS_ENFORCE_PAYLOAD_LIMIT',
-    default=True,
-    cast=bool,
-)
-MOBILE_API_JOBS_STRICT_PAYLOAD = config(
-    'MOBILE_API_JOBS_STRICT_PAYLOAD',
-    default=True,
-    cast=bool,
-)
-MOBILE_API_JOBS_ALLOW_OFFSET_PAGINATION = config(
-    'MOBILE_API_JOBS_ALLOW_OFFSET_PAGINATION',
-    default=False,
-    cast=bool,
-)
-MOBILE_API_JOBS_STARTUP_READINESS_CHECK = config(
-    'MOBILE_API_JOBS_STARTUP_READINESS_CHECK',
-    default=False,
-    cast=bool,
-)
 

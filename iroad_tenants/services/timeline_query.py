@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from django.db.models import Exists, OuterRef, Q, QuerySet, Subquery
 
-from mobile_api.helpers.timeline_cursor import (
+from iroad_tenants.operation_runtime.timeline_cursor import (
     TimelineCursor,
     apply_timeline_cursor_filter,
 )

@@ -16,14 +16,6 @@ from mobile_api.views.driver_auth import (
     DriverResetPasswordView,
     DriverVerifyOtpView,
 )
-from mobile_api.views.driver_dashboard import (
-    DriverDashboardCurrentJobView,
-    DriverDashboardNotificationsSummaryView,
-    DriverDashboardQuickActionsView,
-    DriverDashboardRecentActivityView,
-    DriverDashboardSummaryView,
-    DriverDashboardView,
-)
 from mobile_api.views.driver_organization_profile import (
     DriverOrganizationProfileView,
 )
@@ -33,42 +25,6 @@ from mobile_api.views.driver_profile import (
     DriverProfileView,
     DriverRequestChangePasswordOtpView,
     DriverVerifyChangePasswordOtpView,
-)
-from mobile_api.views.driver_job_allowed_actions import (
-    DriverMovementAllowedActionsView,
-    DriverShipmentAllowedActionsView,
-)
-from mobile_api.views.driver_job_execute import (
-    DriverMovementExecuteActionView,
-    DriverShipmentExecuteActionView,
-)
-from mobile_api.views.driver_job_detail import (
-    DriverMovementJobDetailView,
-    DriverShipmentJobDetailView,
-)
-from mobile_api.views.driver_job_timeline import (
-    DriverMovementTimelineView,
-    DriverShipmentTimelineView,
-)
-from mobile_api.views.driver_job_pod_cod import (
-    DriverShipmentCollectCodView,
-    DriverShipmentUploadPodView,
-)
-from mobile_api.views.driver_jobs import DriverJobSummaryView
-from mobile_api.views.driver_movement_jobs import (
-    DriverMovementJobListActiveView,
-    DriverMovementJobListCancelledView,
-    DriverMovementJobListCompletedView,
-    DriverMovementJobListEmptyMoveView,
-    DriverMovementJobListView,
-)
-from mobile_api.views.driver_shipment_jobs import (
-    DriverShipmentJobListActiveView,
-    DriverShipmentJobListCancelledView,
-    DriverShipmentJobListCodPendingView,
-    DriverShipmentJobListCompletedView,
-    DriverShipmentJobListPodPendingView,
-    DriverShipmentJobListView,
 )
 from mobile_api.views.mobile_operational import MobileOperationalHealthView
 
@@ -129,146 +85,6 @@ urlpatterns = [
         'driver/auth/change-password/',
         DriverChangePasswordView.as_view(),
         name='driver_change_password',
-    ),
-    path(
-        'driver/dashboard/current-job/',
-        DriverDashboardCurrentJobView.as_view(),
-        name='driver_dashboard_current_job',
-    ),
-    path(
-        'driver/dashboard/quick-actions/',
-        DriverDashboardQuickActionsView.as_view(),
-        name='driver_dashboard_quick_actions',
-    ),
-    path(
-        'driver/dashboard/notifications-summary/',
-        DriverDashboardNotificationsSummaryView.as_view(),
-        name='driver_dashboard_notifications_summary',
-    ),
-    path(
-        'driver/dashboard/recent-activity/',
-        DriverDashboardRecentActivityView.as_view(),
-        name='driver_dashboard_recent_activity',
-    ),
-    path(
-        'driver/dashboard/summary/',
-        DriverDashboardSummaryView.as_view(),
-        name='driver_dashboard_summary',
-    ),
-    path(
-        'driver/dashboard/',
-        DriverDashboardView.as_view(),
-        name='driver_dashboard',
-    ),
-    path(
-        'driver/jobs/summary/',
-        DriverJobSummaryView.as_view(),
-        name='driver_jobs_summary',
-    ),
-    path(
-        'driver/jobs/shipments/active/',
-        DriverShipmentJobListActiveView.as_view(),
-        name='driver_jobs_shipments_active',
-    ),
-    path(
-        'driver/jobs/shipments/completed/',
-        DriverShipmentJobListCompletedView.as_view(),
-        name='driver_jobs_shipments_completed',
-    ),
-    path(
-        'driver/jobs/shipments/cancelled/',
-        DriverShipmentJobListCancelledView.as_view(),
-        name='driver_jobs_shipments_cancelled',
-    ),
-    path(
-        'driver/jobs/shipments/pod-pending/',
-        DriverShipmentJobListPodPendingView.as_view(),
-        name='driver_jobs_shipments_pod_pending',
-    ),
-    path(
-        'driver/jobs/shipments/cod-pending/',
-        DriverShipmentJobListCodPendingView.as_view(),
-        name='driver_jobs_shipments_cod_pending',
-    ),
-    path(
-        'driver/jobs/shipments/<uuid:shipment_id>/upload-pod/',
-        DriverShipmentUploadPodView.as_view(),
-        name='driver_jobs_shipment_upload_pod',
-    ),
-    path(
-        'driver/jobs/shipments/<uuid:shipment_id>/collect-cod/',
-        DriverShipmentCollectCodView.as_view(),
-        name='driver_jobs_shipment_collect_cod',
-    ),
-    path(
-        'driver/jobs/shipments/<uuid:shipment_id>/timeline/',
-        DriverShipmentTimelineView.as_view(),
-        name='driver_jobs_shipment_timeline',
-    ),
-    path(
-        'driver/jobs/shipments/<uuid:shipment_id>/actions/execute/',
-        DriverShipmentExecuteActionView.as_view(),
-        name='driver_jobs_shipment_execute',
-    ),
-    path(
-        'driver/jobs/shipments/<uuid:shipment_id>/actions/',
-        DriverShipmentAllowedActionsView.as_view(),
-        name='driver_jobs_shipment_actions',
-    ),
-    path(
-        'driver/jobs/shipments/<uuid:shipment_id>/',
-        DriverShipmentJobDetailView.as_view(),
-        name='driver_jobs_shipment_detail',
-    ),
-    path(
-        'driver/jobs/shipments/',
-        DriverShipmentJobListView.as_view(),
-        name='driver_jobs_shipments',
-    ),
-    path(
-        'driver/jobs/movements/active/',
-        DriverMovementJobListActiveView.as_view(),
-        name='driver_jobs_movements_active',
-    ),
-    path(
-        'driver/jobs/movements/completed/',
-        DriverMovementJobListCompletedView.as_view(),
-        name='driver_jobs_movements_completed',
-    ),
-    path(
-        'driver/jobs/movements/cancelled/',
-        DriverMovementJobListCancelledView.as_view(),
-        name='driver_jobs_movements_cancelled',
-    ),
-    path(
-        'driver/jobs/movements/empty/',
-        DriverMovementJobListEmptyMoveView.as_view(),
-        name='driver_jobs_movements_empty',
-    ),
-    path(
-        'driver/jobs/movements/<uuid:movement_id>/timeline/',
-        DriverMovementTimelineView.as_view(),
-        name='driver_jobs_movement_timeline',
-    ),
-    path(
-        'driver/jobs/movements/<uuid:movement_id>/actions/execute/',
-        DriverMovementExecuteActionView.as_view(),
-        name='driver_jobs_movement_execute',
-    ),
-    path(
-        'driver/jobs/movements/<uuid:movement_id>/actions/',
-        DriverMovementAllowedActionsView.as_view(),
-        name='driver_jobs_movement_actions',
-    ),
-    path(
-        'driver/jobs/movements/<uuid:movement_id>/',
-        DriverMovementJobDetailView.as_view(),
-        name='driver_jobs_movement_detail',
-    ),
-    path(
-        'driver/jobs/movements/',
-        DriverMovementJobListView.as_view(),
-        name='driver_jobs_movements',
     ),
     path(
         'driver/profile/',
