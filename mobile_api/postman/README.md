@@ -1,14 +1,36 @@
-# Iroad Mobile API — Postman (Unified Driver Dashboard)
+# Iroad Mobile API — Postman
 
-Postman assets for the **Unified Driver Dashboard** (live requests + reference examples). Obtain a driver JWT separately (e.g. `POST /driver/auth/login/` in Postman or your app) and set **`access_token`** in the environment or collection.
+Postman assets for the **Unified Driver Dashboard** and **Unified Job Detail** APIs.
 
 ## Files
 
 | File | Purpose |
 |------|---------|
+| `Iroad_Mobile_Driver_Job_Detail.postman_collection.json` | **Job Detail** — auth, job GET, timeline pagination, examples |
+| `Iroad_Mobile_Driver_Dashboard.postman_collection.json` | **Dashboard** — current job, ETag polling, examples |
+| `Iroad_Mobile_Local.postman_environment.json` | Shared local environment (auth + dashboard + job detail vars) |
+| `JOB_DETAIL_SETUP.md` | Job Detail setup guide (recommended starting point) |
+| `README.md` | This file (dashboard focus + index) |
+
+### Quick start — Job Detail
+
+1. Import collection + environment (see `JOB_DETAIL_SETUP.md`).
+2. Run **01 — Auth & JWT → Driver Login**.
+3. Set `shipment_id`, then **02 — Get Shipment Job Detail**.
+4. Run **03 — Timeline — Page 1**, then **Page 2** with saved cursor.
+
+---
+
+## Dashboard (Unified Driver Dashboard)
+
+Obtain a driver JWT via login (included in Job Detail collection folder **01**) or set **`access_token`** manually.
+
+## Files (dashboard)
+
+| File | Purpose |
+|------|---------|
 | `Iroad_Mobile_Driver_Dashboard.postman_collection.json` | Collection (**02** live dashboard, **03** saved example responses only) |
 | `Iroad_Mobile_Local.postman_environment.json` | Local environment variables |
-| `README.md` | This guide |
 
 ## Prerequisites
 

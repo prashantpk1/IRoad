@@ -1,0 +1,1110 @@
+{
+  "info": {
+    "_postman_id": "c3d4e5f6-a7b8-9012-cdef-123456789abc",
+    "name": "Iroad — Mobile Driver API (Unified Job Detail)",
+    "description": "Complete Postman collection for **Unified Driver Job Detail** + timeline pagination.\n\n## Base\n`{{base_url}}` (default `http://127.0.0.1:8000/api/v1/mobile`)\n\n## Folders\n1. **01 — Auth & JWT** — login, refresh, logout\n2. **02 — Job Detail (Live)** — shipment, empty move, security negatives, ETag polling\n3. **03 — Timeline Pagination (Live)** — cursor pages\n4. **04 — Examples (Reference)** — saved responses\n\n## RBAC\n`mobile.driver.job_detail`\n\n## Setup\nSee `JOB_DETAIL_SETUP.md` in this folder.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (!pm.variables.get('request_id') || String(pm.variables.get('request_id')).indexOf('{{') >= 0) {",
+          "    pm.variables.set('request_id', 'postman-' + pm.variables.replaceIn('{{$guid}}'));",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8000/api/v1/mobile"
+    },
+    {
+      "key": "access_token",
+      "value": ""
+    },
+    {
+      "key": "refresh_token",
+      "value": ""
+    },
+    {
+      "key": "tenant_id",
+      "value": ""
+    },
+    {
+      "key": "tenant_schema",
+      "value": ""
+    },
+    {
+      "key": "driver_id",
+      "value": ""
+    },
+    {
+      "key": "shipment_id",
+      "value": ""
+    },
+    {
+      "key": "movement_id",
+      "value": ""
+    },
+    {
+      "key": "job_detail_etag",
+      "value": ""
+    },
+    {
+      "key": "job_detail_content_hash",
+      "value": ""
+    },
+    {
+      "key": "timeline_cursor",
+      "value": ""
+    },
+    {
+      "key": "wrong_tenant_id",
+      "value": "wrong-tenant-schema"
+    },
+    {
+      "key": "foreign_shipment_id",
+      "value": "00000000-0000-0000-0000-000000000099"
+    }
+  ],
+  "item": [
+    {
+      "name": "01 — Auth & JWT",
+      "description": "Run **Driver Login** first.",
+      "item": [
+        {
+          "name": "Driver Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "pm.test('Login success', function () { pm.expect(json.status).to.eql(1); });",
+                  "const data = json.data || {};",
+                  "if (data.access_token) { pm.environment.set('access_token', data.access_token); pm.collectionVariables.set('access_token', data.access_token); }",
+                  "if (data.refresh_token) { pm.environment.set('refresh_token', data.refresh_token); pm.collectionVariables.set('refresh_token', data.refresh_token); }",
+                  "const org = data.organization || {};",
+                  "if (org.schema_name) { pm.environment.set('tenant_schema', org.schema_name); pm.collectionVariables.set('tenant_schema', org.schema_name); }",
+                  "if (org.tenant_id) { pm.environment.set('tenant_id', org.tenant_id); pm.collectionVariables.set('tenant_id', org.tenant_id); }",
+                  "const driver = data.driver || {};",
+                  "const did = driver.driver_id || driver.id || ''; if (did) { pm.environment.set('driver_id', String(did)); pm.collectionVariables.set('driver_id', String(did)); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/auth/login/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{driver_email}}\",\n  \"password\": \"{{driver_password}}\",\n  \"tenant_id\": \"{{tenant_id}}\",\n  \"device_platform\": \"{{device_platform}}\",\n  \"device_id\": \"{{device_id}}\",\n  \"device_name\": \"{{device_name}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [
+            {
+              "name": "200 Login success",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"status\": 1,\n  \"data\": {\n    \"access_token\": \"eyJ.example.access\",\n    \"refresh_token\": \"eyJ.example.refresh\",\n    \"organization\": {\n      \"tenant_id\": \"t-demo\",\n      \"schema_name\": \"tenant_demo\"\n    },\n    \"driver\": {\n      \"driver_id\": \"d1111111-1111-1111-1111-111111111111\"\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Refresh Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "const data = (pm.response.json().data || {});",
+                  "if (data.access_token) pm.environment.set('access_token', data.access_token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/auth/refresh/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\",\n  \"tenant_id\": \"{{tenant_id}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/auth/logout/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "02 — Job Detail (Live)",
+      "description": "GET `/driver/jobs/<job_type>/<job_id>/`",
+      "item": [
+        {
+          "name": "Get Shipment Job Detail",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "pm.test('App status success', function () { pm.expect(json.status).to.eql(1); });",
+                  "pm.test('Job Detail contract keys', function () { const d = json.data || {}; ['job','workflow','timeline','pod_cod','round_trip','alerts','sync_metadata'].forEach(function (k) { pm.expect(d).to.have.property(k); }); });",
+                  "pm.test('sync_metadata required fields', function () { const sm = (json.data || {}).sync_metadata || {}; ['content_hash','entity_versions','workflow_version','generated_at'].forEach(function (k) { pm.expect(sm).to.have.property(k); }); });",
+                  "const etag = pm.response.headers.get('ETag'); if (etag) { pm.environment.set('job_detail_etag', etag); pm.collectionVariables.set('job_detail_etag', etag); }",
+                  "const sm = (json.data || {}).sync_metadata || {}; if (sm.content_hash) { pm.environment.set('job_detail_content_hash', sm.content_hash); pm.collectionVariables.set('job_detail_content_hash', sm.content_hash); }",
+                  "const job = (json.data || {}).job || {}; if (job.job_id) { pm.environment.set('shipment_id', job.job_id); pm.collectionVariables.set('shipment_id', job.job_id); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenant_id}}",
+                "description": "Optional — must match JWT when provided"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipment/{{shipment_id}}/"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Shipment Job Detail (If-None-Match — expect 304)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get('job_detail_etag')) console.warn('Run Get Shipment Job Detail first');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 304', function () { pm.response.to.have.status(304); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenant_id}}",
+                "description": "Optional — must match JWT when provided"
+              },
+              {
+                "key": "If-None-Match",
+                "value": "{{job_detail_etag}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipment/{{shipment_id}}/"
+          },
+          "response": [
+            {
+              "name": "304",
+              "status": "Not Modified",
+              "code": 304,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "ETag",
+                  "value": "\"jd_etag\""
+                }
+              ],
+              "body": "{}"
+            }
+          ]
+        },
+        {
+          "name": "Get Empty Move Job Detail",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "pm.test('App status success', function () { pm.expect(json.status).to.eql(1); });",
+                  "pm.test('Job Detail contract keys', function () { const d = json.data || {}; ['job','workflow','timeline','pod_cod','round_trip','alerts','sync_metadata'].forEach(function (k) { pm.expect(d).to.have.property(k); }); });",
+                  "pm.test('sync_metadata required fields', function () { const sm = (json.data || {}).sync_metadata || {}; ['content_hash','entity_versions','workflow_version','generated_at'].forEach(function (k) { pm.expect(sm).to.have.property(k); }); });",
+                  "const etag = pm.response.headers.get('ETag'); if (etag) { pm.environment.set('job_detail_etag', etag); pm.collectionVariables.set('job_detail_etag', etag); }",
+                  "const sm = (json.data || {}).sync_metadata || {}; if (sm.content_hash) { pm.environment.set('job_detail_content_hash', sm.content_hash); pm.collectionVariables.set('job_detail_content_hash', sm.content_hash); }",
+                  "const job = (json.data || {}).job || {}; if (job.job_id) { pm.environment.set('shipment_id', job.job_id); pm.collectionVariables.set('shipment_id', job.job_id); }",
+                  "const job = (pm.response.json().data || {}).job || {}; if (job.job_id) pm.environment.set('movement_id', job.job_id);",
+                  "pm.test('pod_cod empty', function () { const d = pm.response.json().data; pm.expect(d.pod_cod).to.eql({}); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenant_id}}",
+                "description": "Optional — must match JWT when provided"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/movement/{{movement_id}}/"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Job Detail — No Authorization (expect 401)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipment/{{shipment_id}}/"
+          },
+          "response": [
+            {
+              "name": "401",
+              "status": "Unauthorized",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"status\": 0,\n  \"message\": \"Unauthorized\",\n  \"message_key\": \"mobile.auth.unauthorized\",\n  \"errors\": [\n    {\n      \"code\": \"unauthorized\"\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Job Detail — Wrong Tenant Header (expect 403)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{wrong_tenant_id}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipment/{{shipment_id}}/"
+          },
+          "response": [
+            {
+              "name": "403 Tenant",
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"status\": 0,\n  \"message\": \"Tenant mismatch\",\n  \"message_key\": \"mobile.auth.tenant_mismatch\",\n  \"errors\": [\n    {\n      \"code\": \"tenant_mismatch\"\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Job Detail — Wrong Driver (expect 403)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenant_id}}",
+                "description": "Optional — must match JWT when provided"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipment/{{foreign_shipment_id}}/"
+          },
+          "response": [
+            {
+              "name": "403 Forbidden",
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"status\": 0,\n  \"message\": \"Forbidden\",\n  \"message_key\": \"mobile.auth.forbidden\",\n  \"errors\": [\n    {\n      \"code\": \"forbidden\"\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Job Detail — Not Found (expect 404)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenant_id}}",
+                "description": "Optional — must match JWT when provided"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipment/00000000-0000-0000-0000-000000000001/"
+          },
+          "response": [
+            {
+              "name": "404",
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"status\": 0,\n  \"message\": \"Job not found\",\n  \"message_key\": \"mobile.jobs.not_found\",\n  \"errors\": [\n    {\n      \"code\": \"job_not_found\"\n    }\n  ]\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 — Timeline Pagination (Live)",
+      "description": "GET `.../timeline/?cursor=&limit=`",
+      "item": [
+        {
+          "name": "Timeline — Page 1 (shipment)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "pm.test('Timeline contract', function () { const d = json.data || {}; pm.expect(d).to.have.property('events'); pm.expect(d).to.have.property('next_cursor'); pm.expect(d).to.have.property('has_more'); });",
+                  "const d = json.data || {}; if (d.next_cursor) { pm.environment.set('timeline_cursor', d.next_cursor); pm.collectionVariables.set('timeline_cursor', d.next_cursor); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenant_id}}",
+                "description": "Optional — must match JWT when provided"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipment/{{shipment_id}}/timeline/?limit=10"
+          },
+          "response": []
+        },
+        {
+          "name": "Timeline — Page 2 (cursor)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "pm.test('Timeline contract', function () { const d = json.data || {}; pm.expect(d).to.have.property('events'); pm.expect(d).to.have.property('next_cursor'); pm.expect(d).to.have.property('has_more'); });",
+                  "const d = json.data || {}; if (d.next_cursor) { pm.environment.set('timeline_cursor', d.next_cursor); pm.collectionVariables.set('timeline_cursor', d.next_cursor); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenant_id}}",
+                "description": "Optional — must match JWT when provided"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipment/{{shipment_id}}/timeline/?limit=10&cursor={{timeline_cursor}}"
+          },
+          "response": []
+        },
+        {
+          "name": "Timeline — Empty Move",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "pm.test('Timeline contract', function () { const d = json.data || {}; pm.expect(d).to.have.property('events'); pm.expect(d).to.have.property('next_cursor'); pm.expect(d).to.have.property('has_more'); });",
+                  "const d = json.data || {}; if (d.next_cursor) { pm.environment.set('timeline_cursor', d.next_cursor); pm.collectionVariables.set('timeline_cursor', d.next_cursor); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenant_id}}",
+                "description": "Optional — must match JWT when provided"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/movement/{{movement_id}}/timeline/?limit=20"
+          },
+          "response": []
+        },
+        {
+          "name": "Timeline — Invalid cursor (expect 400)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenant_id}}",
+                "description": "Optional — must match JWT when provided"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipment/{{shipment_id}}/timeline/?cursor=not-valid"
+          },
+          "response": [
+            {
+              "name": "400",
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"status\": 0,\n  \"errors\": [\n    {\n      \"code\": \"invalid_timeline_cursor\"\n    }\n  ]\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 — Job Detail Examples (Reference)",
+      "description": "Saved examples — no server required.",
+      "item": [
+        {
+          "name": "[Example] Shipment — One-Way",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipment/{{shipment_id}}/"
+          },
+          "response": [
+            {
+              "name": "200",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "ETag",
+                  "value": "\"jd_etag_one_way\""
+                }
+              ],
+              "body": "{\n  \"status\": 1,\n  \"message\": \"Data retrieved successfully\",\n  \"message_key\": \"mobile.success.data_retrieved\",\n  \"data\": {\n    \"job\": {\n      \"job_type\": \"shipment\",\n      \"job_id\": \"s1111111-1111-1111-1111-111111111111\",\n      \"job_no\": \"SH-2026-0099\",\n      \"entity_type\": \"shipment\"\n    },\n    \"workflow\": {\n      \"current_stage\": \"In Transit\",\n      \"next_action\": {\n        \"action_code\": \"A5\"\n      },\n      \"allowed_actions\": [\n        {\n          \"action_code\": \"A5\"\n        }\n      ],\n      \"workflow_source\": \"operation_execution.get_allowed_actions\"\n    },\n    \"timeline\": {\n      \"scope\": \"shipment\",\n      \"preview_limit\": 5,\n      \"timeline_preview\": [\n        {\n          \"log_id\": \"log-1001\",\n          \"event_type\": \"action\",\n          \"authority\": \"action_log\"\n        }\n      ],\n      \"timeline_cursor\": \"\",\n      \"has_more\": false\n    },\n    \"pod_cod\": {\n      \"pod_pending\": true,\n      \"pod_compliant\": false,\n      \"hard_pod_pending\": false,\n      \"cod_pending\": false,\n      \"cod_collected\": false,\n      \"treasury_pending\": false,\n      \"delivery_blocked\": true,\n      \"compliance_integrity\": {\n        \"compliance_drift\": false,\n        \"authority_source\": \"action_logs\"\n      }\n    },\n    \"round_trip\": {\n      \"booking_no\": \"BK-2026-0042\",\n      \"trip_type\": \"One-Way\",\n      \"booking_execution_stage\": \"PARTIAL\",\n      \"progression_mode\": \"same_driver\",\n      \"legs\": [],\n      \"outbound_progression\": {\n        \"legs_total\": 1\n      },\n      \"backload_progression\": {\n        \"legs_total\": 0\n      }\n    },\n    \"alerts\": {\n      \"has_drift\": false\n    },\n    \"sync_metadata\": {\n      \"job_detail_projection_version\": \"1\",\n      \"content_hash\": \"jd_hash_one_way_example_64hex000000000000000000000000000000000000000000000000\",\n      \"workflow_version\": \"jd_wf_ver_001\",\n      \"generated_at\": \"2026-05-26T10:15:00.000Z\",\n      \"entity_versions\": {\n        \"booking\": \"bk_v\",\n        \"shipment\": \"sh_v\",\n        \"movement\": \"\",\n        \"action_log\": \"log-1001\",\n        \"pod_cod\": \"pod_v\"\n      },\n      \"workflow_integrity\": {\n        \"authority_source\": \"action_logs\"\n      },\n      \"compliance_integrity\": {\n        \"compliance_drift\": false\n      },\n      \"drift_detected\": false\n    }\n  },\n  \"meta\": {\n    \"request_id\": \"postman-jd-001\",\n    \"content_hash\": \"jd_hash_one_way_example_64hex000000000000000000000000000000000000000000000000\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "[Example] Round Trip — Outbound Completed",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipment/{{shipment_id}}/"
+          },
+          "response": [
+            {
+              "name": "200",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"status\": 1,\n  \"data\": {\n    \"job\": {\n      \"job_type\": \"shipment\",\n      \"job_id\": \"s2222222-2222-2222-2222-222222222222\",\n      \"job_no\": \"SH-RT-BACK\",\n      \"entity_type\": \"shipment\"\n    },\n    \"workflow\": {\n      \"current_stage\": \"Pickup\",\n      \"next_action\": {\n        \"action_code\": \"A2\"\n      }\n    },\n    \"timeline\": {\n      \"scope\": \"shipment\",\n      \"timeline_preview\": [],\n      \"has_more\": true,\n      \"timeline_cursor\": \"cursor_rt_page1\"\n    },\n    \"pod_cod\": {\n      \"pod_pending\": true,\n      \"pod_compliant\": false,\n      \"cod_pending\": false\n    },\n    \"round_trip\": {\n      \"booking_no\": \"BK-RT-0015\",\n      \"trip_type\": \"Round\",\n      \"booking_execution_stage\": \"OUTBOUND_COMPLETED\",\n      \"progression_mode\": \"same_driver\",\n      \"next_executable_leg\": {\n        \"booking_item_type\": \"Backload\"\n      },\n      \"outbound_progression\": {\n        \"all_execution_complete\": true\n      },\n      \"backload_progression\": {\n        \"all_execution_complete\": false,\n        \"active_leg\": {\n          \"shipment_no\": \"SH-RT-BACK\"\n        }\n      }\n    },\n    \"alerts\": {},\n    \"sync_metadata\": {\n      \"content_hash\": \"jd_rt_hash\",\n      \"workflow_version\": \"jd_rt_wf\",\n      \"generated_at\": \"2026-05-26T11:00:00.000Z\",\n      \"entity_versions\": {\n        \"booking\": \"bk_rt\",\n        \"shipment\": \"sh_rt\"\n      }\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "[Example] Round Trip — Split Driver",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipment/{{shipment_id}}/"
+          },
+          "response": [
+            {
+              "name": "200",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"status\": 1,\n  \"data\": {\n    \"job\": {\n      \"job_type\": \"shipment\",\n      \"job_no\": \"SH-RT-BACK\"\n    },\n    \"round_trip\": {\n      \"progression_mode\": \"split_driver\",\n      \"booking_execution_stage\": \"BACKLOAD_ACTIVE\",\n      \"outbound_progression\": {\n        \"driver_owns_any_leg\": false\n      },\n      \"backload_progression\": {\n        \"driver_owns_any_leg\": true\n      },\n      \"current_leg\": {\n        \"driver_owns_leg\": true\n      }\n    },\n    \"pod_cod\": {},\n    \"workflow\": {},\n    \"timeline\": {},\n    \"alerts\": {},\n    \"sync_metadata\": {\n      \"content_hash\": \"jd_split\",\n      \"entity_versions\": {},\n      \"workflow_version\": \"w\",\n      \"generated_at\": \"2026-05-26T12:00:00.000Z\"\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "[Example] Empty Move",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/movement/{{movement_id}}/"
+          },
+          "response": [
+            {
+              "name": "200",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"status\": 1,\n  \"data\": {\n    \"job\": {\n      \"job_type\": \"movement\",\n      \"job_id\": \"m3333333-3333-3333-3333-333333333333\",\n      \"job_no\": \"EM-2026-0007\",\n      \"entity_type\": \"movement\"\n    },\n    \"workflow\": {\n      \"current_stage\": \"In Transit\",\n      \"allowed_actions\": [\n        {\n          \"action_code\": \"EM3\"\n        }\n      ],\n      \"workflow_source\": \"operation_execution.get_allowed_actions\"\n    },\n    \"timeline\": {\n      \"scope\": \"movement\",\n      \"timeline_preview\": [\n        {\n          \"log_id\": \"log-em-1\",\n          \"event_type\": \"movement\",\n          \"authority\": \"action_log\"\n        }\n      ],\n      \"has_more\": false\n    },\n    \"pod_cod\": {},\n    \"round_trip\": {},\n    \"alerts\": {},\n    \"sync_metadata\": {\n      \"content_hash\": \"jd_em_hash\",\n      \"workflow_version\": \"jd_em_wf\",\n      \"generated_at\": \"2026-05-26T10:30:00.000Z\",\n      \"entity_versions\": {\n        \"movement\": \"mv_v\",\n        \"shipment\": \"\",\n        \"action_log\": \"log-em-1\"\n      }\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "[Example] POD Pending",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipment/{{shipment_id}}/"
+          },
+          "response": [
+            {
+              "name": "200",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"status\": 1,\n  \"message\": \"Data retrieved successfully\",\n  \"message_key\": \"mobile.success.data_retrieved\",\n  \"data\": {\n    \"job\": {\n      \"job_type\": \"shipment\",\n      \"job_id\": \"s1111111-1111-1111-1111-111111111111\",\n      \"job_no\": \"SH-2026-0099\",\n      \"entity_type\": \"shipment\"\n    },\n    \"workflow\": {\n      \"current_stage\": \"In Transit\",\n      \"next_action\": {\n        \"action_code\": \"A5\"\n      },\n      \"allowed_actions\": [\n        {\n          \"action_code\": \"A5\"\n        }\n      ],\n      \"workflow_source\": \"operation_execution.get_allowed_actions\"\n    },\n    \"timeline\": {\n      \"scope\": \"shipment\",\n      \"preview_limit\": 5,\n      \"timeline_preview\": [\n        {\n          \"log_id\": \"log-1001\",\n          \"event_type\": \"action\",\n          \"authority\": \"action_log\"\n        }\n      ],\n      \"timeline_cursor\": \"\",\n      \"has_more\": false\n    },\n    \"pod_cod\": {\n      \"pod_pending\": true,\n      \"pod_compliant\": false,\n      \"hard_pod_pending\": false,\n      \"cod_pending\": false,\n      \"cod_collected\": false,\n      \"treasury_pending\": false,\n      \"delivery_blocked\": true,\n      \"compliance_integrity\": {\n        \"compliance_drift\": false,\n        \"authority_source\": \"action_logs\"\n      }\n    },\n    \"round_trip\": {\n      \"booking_no\": \"BK-2026-0042\",\n      \"trip_type\": \"One-Way\",\n      \"booking_execution_stage\": \"PARTIAL\",\n      \"progression_mode\": \"same_driver\",\n      \"legs\": [],\n      \"outbound_progression\": {\n        \"legs_total\": 1\n      },\n      \"backload_progression\": {\n        \"legs_total\": 0\n      }\n    },\n    \"alerts\": {\n      \"has_drift\": false\n    },\n    \"sync_metadata\": {\n      \"job_detail_projection_version\": \"1\",\n      \"content_hash\": \"jd_hash_one_way_example_64hex000000000000000000000000000000000000000000000000\",\n      \"workflow_version\": \"jd_wf_ver_001\",\n      \"generated_at\": \"2026-05-26T10:15:00.000Z\",\n      \"entity_versions\": {\n        \"booking\": \"bk_v\",\n        \"shipment\": \"sh_v\",\n        \"movement\": \"\",\n        \"action_log\": \"log-1001\",\n        \"pod_cod\": \"pod_v\"\n      },\n      \"workflow_integrity\": {\n        \"authority_source\": \"action_logs\"\n      },\n      \"compliance_integrity\": {\n        \"compliance_drift\": false\n      },\n      \"drift_detected\": false\n    }\n  },\n  \"meta\": {\n    \"request_id\": \"postman-jd-001\",\n    \"content_hash\": \"jd_hash_one_way_example_64hex000000000000000000000000000000000000000000000000\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "[Example] POD Compliant",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipment/{{shipment_id}}/"
+          },
+          "response": [
+            {
+              "name": "200",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"status\": 1,\n  \"data\": {\n    \"job\": {\n      \"job_type\": \"shipment\",\n      \"job_no\": \"SH-POD-OK\"\n    },\n    \"pod_cod\": {\n      \"pod_pending\": false,\n      \"pod_compliant\": true,\n      \"hard_pod_pending\": false,\n      \"delivery_blocked\": false,\n      \"compliance_integrity\": {\n        \"compliance_drift\": false,\n        \"authority_source\": \"action_logs\"\n      }\n    },\n    \"workflow\": {},\n    \"timeline\": {},\n    \"round_trip\": {},\n    \"alerts\": {},\n    \"sync_metadata\": {\n      \"content_hash\": \"jd_pod_ok\",\n      \"entity_versions\": {\n        \"pod_cod\": \"pod_compliant_v\"\n      },\n      \"workflow_version\": \"w\",\n      \"generated_at\": \"2026-05-26T12:00:00.000Z\"\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "[Example] Hard POD Pending",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipment/{{shipment_id}}/"
+          },
+          "response": [
+            {
+              "name": "200",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"status\": 1,\n  \"data\": {\n    \"pod_cod\": {\n      \"pod_pending\": true,\n      \"pod_compliant\": false,\n      \"hard_pod_pending\": true,\n      \"delivery_blocked\": true,\n      \"compliance_integrity\": {\n        \"compliance_drift\": false\n      }\n    },\n    \"job\": {\n      \"job_type\": \"shipment\"\n    },\n    \"workflow\": {},\n    \"timeline\": {},\n    \"round_trip\": {},\n    \"alerts\": {\n      \"has_drift\": false\n    },\n    \"sync_metadata\": {\n      \"content_hash\": \"jd_hard_pod\",\n      \"entity_versions\": {},\n      \"workflow_version\": \"w\",\n      \"generated_at\": \"2026-05-26T12:00:00.000Z\"\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "[Example] COD / Treasury",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipment/{{shipment_id}}/"
+          },
+          "response": [
+            {
+              "name": "200",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"status\": 1,\n  \"data\": {\n    \"pod_cod\": {\n      \"cod_pending\": false,\n      \"cod_collected\": true,\n      \"treasury_pending\": true,\n      \"delivery_blocked\": false,\n      \"compliance_integrity\": {\n        \"cod_reconciled\": false,\n        \"treasury_reconciled\": false,\n        \"compliance_drift\": true,\n        \"drift_reasons\": [\n          \"cod_collected_without_treasury_post\"\n        ]\n      }\n    },\n    \"job\": {\n      \"job_type\": \"shipment\"\n    },\n    \"workflow\": {},\n    \"timeline\": {},\n    \"round_trip\": {},\n    \"alerts\": {\n      \"has_drift\": true\n    },\n    \"sync_metadata\": {\n      \"content_hash\": \"jd_cod\",\n      \"drift_detected\": true,\n      \"entity_versions\": {},\n      \"workflow_version\": \"w\",\n      \"generated_at\": \"2026-05-26T12:00:00.000Z\"\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "[Example] Sync Metadata",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipment/{{shipment_id}}/"
+          },
+          "response": [
+            {
+              "name": "200",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "ETag",
+                  "value": "\"jd_etag_example\""
+                }
+              ],
+              "body": "{\n  \"status\": 1,\n  \"data\": {\n    \"sync_metadata\": {\n      \"job_detail_projection_version\": \"1\",\n      \"content_hash\": \"a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456\",\n      \"workflow_version\": \"wf_abc123def456\",\n      \"generated_at\": \"2026-05-26T14:00:00.000Z\",\n      \"last_action_log_id\": \"log-9999\",\n      \"entity_versions\": {\n        \"booking\": \"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\",\n        \"shipment\": \"sh_ver_token\",\n        \"movement\": \"\",\n        \"action_log\": \"log-9999\",\n        \"pod_cod\": \"pod_ver_token\"\n      },\n      \"workflow_integrity\": {\n        \"authority_source\": \"action_logs\",\n        \"workflow_integrity_state\": \"aligned\",\n        \"missing_log_warning\": false\n      },\n      \"compliance_integrity\": {\n        \"pod_reconciled\": true,\n        \"cod_reconciled\": true,\n        \"compliance_drift\": false\n      },\n      \"reconciliation_version\": \"rev_example\",\n      \"workflow_reconciled\": true,\n      \"drift_detected\": false,\n      \"job_etag\": \"\\\"jd_etag_example\\\"\",\n      \"tenant_schema\": \"tenant_demo\",\n      \"job_type\": \"shipment\",\n      \"job_id\": \"s1111111-1111-1111-1111-111111111111\"\n    },\n    \"job\": {},\n    \"workflow\": {},\n    \"timeline\": {},\n    \"pod_cod\": {},\n    \"round_trip\": {},\n    \"alerts\": {}\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "[Example] Timeline Page",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipment/{{shipment_id}}/timeline/"
+          },
+          "response": [
+            {
+              "name": "200",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"status\": 1,\n  \"data\": {\n    \"events\": [\n      {\n        \"log_id\": \"log-1003\",\n        \"log_no\": \"AL-1003\",\n        \"event_type\": \"pod\",\n        \"action_code\": \"A7\",\n        \"action_label\": \"Upload POD\",\n        \"authority\": \"action_log\",\n        \"append_only\": true\n      },\n      {\n        \"log_id\": \"log-1002\",\n        \"log_no\": \"AL-1002\",\n        \"event_type\": \"action\",\n        \"action_code\": \"A5\",\n        \"authority\": \"action_log\"\n      }\n    ],\n    \"next_cursor\": \"eyJsb2dfZGF0ZSI6IjIwMjYtMDUtMjBUMTA6MDA6MDBaIiwibG9nX2lkIjoibG9nLTEwMDIifQ\",\n    \"has_more\": true\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "[Example] 401 Unauthorized",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipment/{{shipment_id}}/"
+          },
+          "response": [
+            {
+              "name": "401",
+              "status": "Unauthorized",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"status\": 0,\n  \"message\": \"Unauthorized\",\n  \"message_key\": \"mobile.auth.unauthorized\",\n  \"errors\": [\n    {\n      \"code\": \"unauthorized\"\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "[Example] 403 Wrong Driver",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipment/{{foreign_shipment_id}}/"
+          },
+          "response": [
+            {
+              "name": "403",
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"status\": 0,\n  \"message\": \"Forbidden\",\n  \"message_key\": \"mobile.auth.forbidden\",\n  \"errors\": [\n    {\n      \"code\": \"forbidden\"\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "[Example] 403 Tenant Mismatch",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "wrong-tenant-schema"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipment/{{shipment_id}}/"
+          },
+          "response": [
+            {
+              "name": "403",
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"status\": 0,\n  \"message\": \"Tenant mismatch\",\n  \"message_key\": \"mobile.auth.tenant_mismatch\",\n  \"errors\": [\n    {\n      \"code\": \"tenant_mismatch\"\n    }\n  ]\n}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
