@@ -28,6 +28,7 @@ from mobile_api.views.driver_profile import (
 )
 from mobile_api.views.mobile_operational import MobileOperationalHealthView
 from mobile_api.dashboard.views.dashboard_view import DashboardAPIView
+from mobile_api.execution.urls import urlpatterns as execution_urlpatterns
 from mobile_api.job_detail.urls import urlpatterns as job_detail_urlpatterns
 
 app_name = 'mobile_api'
@@ -116,4 +117,4 @@ urlpatterns = [
         DashboardAPIView.as_view(),
         name='driver_dashboard',
     ),
-] + job_detail_urlpatterns
+] + job_detail_urlpatterns + execution_urlpatterns

@@ -1,0 +1,1027 @@
+{
+  "info": {
+    "_postman_id": "e7f8a9b0-c1d2-3456-7890-abcdef123456",
+    "name": "Iroad \u2014 Mobile Driver API (Unified Execute Action)",
+    "description": "Complete Postman collection for **Unified Driver Execute Action** API.\n\n## Auth\nBearer token only \u2014 **no login requests**. Set `{{bearer_token}}` (or `access_token` copied from your auth flow).\n\n## Base\n`{{base_url}}` \u2192 `http://127.0.0.1:8000/api/v1/mobile`\n\n## Setup\nSee `EXECUTE_ACTION_SETUP.md` and `EXECUTE_ACTION_SAMPLE_PAYLOADS.md`.\n\n## RBAC\n`mobile.driver.execute`",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{bearer_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (!pm.variables.get('request_id') || String(pm.variables.get('request_id')).indexOf('{{') >= 0) {",
+          "    pm.variables.set('request_id', 'postman-' + pm.variables.replaceIn('{{$guid}}'));",
+          "}",
+          "const bearer = pm.variables.get('bearer_token');",
+          "const access = pm.variables.get('access_token');",
+          "if ((!bearer || String(bearer).indexOf('{{') >= 0) && access && String(access).indexOf('{{') < 0) {",
+          "    pm.variables.set('bearer_token', access);",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8000/api/v1/mobile"
+    },
+    {
+      "key": "bearer_token",
+      "value": ""
+    },
+    {
+      "key": "tenant_schema",
+      "value": ""
+    },
+    {
+      "key": "shipment_id",
+      "value": ""
+    },
+    {
+      "key": "movement_id",
+      "value": ""
+    },
+    {
+      "key": "execute_action_code",
+      "value": "A2"
+    },
+    {
+      "key": "execute_pod_action_code",
+      "value": ""
+    },
+    {
+      "key": "execute_cod_action_code",
+      "value": ""
+    },
+    {
+      "key": "execute_hard_pod_action_code",
+      "value": ""
+    },
+    {
+      "key": "execute_evidence_action_code",
+      "value": ""
+    },
+    {
+      "key": "execute_client_action_id",
+      "value": ""
+    },
+    {
+      "key": "execute_replay_client_action_id",
+      "value": ""
+    },
+    {
+      "key": "execute_workflow_version",
+      "value": ""
+    },
+    {
+      "key": "execute_content_hash",
+      "value": ""
+    },
+    {
+      "key": "execute_latitude",
+      "value": "25.2048"
+    },
+    {
+      "key": "execute_longitude",
+      "value": "55.2708"
+    },
+    {
+      "key": "execute_notes",
+      "value": "Driver execute via Postman"
+    },
+    {
+      "key": "execute_media_json",
+      "value": "[]"
+    },
+    {
+      "key": "execute_cod_amount",
+      "value": "150.00"
+    },
+    {
+      "key": "stale_workflow_version",
+      "value": "stale-workflow-version-intentionally-wrong"
+    },
+    {
+      "key": "stale_content_hash",
+      "value": "stale-content-hash-intentionally-wrong"
+    },
+    {
+      "key": "wrong_tenant_id",
+      "value": "wrong-tenant-schema"
+    },
+    {
+      "key": "foreign_shipment_id",
+      "value": "00000000-0000-0000-0000-000000000099"
+    },
+    {
+      "key": "invalid_action_code",
+      "value": "ZZZ_NOT_ALLOWED"
+    },
+    {
+      "key": "pod_photo_file_ref",
+      "value": "tenant-uploads/pod/photo-001.jpg"
+    },
+    {
+      "key": "pod_signature_file_ref",
+      "value": "tenant-uploads/pod/signature-001.png"
+    },
+    {
+      "key": "hard_pod_photo_file_ref",
+      "value": "tenant-uploads/hard-pod/scan-001.jpg"
+    }
+  ],
+  "item": [
+    {
+      "name": "01 \u2014 Execute (success paths)",
+      "description": "Set `execute_content_hash`, `execute_workflow_version`, and action codes from Job Detail (separate collection) before executing. Each request generates a new `execute_client_action_id` except replay.",
+      "item": [
+        {
+          "name": "1. Shipment Execute",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenant_schema}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipment/{{shipment_id}}/actions/{{execute_action_code}}/execute/",
+            "description": "Primary workflow action on assigned shipment.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_action_id\": \"{{execute_client_action_id}}\",\n  \"workflow_version\": \"{{execute_workflow_version}}\",\n  \"content_hash\": \"{{execute_content_hash}}\",\n  \"latitude\": {{execute_latitude}},\n  \"longitude\": {{execute_longitude}},\n  \"notes\": \"{{execute_notes}}\",\n  \"media\": {{execute_media_json}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('execute_client_action_id') || String(pm.variables.get('execute_client_action_id')).indexOf('{{') >= 0) {",
+                  "    pm.variables.set('execute_client_action_id', pm.variables.replaceIn('{{$guid}}'));",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201 or 200', function () {",
+                  "    pm.expect([200, 201]).to.include(pm.response.code);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test('status=1', function () { pm.expect(json.status).to.eql(1); });",
+                  "const data = json.data || {};",
+                  "pm.test('has execution + workflow + sync_metadata', function () {",
+                  "    pm.expect(data).to.have.property('execution');",
+                  "    pm.expect(data).to.have.property('workflow');",
+                  "    pm.expect(data).to.have.property('sync_metadata');",
+                  "});",
+                  "if (pm.response.code === 201) {",
+                  "    const cid = pm.variables.get('execute_client_action_id');",
+                  "    if (cid) {",
+                  "        pm.environment.set('execute_replay_client_action_id', cid);",
+                  "        pm.collectionVariables.set('execute_replay_client_action_id', cid);",
+                  "    }",
+                  "}",
+                  "const sync = data.sync_metadata || {};",
+                  "if (sync.content_hash) {",
+                  "    pm.environment.set('execute_content_hash', sync.content_hash);",
+                  "    pm.collectionVariables.set('execute_content_hash', sync.content_hash);",
+                  "}",
+                  "if (sync.workflow_version) {",
+                  "    pm.environment.set('execute_workflow_version', sync.workflow_version);",
+                  "    pm.collectionVariables.set('execute_workflow_version', sync.workflow_version);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2. Empty Move Execute",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenant_schema}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/movement/{{movement_id}}/actions/{{execute_action_code}}/execute/",
+            "description": "Execute on movement / empty-move job.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_action_id\": \"{{execute_client_action_id}}\",\n  \"workflow_version\": \"{{execute_workflow_version}}\",\n  \"content_hash\": \"{{execute_content_hash}}\",\n  \"latitude\": {{execute_latitude}},\n  \"longitude\": {{execute_longitude}},\n  \"notes\": \"{{execute_notes}}\",\n  \"media\": {{execute_media_json}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('execute_client_action_id') || String(pm.variables.get('execute_client_action_id')).indexOf('{{') >= 0) {",
+                  "    pm.variables.set('execute_client_action_id', pm.variables.replaceIn('{{$guid}}'));",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201 or 200', function () {",
+                  "    pm.expect([200, 201]).to.include(pm.response.code);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test('status=1', function () { pm.expect(json.status).to.eql(1); });",
+                  "const data = json.data || {};",
+                  "pm.test('has execution + workflow + sync_metadata', function () {",
+                  "    pm.expect(data).to.have.property('execution');",
+                  "    pm.expect(data).to.have.property('workflow');",
+                  "    pm.expect(data).to.have.property('sync_metadata');",
+                  "});",
+                  "if (pm.response.code === 201) {",
+                  "    const cid = pm.variables.get('execute_client_action_id');",
+                  "    if (cid) {",
+                  "        pm.environment.set('execute_replay_client_action_id', cid);",
+                  "        pm.collectionVariables.set('execute_replay_client_action_id', cid);",
+                  "    }",
+                  "}",
+                  "const sync = data.sync_metadata || {};",
+                  "if (sync.content_hash) {",
+                  "    pm.environment.set('execute_content_hash', sync.content_hash);",
+                  "    pm.collectionVariables.set('execute_content_hash', sync.content_hash);",
+                  "}",
+                  "if (sync.workflow_version) {",
+                  "    pm.environment.set('execute_workflow_version', sync.workflow_version);",
+                  "    pm.collectionVariables.set('execute_workflow_version', sync.workflow_version);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3. POD Execute",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenant_schema}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipment/{{shipment_id}}/actions/{{execute_pod_action_code}}/execute/",
+            "description": "Set execute_pod_action_code from Job Detail when pod_cod.pod_pending.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_action_id\": \"{{execute_client_action_id}}\",\n  \"workflow_version\": \"{{execute_workflow_version}}\",\n  \"content_hash\": \"{{execute_content_hash}}\",\n  \"latitude\": {{execute_latitude}},\n  \"longitude\": {{execute_longitude}},\n  \"notes\": \"POD capture \u2014 Postman\",\n  \"media\": [\n    {\n      \"media_type\": \"photo\",\n      \"file_ref\": \"{{pod_photo_file_ref}}\",\n      \"file_name\": \"pod-proof.jpg\",\n      \"description\": \"Delivery proof\"\n    },\n    {\n      \"media_type\": \"signature\",\n      \"file_ref\": \"{{pod_signature_file_ref}}\",\n      \"file_name\": \"receiver-sign.png\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('execute_client_action_id') || String(pm.variables.get('execute_client_action_id')).indexOf('{{') >= 0) {",
+                  "    pm.variables.set('execute_client_action_id', pm.variables.replaceIn('{{$guid}}'));",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201 or 200', function () {",
+                  "    pm.expect([200, 201]).to.include(pm.response.code);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test('status=1', function () { pm.expect(json.status).to.eql(1); });",
+                  "const data = json.data || {};",
+                  "pm.test('has execution + workflow + sync_metadata', function () {",
+                  "    pm.expect(data).to.have.property('execution');",
+                  "    pm.expect(data).to.have.property('workflow');",
+                  "    pm.expect(data).to.have.property('sync_metadata');",
+                  "});",
+                  "if (pm.response.code === 201) {",
+                  "    const cid = pm.variables.get('execute_client_action_id');",
+                  "    if (cid) {",
+                  "        pm.environment.set('execute_replay_client_action_id', cid);",
+                  "        pm.collectionVariables.set('execute_replay_client_action_id', cid);",
+                  "    }",
+                  "}",
+                  "const sync = data.sync_metadata || {};",
+                  "if (sync.content_hash) {",
+                  "    pm.environment.set('execute_content_hash', sync.content_hash);",
+                  "    pm.collectionVariables.set('execute_content_hash', sync.content_hash);",
+                  "}",
+                  "if (sync.workflow_version) {",
+                  "    pm.environment.set('execute_workflow_version', sync.workflow_version);",
+                  "    pm.collectionVariables.set('execute_workflow_version', sync.workflow_version);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4. COD Execute",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenant_schema}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipment/{{shipment_id}}/actions/{{execute_cod_action_code}}/execute/",
+            "description": "Set execute_cod_action_code when pod_cod.cod_pending.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_action_id\": \"{{execute_client_action_id}}\",\n  \"workflow_version\": \"{{execute_workflow_version}}\",\n  \"content_hash\": \"{{execute_content_hash}}\",\n  \"latitude\": {{execute_latitude}},\n  \"longitude\": {{execute_longitude}},\n  \"notes\": \"COD collected \u2014 Postman\",\n  \"mobile_cod_amount\": \"{{execute_cod_amount}}\",\n  \"media\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('execute_client_action_id') || String(pm.variables.get('execute_client_action_id')).indexOf('{{') >= 0) {",
+                  "    pm.variables.set('execute_client_action_id', pm.variables.replaceIn('{{$guid}}'));",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201 or 200', function () {",
+                  "    pm.expect([200, 201]).to.include(pm.response.code);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test('status=1', function () { pm.expect(json.status).to.eql(1); });",
+                  "const data = json.data || {};",
+                  "pm.test('has execution + workflow + sync_metadata', function () {",
+                  "    pm.expect(data).to.have.property('execution');",
+                  "    pm.expect(data).to.have.property('workflow');",
+                  "    pm.expect(data).to.have.property('sync_metadata');",
+                  "});",
+                  "if (pm.response.code === 201) {",
+                  "    const cid = pm.variables.get('execute_client_action_id');",
+                  "    if (cid) {",
+                  "        pm.environment.set('execute_replay_client_action_id', cid);",
+                  "        pm.collectionVariables.set('execute_replay_client_action_id', cid);",
+                  "    }",
+                  "}",
+                  "const sync = data.sync_metadata || {};",
+                  "if (sync.content_hash) {",
+                  "    pm.environment.set('execute_content_hash', sync.content_hash);",
+                  "    pm.collectionVariables.set('execute_content_hash', sync.content_hash);",
+                  "}",
+                  "if (sync.workflow_version) {",
+                  "    pm.environment.set('execute_workflow_version', sync.workflow_version);",
+                  "    pm.collectionVariables.set('execute_workflow_version', sync.workflow_version);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5. Hard POD Execute",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenant_schema}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipment/{{shipment_id}}/actions/{{execute_hard_pod_action_code}}/execute/",
+            "description": "Set execute_hard_pod_action_code when pod_cod.hard_pod_pending.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_action_id\": \"{{execute_client_action_id}}\",\n  \"workflow_version\": \"{{execute_workflow_version}}\",\n  \"content_hash\": \"{{execute_content_hash}}\",\n  \"latitude\": {{execute_latitude}},\n  \"longitude\": {{execute_longitude}},\n  \"notes\": \"Hard POD \u2014 Postman\",\n  \"media\": [\n    {\n      \"media_type\": \"photo\",\n      \"file_ref\": \"{{hard_pod_photo_file_ref}}\",\n      \"file_name\": \"hard-pod.jpg\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('execute_client_action_id') || String(pm.variables.get('execute_client_action_id')).indexOf('{{') >= 0) {",
+                  "    pm.variables.set('execute_client_action_id', pm.variables.replaceIn('{{$guid}}'));",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201 or 200', function () {",
+                  "    pm.expect([200, 201]).to.include(pm.response.code);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test('status=1', function () { pm.expect(json.status).to.eql(1); });",
+                  "const data = json.data || {};",
+                  "pm.test('has execution + workflow + sync_metadata', function () {",
+                  "    pm.expect(data).to.have.property('execution');",
+                  "    pm.expect(data).to.have.property('workflow');",
+                  "    pm.expect(data).to.have.property('sync_metadata');",
+                  "});",
+                  "if (pm.response.code === 201) {",
+                  "    const cid = pm.variables.get('execute_client_action_id');",
+                  "    if (cid) {",
+                  "        pm.environment.set('execute_replay_client_action_id', cid);",
+                  "        pm.collectionVariables.set('execute_replay_client_action_id', cid);",
+                  "    }",
+                  "}",
+                  "const sync = data.sync_metadata || {};",
+                  "if (sync.content_hash) {",
+                  "    pm.environment.set('execute_content_hash', sync.content_hash);",
+                  "    pm.collectionVariables.set('execute_content_hash', sync.content_hash);",
+                  "}",
+                  "if (sync.workflow_version) {",
+                  "    pm.environment.set('execute_workflow_version', sync.workflow_version);",
+                  "    pm.collectionVariables.set('execute_workflow_version', sync.workflow_version);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "6. Idempotent Replay (retry)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenant_schema}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipment/{{shipment_id}}/actions/{{execute_action_code}}/execute/",
+            "description": "Run **1. Shipment Execute** first. Uses execute_replay_client_action_id saved from 201 response.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_action_id\": \"{{execute_replay_client_action_id}}\",\n  \"workflow_version\": \"{{execute_workflow_version}}\",\n  \"content_hash\": \"{{execute_content_hash}}\",\n  \"latitude\": {{execute_latitude}},\n  \"longitude\": {{execute_longitude}},\n  \"notes\": \"{{execute_notes}}\",\n  \"media\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200 idempotent replay', function () { pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "const exec = (json.data || {}).execution || {};",
+                  "pm.test('reused_existing', function () { pm.expect(exec.reused_existing).to.eql(true); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 \u2014 Negative & security",
+      "description": "Expected failures for stale sync, tenant, ownership, validation.",
+      "item": [
+        {
+          "name": "7. Stale Workflow Rejection",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenant_schema}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipment/{{shipment_id}}/actions/{{execute_action_code}}/execute/",
+            "description": "Expect 409 stale_content_hash or stale_workflow_version.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_action_id\": \"{{execute_client_action_id}}\",\n  \"workflow_version\": \"{{stale_workflow_version}}\",\n  \"content_hash\": \"{{stale_content_hash}}\",\n  \"latitude\": 25.0,\n  \"longitude\": 55.0,\n  \"notes\": \"\",\n  \"media\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('execute_client_action_id') || String(pm.variables.get('execute_client_action_id')).indexOf('{{') >= 0) {",
+                  "    pm.variables.set('execute_client_action_id', pm.variables.replaceIn('{{$guid}}'));",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 409', function () { pm.response.to.have.status(409); });",
+                  "const json = pm.response.json();",
+                  "pm.test('status=0 on error', function () { pm.expect(json.status).to.eql(0); });",
+                  "const err = (json.data || {}).error_code || json.data;",
+                  "if (err) { console.log('error_code:', err); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "8. Wrong Tenant",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{wrong_tenant_id}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipment/{{shipment_id}}/actions/{{execute_action_code}}/execute/",
+            "description": "X-Tenant-ID must not match JWT tenant_schema.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_action_id\": \"{{execute_client_action_id}}\",\n  \"workflow_version\": \"{{execute_workflow_version}}\",\n  \"content_hash\": \"{{execute_content_hash}}\",\n  \"latitude\": {{execute_latitude}},\n  \"longitude\": {{execute_longitude}},\n  \"notes\": \"{{execute_notes}}\",\n  \"media\": {{execute_media_json}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('execute_client_action_id') || String(pm.variables.get('execute_client_action_id')).indexOf('{{') >= 0) {",
+                  "    pm.variables.set('execute_client_action_id', pm.variables.replaceIn('{{$guid}}'));",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 403', function () { pm.response.to.have.status(403); });",
+                  "const json = pm.response.json();",
+                  "pm.test('status=0 on error', function () { pm.expect(json.status).to.eql(0); });",
+                  "const err = (json.data || {}).error_code || json.data;",
+                  "if (err) { console.log('error_code:', err); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "9. Wrong Driver (foreign shipment)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenant_schema}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipment/{{foreign_shipment_id}}/actions/{{execute_action_code}}/execute/",
+            "description": "Shipment not owned by authenticated driver.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_action_id\": \"{{execute_client_action_id}}\",\n  \"workflow_version\": \"{{execute_workflow_version}}\",\n  \"content_hash\": \"{{execute_content_hash}}\",\n  \"latitude\": {{execute_latitude}},\n  \"longitude\": {{execute_longitude}},\n  \"notes\": \"{{execute_notes}}\",\n  \"media\": {{execute_media_json}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('execute_client_action_id') || String(pm.variables.get('execute_client_action_id')).indexOf('{{') >= 0) {",
+                  "    pm.variables.set('execute_client_action_id', pm.variables.replaceIn('{{$guid}}'));",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 403', function () { pm.response.to.have.status(403); });",
+                  "const json = pm.response.json();",
+                  "pm.test('status=0 on error', function () { pm.expect(json.status).to.eql(0); });",
+                  "const err = (json.data || {}).error_code || json.data;",
+                  "if (err) { console.log('error_code:', err); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "10. Missing Idempotency Key",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenant_schema}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipment/{{shipment_id}}/actions/{{execute_action_code}}/execute/",
+            "description": "Omits client_action_id \u2014 expect validation_failed.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"workflow_version\": \"{{execute_workflow_version}}\",\n  \"content_hash\": \"{{execute_content_hash}}\",\n  \"latitude\": 25.0,\n  \"longitude\": 55.0,\n  \"notes\": \"\",\n  \"media\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 400', function () { pm.response.to.have.status(400); });",
+                  "const json = pm.response.json();",
+                  "pm.test('status=0 on error', function () { pm.expect(json.status).to.eql(0); });",
+                  "const err = (json.data || {}).error_code || json.data;",
+                  "if (err) { console.log('error_code:', err); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "11. Invalid Action",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenant_schema}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipment/{{shipment_id}}/actions/{{invalid_action_code}}/execute/",
+            "description": "action_not_allowed or action_not_found.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_action_id\": \"{{execute_client_action_id}}\",\n  \"workflow_version\": \"{{execute_workflow_version}}\",\n  \"content_hash\": \"{{execute_content_hash}}\",\n  \"latitude\": {{execute_latitude}},\n  \"longitude\": {{execute_longitude}},\n  \"notes\": \"{{execute_notes}}\",\n  \"media\": {{execute_media_json}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('execute_client_action_id') || String(pm.variables.get('execute_client_action_id')).indexOf('{{') >= 0) {",
+                  "    pm.variables.set('execute_client_action_id', pm.variables.replaceIn('{{$guid}}'));",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 400', function () { pm.response.to.have.status(400); });",
+                  "const json = pm.response.json();",
+                  "pm.test('status=0 on error', function () { pm.expect(json.status).to.eql(0); });",
+                  "const err = (json.data || {}).error_code || json.data;",
+                  "if (err) { console.log('error_code:', err); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "12. Evidence Validation Failure",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenant_schema}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipment/{{shipment_id}}/actions/{{execute_evidence_action_code}}/execute/",
+            "description": "Set execute_evidence_action_code to an action requiring GPS/photo but send empty evidence body.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_action_id\": \"{{execute_client_action_id}}\",\n  \"workflow_version\": \"{{execute_workflow_version}}\",\n  \"content_hash\": \"{{execute_content_hash}}\",\n  \"notes\": \"\",\n  \"media\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('execute_client_action_id') || String(pm.variables.get('execute_client_action_id')).indexOf('{{') >= 0) {",
+                  "    pm.variables.set('execute_client_action_id', pm.variables.replaceIn('{{$guid}}'));",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 400', function () { pm.response.to.have.status(400); });",
+                  "const json = pm.response.json();",
+                  "pm.test('status=0 on error', function () { pm.expect(json.status).to.eql(0); });",
+                  "const err = (json.data || {}).error_code || json.data;",
+                  "if (err) { console.log('error_code:', err); }"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

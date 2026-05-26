@@ -1,16 +1,29 @@
 # Iroad Mobile API — Postman
 
-Postman assets for the **Unified Driver Dashboard** and **Unified Job Detail** APIs.
+Postman assets for the **Unified Driver Dashboard**, **Job Detail**, and **Execute Action** APIs.
 
 ## Files
 
 | File | Purpose |
 |------|---------|
+| `Iroad_Mobile_Driver_Execute_Action.postman_collection.json` | **Execute Action** — 12 scenarios, bearer-only (no login) |
 | `Iroad_Mobile_Driver_Job_Detail.postman_collection.json` | **Job Detail** — auth, job GET, timeline pagination, examples |
 | `Iroad_Mobile_Driver_Dashboard.postman_collection.json` | **Dashboard** — current job, ETag polling, examples |
-| `Iroad_Mobile_Local.postman_environment.json` | Shared local environment (auth + dashboard + job detail vars) |
+| `Iroad_Mobile_Local.postman_environment.json` | Shared local environment (auth + dashboard + job detail + execute vars) |
+| `EXECUTE_ACTION_SETUP.md` | Execute Action setup guide |
+| `EXECUTE_ACTION_SAMPLE_PAYLOADS.md` | Execute request body reference |
 | `JOB_DETAIL_SETUP.md` | Job Detail setup guide (recommended starting point) |
-| `README.md` | This file (dashboard focus + index) |
+| `README.md` | This file (index) |
+
+### Quick start — Execute Action
+
+1. Import `Iroad_Mobile_Driver_Execute_Action.postman_collection.json` + environment.
+2. Paste driver JWT into `bearer_token` (or set `access_token` from Job Detail login).
+3. Set `tenant_schema`, `shipment_id`.
+4. Run Job Detail GET (separate collection) to copy sync fields.
+5. Run **01 — Execute** folder (then **02** negatives).
+
+See `EXECUTE_ACTION_SETUP.md` for full run order.
 
 ### Quick start — Job Detail
 
