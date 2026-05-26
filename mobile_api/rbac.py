@@ -26,6 +26,7 @@ CAPABILITY_GROUPS: dict[str, tuple[str, ...]] = {
     # Driver self-service (requires driver principal + driver role policy)
     'mobile.driver.profile': ('driver',),
     'mobile.driver.organization': ('driver',),
+    'mobile.driver.dashboard': ('driver',),
     'mobile.driver.auth_session': ('driver',),
     # Operational / back-office style mobile modules (dispatcher + tenant admin)
     'mobile.operations.read': ('dispatcher', 'tenant_admin'),

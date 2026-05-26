@@ -27,6 +27,7 @@ from mobile_api.views.driver_profile import (
     DriverVerifyChangePasswordOtpView,
 )
 from mobile_api.views.mobile_operational import MobileOperationalHealthView
+from mobile_api.dashboard.views.dashboard_view import DashboardAPIView
 
 app_name = 'mobile_api'
 
@@ -107,5 +108,11 @@ urlpatterns = [
         'operational/health/',
         MobileOperationalHealthView.as_view(),
         name='mobile_operational_health',
+    ),
+    # Unified driver dashboard (workflow-driven; skeleton — logic TODO in mobile_api.dashboard)
+    path(
+        'driver/dashboard/',
+        DashboardAPIView.as_view(),
+        name='driver_dashboard',
     ),
 ]
