@@ -263,7 +263,7 @@
                 <select class="form-select{% if action_log_form_errors.operation_action_id %} is-invalid{% endif %}" id="actionLookup" name="operation_action_id" required data-initial-action-id="{{ action_log_form.operation_action_id|default:'' }}">
                   <option value="" disabled {% if not action_log_form.operation_action_id %}selected{% endif %}>-Select action-</option>
                   {% for action in action_options %}
-                  <option value="{{ action.action_id }}" {% if action_log_form.operation_action_id == action.action_id %}selected{% endif %}>{{ action.label }} ({{ action.action_code }})</option>
+                  <option value="{{ action.action_id }}" {% if action_log_form.operation_action_id == action.action_id %}selected{% endif %}>{{ action.english_label|default:action.label }}</option>
                   {% endfor %}
                 </select>
                 <div class="form-text text-muted" id="actionAllowedHint">{{ action_allowed_context_label|default:"Select a booking or shipment to see allowed actions." }}</div>
@@ -832,7 +832,7 @@
           (actions || []).forEach(function (row) {
             var opt = document.createElement("option");
             opt.value = row.action_id;
-            opt.textContent = (row.label || row.action_code) + " (" + (row.action_code || "") + ")";
+            opt.textContent = row.english_label || row.label || row.action_code || "";
             if (keep && String(keep) === String(row.action_id)) opt.selected = true;
             actionLookup.appendChild(opt);
           });

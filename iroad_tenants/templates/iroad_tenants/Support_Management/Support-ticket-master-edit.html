@@ -1,321 +1,322 @@
-{% extends 'iroad_tenants/base.html' %}
-{% load static %}
-
-{% block title %}Support Ticket Master | iRoad Admin{% endblock %}
-
-{% block content %}
-
-      <!-- Page Header -->
-      <div class="page-header">
-        <nav aria-label="breadcrumb">
-          <ol class="breadcrumb">
-            <li class="breadcrumb-item">
-              <a href="{% url 'iroad_tenants:tenant_dashboard' %}">Dashboard</a>
-            </li>
-            <li class="breadcrumb-item">Administration</li>
-            <li class="breadcrumb-item">Support Management</li>
-            <li class="breadcrumb-item active" aria-current="page">
-              {% if is_ticket_edit %}Edit Ticket{% elif is_ticket_detail %}Ticket Details{% else %}Create Support Ticket{% endif %}
-            </li>
-          </ol>
-        </nav>
-        <div class="page-header-row">
-          <div class="page-header-left">
-            <h1 class="page-title">
-              {% if is_ticket_edit %}Edit {{ ticket.ticket_no }}{% elif is_ticket_detail %}{{ ticket.ticket_no }}{% else %}Create Support Ticket{% endif %}
-            </h1>
-            <p class="page-subtitle">
-              {% if is_ticket_edit %}Update subject and category for this ticket.{% elif is_ticket_detail %}{% if is_view_only %}View ticket details and conversation.{% else %}Review conversation and send a reply.{% endif %}{% else %}Fill in the details below to create a new support ticket.{% endif %}
-            </p>
-          </div>
-          <div class="page-header-right">
-            <a
-              href="{% url 'iroad_tenants:tenant_support_ticket_list' %}"
-              class="eal-btn eal-btn-outline"
-            >
-              <i class="bi bi-arrow-left"></i>
-              <span>Back</span>
-            </a>
-          </div>
-        </div>
-      </div>
-
-      {% if is_ticket_edit %}
-      <form method="post" action="{% url 'iroad_tenants:tenant_support_ticket_edit' ticket.ticket_id %}">
-        {% csrf_token %}
-        <div class="form-card">
-          <div class="form-card-header">
-            <div class="form-card-icon blue">
-              <i class="bi bi-pencil-square"></i>
-            </div>
-            <div class="form-card-header-text">
-              <h2 class="form-card-title">Ticket Information</h2>
-              <p class="form-card-desc">Edit subject and category while the ticket is open.</p>
-            </div>
-          </div>
-          <div class="form-card-body">
-            <div class="fields-grid cols-2">
-              <div class="field">
-                <label for="ticketNo" class="form-label">Ticket No</label>
-                <input type="text" class="form-control" id="ticketNo" value="{{ ticket.ticket_no }}" readonly />
-              </div>
-              <div class="field">
-                <label for="subject" class="form-label">Subject <span class="required">*</span></label>
-                <input
-                  type="text"
-                  class="form-control"
-                  id="subject"
-                  name="subject"
-                  value="{{ ticket.subject }}"
-                  required
-                />
-              </div>
-              <div class="field">
-                <label for="category_id" class="form-label">Category <span class="required">*</span></label>
-                <select class="form-select" id="category_id" name="category_id" required>
-                  {% for category in categories %}
-                  <option value="{{ category.category_id }}" {% if category.category_id == ticket.category_id %}selected{% endif %}>
-                    {{ category.name_en }}
-                  </option>
-                  {% endfor %}
-                </select>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="form-actions-bar">
-          <div class="form-actions-left">
-            <a href="{% url 'iroad_tenants:tenant_support_ticket_list' %}" class="btn btn-outline-secondary">Cancel</a>
-          </div>
-          <div class="form-actions-right">
-            <button type="submit" class="btn btn-primary">
-              <i class="bi bi-check-circle"></i> Save Changes
-            </button>
-          </div>
-        </div>
-      </form>
-
-      {% elif is_ticket_detail %}
-      <div class="form-card mb-3">
-        <div class="form-card-body">
-          <div class="row g-3">
-            <div class="col-md-3"><strong>Subject:</strong> {{ ticket.subject }}</div>
-            <div class="col-md-3"><strong>Category:</strong> {{ ticket.category.name_en }}</div>
-            <div class="col-md-3"><strong>Priority:</strong> {{ ticket.priority }}</div>
-            <div class="col-md-3"><strong>Status:</strong> {{ ticket.get_status_display }}</div>
-            <div class="col-md-3">
-              <strong>Assigned To:</strong>
-              {{ assigned_to_username|default:"-" }}
-              {% if assigned_to_role and assigned_to_role != "-" %}
-              <span class="text-muted">({{ assigned_to_role }})</span>
-              {% endif %}
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="form-card mb-3">
-        <div class="form-card-header">
-          <div class="form-card-header-text">
-            <h2 class="form-card-title">Conversation History</h2>
-          </div>
-        </div>
-        <div class="form-card-body">
-          {% for reply in replies %}
-            <div class="mb-3 pb-3 border-bottom">
-              <div class="d-flex justify-content-between">
-                <strong>{{ reply.sender_type }}</strong>
-                <small>{{ reply.created_at }}</small>
-              </div>
-              <div class="mt-2">{{ reply.message_body }}</div>
-              {% if reply.attachment %}
-              <div class="mt-2">
-                <a href="{{ reply.attachment.url }}" target="_blank" rel="noopener">View Attachment</a>
-              </div>
-              {% endif %}
-            </div>
-          {% empty %}
-            <p class="mb-0">No replies yet.</p>
-          {% endfor %}
-        </div>
-      </div>
-
-      {% if not is_view_only and ticket.status != 'Closed' %}
-      <form id="supportTicketForm" method="post" enctype="multipart/form-data">
-        {% csrf_token %}
-        <div class="form-card" id="reply-section" data-section="2">
-          <div class="form-card-header">
-            <div class="form-card-icon amber">
-              <i class="bi bi-chat-text"></i>
-            </div>
-            <div class="form-card-header-text">
-              <h2 class="form-card-title">Message &amp; Attachment</h2>
-              <p class="form-card-desc">Reply content and optional file attachment.</p>
-            </div>
-          </div>
-          <div class="form-card-body">
-            <div class="field">
-              <label for="message_body" class="form-label">Reply <span class="required">*</span></label>
-              <textarea
-                class="form-control"
-                id="message_body"
-                name="message_body"
-                rows="6"
-                placeholder="Enter your reply message..."
-                required
-              ></textarea>
-            </div>
-            <div class="field mt-3">
-              <label for="attachment" class="form-label">Attachment</label>
-              <input
-                type="file"
-                class="form-control"
-                id="attachment"
-                name="attachment"
-                accept="image/*,.pdf,.log"
-              />
-              <span class="field-hint">Image, PDF or log file</span>
-            </div>
-          </div>
-        </div>
-        <div class="form-actions-bar">
-          <div class="form-actions-left">
-            <a href="{% url 'iroad_tenants:tenant_support_ticket_list' %}" class="btn btn-outline-secondary">Back to List</a>
-          </div>
-          <div class="form-actions-right">
-            <button type="submit" class="btn btn-primary">
-              <i class="bi bi-check-circle"></i> Send Reply
-            </button>
-          </div>
-        </div>
-      </form>
-      {% else %}
-      <div class="form-actions-bar">
-        <div class="form-actions-left">
-          <a href="{% url 'iroad_tenants:tenant_support_ticket_list' %}" class="btn btn-outline-secondary">Back to List</a>
-          {% if ticket.status != 'Closed' %}
-          <a href="{% url 'iroad_tenants:tenant_support_ticket_detail' ticket.ticket_id %}#reply-section" class="btn btn-primary ms-2">
-            <i class="bi bi-reply"></i> Reply
-          </a>
-          {% endif %}
-        </div>
-      </div>
-      {% endif %}
-
-      {% else %}
-      <!-- Create Support Ticket -->
-      <form id="supportTicketForm" method="post" enctype="multipart/form-data">
-        {% csrf_token %}
-        <div class="form-card" data-section="1">
-          <div class="form-card-header">
-            <div class="form-card-icon blue">
-              <i class="bi bi-info-circle"></i>
-            </div>
-            <div class="form-card-header-text">
-              <h2 class="form-card-title">Ticket Information</h2>
-              <p class="form-card-desc">Basic details about the support ticket.</p>
-            </div>
-          </div>
-          <div class="form-card-body">
-            <div class="fields-grid cols-3">
-              <div class="field">
-                <label for="ticketNo" class="form-label">Ticket No <span class="required">*</span></label>
-                <input
-                  type="text"
-                  class="form-control"
-                  id="ticketNo"
-                  value="{{ next_ticket_no_preview|default:'' }}"
-                  placeholder="e.g. TKT-1001"
-                  readonly
-                />
-              </div>
-              <div class="field">
-                <label for="subject" class="form-label">Subject <span class="required">*</span></label>
-                <input
-                  type="text"
-                  class="form-control"
-                  id="subject"
-                  name="subject"
-                  placeholder="Enter subject"
-                  required
-                />
-              </div>
-              <div class="field">
-                <label for="category_id" class="form-label">Category <span class="required">*</span></label>
-                <select class="form-select" id="category_id" name="category_id" required>
-                  <option value="" selected disabled>-Select category-</option>
-                  {% for category in categories %}
-                  <option value="{{ category.category_id }}">{{ category.name_en }}</option>
-                  {% endfor %}
-                </select>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="form-card" data-section="2">
-          <div class="form-card-header">
-            <div class="form-card-icon amber">
-              <i class="bi bi-chat-text"></i>
-            </div>
-            <div class="form-card-header-text">
-              <h2 class="form-card-title">Message &amp; Attachment</h2>
-              <p class="form-card-desc">Initial message and optional file attachment.</p>
-            </div>
-          </div>
-          <div class="form-card-body">
-            <div class="field">
-              <label for="message_body" class="form-label">Message <span class="required">*</span></label>
-              <textarea
-                class="form-control"
-                id="message_body"
-                name="message_body"
-                rows="6"
-                placeholder="Describe your issue..."
-                required
-              ></textarea>
-            </div>
-            <div class="field mt-3">
-              <label for="attachment" class="form-label">Attachment</label>
-              <input
-                type="file"
-                class="form-control"
-                id="attachment"
-                name="attachment"
-                accept="image/*,.pdf,.log"
-              />
-            </div>
-          </div>
-        </div>
-
-        <div class="form-actions-bar">
-          <div class="form-actions-left">
-            <button type="reset" class="btn btn-outline-secondary">
-              <i class="bi bi-arrow-counterclockwise"></i> Reset Form
-            </button>
-          </div>
-          <div class="form-actions-right">
-            <button type="submit" class="btn btn-primary">
-              <i class="bi bi-check-circle"></i> Create Support Ticket
-            </button>
-          </div>
-        </div>
-      </form>
-      {% endif %}
-
-{% endblock %}
-
-{% block extra_js %}
-{% if is_ticket_detail %}
-<script>
-(function () {
-  if (window.location.hash !== "#reply-section") return;
-  var el = document.getElementById("reply-section");
-  if (!el) return;
-  el.scrollIntoView({ behavior: "smooth", block: "start" });
-  var ta = document.getElementById("message_body");
-  if (ta) ta.focus();
-})();
-</script>
-{% endif %}
-{% endblock %}
-
+{% extends 'iroad_tenants/base.html' %}
+{% load static %}
+
+{% block title %}Support Ticket Master | iRoad Admin{% endblock %}
+
+{% block content %}
+
+      <!-- Page Header -->
+      <div class="page-header">
+        <nav aria-label="breadcrumb">
+          <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+              <a href="{% url 'iroad_tenants:tenant_dashboard' %}">Dashboard</a>
+            </li>
+            <li class="breadcrumb-item">Administration</li>
+            <li class="breadcrumb-item">Support Management</li>
+            <li class="breadcrumb-item active" aria-current="page">
+              {% if is_ticket_edit %}Edit Ticket{% elif is_ticket_detail %}Ticket Details{% else %}Create Support Ticket{% endif %}
+            </li>
+          </ol>
+        </nav>
+        <div class="page-header-row">
+          <div class="page-header-left">
+            <h1 class="page-title">
+              {% if is_ticket_edit %}Edit {{ ticket.ticket_no }}{% elif is_ticket_detail %}{{ ticket.ticket_no }}{% else %}Create Support Ticket{% endif %}
+            </h1>
+            <p class="page-subtitle">
+              {% if is_ticket_edit %}Update subject and category for this ticket.{% elif is_ticket_detail %}{% if is_view_only %}View ticket details and conversation.{% else %}Review conversation and send a reply.{% endif %}{% else %}Fill in the details below to create a new support ticket.{% endif %}
+            </p>
+          </div>
+          <div class="page-header-right">
+            <a
+              href="{% url 'iroad_tenants:tenant_support_ticket_list' %}"
+              class="eal-btn eal-btn-outline"
+            >
+              <i class="bi bi-arrow-left"></i>
+              <span>Back</span>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      {% if is_ticket_edit %}
+      <form method="post" action="{% url 'iroad_tenants:tenant_support_ticket_edit' ticket.ticket_id %}">
+        {% csrf_token %}
+        <div class="form-card">
+          <div class="form-card-header">
+            <div class="form-card-icon blue">
+              <i class="bi bi-pencil-square"></i>
+            </div>
+            <div class="form-card-header-text">
+              <h2 class="form-card-title">Ticket Information</h2>
+              <p class="form-card-desc">Edit subject and category while the ticket is open.</p>
+            </div>
+          </div>
+          <div class="form-card-body">
+            <div class="fields-grid cols-2">
+              <div class="field">
+                <label for="ticketNo" class="form-label">Ticket No</label>
+                <input type="text" class="form-control" id="ticketNo" value="{{ ticket.ticket_no }}" readonly />
+              </div>
+              <div class="field">
+                <label for="subject" class="form-label">Subject <span class="required">*</span></label>
+                <input
+                  type="text"
+                  class="form-control"
+                  id="subject"
+                  name="subject"
+                  value="{{ ticket.subject }}"
+                  required
+                />
+              </div>
+              <div class="field">
+                <label for="category_id" class="form-label">Category <span class="required">*</span></label>
+                <select class="form-select" id="category_id" name="category_id" required>
+                  {% for category in categories %}
+                  <option value="{{ category.category_id }}" {% if category.category_id == ticket.category_id %}selected{% endif %}>
+                    {{ category.name_en }}
+                  </option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="form-actions-bar">
+          <div class="form-actions-left">
+            <a href="{% url 'iroad_tenants:tenant_support_ticket_list' %}" class="btn btn-outline-secondary">Cancel</a>
+          </div>
+          <div class="form-actions-right">
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-check-circle"></i> Save Changes
+            </button>
+          </div>
+        </div>
+      </form>
+
+      {% elif is_ticket_detail %}
+      <div class="form-card mb-3">
+        <div class="form-card-body">
+          <div class="row g-3">
+            <div class="col-md-3"><strong>Subject:</strong> {{ ticket.subject }}</div>
+            <div class="col-md-3"><strong>Category:</strong> {{ ticket.category.name_en }}</div>
+            <div class="col-md-3"><strong>Priority:</strong> {{ ticket.priority }}</div>
+            <div class="col-md-3"><strong>Status:</strong> {{ ticket.get_status_display }}</div>
+            <div class="col-md-3">
+              <strong>Assigned To:</strong>
+              {{ assigned_to_username|default:"-" }}
+              {% if assigned_to_role and assigned_to_role != "-" %}
+              <span class="text-muted">({{ assigned_to_role }})</span>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="form-card mb-3">
+        <div class="form-card-header">
+          <div class="form-card-header-text">
+            <h2 class="form-card-title">Conversation History</h2>
+          </div>
+        </div>
+        <div class="form-card-body">
+          {% for reply in replies %}
+            <div class="mb-3 pb-3 border-bottom">
+              <div class="d-flex justify-content-between">
+                <strong>{{ reply.sender_type }}</strong>
+                <small>{{ reply.created_at }}</small>
+              </div>
+              <div class="mt-2">{{ reply.message_body }}</div>
+              {% if reply.attachment %}
+              <div class="mt-2">
+                <a href="{{ reply.attachment.url }}" target="_blank" rel="noopener">View Attachment</a>
+              </div>
+              {% endif %}
+            </div>
+          {% empty %}
+            <p class="mb-0">No replies yet.</p>
+          {% endfor %}
+        </div>
+      </div>
+
+      {% if not is_view_only and ticket.status != 'Closed' %}
+      <form id="supportTicketForm" method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="form-card" id="reply-section" data-section="2">
+          <div class="form-card-header">
+            <div class="form-card-icon amber">
+              <i class="bi bi-chat-text"></i>
+            </div>
+            <div class="form-card-header-text">
+              <h2 class="form-card-title">Message &amp; Attachment</h2>
+              <p class="form-card-desc">Reply content and optional file attachment.</p>
+            </div>
+          </div>
+          <div class="form-card-body">
+            <div class="field">
+              <label for="message_body" class="form-label">Reply <span class="required">*</span></label>
+              <textarea
+                class="form-control"
+                id="message_body"
+                name="message_body"
+                rows="6"
+                placeholder="Enter your reply message..."
+                required
+              ></textarea>
+            </div>
+            <div class="field mt-3">
+              <label for="attachment" class="form-label">Attachment</label>
+              <input
+                type="file"
+                class="form-control"
+                id="attachment"
+                name="attachment"
+                accept="image/*,.pdf,.log"
+              />
+              <span class="field-hint">Image, PDF or log file</span>
+            </div>
+          </div>
+        </div>
+        <div class="form-actions-bar">
+          <div class="form-actions-left">
+            <a href="{% url 'iroad_tenants:tenant_support_ticket_list' %}" class="btn btn-outline-secondary">Back to List</a>
+          </div>
+          <div class="form-actions-right">
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-check-circle"></i> Send Reply
+            </button>
+          </div>
+        </div>
+      </form>
+      {% else %}
+      <div class="form-actions-bar">
+        <div class="form-actions-left">
+          <a href="{% url 'iroad_tenants:tenant_support_ticket_list' %}" class="btn btn-outline-secondary">Back to List</a>
+          {% if ticket.status != 'Closed' %}
+          <a href="{% url 'iroad_tenants:tenant_support_ticket_detail' ticket.ticket_id %}#reply-section" class="btn btn-primary ms-2">
+            <i class="bi bi-reply"></i> Reply
+          </a>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+
+      {% else %}
+      <!-- Create Support Ticket -->
+      <form id="supportTicketForm" method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="form-card" data-section="1">
+          <div class="form-card-header">
+            <div class="form-card-icon blue">
+              <i class="bi bi-info-circle"></i>
+            </div>
+            <div class="form-card-header-text">
+              <h2 class="form-card-title">Ticket Information</h2>
+              <p class="form-card-desc">Basic details about the support ticket.</p>
+            </div>
+          </div>
+          <div class="form-card-body">
+            <div class="fields-grid cols-3">
+              <div class="field">
+                <label for="ticketNo" class="form-label">Ticket No</label>
+                <input
+                  type="text"
+                  class="form-control"
+                  id="ticketNo"
+                  value="{{ next_ticket_no_preview|default:'Auto-generated on save' }}"
+                  placeholder="Auto-generated from configuration"
+                  readonly
+                />
+                <div class="form-text">Assigned from Auto Number Configuration (Support Ticket Master).</div>
+              </div>
+              <div class="field">
+                <label for="subject" class="form-label">Subject <span class="required">*</span></label>
+                <input
+                  type="text"
+                  class="form-control"
+                  id="subject"
+                  name="subject"
+                  placeholder="Enter subject"
+                  required
+                />
+              </div>
+              <div class="field">
+                <label for="category_id" class="form-label">Category <span class="required">*</span></label>
+                <select class="form-select" id="category_id" name="category_id" required>
+                  <option value="" selected disabled>-Select category-</option>
+                  {% for category in categories %}
+                  <option value="{{ category.category_id }}">{{ category.name_en }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-card" data-section="2">
+          <div class="form-card-header">
+            <div class="form-card-icon amber">
+              <i class="bi bi-chat-text"></i>
+            </div>
+            <div class="form-card-header-text">
+              <h2 class="form-card-title">Message &amp; Attachment</h2>
+              <p class="form-card-desc">Initial message and optional file attachment.</p>
+            </div>
+          </div>
+          <div class="form-card-body">
+            <div class="field">
+              <label for="message_body" class="form-label">Message <span class="required">*</span></label>
+              <textarea
+                class="form-control"
+                id="message_body"
+                name="message_body"
+                rows="6"
+                placeholder="Describe your issue..."
+                required
+              ></textarea>
+            </div>
+            <div class="field mt-3">
+              <label for="attachment" class="form-label">Attachment</label>
+              <input
+                type="file"
+                class="form-control"
+                id="attachment"
+                name="attachment"
+                accept="image/*,.pdf,.log"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div class="form-actions-bar">
+          <div class="form-actions-left">
+            <button type="reset" class="btn btn-outline-secondary">
+              <i class="bi bi-arrow-counterclockwise"></i> Reset Form
+            </button>
+          </div>
+          <div class="form-actions-right">
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-check-circle"></i> Create Support Ticket
+            </button>
+          </div>
+        </div>
+      </form>
+      {% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+{% if is_ticket_detail %}
+<script>
+(function () {
+  if (window.location.hash !== "#reply-section") return;
+  var el = document.getElementById("reply-section");
+  if (!el) return;
+  el.scrollIntoView({ behavior: "smooth", block: "start" });
+  var ta = document.getElementById("message_body");
+  if (ta) ta.focus();
+})();
+</script>
+{% endif %}
+{% endblock %}
+

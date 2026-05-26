@@ -351,7 +351,14 @@ def mark_all_read(*, recipient_key: str) -> int:
 
 def run_with_tenant_schema(request, callback):
     """Activate tenant workspace schema, run callback, restore public."""
+    from iroad_tenants.tenant_schema import is_portal_schema_locked, restore_public_schema
     from iroad_tenants.views import _activate_tenant_workspace_schema
+
+    if is_portal_schema_locked(request):
+        registry = getattr(request, 'tenant_workspace_registry', None)
+        if registry is None:
+            return None
+        return callback(registry)
 
     registry = _activate_tenant_workspace_schema(request)
     if registry is None:
@@ -359,4 +366,4 @@ def run_with_tenant_schema(request, callback):
     try:
         return callback(registry)
     finally:
-        connection.set_schema_to_public()
+        restore_public_schema(request)

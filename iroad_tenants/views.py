@@ -22,6 +22,7 @@ from django.core.validators import validate_email
 from django.core.paginator import Paginator
 from django.core.files.storage import default_storage
 from django.db import IntegrityError, ProgrammingError, connection
+from iroad_tenants.tenant_schema import restore_public_schema
 from django.db.models.deletion import ProtectedError
 from django.db import transaction as db_transaction
 from django.db.models import Prefetch, Q, Sum
@@ -138,6 +139,10 @@ from tenant_workspace.models import (
 )
 from iroad_tenants.models import TenantPaymentCard, TenantRegistry
 from iroad_tenants.tenant_dashboard_overview import build_tenant_dashboard_overview
+from iroad_tenants.tenant_permission_matrix import (
+    TENANT_PERMISSION_MATRIX,
+    enrich_permission_matrix_rows,
+)
 from iroad_tenants.tenant_dashboard_search import (
     _empty_results,
     build_dashboard_search_routes,
@@ -748,21 +753,25 @@ def _resolve_tenant_favicon_url(request, tenant):
     )
 
 
-def _tenant_context_from_session(request):
+def _tenant_context_from_session(request, *, _debug_label=''):
     auth_payload = get_tenant_portal_cookie_payload(request) or {}
     jwt_claims = auth_payload.get('jwt_claims') or {}
     tenant_id = auth_payload.get('tenant_id')
     tenant_jti = auth_payload.get('jti')
+    _dbg = f'[DEBUG tenant-auth{_debug_label}]'
     tenant = None
     if tenant_id:
         tenant = TenantProfile.objects.filter(pk=tenant_id).first()
     if tenant is None:
+        print(f'{_dbg} FAIL: no tenant profile for cookie tenant_id={tenant_id!r}')
         _clear_tenant_bootstrap_session(request)
         return None
     if tenant.account_status != 'Active':
+        print(f'{_dbg} FAIL: tenant not Active (status={tenant.account_status!r})')
         _clear_tenant_bootstrap_session(request)
         return None
     if not tenant_jti:
+        print(f'{_dbg} FAIL: missing jti in tenant portal cookie')
         _clear_tenant_bootstrap_session(request)
         return None
 
@@ -770,7 +779,12 @@ def _tenant_context_from_session(request):
     # tenant kill-switch/mass revoke takes effect immediately.
     sec = TenantSecuritySettings.objects.first()
     timeout_minutes = max(60, int(getattr(sec, 'tenant_web_timeout_hours', 12)) * 60)
-    if not refresh_tenant_session(str(tenant.tenant_id), str(tenant_jti), timeout_minutes):
+    redis_ok = refresh_tenant_session(str(tenant.tenant_id), str(tenant_jti), timeout_minutes)
+    if not redis_ok:
+        print(
+            f'{_dbg} FAIL: refresh_tenant_session returned False '
+            f'(tenant_id={tenant.tenant_id} jti={tenant_jti} timeout_min={timeout_minutes})'
+        )
         _clear_tenant_bootstrap_session(request)
         return None
     
@@ -795,7 +809,7 @@ def _tenant_context_from_session(request):
                 tenant_user = TenantUser.all_objects.filter(pk=reference_id).first()
                 if tenant_user:
                     if not tenant_user.is_active_user:
-                        connection.set_schema_to_public()
+                        restore_public_schema(request)
                         revoke_tenant_session_key(str(tenant.tenant_id), str(tenant_jti))
                         _clear_tenant_bootstrap_session(request)
                         return None
@@ -814,7 +828,7 @@ def _tenant_context_from_session(request):
                             ).values_list('form_name', flat=True)
                         )
             finally:
-                connection.set_schema_to_public()
+                restore_public_schema(request)
 
     return {
         'tenant': tenant,
@@ -849,13 +863,20 @@ def _clear_tenant_bootstrap_session(request):
         request.session.pop(key, None)
 
 
-def _activate_tenant_workspace_schema(request):
+def _activate_tenant_workspace_schema(request, *, _debug_label=''):
     """Switch DB connection to current tenant schema for tenant workspace ORM."""
+    registry = getattr(request, 'tenant_workspace_registry', None)
+    if getattr(request, '_tenant_portal_schema_locked', False) and registry is not None:
+        return registry
+
+    _dbg = f'[DEBUG tenant-schema{_debug_label}]'
     auth_payload = get_tenant_portal_cookie_payload(request) or {}
     tenant_id = auth_payload.get('tenant_id')
     if not tenant_id:
+        print(f'{_dbg} FAIL: no tenant_id in tenant portal cookie')
         return None
 
+    # TenantRegistry lives in public schema; always switch explicitly here.
     connection.set_schema_to_public()
     registry = (
         TenantRegistry.objects.select_related('tenant_profile')
@@ -863,7 +884,12 @@ def _activate_tenant_workspace_schema(request):
         .first()
     )
     if registry is None:
+        print(
+            f'{_dbg} FAIL: no TenantRegistry for tenant_profile_id={tenant_id!r} '
+            f'(count={TenantRegistry.objects.filter(tenant_profile_id=tenant_id).count()})'
+        )
         return None
+    print(f'{_dbg} OK: schema_name={registry.schema_name!r}')
     connection.set_tenant(registry)
     return registry
 
@@ -923,7 +949,7 @@ class TenantDashboardSearchView(View):
                 'redirect': redirect_url,
             })
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantDashboardSearchResultsView(View):
@@ -957,7 +983,7 @@ class TenantDashboardSearchResultsView(View):
                 )
                 total_count = count_dashboard_search_results(results)
             finally:
-                connection.set_schema_to_public()
+                restore_public_schema(request)
 
         context.update({
             'query': q,
@@ -1059,6 +1085,7 @@ class TenantSupportTicketCreateView(View):
             'categories': SupportCategory.objects.filter(
                 is_active=True
             ).order_by('name_en'),
+            'next_ticket_no_preview': _preview_next_support_ticket_no(request),
         })
         return render(request, self.template_name, context)
 
@@ -1483,7 +1510,7 @@ class TenantCargoMasterListView(View):
         try:
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantCargoMasterCreateView(View):
@@ -1529,7 +1556,7 @@ class TenantCargoMasterCreateView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request):
         context = _tenant_context_from_session(request)
@@ -1619,7 +1646,7 @@ class TenantCargoMasterCreateView(View):
             )
             redirect_resp = _tenant_redirect(request, 'iroad_tenants:tenant_cargo_master_list')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
         return redirect_resp
 
@@ -1664,7 +1691,7 @@ class TenantCargoMasterEditView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request, cargo_id):
         context = _tenant_context_from_session(request)
@@ -1733,7 +1760,7 @@ class TenantCargoMasterEditView(View):
             )
             redirect_resp = _tenant_redirect(request, 'iroad_tenants:tenant_cargo_master_list')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
         return redirect_resp
 
@@ -1824,7 +1851,7 @@ class TenantCargoMasterDetailView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantCargoMasterDeleteView(View):
@@ -1851,7 +1878,7 @@ class TenantCargoMasterDeleteView(View):
             messages.success(request, f'Cargo {label} deleted.', extra_tags='tenant')
             return _tenant_redirect(request, 'iroad_tenants:tenant_cargo_master_list')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantCargoCategoryListView(View):
@@ -1913,7 +1940,7 @@ class TenantCargoCategoryListView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantCargoCategoryCreateView(View):
@@ -1944,7 +1971,7 @@ class TenantCargoCategoryCreateView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request):
         context = _tenant_context_from_session(request)
@@ -2013,7 +2040,7 @@ class TenantCargoCategoryCreateView(View):
             )
             redirect_resp = _tenant_redirect(request, 'iroad_tenants:tenant_cargo_category_list')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
         return redirect_resp
 
@@ -2086,7 +2113,7 @@ class TenantCargoCategoryDetailView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantCargoCategoryEditView(View):
@@ -2124,7 +2151,7 @@ class TenantCargoCategoryEditView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request, category_id):
         context = _tenant_context_from_session(request)
@@ -2186,7 +2213,7 @@ class TenantCargoCategoryEditView(View):
             messages.error(request, 'Could not save the category.', extra_tags='tenant')
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
         return redirect_resp
 
@@ -2224,7 +2251,7 @@ class TenantCargoCategoryDeleteView(View):
             messages.success(request, f'Category {label} deleted.', extra_tags='tenant')
             return _redirect_cargo_category_list(request)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantSubscriptionPlanView(View):
@@ -2622,7 +2649,7 @@ class TenantSubscriptionBillingView(View):
             code = (getattr(org, 'base_currency_code', '') or '').strip().upper()
             return code or 'SAR'
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     @staticmethod
     def _parse_expiry(expiry_value):
@@ -3026,6 +3053,77 @@ def _audit_list_filter_params(request):
     return params
 
 
+def _audit_list_query_params(request):
+    """GET query params for audit list filters and column sort (excludes page)."""
+    params = _audit_list_filter_params(request)
+    if request.GET.get('sort_col') and request.GET.get('sort_dir'):
+        sort_col, sort_dir = _parse_audit_table_sort(request)
+        params['sort_col'] = str(sort_col)
+        params['sort_dir'] = sort_dir
+    return params
+
+
+def _parse_audit_table_sort(request):
+    """Parse column sort for paginated audit tables (default: timestamp descending)."""
+    default_col, default_dir = 2, 'desc'
+    raw_col = request.GET.get('sort_col')
+    if raw_col is None or str(raw_col).strip() == '':
+        return default_col, default_dir
+    try:
+        sort_col = int(raw_col)
+    except (TypeError, ValueError):
+        return default_col, default_dir
+    if sort_col not in (1, 2, 3, 4, 5):
+        return default_col, default_dir
+    sort_dir = (request.GET.get('sort_dir') or default_dir).strip().lower()
+    if sort_dir not in ('asc', 'desc'):
+        sort_dir = default_dir
+    return sort_col, sort_dir
+
+
+def _sort_audit_events_in_place(events, sort_col, sort_dir):
+    """Sort full in-memory audit event lists before server pagination."""
+    if sort_col == 1:
+        events.sort(
+            key=lambda event: event.get('timestamp') or timezone.now(),
+            reverse=(sort_dir == 'asc'),
+        )
+        return
+    if sort_col == 2:
+        events.sort(
+            key=lambda event: event.get('timestamp') or timezone.now(),
+            reverse=(sort_dir == 'desc'),
+        )
+        return
+    reverse = sort_dir == 'desc'
+    if sort_col == 3:
+        events.sort(key=lambda event: (event.get('action') or '').lower(), reverse=reverse)
+    elif sort_col == 4:
+        events.sort(key=lambda event: (event.get('module') or '').lower(), reverse=reverse)
+    elif sort_col == 5:
+        events.sort(
+            key=lambda event: (event.get('performed_by') or '').lower(),
+            reverse=reverse,
+        )
+
+
+def _critical_account_audit_order_by(sort_col, sort_dir):
+    """Map audit table column sort to AuditLog queryset order_by fields."""
+    if sort_col == 1:
+        return ('timestamp',) if sort_dir == 'desc' else ('-timestamp',)
+    if sort_col == 2:
+        return ('-timestamp',) if sort_dir == 'desc' else ('timestamp',)
+    if sort_col == 3:
+        return ('-action_type',) if sort_dir == 'desc' else ('action_type',)
+    if sort_col == 4:
+        return ('-module_name',) if sort_dir == 'desc' else ('module_name',)
+    return (
+        ('-admin__email', '-admin__first_name', '-admin__last_name')
+        if sort_dir == 'desc'
+        else ('admin__email', 'admin__first_name', 'admin__last_name')
+    )
+
+
 def _parse_audit_list_filters(request):
     """Parse shared audit list filter GET params."""
     date_from_str = (request.GET.get('date_from') or '').strip()
@@ -3037,7 +3135,8 @@ def _parse_audit_list_filters(request):
     if date_from and date_to and date_from > date_to:
         date_from, date_to = date_to, date_from
         date_from_str, date_to_str = date_to_str, date_from_str
-    filter_params = _audit_list_filter_params(request)
+    filter_params = _audit_list_query_params(request)
+    sort_col, sort_dir = _parse_audit_table_sort(request)
     return {
         'date_from_str': date_from_str,
         'date_to_str': date_to_str,
@@ -3046,8 +3145,10 @@ def _parse_audit_list_filters(request):
         'module_filter': module_filter,
         'performed_by_filter': performed_by_filter,
         'filter_params': filter_params,
-        'filters_active': bool(filter_params),
+        'filters_active': bool(_audit_list_filter_params(request)),
         'filters_qs': urlencode(filter_params) if filter_params else '',
+        'sort_col': sort_col,
+        'sort_dir': sort_dir,
     }
 
 
@@ -3175,7 +3276,7 @@ def _build_login_session_events_context(request):
                         }
                     )
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     if audit_filters['filters_active']:
         events = [
@@ -3190,7 +3291,11 @@ def _build_login_session_events_context(request):
             )
         ]
 
-    events.sort(key=lambda row: row.get('timestamp') or timezone.now(), reverse=True)
+    _sort_audit_events_in_place(
+        events,
+        audit_filters['sort_col'],
+        audit_filters['sort_dir'],
+    )
     paginator = Paginator(events, 10)
     page_obj = paginator.get_page(request.GET.get('page'))
 
@@ -3328,9 +3433,10 @@ def _build_role_permission_changes_context(request):
                 1 for event in raw_events if (event.get('action') or '') == 'Role Disabled'
             )
 
-            raw_events.sort(
-                key=lambda item: item.get('timestamp') or timezone.now(),
-                reverse=True,
+            _sort_audit_events_in_place(
+                raw_events,
+                audit_filters['sort_col'],
+                audit_filters['sort_dir'],
             )
             paginator = Paginator(raw_events, 10)
             page_obj = paginator.get_page(request.GET.get('page'))
@@ -3346,7 +3452,7 @@ def _build_role_permission_changes_context(request):
                     }
                 )
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     return {
         'role_permission_total_changes': total_changes,
@@ -3422,7 +3528,7 @@ def _build_critical_account_changes_context(request):
                         or tenant_actor_label
                     )
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     security_terms = (
         Q(module_name__icontains='security')
@@ -3487,7 +3593,12 @@ def _build_critical_account_changes_context(request):
         if matching_user_ids:
             performed_q |= Q(record_id__in=matching_user_ids)
         critical_qs = critical_qs.filter(performed_q)
-    critical_qs = critical_qs.order_by('-timestamp')
+    critical_qs = critical_qs.order_by(
+        *_critical_account_audit_order_by(
+            audit_filters['sort_col'],
+            audit_filters['sort_dir'],
+        )
+    )
     paginator = Paginator(critical_qs, 10)
     page_obj = paginator.get_page(request.GET.get('page'))
     logs = list(page_obj.object_list)
@@ -3654,7 +3765,7 @@ class TenantServiceItemMasterListView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantServiceItemMasterCreateView(View):
@@ -3702,7 +3813,7 @@ class TenantServiceItemMasterCreateView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request):
         context = _tenant_context_from_session(request)
@@ -3881,7 +3992,7 @@ class TenantServiceItemMasterCreateView(View):
             messages.error(request, 'Please fix the highlighted errors.', extra_tags='tenant')
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantServiceItemMasterEditView(View):
@@ -3944,7 +4055,7 @@ class TenantServiceItemMasterEditView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request, service_item_id):
         context = _tenant_context_from_session(request)
@@ -4099,7 +4210,7 @@ class TenantServiceItemMasterEditView(View):
             messages.error(request, 'Please fix the highlighted errors.', extra_tags='tenant')
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 def _tenant_service_item_master_activity_entries(service_item):
@@ -4183,7 +4294,7 @@ class TenantServiceItemMasterDetailView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantServiceItemMasterDeleteView(View):
@@ -4216,7 +4327,7 @@ class TenantServiceItemMasterDeleteView(View):
             messages.error(request, 'Cannot delete this service item because it is referenced by other records.', extra_tags='tenant')
             return _tenant_redirect(request, 'iroad_tenants:tenant_service_item_master_list')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantServiceItemSettingsView(View):
@@ -4380,7 +4491,7 @@ class TenantPriceListMasterListView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantPriceListMasterCreateFromClientView(View):
@@ -4417,7 +4528,7 @@ class TenantPriceListMasterCreateFromClientView(View):
             request.session[PRICE_LIST_CREATE_PREFILL_CLIENT_SESSION_KEY] = str(client_obj.account_id)
             return _tenant_redirect(request, 'iroad_tenants:tenant_price_list_master_create')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantPriceListMasterCreateView(View):
@@ -4481,7 +4592,7 @@ class TenantPriceListMasterCreateView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request):
         context = _tenant_context_from_session(request)
@@ -4756,7 +4867,7 @@ class TenantPriceListMasterCreateView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 def _price_list_line_payload(price_list):
@@ -4987,7 +5098,7 @@ class TenantPriceListMasterDetailView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantPriceListMasterEditView(View):
@@ -5056,7 +5167,7 @@ class TenantPriceListMasterEditView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request, price_list_ref):
         context = _tenant_context_from_session(request)
@@ -5293,7 +5404,7 @@ class TenantPriceListMasterEditView(View):
             messages.error(request, 'Please fix the highlighted errors.', extra_tags='tenant')
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantPriceListMasterDeleteView(View):
@@ -5323,7 +5434,7 @@ class TenantPriceListMasterDeleteView(View):
                 messages.success(request, f'{price_list.price_list_code} set to inactive.', extra_tags='tenant')
             return _tenant_redirect(request, 'iroad_tenants:tenant_price_list_master_list')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantSalesInvoiceReportListView(View):
@@ -5378,6 +5489,9 @@ class TenantSalesInvoiceReportListView(View):
             except ValueError:
                 page_no = 1
             page = paginator.get_page(page_no)
+            # Evaluate page rows (and select_related client) before render; context
+            # processors reset the connection to public during template rendering.
+            list(page.object_list)
 
             total_count = SalesInvoiceReport.objects.count()
             draft_count = SalesInvoiceReport.objects.filter(
@@ -5406,9 +5520,11 @@ class TenantSalesInvoiceReportListView(View):
                     'client_filter': client_filter,
                     'date_from': request.GET.get('date_from') or '',
                     'date_to': request.GET.get('date_to') or '',
-                    'client_choices': TenantClientAccount.objects.filter(
-                        status=TenantClientAccount.Status.ACTIVE
-                    ).order_by('display_name'),
+                    'client_choices': list(
+                        TenantClientAccount.objects.filter(
+                            status=TenantClientAccount.Status.ACTIVE,
+                        ).order_by('display_name'),
+                    ),
                     'stats': {
                         'total_count': total_count,
                         'draft_count': draft_count,
@@ -5422,7 +5538,7 @@ class TenantSalesInvoiceReportListView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantSalesInvoiceReportCreateView(View):
@@ -5471,7 +5587,7 @@ class TenantSalesInvoiceReportCreateView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request):
         context = _tenant_context_from_session(request)
@@ -5538,7 +5654,7 @@ class TenantSalesInvoiceReportCreateView(View):
                 report_id=obj.report_id,
             )
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantSalesInvoiceReportDetailView(View):
@@ -5605,7 +5721,7 @@ class TenantSalesInvoiceReportDetailView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantSalesInvoiceReportPrintView(View):
@@ -5667,7 +5783,7 @@ class TenantSalesInvoiceReportPrintView(View):
             logger.exception('Tenant sales invoice print stream failed')
             return JsonResponse({'error': 'Failed to render print PDF'}, status=500)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantBookingSnapshotPrintView(View):
@@ -5701,7 +5817,7 @@ class TenantBookingSnapshotPrintView(View):
             logger.exception('Tenant booking snapshot print stream failed')
             return JsonResponse({'error': 'Failed to render print PDF'}, status=500)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantShipmentPrintView(View):
@@ -5739,7 +5855,7 @@ class TenantShipmentPrintView(View):
             logger.exception('Tenant shipment print stream failed')
             return JsonResponse({'error': 'Failed to render print PDF'}, status=500)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 # Updated operation management views from iroad_tenants/sdsdsd.txt; existing stubs are kept above.
 class TenantSurchargePrintView(View):
@@ -5779,7 +5895,7 @@ class TenantSurchargePrintView(View):
             logger.exception('Tenant surcharge print stream failed')
             return JsonResponse({'error': 'Failed to render print PDF'}, status=500)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantDriverPrintView(View):
@@ -5807,7 +5923,7 @@ class TenantDriverPrintView(View):
             logger.exception('Tenant driver print stream failed')
             return JsonResponse({'error': 'Failed to render print PDF'}, status=500)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantTruckPrintView(View):
@@ -5835,7 +5951,7 @@ class TenantTruckPrintView(View):
             logger.exception('Tenant truck print stream failed')
             return JsonResponse({'error': 'Failed to render print PDF'}, status=500)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantTreasuryPrintView(View):
@@ -5869,7 +5985,7 @@ class TenantTreasuryPrintView(View):
             logger.exception('Tenant treasury print stream failed')
             return JsonResponse({'error': 'Failed to render print PDF'}, status=500)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantSalesInvoiceReportUpdateView(View):
@@ -5929,7 +6045,7 @@ class TenantSalesInvoiceReportUpdateView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request, report_id):
         context = _tenant_context_from_session(request)
@@ -6042,7 +6158,7 @@ class TenantSalesInvoiceReportUpdateView(View):
                 report_id=obj.report_id,
             )
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantSalesInvoiceReportStatusUpdateView(View):
@@ -6119,7 +6235,7 @@ class TenantSalesInvoiceReportStatusUpdateView(View):
                 report_id=report.report_id,
             )
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantOperationBookingCreateView(View):
@@ -6297,7 +6413,7 @@ class TenantOperationBookingCreateView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request):
         context = _tenant_context_from_session(request)
@@ -6377,7 +6493,7 @@ class TenantOperationBookingCreateView(View):
             )
             return _tenant_redirect(request, 'iroad_tenants:tenant_operation_booking_list')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantOperationBookingListView(View):
@@ -6444,7 +6560,7 @@ class TenantOperationBookingListView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 def _tenant_booking_activity_entries(booking):
@@ -6538,7 +6654,7 @@ class TenantOperationShipmentListView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantOperationShipmentCreateView(View):
@@ -6569,7 +6685,7 @@ class TenantOperationShipmentCreateView(View):
             context.update(_tenant_shipment_form_options_context(tenant_registry))
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request):
         context = _tenant_context_from_session(request)
@@ -6832,7 +6948,7 @@ class TenantOperationShipmentCreateView(View):
             messages.success(request, f'Shipment {shipment.shipment_no} created successfully.', extra_tags='tenant')
             return _tenant_redirect(request, 'iroad_tenants:tenant_operation_shipment_list')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 def _tenant_shipment_activity_entries(shipment):
@@ -6905,7 +7021,7 @@ class TenantOperationShipmentDocumentsListView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantOperationShipmentDocumentsCreateView(View):
@@ -7176,7 +7292,7 @@ class TenantOperationShipmentDocumentsCreateView(View):
             context.update(self._form_context(tenant_registry))
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request):
         context = _tenant_context_from_session(request)
@@ -7269,7 +7385,7 @@ class TenantOperationShipmentDocumentsCreateView(View):
             messages.success(request, f'Shipment document {document.record_no} created successfully.', extra_tags='tenant')
             return _tenant_redirect(request, 'iroad_tenants:tenant_operation_shipment_documents_list')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantOperationShipmentPodListView(View):
@@ -7352,7 +7468,7 @@ class TenantOperationShipmentPodListView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantOperationShipmentPodCreateView(View):
@@ -7530,7 +7646,7 @@ class TenantOperationShipmentPodCreateView(View):
             context.update(self._form_context(request, tenant_registry, document=document))
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request):
         context = _tenant_context_from_session(request)
@@ -7790,7 +7906,7 @@ class TenantOperationShipmentPodCreateView(View):
             )
             return _tenant_redirect(request, 'iroad_tenants:tenant_operation_shipment_pod_list')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantOperationShipmentPodDetailView(View):
@@ -7831,7 +7947,7 @@ class TenantOperationShipmentPodDetailView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantOperationShipmentPodDeleteView(View):
@@ -7851,7 +7967,7 @@ class TenantOperationShipmentPodDeleteView(View):
             messages.success(request, 'POD record deleted.', extra_tags='tenant')
             return _tenant_redirect(request, 'iroad_tenants:tenant_operation_shipment_pod_list')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantOperationDocumentHandoverListView(View):
@@ -7910,7 +8026,7 @@ class TenantOperationDocumentHandoverListView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantOperationDocumentHandoverCreateView(View):
@@ -8041,7 +8157,7 @@ class TenantOperationDocumentHandoverCreateView(View):
             context.update(self._form_context(request, tenant_registry))
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request):
         context = _tenant_context_from_session(request)
@@ -8288,7 +8404,7 @@ class TenantOperationDocumentHandoverCreateView(View):
             )
             return _tenant_redirect(request, 'iroad_tenants:tenant_operation_document_handover_list')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 def _tenant_truck_movement_linkage_options():
@@ -8608,6 +8724,26 @@ def _tenant_truck_movement_auto_create_loaded_from_shipment(shipment, *, created
         created_by_label=(created_by_label or '').strip(),
     )
     movement.save()
+    return movement
+
+
+def _tenant_truck_movement_auto_complete_loaded_for_shipment(shipment):
+    """Complete open Loaded movement when shipment is Delivered."""
+    if shipment is None:
+        return None
+    movement = (
+        TenantTruckMovementLog.objects.filter(shipment_id=shipment.pk)
+        .exclude(status=TenantTruckMovementLog.Status.CANCELLED)
+        .order_by('-created_at')
+        .first()
+    )
+    if movement is None:
+        return None
+    if movement.status == TenantTruckMovementLog.Status.COMPLETED:
+        return movement
+    movement.status = TenantTruckMovementLog.Status.COMPLETED
+    movement.end_time = timezone.now()
+    movement.save(update_fields=['status', 'end_time', 'updated_at'])
     return movement
 
 
@@ -9136,7 +9272,7 @@ class TenantOperationActionsListView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantOperationActionsCreateView(View):
@@ -9157,7 +9293,7 @@ class TenantOperationActionsCreateView(View):
             context.update(_tenant_operation_action_form_context(tenant_registry))
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request):
         context = _tenant_context_from_session(request)
@@ -9271,7 +9407,7 @@ class TenantOperationActionsCreateView(View):
             messages.success(request, f'Operation action {action.action_code} created successfully.', extra_tags='tenant')
             return _tenant_redirect(request, 'iroad_tenants:tenant_operation_actions_list')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantOperationActionsDetailView(View):
@@ -9303,7 +9439,7 @@ class TenantOperationActionsDetailView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantOperationActionsEditView(View):
@@ -9342,7 +9478,7 @@ class TenantOperationActionsEditView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request, action_id):
         context = _tenant_context_from_session(request)
@@ -9400,7 +9536,7 @@ class TenantOperationActionsEditView(View):
             messages.success(request, f'Operation action {action.action_code} updated successfully.', extra_tags='tenant')
             return _tenant_redirect(request, 'iroad_tenants:tenant_operation_actions_list')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantOperationActionsDeleteView(View):
@@ -9425,7 +9561,7 @@ class TenantOperationActionsDeleteView(View):
                 messages.success(request, f'Operation action {action_code} deleted successfully.', extra_tags='tenant')
             return _tenant_redirect(request, 'iroad_tenants:tenant_operation_actions_list')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 def _tenant_operation_action_log_no(movement, fallback_sequence=1):
@@ -9798,9 +9934,9 @@ def _tenant_operation_action_log_lookup_context(
     request=None,
 ):
     from iroad_tenants.operation_execution import (
+        action_dropdown_context_label,
         action_options_payload,
-        allowed_actions_context_label,
-        get_allowed_actions,
+        get_action_dropdown_options,
     )
 
     if form_data is not None or action_log is not None or request is not None:
@@ -9818,7 +9954,7 @@ def _tenant_operation_action_log_lookup_context(
     if action_log is not None and action_log.operation_action_id:
         include_action_id = action_log.operation_action_id
 
-    allowed_actions = get_allowed_actions(
+    action_dropdown_options = get_action_dropdown_options(
         booking=booking,
         shipment=shipment,
         movement=movement,
@@ -9890,10 +10026,11 @@ def _tenant_operation_action_log_lookup_context(
             }
             for driver in DriverMaster.active_objects.order_by('driver_code')[:500]
         ],
-        'action_options': action_options_payload(allowed_actions),
-        'action_allowed_context_label': allowed_actions_context_label(
+        'action_options': action_options_payload(action_dropdown_options),
+        'action_allowed_context_label': action_dropdown_context_label(
             booking=booking,
             shipment=shipment,
+            movement=movement,
             booking_item_type=booking_item_type,
         ),
         'user_options': [
@@ -10166,6 +10303,47 @@ def _update_tenant_operation_action_log_from_request(movement, request):
     movement.save()
 
 
+def _tenant_operation_action_log_normalize_idempotency_key(raw_value):
+    token = (raw_value or '').strip()
+    if not token:
+        return ''
+    return token[:128]
+
+
+def _tenant_operation_action_log_normalize_source_ref(raw_value):
+    token = (raw_value or '').strip()
+    if not token:
+        return ''
+    return token[:128]
+
+
+def _tenant_operation_action_log_recent_duplicate(
+    *,
+    shipment=None,
+    operation_action=None,
+    created_by_label='',
+    notes='',
+    source='Manual',
+    minutes=2,
+):
+    if operation_action is None:
+        return None
+    threshold = timezone.now() - timedelta(minutes=minutes)
+    qs = (
+        TenantOperationActionLog.objects.filter(
+            operation_action=operation_action,
+            source=(source or 'Manual')[:32],
+            notes=(notes or ''),
+            created_by_label=(created_by_label or '')[:200],
+            created_at__gte=threshold,
+        )
+        .order_by('-created_at')
+    )
+    if shipment is not None:
+        qs = qs.filter(shipment=shipment)
+    return qs.first()
+
+
 def _tenant_operation_action_log_create_form_context(
     *,
     display_name='',
@@ -10314,9 +10492,9 @@ class TenantOperationActionLogAllowedActionsView(View):
             return JsonResponse({'error': 'Unauthorized'}, status=401)
         try:
             from iroad_tenants.operation_execution import (
+                action_dropdown_context_label,
                 action_options_payload,
-                allowed_actions_context_label,
-                get_allowed_actions,
+                get_action_dropdown_options,
             )
 
             linkage = _tenant_operation_action_log_resolve_linkage_entities(
@@ -10328,7 +10506,7 @@ class TenantOperationActionLogAllowedActionsView(View):
                 }
             )
             include_action_id = (request.GET.get('include_action_id') or '').strip() or None
-            allowed = get_allowed_actions(
+            dropdown_options = get_action_dropdown_options(
                 booking=linkage['booking'],
                 shipment=linkage['shipment'],
                 movement=linkage['movement'],
@@ -10337,16 +10515,17 @@ class TenantOperationActionLogAllowedActionsView(View):
             )
             return JsonResponse(
                 {
-                    'actions': action_options_payload(allowed),
-                    'context_label': allowed_actions_context_label(
+                    'actions': action_options_payload(dropdown_options),
+                    'context_label': action_dropdown_context_label(
                         booking=linkage['booking'],
                         shipment=linkage['shipment'],
+                        movement=linkage['movement'],
                         booking_item_type=linkage['booking_item_type'],
                     ),
                 }
             )
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantOperationActionLogCreateView(View):
@@ -10376,7 +10555,7 @@ class TenantOperationActionLogCreateView(View):
             context['tenant_schema_name'] = tenant_registry.schema_name
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request):
         context = _tenant_context_from_session(request)
@@ -10529,39 +10708,53 @@ class TenantOperationActionLogCreateView(View):
                     )
             try:
                 with db_transaction.atomic():
-                    exec_result = ActionExecutionService.execute_portal_action_log(
-                        operation_action=operation_action,
+                    log_no = ''
+                    log_sequence = 0
+                    for _ in range(10):
+                        log_no, log_sequence = _next_auto_number_for_form(
+                            form_code=OPERATION_ACTION_LOG_AUTO_FORM_CODE,
+                            form_label=OPERATION_ACTION_LOG_AUTO_FORM_LABEL,
+                            prefix=OPERATION_ACTION_LOG_REF_PREFIX,
+                        )
+                        if not TenantOperationActionLog.objects.filter(log_no=log_no).exists():
+                            break
+                    if TenantOperationActionLog.objects.filter(log_no=log_no).exists():
+                        raise ValueError(
+                            'Unable to allocate a unique Log No. Please check Auto Number Configuration.'
+                        )
+
+                    action_log = TenantOperationActionLog(
+                        log_no=log_no,
+                        idempotency_key=(idempotency_key or None),
+                        source_channel='admin_manual',
+                        source_ref=(source_ref or ''),
+                        log_sequence=log_sequence,
                         log_date=parsed_log_date,
+                        operation_action=operation_action,
+                        source=form_data['source'],
+                        notes=form_data['notes'],
                         booking=linkage['booking'],
                         shipment=linkage['shipment'],
-                        movement=linkage['truck_movement'],
                         truck=linkage['truck'],
                         driver=linkage['driver'],
-                        tenant_user=tenant_user,
-                        created_by_label=planned_created_by_label,
-                        notes=form_data['notes'],
-                        source=form_data['source'],
-                        source_ref=source_ref,
-                        idempotency_key=idempotency_key,
-                        booking_item_type=(request.POST.get('booking_item_type') or '').strip(),
+                        truck_movement=linkage['truck_movement'],
                         latitude=form_data['latitude'],
                         longitude=form_data['longitude'],
                         map_link=form_data['map_link'],
+                        created_by=tenant_user,
+                        created_by_label=planned_created_by_label,
                     )
-                    action_log = exec_result.action_log
-                    if exec_result.reused_existing:
-                        messages.info(
-                            request,
-                            f'Duplicate submit ignored. Reusing Action Log {action_log.log_no}.',
-                            extra_tags='tenant',
-                        )
-                        return redirect(
-                            reverse(
-                                'iroad_tenants:tenant_operation_action_log_detail',
-                                args=[action_log.log_id],
-                            )
-                        )
+                    action_log._birth_booking_item_type = (
+                        request.POST.get('booking_item_type') or ''
+                    ).strip()
+                    action_log.save()
                     _tenant_operation_action_log_save_media_from_request(action_log, request)
+                    _tenant_operation_action_log_apply_side_effects(
+                        action_log,
+                        created_by_label=action_log.created_by_label,
+                    )
+                    if action_log.shipment_id:
+                        _tenant_shipment_sync_status_from_action_log(action_log.shipment)
                     if action_log.shipment_id:
                         request.session['tenant_action_log_birth'] = {
                             'shipment_id': str(action_log.shipment_id),
@@ -10638,7 +10831,7 @@ class TenantOperationActionLogCreateView(View):
                 )
             )
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantOperationActionLogListView(View):
@@ -10711,7 +10904,7 @@ class TenantOperationActionLogListView(View):
             })
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantOperationActionLogDetailView(View):
@@ -10756,7 +10949,7 @@ class TenantOperationActionLogDetailView(View):
             })
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantOperationBookingCancelView(View):
@@ -10801,7 +10994,7 @@ class TenantOperationBookingCancelView(View):
             )
             return redirect('iroad_tenants:tenant_operation_booking_detail', booking_id=booking.booking_id)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantOperationBookingDeleteView(View):
@@ -10846,7 +11039,7 @@ class TenantOperationBookingDeleteView(View):
             )
             return _tenant_redirect(request, 'iroad_tenants:tenant_operation_booking_list')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantOperationActionLogEditView(View):
@@ -10892,7 +11085,7 @@ class TenantOperationActionLogEditView(View):
             context['tenant_schema_name'] = tenant_registry.schema_name
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request, log_id):
         context = _tenant_context_from_session(request)
@@ -10969,7 +11162,7 @@ class TenantOperationActionLogEditView(View):
                 )
             )
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantOperationSurchargeSalesListView(View):
@@ -11069,7 +11262,7 @@ class TenantOperationSurchargeSalesListView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantOperationSurchargeSalesCreateView(View):
@@ -11133,7 +11326,7 @@ class TenantOperationSurchargeSalesCreateView(View):
             context.update(_tenant_surcharge_sales_options_context(tenant_registry))
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request, mode=None):
         context = _tenant_context_from_session(request)
@@ -11263,7 +11456,7 @@ class TenantOperationSurchargeSalesCreateView(View):
             messages.success(request, 'Surcharge transaction saved for the selected shipment and service.', extra_tags='tenant')
             return _tenant_redirect(request, 'iroad_tenants:tenant_operation_surcharge_sales_list')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantShipmentPrintView(View):
@@ -11301,7 +11494,7 @@ class TenantShipmentPrintView(View):
             logger.exception('Tenant shipment print stream failed')
             return JsonResponse({'error': 'Failed to render print PDF'}, status=500)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 # Updated operation management views from iroad_tenants/sdsdsd.txt; existing stubs are kept above.
 def _tenant_booking_form_options_context(tenant_registry, booking=None):
@@ -11922,6 +12115,83 @@ def _tenant_shipment_sync_sales_report_backlinks(report):
     )
 
 
+def _tenant_operation_action_matches(action, *needles):
+    if action is None:
+        return False
+    blob = f'{(action.action_code or "")} {(action.english_label or "")}'.lower()
+    return any(needle.lower() in blob for needle in needles)
+
+
+def _tenant_resolve_shipment_status_impact(raw_value):
+    """Map Action Master shipment_status_impact to TenantShipment.ShipmentStatus."""
+    token = (raw_value or '').strip()
+    if not token:
+        return None
+    if token in {choice[0] for choice in TenantShipment.ShipmentStatus.choices}:
+        return token
+    normalized = token.lower().replace('-', '_').replace(' ', '_')
+    alias_map = {
+        'loaded': TenantShipment.ShipmentStatus.LOADED,
+        'created': TenantShipment.ShipmentStatus.CREATED,
+        'in_transit': TenantShipment.ShipmentStatus.IN_TRANSIT,
+        'at_delivery': TenantShipment.ShipmentStatus.AT_DELIVERY,
+        'pod_submitted': TenantShipment.ShipmentStatus.POD_SUBMITTED,
+        'delivered': TenantShipment.ShipmentStatus.DELIVERED,
+        'closed': TenantShipment.ShipmentStatus.CLOSED,
+        'cancelled': TenantShipment.ShipmentStatus.CANCELLED,
+    }
+    return alias_map.get(normalized)
+
+
+def _tenant_resolve_movement_status_impact(raw_value):
+    token = (raw_value or '').strip()
+    if not token:
+        return None
+    if token in {choice[0] for choice in TenantTruckMovementLog.Status.choices}:
+        return token
+    normalized = token.lower().replace('-', '_').replace(' ', '_')
+    alias_map = {
+        'scheduled': TenantTruckMovementLog.Status.SCHEDULED,
+        'in_progress': TenantTruckMovementLog.Status.IN_PROGRESS,
+        'completed': TenantTruckMovementLog.Status.COMPLETED,
+        'cancelled': TenantTruckMovementLog.Status.CANCELLED,
+    }
+    return alias_map.get(normalized)
+
+
+def _tenant_shipment_validate_status_transition(shipment, new_status):
+    """Doc §4.6 — gate Delivered on POD compliance and COD collection."""
+    if shipment is None or not new_status:
+        return
+    if new_status != TenantShipment.ShipmentStatus.DELIVERED:
+        return
+    compliant_statuses = {
+        TenantShipment.PodStatus.COMPLIANT,
+        TenantShipment.PodStatus.HARD_COPY_RECEIVED,
+    }
+    if (shipment.pod_status or '') not in compliant_statuses:
+        raise ValidationError(
+            'Shipment cannot move to Delivered until POD is compliant '
+            '(all delivery-note documents verified).'
+        )
+    if shipment.order_type.upper() == 'COD':
+        if shipment.collection_status != TenantShipment.CollectionStatus.COLLECTED:
+            raise ValidationError(
+                'COD shipment cannot move to Delivered until payment is collected.'
+            )
+
+
+def _tenant_shipment_after_status_side_effects(shipment):
+    if shipment is None:
+        return
+    if shipment.shipment_status in {
+        TenantShipment.ShipmentStatus.DELIVERED,
+        TenantShipment.ShipmentStatus.CLOSED,
+    }:
+        _tenant_truck_movement_auto_complete_loaded_for_shipment(shipment)
+    _tenant_shipment_document_refresh_shipment_pod(shipment)
+
+
 def _tenant_manual_override_action_code_for_status(shipment_status):
     normalized = re.sub(r'[^A-Z0-9]+', '_', (shipment_status or '').upper()).strip('_')
     return f'MANUAL-STATUS-{normalized or "UNKNOWN"}'[:64]
@@ -11955,6 +12225,39 @@ def _tenant_get_or_create_manual_override_action(shipment_status):
         action.shipment_status_impact = shipment_status
         action.save(update_fields=['shipment_status_impact', 'updated_at'])
     return action
+
+
+def _tenant_shipment_derive_latest_action_status(shipment):
+    if shipment is None:
+        return None
+    latest_logs = (
+        TenantOperationActionLog.objects.filter(shipment_id=shipment.pk)
+        .select_related('operation_action')
+        .exclude(operation_action__isnull=True)
+        .order_by('-log_date', '-created_at')[:50]
+    )
+    for log in latest_logs:
+        derived = _tenant_resolve_shipment_status_impact(
+            getattr(log.operation_action, 'shipment_status_impact', '')
+        )
+        if derived:
+            return derived
+    return None
+
+
+def _tenant_shipment_sync_status_from_action_log(shipment):
+    """
+    Gap 4 (hybrid): keep shipment_status column as cache, derive from latest action log.
+    """
+    if shipment is None:
+        return shipment
+    derived_status = _tenant_shipment_derive_latest_action_status(shipment)
+    if not derived_status or shipment.shipment_status == derived_status:
+        return shipment
+    shipment.shipment_status = derived_status
+    shipment.save(update_fields=['shipment_status', 'updated_at'])
+    _tenant_shipment_after_status_side_effects(shipment)
+    return shipment
 
 
 def _tenant_shipment_create_manual_override_action_log(
@@ -12065,6 +12368,22 @@ def _tenant_shipment_create_manual_override_action_log(
     return action_log
 
 
+def _tenant_operation_action_apply_booking_status_impact(booking, raw_impact):
+    if booking is None:
+        return
+    token = (raw_impact or '').strip().lower()
+    if not token:
+        return
+    if token in {'draft'}:
+        if booking.booking_status != TenantBooking.Status.CANCELLED:
+            booking.booking_status = TenantBooking.Status.DRAFT
+            booking.save(update_fields=['booking_status', 'updated_at'])
+    elif token in {'confirmed', 'in_progress', 'completed', 'active'}:
+        if booking.booking_status == TenantBooking.Status.DRAFT:
+            booking.booking_status = TenantBooking.Status.CONFIRMED
+            booking.save(update_fields=['booking_status', 'updated_at'])
+
+
 def _tenant_shipment_pod_assert_unique_source(source_document, form_errors, *, exclude_document_id=None):
     if source_document is None:
         return
@@ -12075,6 +12394,85 @@ def _tenant_shipment_pod_assert_unique_source(source_document, form_errors, *, e
         form_errors['source_document_id'] = (
             'A POD record already exists for this delivery note.'
         )
+
+
+def _tenant_shipment_pod_birth_from_action_log(action_log, *, created_by_label=''):
+    """Action 7 / auto_pod_post — one POD record per delivery-note document."""
+    shipment = action_log.shipment
+    if shipment is None:
+        return None
+    source_document = (
+        TenantShipmentDocument.objects.filter(
+            shipment=shipment,
+            is_delivery_note=True,
+        )
+        .order_by('-created_at')
+        .first()
+    )
+    if source_document is None:
+        raise ValidationError(
+            'Auto POD Post requires at least one delivery-note document on the shipment.'
+        )
+    existing_pod = TenantShipmentDocument.objects.filter(
+        source_document_id=source_document.pk,
+    ).first()
+    if existing_pod is not None:
+        return existing_pod
+
+    record_no, record_sequence = _next_auto_number_for_form(
+        form_code=SHIPMENT_POD_AUTO_FORM_CODE,
+        form_label=SHIPMENT_POD_AUTO_FORM_LABEL,
+        prefix=SHIPMENT_POD_REF_PREFIX,
+    )
+    document = TenantShipmentDocument(
+        record_no=record_no,
+        record_sequence=record_sequence,
+        record_date=timezone.localdate(),
+        document_type='pod',
+        document_ref_no=source_document.document_ref_no,
+        document_date=source_document.document_date or timezone.localdate(),
+        physical_location='With Driver',
+        page_count=source_document.page_count or 1,
+        status=TenantShipmentDocument.Status.DRAFT,
+        source_document=source_document,
+        created_by_label=(created_by_label or '')[:200],
+    )
+    _tenant_shipment_document_apply_foreign_keys(
+        document,
+        booking=shipment.booking if shipment.booking_id else None,
+        shipment=shipment,
+    )
+    document.save()
+
+    line_payload = _tenant_shipment_pod_build_line_rows_from_source(source_document)
+    TenantShipmentPodPage.objects.filter(document=document).delete()
+    for idx, row in enumerate(line_payload, start=1):
+        if not isinstance(row, dict):
+            continue
+        source_page = _tenant_shipment_pod_resolve_line_source_page(
+            row.get('doc_page'),
+            source_document,
+            {},
+        )
+        TenantShipmentPodPage.objects.create(
+            document=document,
+            line_no=idx,
+            source_page=source_page,
+            doc_page=_tenant_shipment_pod_page_label(source_page) if source_page else row.get('doc_page', ''),
+            source=row.get('source') or 'Action Log',
+            action_log=row.get('action_log') or action_log.log_no,
+            physical_location=row.get('physical_location') or 'With Driver',
+            soft_copy_status=row.get('soft_copy_status') or 'Not Collected',
+            digital_evidence_status=row.get('digital_evidence_status') or 'Not Collected',
+            map_url=row.get('map_url') or '',
+            attachment_label=row.get('attachment_label') or '',
+        )
+
+    if _tenant_operation_action_matches(action_log.operation_action, 'upload pod', 'a7', 'action 7'):
+        shipment.pod_type = TenantShipment.PodType.DIGITAL
+        shipment.save(update_fields=['pod_type', 'updated_at'])
+
+    return document
 
 
 def _tenant_shipment_document_guard_mutable(document, *, new_status=None):
@@ -12152,6 +12550,120 @@ def _tenant_document_handover_sync_page_custody(handover, source_document):
             if custody in allowed:
                 doc_page.signer_location = custody
                 doc_page.save(update_fields=['signer_location', 'updated_at'])
+
+
+def _tenant_operation_action_log_apply_side_effects(action_log, *, created_by_label=''):
+    """
+    Apply Action Master impacts after log save (doc Ch.2–4).
+    Atomic shipment + movement birth when auto_post flags or Confirm Loaded action.
+    """
+    action = action_log.operation_action
+    if action is None:
+        return
+
+    booking = action_log.booking
+    shipment = action_log.shipment
+    truck_movement = action_log.truck_movement
+    log_date = action_log.log_date
+    shipment_date = log_date.date() if log_date else timezone.localdate()
+
+    # Start Job (A1) execution date stamp — disabled until driver API is implemented.
+    # if booking is not None and _tenant_operation_action_matches(action, 'start job', 'a1', 'action 1'):
+    #     if booking.execution_date is None:
+    #         booking.execution_date = shipment_date
+    #         booking.save(update_fields=['execution_date', 'updated_at'])
+
+    if booking is not None and (action.booking_status_impact or '').strip():
+        _tenant_operation_action_apply_booking_status_impact(
+            booking,
+            action.booking_status_impact,
+        )
+
+    if booking is not None and shipment is None and action.auto_shipment_post:
+        booking_item_type_hint = (getattr(action_log, '_birth_booking_item_type', None) or '').strip()
+        target_line = _tenant_shipment_match_booking_line(
+            booking,
+            booking_item_type=booking_item_type_hint,
+        )
+        if target_line is None:
+            for line in _tenant_shipment_booking_line_rows(booking):
+                if not _tenant_shipment_has_active_duplicate(booking, line['booking_item_type']):
+                    target_line = line
+                    break
+        if target_line is None:
+            raise ValidationError(
+                'Auto Shipment Post requires a confirmed booking line without an active shipment.'
+            )
+        shipment = _tenant_shipment_birth_from_booking_line(
+            booking,
+            target_line,
+            shipment_date=shipment_date,
+            created_by_label=created_by_label,
+        )
+        action_log.shipment = shipment
+        action_log.truck = shipment.truck
+        action_log.driver = shipment.driver
+        action_log.save(update_fields=['shipment', 'truck', 'driver', 'updated_at'])
+
+    if shipment is not None and truck_movement is None and action.auto_movement_post:
+        truck_movement = _tenant_truck_movement_birth_for_shipment(
+            shipment,
+            movement_date=shipment_date,
+            created_by_label=created_by_label,
+        )
+        action_log.truck_movement = truck_movement
+        action_log.save(update_fields=['truck_movement', 'updated_at'])
+
+    if shipment is not None and action.auto_pod_post:
+        pod_document = _tenant_shipment_pod_birth_from_action_log(
+            action_log,
+            created_by_label=created_by_label,
+        )
+        if (
+            pod_document is not None
+            and _tenant_operation_action_matches(action, 'upload pod', 'a7', 'action 7')
+        ):
+            _tenant_shipment_pod_apply_posting_effects(
+                document=pod_document,
+                source_document=pod_document.source_document,
+                shipment=shipment,
+                header_physical_location='with_driver',
+            )
+            pod_document.save(update_fields=['status', 'physical_location', 'updated_at'])
+
+    if shipment is not None and (action.shipment_status_impact or '').strip():
+        new_status = _tenant_resolve_shipment_status_impact(action.shipment_status_impact)
+        if new_status:
+            _tenant_shipment_validate_status_transition(shipment, new_status)
+            shipment.shipment_status = new_status
+            shipment.save(update_fields=['shipment_status', 'updated_at'])
+            _tenant_shipment_after_status_side_effects(shipment)
+
+    if (
+        shipment is not None
+        and shipment.order_type.upper() == 'COD'
+        and _tenant_operation_action_matches(action, 'collect payment', 'a9', 'action 9')
+    ):
+        shipment.collection_status = TenantShipment.CollectionStatus.COLLECTED
+        shipment.save(update_fields=['collection_status', 'updated_at'])
+        post_cod_collection_for_action9(
+            shipment=shipment,
+            action_log=action_log,
+        )
+
+    if truck_movement is not None and (action.movement_status_impact or '').strip():
+        movement_status = _tenant_resolve_movement_status_impact(action.movement_status_impact)
+        if movement_status:
+            truck_movement.status = movement_status
+            truck_movement.save(update_fields=['status', 'updated_at'])
+
+    if (
+        shipment is not None
+        and action.hard_copy_collection
+        and _tenant_operation_action_matches(action, 'upload pod', 'a7', 'action 7', 'confirm loaded', 'a4')
+    ):
+        shipment.pod_type = TenantShipment.PodType.HARD
+        shipment.save(update_fields=['pod_type', 'updated_at'])
 
 
 def _tenant_shipment_birth_from_booking_line(booking, matched_line, *, shipment_date=None, created_by_label=''):
@@ -12282,6 +12794,39 @@ def _tenant_shipment_birth_from_booking_line(booking, matched_line, *, shipment_
     shipment.full_clean()
     shipment.save()
     return shipment
+
+
+def _tenant_truck_movement_birth_for_shipment(shipment, *, movement_date=None, created_by_label=''):
+    """Truck movement born with shipment at Confirm Loaded (doc §4.4)."""
+    existing = (
+        TenantTruckMovementLog.objects.filter(shipment_id=shipment.pk)
+        .exclude(status=TenantTruckMovementLog.Status.CANCELLED)
+        .order_by('-created_at')
+        .first()
+    )
+    if existing is not None:
+        return existing
+    movement_date = movement_date or shipment.shipment_date or timezone.localdate()
+    movement_no, movement_sequence = _next_auto_number_for_form(
+        form_code=TRUCK_MOVEMENT_LOG_AUTO_FORM_CODE,
+        form_label=TRUCK_MOVEMENT_LOG_AUTO_FORM_LABEL,
+        prefix=TRUCK_MOVEMENT_LOG_REF_PREFIX,
+    )
+    movement = TenantTruckMovementLog(
+        movement_no=movement_no,
+        movement_sequence=movement_sequence,
+        movement_date=movement_date,
+        movement_source='Loaded',
+        status=TenantTruckMovementLog.Status.IN_PROGRESS,
+        booking=shipment.booking,
+        shipment=shipment,
+        truck=shipment.truck,
+        driver=shipment.driver,
+        start_time=timezone.now(),
+        created_by_label=(created_by_label or '')[:200],
+    )
+    movement.save()
+    return movement
 
 
 def _tenant_shipment_manual_create_allowed():
@@ -13080,7 +13625,7 @@ class TenantOperationBookingCreateView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request):
         context = _tenant_context_from_session(request)
@@ -13160,7 +13705,7 @@ class TenantOperationBookingCreateView(View):
             )
             return _tenant_redirect(request, 'iroad_tenants:tenant_operation_booking_list')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantOperationBookingEditView(View):
@@ -13216,7 +13761,7 @@ class TenantOperationBookingEditView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request, booking_id):
         context = _tenant_context_from_session(request)
@@ -13286,7 +13831,7 @@ class TenantOperationBookingEditView(View):
             )
             return redirect('iroad_tenants:tenant_operation_booking_detail', booking_id=booking.booking_id)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantOperationBookingListView(View):
@@ -13353,7 +13898,7 @@ class TenantOperationBookingListView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 def _tenant_booking_activity_entries(booking):
@@ -13539,7 +14084,7 @@ class TenantOperationBookingDetailView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantOperationBookingAssignTruckView(View):
@@ -13595,7 +14140,7 @@ class TenantOperationBookingAssignTruckView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request, booking_id):
         context = _tenant_context_from_session(request)
@@ -13639,7 +14184,7 @@ class TenantOperationBookingAssignTruckView(View):
             messages.success(request, f'Truck {truck.truck_code} assigned to {booking.booking_no}.', extra_tags='tenant')
             return redirect('iroad_tenants:tenant_operation_booking_detail', booking_id=booking.booking_id)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantOperationShipmentListView(View):
@@ -13714,7 +14259,7 @@ class TenantOperationShipmentListView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 def _tenant_shipment_form_options_context(tenant_registry):
@@ -14300,7 +14845,7 @@ class TenantOperationShipmentCreateView(View):
             context.update(_tenant_shipment_form_options_context(tenant_registry))
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request):
         context = _tenant_context_from_session(request)
@@ -14563,7 +15108,7 @@ class TenantOperationShipmentCreateView(View):
             messages.success(request, f'Shipment {shipment.shipment_no} created successfully.', extra_tags='tenant')
             return _tenant_redirect(request, 'iroad_tenants:tenant_operation_shipment_list')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 def _tenant_shipment_activity_entries(shipment):
@@ -14640,7 +15185,7 @@ class TenantOperationShipmentDetailView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantOperationShipmentEditView(View):
@@ -14684,7 +15229,7 @@ class TenantOperationShipmentEditView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request, shipment_id):
         context = _tenant_context_from_session(request)
@@ -14946,7 +15491,7 @@ class TenantOperationShipmentEditView(View):
             messages.success(request, f'Shipment {shipment.shipment_no} updated successfully.', extra_tags='tenant')
             return redirect('iroad_tenants:tenant_operation_shipment_detail', shipment_id=shipment.shipment_id)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantOperationShipmentUpdateView(View):
@@ -14982,7 +15527,7 @@ class TenantOperationShipmentUpdateView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request, shipment_id):
         context = _tenant_context_from_session(request)
@@ -15077,7 +15622,7 @@ class TenantOperationShipmentUpdateView(View):
             messages.success(request, f'Shipment {shipment.shipment_no} updated successfully.', extra_tags='tenant')
             return redirect('iroad_tenants:tenant_operation_shipment_detail', shipment_id=shipment.shipment_id)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantOperationShipmentDeleteView(View):
@@ -15105,7 +15650,7 @@ class TenantOperationShipmentDeleteView(View):
             messages.success(request, f'Shipment {shipment_no} deleted successfully.', extra_tags='tenant')
             return _tenant_redirect(request, 'iroad_tenants:tenant_operation_shipment_list')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 def _tenant_shipment_document_linkage_options():
@@ -15893,7 +16438,7 @@ class TenantOperationShipmentDocumentsDetailView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantOperationShipmentDocumentsListView(View):
@@ -15942,7 +16487,7 @@ class TenantOperationShipmentDocumentsListView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantOperationShipmentDocumentsCreateView(View):
@@ -16213,7 +16758,7 @@ class TenantOperationShipmentDocumentsCreateView(View):
             context.update(self._form_context(tenant_registry))
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request):
         context = _tenant_context_from_session(request)
@@ -16306,7 +16851,7 @@ class TenantOperationShipmentDocumentsCreateView(View):
             messages.success(request, f'Shipment document {document.record_no} created successfully.', extra_tags='tenant')
             return _tenant_redirect(request, 'iroad_tenants:tenant_operation_shipment_documents_list')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantOperationShipmentDocumentsEditView(TenantOperationShipmentDocumentsCreateView):
@@ -16342,7 +16887,7 @@ class TenantOperationShipmentDocumentsEditView(TenantOperationShipmentDocumentsC
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request, document_id):
         context = _tenant_context_from_session(request)
@@ -16424,7 +16969,7 @@ class TenantOperationShipmentDocumentsEditView(TenantOperationShipmentDocumentsC
             messages.success(request, f'Shipment document {document.record_no} updated successfully.', extra_tags='tenant')
             return _tenant_redirect(request, 'iroad_tenants:tenant_operation_shipment_documents_list')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantOperationShipmentDocumentsDownloadView(View):
@@ -16484,7 +17029,7 @@ class TenantOperationShipmentDocumentsDownloadView(View):
             response['Content-Disposition'] = f'attachment; filename="{document.record_no}.csv"'
             return response
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantOperationShipmentDocumentsDeleteView(View):
@@ -16523,7 +17068,7 @@ class TenantOperationShipmentDocumentsDeleteView(View):
             messages.success(request, f'Shipment document {record_no} deleted successfully.', extra_tags='tenant')
             return _tenant_redirect(request, 'iroad_tenants:tenant_operation_shipment_documents_list')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 def _shipment_pod_display_data(document, shipment=None):
@@ -16680,7 +17225,7 @@ class TenantOperationShipmentPodListView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantOperationShipmentPodCreateView(View):
@@ -16858,7 +17403,7 @@ class TenantOperationShipmentPodCreateView(View):
             context.update(self._form_context(request, tenant_registry, document=document))
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request):
         context = _tenant_context_from_session(request)
@@ -17118,7 +17663,7 @@ class TenantOperationShipmentPodCreateView(View):
             )
             return _tenant_redirect(request, 'iroad_tenants:tenant_operation_shipment_pod_list')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantOperationShipmentPodDetailView(View):
@@ -17159,7 +17704,7 @@ class TenantOperationShipmentPodDetailView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantOperationShipmentPodDeleteView(View):
@@ -17179,7 +17724,7 @@ class TenantOperationShipmentPodDeleteView(View):
             messages.success(request, 'POD record deleted.', extra_tags='tenant')
             return _tenant_redirect(request, 'iroad_tenants:tenant_operation_shipment_pod_list')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantOperationDocumentHandoverListView(View):
@@ -17238,7 +17783,7 @@ class TenantOperationDocumentHandoverListView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantOperationDocumentHandoverCreateView(View):
@@ -17369,7 +17914,7 @@ class TenantOperationDocumentHandoverCreateView(View):
             context.update(self._form_context(request, tenant_registry))
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request):
         context = _tenant_context_from_session(request)
@@ -17616,7 +18161,7 @@ class TenantOperationDocumentHandoverCreateView(View):
             )
             return _tenant_redirect(request, 'iroad_tenants:tenant_operation_document_handover_list')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantOperationTruckMovementLogListView(View):
@@ -17685,7 +18230,7 @@ class TenantOperationTruckMovementLogListView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantOperationTruckMovementLogCreateView(View):
@@ -17725,7 +18270,7 @@ class TenantOperationTruckMovementLogCreateView(View):
             context.update(_tenant_truck_movement_form_context(tenant_registry))
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request):
         context = _tenant_context_from_session(request)
@@ -17808,7 +18353,7 @@ class TenantOperationTruckMovementLogCreateView(View):
             messages.success(request, f'Truck movement log {movement.movement_no} created successfully.', extra_tags='tenant')
             return _tenant_redirect(request, 'iroad_tenants:tenant_operation_truck_movement_log_list')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantOperationTruckMovementLogEditView(TenantOperationTruckMovementLogCreateView):
@@ -17895,7 +18440,7 @@ class TenantOperationTruckMovementLogEditView(TenantOperationTruckMovementLogCre
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request, movement_id):
         context = _tenant_context_from_session(request)
@@ -17964,7 +18509,7 @@ class TenantOperationTruckMovementLogEditView(TenantOperationTruckMovementLogCre
                 )
             )
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantOperationTruckMovementLogDetailView(View):
@@ -18014,7 +18559,7 @@ class TenantOperationTruckMovementLogDetailView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantOperationTruckMovementLogDeleteView(View):
@@ -18039,7 +18584,7 @@ class TenantOperationTruckMovementLogDeleteView(View):
                 messages.success(request, f'Truck movement log {movement_no} deleted successfully.', extra_tags='tenant')
             return _tenant_redirect(request, 'iroad_tenants:tenant_operation_truck_movement_log_list')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantOperationActionsListView(View):
@@ -18092,7 +18637,7 @@ class TenantOperationActionsListView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantOperationActionsCreateView(View):
@@ -18113,7 +18658,7 @@ class TenantOperationActionsCreateView(View):
             context.update(_tenant_operation_action_form_context(tenant_registry))
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request):
         context = _tenant_context_from_session(request)
@@ -18227,7 +18772,7 @@ class TenantOperationActionsCreateView(View):
             messages.success(request, f'Operation action {action.action_code} created successfully.', extra_tags='tenant')
             return _tenant_redirect(request, 'iroad_tenants:tenant_operation_actions_list')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 def _tenant_surcharge_sales_booking_display_label(shipment):
@@ -18551,7 +19096,7 @@ class TenantOperationSurchargeSalesListView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 def _tenant_surcharge_sales_options_context(tenant_registry):
@@ -18704,7 +19249,7 @@ class TenantOperationSurchargeSalesCreateView(View):
             context.update(_tenant_surcharge_sales_options_context(tenant_registry))
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request, mode=None):
         context = _tenant_context_from_session(request)
@@ -18834,7 +19379,7 @@ class TenantOperationSurchargeSalesCreateView(View):
             messages.success(request, 'Surcharge transaction saved for the selected shipment and service.', extra_tags='tenant')
             return _tenant_redirect(request, 'iroad_tenants:tenant_operation_surcharge_sales_list')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantWebPushTokenUpsertView(View):
@@ -18999,7 +19544,7 @@ class TenantClientAccountView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantClientAccountSettingsView(View):
@@ -19030,7 +19575,7 @@ class TenantClientAccountSettingsView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request):
         context = _tenant_context_from_session(request)
@@ -19122,7 +19667,7 @@ class TenantClientAccountSettingsView(View):
             )
             return _tenant_redirect(request, 'iroad_tenants:tenant_client_account_settings')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantClientAccountCreateView(View):
@@ -19207,7 +19752,7 @@ class TenantClientAccountCreateView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request):
         context = _tenant_context_from_session(request)
@@ -19330,7 +19875,7 @@ class TenantClientAccountCreateView(View):
             )
             return _tenant_redirect(request, 'iroad_tenants:tenant_client_account')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantClientAccountEditView(TenantClientAccountCreateView):
@@ -19391,7 +19936,7 @@ class TenantClientAccountEditView(TenantClientAccountCreateView):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request, account_no):
         context = _tenant_context_from_session(request)
@@ -19512,7 +20057,7 @@ class TenantClientAccountEditView(TenantClientAccountCreateView):
             )
             return _tenant_redirect(request, 'iroad_tenants:tenant_client_account')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantClientAccountToggleStatusView(View):
@@ -19546,7 +20091,7 @@ class TenantClientAccountToggleStatusView(View):
                 )
             return _tenant_redirect(request, 'iroad_tenants:tenant_client_account')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantClientAccountDeleteView(View):
@@ -19579,7 +20124,7 @@ class TenantClientAccountDeleteView(View):
             messages.success(request, f'Client account {label} deleted.', extra_tags='tenant')
             return _tenant_redirect(request, 'iroad_tenants:tenant_client_account')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantClientSalesReportView(View):
@@ -19621,7 +20166,7 @@ class TenantClientSalesReportView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantClientAttachmentsView(View):
@@ -19684,7 +20229,7 @@ class TenantClientAttachmentsView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request):
         context = _tenant_context_from_session(request)
@@ -19752,7 +20297,7 @@ class TenantClientAttachmentsView(View):
             try:
                 return render(request, self.template_name, context)
             finally:
-                connection.set_schema_to_public()
+                restore_public_schema(request)
 
         try:
             with db_transaction.atomic():
@@ -19791,14 +20336,14 @@ class TenantClientAttachmentsView(View):
             try:
                 return render(request, self.template_name, context)
             finally:
-                connection.set_schema_to_public()
+                restore_public_schema(request)
 
         messages.success(
             request,
             f'Attachment {attachment_no} uploaded for {account.account_no}.',
             extra_tags='tenant',
         )
-        connection.set_schema_to_public()
+        restore_public_schema(request)
         list_url = reverse('iroad_tenants:tenant_client_attachments_list')
         return redirect(list_url)
 
@@ -19900,7 +20445,7 @@ class TenantClientAttachmentEditView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request, attachment_id):
         context = _tenant_context_from_session(request)
@@ -20011,7 +20556,7 @@ class TenantClientAttachmentEditView(View):
             )
             return _redirect_client_attachment_list(request)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantClientAttachmentDeleteView(View):
@@ -20038,7 +20583,7 @@ class TenantClientAttachmentDeleteView(View):
             messages.success(request, f'Attachment {label} deleted.', extra_tags='tenant')
             return _redirect_client_attachment_list(request)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantClientAttachmentDetailView(View):
@@ -20091,7 +20636,7 @@ class TenantClientAttachmentDetailView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantClientAttachmentsListView(View):
@@ -20146,7 +20691,7 @@ class TenantClientAttachmentsListView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantClientContactsView(View):
@@ -20212,7 +20757,7 @@ class TenantClientContactsView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request):
         context = _tenant_context_from_session(request)
@@ -20275,7 +20820,7 @@ class TenantClientContactsView(View):
             try:
                 return render(request, self.template_name, context)
             finally:
-                connection.set_schema_to_public()
+                restore_public_schema(request)
 
         is_primary = bool(form_data['is_primary'])
         try:
@@ -20314,14 +20859,14 @@ class TenantClientContactsView(View):
             try:
                 return render(request, self.template_name, context)
             finally:
-                connection.set_schema_to_public()
+                restore_public_schema(request)
 
         messages.success(
             request,
             f'Contact {form_data["name"]} added for {account.account_no}.',
             extra_tags='tenant',
         )
-        connection.set_schema_to_public()
+        restore_public_schema(request)
         list_url = reverse('iroad_tenants:tenant_client_contacts_list')
         return redirect(list_url)
 
@@ -20392,7 +20937,7 @@ class TenantClientContactEditView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request, contact_id):
         context = _tenant_context_from_session(request)
@@ -20499,7 +21044,7 @@ class TenantClientContactEditView(View):
             )
             return _redirect_client_contact_list(request)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantClientContactDeleteView(View):
@@ -20524,7 +21069,7 @@ class TenantClientContactDeleteView(View):
             messages.success(request, f'Contact {label} deleted.', extra_tags='tenant')
             return _redirect_client_contact_list(request)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantClientContactDetailView(View):
@@ -20573,7 +21118,7 @@ class TenantClientContactDetailView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantClientContactsListView(View):
@@ -20648,7 +21193,7 @@ class TenantClientContactsListView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantClientContractView(View):
@@ -20713,7 +21258,7 @@ class TenantClientContractView(View):
             context.update(self._build_create_context(request, tenant_registry, form_data, {}))
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request):
         context = _tenant_context_from_session(request)
@@ -20816,7 +21361,7 @@ class TenantClientContractView(View):
             messages.error(request, 'Contract save failed.', extra_tags='tenant')
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantClientContractDetailView(View):
@@ -20869,7 +21414,7 @@ class TenantClientContractDetailView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantClientContractEditView(View):
@@ -20937,7 +21482,7 @@ class TenantClientContractEditView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request, contract_id):
         context = _tenant_context_from_session(request)
@@ -21035,7 +21580,7 @@ class TenantClientContractEditView(View):
             )
             return _redirect_client_contract_list(request)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantClientContractDeleteView(View):
@@ -21062,7 +21607,7 @@ class TenantClientContractDeleteView(View):
             messages.success(request, f'Contract {label} deleted.', extra_tags='tenant')
             return _redirect_client_contract_list(request)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantClientContractListView(View):
@@ -21137,7 +21682,7 @@ class TenantClientContractListView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantClientContractSettingsView(View):
@@ -21167,7 +21712,7 @@ class TenantClientContractSettingsView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request):
         context = _tenant_context_from_session(request)
@@ -21294,7 +21839,7 @@ class TenantClientContractSettingsView(View):
             )
             return _tenant_redirect(request, 'iroad_tenants:tenant_client_contract_settings')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantClientDetailsView(View):
@@ -21485,7 +22030,7 @@ class TenantClientDetailsView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 def _tenant_address_master_access(request, context):
@@ -21822,7 +22367,7 @@ class TenantAddressMasterListView(View):
         try:
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request):
         """Set status Active / Inactivate (PCS: keep row, no delete)."""
@@ -21863,7 +22408,7 @@ class TenantAddressMasterListView(View):
                 addr.save(update_fields=['status', 'updated_at'])
                 messages.success(request, f'Address set to {new_status.lower()}.', extra_tags='tenant')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
         rq = (request.POST.get('redirect_query') or '').strip()
         base = reverse('iroad_tenants:tenant_address_master')
@@ -21912,7 +22457,7 @@ class TenantAddressMasterCreateView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request):
         context = _tenant_context_from_session(request)
@@ -22033,7 +22578,7 @@ class TenantAddressMasterCreateView(View):
 
             redirect_resp = _tenant_redirect(request, 'iroad_tenants:tenant_address_master')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
         return redirect_resp
 
@@ -22088,7 +22633,7 @@ class TenantAddressMasterEditView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request, address_ref):
         context = _tenant_context_from_session(request)
@@ -22200,7 +22745,7 @@ class TenantAddressMasterEditView(View):
             messages.success(request, 'Address updated successfully.', extra_tags='tenant')
             redirect_resp = _tenant_redirect(request, 'iroad_tenants:tenant_address_master')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
         return redirect_resp
 
@@ -22259,7 +22804,7 @@ class TenantAddressMasterDetailView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TruckTypeMasterListView(View):
@@ -22394,7 +22939,7 @@ class TruckTypeMasterListView(View):
         try:
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request):
         context = _tenant_context_from_session(request)
@@ -22450,7 +22995,7 @@ class TruckTypeMasterListView(View):
                     extra_tags='tenant',
                 )
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
         rq = (request.POST.get('redirect_query') or '').strip()
         base = reverse('iroad_tenants:truck_type_master')
@@ -22491,7 +23036,7 @@ class TruckTypeMasterCreateView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request):
         context = _tenant_context_from_session(request)
@@ -22591,7 +23136,7 @@ class TruckTypeMasterCreateView(View):
             )
             redirect_resp = _tenant_redirect(request, 'iroad_tenants:truck_type_master')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
         return redirect_resp
 
@@ -22631,7 +23176,7 @@ class TruckTypeMasterEditView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request, truck_type_id):
         context = _tenant_context_from_session(request)
@@ -22736,7 +23281,7 @@ class TruckTypeMasterEditView(View):
             messages.success(request, 'Truck type updated successfully.', extra_tags='tenant')
             redirect_resp = _tenant_redirect(request, 'iroad_tenants:truck_type_master')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
         return redirect_resp
 
@@ -22911,7 +23456,7 @@ class TruckMasterListView(View):
         try:
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request):
         context = _tenant_context_from_session(request)
@@ -22953,7 +23498,7 @@ class TruckMasterListView(View):
                     extra_tags='tenant',
                 )
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
         rq = (request.POST.get('redirect_query') or '').strip()
         base = reverse('iroad_tenants:truck_master')
@@ -23037,7 +23582,7 @@ class TruckMasterCreateView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request):
         context = _tenant_context_from_session(request)
@@ -23190,7 +23735,7 @@ class TruckMasterCreateView(View):
             )
             redirect_resp = _tenant_redirect(request, 'iroad_tenants:truck_master')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
         return redirect_resp
 
@@ -23241,7 +23786,7 @@ class TruckMasterEditView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request, truck_id):
         context = _tenant_context_from_session(request)
@@ -23396,7 +23941,7 @@ class TruckMasterEditView(View):
             messages.success(request, 'Truck updated successfully.', extra_tags='tenant')
             redirect_resp = _tenant_redirect(request, 'iroad_tenants:truck_master')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
         return redirect_resp
 
@@ -23531,7 +24076,7 @@ class TruckMasterDetailView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class DriverMasterListView(View):
@@ -23689,7 +24234,7 @@ class DriverMasterListView(View):
         try:
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request):
         context = _tenant_context_from_session(request)
@@ -23746,7 +24291,7 @@ class DriverMasterListView(View):
                     extra_tags='tenant',
                 )
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
         rq = (request.POST.get('redirect_query') or '').strip()
         base = reverse('iroad_tenants:driver_master')
@@ -23857,7 +24402,7 @@ class DriverMasterCreateView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request):
         context = _tenant_context_from_session(request)
@@ -24017,7 +24562,7 @@ class DriverMasterCreateView(View):
             )
             redirect_resp = _tenant_redirect(request, 'iroad_tenants:driver_master')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
         return redirect_resp
 
@@ -24080,7 +24625,7 @@ class DriverMasterEditView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request, driver_id):
         context = _tenant_context_from_session(request)
@@ -24223,7 +24768,7 @@ class DriverMasterEditView(View):
             messages.success(request, 'Driver profile updated successfully.', extra_tags='tenant')
             redirect_resp = _tenant_redirect(request, 'iroad_tenants:driver_master')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
         return redirect_resp
 
@@ -24368,7 +24913,7 @@ class DriverMasterDetailView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 def _tenant_driver_treasury_access(request, context):
@@ -24544,7 +25089,7 @@ class DriverTreasuryListView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request):
         context = _tenant_context_from_session(request)
@@ -24587,7 +25132,7 @@ class DriverTreasuryListView(View):
                     extra_tags='tenant',
                 )
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
         rq = (request.POST.get('redirect_query') or '').strip()
         base = reverse('iroad_tenants:driver_treasury_list')
@@ -24640,7 +25185,7 @@ class DriverTreasuryCreateView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request):
         context = _tenant_context_from_session(request)
@@ -24692,7 +25237,7 @@ class DriverTreasuryCreateView(View):
             )
             return _tenant_redirect(request, 'iroad_tenants:driver_treasury_list')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class DriverTreasuryEditView(View):
@@ -24733,7 +25278,7 @@ class DriverTreasuryEditView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request, treasury_id):
         context = _tenant_context_from_session(request)
@@ -24776,7 +25321,7 @@ class DriverTreasuryEditView(View):
             messages.success(request, 'Driver Treasury updated.', extra_tags='tenant')
             return _tenant_redirect(request, 'iroad_tenants:driver_treasury_list')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class DriverTreasuryDetailView(View):
@@ -24816,7 +25361,7 @@ class DriverTreasuryDetailView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class DriverTreasuryTransactionListView(View):
@@ -24985,7 +25530,7 @@ class DriverTreasuryTransactionListView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request):
         context = _tenant_context_from_session(request)
@@ -25015,7 +25560,7 @@ class DriverTreasuryTransactionListView(View):
                     extra_tags='tenant',
                 )
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
         rq = (request.POST.get('redirect_query') or '').strip()
         base = reverse('iroad_tenants:driver_transaction_list')
@@ -25068,7 +25613,7 @@ class DriverTreasuryTransactionCreateView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request):
         context = _tenant_context_from_session(request)
@@ -25118,7 +25663,7 @@ class DriverTreasuryTransactionCreateView(View):
             )
             return _tenant_redirect(request, 'iroad_tenants:driver_transaction_list')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class DriverTreasuryTransactionEditView(View):
@@ -25160,7 +25705,7 @@ class DriverTreasuryTransactionEditView(View):
                 transaction_id=transaction_id,
             )
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request, transaction_id):
         return self.get(request, transaction_id)
@@ -25200,7 +25745,7 @@ class DriverTreasuryTransactionDetailView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class DriverAttachmentAllListView(View):
@@ -25430,7 +25975,7 @@ class DriverAttachmentAllListView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class DriverAttachmentListView(View):
@@ -25495,7 +26040,7 @@ class DriverAttachmentCreateView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request, driver_id=None):
         context = _tenant_context_from_session(request)
@@ -25572,7 +26117,7 @@ class DriverAttachmentCreateView(View):
             messages.success(request, 'Attachment saved.', extra_tags='tenant')
             return redirect('iroad_tenants:driver_attachment_all_list')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class DriverAttachmentEditView(View):
@@ -25617,7 +26162,7 @@ class DriverAttachmentEditView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request, driver_id, attachment_id):
         context = _tenant_context_from_session(request)
@@ -25693,7 +26238,7 @@ class DriverAttachmentEditView(View):
             )
             return redirect('iroad_tenants:driver_attachment_all_list')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class DriverAttachmentDetailView(View):
@@ -25735,7 +26280,7 @@ class DriverAttachmentDetailView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class DriverAttachmentDeleteView(View):
@@ -25771,7 +26316,7 @@ class DriverAttachmentDeleteView(View):
 
             return redirect('iroad_tenants:driver_attachment_all_list')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class DriverAttachmentDriverSelectView(View):
@@ -25824,7 +26369,7 @@ class DriverAttachmentDriverSelectView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class DriverSettingsView(View):
@@ -25855,7 +26400,7 @@ class DriverSettingsView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request):
         context = _tenant_context_from_session(request)
@@ -25888,7 +26433,7 @@ class DriverSettingsView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TruckSettingsView(View):
@@ -25919,7 +26464,7 @@ class TruckSettingsView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request):
         context = _tenant_context_from_session(request)
@@ -25952,7 +26497,7 @@ class TruckSettingsView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TruckAttachmentListView(View):
@@ -26014,7 +26559,7 @@ class TruckAttachmentCreateView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request, truck_id=None):
         context = _tenant_context_from_session(request)
@@ -26091,7 +26636,7 @@ class TruckAttachmentCreateView(View):
             messages.success(request, 'Attachment saved.', extra_tags='tenant')
             return redirect('iroad_tenants:truck_attachment_all_list')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TruckAttachmentEditView(View):
@@ -26137,7 +26682,7 @@ class TruckAttachmentEditView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request, truck_id, attachment_id):
         context = _tenant_context_from_session(request)
@@ -26214,7 +26759,7 @@ class TruckAttachmentEditView(View):
             )
             return redirect('iroad_tenants:truck_attachment_all_list')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TruckAttachmentDetailView(View):
@@ -26257,7 +26802,7 @@ class TruckAttachmentDetailView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TruckAttachmentTruckSelectView(View):
@@ -26310,7 +26855,7 @@ class TruckAttachmentTruckSelectView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TruckAttachmentDeleteView(View):
@@ -26350,7 +26895,7 @@ class TruckAttachmentDeleteView(View):
 
             return redirect('iroad_tenants:truck_attachment_all_list')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TruckAttachmentAllListView(View):
@@ -26593,7 +27138,7 @@ class TruckAttachmentAllListView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantAddressLocationOptionsView(View):
@@ -26637,7 +27182,7 @@ class TenantAddressLocationOptionsView(View):
                 }
             )
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantMyAccountView(View):
@@ -26835,9 +27380,8 @@ class TenantAutoNumberConfigurationView(View):
             alpha_match = re.search(r'[A-Za-z]+$', raw)
             if not alpha_match:
                 raise ValueError('Next Number must contain an alphabetic sequence.')
-            parsed = 0
-            for ch in alpha_match.group(0).upper():
-                parsed = (parsed * 26) + (ord(ch) - 64)
+            alpha_suffix = alpha_match.group(0).upper()
+            parsed = _parse_alpha_padded_sequence(alpha_suffix, len(alpha_suffix))
         else:
             numeric_matches = re.findall(r'\d+', raw)
             if not numeric_matches:
@@ -26914,7 +27458,7 @@ class TenantAutoNumberConfigurationView(View):
             _ensure_support_ticket_sequence_floor(request, requested_form_code)
             base_next_number = self._load_sequence_next_number(requested_form_code, config)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
         context.update(
             {
@@ -26971,6 +27515,8 @@ class TenantAutoNumberConfigurationView(View):
                         raise ValueError('Number of digits must be between 1 and 10.')
                     if sequence_format not in self.ALLOWED_SEQUENCE_FORMATS:
                         raise ValueError('Invalid sequence format selected.')
+                    config.number_of_digits = int(digits_raw)
+                    config.sequence_format = sequence_format
                     next_number = self._parse_next_number(
                         request.POST.get('next_number'),
                         sequence_format=sequence_format,
@@ -26978,15 +27524,15 @@ class TenantAutoNumberConfigurationView(View):
                     if selected_form == SUPPORT_TICKET_MASTER_AUTO_FORM_CODE:
                         auth_payload = get_tenant_portal_cookie_payload(request) or {}
                         tenant_id = auth_payload.get('tenant_id')
-                        floor = _max_support_ticket_sequence_for_tenant(tenant_id) + 1
+                        floor = _max_support_ticket_sequence_for_tenant(
+                            tenant_id,
+                            config=config,
+                        ) + 1
                         if floor > 1 and next_number < floor:
                             raise ValueError(
                                 f'Next Number cannot be less than {floor} '
                                 '(already assigned to an existing support ticket).'
                             )
-
-                    config.number_of_digits = int(digits_raw)
-                    config.sequence_format = sequence_format
                     config.is_unique = request.POST.get('is_unique') == 'on'
                     config.form_label = self.FORM_LABELS[selected_form]
                     config.save(update_fields=[
@@ -27017,7 +27563,7 @@ class TenantAutoNumberConfigurationView(View):
                     messages.error(request, str(exc), extra_tags='tenant')
                 redirect_url = self._auto_number_list_url(request, selected_form)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
         return redirect(redirect_url)
 
@@ -27046,13 +27592,23 @@ class TenantOrganizationProfileView(View):
     """View organization profile."""
 
     def get(self, request):
-        context = _tenant_context_from_session(request)
+        _dbg = '[DEBUG org-profile]'
+        print(f'{_dbg} GET {request.path}')
+        auth_payload = get_tenant_portal_cookie_payload(request) or {}
+        print(
+            f'{_dbg} cookie: tenant_id={auth_payload.get("tenant_id")!r} '
+            f'jti={auth_payload.get("jti")!r}'
+        )
+        context = _tenant_context_from_session(request, _debug_label=' org-profile')
         if context is None:
+            print(f'{_dbg} redirect login: session/context check failed (see tenant-auth logs above)')
             response = redirect('login')
             clear_tenant_portal_cookie(response, request=request)
             return response
-        tenant_registry = _activate_tenant_workspace_schema(request)
+        print(f'{_dbg} session OK: tenant_id={context["tenant"].tenant_id} is_tenant_admin={context["is_tenant_admin"]}')
+        tenant_registry = _activate_tenant_workspace_schema(request, _debug_label=' org-profile')
         if tenant_registry is None:
+            print(f'{_dbg} redirect login: TenantRegistry/schema activation failed (see tenant-schema logs above)')
             response = redirect('login')
             clear_tenant_portal_cookie(response, request=request)
             return response
@@ -27068,7 +27624,8 @@ class TenantOrganizationProfileView(View):
                 'tenant_schema_name': tenant_registry.schema_name,
             })
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
+        print(f'{_dbg} OK: rendering Organization-profile.html')
         return render(request, 'iroad_tenants/Administration/Organization-profile.html', context)
 
 
@@ -27093,7 +27650,7 @@ class TenantOrganizationProfileEditView(View):
             context['org_status_label'] = _organization_status_from_tenant(context['tenant'])
             context['tenant_schema_name'] = tenant_registry.schema_name
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
         return render(request, 'iroad_tenants/Administration/Organization-profile-view.html', context)
 
     def post(self, request):
@@ -27121,7 +27678,7 @@ class TenantOrganizationProfileEditView(View):
             context['tenant_schema_name'] = tenant_registry.schema_name
             return render(request, 'iroad_tenants/Administration/Organization-profile-view.html', context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantLocationMasterListView(View):
@@ -27223,7 +27780,7 @@ class TenantLocationMasterListView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantLocationMasterCreateView(View):
@@ -27258,7 +27815,7 @@ class TenantLocationMasterCreateView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request):
         context = _tenant_context_from_session(request)
@@ -27325,7 +27882,7 @@ class TenantLocationMasterCreateView(View):
             )
             return _tenant_redirect(request, 'iroad_tenants:tenant_location_master_list')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantRouteMasterListView(View):
@@ -27383,7 +27940,7 @@ class TenantRouteMasterListView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantLocationMasterDeleteView(View):
@@ -27427,7 +27984,7 @@ class TenantLocationMasterDeleteView(View):
             messages.success(request, f'{code} deleted successfully.', extra_tags='tenant')
             return _tenant_redirect(request, 'iroad_tenants:tenant_location_master_list')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 def _tenant_location_master_activity_entries(location):
@@ -27498,7 +28055,7 @@ class TenantLocationMasterDetailView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantLocationMasterEditView(View):
@@ -27545,7 +28102,7 @@ class TenantLocationMasterEditView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request, location_id):
         context = _tenant_context_from_session(request)
@@ -27599,7 +28156,7 @@ class TenantLocationMasterEditView(View):
             )
             return _tenant_redirect(request, 'iroad_tenants:tenant_location_master_list')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantRouteMasterCreateView(View):
@@ -27632,7 +28189,7 @@ class TenantRouteMasterCreateView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request):
         context = _tenant_context_from_session(request)
@@ -27692,7 +28249,7 @@ class TenantRouteMasterCreateView(View):
             messages.success(request, f'{route.route_code} created successfully.', extra_tags='tenant')
             return _tenant_redirect(request, 'iroad_tenants:tenant_route_master_list')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 def _tenant_route_master_activity_entries(route):
@@ -27755,7 +28312,7 @@ class TenantRouteMasterDetailView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantRouteMasterEditView(View):
@@ -27797,7 +28354,7 @@ class TenantRouteMasterEditView(View):
             )
             return render(request, self.template_name, context)
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request, route_id):
         context = _tenant_context_from_session(request)
@@ -27854,7 +28411,7 @@ class TenantRouteMasterEditView(View):
             messages.success(request, f'{route.route_code} updated successfully.', extra_tags='tenant')
             return _tenant_redirect(request, 'iroad_tenants:tenant_route_master_list')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantRouteMasterDeleteView(View):
@@ -27882,7 +28439,7 @@ class TenantRouteMasterDeleteView(View):
             messages.success(request, f'{code} deleted successfully.', extra_tags='tenant')
             return _tenant_redirect(request, 'iroad_tenants:tenant_route_master_list')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantUsersAdministrationView(View):
@@ -27933,7 +28490,7 @@ class TenantUsersAdministrationView(View):
                 }
             )
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
         return render(
             request,
             'iroad_tenants/User_Management/Users-administration.html',
@@ -27942,13 +28499,6 @@ class TenantUsersAdministrationView(View):
 
 
 TENANT_USER_ROLE_OPTIONS = ['Administrator', 'Finance Manager', 'Operations Staff', 'Sales Executive']
-TENANT_PERMISSION_MATRIX = [
-    {'module_name': 'Master Data', 'form_name': 'Cargo Master'},
-    {'module_name': 'Operations', 'form_name': 'Booking'},
-    {'module_name': 'Operations', 'form_name': 'Shipment'},
-    {'module_name': 'Finance', 'form_name': 'Sales Invoicing'},
-    {'module_name': 'Finance', 'form_name': 'Purchase Invoicing'},
-]
 
 
 def _tenant_role_name_options():
@@ -28099,7 +28649,7 @@ class TenantUsersAdministrationCreateView(View):
                 context,
             )
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request):
         context = _tenant_context_from_session(request)
@@ -28220,7 +28770,7 @@ class TenantUsersAdministrationCreateView(View):
             messages.success(request, 'Tenant user created successfully.', extra_tags='tenant')
             return _tenant_redirect(request, 'iroad_tenants:tenant_users_administration')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantUsersAdministrationEditView(View):
@@ -28268,7 +28818,7 @@ class TenantUsersAdministrationEditView(View):
                 context,
             )
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request, user_id):
         context = _tenant_context_from_session(request)
@@ -28359,7 +28909,7 @@ class TenantUsersAdministrationEditView(View):
             messages.success(request, 'Tenant user updated successfully.', extra_tags='tenant')
             return _tenant_redirect(request, 'iroad_tenants:tenant_users_administration')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantUsersAdministrationToggleStatusView(View):
@@ -28399,7 +28949,7 @@ class TenantUsersAdministrationToggleStatusView(View):
             messages.success(request, f'User status changed to {tenant_user.status}.', extra_tags='tenant')
             return _tenant_redirect(request, 'iroad_tenants:tenant_users_administration')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantUsersAdministrationDeleteView(View):
@@ -28429,7 +28979,7 @@ class TenantUsersAdministrationDeleteView(View):
             messages.success(request, 'User deleted successfully.', extra_tags='tenant')
             return _tenant_redirect(request, 'iroad_tenants:tenant_users_administration')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantUsersAdministrationRestoreView(View):
@@ -28467,7 +29017,7 @@ class TenantUsersAdministrationRestoreView(View):
                 )
             )
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantUsersAdministrationExportView(View):
@@ -28531,7 +29081,7 @@ class TenantUsersAdministrationExportView(View):
                 ])
             return response
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 def _tenant_role_form_data_from_post(request):
@@ -28611,7 +29161,7 @@ def _permission_matrix_with_values(permission_map=None):
                 'can_print': permission_map.get(key, {}).get('can_print', False),
             }
         )
-    return matrix_rows
+    return enrich_permission_matrix_rows(matrix_rows)
 
 
 class TenantRolesPermissionsView(View):
@@ -28645,7 +29195,7 @@ class TenantRolesPermissionsView(View):
                 }
             )
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
         return render(
             request,
             'iroad_tenants/User_Management/Role/Roles--permissions.html',
@@ -28666,7 +29216,6 @@ class TenantRolesPermissionsCreateView(View):
             {
                 'form_data': {
                     'status': 'Active',
-                    'created_by_label': (context.get('display_name') or '').strip(),
                 },
                 'form_errors': {},
                 'permission_matrix': _permission_matrix_with_values(),
@@ -28692,7 +29241,6 @@ class TenantRolesPermissionsCreateView(View):
             clear_tenant_portal_cookie(response, request=request)
             return response
         form_data = _tenant_role_form_data_from_post(request)
-        form_data['created_by_label'] = (context.get('display_name') or '').strip()
         permissions_payload = _permissions_payload_from_post(request)
         form_errors = {}
         try:
@@ -28714,7 +29262,7 @@ class TenantRolesPermissionsCreateView(View):
                     {
                         'form_data': form_data,
                         'form_errors': form_errors,
-                        'permission_matrix': permissions_payload,
+                        'permission_matrix': enrich_permission_matrix_rows(permissions_payload),
                         'tenant_schema_name': tenant_registry.schema_name,
                         'is_edit_mode': False,
                         'is_view_mode': False,
@@ -28756,7 +29304,7 @@ class TenantRolesPermissionsCreateView(View):
             messages.success(request, 'Role created successfully.', extra_tags='tenant')
             return _tenant_redirect(request, 'iroad_tenants:tenant_roles_permissions')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantRolesPermissionsEditView(View):
@@ -28781,10 +29329,7 @@ class TenantRolesPermissionsEditView(View):
             is_view_mode = request.GET.get('mode') == 'view'
             context.update(
                 {
-                    'form_data': {
-                        **_tenant_role_form_data_from_model(tenant_role),
-                        'created_by_label': (context.get('display_name') or '').strip(),
-                    },
+                    'form_data': _tenant_role_form_data_from_model(tenant_role),
                     'form_errors': {},
                     'permission_matrix': _permission_matrix_with_values(_permissions_by_key(tenant_role)),
                     'tenant_schema_name': tenant_registry.schema_name,
@@ -28799,7 +29344,7 @@ class TenantRolesPermissionsEditView(View):
                 context,
             )
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
     def post(self, request, role_id):
         context = _tenant_context_from_session(request)
@@ -28813,7 +29358,6 @@ class TenantRolesPermissionsEditView(View):
             clear_tenant_portal_cookie(response, request=request)
             return response
         form_data = _tenant_role_form_data_from_post(request)
-        form_data['created_by_label'] = (context.get('display_name') or '').strip()
         permissions_payload = _permissions_payload_from_post(request)
         form_errors = {}
         try:
@@ -28840,7 +29384,7 @@ class TenantRolesPermissionsEditView(View):
                     {
                         'form_data': form_data,
                         'form_errors': form_errors,
-                        'permission_matrix': permissions_payload,
+                        'permission_matrix': enrich_permission_matrix_rows(permissions_payload),
                         'tenant_schema_name': tenant_registry.schema_name,
                         'is_edit_mode': True,
                         'is_view_mode': False,
@@ -28859,7 +29403,6 @@ class TenantRolesPermissionsEditView(View):
             tenant_role.description_en = form_data['description_en']
             tenant_role.description_ar = form_data['description_ar']
             tenant_role.status = form_data['status']
-            tenant_role.created_by_label = (context.get('display_name') or '').strip()
             tenant_role.save()
 
             TenantRolePermission.objects.filter(role=tenant_role).delete()
@@ -28884,7 +29427,7 @@ class TenantRolesPermissionsEditView(View):
             messages.success(request, 'Role updated successfully.', extra_tags='tenant')
             return _tenant_redirect(request, 'iroad_tenants:tenant_roles_permissions')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantRolesPermissionsToggleStatusView(View):
@@ -28915,7 +29458,7 @@ class TenantRolesPermissionsToggleStatusView(View):
             messages.success(request, f'Role status changed to {tenant_role.status}.', extra_tags='tenant')
             return _tenant_redirect(request, 'iroad_tenants:tenant_roles_permissions')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantRolesPermissionsDeleteView(View):
@@ -28941,7 +29484,7 @@ class TenantRolesPermissionsDeleteView(View):
             messages.success(request, 'Role deleted successfully.', extra_tags='tenant')
             return _tenant_redirect(request, 'iroad_tenants:tenant_roles_permissions')
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 class TenantRolesPermissionsExportView(View):
@@ -28993,7 +29536,7 @@ class TenantRolesPermissionsExportView(View):
                 )
             return response
         finally:
-            connection.set_schema_to_public()
+            restore_public_schema(request)
 
 
 def _active_currency_options():
@@ -29141,13 +29684,40 @@ def _sync_tenant_ref_if_config_changed(profile):
         profile.save(update_fields=['tenant_ref_no', 'updated_at'])
 
 
-def _parse_auto_number_sequence_from_ref(ref_value, *, sequence_format=None):
-    """Extract the numeric sequence from a rendered ref (e.g. TKT-00017)."""
+def _sequence_from_ref_no(ref_value: str, config, prefix: str) -> int:
+    """Parse a rendered ref back to its integer sequence (matches ``_render_tenant_ref_no``)."""
+    raw = str(ref_value or '').strip()
+    prefix_key = f'{prefix}-'
+    if raw.upper().startswith(prefix_key.upper()):
+        suffix = raw[len(prefix_key):]
+    else:
+        suffix = raw.split('-')[-1] if '-' in raw else raw
+    digits = max(1, int(getattr(config, 'number_of_digits', None) or 4))
+    fmt = (getattr(config, 'sequence_format', None) or '').strip().lower()
+    if fmt == AutoNumberConfiguration.SequenceFormat.ALPHA:
+        return _parse_alpha_padded_sequence(suffix, digits)
+    if fmt == AutoNumberConfiguration.SequenceFormat.ALPHANUMERIC:
+        alpha_match = re.search(r'[A-Za-z]+', suffix)
+        numeric_matches = re.findall(r'\d+', suffix)
+        if not alpha_match or not numeric_matches:
+            raise ValueError('Invalid alphanumeric sequence.')
+        alpha_part = alpha_match.group(0).upper()
+        return _parse_alpha_padded_sequence(alpha_part, max(1, digits - 1))
+    numeric_matches = re.findall(r'\d+', suffix)
+    if not numeric_matches:
+        raise ValueError('Invalid numeric sequence.')
+    return int(numeric_matches[-1])
+
+
+def _parse_auto_number_sequence_from_ref(ref_value, *, sequence_format=None, config=None, prefix=None):
+    """Extract the integer sequence from a rendered ref (e.g. TKT-00017)."""
+    if config is not None and prefix:
+        return _sequence_from_ref_no(ref_value, config, prefix)
     view = TenantAutoNumberConfigurationView()
     return view._parse_next_number(ref_value, sequence_format=sequence_format)
 
 
-def _max_support_ticket_sequence_for_tenant(tenant_id):
+def _max_support_ticket_sequence_for_tenant(tenant_id, *, config=None, sequence_format=None):
     """Highest sequence value already used for this tenant's ticket numbers."""
     max_seq = 0
     if not tenant_id:
@@ -29158,7 +29728,18 @@ def _max_support_ticket_sequence_for_tenant(tenant_id):
     )
     for ticket_no in tickets:
         try:
-            max_seq = max(max_seq, _parse_auto_number_sequence_from_ref(ticket_no))
+            if config is not None:
+                seq = _sequence_from_ref_no(
+                    ticket_no,
+                    config,
+                    SUPPORT_TICKET_REF_PREFIX,
+                )
+            else:
+                seq = _parse_auto_number_sequence_from_ref(
+                    ticket_no,
+                    sequence_format=sequence_format,
+                )
+            max_seq = max(max_seq, int(seq))
         except ValueError:
             continue
     return max_seq
@@ -29174,16 +29755,44 @@ def _ensure_support_ticket_sequence_floor(request, form_code):
     tenant_id = auth_payload.get('tenant_id')
     if not tenant_id:
         return
-    floor = _max_support_ticket_sequence_for_tenant(tenant_id) + 1
+    config = AutoNumberConfiguration.objects.filter(form_code=form_code).first()
+    floor = _max_support_ticket_sequence_for_tenant(tenant_id, config=config) + 1
     if floor < 1:
         floor = 1
     sequence, _ = AutoNumberSequence.objects.get_or_create(
         form_code=form_code,
         defaults={'next_number': floor},
     )
-    if int(sequence.next_number or 1) < floor:
+    stored = int(sequence.next_number or 1)
+    if stored < floor:
         sequence.next_number = floor
         sequence.save(update_fields=['next_number', 'updated_at'])
+    elif stored > floor and floor <= 9999 and stored >= 1000:
+        # Heal counters inflated by the old alpha parser (e.g. TKT-AAAA → 18279).
+        sequence.next_number = floor
+        sequence.save(update_fields=['next_number', 'updated_at'])
+
+
+def _preview_next_support_ticket_no(request) -> str:
+    """Preview the next support ticket number from tenant auto-number config."""
+    tenant_registry = _activate_tenant_workspace_schema(request)
+    if tenant_registry is None:
+        return ''
+    try:
+        _ensure_support_ticket_sequence_floor(
+            request,
+            SUPPORT_TICKET_MASTER_AUTO_FORM_CODE,
+        )
+        return _preview_next_auto_number_for_form(
+            form_code=SUPPORT_TICKET_MASTER_AUTO_FORM_CODE,
+            form_label=SUPPORT_TICKET_MASTER_AUTO_FORM_LABEL,
+            prefix=SUPPORT_TICKET_REF_PREFIX,
+        )
+    except Exception:
+        logger.exception('Support ticket number preview failed')
+        return ''
+    finally:
+        restore_public_schema(request)
 
 
 def _allocate_tenant_support_ticket_no(request):
@@ -29202,9 +29811,9 @@ def _allocate_tenant_support_ticket_no(request):
             if not SupportTicket.objects.filter(ticket_no=ticket_no).exists():
                 return ticket_no
     except Exception:
-        pass
+        logger.exception('Support ticket auto-number allocation failed')
     finally:
-        connection.set_schema_to_public()
+        restore_public_schema(request)
     return SupportTicket.generate_ticket_no()
 
 
@@ -30348,6 +30957,27 @@ def _int_to_alpha(value):
         num, rem = divmod(num - 1, 26)
         chars.append(chr(65 + rem))
     return ''.join(reversed(chars))
+
+
+def _parse_alpha_padded_sequence(suffix: str, digits: int) -> int:
+    """
+    Inverse of ``_int_to_alpha(n).rjust(digits, 'A')`` used when rendering alpha refs.
+
+    Do not use Excel-style column math (A=1, AA=27, AAAA=18279); that disagrees with
+    render and caused support-ticket counters to jump to 18279 after ``TKT-AAAA``.
+    """
+    suffix = (suffix or '').strip().upper()
+    if not suffix or not suffix.isalpha():
+        raise ValueError('Invalid alphabetic sequence.')
+    digits = max(1, int(digits or len(suffix)))
+    if len(suffix) > digits:
+        suffix = suffix[-digits:]
+    elif len(suffix) < digits:
+        suffix = suffix.rjust(digits, 'A')
+    for n in range(1, 100000):
+        if _int_to_alpha(n).rjust(digits, 'A') == suffix:
+            return n
+    raise ValueError('Unknown alphabetic sequence.')
 
 
 def _apply_organization_profile_post(request, profile):

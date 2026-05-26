@@ -65,6 +65,7 @@ def support_ticket_created_by_display_map(tickets):
             by_tenant_ids.setdefault(str(t.tenant_id), set()).add(raw)
 
     tenant_user_labels = {}
+    previous_tenant = connection.tenant
     connection.set_schema_to_public()
     try:
         tenant_pks = list(by_tenant_ids.keys())
@@ -94,7 +95,10 @@ def support_ticket_created_by_display_map(tickets):
                         'role': role,
                     }
     finally:
-        connection.set_schema_to_public()
+        if isinstance(previous_tenant, TenantRegistry):
+            connection.set_tenant(previous_tenant)
+        else:
+            connection.set_schema_to_public()
 
     out = {}
     tenant_by = {}

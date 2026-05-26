@@ -5,6 +5,7 @@ from iroad_tenants.driver_treasury_ops import (
     validate_shipment_for_treasury,
     validate_transaction_type_category,
 )
+from iroad_tenants.tenant_form_choices import pin_model_choice_field
 from tenant_workspace.models import (
     DriverTreasury,
     DriverTreasuryTransaction,
@@ -12,18 +13,18 @@ from tenant_workspace.models import (
     TenantShipment,
 )
 
+_DRIVER_TREASURY_TXN_SHIPMENT_LIMIT = 500
+
 
 class DriverTreasuryForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Only Active drivers selectable
-        self.fields['driver'].queryset = (
-            DriverMaster.active_objects.all()
-        )
-        self.fields['driver'].empty_label = (
-            '— Select Driver —'
-        )
+        driver_field = self.fields['driver']
+        driver_field.queryset = DriverMaster.active_objects.all()
+        driver_field.empty_label = '— Select Driver —'
+        pin_model_choice_field(driver_field, list(driver_field.queryset))
         # current_balance is read-only — never in form
         # treasury_code is auto-generated — never in form
 
@@ -61,18 +62,28 @@ class DriverTreasuryTransactionForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['driver_treasury'].queryset = (
+        treasury_field = self.fields['driver_treasury']
+        treasury_field.queryset = (
             DriverTreasury.active_objects.select_related('driver')
+            .order_by('treasury_code')
         )
-        self.fields['driver_treasury'].empty_label = '— Select Treasury —'
-        self.fields['shipment'].queryset = (
+        treasury_field.empty_label = '— Select Treasury —'
+        treasury_field.label_from_instance = (
+            lambda obj: (
+                f'{obj.treasury_code} — '
+                f'{(obj.driver.english_name or obj.driver.arabic_name or obj.driver.driver_code) if obj.driver else "—"}'
+            )
+        )
+        pin_model_choice_field(treasury_field, list(treasury_field.queryset))
+
+        shipment_field = self.fields['shipment']
+        shipment_field.queryset = (
             TenantShipment.objects.select_related('driver')
-            .order_by('-shipment_date', '-created_at')
+            .order_by('-shipment_date', '-created_at')[:_DRIVER_TREASURY_TXN_SHIPMENT_LIMIT]
         )
-        self.fields['shipment'].empty_label = '— None —'
-        self.fields['shipment'].label_from_instance = (
-            lambda obj: obj.shipment_no
-        )
+        shipment_field.empty_label = '— None —'
+        shipment_field.label_from_instance = lambda obj: obj.shipment_no
+        pin_model_choice_field(shipment_field, list(shipment_field.queryset))
 
     class Meta:
         model = DriverTreasuryTransaction

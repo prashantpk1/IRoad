@@ -2,6 +2,7 @@ from django import forms
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
+from iroad_tenants.tenant_form_choices import pin_model_choice_field
 from tenant_workspace.models import (
     SalesInvoiceReport,
     SalesInvoiceReportBooking,
@@ -47,10 +48,15 @@ class SalesInvoiceReportForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['client'].queryset = TenantClientAccount.objects.filter(
-            status=TenantClientAccount.Status.ACTIVE
+        client_field = self.fields['client']
+        client_field.queryset = TenantClientAccount.objects.filter(
+            status=TenantClientAccount.Status.ACTIVE,
         ).order_by('display_name')
-        self.fields['client'].empty_label = _('Select client...')
+        client_field.empty_label = _('Select client...')
+        client_field.label_from_instance = (
+            lambda obj: f'{obj.account_no} - {obj.display_name}'
+        )
+        pin_model_choice_field(client_field, list(client_field.queryset))
 
         # Derived/system fields
         self.fields['report_no'].required = False

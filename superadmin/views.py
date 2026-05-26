@@ -968,6 +968,18 @@ class OTPVerificationView(View):
         }
 
     def get(self, request):
+        if request.GET.get('cancel'):
+            pending = self._pending_state(request)
+            if pending:
+                if pending['domain'] == 'admin':
+                    self._clear_admin_pending(request)
+                else:
+                    self._clear_tenant_pending(request)
+            else:
+                self._clear_admin_pending(request)
+                self._clear_tenant_pending(request)
+            return redirect('login')
+
         pending = self._pending_state(request)
         if not pending:
             if request.user.is_authenticated:

@@ -451,15 +451,81 @@ def validate_operation_action_allowed(
     )
 
 
+def get_action_master_options():
+    """All active Action Master rows for FK dropdowns (english_label display)."""
+    return TenantOperationAction.objects.filter(
+        status=TenantOperationAction.Status.ACTIVE,
+    ).order_by('sequence_number', 'action_code')
+
+
+def _has_action_dropdown_context(*, booking=None, shipment=None, movement=None):
+    return booking is not None or shipment is not None or movement is not None
+
+
+def get_action_dropdown_options(
+    *,
+    booking=None,
+    shipment=None,
+    movement=None,
+    booking_item_type='',
+    exclude_log_id=None,
+    include_action_id=None,
+    for_mobile: bool = True,
+):
+    """
+    Return queryset for the Action Log FK dropdown.
+    Without booking/shipment/movement: all active Action Master rows.
+    With context: workflow-filtered allowed actions only.
+    """
+    if not _has_action_dropdown_context(
+        booking=booking,
+        shipment=shipment,
+        movement=movement,
+    ):
+        return get_action_master_options()
+
+    return get_allowed_actions(
+        booking=booking,
+        shipment=shipment,
+        movement=movement,
+        booking_item_type=booking_item_type,
+        exclude_log_id=exclude_log_id,
+        include_action_id=include_action_id,
+        for_mobile=for_mobile,
+    )
+
+
 def action_options_payload(actions):
     return [
         {
             'action_id': str(action.action_id),
             'action_code': action.action_code,
             'label': action.english_label or action.action_code,
+            'english_label': action.english_label or action.action_code,
         }
         for action in actions
     ]
+
+
+def action_dropdown_context_label(
+    *,
+    booking=None,
+    shipment=None,
+    movement=None,
+    booking_item_type='',
+):
+    if not _has_action_dropdown_context(
+        booking=booking,
+        shipment=shipment,
+        movement=movement,
+    ):
+        return 'Active actions from Action Master (english label). Link booking or shipment to filter by workflow.'
+
+    return allowed_actions_context_label(
+        booking=booking,
+        shipment=shipment,
+        booking_item_type=booking_item_type,
+    )
 
 
 def allowed_actions_context_label(*, booking=None, shipment=None, booking_item_type=''):

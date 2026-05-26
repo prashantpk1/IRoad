@@ -11,6 +11,9 @@ headers for JSON under ``/api/v1/mobile/``.
 
 Driver **session** checks (active user + active driver + tenant consistency) run
 in ``MobileJWTAuthentication`` / ``resolve_mobile_driver_session``.
+
+Dashboard routes additionally use ``MobileDashboardSecurityMiddleware`` (tenant
+hint vs JWT, read-only verbs).
 """
 from __future__ import annotations
 
@@ -117,6 +120,115 @@ class MobileApiTenantGateMiddleware:
                     'data': {'error_code': 'invalid_tenant'},
                 },
                 status=400,
+            )
+
+        return self.get_response(request)
+
+
+class MobileDashboardSecurityMiddleware:
+    """
+    Defense-in-depth for ``/api/v1/mobile/driver/dashboard/*``.
+
+    - Allows only safe read verbs (GET/HEAD/OPTIONS).
+    - When Bearer + ``X-Tenant-ID`` are both sent, JWT ``tenant_schema`` must match
+      the resolved registry schema (blocks cross-tenant leakage).
+    """
+
+    SAFE_METHODS = frozenset({'GET', 'HEAD', 'OPTIONS'})
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        from mobile_api.helpers.dashboard_security import (
+            DASHBOARD_API_PREFIX,
+            resolve_tenant_schema_from_header,
+        )
+
+        if not request.path.startswith(DASHBOARD_API_PREFIX):
+            return self.get_response(request)
+
+        request.mobile_dashboard_route = True
+
+        if request.method not in self.SAFE_METHODS:
+            logger.info(
+                'dashboard.middleware method_blocked method=%s path=%s',
+                request.method,
+                request.path[:120],
+            )
+            return JsonResponse(
+                {
+                    'status': 0,
+                    'message': str(_('mobile.auth.dashboard_method_not_allowed')),
+                    'data': {'error_code': 'dashboard_method_not_allowed'},
+                },
+                status=405,
+            )
+
+        try:
+            from django.conf import settings
+
+            if not getattr(
+                settings,
+                'MOBILE_API_DASHBOARD_MIDDLEWARE_ENFORCE_TENANT',
+                True,
+            ):
+                return self.get_response(request)
+        except Exception:
+            return self.get_response(request)
+
+        tenant_hint = (request.headers.get('X-Tenant-ID') or '').strip()
+        if not tenant_hint:
+            return self.get_response(request)
+
+        from mobile_api.helpers.auth import (
+            TOKEN_TYPE_ACCESS,
+            get_token_from_request,
+            verify_token,
+        )
+
+        token = get_token_from_request(request)
+        if not token:
+            return self.get_response(request)
+
+        try:
+            payload = verify_token(token, expected_type=TOKEN_TYPE_ACCESS)
+        except Exception:
+            return self.get_response(request)
+
+        if not payload:
+            return self.get_response(request)
+
+        token_schema = str(payload.get('tenant_schema') or '').strip()
+        hint_schema = resolve_tenant_schema_from_header(tenant_hint)
+        if hint_schema and token_schema and hint_schema != token_schema:
+            try:
+                from mobile_api.helpers.security_audit import (
+                    client_ip_from_request as _sec_ip,
+                    log_mobile_security_event,
+                )
+
+                log_mobile_security_event(
+                    'dashboard_middleware_tenant_mismatch',
+                    schema=token_schema,
+                    ip=_sec_ip(request),
+                    reason=f'hint={hint_schema[:64]}',
+                )
+            except Exception:
+                pass
+            logger.warning(
+                'dashboard.middleware tenant_mismatch token=%s hint=%s path=%s',
+                token_schema,
+                hint_schema,
+                request.path[:120],
+            )
+            return JsonResponse(
+                {
+                    'status': 0,
+                    'message': str(_('mobile.auth.tenant_mismatch')),
+                    'data': {'error_code': 'tenant_mismatch'},
+                },
+                status=403,
             )
 
         return self.get_response(request)

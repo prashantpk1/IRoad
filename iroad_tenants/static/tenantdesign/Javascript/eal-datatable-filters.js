@@ -137,9 +137,29 @@
     });
   }
 
+  function navigateServerPaginatedSort(columnIndex, direction) {
+    var url = new URL(window.location.href);
+    url.searchParams.set("sort_col", String(columnIndex));
+    url.searchParams.set("sort_dir", direction || "asc");
+    url.searchParams.delete("page");
+    window.location.assign(url.toString());
+  }
+
+  function clearServerPaginatedSort(columnIndex) {
+    var url = new URL(window.location.href);
+    var activeCol = url.searchParams.get("sort_col");
+    if (!activeCol || Number(activeCol) === columnIndex) {
+      url.searchParams.delete("sort_col");
+      url.searchParams.delete("sort_dir");
+    }
+    url.searchParams.delete("page");
+    window.location.assign(url.toString());
+  }
+
   function initFilterableTable(root) {
     if (!root || root.getAttribute("data-eal-filter-skip") === "1") return;
 
+    var serverPaginated = root.getAttribute("data-eal-server-paginated") === "1";
     var table = root.querySelector("table.eal-table");
     if (!table) return;
     var tbody = table.querySelector("tbody");
@@ -205,6 +225,22 @@
       ? Array.prototype.slice.call(chipGroup.querySelectorAll("[data-eal-chip-value]"))
       : [];
 
+    function hasActiveFilters() {
+      if (state.globalSearch) return true;
+      if (state.chipFilter !== "all") return true;
+      return Object.keys(state.columnFilters).some(function (key) {
+        return normalizeText(state.columnFilters[key]);
+      });
+    }
+
+    function getServerEmptyRows() {
+      return Array.prototype.slice
+        .call(tbody.querySelectorAll("tr.eal-table-empty-row"))
+        .filter(function (row) {
+          return row !== emptyRow;
+        });
+    }
+
     function chipMatches(row) {
       if (state.chipFilter === "all") return true;
       if (chipRowPrimaryAttr) {
@@ -252,7 +288,12 @@
         return row.style.display !== "none";
       });
 
-      if (state.sort.columnIndex !== null && state.sort.direction && visibleRows.length) {
+      if (
+        !serverPaginated &&
+        state.sort.columnIndex !== null &&
+        state.sort.direction &&
+        visibleRows.length
+      ) {
         var col = state.sort.columnIndex;
         var dir = state.sort.direction;
         var sorted = visibleRows.slice().sort(function (a, b) {
@@ -277,7 +318,14 @@
         tbody.insertBefore(frag, emptyRow);
       }
 
-      emptyRow.style.display = visibleRows.length ? "none" : "";
+      var dataRows = rows;
+      var filtersActive = hasActiveFilters();
+      var showServerEmpty = dataRows.length === 0 && !filtersActive;
+      getServerEmptyRows().forEach(function (row) {
+        row.style.display = showServerEmpty ? "" : "none";
+      });
+      emptyRow.style.display =
+        visibleRows.length === 0 && (dataRows.length > 0 || filtersActive) ? "" : "none";
     }
 
     if (globalSearchInput) {
@@ -360,8 +408,13 @@
 
       Array.prototype.slice.call(menu.querySelectorAll("[data-sort]")).forEach(function (button) {
         button.addEventListener("click", function () {
+          var direction = button.getAttribute("data-sort");
+          if (serverPaginated) {
+            navigateServerPaginatedSort(columnIndex, direction);
+            return;
+          }
           state.sort.columnIndex = columnIndex;
-          state.sort.direction = button.getAttribute("data-sort");
+          state.sort.direction = direction;
           applyTableState();
           menu.classList.remove("open");
           resetFloatingMenu(menu);
@@ -371,6 +424,10 @@
 
       Array.prototype.slice.call(menu.querySelectorAll("[data-clear]")).forEach(function (button) {
         button.addEventListener("click", function () {
+          if (serverPaginated) {
+            clearServerPaginatedSort(columnIndex);
+            return;
+          }
           if (input) input.value = "";
           delete state.columnFilters[columnIndex];
           if (state.sort.columnIndex === columnIndex) {

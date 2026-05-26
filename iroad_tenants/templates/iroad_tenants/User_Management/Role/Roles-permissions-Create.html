@@ -2,6 +2,22 @@
 
 {% block title %}Create Role & Permissions | iRoad Admin{% endblock %}
 
+{% block extra_css %}
+<style>
+  .fields-grid.cols-desc-status {
+    grid-template-columns: 1fr 1fr auto;
+  }
+  @media (max-width: 991.98px) {
+    .fields-grid.cols-desc-status {
+      grid-template-columns: repeat(2, 1fr);
+    }
+    .fields-grid.cols-desc-status .field-status {
+      grid-column: 1 / -1;
+    }
+  }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
   <nav aria-label="breadcrumb">
@@ -52,7 +68,7 @@
             {% if form_errors.role_name_ar %}<div class="invalid-feedback d-block">{{ form_errors.role_name_ar }}</div>{% endif %}
           </div>
         </div>
-        <div class="fields-grid cols-2">
+        <div class="fields-grid cols-desc-status">
           <div class="field">
             <label for="descriptionEn" class="form-label">Description (English)</label>
             <div class="input-icon-wrapper"><i class="bi bi-text-paragraph"></i><input type="text" name="description_en" class="form-control has-icon" id="descriptionEn" placeholder="Brief description..." value="{{ form_data.description_en|default:'' }}" {% if is_view_mode %}disabled{% endif %} /></div>
@@ -61,13 +77,7 @@
             <label for="descriptionAr" class="form-label">Description (Arabic)</label>
             <div class="input-icon-wrapper"><i class="bi bi-text-paragraph"></i><input type="text" name="description_ar" class="form-control has-icon" id="descriptionAr" dir="rtl" placeholder="وصف موجز..." value="{{ form_data.description_ar|default:'' }}" {% if is_view_mode %}disabled{% endif %} /></div>
           </div>
-        </div>
-        <div class="fields-grid cols-2">
-          <div class="field">
-            <label for="createdBy" class="form-label">Created By</label>
-            <div class="input-icon-wrapper"><i class="bi bi-person"></i><input type="text" name="created_by_label" class="form-control has-icon" id="createdBy" value="{{ form_data.created_by_label|default:display_name }}" readonly /></div>
-          </div>
-          <div class="field">
+          <div class="field field-status">
             <label for="statusToggle" class="form-label d-block mb-2">Status</label>
             <label class="setting-toggle" for="statusToggle">
               <input
@@ -85,6 +95,14 @@
             </label>
           </div>
         </div>
+        {% if is_view_mode %}
+        <div class="fields-grid cols-2">
+          <div class="field">
+            <label for="createdBy" class="form-label">Created By</label>
+            <div class="input-icon-wrapper"><i class="bi bi-person"></i><input type="text" class="form-control has-icon bg-light" id="createdBy" value="{% if editing_role %}{{ editing_role.created_by_label|default:'—' }}{% else %}{{ form_data.created_by_label|default:'—' }}{% endif %}" readonly /></div>
+          </div>
+        </div>
+        {% endif %}
       </div>
     </div>
   </div>
@@ -98,24 +116,34 @@
       </div>
     </div>
     <div class="form-card-body">
+      {% if not is_view_mode %}
+      <div class="d-flex justify-content-end gap-2 mb-3">
+        <button type="button" class="eal-btn eal-btn-outline" id="permSelectAll">
+          <i class="bi bi-check2-square"></i><span>Select All</span>
+        </button>
+        <button type="button" class="eal-btn eal-btn-outline" id="permClearAll">
+          <i class="bi bi-x-square"></i><span>Clear All</span>
+        </button>
+      </div>
+      {% endif %}
       <div class="table-responsive eal-table-wrapper" style="border: 1px solid #e2e8f0; border-radius: 8px">
-        <table class="eal-table" style="margin-bottom: 0">
+        <table class="eal-table" id="permissionsMatrix" style="margin-bottom: 0">
           <thead>
             <tr><th>Module</th><th>Form</th><th class="text-center">View</th><th class="text-center">Create</th><th class="text-center">Edit</th><th class="text-center">Delete</th><th class="text-center">Post</th><th class="text-center">Approve</th><th class="text-center">Export</th><th class="text-center">Print</th></tr>
           </thead>
           <tbody>
             {% for permission_row in permission_matrix %}
             <tr>
-              <td><strong>{{ permission_row.module_name }}</strong></td>
+              <td>{% if permission_row.show_module_name %}<strong>{{ permission_row.module_name }}</strong>{% endif %}</td>
               <td>{{ permission_row.form_name }}</td>
-              <td class="text-center"><input class="form-check-input" name="perm_{{ forloop.counter0 }}_view" type="checkbox" {% if permission_row.can_view %}checked{% endif %} {% if is_view_mode %}disabled{% endif %}/></td>
-              <td class="text-center"><input class="form-check-input" name="perm_{{ forloop.counter0 }}_create" type="checkbox" {% if permission_row.can_create %}checked{% endif %} {% if is_view_mode %}disabled{% endif %}/></td>
-              <td class="text-center"><input class="form-check-input" name="perm_{{ forloop.counter0 }}_edit" type="checkbox" {% if permission_row.can_edit %}checked{% endif %} {% if is_view_mode %}disabled{% endif %}/></td>
-              <td class="text-center"><input class="form-check-input" name="perm_{{ forloop.counter0 }}_delete" type="checkbox" {% if permission_row.can_delete %}checked{% endif %} {% if is_view_mode %}disabled{% endif %}/></td>
-              <td class="text-center"><input class="form-check-input" name="perm_{{ forloop.counter0 }}_post" type="checkbox" {% if permission_row.can_post %}checked{% endif %} {% if is_view_mode %}disabled{% endif %}/></td>
-              <td class="text-center"><input class="form-check-input" name="perm_{{ forloop.counter0 }}_approve" type="checkbox" {% if permission_row.can_approve %}checked{% endif %} {% if is_view_mode %}disabled{% endif %}/></td>
-              <td class="text-center"><input class="form-check-input" name="perm_{{ forloop.counter0 }}_export" type="checkbox" {% if permission_row.can_export %}checked{% endif %} {% if is_view_mode %}disabled{% endif %}/></td>
-              <td class="text-center"><input class="form-check-input" name="perm_{{ forloop.counter0 }}_print" type="checkbox" {% if permission_row.can_print %}checked{% endif %} {% if is_view_mode %}disabled{% endif %}/></td>
+              <td class="text-center"><input class="form-check-input perm-matrix-check" name="perm_{{ forloop.counter0 }}_view" type="checkbox" {% if permission_row.can_view %}checked{% endif %} {% if is_view_mode %}disabled{% endif %}/></td>
+              <td class="text-center"><input class="form-check-input perm-matrix-check" name="perm_{{ forloop.counter0 }}_create" type="checkbox" {% if permission_row.can_create %}checked{% endif %} {% if is_view_mode %}disabled{% endif %}/></td>
+              <td class="text-center"><input class="form-check-input perm-matrix-check" name="perm_{{ forloop.counter0 }}_edit" type="checkbox" {% if permission_row.can_edit %}checked{% endif %} {% if is_view_mode %}disabled{% endif %}/></td>
+              <td class="text-center"><input class="form-check-input perm-matrix-check" name="perm_{{ forloop.counter0 }}_delete" type="checkbox" {% if permission_row.can_delete %}checked{% endif %} {% if is_view_mode %}disabled{% endif %}/></td>
+              <td class="text-center"><input class="form-check-input perm-matrix-check" name="perm_{{ forloop.counter0 }}_post" type="checkbox" {% if permission_row.can_post %}checked{% endif %} {% if is_view_mode %}disabled{% endif %}/></td>
+              <td class="text-center"><input class="form-check-input perm-matrix-check" name="perm_{{ forloop.counter0 }}_approve" type="checkbox" {% if permission_row.can_approve %}checked{% endif %} {% if is_view_mode %}disabled{% endif %}/></td>
+              <td class="text-center"><input class="form-check-input perm-matrix-check" name="perm_{{ forloop.counter0 }}_export" type="checkbox" {% if permission_row.can_export %}checked{% endif %} {% if is_view_mode %}disabled{% endif %}/></td>
+              <td class="text-center"><input class="form-check-input perm-matrix-check" name="perm_{{ forloop.counter0 }}_print" type="checkbox" {% if permission_row.can_print %}checked{% endif %} {% if is_view_mode %}disabled{% endif %}/></td>
             </tr>
             {% endfor %}
           </tbody>
@@ -167,6 +195,25 @@
       });
       updateLabel();
     });
+
+    var permSelectAll = document.getElementById("permSelectAll");
+    var permClearAll = document.getElementById("permClearAll");
+    var permChecks = document.querySelectorAll("#permissionsMatrix .perm-matrix-check:not(:disabled)");
+    function setPermMatrixChecks(checked) {
+      permChecks.forEach(function (cb) {
+        cb.checked = checked;
+      });
+    }
+    if (permSelectAll) {
+      permSelectAll.addEventListener("click", function () {
+        setPermMatrixChecks(true);
+      });
+    }
+    if (permClearAll) {
+      permClearAll.addEventListener("click", function () {
+        setPermMatrixChecks(false);
+      });
+    }
   });
 </script>
 {% endblock %}
