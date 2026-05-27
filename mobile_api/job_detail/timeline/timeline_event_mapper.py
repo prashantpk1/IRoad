@@ -9,92 +9,30 @@ from __future__ import annotations
 
 from typing import Any
 
-from iroad_tenants.operation_runtime.impacts import operation_action_matches
+from mobile_api.pod_capture.policy.canonical_pod_action_registry import (
+    TIMELINE_EVENT_ACTION,
+    TIMELINE_EVENT_COD,
+    TIMELINE_EVENT_DELAY,
+    TIMELINE_EVENT_HARD_POD,
+    TIMELINE_EVENT_ISSUE,
+    TIMELINE_EVENT_MOVEMENT,
+    TIMELINE_EVENT_POD,
+    classify_timeline_event_type,
+)
 
-# Event taxonomy for mobile Job Detail timeline UI.
-EVENT_ACTION = 'action'
-EVENT_MOVEMENT = 'movement'
-EVENT_POD = 'pod'
-EVENT_COD = 'cod'
-EVENT_HARD_POD = 'hard_pod'
-EVENT_ISSUE = 'issue'
-EVENT_DELAY = 'delay'
+# Re-export taxonomy constants for existing imports.
+EVENT_ACTION = TIMELINE_EVENT_ACTION
+EVENT_MOVEMENT = TIMELINE_EVENT_MOVEMENT
+EVENT_POD = TIMELINE_EVENT_POD
+EVENT_COD = TIMELINE_EVENT_COD
+EVENT_HARD_POD = TIMELINE_EVENT_HARD_POD
+EVENT_ISSUE = TIMELINE_EVENT_ISSUE
+EVENT_DELAY = TIMELINE_EVENT_DELAY
 
 
 def classify_event_type(action: Any | None) -> str:
-    """
-    Classify one Action Master row into a timeline event category.
-
-    Order matters: compliance/delay/issue before generic movement/action.
-    """
-    if action is None:
-        return EVENT_ACTION
-
-    if operation_action_matches(
-        action,
-        'delay',
-        'delayed',
-        'late arrival',
-        'traffic delay',
-        'waiting',
-    ):
-        return EVENT_DELAY
-
-    if operation_action_matches(
-        action,
-        'issue',
-        'incident',
-        'problem',
-        'breakdown',
-        'accident',
-        'complaint',
-    ):
-        return EVENT_ISSUE
-
-    if getattr(action, 'hard_copy_collection', False) or operation_action_matches(
-        action,
-        'hard pod',
-        'hard copy',
-        'hard-copy',
-        'delivery note',
-    ):
-        return EVENT_HARD_POD
-
-    if operation_action_matches(
-        action,
-        'collect payment',
-        'cod',
-        'cash on delivery',
-        'a9',
-        'action 9',
-        'payment collection',
-    ):
-        return EVENT_COD
-
-    if getattr(action, 'auto_pod_post', False) or operation_action_matches(
-        action,
-        'pod',
-        'upload pod',
-        'submit pod',
-        'a7',
-        'action 7',
-        'a8',
-        'action 8',
-        'proof of delivery',
-    ):
-        return EVENT_POD
-
-    if (action.movement_status_impact or '').strip() or operation_action_matches(
-        action,
-        'movement',
-        'empty move',
-        'depart yard',
-        'arrive',
-        'start move',
-    ):
-        return EVENT_MOVEMENT
-
-    return EVENT_ACTION
+    """Delegate to canonical POD action registry (A7≠A8)."""
+    return classify_timeline_event_type(action)
 
 
 def _action_label(log_row: Any, *, request: Any | None = None) -> str:

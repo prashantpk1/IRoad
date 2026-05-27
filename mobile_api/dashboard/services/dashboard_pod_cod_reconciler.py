@@ -24,7 +24,9 @@ from mobile_api.dashboard.services.dashboard_projection_cache import (
     get_projection_cache,
 )
 
-from iroad_tenants.operation_runtime.impacts import operation_action_matches
+from mobile_api.pod_capture.policy.compliance_log_evidence import (
+    log_evidence_flags as canonical_log_evidence_flags,
+)
 
 
 def _logs_for_shipment(context: DriverDashboardContext) -> list[Any]:
@@ -35,55 +37,8 @@ def _logs_for_shipment(context: DriverDashboardContext) -> list[Any]:
 
 
 def _log_evidence_flags(logs: list[Any]) -> dict[str, bool]:
-    """Derive compliance signals from append-only Action Log rows."""
-    pod_uploaded = False
-    cod_collected_log = False
-    delivered_log = False
-    hard_pod_log = False
-
-    for log in logs:
-        action = getattr(log, 'operation_action', None)
-        if action is None:
-            continue
-        if operation_action_matches(
-            action,
-            'pod',
-            'upload pod',
-            'a8',
-            'action 8',
-            'submit pod',
-        ):
-            pod_uploaded = True
-        if operation_action_matches(
-            action,
-            'collect payment',
-            'a9',
-            'action 9',
-            'cod',
-        ):
-            cod_collected_log = True
-        if operation_action_matches(
-            action,
-            'deliver',
-            'a7',
-            'action 7',
-            'delivered',
-        ):
-            delivered_log = True
-        if operation_action_matches(
-            action,
-            'hard pod',
-            'hard copy',
-            'hardcopy',
-        ):
-            hard_pod_log = True
-
-    return {
-        'pod_uploaded': pod_uploaded,
-        'cod_collected_log': cod_collected_log,
-        'delivered_log': delivered_log,
-        'hard_pod_log': hard_pod_log,
-    }
+    """Derive compliance signals via canonical POD action registry."""
+    return canonical_log_evidence_flags(logs)
 
 
 def _detect_compliance_drift(

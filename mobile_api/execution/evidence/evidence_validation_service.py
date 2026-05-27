@@ -28,6 +28,20 @@ from mobile_api.execution.exceptions import ExecuteActionError
 from mobile_api.helpers.action_execution_metadata import build_execution_requirements
 
 
+def extract_capture_bundle_id(payload: dict[str, Any] | None) -> str:
+    """Resolve staged POD bundle id from execute payload."""
+    data = payload or {}
+    for key in (
+        'capture_bundle_id',
+        'pod_capture_bundle_id',
+        'bundle_id',
+    ):
+        token = str(data.get(key) or '').strip()
+        if token:
+            return token
+    return ''
+
+
 class EvidenceValidationService:
     """
     Validate required evidence before ``ActionExecutionService.execute_driver_action``.
@@ -54,13 +68,117 @@ class EvidenceValidationService:
         if operation_action is None:
             return
 
-        requirements = build_execution_requirements(operation_action)
         payload = context.payload or {}
+        bundle_id = extract_capture_bundle_id(payload)
+        if bundle_id:
+            self.validate_pod_capture_bundle(context, bundle_id)
+            requirements = dict(context.resolver_meta.get('pod_capture_compliance') or {})
+            self._validate_gps(payload, requirements)
+            self._validate_notes(payload, requirements)
+            return
 
+        requirements = build_execution_requirements(operation_action)
         self._validate_gps(payload, requirements)
         self._validate_notes(payload, requirements)
         self._media_security.validate_media(context)
         self._validate_media(context, requirements)
+
+    def validate_pod_capture_bundle(
+        self,
+        context: ExecuteActionContext,
+        bundle_id: str,
+    ) -> None:
+        """
+        Validate staged POD bundle before kernel execute (ownership, shipment, state).
+
+        Does not promote — promotion runs after Action Log insert in orchestrator.
+        """
+        if context.job_type != 'shipment':
+            raise self._evidence_error(
+                error_code='pod_capture_shipment_only',
+                message=str(_('mobile.jobs.execute.pod_capture_shipment_only')),
+            )
+
+        driver_pk = self._driver_pk(context.driver)
+        shipment_key = self._shipment_key(context)
+        if not shipment_key:
+            raise self._evidence_error(
+                error_code='job_not_found',
+                message=str(_('mobile.jobs.not_found')),
+                http_status=404,
+            )
+
+        try:
+            from mobile_api.pod_capture.dto.promotion_models import PodPromotionScope
+            from mobile_api.pod_capture.exceptions import PodCaptureError
+            from mobile_api.pod_capture.policy.pod_capture_policy import (
+                build_pod_capture_requirements,
+            )
+            from mobile_api.pod_capture.services.pod_capture_bundle_service import (
+                PodCaptureBundleService,
+            )
+
+            scope = PodPromotionScope(
+                tenant_schema=(context.tenant_schema or '').strip(),
+                driver_id=driver_pk,
+                shipment_id=shipment_key,
+            )
+            bundle = PodCaptureBundleService().assert_orphan_bundle_prevented(
+                bundle_id,
+                scope=scope,
+            )
+        except PodCaptureError as exc:
+            raise self._map_pod_capture_error(exc) from exc
+
+        pod_type = str((context.payload or {}).get('pod_type') or '').strip()
+        requirements = build_pod_capture_requirements(
+            context.operation_action,
+            pod_capture_type=pod_type,
+            shipment=context.shipment,
+        )
+        context.resolver_meta = dict(context.resolver_meta or {})
+        context.resolver_meta['pod_capture_bundle_id'] = bundle.bundle_id
+        context.resolver_meta['pod_capture_bundle'] = bundle
+        context.resolver_meta['pod_capture_compliance'] = requirements
+
+    @staticmethod
+    def _driver_pk(driver: Any) -> str:
+        if driver is None:
+            return ''
+        pk = getattr(driver, 'pk', None) or getattr(driver, 'driver_id', None)
+        return str(pk or '').strip()
+
+    @staticmethod
+    def _shipment_key(context: ExecuteActionContext) -> str:
+        shipment = context.shipment
+        if shipment is not None:
+            return str(
+                getattr(shipment, 'pk', None)
+                or getattr(shipment, 'shipment_id', None)
+                or context.job_id
+                or ''
+            ).strip()
+        return str(context.job_id or '').strip()
+
+    @staticmethod
+    def _map_pod_capture_error(exc: Any) -> ExecuteActionError:
+        from mobile_api.pod_capture.exceptions import PodCaptureError
+
+        if not isinstance(exc, PodCaptureError):
+            raise exc
+        body = build_validation_error(
+            error_code=exc.code,
+            message=str(exc),
+            refresh_required=bool(getattr(exc, 'refresh_required', False)),
+        )
+        return ExecuteActionError(
+            str(exc),
+            code=exc.code,
+            http_status=exc.http_status,
+            message_key=exc.message_key,
+            refresh_required=bool(getattr(exc, 'refresh_required', False)),
+            validation_error=body,
+        )
 
     def _validate_gps(self, payload: dict[str, Any], requirements: dict[str, Any]) -> None:
         if not requirements.get('gps'):
@@ -177,7 +295,12 @@ class EvidenceValidationService:
                     )
 
     @staticmethod
-    def _evidence_error(*, error_code: str, message: str) -> ExecuteActionError:
+    def _evidence_error(
+        *,
+        error_code: str,
+        message: str,
+        http_status: int = 400,
+    ) -> ExecuteActionError:
         body = build_validation_error(
             error_code=error_code,
             message=message,
@@ -186,7 +309,7 @@ class EvidenceValidationService:
         return ExecuteActionError(
             message,
             code=error_code,
-            http_status=400,
+            http_status=http_status,
             message_key=f'mobile.jobs.execute.{error_code}',
             refresh_required=False,
             validation_error=body,

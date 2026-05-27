@@ -1,0 +1,1440 @@
+{
+  "info": {
+    "_postman_id": "f1a2b3c4-d5e6-7890-abcd-ef1234567891",
+    "name": "Iroad \u2014 Mobile Driver API (POD Capture)",
+    "description": "POD Capture + Execute bundle promotion.\n\n**Auth:** `Bearer {{bearer_token}}` (no login).\n**Tenant:** `X-Tenant-ID: {{tenant_header}}`.\n\nSee `POD_CAPTURE_SETUP.md` and `POD_CAPTURE_SAMPLE_PAYLOADS.md`.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{bearer_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (!pm.variables.get('request_id') || String(pm.variables.get('request_id')).indexOf('{{') >= 0) {",
+          "    pm.variables.set('request_id', 'postman-' + pm.variables.replaceIn('{{$guid}}'));",
+          "}",
+          "const bearer = pm.variables.get('bearer_token');",
+          "const access = pm.variables.get('access_token');",
+          "if ((!bearer || String(bearer).indexOf('{{') >= 0) && access && String(access).indexOf('{{') < 0) {",
+          "    pm.variables.set('bearer_token', access);",
+          "}",
+          "const schema = pm.variables.get('tenant_schema') || pm.variables.get('tenant_header');",
+          "if (schema && String(schema).indexOf('{{') < 0) {",
+          "    pm.environment.set('tenant_header', schema);",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8000/api/v1/mobile"
+    },
+    {
+      "key": "bearer_token",
+      "value": ""
+    },
+    {
+      "key": "tenant_header",
+      "value": ""
+    },
+    {
+      "key": "tenant_schema",
+      "value": ""
+    },
+    {
+      "key": "shipment_id",
+      "value": ""
+    },
+    {
+      "key": "driver_id",
+      "value": ""
+    },
+    {
+      "key": "pod_capture_type",
+      "value": "digital"
+    }
+  ],
+  "item": [
+    {
+      "name": "00 \u2014 Prerequisites",
+      "item": [
+        {
+          "name": "0. GET Shipment Job Detail (sync hashes)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenant_header}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipment/{{shipment_id}}/",
+            "description": "Copies `pod_content_hash` / `pod_workflow_version` for stale guards."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "const sync = pm.response.json().data.sync_metadata || {};",
+                  "if (sync.content_hash) pm.environment.set('pod_content_hash', sync.content_hash);",
+                  "if (sync.workflow_version) pm.environment.set('pod_workflow_version', sync.workflow_version);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "01 \u2014 POD Capture (success)",
+      "item": [
+        {
+          "name": "1. POD image capture (digital)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenant_header}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipments/{{shipment_id}}/pod/capture/",
+            "description": "Digital POD \u2014 one photo. Saves `capture_bundle_id`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_capture_id\": \"{{pod_client_capture_id}}\",\n  \"workflow_version\": \"{{pod_workflow_version}}\",\n  \"content_hash\": \"{{pod_content_hash}}\",\n  \"pod_type\": \"digital\",\n  \"notes\": \"{{pod_notes}}\",\n  \"latitude\": {{pod_latitude}},\n  \"longitude\": {{pod_longitude}},\n  \"media\": {{pod_media_json}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('request_id') || String(pm.variables.get('request_id')).indexOf('{{') >= 0) {",
+                  "    pm.variables.set('request_id', 'postman-' + pm.variables.replaceIn('{{$guid}}'));",
+                  "}",
+                  "const bearer = pm.variables.get('bearer_token');",
+                  "const access = pm.variables.get('access_token');",
+                  "if ((!bearer || String(bearer).indexOf('{{') >= 0) && access && String(access).indexOf('{{') < 0) {",
+                  "    pm.variables.set('bearer_token', access);",
+                  "}",
+                  "const schema = pm.variables.get('tenant_schema') || pm.variables.get('tenant_header');",
+                  "if (schema && String(schema).indexOf('{{') < 0) {",
+                  "    pm.environment.set('tenant_header', schema);",
+                  "}",
+                  "if (!pm.variables.get('pod_client_capture_id') || String(pm.variables.get('pod_client_capture_id')).indexOf('{{') >= 0) {",
+                  "    pm.variables.set('pod_client_capture_id', pm.variables.replaceIn('{{$guid}}'));",
+                  "}",
+                  "const tenant = pm.variables.get('tenant_schema') || pm.variables.get('tenant_header') || 'tenant';",
+                  "const driver = pm.variables.get('driver_id') || 'driver';",
+                  "const shipment = pm.variables.get('shipment_id') || 'shipment';",
+                  "pm.variables.set('pod_path_prefix', 'mobile_driver_uploads/' + tenant + '/' + driver + '/' + shipment + '/pod_capture/');",
+                  "pm.variables.set(\"pod_media_json\", `[ { \"media_type\": \"photo\", \"file_ref\": \"{{pod_path_prefix}}digital-photo.jpg\", \"file_name\": \"digital-photo.jpg\", \"description\": \"Digital POD photo\" } ]`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "pm.test('envelope ok', function () { pm.expect(pm.response.json().status).to.eql(1); });",
+                  "const data = pm.response.json().data;",
+                  "pm.test('capture_bundle_id present', function () {",
+                  "    pm.expect(data.capture_bundle.capture_bundle_id).to.be.a('string');",
+                  "});",
+                  "pm.test('execute ready', function () {",
+                  "    pm.expect(data.next_step.requires_execute_action).to.be.true;",
+                  "});",
+                  "pm.environment.set('capture_bundle_id', data.capture_bundle.capture_bundle_id);",
+                  "pm.environment.set('pod_replay_client_capture_id', data.capture_bundle.client_capture_id);",
+                  "if (data.sync_metadata && data.sync_metadata.content_hash) {",
+                  "    pm.environment.set('pod_content_hash', data.sync_metadata.content_hash);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2. POD video capture",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenant_header}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipments/{{shipment_id}}/pod/capture/",
+            "description": "`pod_type: video`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_capture_id\": \"{{pod_client_capture_id}}\",\n  \"workflow_version\": \"{{pod_workflow_version}}\",\n  \"content_hash\": \"{{pod_content_hash}}\",\n  \"pod_type\": \"video\",\n  \"notes\": \"{{pod_notes}}\",\n  \"latitude\": {{pod_latitude}},\n  \"longitude\": {{pod_longitude}},\n  \"media\": {{pod_media_json}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('request_id') || String(pm.variables.get('request_id')).indexOf('{{') >= 0) {",
+                  "    pm.variables.set('request_id', 'postman-' + pm.variables.replaceIn('{{$guid}}'));",
+                  "}",
+                  "const bearer = pm.variables.get('bearer_token');",
+                  "const access = pm.variables.get('access_token');",
+                  "if ((!bearer || String(bearer).indexOf('{{') >= 0) && access && String(access).indexOf('{{') < 0) {",
+                  "    pm.variables.set('bearer_token', access);",
+                  "}",
+                  "const schema = pm.variables.get('tenant_schema') || pm.variables.get('tenant_header');",
+                  "if (schema && String(schema).indexOf('{{') < 0) {",
+                  "    pm.environment.set('tenant_header', schema);",
+                  "}",
+                  "if (!pm.variables.get('pod_client_capture_id') || String(pm.variables.get('pod_client_capture_id')).indexOf('{{') >= 0) {",
+                  "    pm.variables.set('pod_client_capture_id', pm.variables.replaceIn('{{$guid}}'));",
+                  "}",
+                  "const tenant = pm.variables.get('tenant_schema') || pm.variables.get('tenant_header') || 'tenant';",
+                  "const driver = pm.variables.get('driver_id') || 'driver';",
+                  "const shipment = pm.variables.get('shipment_id') || 'shipment';",
+                  "pm.variables.set('pod_path_prefix', 'mobile_driver_uploads/' + tenant + '/' + driver + '/' + shipment + '/pod_capture/');",
+                  "pm.variables.set(\"pod_media_json\", `[ { \"media_type\": \"video\", \"file_ref\": \"{{pod_path_prefix}}delivery-video.mp4\", \"file_name\": \"delivery-video.mp4\", \"description\": \"POD video evidence\" } ]`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "pm.test('envelope ok', function () { pm.expect(pm.response.json().status).to.eql(1); });",
+                  "const data = pm.response.json().data;",
+                  "pm.test('capture_bundle_id present', function () {",
+                  "    pm.expect(data.capture_bundle.capture_bundle_id).to.be.a('string');",
+                  "});",
+                  "pm.test('execute ready', function () {",
+                  "    pm.expect(data.next_step.requires_execute_action).to.be.true;",
+                  "});",
+                  "pm.environment.set('capture_bundle_id', data.capture_bundle.capture_bundle_id);",
+                  "pm.environment.set('pod_replay_client_capture_id', data.capture_bundle.client_capture_id);",
+                  "if (data.sync_metadata && data.sync_metadata.content_hash) {",
+                  "    pm.environment.set('pod_content_hash', data.sync_metadata.content_hash);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3. Signature POD capture",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenant_header}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipments/{{shipment_id}}/pod/capture/",
+            "description": "`pod_type: signature` + signature media.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_capture_id\": \"{{pod_client_capture_id}}\",\n  \"workflow_version\": \"{{pod_workflow_version}}\",\n  \"content_hash\": \"{{pod_content_hash}}\",\n  \"pod_type\": \"signature\",\n  \"notes\": \"{{pod_notes}}\",\n  \"latitude\": {{pod_latitude}},\n  \"longitude\": {{pod_longitude}},\n  \"media\": {{pod_media_json}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('request_id') || String(pm.variables.get('request_id')).indexOf('{{') >= 0) {",
+                  "    pm.variables.set('request_id', 'postman-' + pm.variables.replaceIn('{{$guid}}'));",
+                  "}",
+                  "const bearer = pm.variables.get('bearer_token');",
+                  "const access = pm.variables.get('access_token');",
+                  "if ((!bearer || String(bearer).indexOf('{{') >= 0) && access && String(access).indexOf('{{') < 0) {",
+                  "    pm.variables.set('bearer_token', access);",
+                  "}",
+                  "const schema = pm.variables.get('tenant_schema') || pm.variables.get('tenant_header');",
+                  "if (schema && String(schema).indexOf('{{') < 0) {",
+                  "    pm.environment.set('tenant_header', schema);",
+                  "}",
+                  "if (!pm.variables.get('pod_client_capture_id') || String(pm.variables.get('pod_client_capture_id')).indexOf('{{') >= 0) {",
+                  "    pm.variables.set('pod_client_capture_id', pm.variables.replaceIn('{{$guid}}'));",
+                  "}",
+                  "const tenant = pm.variables.get('tenant_schema') || pm.variables.get('tenant_header') || 'tenant';",
+                  "const driver = pm.variables.get('driver_id') || 'driver';",
+                  "const shipment = pm.variables.get('shipment_id') || 'shipment';",
+                  "pm.variables.set('pod_path_prefix', 'mobile_driver_uploads/' + tenant + '/' + driver + '/' + shipment + '/pod_capture/');",
+                  "pm.variables.set(\"pod_media_json\", `[ { \"media_type\": \"signature\", \"file_ref\": \"{{pod_path_prefix}}signature.png\", \"file_name\": \"signature.png\", \"description\": \"Recipient signature\" } ]`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "pm.test('envelope ok', function () { pm.expect(pm.response.json().status).to.eql(1); });",
+                  "const data = pm.response.json().data;",
+                  "pm.test('capture_bundle_id present', function () {",
+                  "    pm.expect(data.capture_bundle.capture_bundle_id).to.be.a('string');",
+                  "});",
+                  "pm.test('execute ready', function () {",
+                  "    pm.expect(data.next_step.requires_execute_action).to.be.true;",
+                  "});",
+                  "pm.environment.set('capture_bundle_id', data.capture_bundle.capture_bundle_id);",
+                  "pm.environment.set('pod_replay_client_capture_id', data.capture_bundle.client_capture_id);",
+                  "if (data.sync_metadata && data.sync_metadata.content_hash) {",
+                  "    pm.environment.set('pod_content_hash', data.sync_metadata.content_hash);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4. Hard POD capture",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenant_header}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipments/{{shipment_id}}/pod/capture/",
+            "description": "`pod_type: hard` \u2014 delivery note scan.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_capture_id\": \"{{pod_client_capture_id}}\",\n  \"workflow_version\": \"{{pod_workflow_version}}\",\n  \"content_hash\": \"{{pod_content_hash}}\",\n  \"pod_type\": \"hard\",\n  \"notes\": \"{{pod_notes}}\",\n  \"latitude\": {{pod_latitude}},\n  \"longitude\": {{pod_longitude}},\n  \"media\": {{pod_media_json}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('request_id') || String(pm.variables.get('request_id')).indexOf('{{') >= 0) {",
+                  "    pm.variables.set('request_id', 'postman-' + pm.variables.replaceIn('{{$guid}}'));",
+                  "}",
+                  "const bearer = pm.variables.get('bearer_token');",
+                  "const access = pm.variables.get('access_token');",
+                  "if ((!bearer || String(bearer).indexOf('{{') >= 0) && access && String(access).indexOf('{{') < 0) {",
+                  "    pm.variables.set('bearer_token', access);",
+                  "}",
+                  "const schema = pm.variables.get('tenant_schema') || pm.variables.get('tenant_header');",
+                  "if (schema && String(schema).indexOf('{{') < 0) {",
+                  "    pm.environment.set('tenant_header', schema);",
+                  "}",
+                  "if (!pm.variables.get('pod_client_capture_id') || String(pm.variables.get('pod_client_capture_id')).indexOf('{{') >= 0) {",
+                  "    pm.variables.set('pod_client_capture_id', pm.variables.replaceIn('{{$guid}}'));",
+                  "}",
+                  "const tenant = pm.variables.get('tenant_schema') || pm.variables.get('tenant_header') || 'tenant';",
+                  "const driver = pm.variables.get('driver_id') || 'driver';",
+                  "const shipment = pm.variables.get('shipment_id') || 'shipment';",
+                  "pm.variables.set('pod_path_prefix', 'mobile_driver_uploads/' + tenant + '/' + driver + '/' + shipment + '/pod_capture/');",
+                  "pm.variables.set(\"pod_media_json\", `[ { \"media_type\": \"photo\", \"file_ref\": \"{{pod_path_prefix}}hard-copy-scan.jpg\", \"file_name\": \"hard-copy-scan.jpg\", \"description\": \"Hard POD scan\" } ]`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "pm.test('envelope ok', function () { pm.expect(pm.response.json().status).to.eql(1); });",
+                  "const data = pm.response.json().data;",
+                  "pm.test('capture_bundle_id present', function () {",
+                  "    pm.expect(data.capture_bundle.capture_bundle_id).to.be.a('string');",
+                  "});",
+                  "pm.test('execute ready', function () {",
+                  "    pm.expect(data.next_step.requires_execute_action).to.be.true;",
+                  "});",
+                  "pm.environment.set('capture_bundle_id', data.capture_bundle.capture_bundle_id);",
+                  "pm.environment.set('pod_replay_client_capture_id', data.capture_bundle.client_capture_id);",
+                  "if (data.sync_metadata && data.sync_metadata.content_hash) {",
+                  "    pm.environment.set('pod_content_hash', data.sync_metadata.content_hash);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5. Multi-page POD capture",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenant_header}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipments/{{shipment_id}}/pod/capture/",
+            "description": "`pod_type: multi_page` \u2014 photo + document.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_capture_id\": \"{{pod_client_capture_id}}\",\n  \"workflow_version\": \"{{pod_workflow_version}}\",\n  \"content_hash\": \"{{pod_content_hash}}\",\n  \"pod_type\": \"multi_page\",\n  \"notes\": \"{{pod_notes}}\",\n  \"latitude\": {{pod_latitude}},\n  \"longitude\": {{pod_longitude}},\n  \"media\": {{pod_media_json}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('request_id') || String(pm.variables.get('request_id')).indexOf('{{') >= 0) {",
+                  "    pm.variables.set('request_id', 'postman-' + pm.variables.replaceIn('{{$guid}}'));",
+                  "}",
+                  "const bearer = pm.variables.get('bearer_token');",
+                  "const access = pm.variables.get('access_token');",
+                  "if ((!bearer || String(bearer).indexOf('{{') >= 0) && access && String(access).indexOf('{{') < 0) {",
+                  "    pm.variables.set('bearer_token', access);",
+                  "}",
+                  "const schema = pm.variables.get('tenant_schema') || pm.variables.get('tenant_header');",
+                  "if (schema && String(schema).indexOf('{{') < 0) {",
+                  "    pm.environment.set('tenant_header', schema);",
+                  "}",
+                  "if (!pm.variables.get('pod_client_capture_id') || String(pm.variables.get('pod_client_capture_id')).indexOf('{{') >= 0) {",
+                  "    pm.variables.set('pod_client_capture_id', pm.variables.replaceIn('{{$guid}}'));",
+                  "}",
+                  "const tenant = pm.variables.get('tenant_schema') || pm.variables.get('tenant_header') || 'tenant';",
+                  "const driver = pm.variables.get('driver_id') || 'driver';",
+                  "const shipment = pm.variables.get('shipment_id') || 'shipment';",
+                  "pm.variables.set('pod_path_prefix', 'mobile_driver_uploads/' + tenant + '/' + driver + '/' + shipment + '/pod_capture/');",
+                  "pm.variables.set(\"pod_media_json\", `[ { \"media_type\": \"photo\", \"file_ref\": \"{{pod_path_prefix}}page-1.jpg\", \"file_name\": \"page-1.jpg\", \"description\": \"Page 1\" }, { \"media_type\": \"document\", \"file_ref\": \"{{pod_path_prefix}}page-2.jpg\", \"file_name\": \"page-2.jpg\", \"description\": \"Page 2\" } ]`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "pm.test('envelope ok', function () { pm.expect(pm.response.json().status).to.eql(1); });",
+                  "const data = pm.response.json().data;",
+                  "pm.test('capture_bundle_id present', function () {",
+                  "    pm.expect(data.capture_bundle.capture_bundle_id).to.be.a('string');",
+                  "});",
+                  "pm.test('execute ready', function () {",
+                  "    pm.expect(data.next_step.requires_execute_action).to.be.true;",
+                  "});",
+                  "pm.environment.set('capture_bundle_id', data.capture_bundle.capture_bundle_id);",
+                  "pm.environment.set('pod_replay_client_capture_id', data.capture_bundle.client_capture_id);",
+                  "if (data.sync_metadata && data.sync_metadata.content_hash) {",
+                  "    pm.environment.set('pod_content_hash', data.sync_metadata.content_hash);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "6. Replay-safe capture",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenant_header}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipments/{{shipment_id}}/pod/capture/",
+            "description": "Same `client_capture_id` as request 1 \u2014 expect **200** + `replayed: true`. Run after **1**.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_capture_id\": \"{{pod_replay_client_capture_id}}\",\n  \"workflow_version\": \"{{pod_workflow_version}}\",\n  \"content_hash\": \"{{pod_content_hash}}\",\n  \"pod_type\": \"digital\",\n  \"notes\": \"{{pod_notes}}\",\n  \"latitude\": {{pod_latitude}},\n  \"longitude\": {{pod_longitude}},\n  \"media\": [\n    {\n      \"media_type\": \"photo\",\n      \"file_ref\": \"{{pod_path_prefix}}digital-photo.jpg\",\n      \"file_name\": \"digital-photo.jpg\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('request_id') || String(pm.variables.get('request_id')).indexOf('{{') >= 0) {",
+                  "    pm.variables.set('request_id', 'postman-' + pm.variables.replaceIn('{{$guid}}'));",
+                  "}",
+                  "const bearer = pm.variables.get('bearer_token');",
+                  "const access = pm.variables.get('access_token');",
+                  "if ((!bearer || String(bearer).indexOf('{{') >= 0) && access && String(access).indexOf('{{') < 0) {",
+                  "    pm.variables.set('bearer_token', access);",
+                  "}",
+                  "const schema = pm.variables.get('tenant_schema') || pm.variables.get('tenant_header');",
+                  "if (schema && String(schema).indexOf('{{') < 0) {",
+                  "    pm.environment.set('tenant_header', schema);",
+                  "}",
+                  "if (!pm.variables.get('pod_client_capture_id') || String(pm.variables.get('pod_client_capture_id')).indexOf('{{') >= 0) {",
+                  "    pm.variables.set('pod_client_capture_id', pm.variables.replaceIn('{{$guid}}'));",
+                  "}",
+                  "const tenant = pm.variables.get('tenant_schema') || pm.variables.get('tenant_header') || 'tenant';",
+                  "const driver = pm.variables.get('driver_id') || 'driver';",
+                  "const shipment = pm.variables.get('shipment_id') || 'shipment';",
+                  "pm.variables.set('pod_path_prefix', 'mobile_driver_uploads/' + tenant + '/' + driver + '/' + shipment + '/pod_capture/');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200 replay', function () { pm.response.to.have.status(200); });",
+                  "pm.test('replayed', function () {",
+                  "    pm.expect(pm.response.json().data.capture_bundle.replayed).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 \u2014 Security & validation (negative)",
+      "item": [
+        {
+          "name": "7. Wrong shipment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenant_header}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipments/{{foreign_shipment_id}}/pod/capture/",
+            "description": "`foreign_shipment_id` not assigned to driver.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_capture_id\": \"{{pod_client_capture_id}}\",\n  \"workflow_version\": \"{{pod_workflow_version}}\",\n  \"content_hash\": \"{{pod_content_hash}}\",\n  \"pod_type\": \"digital\",\n  \"notes\": \"{{pod_notes}}\",\n  \"latitude\": {{pod_latitude}},\n  \"longitude\": {{pod_longitude}},\n  \"media\": {{pod_media_json}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('request_id') || String(pm.variables.get('request_id')).indexOf('{{') >= 0) {",
+                  "    pm.variables.set('request_id', 'postman-' + pm.variables.replaceIn('{{$guid}}'));",
+                  "}",
+                  "const bearer = pm.variables.get('bearer_token');",
+                  "const access = pm.variables.get('access_token');",
+                  "if ((!bearer || String(bearer).indexOf('{{') >= 0) && access && String(access).indexOf('{{') < 0) {",
+                  "    pm.variables.set('bearer_token', access);",
+                  "}",
+                  "const schema = pm.variables.get('tenant_schema') || pm.variables.get('tenant_header');",
+                  "if (schema && String(schema).indexOf('{{') < 0) {",
+                  "    pm.environment.set('tenant_header', schema);",
+                  "}",
+                  "if (!pm.variables.get('pod_client_capture_id') || String(pm.variables.get('pod_client_capture_id')).indexOf('{{') >= 0) {",
+                  "    pm.variables.set('pod_client_capture_id', pm.variables.replaceIn('{{$guid}}'));",
+                  "}",
+                  "const tenant = pm.variables.get('tenant_schema') || pm.variables.get('tenant_header') || 'tenant';",
+                  "const driver = pm.variables.get('driver_id') || 'driver';",
+                  "const shipment = pm.variables.get('shipment_id') || 'shipment';",
+                  "pm.variables.set('pod_path_prefix', 'mobile_driver_uploads/' + tenant + '/' + driver + '/' + shipment + '/pod_capture/');",
+                  "pm.variables.set(\"pod_media_json\", `[ { \"media_type\": \"photo\", \"file_ref\": \"{{pod_path_prefix}}digital-photo.jpg\", \"file_name\": \"digital-photo.jpg\", \"description\": \"Digital POD photo\" } ]`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('client error', function () { pm.expect(pm.response.code).to.be.at.least(400); });",
+                  "pm.test('status 0', function () { pm.expect(pm.response.json().status).to.eql(0); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "8. Wrong driver (orphan upload)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenant_header}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipments/{{shipment_id}}/pod/capture/",
+            "description": "`file_ref` uses `wrong_driver_id` in path.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_capture_id\": \"{{pod_client_capture_id}}\",\n  \"workflow_version\": \"{{pod_workflow_version}}\",\n  \"content_hash\": \"{{pod_content_hash}}\",\n  \"pod_type\": \"digital\",\n  \"notes\": \"{{pod_notes}}\",\n  \"latitude\": {{pod_latitude}},\n  \"longitude\": {{pod_longitude}},\n  \"media\": {{pod_media_json}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('request_id') || String(pm.variables.get('request_id')).indexOf('{{') >= 0) {",
+                  "    pm.variables.set('request_id', 'postman-' + pm.variables.replaceIn('{{$guid}}'));",
+                  "}",
+                  "const bearer = pm.variables.get('bearer_token');",
+                  "const access = pm.variables.get('access_token');",
+                  "if ((!bearer || String(bearer).indexOf('{{') >= 0) && access && String(access).indexOf('{{') < 0) {",
+                  "    pm.variables.set('bearer_token', access);",
+                  "}",
+                  "const schema = pm.variables.get('tenant_schema') || pm.variables.get('tenant_header');",
+                  "if (schema && String(schema).indexOf('{{') < 0) {",
+                  "    pm.environment.set('tenant_header', schema);",
+                  "}",
+                  "if (!pm.variables.get('pod_client_capture_id') || String(pm.variables.get('pod_client_capture_id')).indexOf('{{') >= 0) {",
+                  "    pm.variables.set('pod_client_capture_id', pm.variables.replaceIn('{{$guid}}'));",
+                  "}",
+                  "const tenant = pm.variables.get('tenant_schema') || pm.variables.get('tenant_header') || 'tenant';",
+                  "const driver = pm.variables.get('driver_id') || 'driver';",
+                  "const shipment = pm.variables.get('shipment_id') || 'shipment';",
+                  "pm.variables.set('pod_path_prefix', 'mobile_driver_uploads/' + tenant + '/' + driver + '/' + shipment + '/pod_capture/');",
+                  "pm.variables.set(\"pod_media_json\", `[ { \"media_type\": \"photo\", \"file_ref\": \"mobile_driver_uploads/{{tenant_schema}}/{{wrong_driver_id}}/{{shipment_id}}/pod_capture/orphan.jpg\", \"file_name\": \"orphan.jpg\" } ]`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('client error', function () { pm.expect(pm.response.code).to.be.at.least(400); });",
+                  "pm.test('status 0', function () { pm.expect(pm.response.json().status).to.eql(0); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "9. Wrong tenant",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{wrong_tenant_id}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipments/{{shipment_id}}/pod/capture/",
+            "description": "`X-Tenant-ID` = `wrong_tenant_id`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_capture_id\": \"{{pod_client_capture_id}}\",\n  \"workflow_version\": \"{{pod_workflow_version}}\",\n  \"content_hash\": \"{{pod_content_hash}}\",\n  \"pod_type\": \"digital\",\n  \"notes\": \"{{pod_notes}}\",\n  \"latitude\": {{pod_latitude}},\n  \"longitude\": {{pod_longitude}},\n  \"media\": {{pod_media_json}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('request_id') || String(pm.variables.get('request_id')).indexOf('{{') >= 0) {",
+                  "    pm.variables.set('request_id', 'postman-' + pm.variables.replaceIn('{{$guid}}'));",
+                  "}",
+                  "const bearer = pm.variables.get('bearer_token');",
+                  "const access = pm.variables.get('access_token');",
+                  "if ((!bearer || String(bearer).indexOf('{{') >= 0) && access && String(access).indexOf('{{') < 0) {",
+                  "    pm.variables.set('bearer_token', access);",
+                  "}",
+                  "const schema = pm.variables.get('tenant_schema') || pm.variables.get('tenant_header');",
+                  "if (schema && String(schema).indexOf('{{') < 0) {",
+                  "    pm.environment.set('tenant_header', schema);",
+                  "}",
+                  "if (!pm.variables.get('pod_client_capture_id') || String(pm.variables.get('pod_client_capture_id')).indexOf('{{') >= 0) {",
+                  "    pm.variables.set('pod_client_capture_id', pm.variables.replaceIn('{{$guid}}'));",
+                  "}",
+                  "const tenant = pm.variables.get('tenant_schema') || pm.variables.get('tenant_header') || 'tenant';",
+                  "const driver = pm.variables.get('driver_id') || 'driver';",
+                  "const shipment = pm.variables.get('shipment_id') || 'shipment';",
+                  "pm.variables.set('pod_path_prefix', 'mobile_driver_uploads/' + tenant + '/' + driver + '/' + shipment + '/pod_capture/');",
+                  "pm.variables.set(\"pod_media_json\", `[ { \"media_type\": \"photo\", \"file_ref\": \"{{pod_path_prefix}}digital-photo.jpg\", \"file_name\": \"digital-photo.jpg\", \"description\": \"Digital POD photo\" } ]`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('client error', function () { pm.expect(pm.response.code).to.be.at.least(400); });",
+                  "pm.test('status 0', function () { pm.expect(pm.response.json().status).to.eql(0); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "11. Invalid MIME / extension",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenant_header}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipments/{{shipment_id}}/pod/capture/",
+            "description": "`.exe` in `file_ref`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_capture_id\": \"{{pod_client_capture_id}}\",\n  \"workflow_version\": \"{{pod_workflow_version}}\",\n  \"content_hash\": \"{{pod_content_hash}}\",\n  \"pod_type\": \"digital\",\n  \"notes\": \"{{pod_notes}}\",\n  \"latitude\": {{pod_latitude}},\n  \"longitude\": {{pod_longitude}},\n  \"media\": {{pod_media_json}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('request_id') || String(pm.variables.get('request_id')).indexOf('{{') >= 0) {",
+                  "    pm.variables.set('request_id', 'postman-' + pm.variables.replaceIn('{{$guid}}'));",
+                  "}",
+                  "const bearer = pm.variables.get('bearer_token');",
+                  "const access = pm.variables.get('access_token');",
+                  "if ((!bearer || String(bearer).indexOf('{{') >= 0) && access && String(access).indexOf('{{') < 0) {",
+                  "    pm.variables.set('bearer_token', access);",
+                  "}",
+                  "const schema = pm.variables.get('tenant_schema') || pm.variables.get('tenant_header');",
+                  "if (schema && String(schema).indexOf('{{') < 0) {",
+                  "    pm.environment.set('tenant_header', schema);",
+                  "}",
+                  "if (!pm.variables.get('pod_client_capture_id') || String(pm.variables.get('pod_client_capture_id')).indexOf('{{') >= 0) {",
+                  "    pm.variables.set('pod_client_capture_id', pm.variables.replaceIn('{{$guid}}'));",
+                  "}",
+                  "const tenant = pm.variables.get('tenant_schema') || pm.variables.get('tenant_header') || 'tenant';",
+                  "const driver = pm.variables.get('driver_id') || 'driver';",
+                  "const shipment = pm.variables.get('shipment_id') || 'shipment';",
+                  "pm.variables.set('pod_path_prefix', 'mobile_driver_uploads/' + tenant + '/' + driver + '/' + shipment + '/pod_capture/');",
+                  "pm.variables.set(\"pod_media_json\", `[ { \"media_type\": \"photo\", \"file_ref\": \"{{pod_path_prefix}}malware.exe\", \"file_name\": \"malware.exe\" } ]`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('client error', function () { pm.expect(pm.response.code).to.be.at.least(400); });",
+                  "pm.test('status 0', function () { pm.expect(pm.response.json().status).to.eql(0); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "12. Missing GPS",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenant_header}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipments/{{shipment_id}}/pod/capture/",
+            "description": "No latitude/longitude when action requires GPS.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_capture_id\": \"{{pod_client_capture_id}}\",\n  \"workflow_version\": \"{{pod_workflow_version}}\",\n  \"content_hash\": \"{{pod_content_hash}}\",\n  \"pod_type\": \"digital\",\n  \"notes\": \"{{pod_notes}}\",\n  \"media\": {{pod_media_json}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('request_id') || String(pm.variables.get('request_id')).indexOf('{{') >= 0) {",
+                  "    pm.variables.set('request_id', 'postman-' + pm.variables.replaceIn('{{$guid}}'));",
+                  "}",
+                  "const bearer = pm.variables.get('bearer_token');",
+                  "const access = pm.variables.get('access_token');",
+                  "if ((!bearer || String(bearer).indexOf('{{') >= 0) && access && String(access).indexOf('{{') < 0) {",
+                  "    pm.variables.set('bearer_token', access);",
+                  "}",
+                  "const schema = pm.variables.get('tenant_schema') || pm.variables.get('tenant_header');",
+                  "if (schema && String(schema).indexOf('{{') < 0) {",
+                  "    pm.environment.set('tenant_header', schema);",
+                  "}",
+                  "if (!pm.variables.get('pod_client_capture_id') || String(pm.variables.get('pod_client_capture_id')).indexOf('{{') >= 0) {",
+                  "    pm.variables.set('pod_client_capture_id', pm.variables.replaceIn('{{$guid}}'));",
+                  "}",
+                  "const tenant = pm.variables.get('tenant_schema') || pm.variables.get('tenant_header') || 'tenant';",
+                  "const driver = pm.variables.get('driver_id') || 'driver';",
+                  "const shipment = pm.variables.get('shipment_id') || 'shipment';",
+                  "pm.variables.set('pod_path_prefix', 'mobile_driver_uploads/' + tenant + '/' + driver + '/' + shipment + '/pod_capture/');",
+                  "pm.variables.set(\"pod_media_json\", `[ { \"media_type\": \"photo\", \"file_ref\": \"{{pod_path_prefix}}digital-photo.jpg\", \"file_name\": \"digital-photo.jpg\", \"description\": \"Digital POD photo\" } ]`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('client error', function () { pm.expect(pm.response.code).to.be.at.least(400); });",
+                  "pm.test('status 0', function () { pm.expect(pm.response.json().status).to.eql(0); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "13. Invalid POD type",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenant_header}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipments/{{shipment_id}}/pod/capture/",
+            "description": "Unknown pod_type token.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_capture_id\": \"{{pod_client_capture_id}}\",\n  \"workflow_version\": \"{{pod_workflow_version}}\",\n  \"content_hash\": \"{{pod_content_hash}}\",\n  \"pod_type\": \"not_a_valid_type\",\n  \"notes\": \"{{pod_notes}}\",\n  \"latitude\": {{pod_latitude}},\n  \"longitude\": {{pod_longitude}},\n  \"media\": {{pod_media_json}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('request_id') || String(pm.variables.get('request_id')).indexOf('{{') >= 0) {",
+                  "    pm.variables.set('request_id', 'postman-' + pm.variables.replaceIn('{{$guid}}'));",
+                  "}",
+                  "const bearer = pm.variables.get('bearer_token');",
+                  "const access = pm.variables.get('access_token');",
+                  "if ((!bearer || String(bearer).indexOf('{{') >= 0) && access && String(access).indexOf('{{') < 0) {",
+                  "    pm.variables.set('bearer_token', access);",
+                  "}",
+                  "const schema = pm.variables.get('tenant_schema') || pm.variables.get('tenant_header');",
+                  "if (schema && String(schema).indexOf('{{') < 0) {",
+                  "    pm.environment.set('tenant_header', schema);",
+                  "}",
+                  "if (!pm.variables.get('pod_client_capture_id') || String(pm.variables.get('pod_client_capture_id')).indexOf('{{') >= 0) {",
+                  "    pm.variables.set('pod_client_capture_id', pm.variables.replaceIn('{{$guid}}'));",
+                  "}",
+                  "const tenant = pm.variables.get('tenant_schema') || pm.variables.get('tenant_header') || 'tenant';",
+                  "const driver = pm.variables.get('driver_id') || 'driver';",
+                  "const shipment = pm.variables.get('shipment_id') || 'shipment';",
+                  "pm.variables.set('pod_path_prefix', 'mobile_driver_uploads/' + tenant + '/' + driver + '/' + shipment + '/pod_capture/');",
+                  "pm.variables.set(\"pod_media_json\", `[ { \"media_type\": \"photo\", \"file_ref\": \"{{pod_path_prefix}}digital-photo.jpg\", \"file_name\": \"digital-photo.jpg\", \"description\": \"Digital POD photo\" } ]`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('client error', function () { pm.expect(pm.response.code).to.be.at.least(400); });",
+                  "pm.test('status 0', function () { pm.expect(pm.response.json().status).to.eql(0); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 \u2014 Execute promotion flow",
+      "description": "Complete **01 \u2192 1** first. Set `execute_pod_action_code` from Job Detail.",
+      "item": [
+        {
+          "name": "14. Execute \u2014 promote staged bundle",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenant_header}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipment/{{shipment_id}}/actions/{{execute_pod_action_code}}/execute/",
+            "description": "Kernel execute + `capture_bundle_id` promotion. Expect `data.pod_capture`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_action_id\": \"{{execute_client_action_id}}\",\n  \"workflow_version\": \"{{pod_workflow_version}}\",\n  \"content_hash\": \"{{pod_content_hash}}\",\n  \"latitude\": {{execute_latitude}},\n  \"longitude\": {{execute_longitude}},\n  \"notes\": \"{{pod_execute_notes}}\",\n  \"capture_bundle_id\": \"{{capture_bundle_id}}\",\n  \"media\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('request_id') || String(pm.variables.get('request_id')).indexOf('{{') >= 0) {",
+                  "    pm.variables.set('request_id', 'postman-' + pm.variables.replaceIn('{{$guid}}'));",
+                  "}",
+                  "const bearer = pm.variables.get('bearer_token');",
+                  "const access = pm.variables.get('access_token');",
+                  "if ((!bearer || String(bearer).indexOf('{{') >= 0) && access && String(access).indexOf('{{') < 0) {",
+                  "    pm.variables.set('bearer_token', access);",
+                  "}",
+                  "const schema = pm.variables.get('tenant_schema') || pm.variables.get('tenant_header');",
+                  "if (schema && String(schema).indexOf('{{') < 0) {",
+                  "    pm.environment.set('tenant_header', schema);",
+                  "}",
+                  "if (!pm.variables.get('execute_client_action_id') || String(pm.variables.get('execute_client_action_id')).indexOf('{{') >= 0) {",
+                  "    pm.variables.set('execute_client_action_id', pm.variables.replaceIn('{{$guid}}'));",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201 or 200', function () { pm.expect([200, 201]).to.include(pm.response.code); });",
+                  "const pc = pm.response.json().data.pod_capture;",
+                  "pm.test('promoted_bundle_id', function () {",
+                  "    pm.expect(pc.promoted_bundle_id).to.eql(pm.environment.get('capture_bundle_id'));",
+                  "});",
+                  "pm.environment.set('execute_replay_client_action_id', pm.environment.get('execute_client_action_id'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "14b. Execute \u2014 idempotent replay (same client_action_id)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenant_header}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipment/{{shipment_id}}/actions/{{execute_pod_action_code}}/execute/",
+            "description": "Re-run after 14 with saved `execute_replay_client_action_id`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_action_id\": \"{{execute_replay_client_action_id}}\",\n  \"workflow_version\": \"{{pod_workflow_version}}\",\n  \"content_hash\": \"{{pod_content_hash}}\",\n  \"latitude\": {{execute_latitude}},\n  \"longitude\": {{execute_longitude}},\n  \"notes\": \"{{pod_execute_notes}}\",\n  \"capture_bundle_id\": \"{{capture_bundle_id}}\",\n  \"media\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('request_id') || String(pm.variables.get('request_id')).indexOf('{{') >= 0) {",
+                  "    pm.variables.set('request_id', 'postman-' + pm.variables.replaceIn('{{$guid}}'));",
+                  "}",
+                  "const bearer = pm.variables.get('bearer_token');",
+                  "const access = pm.variables.get('access_token');",
+                  "if ((!bearer || String(bearer).indexOf('{{') >= 0) && access && String(access).indexOf('{{') < 0) {",
+                  "    pm.variables.set('bearer_token', access);",
+                  "}",
+                  "const schema = pm.variables.get('tenant_schema') || pm.variables.get('tenant_header');",
+                  "if (schema && String(schema).indexOf('{{') < 0) {",
+                  "    pm.environment.set('tenant_header', schema);",
+                  "}",
+                  "if (!pm.variables.get('execute_client_action_id') || String(pm.variables.get('execute_client_action_id')).indexOf('{{') >= 0) {",
+                  "    pm.variables.set('execute_client_action_id', pm.variables.replaceIn('{{$guid}}'));",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.expect(pm.response.code).to.eql(200); });",
+                  "pm.test('reused_existing', function () {",
+                  "    pm.expect(pm.response.json().data.execution.reused_existing).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "14c. Execute \u2014 duplicate promotion",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenant_header}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipment/{{shipment_id}}/actions/{{execute_pod_action_code}}/execute/",
+            "description": "New `client_action_id` on already-promoted bundle \u2014 expect **409**.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_action_id\": \"{{execute_client_action_id}}\",\n  \"workflow_version\": \"{{pod_workflow_version}}\",\n  \"content_hash\": \"{{pod_content_hash}}\",\n  \"latitude\": {{execute_latitude}},\n  \"longitude\": {{execute_longitude}},\n  \"notes\": \"{{pod_execute_notes}}\",\n  \"capture_bundle_id\": \"{{capture_bundle_id}}\",\n  \"media\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('request_id') || String(pm.variables.get('request_id')).indexOf('{{') >= 0) {",
+                  "    pm.variables.set('request_id', 'postman-' + pm.variables.replaceIn('{{$guid}}'));",
+                  "}",
+                  "const bearer = pm.variables.get('bearer_token');",
+                  "const access = pm.variables.get('access_token');",
+                  "if ((!bearer || String(bearer).indexOf('{{') >= 0) && access && String(access).indexOf('{{') < 0) {",
+                  "    pm.variables.set('bearer_token', access);",
+                  "}",
+                  "const schema = pm.variables.get('tenant_schema') || pm.variables.get('tenant_header');",
+                  "if (schema && String(schema).indexOf('{{') < 0) {",
+                  "    pm.environment.set('tenant_header', schema);",
+                  "}",
+                  "if (!pm.variables.get('execute_client_action_id') || String(pm.variables.get('execute_client_action_id')).indexOf('{{') >= 0) {",
+                  "    pm.variables.set('execute_client_action_id', pm.variables.replaceIn('{{$guid}}'));",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('client error', function () { pm.expect(pm.response.code).to.be.at.least(400); });",
+                  "pm.test('status 0', function () { pm.expect(pm.response.json().status).to.eql(0); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "10 / 14d. Execute \u2014 expired bundle",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenant_header}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipment/{{shipment_id}}/actions/{{execute_pod_action_code}}/execute/",
+            "description": "Set `expired_bundle_id` to an expired bundle UUID \u2014 expect **410**.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_action_id\": \"{{execute_client_action_id}}\",\n  \"workflow_version\": \"{{pod_workflow_version}}\",\n  \"content_hash\": \"{{pod_content_hash}}\",\n  \"latitude\": {{execute_latitude}},\n  \"longitude\": {{execute_longitude}},\n  \"notes\": \"{{pod_execute_notes}}\",\n  \"capture_bundle_id\": \"{{expired_bundle_id}}\",\n  \"media\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('request_id') || String(pm.variables.get('request_id')).indexOf('{{') >= 0) {",
+                  "    pm.variables.set('request_id', 'postman-' + pm.variables.replaceIn('{{$guid}}'));",
+                  "}",
+                  "const bearer = pm.variables.get('bearer_token');",
+                  "const access = pm.variables.get('access_token');",
+                  "if ((!bearer || String(bearer).indexOf('{{') >= 0) && access && String(access).indexOf('{{') < 0) {",
+                  "    pm.variables.set('bearer_token', access);",
+                  "}",
+                  "const schema = pm.variables.get('tenant_schema') || pm.variables.get('tenant_header');",
+                  "if (schema && String(schema).indexOf('{{') < 0) {",
+                  "    pm.environment.set('tenant_header', schema);",
+                  "}",
+                  "if (!pm.variables.get('execute_client_action_id') || String(pm.variables.get('execute_client_action_id')).indexOf('{{') >= 0) {",
+                  "    pm.variables.set('execute_client_action_id', pm.variables.replaceIn('{{$guid}}'));",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('client error', function () { pm.expect(pm.response.code).to.be.at.least(400); });",
+                  "pm.test('status 0', function () { pm.expect(pm.response.json().status).to.eql(0); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,11 +1,15 @@
 # Iroad Mobile API — Postman
 
-Postman assets for the **Unified Driver Dashboard**, **Job Detail**, and **Execute Action** APIs.
+Postman assets for the **Unified Driver Dashboard**, **Job Detail**, **Execute Action**, and **POD Capture** APIs.
 
 ## Files
 
 | File | Purpose |
 |------|---------|
+| `Iroad_Mobile_Driver_POD_Capture.postman_collection.json` | **POD Capture** — 14 scenarios + execute promotion, bearer-only |
+| `Iroad_Mobile_POD_Capture.postman_environment.json` | POD Capture environment (`bearer_token`, `tenant_header`, bundle ids) |
+| `POD_CAPTURE_SETUP.md` | POD Capture setup guide |
+| `POD_CAPTURE_SAMPLE_PAYLOADS.md` | POD request/response samples |
 | `Iroad_Mobile_Driver_Execute_Action.postman_collection.json` | **Execute Action** — 12 scenarios, bearer-only (no login) |
 | `Iroad_Mobile_Driver_Job_Detail.postman_collection.json` | **Job Detail** — auth, job GET, timeline pagination, examples |
 | `Iroad_Mobile_Driver_Dashboard.postman_collection.json` | **Dashboard** — current job, ETag polling, examples |
@@ -14,6 +18,16 @@ Postman assets for the **Unified Driver Dashboard**, **Job Detail**, and **Execu
 | `EXECUTE_ACTION_SAMPLE_PAYLOADS.md` | Execute request body reference |
 | `JOB_DETAIL_SETUP.md` | Job Detail setup guide (recommended starting point) |
 | `README.md` | This file (index) |
+
+### Quick start — POD Capture
+
+1. Import `Iroad_Mobile_Driver_POD_Capture.postman_collection.json` + `Iroad_Mobile_POD_Capture.postman_environment.json`.
+2. Paste driver JWT into `bearer_token`; set `tenant_header`, `driver_id`, `shipment_id`.
+3. Run **00 → GET Shipment Job Detail** (sync hashes).
+4. Run **01 → 1. POD image capture** → copy `capture_bundle_id`.
+5. Run **03 → 14. Execute — promote staged bundle**.
+
+See `POD_CAPTURE_SETUP.md` for all 14 scenarios.
 
 ### Quick start — Execute Action
 

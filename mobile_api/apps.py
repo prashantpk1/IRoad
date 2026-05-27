@@ -8,3 +8,4 @@ class MobileApiConfig(AppConfig):
     def ready(self) -> None:
         # Register django.core.checks (production hardening).
         from mobile_api import checks  # noqa: F401
+        from mobile_api.pod_capture import models as pod_capture_models  # noqa: F401

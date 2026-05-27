@@ -24,6 +24,7 @@ from mobile_api.execution.dto.execution_authoritative_context import kernel_vali
 from mobile_api.execution.dto.execution_validation_error import build_validation_error
 from mobile_api.execution.evidence.evidence_validation_service import (
     EvidenceValidationService,
+    extract_capture_bundle_id,
 )
 from mobile_api.execution.evidence.execution_media_service import ExecutionMediaService
 from mobile_api.execution.exceptions import ExecuteActionError
@@ -248,14 +249,19 @@ class ExecuteActionOrchestrator:
         context.reused_existing = exec_result.reused_existing
         context.idempotent_replay = exec_result.reused_existing
 
-        # 11. media (same transaction; rolls back with kernel on failure)
-        self._media_service.persist_execution_media(context)
+        # 11. media / POD bundle promotion (same transaction; rolls back with kernel)
+        bundle_id = extract_capture_bundle_id(context.payload)
+        if bundle_id:
+            self._promote_pod_capture_bundle(context, bundle_id=bundle_id)
+        else:
+            self._media_service.persist_execution_media(context)
 
         # 12. post reconcile + response
-        return self._response_service.build_execute_result(
+        result = self._response_service.build_execute_result(
             context,
             request=request,
         )
+        return self._attach_pod_capture_to_result(result, context)
 
     def _execute_kernel(
         self,
@@ -356,6 +362,131 @@ class ExecuteActionOrchestrator:
                 return str(value)[:200]
         return str(getattr(driver, 'driver_no', '') or getattr(driver, 'pk', ''))[:200]
 
+    def _promote_pod_capture_bundle(
+        self,
+        context: ExecuteActionContext,
+        *,
+        bundle_id: str,
+    ) -> None:
+        """
+        After Action Log insert: append immutable staged media and mark bundle promoted.
+
+        Skipped on execute idempotent replay (Action Log already linked).
+        """
+        if context.idempotent_replay or context.action_log is None:
+            return
+
+        from mobile_api.pod_capture.dto.promotion_models import (
+            PodPromotionRequest,
+            PodPromotionScope,
+        )
+        from mobile_api.pod_capture.exceptions import PodCaptureError
+        from mobile_api.pod_capture.staging.evidence_promotion_service import (
+            EvidencePromotionService,
+            staged_media_to_action_log_items,
+        )
+
+        driver_pk = EvidenceValidationService._driver_pk(context.driver)
+        shipment_key = EvidenceValidationService._shipment_key(context)
+        scope = PodPromotionScope(
+            tenant_schema=(context.tenant_schema or '').strip(),
+            driver_id=driver_pk,
+            shipment_id=shipment_key,
+        )
+
+        try:
+            promotion = EvidencePromotionService().promote_staged_bundle(
+                PodPromotionRequest(
+                    bundle_id=bundle_id,
+                    action_log=context.action_log,
+                    scope=scope,
+                ),
+                promoted_by=self._driver_label(context.driver),
+                execution_idempotency_key=str(
+                    (context.payload or {}).get('client_action_id') or ''
+                ).strip(),
+            )
+        except PodCaptureError as exc:
+            raise EvidenceValidationService._map_pod_capture_error(exc) from exc
+
+        staging = EvidencePromotionService()._staging  # noqa: SLF001
+        media_rows = staging.get_media(bundle_id)
+        promoted_media = [
+            {
+                'media_id': row.media_id,
+                'media_type': row.media_type,
+                'file_ref': row.file_ref,
+                'line_no': row.line_no,
+                'action_log_media_id': media_id,
+            }
+            for row, media_id in zip(
+                media_rows,
+                promotion.media_row_ids,
+                strict=False,
+            )
+        ]
+        if len(promoted_media) != len(promotion.media_row_ids):
+            items = staged_media_to_action_log_items(media_rows)
+            promoted_media = [
+                {
+                    'media_type': item.media_type,
+                    'file_ref': item.file_ref,
+                    'line_no': item.line_no,
+                    'action_log_media_id': str(pk),
+                }
+                for item, pk in zip(items, promotion.media_row_ids, strict=False)
+            ]
+
+        compliance = self._build_pod_capture_compliance_summary(context)
+        context.resolver_meta = dict(context.resolver_meta or {})
+        context.resolver_meta['pod_capture_promotion'] = {
+            'promoted_bundle_id': promotion.bundle_id,
+            'promoted_media': promoted_media,
+            'compliance': compliance,
+            'replayed': promotion.replayed,
+            'media_row_ids': promotion.media_row_ids,
+        }
+
+    @staticmethod
+    def _build_pod_capture_compliance_summary(
+        context: ExecuteActionContext,
+    ) -> dict[str, Any]:
+        requirements = dict(context.resolver_meta.get('pod_capture_compliance') or {})
+        payload = context.payload or {}
+        return {
+            'validated': bool(requirements),
+            'pod_type': str(payload.get('pod_type') or '').strip() or None,
+            'target_action_code': (context.action_code or '').strip() or None,
+            'requirements': {
+                'gps': bool(requirements.get('gps')),
+                'photo': bool(requirements.get('photo')),
+                'photo_min_count': int(requirements.get('photo_min_count') or 0),
+                'video': bool(requirements.get('video')),
+                'signature': bool(requirements.get('signature')),
+                'note_required': bool(requirements.get('note_required')),
+            },
+            'bundle_status': _bundle_status_value(
+                context.resolver_meta.get('pod_capture_bundle'),
+            ),
+        }
+
+    @staticmethod
+    def _attach_pod_capture_to_result(
+        result: ExecuteActionResult,
+        context: ExecuteActionContext,
+    ) -> ExecuteActionResult:
+        promotion = (context.resolver_meta or {}).get('pod_capture_promotion')
+        if not promotion:
+            return result
+        payload = dict(result.payload)
+        payload['pod_capture'] = {
+            'promoted_bundle_id': promotion.get('promoted_bundle_id'),
+            'promoted_media': list(promotion.get('promoted_media') or []),
+            'compliance': dict(promotion.get('compliance') or {}),
+            'replayed': bool(promotion.get('replayed')),
+        }
+        return ExecuteActionResult(payload=payload, http_status=result.http_status)
+
     @staticmethod
     def _normalize_job_type(job_type: str) -> JobType:
         raw = (job_type or '').strip().lower()
@@ -369,3 +500,12 @@ class ExecuteActionOrchestrator:
             http_status=400,
             message_key='mobile.validation.failed',
         )
+
+
+def _bundle_status_value(bundle: Any) -> str | None:
+    if bundle is None:
+        return None
+    status = getattr(bundle, 'status', None)
+    if status is None:
+        return None
+    return getattr(status, 'value', str(status))

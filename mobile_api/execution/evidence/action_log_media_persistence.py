@@ -87,6 +87,7 @@ def persist_action_log_media_rows(
     items: list[ActionLogMediaItem],
     *,
     replace_existing: bool = True,
+    immutable: bool = False,
 ) -> list[Any]:
     """
     Create or update ``TenantOperationActionMedia`` rows for one Action Log.
@@ -94,10 +95,25 @@ def persist_action_log_media_rows(
     Mirrors portal replace semantics: rows not in ``kept_ids`` are deleted when
     ``replace_existing`` is True (same as portal evidence attachment save).
 
+    When ``immutable`` is True (promoted POD bundles), rows are **append-only**:
+    never update or delete existing Action Log media — only create new rows.
+    ``replace_existing`` is forced to False.
+
     Must run inside the caller's ``transaction.atomic`` — rolls back with execute.
     """
     if action_log is None:
         return []
+
+    if immutable:
+        replace_existing = False
+
+    from mobile_api.pod_capture.guards.immutable_evidence_guard import guard_persist_kwargs
+
+    guard_persist_kwargs(
+        replace_existing=replace_existing,
+        immutable=immutable,
+        action_log_id=str(getattr(action_log, 'pk', '') or ''),
+    )
 
     kept_ids: set[Any] = set()
     line_no = 0
@@ -109,7 +125,7 @@ def persist_action_log_media_rows(
         upload = item.upload
 
         existing = None
-        if item.media_id:
+        if item.media_id and not immutable:
             parsed_id = _coerce_uuid(item.media_id)
             if parsed_id is not None:
                 existing = action_log.media_rows.filter(pk=parsed_id).first()

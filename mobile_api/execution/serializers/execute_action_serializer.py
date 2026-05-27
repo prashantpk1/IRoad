@@ -44,6 +44,22 @@ class ExecuteActionRequestSerializer(serializers.Serializer):
     longitude = serializers.FloatField(required=False, allow_null=True)
     notes = serializers.CharField(required=False, allow_blank=True, default='')
     media = ExecuteActionMediaItemSerializer(many=True, required=False, default=list)
+    capture_bundle_id = serializers.CharField(
+        max_length=64,
+        required=False,
+        allow_blank=True,
+        help_text='Staged POD capture bundle to promote after Action Log insert.',
+    )
+    pod_capture_bundle_id = serializers.CharField(
+        max_length=64,
+        required=False,
+        allow_blank=True,
+    )
+    bundle_id = serializers.CharField(
+        max_length=64,
+        required=False,
+        allow_blank=True,
+    )
 
     # Optional extensions (orchestrator / kernel)
     map_link = serializers.CharField(required=False, allow_blank=True, default='')
@@ -82,6 +98,13 @@ class ExecuteActionRequestSerializer(serializers.Serializer):
             attrs['latitude'] = str(lat)
         if lon is not None:
             attrs['longitude'] = str(lon)
+        bundle = (
+            (attrs.get('capture_bundle_id') or '')
+            or (attrs.get('pod_capture_bundle_id') or '')
+            or (attrs.get('bundle_id') or '')
+        ).strip()
+        if bundle:
+            attrs['capture_bundle_id'] = bundle
         return attrs
 
 
