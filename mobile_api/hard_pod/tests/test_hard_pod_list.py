@@ -27,10 +27,11 @@ from mobile_api.hard_pod.services.hard_pod_reconciliation_service import (
 )
 from mobile_api.hard_pod.services.hard_pod_list_service import HardPodListService
 from mobile_api.pod_capture.models import (
-    HardPODCustodyEvent,
-    HardPODReceipt,
-    HardPODVerification,
     PODCaptureBundle,
+)
+from mobile_api.hard_pod.models import (
+    HardPODCustodySubmission,
+    HardPODCustodySubmissionEvent,
 )
 from tenant_workspace.models import TenantShipment
 
@@ -71,7 +72,7 @@ class HardPodProjectionBuilderTests(SimpleTestCase):
         self.assertEqual(state, CUSTODY_VERIFIED)
 
     def test_custody_state_collected_from_events(self):
-        event = SimpleNamespace(event_type=HardPODCustodyEvent.EventType.COLLECTED)
+        event = SimpleNamespace(event_type=HardPODCustodySubmissionEvent.EventType.COLLECTED)
         state = derive_custody_state([event], has_verification=False)
         self.assertEqual(state, CUSTODY_COLLECTED)
 
@@ -241,20 +242,19 @@ class HardPodListIntegrationTests(TransactionTestCase):
         mock_policy.derive_delivery_blocked.return_value = False
 
         bundle = self._create_bundle()
-        receipt = HardPODReceipt.objects.create(
-            bundle=bundle,
+        submission = HardPODCustodySubmission.objects.create(
             tenant_schema=self.tenant_schema,
             shipment_id=self.shipment_id,
             driver_id=self.driver_id,
+            client_submission_id=f'custody-{uuid.uuid4()}',
             receiver_name='Receiver One',
-            document_serial='DN-9',
         )
-        HardPODCustodyEvent.objects.create(
-            bundle=bundle,
-            receipt=receipt,
+        HardPODCustodySubmissionEvent.objects.create(
+            submission=submission,
             tenant_schema=self.tenant_schema,
             shipment_id=self.shipment_id,
-            event_type=HardPODCustodyEvent.EventType.COLLECTED,
+            driver_id=self.driver_id,
+            event_type=HardPODCustodySubmissionEvent.EventType.COLLECTED,
             actor_label='Driver',
         )
 
@@ -263,11 +263,10 @@ class HardPodListIntegrationTests(TransactionTestCase):
             driver=_driver(self.driver_id),
             tenant_schema=self.tenant_schema,
             custody_bundle={
-                'events': list(
-                    HardPODCustodyEvent.objects.filter(bundle_id=bundle.id)
-                ),
-                'receipt': receipt,
+                'events': list(submission.custody_events.all()),
+                'receipt': None,
                 'verification': None,
+                'submission': submission,
                 'bundle_id': str(bundle.id),
             },
         )
@@ -283,22 +282,30 @@ class HardPodListIntegrationTests(TransactionTestCase):
         mock_policy.derive_delivery_blocked.return_value = False
 
         bundle = self._create_bundle()
-        HardPODVerification.objects.create(
-            bundle=bundle,
+        submission = HardPODCustodySubmission.objects.create(
             tenant_schema=self.tenant_schema,
             shipment_id=self.shipment_id,
-            supervisor_label='Supervisor',
+            driver_id=self.driver_id,
+            client_submission_id=f'verified-{uuid.uuid4()}',
+            capture_bundle_id=bundle.id,
+        )
+        HardPODCustodySubmissionEvent.objects.create(
+            submission=submission,
+            tenant_schema=self.tenant_schema,
+            shipment_id=self.shipment_id,
+            driver_id=self.driver_id,
+            event_type=HardPODCustodySubmissionEvent.EventType.VERIFIED,
+            actor_label='Supervisor',
         )
         custody = HardPodProjectionService().build_row(
             _shipment(pk=self.shipment_id, driver_id=self.driver_id),
             driver=_driver(self.driver_id),
             tenant_schema=self.tenant_schema,
             custody_bundle={
-                'events': [],
+                'events': list(submission.custody_events.all()),
                 'receipt': None,
-                'verification': HardPODVerification.objects.filter(
-                    bundle_id=bundle.id
-                ).first(),
+                'verification': None,
+                'submission': submission,
                 'bundle_id': str(bundle.id),
             },
         )

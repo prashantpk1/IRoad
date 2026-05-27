@@ -24,6 +24,8 @@ class PaymentCollectionBundle(models.Model):
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     expected_amount = models.DecimalField(max_digits=12, decimal_places=2)
     variance_detected = models.BooleanField(default=False, db_index=True)
+    variance_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    variance_type = models.CharField(max_length=16, blank=True, default='')
 
     payment_mode = models.CharField(max_length=32, blank=True, default='')
     notes = models.TextField(blank=True, default='')

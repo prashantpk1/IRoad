@@ -57,6 +57,7 @@ from iroad_tenants.operation_runtime.shipment_execution_stage import (
     STAGE_PICKUP,
     STAGE_LOADING,
     STAGE_PRE_TRANSIT,
+    STAGE_POD,
     STAGE_CANCELLED,
     derive_shipment_execution_stage,
 )
@@ -68,16 +69,19 @@ _SHIPMENT_IMPACT_DB_TOKENS = {
     TenantShipment.ShipmentStatus.IN_TRANSIT: (
         TenantShipment.ShipmentStatus.IN_TRANSIT,
         'In Transit',
+        'In_Transit',
         'in_transit',
     ),
     TenantShipment.ShipmentStatus.AT_DELIVERY: (
         TenantShipment.ShipmentStatus.AT_DELIVERY,
         'At Delivery',
+        'At_Delivery',
         'at_delivery',
     ),
     TenantShipment.ShipmentStatus.POD_SUBMITTED: (
         TenantShipment.ShipmentStatus.POD_SUBMITTED,
         'POD Submitted',
+        'POD_Submitted',
         'pod_submitted',
     ),
     TenantShipment.ShipmentStatus.DELIVERED: (
@@ -120,7 +124,11 @@ def _forward_impact_tokens_for_status(current_status: str) -> list[str]:
 
 
 def _apply_mobile_scope_filter(qs: QuerySet) -> QuerySet:
-    return qs.filter(action_scope__in=_MOBILE_JOB_ACTION_SCOPES)
+    return (
+        qs.filter(action_scope__in=_MOBILE_JOB_ACTION_SCOPES)
+        .filter(mobile_visible=True)
+        .exclude(admin_only=True)
+    )
 
 
 def _exclude_executed(qs: QuerySet, executed_ids: set) -> QuerySet:
@@ -204,6 +212,9 @@ def _prefilter_shipment_candidates(
     }:
         clauses |= Q(auto_movement_post=True) | Q(auto_pod_post=True)
 
+    if stage == STAGE_POD:
+        clauses |= Q(movement_status_impact__in=('Completed', 'completed'))
+
     if clauses:
         qs = qs.filter(clauses)
     else:
@@ -231,12 +242,22 @@ def _prefilter_booking_candidates(qs: QuerySet, *, booking) -> QuerySet:
             reversal_q |= Q(action_code__istartswith=prefix)
         return qs.filter(reversal_q | Q(english_label__icontains='reversal'))
 
+    pickup_loading_q = Q()
+    for hint in (*_PICKUP_CODE_HINTS, *_LOADING_CODE_HINTS):
+        pickup_loading_q |= Q(action_code__icontains=hint)
+    pickup_loading_q |= Q(english_label__icontains='pickup')
+    pickup_loading_q |= Q(english_label__icontains='loading')
+
     qs = qs.filter(
-        Q(booking_status_impact__gt='') | Q(auto_shipment_post=True),
+        Q(booking_status_impact__gt='')
+        | Q(auto_shipment_post=True)
+        | pickup_loading_q,
     )
     if booking.booking_status != TenantBooking.Status.CONFIRMED:
         qs = qs.exclude(auto_shipment_post=True)
-    return qs.exclude(shipment_status_impact__gt='')
+    return qs.exclude(
+        Q(shipment_status_impact__gt='') & Q(auto_shipment_post=False)
+    )
 
 
 def _prefilter_movement_only_candidates(qs: QuerySet, *, movement) -> QuerySet:

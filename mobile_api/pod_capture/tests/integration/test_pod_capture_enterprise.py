@@ -31,7 +31,6 @@ from mobile_api.pod_capture.services.action_log_bundle_link import (
     bundle_source_ref,
     parse_bundle_id_from_source_ref,
 )
-from mobile_api.pod_capture.services.hard_pod_custody_service import HardPODCustodyService
 from mobile_api.pod_capture.services.media_integrity_service import MediaIntegrityService
 from mobile_api.pod_capture.services.promotion_audit_service import PromotionAuditService
 from mobile_api.pod_capture.staging.evidence_promotion_service import EvidencePromotionService
@@ -189,23 +188,6 @@ class PodCaptureEnterpriseIntegrationTests(TransactionTestCase):
         self.assertFalse(is_unloading_action(a7))
         self.assertEqual(classify_timeline_event_type(a7), 'pod')
         self.assertEqual(classify_timeline_event_type(a8), 'movement')
-
-    def test_hard_pod_custody_chain(self) -> None:
-        bundle = self._ready_bundle_with_media()
-        custody = HardPODCustodyService()
-        receipt = custody.record_collection(
-            bundle,
-            document_serial='DN-100',
-            receiver_name='Receiver',
-        )
-        custody.record_received(receipt, actor_label='Hub')
-        custody.record_supervisor_verification(
-            bundle,
-            supervisor_id='sup-1',
-            supervisor_label='Supervisor',
-        )
-        entries = custody.timeline_entries_for_bundle(bundle.bundle_id)
-        self.assertGreaterEqual(len(entries), 3)
 
     def test_stale_bundle_expired_by_ttl_command(self) -> None:
         bundle = self._ready_bundle_with_media()

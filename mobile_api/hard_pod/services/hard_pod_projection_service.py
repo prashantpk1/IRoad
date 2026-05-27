@@ -27,12 +27,7 @@ from mobile_api.hard_pod.services.hard_pod_reconciliation_service import (
     workflow_blocked_read_only,
 )
 from mobile_api.job_detail.guards.ownership import driver_owns_shipment_leg
-from mobile_api.pod_capture.models import (
-    HardPODCustodyEvent,
-    HardPODReceipt,
-    HardPODVerification,
-    PODCaptureBundle,
-)
+from mobile_api.pod_capture.models import PODCaptureBundle
 from mobile_api.hard_pod.models import (
     HardPODCustodySubmission,
     HardPODCustodySubmissionEvent,
@@ -74,25 +69,6 @@ def _load_custody_by_shipment(
     if not shipment_ids:
         return {}
 
-    legacy_events = list(
-        HardPODCustodyEvent.objects.filter(
-            tenant_schema=tenant_schema,
-            shipment_id__in=shipment_ids,
-        ).order_by('shipment_id', 'occurred_at', 'created_at')
-    )
-    receipts = list(
-        HardPODReceipt.objects.filter(
-            tenant_schema=tenant_schema,
-            shipment_id__in=shipment_ids,
-            driver_id=driver_id,
-        ).order_by('shipment_id', '-collected_at')
-    )
-    verifications = list(
-        HardPODVerification.objects.filter(
-            tenant_schema=tenant_schema,
-            shipment_id__in=shipment_ids,
-        ).order_by('shipment_id', '-verified_at')
-    )
     bundles = list(
         PODCaptureBundle.objects.filter(
             tenant_schema=tenant_schema,
@@ -125,19 +101,6 @@ def _load_custody_by_shipment(
             'submission': None,
         }
     )
-
-    for event in legacy_events:
-        by_shipment[event.shipment_id]['events'].append(event)
-
-    for receipt in receipts:
-        bucket = by_shipment[receipt.shipment_id]
-        if bucket['receipt'] is None:
-            bucket['receipt'] = receipt
-
-    for verification in verifications:
-        bucket = by_shipment[verification.shipment_id]
-        if bucket['verification'] is None:
-            bucket['verification'] = verification
 
     for bundle in bundles:
         bucket = by_shipment[bundle.shipment_id]
@@ -220,7 +183,7 @@ class HardPodProjectionService:
 
         verified_event_present = any(
             (getattr(e, 'event_type', None) or '').strip().casefold()
-            == HardPODCustodyEvent.EventType.VERIFIED.casefold()
+            == HardPODCustodySubmissionEvent.EventType.VERIFIED.casefold()
             for e in (events or [])
         )
         has_verification = verification is not None or verified_event_present

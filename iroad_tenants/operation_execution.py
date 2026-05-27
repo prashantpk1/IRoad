@@ -10,6 +10,9 @@ from __future__ import annotations
 from django.db.models import Q
 
 from iroad_tenants.operation_runtime.shipment_execution_stage import (
+    STAGE_COD,
+    STAGE_COMPLETION,
+    STAGE_POD,
     STAGE_PRE_TRANSIT,
     derive_shipment_execution_stage,
     execution_stage_operational_label,
@@ -260,6 +263,21 @@ def _action_is_allowed(
             )
 
         if action.booking_status_impact and not impact:
+            return False
+
+        movement_token = (
+            (action.movement_status_impact or '')
+            .strip()
+            .lower()
+            .replace('-', '_')
+            .replace(' ', '_')
+        )
+        if movement_token:
+            if movement_token == 'completed':
+                return derive_shipment_execution_stage(
+                    shipment,
+                    exclude_log_id=exclude_log_id,
+                ) in {STAGE_POD, STAGE_COD, STAGE_COMPLETION}
             return False
 
         # Generic active action with no impact: allow only mid-lifecycle (manual audit).

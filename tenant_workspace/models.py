@@ -4300,7 +4300,12 @@ class TenantOperationAction(models.Model):
     auto_movement_post = models.BooleanField(default=False)
     auto_shipment_post = models.BooleanField(default=False)
     auto_pod_post = models.BooleanField(default=False)
+    auto_treasury_post = models.BooleanField(default=False)
     hard_copy_collection = models.BooleanField(default=False)
+    mobile_visible = models.BooleanField(default=False)
+    admin_only = models.BooleanField(default=False)
+    prerequisite_action_codes = models.CharField(max_length=255, blank=True, default='')
+    condition_code = models.CharField(max_length=128, blank=True, default='')
     booking_status_impact = models.CharField(max_length=64, blank=True, default='')
     shipment_status_impact = models.CharField(max_length=64, blank=True, default='')
     movement_status_impact = models.CharField(max_length=64, blank=True, default='')
@@ -4320,6 +4325,14 @@ class TenantOperationAction(models.Model):
             models.Index(
                 fields=['status', 'sequence_category'],
                 name='tenant_op_act_stat_cat_idx',
+            ),
+            models.Index(
+                fields=['status', 'mobile_visible'],
+                name='tenant_op_act_mobile_idx',
+            ),
+            models.Index(
+                fields=['status', 'admin_only'],
+                name='tenant_op_act_admin_idx',
             ),
         ]
 

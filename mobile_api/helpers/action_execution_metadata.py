@@ -139,6 +139,7 @@ def build_execution_requirements(action) -> dict[str, Any]:
         'auto_movement_post': bool(getattr(action, 'auto_movement_post', False)),
         'auto_pod_post': bool(getattr(action, 'auto_pod_post', False)),
         'auto_shipment_post': bool(getattr(action, 'auto_shipment_post', False)),
+        'auto_treasury_post': bool(getattr(action, 'auto_treasury_post', False)),
         'hard_copy_collection': bool(getattr(action, 'hard_copy_collection', False)),
         'shipment_status_impact': (action.shipment_status_impact or '').strip()
         if action

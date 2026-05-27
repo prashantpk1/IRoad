@@ -158,6 +158,23 @@ class PaymentValidationService:
                 message_key='mobile.hard_pod.not_hard_pod_shipment',
             )
 
+    @staticmethod
+    def detect_variance(*, collected_amount: Decimal, cod_amount: Decimal) -> dict[str, Any] | None:
+        collected = Decimal(str(collected_amount))
+        expected = Decimal(str(cod_amount))
+        if collected == expected:
+            return None
+
+        variance_amount = collected - expected
+        variance_type = 'short' if variance_amount < 0 else 'over'
+        return {
+            'has_variance': True,
+            'variance_type': variance_type,
+            'variance_amount': abs(variance_amount),
+            'expected': expected,
+            'collected': collected,
+        }
+
     def validate_amount_ceiling(
         self,
         *,
@@ -174,19 +191,12 @@ class PaymentValidationService:
                 http_status=400,
                 message_key='mobile.validation.failed',
             )
-        if submitted > expected:
-            raise PaymentCollectionError(
-                str(_('mobile.payment_collection.amount_ceiling_exceeded')),
-                code='amount_ceiling_exceeded',
-                http_status=400,
-                message_key='mobile.validation.failed',
-            )
-
-        variance_detected = submitted != expected
+        variance = self.detect_variance(collected_amount=submitted, cod_amount=expected)
         return {
             'expected_amount': expected,
             'collected_amount': submitted,
-            'variance_detected': variance_detected,
+            'variance_detected': bool(variance),
+            'variance': variance,
         }
 
     def validate_duplicate_payment(

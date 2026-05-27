@@ -147,6 +147,9 @@ class PaymentCollectionService:
         expected_amount = ceiling['expected_amount']  # type: ignore[assignment]
         collected_amount = ceiling['collected_amount']  # type: ignore[assignment]
         variance_detected = bool(ceiling['variance_detected'])
+        variance_info = ceiling.get('variance') if isinstance(ceiling, dict) else None
+        variance_amount = variance_info.get('variance_amount') if variance_info else Decimal('0.00')
+        variance_type = variance_info.get('variance_type') if variance_info else 'none'
 
         duplicate = self._validation.validate_duplicate_payment(
             shipment=shipment,
@@ -197,6 +200,8 @@ class PaymentCollectionService:
                     amount=amount,
                     expected_amount=expected_amount,
                     variance_detected=variance_detected,
+                    variance_amount=Decimal(str(variance_amount)),
+                    variance_type=str(variance_type),
                     payment_mode=payment_mode,
                     notes=notes,
                     integrity_checksum=integrity_checksum,

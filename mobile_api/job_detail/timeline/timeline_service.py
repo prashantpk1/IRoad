@@ -211,6 +211,8 @@ class JobDetailTimelineService:
         qs = TenantOperationAction.objects.filter(
             status=TenantOperationAction.Status.ACTIVE,
             action_scope__in=('job', 'without', ''),
+            mobile_visible=True,
+            admin_only=False,
         ).order_by('sequence_number', 'action_code')
         try:
             return list(qs)

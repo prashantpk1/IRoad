@@ -17,6 +17,12 @@ Pipeline::
 
 Future: Execute Action calls :class:`EvidencePromotionService` — not this module.
 """
+# POD CAPTURE API — LAYER 1 (Digital Evidence) + LAYER 2 (Soft Copy)
+# Responsibility: Stage digital GPS/photo evidence and soft-copy scans
+# Does NOT handle physical paper custody (Layer 3)
+# Does NOT write Action Log
+# Does NOT mutate Shipment status
+# Execute Action A7 consumes this bundle and creates the POD Record
 from __future__ import annotations
 
 import logging
@@ -128,7 +134,6 @@ class PodCaptureOrchestrator:
         staged_rows = self._media.build_staged_media_rows(context, secured_items)
         self._staging.attach_media(context, staged_rows)
         self._bundle.finalize_bundle(context)
-        self._record_hard_pod_custody_if_needed(context)
 
         logger.info(
             'pod_capture staged bundle_id=%s shipment_id=%s media_count=%s',
@@ -137,28 +142,6 @@ class PodCaptureOrchestrator:
             len(context.staged_media),
         )
         return self._response.build(context)
-
-    def _record_hard_pod_custody_if_needed(self, context: PodCaptureContext) -> None:
-        """Append-only Hard POD custody when capture payload indicates physical POD."""
-        bundle = context.bundle
-        if bundle is None or context.idempotent_replay:
-            return
-        payload = context.payload or {}
-        pod_type = str(payload.get('pod_type') or '').strip().casefold()
-        hard_flag = bool(payload.get('hard_pod') or payload.get('hard_copy'))
-        if pod_type not in {'hard', 'hard_pod', 'hardcopy'} and not hard_flag:
-            return
-        from mobile_api.pod_capture.services.hard_pod_custody_service import HardPODCustodyService
-
-        HardPODCustodyService().record_collection(
-            bundle,
-            document_serial=str(payload.get('document_serial') or '').strip(),
-            document_reference=str(payload.get('document_reference') or '').strip(),
-            receiver_name=str(payload.get('receiver_name') or '').strip(),
-            receiver_identity_ref=str(payload.get('receiver_identity') or '').strip(),
-            actor_id=str(getattr(context.driver, 'pk', '') or ''),
-            actor_label=str(getattr(context.driver, 'driver_no', '') or ''),
-        )
 
     def _hydrate_sync_metadata(self, context: PodCaptureContext) -> None:
         """

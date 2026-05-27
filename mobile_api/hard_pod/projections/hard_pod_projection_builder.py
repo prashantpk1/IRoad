@@ -8,7 +8,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from mobile_api.pod_capture.models import HardPODCustodyEvent
+from mobile_api.hard_pod.models import HardPODCustodySubmissionEvent
 
 CUSTODY_NOT_STARTED = 'not_started'
 CUSTODY_COLLECTED = 'collected'
@@ -21,19 +21,19 @@ VERIFICATION_PENDING = 'pending'
 VERIFICATION_VERIFIED = 'verified'
 
 _EVENT_RANK = {
-    HardPODCustodyEvent.EventType.COLLECTED: 1,
-    HardPODCustodyEvent.EventType.RECEIVED: 2,
-    HardPODCustodyEvent.EventType.HANDOFF: 3,
-    HardPODCustodyEvent.EventType.TRANSFERRED: 4,
-    HardPODCustodyEvent.EventType.VERIFIED: 5,
+    HardPODCustodySubmissionEvent.EventType.COLLECTED: 1,
+    HardPODCustodySubmissionEvent.EventType.RECEIVED: 2,
+    HardPODCustodySubmissionEvent.EventType.HANDOFF: 3,
+    HardPODCustodySubmissionEvent.EventType.TRANSFERRED: 4,
+    HardPODCustodySubmissionEvent.EventType.VERIFIED: 5,
 }
 
 _CUSTODY_STATE_FROM_EVENT = {
-    HardPODCustodyEvent.EventType.COLLECTED: CUSTODY_COLLECTED,
-    HardPODCustodyEvent.EventType.RECEIVED: CUSTODY_RECEIVED,
-    HardPODCustodyEvent.EventType.HANDOFF: CUSTODY_HANDOFF,
-    HardPODCustodyEvent.EventType.TRANSFERRED: CUSTODY_TRANSFERRED,
-    HardPODCustodyEvent.EventType.VERIFIED: CUSTODY_VERIFIED,
+    HardPODCustodySubmissionEvent.EventType.COLLECTED: CUSTODY_COLLECTED,
+    HardPODCustodySubmissionEvent.EventType.RECEIVED: CUSTODY_RECEIVED,
+    HardPODCustodySubmissionEvent.EventType.HANDOFF: CUSTODY_HANDOFF,
+    HardPODCustodySubmissionEvent.EventType.TRANSFERRED: CUSTODY_TRANSFERRED,
+    HardPODCustodySubmissionEvent.EventType.VERIFIED: CUSTODY_VERIFIED,
 }
 
 
@@ -111,7 +111,8 @@ def build_handoff_block(events: list[Any]) -> dict[str, Any]:
     handoff_events = [
         e
         for e in events
-        if (getattr(e, 'event_type', None) or '') == HardPODCustodyEvent.EventType.HANDOFF
+        if (getattr(e, 'event_type', None) or '')
+        == HardPODCustodySubmissionEvent.EventType.HANDOFF
     ]
     if not handoff_events:
         return {}

@@ -110,6 +110,14 @@ def _shipment_pickup_loading_done(
     qs = TenantOperationActionLog.objects.filter(
         shipment_id=shipment.pk,
     ).exclude(operation_action__isnull=True)
+    if shipment.booking_id:
+        qs = (
+            qs
+            | TenantOperationActionLog.objects.filter(
+                booking_id=shipment.booking_id,
+                shipment__isnull=True,
+            ).exclude(operation_action__isnull=True)
+        )
     if exclude_log_id:
         qs = qs.exclude(log_id=exclude_log_id)
     pickup_done = False
@@ -175,10 +183,10 @@ def derive_shipment_execution_stage(
             exclude_log_id=exclude_log_id,
             prefetched_logs=prefetched_logs,
         )
+        if loading_done:
+            return STAGE_PRE_TRANSIT
         if not pickup_done:
             return STAGE_PICKUP
-        if not loading_done:
-            return STAGE_LOADING
         return STAGE_PRE_TRANSIT
 
     mapped = _STATUS_TO_EXECUTION_STAGE.get(current)

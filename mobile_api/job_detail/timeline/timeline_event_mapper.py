@@ -46,8 +46,13 @@ def _action_label(log_row: Any, *, request: Any | None = None) -> str:
     action = getattr(log_row, 'operation_action', None)
     if action is None:
         return ''
-    english = (action.english_label or action.action_code or '').strip()
-    arabic = (action.arabic_label or '').strip()
+    english = (
+        getattr(action, 'label', '')
+        or getattr(action, 'english_label', '')
+        or getattr(action, 'action_code', '')
+        or ''
+    ).strip()
+    arabic = (getattr(action, 'arabic_label', '') or '').strip()
     if request is not None:
         try:
             from mobile_api.helpers.i18n import get_localized_value
@@ -209,7 +214,8 @@ def _action_label_from_action(action: Any, *, request: Any | None = None) -> str
     if action is None:
         return ''
     english = (
-        getattr(action, 'english_label', '')
+        getattr(action, 'label', '')
+        or getattr(action, 'english_label', '')
         or getattr(action, 'action_code', '')
         or ''
     ).strip()

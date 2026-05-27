@@ -12642,7 +12642,10 @@ def _tenant_operation_action_log_apply_side_effects(action_log, *, created_by_la
     if (
         shipment is not None
         and shipment.order_type.upper() == 'COD'
-        and _tenant_operation_action_matches(action, 'collect payment', 'a9', 'action 9')
+        and (
+            getattr(action, 'auto_treasury_post', False)
+            or _tenant_operation_action_matches(action, 'collect payment', 'a9', 'action 9')
+        )
     ):
         shipment.collection_status = TenantShipment.CollectionStatus.COLLECTED
         shipment.save(update_fields=['collection_status', 'updated_at'])
@@ -12677,6 +12680,8 @@ def _tenant_shipment_birth_from_booking_line(booking, matched_line, *, shipment_
         raise ValidationError('Booking client account is required.')
 
     shipment_form_data = {
+        'booking_id': str(booking.booking_id),
+        'booking_no': booking.booking_no or '',
         'order_type': matched_line.get('order_type') or booking.order_type or '',
         'booking_item': matched_line.get('booking_item') or '',
         'booking_item_type': matched_line.get('booking_item_type') or '',
@@ -12817,12 +12822,11 @@ def _tenant_truck_movement_birth_for_shipment(shipment, *, movement_date=None, c
         movement_sequence=movement_sequence,
         movement_date=movement_date,
         movement_source='Loaded',
-        status=TenantTruckMovementLog.Status.IN_PROGRESS,
+        status=TenantTruckMovementLog.Status.SCHEDULED,
         booking=shipment.booking,
         shipment=shipment,
         truck=shipment.truck,
         driver=shipment.driver,
-        start_time=timezone.now(),
         created_by_label=(created_by_label or '')[:200],
     )
     movement.save()

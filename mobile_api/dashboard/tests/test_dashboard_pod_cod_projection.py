@@ -60,7 +60,16 @@ class PodCodPolicyTests(SimpleTestCase):
             pod_type=TenantShipment.PodType.HARD,
             pod_status=TenantShipment.PodStatus.NOT_COMPLIANT,
         )
-        self.assertTrue(policy.derive_hard_pod_pending(shipment))
+        with patch(
+            'mobile_api.dashboard.selectors.pod_cod_policy.HardPodCustodyAuthorityService',
+        ) as mock_authority, patch(
+            'mobile_api.dashboard.selectors.pod_cod_policy.HardPODCustodySubmission',
+        ) as mock_submission:
+            mock_authority.return_value.resolve_authority.return_value = {
+                'custody_authority': '',
+            }
+            mock_submission.objects.filter.return_value.exclude.return_value.first.return_value = None
+            self.assertTrue(policy.derive_hard_pod_pending(shipment))
 
     def test_hard_pod_not_pending_when_compliant(self):
         shipment = _shipment(

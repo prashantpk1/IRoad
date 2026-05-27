@@ -10,6 +10,7 @@ evidence, stale sync, response projection).
 from __future__ import annotations
 
 import logging
+from decimal import Decimal
 from typing import Any, Mapping
 
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -52,6 +53,7 @@ from mobile_api.helpers.mobile_execution_guard import (
 )
 from mobile_api.job_detail.services.movement_job_resolver import MovementJobResolver
 from mobile_api.job_detail.services.shipment_job_resolver import ShipmentJobResolver
+from tenant_workspace.models import DriverTreasuryTransaction
 logger = logging.getLogger('mobile_api.execution')
 
 
@@ -254,6 +256,7 @@ class ExecuteActionOrchestrator:
         context.action_log = exec_result.action_log
         context.reused_existing = exec_result.reused_existing
         context.idempotent_replay = exec_result.reused_existing
+        self._sync_context_from_action_log(context)
 
         hard_pod_submission = self._hard_pod_integration.bind_action_log(
             context,
@@ -291,8 +294,7 @@ class ExecuteActionOrchestrator:
         if context.idempotent_replay:
             return
         action = context.operation_action
-        action_code = (getattr(action, 'action_code', None) or '').strip().upper()
-        if action_code != 'A9':
+        if not self._is_collect_payment_action(action):
             return
         if context.shipment is None:
             return
@@ -342,14 +344,6 @@ class ExecuteActionOrchestrator:
                 message_key='mobile.payment_collection.bundle_shipment_mismatch',
                 refresh_required=True,
             )
-        if bool(getattr(bundle, 'variance_detected', False)):
-            raise ExecuteActionError(
-                'Payment variance detected; cannot execute COD collection.',
-                code='payment_variance_detected',
-                http_status=400,
-                message_key='mobile.payment_collection.variance_detected',
-                refresh_required=True,
-            )
 
         # Override mobile_cod_amount for Action 9 side effects (treasury posting).
         context.payload = dict(context.payload or {})
@@ -357,6 +351,7 @@ class ExecuteActionOrchestrator:
 
         context.resolver_meta = dict(context.resolver_meta or {})
         context.resolver_meta['payment_collection_bundle'] = bundle
+        context.resolver_meta['payment_collection_variance'] = self._build_payment_variance(bundle)
 
     @staticmethod
     def _attach_payment_collection_to_result(
@@ -397,7 +392,59 @@ class ExecuteActionOrchestrator:
         pod_cod_payload.setdefault('treasury_status', treasury_status)
         pod_cod_payload.setdefault('cod_status', cod_status)
         payload['pod_cod'] = pod_cod_payload
+
+        treasury_txn = None
+        if context.action_log is not None:
+            treasury_txn = (
+                DriverTreasuryTransaction.objects.filter(operation_action_log=context.action_log)
+                .order_by('-transaction_date', '-created_at')
+                .first()
+            )
+
+        variance = (context.resolver_meta or {}).get('payment_collection_variance')
+        if variance is None:
+            variance = ExecuteActionOrchestrator._build_payment_variance(bundle)
+
+        payload['success'] = True
+        payload['action'] = str(getattr(context.operation_action, 'action_code', '') or context.action_code or '')
+        payload['shipment_id'] = str(getattr(context.shipment, 'pk', '') or getattr(context.shipment, 'shipment_id', '') or '')
+        payload['cod_payment_status'] = str(getattr(context.shipment, 'collection_status', '') or '')
+        payload['treasury_transaction_id'] = str(getattr(treasury_txn, 'transaction_id', '') or '') if treasury_txn else ''
+        payload['variance'] = variance
         return ExecuteActionResult(payload=payload, http_status=result.http_status)
+
+    @staticmethod
+    def _is_collect_payment_action(action_master_row: Any | None) -> bool:
+        return bool(
+            action_master_row is not None
+            and bool(getattr(action_master_row, 'auto_treasury_post', False))
+            and str(getattr(action_master_row, 'action_scope', '') or '').strip().casefold() == 'job'
+            and int(getattr(action_master_row, 'sequence_number', 0) or 0) == 9
+        )
+
+    @staticmethod
+    def _build_payment_variance(bundle: Any) -> dict[str, Any] | None:
+        collected = Decimal(str(getattr(bundle, 'amount', 0) or 0))
+        expected = Decimal(str(getattr(bundle, 'expected_amount', 0) or 0))
+        if collected == expected:
+            return {
+                'has_variance': False,
+                'variance_type': 'none',
+                'variance_amount': '0.00',
+                'expected': str(expected),
+                'collected': str(collected),
+                'message': 'No variance detected.',
+            }
+        variance_amount = collected - expected
+        variance_type = 'short' if variance_amount < 0 else 'over'
+        return {
+            'has_variance': True,
+            'variance_type': variance_type,
+            'variance_amount': str(abs(variance_amount)),
+            'expected': str(expected),
+            'collected': str(collected),
+            'message': 'Variance recorded. Operations team will follow up.',
+        }
 
     def _attach_hard_pod_custody_to_result(
         self,
@@ -513,6 +560,19 @@ class ExecuteActionOrchestrator:
         if context.movement is not None:
             return getattr(context.movement, 'truck', None)
         return None
+
+    @staticmethod
+    def _sync_context_from_action_log(context: ExecuteActionContext) -> None:
+        action_log = context.action_log
+        if action_log is None:
+            return
+        shipment = getattr(action_log, 'shipment', None)
+        movement = getattr(action_log, 'truck_movement', None)
+        if shipment is not None:
+            context.shipment = shipment
+            context.booking = getattr(shipment, 'booking', None) or context.booking
+        if movement is not None:
+            context.movement = movement
 
     @staticmethod
     def _driver_label(driver: Any) -> str:

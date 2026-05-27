@@ -76,6 +76,8 @@ class ExecuteActionResponseBuilder:
             'job_type': context.job_type,
             'job_id': context.job_id,
             'action_code': context.action_code,
+            'shipment_id': str(getattr(action_log, 'shipment_id', '') or ''),
+            'movement_id': str(getattr(action_log, 'truck_movement_id', '') or ''),
             'reused_existing': bool(context.reused_existing),
             'idempotent_replay': bool(context.idempotent_replay),
             'replayed': replayed,

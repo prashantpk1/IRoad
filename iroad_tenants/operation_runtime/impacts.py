@@ -8,7 +8,12 @@ from tenant_workspace.models import TenantShipment, TenantTruckMovementLog
 def operation_action_matches(action, *needles) -> bool:
     if action is None:
         return False
-    blob = f'{(action.action_code or "")} {(action.english_label or "")}'.lower()
+    label = (
+        getattr(action, 'label', '')
+        or getattr(action, 'english_label', '')
+        or ''
+    )
+    blob = f'{(getattr(action, "action_code", "") or "")} {label}'.lower()
     return any(needle.lower() in blob for needle in needles)
 
 

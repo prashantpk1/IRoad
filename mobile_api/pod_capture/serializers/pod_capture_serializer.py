@@ -37,12 +37,12 @@ class PodCaptureRequestSerializer(serializers.Serializer):
     content_hash = serializers.CharField(max_length=128)
     workflow_version = serializers.CharField(max_length=256)
     pod_type = serializers.ChoiceField(
-        choices=['digital', 'soft', 'hard', 'signature', 'multi_page', 'video'],
+        choices=['digital', 'soft', 'signature', 'multi_page', 'video'],
         required=False,
         allow_blank=True,
     )
     pod_capture_type = serializers.ChoiceField(
-        choices=['digital', 'soft', 'hard', 'signature', 'multi_page', 'video'],
+        choices=['digital', 'soft', 'signature', 'multi_page', 'video'],
         required=False,
         allow_blank=True,
         help_text='Deprecated alias for ``pod_type``.',

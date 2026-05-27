@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from django.core.exceptions import ValidationError
+from decimal import Decimal
 
 from iroad_tenants.driver_treasury_ops import post_cod_collection_for_action9
 from tenant_workspace.models import TenantShipment
@@ -28,6 +29,9 @@ class CODExecutionService:
             return
         if (shipment.order_type or '').upper() != 'COD':
             return
+
+        if shipment.collection_status == TenantShipment.CollectionStatus.COLLECTED:
+            raise ValidationError('Payment already collected.')
 
         should_post_treasury = True
         action_log_id = str(
@@ -70,13 +74,35 @@ class CODExecutionService:
                     .first()
                 )
                 if bundle is not None:
-                    if bool(getattr(bundle, 'variance_detected', False)):
-                        raise ValidationError(
-                            'Payment variance detected; cannot execute COD collection.'
-                        )
                     if (bundle.shipment_id or '').strip() != shipment_id:
                         raise ValidationError('Payment bundle does not match shipment.')
                     amount = getattr(bundle, 'amount', None) or amount
+                    expected_amount = getattr(bundle, 'expected_amount', None)
+                    if expected_amount is None:
+                        expected_amount = getattr(shipment, 'cod_amount', None)
+                    if expected_amount is not None and amount is not None:
+                        actual_amount = Decimal(str(amount))
+                        expected_decimal = Decimal(str(expected_amount))
+                        if actual_amount != expected_decimal:
+                            variance_amount = abs(actual_amount - expected_decimal)
+                            variance_type = 'short' if actual_amount < expected_decimal else 'over'
+                            variance_note = (
+                                f'Variance recorded: {variance_type} by {variance_amount:.2f} '
+                                f'(expected {expected_decimal:.2f}, collected {actual_amount:.2f}).'
+                            )
+                            existing_notes = (getattr(action_log, 'notes', '') or '').strip()
+                            action_log.notes = (
+                                f'{existing_notes}\n{variance_note}'.strip()
+                                if existing_notes
+                                else variance_note
+                            )
+                            if hasattr(action_log, 'save'):
+                                action_log.save(update_fields=['notes', 'updated_at'])
+                            if hasattr(bundle, 'variance_amount') and hasattr(bundle, 'variance_type'):
+                                bundle.variance_detected = True
+                                bundle.variance_amount = variance_amount
+                                bundle.variance_type = variance_type
+                                bundle.save(update_fields=['variance_detected', 'variance_amount', 'variance_type'])
                     already_consumed_by_this_action_log = bool(
                         (getattr(bundle, 'promotion_action_log_id', '') or '').strip()
                         and action_log_id

@@ -55,12 +55,11 @@ def birth_movement_for_shipment(shipment, *, movement_date=None, created_by_labe
         movement_sequence=movement_sequence,
         movement_date=movement_date,
         movement_source='Loaded',
-        status=TenantTruckMovementLog.Status.IN_PROGRESS,
+        status=TenantTruckMovementLog.Status.SCHEDULED,
         booking=shipment.booking,
         shipment=shipment,
         truck=shipment.truck,
         driver=shipment.driver,
-        start_time=timezone.now(),
         created_by_label=(created_by_label or '')[:200],
     )
     movement.save()

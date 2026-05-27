@@ -61,7 +61,24 @@ def _action_log():
         log_id='log-1',
         log_no='OAL-001',
         log_date=None,
-        operation_action=SimpleNamespace(action_code='A2'),
+        operation_action=_action('A2'),
+    )
+
+
+def _action(code: str, *, label: str = ''):
+    return SimpleNamespace(
+        action_code=code,
+        english_label=label,
+    )
+
+
+def _collect_payment_action():
+    return SimpleNamespace(
+        action_code='A9',
+        english_label='Collect Payment',
+        auto_treasury_post=True,
+        action_scope='Job',
+        sequence_number=9,
     )
 
 
@@ -140,7 +157,7 @@ class ExecuteActionOrchestratorTests(SimpleTestCase):
         ), patch.object(
             orch._validation_service,
             'resolve_operation_action',
-            return_value=SimpleNamespace(action_code='A2'),
+            return_value=_action('A2'),
         ), patch.object(
             orch,
             '_execute_kernel',
@@ -199,7 +216,7 @@ class ExecuteActionOrchestratorTests(SimpleTestCase):
             action_log=SimpleNamespace(
                 log_id='log-1',
                 idempotency_key='client-uuid-execute-1',
-                operation_action=SimpleNamespace(action_code='A9'),
+                operation_action=_collect_payment_action(),
             ),
             reused_existing=False,
         )
@@ -216,6 +233,13 @@ class ExecuteActionOrchestratorTests(SimpleTestCase):
             created_at=None,
         )
 
+        class _TreasuryTxn:
+            transaction_id = 'tt-1'
+
+        def _kernel_side_effect(context, *, tenant_user, request):
+            context.shipment.collection_status = 'Collected'
+            return kernel_result
+
         with patch.object(
             orch._reconcile_service,
             'prepare_pre_execute',
@@ -244,11 +268,11 @@ class ExecuteActionOrchestratorTests(SimpleTestCase):
         ), patch.object(
             orch._validation_service,
             'resolve_operation_action',
-            return_value=SimpleNamespace(action_code='A9'),
+            return_value=_collect_payment_action(),
         ), patch.object(
             orch,
             '_execute_kernel',
-            return_value=kernel_result,
+            side_effect=_kernel_side_effect,
         ), patch.object(
             orch._media_service,
             'persist_execution_media',
@@ -259,11 +283,14 @@ class ExecuteActionOrchestratorTests(SimpleTestCase):
         ), patch(
             'mobile_api.payment_collection.models.PaymentCollectionBundle',
         ) as bundle_model, patch(
+            'mobile_api.execution.services.execute_action_orchestrator.DriverTreasuryTransaction',
+        ) as treasury_txn_model, patch(
             'django.db.connection',
             autospec=True,
         ) as db_connection:
             db_connection.schema_name = 'tenant-1'
             bundle_model.objects.filter.return_value.order_by.return_value.first.return_value = bundle
+            treasury_txn_model.objects.filter.return_value.order_by.return_value.first.return_value = _TreasuryTxn()
 
             result = orch._run_execute_pipeline(
                 driver=_driver(),
@@ -279,10 +306,17 @@ class ExecuteActionOrchestratorTests(SimpleTestCase):
 
         self.assertIn('payment_bundle', result.payload)
         self.assertEqual(result.payload['payment_bundle']['bundle_id'], 'pb-1')
-        self.assertEqual(result.payload['treasury_status']['treasury_pending'], False)
-        self.assertEqual(result.payload['cod_status']['cod_collected'], True)
+        self.assertEqual(result.payload['success'], True)
+        self.assertEqual(result.payload['action'], 'A9')
+        self.assertEqual(result.payload['shipment_id'], 'ship-1')
+        self.assertEqual(result.payload['cod_payment_status'], 'Collected')
+        self.assertEqual(result.payload['treasury_transaction_id'], 'tt-1')
+        self.assertIsNotNone(result.payload['variance'])
+        self.assertEqual(result.payload['variance']['has_variance'], False)
+        self.assertEqual(result.payload['variance']['variance_type'], 'none')
+        self.assertEqual(result.payload['variance']['variance_amount'], '0.00')
 
-    def test_a9_variance_bundle_rejected(self):
+    def test_a9_variance_bundle_allowed_and_flagged(self):
         orch = self._orchestrator()
 
         def _capture_prepare(ctx, **kw):
@@ -296,6 +330,27 @@ class ExecuteActionOrchestratorTests(SimpleTestCase):
             ctx.sync_metadata = {'content_hash': 'h1', 'workflow_version': 'v1'}
             return {}
 
+        def _capture_build(ctx, **kw):
+            return ExecuteActionResult(
+                payload={
+                    'execution': {'action_log_id': 'log-1'},
+                    'workflow': ctx.workflow,
+                    'pod_cod': {'treasury_pending': False, 'cod_collected': True},
+                    'round_trip': {},
+                    'sync_metadata': ctx.sync_metadata,
+                },
+                http_status=201,
+            )
+
+        kernel_result = SimpleNamespace(
+            action_log=SimpleNamespace(
+                log_id='log-1',
+                idempotency_key='client-uuid-execute-1',
+                operation_action=_collect_payment_action(),
+            ),
+            reused_existing=False,
+        )
+
         bundle = SimpleNamespace(
             id='pb-1',
             client_payment_id='client-uuid-execute-1',
@@ -307,6 +362,13 @@ class ExecuteActionOrchestratorTests(SimpleTestCase):
             payment_mode='cash',
             created_at=None,
         )
+
+        class _TreasuryTxn:
+            transaction_id = 'tt-2'
+
+        def _kernel_side_effect(context, *, tenant_user, request):
+            context.shipment.collection_status = 'Collected'
+            return kernel_result
 
         with patch.object(
             orch._reconcile_service,
@@ -327,6 +389,8 @@ class ExecuteActionOrchestratorTests(SimpleTestCase):
             orch._validation_service,
             'validate_pre_execute_after_idempotency',
             return_value=SimpleNamespace(ok=True, idempotent_replay=False),
+        ), patch(
+            'mobile_api.execution.services.execute_action_orchestrator.lock_execution_entities',
         ), patch.object(
             orch._evidence_service,
             'validate_required_evidence',
@@ -334,32 +398,49 @@ class ExecuteActionOrchestratorTests(SimpleTestCase):
         ), patch.object(
             orch._validation_service,
             'resolve_operation_action',
-            return_value=SimpleNamespace(action_code='A9'),
+            return_value=_collect_payment_action(),
+        ), patch.object(
+            orch,
+            '_execute_kernel',
+            side_effect=_kernel_side_effect,
+        ), patch.object(
+            orch._media_service,
+            'persist_execution_media',
+        ), patch.object(
+            orch._response_service,
+            'build_execute_result',
+            side_effect=_capture_build,
         ), patch(
             'mobile_api.payment_collection.models.PaymentCollectionBundle',
         ) as bundle_model, patch(
-            'mobile_api.execution.services.execute_action_orchestrator.lock_execution_entities',
-        ), patch(
+            'mobile_api.execution.services.execute_action_orchestrator.DriverTreasuryTransaction',
+        ) as treasury_txn_model, patch(
             'django.db.connection',
             autospec=True,
         ) as db_connection:
             db_connection.schema_name = 'tenant-1'
             bundle_model.objects.filter.return_value.order_by.return_value.first.return_value = bundle
+            treasury_txn_model.objects.filter.return_value.order_by.return_value.first.return_value = _TreasuryTxn()
 
-            with self.assertRaises(ExecuteActionError) as ctx_exc:
-                orch._run_execute_pipeline(
-                    driver=_driver(),
-                    tenant_schema='tenant-1',
-                    job_type='shipment',
-                    job_id='ship-1',
-                    action_code='A9',
-                    payload=self._base_payload(),
-                    request=None,
-                    tenant_user=None,
-                    user_id='user-1',
-                )
+            result = orch._run_execute_pipeline(
+                driver=_driver(),
+                tenant_schema='tenant-1',
+                job_type='shipment',
+                job_id='ship-1',
+                action_code='A9',
+                payload=self._base_payload(),
+                request=None,
+                tenant_user=None,
+                user_id='user-1',
+            )
 
-        self.assertEqual(ctx_exc.exception.code, 'payment_variance_detected')
+        self.assertEqual(result.payload['success'], True)
+        self.assertEqual(result.payload['cod_payment_status'], 'Collected')
+        self.assertEqual(result.payload['treasury_transaction_id'], 'tt-2')
+        self.assertIsNotNone(result.payload['variance'])
+        self.assertEqual(result.payload['variance']['has_variance'], True)
+        self.assertEqual(result.payload['variance']['variance_type'], 'short')
+        self.assertEqual(result.payload['variance']['variance_amount'], '50.00')
 
     def test_a9_missing_payment_bundle_rejected(self):
         orch = self._orchestrator()
@@ -401,7 +482,7 @@ class ExecuteActionOrchestratorTests(SimpleTestCase):
         ), patch.object(
             orch._validation_service,
             'resolve_operation_action',
-            return_value=SimpleNamespace(action_code='A9'),
+            return_value=_collect_payment_action(),
         ), patch(
             'mobile_api.payment_collection.models.PaymentCollectionBundle',
         ) as bundle_model:
@@ -474,7 +555,7 @@ class ExecuteActionOrchestratorTests(SimpleTestCase):
         ), patch.object(
             orch._validation_service,
             'resolve_operation_action',
-            return_value=SimpleNamespace(action_code='A9'),
+            return_value=_collect_payment_action(),
         ), patch(
             'mobile_api.payment_collection.models.PaymentCollectionBundle',
         ) as bundle_model, patch(
@@ -566,7 +647,7 @@ class ExecuteActionOrchestratorTests(SimpleTestCase):
         ), patch.object(
             orch._validation_service,
             'resolve_operation_action',
-            return_value=SimpleNamespace(action_code='M1'),
+            return_value=_action('M1'),
         ), patch.object(
             orch,
             '_execute_kernel',
@@ -692,7 +773,7 @@ class ExecuteActionOrchestratorTests(SimpleTestCase):
         ), patch.object(
             orch._validation_service,
             'resolve_operation_action',
-            return_value=SimpleNamespace(action_code='A2'),
+            return_value=_action('A2'),
         ), patch(
             'mobile_api.execution.services.execute_action_orchestrator.ActionExecutionService.execute_driver_action',
             side_effect=DjangoValidationError('POD required'),
@@ -741,7 +822,7 @@ class ExecuteActionOrchestratorTests(SimpleTestCase):
         ), patch.object(
             orch._validation_service,
             'resolve_operation_action',
-            return_value=SimpleNamespace(action_code='A2'),
+            return_value=_action('A2'),
         ), patch.object(
             orch,
             '_execute_kernel',
@@ -789,7 +870,7 @@ class ExecuteActionOrchestratorTests(SimpleTestCase):
             action_code='A2',
             payload={'notes': 'n'},
             shipment=_shipment(),
-            operation_action=SimpleNamespace(action_code='A2'),
+            operation_action=_action('A2'),
             idempotency_key='key-1',
             source_ref='ref-1',
         )
@@ -823,7 +904,7 @@ class ExecuteActionOrchestratorTests(SimpleTestCase):
             action_code='A9',
             payload={'mobile_cod_amount': '100.50', 'notes': 'collected'},
             shipment=_shipment(),
-            operation_action=SimpleNamespace(action_code='A9'),
+            operation_action=_collect_payment_action(),
             idempotency_key='k',
             source_ref='r',
         )

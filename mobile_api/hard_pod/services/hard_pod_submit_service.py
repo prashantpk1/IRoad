@@ -3,6 +3,12 @@ mobile_api/hard_pod/services/hard_pod_submit_service.py
 
 Hard POD custody submit orchestration — prepares custody state only.
 """
+# HARD POD SUBMIT API — LAYER 3 (Physical Custody) — DRIVER SIDE ONLY
+# Responsibility: Record that driver physically has/submits paper document
+# Does NOT duplicate digital evidence from POD Capture
+# Does NOT write Action Log directly
+# Does NOT verify/finalize documents (that is Ops Document Handover)
+# Ops Document Handover on desktop is the final verification step
 from __future__ import annotations
 
 from typing import Any, Mapping
