@@ -43,13 +43,15 @@ from mobile_api.execution.services.execution_response_service import (
 from mobile_api.execution.services.execution_validation_service import (
     ExecutionValidationService,
 )
+from mobile_api.hard_pod.services.hard_pod_execute_integration import (
+    HardPodExecuteIntegrationService,
+)
 from mobile_api.helpers.mobile_execution_guard import (
     MobileExecutionContext,
     mobile_execution_guard,
 )
 from mobile_api.job_detail.services.movement_job_resolver import MovementJobResolver
 from mobile_api.job_detail.services.shipment_job_resolver import ShipmentJobResolver
-
 logger = logging.getLogger('mobile_api.execution')
 
 
@@ -102,6 +104,7 @@ class ExecuteActionOrchestrator:
         self._response_service = response_service or ExecutionResponseService(
             reconcile_service=self._reconcile_service,
         )
+        self._hard_pod_integration = HardPodExecuteIntegrationService()
 
     def execute_driver_action(
         self,
@@ -233,6 +236,9 @@ class ExecuteActionOrchestrator:
                 context,
             )
 
+        # 8.5 payment bundle staging integration (read-only validation)
+        self._attach_payment_bundle_for_cod(context)
+
         # 9. pessimistic locks before mutation
         lock_execution_entities(
             context,
@@ -249,6 +255,15 @@ class ExecuteActionOrchestrator:
         context.reused_existing = exec_result.reused_existing
         context.idempotent_replay = exec_result.reused_existing
 
+        hard_pod_submission = self._hard_pod_integration.bind_action_log(
+            context,
+            exec_result.action_log,
+        )
+        if hard_pod_submission is not None:
+            context.resolver_meta = dict(context.resolver_meta or {})
+            context.resolver_meta['hard_pod_custody_submission_id'] = str(hard_pod_submission.pk)
+            context.resolver_meta['hard_pod_promotion_action_log_id'] = hard_pod_submission.promotion_action_log_id
+
         # 11. media / POD bundle promotion (same transaction; rolls back with kernel)
         bundle_id = extract_capture_bundle_id(context.payload)
         if bundle_id:
@@ -261,7 +276,154 @@ class ExecuteActionOrchestrator:
             context,
             request=request,
         )
-        return self._attach_pod_capture_to_result(result, context)
+        result = self._attach_pod_capture_to_result(result, context)
+        result = self._attach_payment_collection_to_result(result, context)
+        return self._attach_hard_pod_custody_to_result(result, context)
+
+    def _attach_payment_bundle_for_cod(self, context: ExecuteActionContext) -> None:
+        """
+        If the action is COD collection (A9 semantics), consume a staged payment bundle.
+
+        This is read-only at this point: it sets ``payload.mobile_cod_amount`` and
+        records bundle metadata for response shaping. Treasury mutation remains
+        in kernel side effects (Action 9).
+        """
+        if context.idempotent_replay:
+            return
+        action = context.operation_action
+        action_code = (getattr(action, 'action_code', None) or '').strip().upper()
+        if action_code != 'A9':
+            return
+        if context.shipment is None:
+            return
+        if (getattr(context.shipment, 'order_type', '') or '').upper() != 'COD':
+            return
+
+        from decimal import Decimal
+        from django.db import connection
+
+        from mobile_api.execution.exceptions import ExecuteActionError
+        from mobile_api.payment_collection.models import PaymentCollectionBundle
+
+        tenant_schema = (context.tenant_schema or '').strip() or getattr(connection, 'schema_name', '')
+        driver_pk = EvidenceValidationService._driver_pk(context.driver)
+        shipment_pk = EvidenceValidationService._shipment_key(context)
+        idempotency_key = (
+            (context.idempotency_key or '').strip()
+            or str((context.payload or {}).get('client_action_id') or '').strip()
+        )
+        if not (tenant_schema and driver_pk and shipment_pk and idempotency_key):
+            return
+
+        bundle = (
+            PaymentCollectionBundle.objects.filter(
+                tenant_schema=tenant_schema,
+                driver_id=driver_pk,
+                client_payment_id=idempotency_key,
+            )
+            .order_by('-created_at')
+            .first()
+        )
+        if bundle is None:
+            raise ExecuteActionError(
+                'Missing staged payment bundle for COD collection.',
+                code='payment_bundle_missing',
+                http_status=409,
+                message_key='mobile.payment_collection.bundle_not_found',
+                refresh_required=True,
+            )
+
+        # Scope checks: wrong bundle/shipment should hard fail.
+        if (bundle.shipment_id or '').strip() != shipment_pk:
+            raise ExecuteActionError(
+                'Payment bundle does not match shipment.',
+                code='payment_bundle_shipment_mismatch',
+                http_status=409,
+                message_key='mobile.payment_collection.bundle_shipment_mismatch',
+                refresh_required=True,
+            )
+        if bool(getattr(bundle, 'variance_detected', False)):
+            raise ExecuteActionError(
+                'Payment variance detected; cannot execute COD collection.',
+                code='payment_variance_detected',
+                http_status=400,
+                message_key='mobile.payment_collection.variance_detected',
+                refresh_required=True,
+            )
+
+        # Override mobile_cod_amount for Action 9 side effects (treasury posting).
+        context.payload = dict(context.payload or {})
+        context.payload['mobile_cod_amount'] = Decimal(str(bundle.amount))
+
+        context.resolver_meta = dict(context.resolver_meta or {})
+        context.resolver_meta['payment_collection_bundle'] = bundle
+
+    @staticmethod
+    def _attach_payment_collection_to_result(
+        result: ExecuteActionResult,
+        context: ExecuteActionContext,
+    ) -> ExecuteActionResult:
+        bundle = (context.resolver_meta or {}).get('payment_collection_bundle')
+        if not bundle:
+            return result
+        payload = dict(result.payload)
+        payment_bundle = {
+            'bundle_id': str(getattr(bundle, 'id', '') or ''),
+            'client_payment_id': (getattr(bundle, 'client_payment_id', None) or '').strip(),
+            'shipment_id': (getattr(bundle, 'shipment_id', None) or '').strip(),
+            'driver_id': (getattr(bundle, 'driver_id', None) or '').strip(),
+            'amount': str(getattr(bundle, 'amount', '') or ''),
+            'expected_amount': str(getattr(bundle, 'expected_amount', '') or ''),
+            'variance_detected': bool(getattr(bundle, 'variance_detected', False)),
+            'payment_mode': (getattr(bundle, 'payment_mode', None) or '').strip(),
+        }
+        pod_cod = dict(payload.get('pod_cod') or {})
+        treasury_pending = bool(pod_cod.get('treasury_pending')) if isinstance(pod_cod, dict) else False
+        cod_collected = bool(pod_cod.get('cod_collected')) if isinstance(pod_cod, dict) else False
+        payload['payment_bundle'] = payment_bundle
+        treasury_status = {
+            'treasury_pending': treasury_pending,
+        }
+        cod_status = {
+            'cod_collected': cod_collected,
+        }
+        payload['treasury_status'] = treasury_status
+        payload['cod_status'] = cod_status
+
+        # Execute Action API response serializer only exposes `pod_cod`,
+        # so we also nest payment/tax status inside `pod_cod`.
+        pod_cod_payload = dict(payload.get('pod_cod') or {})
+        pod_cod_payload.setdefault('payment_bundle', payment_bundle)
+        pod_cod_payload.setdefault('treasury_status', treasury_status)
+        pod_cod_payload.setdefault('cod_status', cod_status)
+        payload['pod_cod'] = pod_cod_payload
+        return ExecuteActionResult(payload=payload, http_status=result.http_status)
+
+    def _attach_hard_pod_custody_to_result(
+        self,
+        result: ExecuteActionResult,
+        context: ExecuteActionContext,
+    ) -> ExecuteActionResult:
+        submission = (context.resolver_meta or {}).get('hard_pod_custody_submission')
+        authority = (context.resolver_meta or {}).get('hard_pod_custody_authority')
+        if not submission:
+            return result
+
+        payload = dict(result.payload)
+        hard_pod = {
+            'submission_id': str(getattr(submission, 'pk', '') or ''),
+            'client_submission_id': (getattr(submission, 'client_submission_id', None) or '').strip(),
+            'shipment_id': (getattr(submission, 'shipment_id', None) or '').strip(),
+            'driver_id': (getattr(submission, 'driver_id', None) or '').strip(),
+            'promoted_at': getattr(submission, 'promoted_at', None).isoformat() if getattr(submission, 'promoted_at', None) else None,
+            'promotion_action_log_id': (getattr(submission, 'promotion_action_log_id', None) or '').strip(),
+            'custody_authority': dict(authority or {}),
+        }
+        pod_cod = dict(payload.get('pod_cod') or {})
+        pod_cod.setdefault('hard_pod', hard_pod)
+        payload['pod_cod'] = pod_cod
+        payload['hard_pod'] = hard_pod
+        return ExecuteActionResult(payload=payload, http_status=result.http_status)
 
     def _execute_kernel(
         self,

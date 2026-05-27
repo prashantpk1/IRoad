@@ -7,9 +7,9 @@ from contextlib import contextmanager
 from datetime import timedelta
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
-from uuid import uuid4
+from uuid import UUID, uuid4
 
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, TransactionTestCase
 from django.utils import timezone
 
 from mobile_api.execution.dto.execute_action_context import ExecuteActionContext
@@ -38,6 +38,7 @@ from mobile_api.pod_capture.staging.evidence_staging_service import (
     EvidenceStagingService,
     _InMemoryStagingStore,
 )
+from mobile_api.pod_capture.models import PODCaptureBundle as PODCaptureBundleORM
 
 
 @contextmanager
@@ -227,7 +228,7 @@ class EvidencePodBundleValidationTests(SimpleTestCase):
         self.assertEqual(exc.exception.code, 'bundle_expired')
 
 
-class ExecutePodBundleOrchestratorTests(SimpleTestCase):
+class ExecutePodBundleOrchestratorTests(TransactionTestCase):
     def setUp(self) -> None:
         self.store = _InMemoryStagingStore()
         self.staging = EvidenceStagingService(store=self.store)
@@ -251,6 +252,35 @@ class ExecutePodBundleOrchestratorTests(SimpleTestCase):
         )
         self.store.save_media(self.bundle.bundle_id, [media])
         self.store.register_file_refs([media], replace_bundle_id=self.bundle.bundle_id)
+
+        # Promotion audit rows have a FK to the durable ORM bundle row.
+        # These orchestrator tests are wired with in-memory staging, so we
+        # create the minimal ORM bundle record for referential integrity.
+        PODCaptureBundleORM.objects.update_or_create(
+            id=UUID(self.bundle.bundle_id),
+            defaults={
+                'tenant_schema': self.bundle.tenant_schema,
+                'shipment_id': self.bundle.shipment_id,
+                'driver_id': self.bundle.driver_id,
+                'client_capture_id': self.bundle.client_capture_id,
+                'workflow_version': self.bundle.workflow_version or '',
+                'content_hash': self.bundle.content_hash or '',
+                'bundle_status': self.bundle.status.value,
+                'media_count': self.bundle.media_count,
+                'expires_at': self.bundle.expires_at,
+                'pod_type': self.bundle.pod_type or '',
+                'notes': self.bundle.notes or '',
+                'latitude': self.bundle.latitude or '',
+                'longitude': self.bundle.longitude or '',
+                'integrity_checksum': self.bundle.integrity_checksum or '',
+                'capture_device_id': self.bundle.capture_device_id or '',
+                'capture_app_version': self.bundle.capture_app_version or '',
+                'promoted_at': self.bundle.promoted_at,
+                'promotion_action_log_id': self.bundle.promotion_action_log_id or '',
+                'replayed_from_bundle_id': None,
+                'created_at': self.bundle.created_at,
+            },
+        )
 
     def _orchestrator(self) -> ExecuteActionOrchestrator:
         return ExecuteActionOrchestrator()

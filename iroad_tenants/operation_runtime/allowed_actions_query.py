@@ -159,7 +159,13 @@ def _prefilter_shipment_candidates(
 
     clauses = Q()
 
-    forward_tokens = _forward_impact_tokens_for_status(current)
+    if current in {
+        TenantShipment.ShipmentStatus.CREATED,
+        TenantShipment.ShipmentStatus.LOADED,
+    } and stage != STAGE_PRE_TRANSIT:
+        forward_tokens = []
+    else:
+        forward_tokens = _forward_impact_tokens_for_status(current)
     if forward_tokens:
         clauses |= Q(shipment_status_impact__in=forward_tokens)
 

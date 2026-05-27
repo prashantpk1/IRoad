@@ -27,6 +27,9 @@ from mobile_api.execution.guards.stale_execution_guard import StaleExecutionGuar
 from mobile_api.execution.services.execution_reconcile_service import (
     ExecutionReconcileService,
 )
+from mobile_api.hard_pod.services.hard_pod_execute_integration import (
+    HardPodExecuteIntegrationService,
+)
 from mobile_api.job_detail.projections.workflow_projection import build_workflow_section
 from mobile_api.execution.services.execution_context_adapter import to_job_detail_context
 from tenant_workspace.models import TenantOperationAction
@@ -64,6 +67,7 @@ class ExecutionValidationService:
         self._stale = stale_guard or StaleExecutionGuard()
         self._reconcile = reconcile_service or ExecutionReconcileService()
         self._operation_action_model = operation_action_model
+        self._hard_pod_integration = HardPodExecuteIntegrationService()
 
     def validate_pre_execute(
         self,
@@ -106,6 +110,8 @@ class ExecutionValidationService:
         self._stale.assert_not_stale(context)
         self.validate_action_master(context, request=request)
         _ = ExecutionAuthoritativeContext.from_execute_context(context)
+        self._validate_hard_pod_execute_requirements(context)
+        self._attach_operational_issue_warnings(context)
         return ExecutionValidationResult(
             ok=True,
             idempotent_replay=False,
@@ -210,6 +216,22 @@ class ExecutionValidationService:
                 if token:
                     codes.add(token)
         return codes
+
+    @staticmethod
+    def _attach_operational_issue_warnings(context: ExecuteActionContext) -> None:
+        """
+        Advisory operational issue overlay — never blocks kernel execute.
+
+        Surfaces escalation alerts and blocking recommendations for Action Master policy later.
+        """
+        from mobile_api.job_detail.projections.job_detail_projection_builder import (
+            attach_operational_issue_warnings_to_execute_context,
+        )
+
+        attach_operational_issue_warnings_to_execute_context(context)
+
+    def _validate_hard_pod_execute_requirements(self, context: ExecuteActionContext) -> None:
+        self._hard_pod_integration.validate_execute_requirements(context)
 
     @staticmethod
     def _booking_item_type(context: ExecuteActionContext) -> str:

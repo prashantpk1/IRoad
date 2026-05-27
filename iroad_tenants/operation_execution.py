@@ -10,6 +10,7 @@ from __future__ import annotations
 from django.db.models import Q
 
 from iroad_tenants.operation_runtime.shipment_execution_stage import (
+    STAGE_PRE_TRANSIT,
     derive_shipment_execution_stage,
     execution_stage_operational_label,
     is_pickup_or_loading_action,
@@ -218,6 +219,20 @@ def _action_is_allowed(
             return False
 
         if impact:
+            if (
+                impact == TenantShipment.ShipmentStatus.IN_TRANSIT
+                and current
+                in {
+                    TenantShipment.ShipmentStatus.CREATED,
+                    TenantShipment.ShipmentStatus.LOADED,
+                }
+                and derive_shipment_execution_stage(
+                    shipment,
+                    exclude_log_id=exclude_log_id,
+                )
+                != STAGE_PRE_TRANSIT
+            ):
+                return False
             allowed_from = _FORWARD_FROM_STATUSES.get(impact, set())
             if not allowed_from:
                 return False

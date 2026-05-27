@@ -30,6 +30,7 @@ class JobDetailApiPayload(TypedDict, total=False):
       - round_trip
       - alerts
       - sync_metadata
+      - operational_issues (shipment advisory)
     """
 
     job: dict[str, Any]
@@ -39,6 +40,9 @@ class JobDetailApiPayload(TypedDict, total=False):
     round_trip: dict[str, Any]
     alerts: dict[str, Any]
     sync_metadata: dict[str, Any]
+    operational_issues: list[dict[str, Any]]
+    unresolved_issue_count: int
+    blocking_recommendation: bool
 
 
 @dataclass
@@ -51,6 +55,7 @@ class JobDetailResponseBuilder:
 
         TODO: enforce empty-move omission rules for ``pod_cod`` / ``round_trip``.
         """
+        visibility = self._build_operational_issues_visibility(context)
         return JobDetailApiPayload(
             job=self._build_job(context),
             workflow=self._build_workflow(context),
@@ -59,6 +64,9 @@ class JobDetailResponseBuilder:
             round_trip=self._build_round_trip(context),
             alerts=self._build_alerts(context),
             sync_metadata=self._build_sync_metadata(context),
+            operational_issues=list(visibility.get('operational_issues') or []),
+            unresolved_issue_count=int(visibility.get('unresolved_issue_count') or 0),
+            blocking_recommendation=bool(visibility.get('blocking_recommendation')),
         )
 
     def _build_job(self, context: JobDetailContext) -> dict[str, Any]:
@@ -88,3 +96,20 @@ class JobDetailResponseBuilder:
 
     def _build_sync_metadata(self, context: JobDetailContext) -> dict[str, Any]:
         return dict(context.sync_metadata or {})
+
+    @staticmethod
+    def _build_operational_issues_visibility(context: JobDetailContext) -> dict[str, Any]:
+        cached = (context.resolver_meta or {}).get('operational_issues_visibility')
+        if isinstance(cached, dict):
+            return cached
+        if context.job_type != 'shipment':
+            return {
+                'operational_issues': [],
+                'unresolved_issue_count': 0,
+                'blocking_recommendation': False,
+            }
+        from mobile_api.job_detail.projections.job_detail_projection_builder import (
+            build_operational_issues_visibility,
+        )
+
+        return build_operational_issues_visibility(context)

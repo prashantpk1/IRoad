@@ -75,6 +75,7 @@ class EvidenceValidationService:
             requirements = dict(context.resolver_meta.get('pod_capture_compliance') or {})
             self._validate_gps(payload, requirements)
             self._validate_notes(payload, requirements)
+            self._attach_operational_issue_warnings(context)
             return
 
         requirements = build_execution_requirements(operation_action)
@@ -82,6 +83,7 @@ class EvidenceValidationService:
         self._validate_notes(payload, requirements)
         self._media_security.validate_media(context)
         self._validate_media(context, requirements)
+        self._attach_operational_issue_warnings(context)
 
     def validate_pod_capture_bundle(
         self,
@@ -179,6 +181,18 @@ class EvidenceValidationService:
             refresh_required=bool(getattr(exc, 'refresh_required', False)),
             validation_error=body,
         )
+
+    def _attach_operational_issue_warnings(self, context: ExecuteActionContext) -> None:
+        """
+        Attach advisory operational issue warnings (no hard-block).
+
+        Execute Action remains workflow authority; warnings surface in ``alerts``.
+        """
+        from mobile_api.job_detail.projections.job_detail_projection_builder import (
+            attach_operational_issue_warnings_to_execute_context,
+        )
+
+        attach_operational_issue_warnings_to_execute_context(context)
 
     def _validate_gps(self, payload: dict[str, Any], requirements: dict[str, Any]) -> None:
         if not requirements.get('gps'):

@@ -26,10 +26,12 @@ from mobile_api.job_detail.timeline.timeline_cursor_service import (
 )
 from mobile_api.job_detail.timeline.timeline_event_mapper import (
     dedupe_timeline_events,
+    merge_actions_with_timeline_logs,
     map_logs_to_timeline_events,
     sort_logs_newest_first,
 )
 from iroad_tenants.services.timeline_service import TimelineService
+from tenant_workspace.models import TenantOperationAction
 
 JobType = Literal['shipment', 'movement']
 
@@ -93,12 +95,25 @@ class JobDetailTimelineService:
             return _empty_bundle(limit)
 
         cache = get_projection_cache(context)
-        if cache is not None and cache.primary_logs():
-            return self._preview_from_cached_logs(
-                cache.primary_logs(),
-                limit=limit,
+        if cache is not None:
+            cached_logs = cache.primary_logs()
+            workflow_events = self._workflow_events_for_context(
+                context,
+                logs=cached_logs,
                 request=request,
             )
+            if workflow_events:
+                return self._bundle_from_workflow_events(
+                    workflow_events,
+                    limit=limit,
+                    scope=context.job_type,
+                )
+            if cached_logs:
+                return self._preview_from_cached_logs(
+                    cached_logs,
+                    limit=limit,
+                    request=request,
+                )
 
         page = self.fetch_page_for_context(
             context,
@@ -153,6 +168,16 @@ class JobDetailTimelineService:
         driver_id = driver_pk(context.driver)
 
         if context.job_type == 'shipment' and context.shipment is not None:
+            workflow_page = self._fetch_workflow_page(
+                context,
+                shipment=context.shipment,
+                movement=None,
+                driver_id=driver_id,
+                limit=page_limit,
+                request=request,
+            )
+            if workflow_page.timeline_preview:
+                return workflow_page
             return self._fetch_page(
                 shipment=context.shipment,
                 movement=None,
@@ -162,6 +187,16 @@ class JobDetailTimelineService:
                 request=request,
             )
         if context.job_type == 'movement' and context.movement is not None:
+            workflow_page = self._fetch_workflow_page(
+                context,
+                shipment=None,
+                movement=context.movement,
+                driver_id=driver_id,
+                limit=page_limit,
+                request=request,
+            )
+            if workflow_page.timeline_preview:
+                return workflow_page
             return self._fetch_page(
                 shipment=None,
                 movement=context.movement,
@@ -171,6 +206,78 @@ class JobDetailTimelineService:
                 request=request,
             )
         return TimelinePageResult(timeline_preview=[], timeline_cursor='', has_more=False)
+
+    def _workflow_actions(self) -> list[Any]:
+        qs = TenantOperationAction.objects.filter(
+            status=TenantOperationAction.Status.ACTIVE,
+            action_scope__in=('job', 'without', ''),
+        ).order_by('sequence_number', 'action_code')
+        try:
+            return list(qs)
+        except Exception as exc:
+            if exc.__class__.__name__ == 'DatabaseOperationForbidden':
+                return []
+            raise
+
+    def _workflow_events_for_context(
+        self,
+        context: JobDetailContext,
+        *,
+        logs: list[Any],
+        request: Any | None,
+    ) -> list[dict[str, Any]]:
+        actions = self._workflow_actions()
+        if not actions:
+            return []
+        return merge_actions_with_timeline_logs(actions, logs, request=request)
+
+    def _bundle_from_workflow_events(
+        self,
+        events: list[dict[str, Any]],
+        *,
+        limit: int,
+        scope: str,
+    ) -> dict[str, Any]:
+        window = events[:limit]
+        return {
+            'scope': scope,
+            'preview_limit': limit,
+            'timeline_preview': window,
+            'timeline_cursor': '',
+            'has_more': len(events) > limit,
+        }
+
+    def _fetch_workflow_page(
+        self,
+        context: JobDetailContext,
+        *,
+        shipment: Any | None,
+        movement: Any | None,
+        driver_id: Any,
+        limit: int,
+        request: Any | None,
+    ) -> TimelinePageResult:
+        actions = self._workflow_actions()
+        if not actions:
+            return TimelinePageResult(
+                timeline_preview=[],
+                timeline_cursor='',
+                has_more=False,
+            )
+
+        logs = TimelineService.fetch_scoped_timeline_page(
+            shipment=shipment,
+            movement=movement,
+            driver_id=driver_id,
+            cursor=None,
+            limit=max(len(actions) * 3, limit + 1),
+        )
+        events = merge_actions_with_timeline_logs(actions, logs, request=request)
+        return TimelinePageResult(
+            timeline_preview=events[:limit],
+            timeline_cursor='',
+            has_more=len(events) > limit,
+        )
 
     def _preview_from_cached_logs(
         self,

@@ -7,7 +7,7 @@ from contextlib import contextmanager
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, TransactionTestCase
 
 from mobile_api.execution.dto.execute_action_result import ExecuteActionResult
 from mobile_api.execution.guards.execution_idempotency_guard import IdempotencyKeys
@@ -34,7 +34,7 @@ def _existing_log():
     )
 
 
-class ExecutionReplaySafetyTests(SimpleTestCase):
+class ExecutionReplaySafetyTests(TransactionTestCase):
     @patch('mobile_api.execution.services.execute_action_orchestrator.schema_context', _fake_schema)
     def test_replay_skips_kernel_and_evidence(self):
         orch = ExecuteActionOrchestrator()

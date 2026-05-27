@@ -34,6 +34,9 @@ from mobile_api.job_detail.services.job_detail_sync_metadata import (
     build_job_detail_sync_metadata,
     resolve_content_hash,
 )
+from mobile_api.services.operational_reconciliation_service import (
+    OperationalReconciliationService,
+)
 
 
 class ExecutionProjectionCache:
@@ -158,8 +161,16 @@ class ExecutionProjectionCache:
         ctx.timeline = dict(self._execute_context.timeline or {})
 
         projection_svc = JobDetailProjectionService()
-        self._execute_context.alerts = projection_svc._build_alerts_placeholder(ctx)
-        ctx.alerts = dict(self._execute_context.alerts or {})
+        ctx.resolver_meta = dict(ctx.resolver_meta or {})
+        ctx.resolver_meta['operational_reconciliation'] = OperationalReconciliationService().reconcile(
+            context=ctx,
+            request=request,
+        )
+        placeholder = projection_svc._build_alerts_placeholder(ctx)
+        merged_alerts = dict(self._execute_context.alerts or {})
+        merged_alerts.update(placeholder)
+        self._execute_context.alerts = merged_alerts
+        ctx.alerts = dict(merged_alerts)
 
         ctx.sync_metadata = build_job_detail_sync_metadata(ctx)
         ctx.content_hash = resolve_content_hash(ctx)

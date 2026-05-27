@@ -105,6 +105,10 @@ def _validation_patches(*, replay: bool = False):
             ),
         ),
         patch.object(ExecutionReconcileService, 'apply_status_overlays', _fake_apply_overlays),
+        patch.object(
+            ExecutionValidationService,
+            '_attach_operational_issue_warnings',
+        ),
     )
 
 
@@ -115,8 +119,8 @@ class ExecutionValidationTests(SimpleTestCase):
         svc = ExecutionValidationService(operation_action_model=MagicMock())
         svc._operation_action_model.objects.filter.return_value.first.return_value = action
 
-        p_replay, p_keys, p_overlay = _validation_patches()
-        with p_replay, p_keys, p_overlay, patch.object(
+        p_replay, p_keys, p_overlay, p_issues = _validation_patches()
+        with p_replay, p_keys, p_overlay, p_issues, patch.object(
             OperationExecutionService,
             'validate_operation_action_allowed',
             return_value=None,
@@ -132,8 +136,8 @@ class ExecutionValidationTests(SimpleTestCase):
         svc = ExecutionValidationService(operation_action_model=MagicMock())
         svc._operation_action_model.objects.filter.return_value.first.return_value = action
 
-        p_replay, p_keys, p_overlay = _validation_patches()
-        with p_replay, p_keys, p_overlay, patch.object(
+        p_replay, p_keys, p_overlay, p_issues = _validation_patches()
+        with p_replay, p_keys, p_overlay, p_issues, patch.object(
             OperationExecutionService,
             'validate_operation_action_allowed',
             return_value=None,

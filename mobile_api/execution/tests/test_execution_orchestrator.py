@@ -4,6 +4,7 @@ Execute Action orchestrator pipeline tests (mocked kernel / no tenant DB).
 from __future__ import annotations
 
 from contextlib import contextmanager
+from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -39,6 +40,7 @@ def _shipment():
         shipment_no='SHP-1',
         shipment_status='In Transit',
         booking_item_type='outbound',
+        order_type='COD',
         booking=SimpleNamespace(pk='bk-1'),
         truck=None,
     )
@@ -166,6 +168,380 @@ class ExecuteActionOrchestratorTests(SimpleTestCase):
         self.assertEqual(result.http_status, 201)
         mock_kernel.assert_called_once()
         self.assertEqual(context_holder['ctx'].action_log, kernel_result.action_log)
+
+    def test_a9_attaches_payment_bundle_and_status_blocks(self):
+        orch = self._orchestrator()
+
+        def _capture_prepare(ctx, **kw):
+            ctx.shipment = _shipment()
+            ctx.booking = ctx.shipment.booking
+            ctx.workflow = {
+                'allowed_actions': [{'action_code': 'A9'}],
+                'next_action': {'action_code': 'A9'},
+                'primary_action': {'action_code': 'A9'},
+            }
+            ctx.sync_metadata = {'content_hash': 'h1', 'workflow_version': 'v1'}
+            return {}
+
+        def _capture_build(ctx, **kw):
+            return ExecuteActionResult(
+                payload={
+                    'execution': {'action_log_id': 'log-1'},
+                    'workflow': ctx.workflow,
+                    'pod_cod': {'treasury_pending': False, 'cod_collected': True},
+                    'round_trip': {},
+                    'sync_metadata': ctx.sync_metadata,
+                },
+                http_status=201,
+            )
+
+        kernel_result = SimpleNamespace(
+            action_log=SimpleNamespace(
+                log_id='log-1',
+                idempotency_key='client-uuid-execute-1',
+                operation_action=SimpleNamespace(action_code='A9'),
+            ),
+            reused_existing=False,
+        )
+
+        bundle = SimpleNamespace(
+            id='pb-1',
+            client_payment_id='client-uuid-execute-1',
+            shipment_id='ship-1',
+            driver_id='drv-1',
+            amount=Decimal('100.00'),
+            expected_amount=Decimal('100.00'),
+            variance_detected=False,
+            payment_mode='cash',
+            created_at=None,
+        )
+
+        with patch.object(
+            orch._reconcile_service,
+            'prepare_pre_execute',
+            side_effect=_capture_prepare,
+        ), patch.object(
+            orch._idempotency_guard,
+            'normalize_request_keys',
+            return_value=SimpleNamespace(
+                idempotency_key='client-uuid-execute-1',
+                source_ref='',
+            ),
+        ), patch.object(
+            orch._idempotency_guard,
+            'detect_idempotent_replay',
+            return_value=False,
+        ), patch.object(
+            orch._validation_service,
+            'validate_pre_execute_after_idempotency',
+            return_value=SimpleNamespace(ok=True, idempotent_replay=False),
+        ), patch(
+            'mobile_api.execution.services.execute_action_orchestrator.lock_execution_entities',
+        ), patch.object(
+            orch._evidence_service,
+            'validate_required_evidence',
+            return_value=None,
+        ), patch.object(
+            orch._validation_service,
+            'resolve_operation_action',
+            return_value=SimpleNamespace(action_code='A9'),
+        ), patch.object(
+            orch,
+            '_execute_kernel',
+            return_value=kernel_result,
+        ), patch.object(
+            orch._media_service,
+            'persist_execution_media',
+        ), patch.object(
+            orch._response_service,
+            'build_execute_result',
+            side_effect=_capture_build,
+        ), patch(
+            'mobile_api.payment_collection.models.PaymentCollectionBundle',
+        ) as bundle_model, patch(
+            'django.db.connection',
+            autospec=True,
+        ) as db_connection:
+            db_connection.schema_name = 'tenant-1'
+            bundle_model.objects.filter.return_value.order_by.return_value.first.return_value = bundle
+
+            result = orch._run_execute_pipeline(
+                driver=_driver(),
+                tenant_schema='tenant-1',
+                job_type='shipment',
+                job_id='ship-1',
+                action_code='A9',
+                payload=self._base_payload(),
+                request=None,
+                tenant_user=None,
+                user_id='user-1',
+            )
+
+        self.assertIn('payment_bundle', result.payload)
+        self.assertEqual(result.payload['payment_bundle']['bundle_id'], 'pb-1')
+        self.assertEqual(result.payload['treasury_status']['treasury_pending'], False)
+        self.assertEqual(result.payload['cod_status']['cod_collected'], True)
+
+    def test_a9_variance_bundle_rejected(self):
+        orch = self._orchestrator()
+
+        def _capture_prepare(ctx, **kw):
+            ctx.shipment = _shipment()
+            ctx.booking = ctx.shipment.booking
+            ctx.workflow = {
+                'allowed_actions': [{'action_code': 'A9'}],
+                'next_action': {'action_code': 'A9'},
+                'primary_action': {'action_code': 'A9'},
+            }
+            ctx.sync_metadata = {'content_hash': 'h1', 'workflow_version': 'v1'}
+            return {}
+
+        bundle = SimpleNamespace(
+            id='pb-1',
+            client_payment_id='client-uuid-execute-1',
+            shipment_id='ship-1',
+            driver_id='drv-1',
+            amount=Decimal('50.00'),
+            expected_amount=Decimal('100.00'),
+            variance_detected=True,
+            payment_mode='cash',
+            created_at=None,
+        )
+
+        with patch.object(
+            orch._reconcile_service,
+            'prepare_pre_execute',
+            side_effect=_capture_prepare,
+        ), patch.object(
+            orch._idempotency_guard,
+            'normalize_request_keys',
+            return_value=SimpleNamespace(
+                idempotency_key='client-uuid-execute-1',
+                source_ref='',
+            ),
+        ), patch.object(
+            orch._idempotency_guard,
+            'detect_idempotent_replay',
+            return_value=False,
+        ), patch.object(
+            orch._validation_service,
+            'validate_pre_execute_after_idempotency',
+            return_value=SimpleNamespace(ok=True, idempotent_replay=False),
+        ), patch.object(
+            orch._evidence_service,
+            'validate_required_evidence',
+            return_value=None,
+        ), patch.object(
+            orch._validation_service,
+            'resolve_operation_action',
+            return_value=SimpleNamespace(action_code='A9'),
+        ), patch(
+            'mobile_api.payment_collection.models.PaymentCollectionBundle',
+        ) as bundle_model, patch(
+            'mobile_api.execution.services.execute_action_orchestrator.lock_execution_entities',
+        ), patch(
+            'django.db.connection',
+            autospec=True,
+        ) as db_connection:
+            db_connection.schema_name = 'tenant-1'
+            bundle_model.objects.filter.return_value.order_by.return_value.first.return_value = bundle
+
+            with self.assertRaises(ExecuteActionError) as ctx_exc:
+                orch._run_execute_pipeline(
+                    driver=_driver(),
+                    tenant_schema='tenant-1',
+                    job_type='shipment',
+                    job_id='ship-1',
+                    action_code='A9',
+                    payload=self._base_payload(),
+                    request=None,
+                    tenant_user=None,
+                    user_id='user-1',
+                )
+
+        self.assertEqual(ctx_exc.exception.code, 'payment_variance_detected')
+
+    def test_a9_missing_payment_bundle_rejected(self):
+        orch = self._orchestrator()
+
+        def _capture_prepare(ctx, **kw):
+            ctx.shipment = _shipment()
+            ctx.booking = ctx.shipment.booking
+            ctx.workflow = {
+                'allowed_actions': [{'action_code': 'A9'}],
+                'next_action': {'action_code': 'A9'},
+                'primary_action': {'action_code': 'A9'},
+            }
+            ctx.sync_metadata = {'content_hash': 'h1', 'workflow_version': 'v1'}
+            return {}
+
+        with patch.object(
+            orch._reconcile_service,
+            'prepare_pre_execute',
+            side_effect=_capture_prepare,
+        ), patch.object(
+            orch._idempotency_guard,
+            'normalize_request_keys',
+            return_value=SimpleNamespace(
+                idempotency_key='client-uuid-execute-1',
+                source_ref='',
+            ),
+        ), patch.object(
+            orch._idempotency_guard,
+            'detect_idempotent_replay',
+            return_value=False,
+        ), patch.object(
+            orch._validation_service,
+            'validate_pre_execute_after_idempotency',
+            return_value=SimpleNamespace(ok=True, idempotent_replay=False),
+        ), patch.object(
+            orch._evidence_service,
+            'validate_required_evidence',
+            return_value=None,
+        ), patch.object(
+            orch._validation_service,
+            'resolve_operation_action',
+            return_value=SimpleNamespace(action_code='A9'),
+        ), patch(
+            'mobile_api.payment_collection.models.PaymentCollectionBundle',
+        ) as bundle_model:
+            bundle_model.objects.filter.return_value.order_by.return_value.first.return_value = None
+
+            with self.assertRaises(ExecuteActionError) as ctx_exc:
+                orch._run_execute_pipeline(
+                    driver=_driver(),
+                    tenant_schema='tenant-1',
+                    job_type='shipment',
+                    job_id='ship-1',
+                    action_code='A9',
+                    payload=self._base_payload(),
+                    request=None,
+                    tenant_user=None,
+                    user_id='user-1',
+                )
+
+        self.assertEqual(ctx_exc.exception.code, 'payment_bundle_missing')
+
+    def test_a9_wrong_shipment_payment_bundle_rejected(self):
+        orch = self._orchestrator()
+
+        def _capture_prepare(ctx, **kw):
+            ctx.shipment = _shipment()
+            ctx.booking = ctx.shipment.booking
+            ctx.workflow = {
+                'allowed_actions': [{'action_code': 'A9'}],
+                'next_action': {'action_code': 'A9'},
+                'primary_action': {'action_code': 'A9'},
+            }
+            ctx.sync_metadata = {'content_hash': 'h1', 'workflow_version': 'v1'}
+            return {}
+
+        bundle = SimpleNamespace(
+            id='pb-1',
+            client_payment_id='client-uuid-execute-1',
+            shipment_id='ship-other',
+            driver_id='drv-1',
+            amount=Decimal('100.00'),
+            expected_amount=Decimal('100.00'),
+            variance_detected=False,
+            payment_mode='cash',
+            created_at=None,
+        )
+
+        with patch.object(
+            orch._reconcile_service,
+            'prepare_pre_execute',
+            side_effect=_capture_prepare,
+        ), patch.object(
+            orch._idempotency_guard,
+            'normalize_request_keys',
+            return_value=SimpleNamespace(
+                idempotency_key='client-uuid-execute-1',
+                source_ref='',
+            ),
+        ), patch.object(
+            orch._idempotency_guard,
+            'detect_idempotent_replay',
+            return_value=False,
+        ), patch.object(
+            orch._validation_service,
+            'validate_pre_execute_after_idempotency',
+            return_value=SimpleNamespace(ok=True, idempotent_replay=False),
+        ), patch.object(
+            orch._evidence_service,
+            'validate_required_evidence',
+            return_value=None,
+        ), patch.object(
+            orch._validation_service,
+            'resolve_operation_action',
+            return_value=SimpleNamespace(action_code='A9'),
+        ), patch(
+            'mobile_api.payment_collection.models.PaymentCollectionBundle',
+        ) as bundle_model, patch(
+            'django.db.connection',
+            autospec=True,
+        ) as db_connection:
+            db_connection.schema_name = 'tenant-1'
+            bundle_model.objects.filter.return_value.order_by.return_value.first.return_value = bundle
+
+            with self.assertRaises(ExecuteActionError) as ctx_exc:
+                orch._run_execute_pipeline(
+                    driver=_driver(),
+                    tenant_schema='tenant-1',
+                    job_type='shipment',
+                    job_id='ship-1',
+                    action_code='A9',
+                    payload=self._base_payload(),
+                    request=None,
+                    tenant_user=None,
+                    user_id='user-1',
+                )
+
+        self.assertEqual(ctx_exc.exception.code, 'payment_bundle_shipment_mismatch')
+
+    def test_a9_idempotent_replay_skips_payment_bundle_lookup(self):
+        orch = self._orchestrator()
+
+        with patch.object(
+            orch._reconcile_service,
+            'prepare_pre_execute',
+            return_value={},
+        ), patch.object(
+            orch._idempotency_guard,
+            'normalize_request_keys',
+            return_value=SimpleNamespace(
+                idempotency_key='client-uuid-execute-1',
+                source_ref='',
+            ),
+        ), patch.object(
+            orch._idempotency_guard,
+            'detect_idempotent_replay',
+            return_value=True,
+        ), patch.object(
+            orch._response_service,
+            'build_execute_result',
+            return_value=ExecuteActionResult(payload={'execution': {}}, http_status=200),
+        ), patch(
+            'mobile_api.payment_collection.models.PaymentCollectionBundle'
+        ) as bundle_model:
+            bundle_model.objects.filter.side_effect = AssertionError(
+                'payment bundle lookup should not run on idempotent replay'
+            )
+
+            result = orch._run_execute_pipeline(
+                driver=_driver(),
+                tenant_schema='tenant-1',
+                job_type='shipment',
+                job_id='ship-1',
+                action_code='A9',
+                payload=self._base_payload(),
+                request=None,
+                tenant_user=None,
+                user_id='user-1',
+            )
+
+        self.assertEqual(result.http_status, 200)
+        self.assertNotIn('payment_bundle', result.payload)
 
     def test_movement_execute_success(self):
         orch = self._orchestrator()

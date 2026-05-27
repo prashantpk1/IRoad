@@ -11,6 +11,7 @@ Prevents orphan, cross-tenant, cross-driver, and cross-shipment uploads via:
 from __future__ import annotations
 
 from typing import Any
+from types import SimpleNamespace
 
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -40,6 +41,82 @@ def _driver_pk(driver: Any) -> str:
     return str(pk or '').strip()
 
 
+class _InMemoryStagingStore:
+    """
+    Test-only compatibility store.
+
+    Historically unit tests injected an in-memory store into EvidenceStagingService
+    via `store=...`. The production code now defaults to `DurableBundleRepository`,
+    but we keep this small adapter to avoid forcing DB-backed changes into
+    SimpleTestCase suites.
+    """
+
+    def __init__(self) -> None:
+        self._bundles: dict[str, PODCaptureBundle] = {}
+        self._media: dict[str, list[PODCaptureMedia]] = {}
+        # normalized_file_ref -> registration
+        self._file_refs: dict[str, Any] = {}
+
+    def get_by_idempotency(
+        self,
+        *,
+        tenant_schema: str,
+        client_capture_id: str,
+        driver_id: str,
+    ) -> PODCaptureBundle | None:
+        for bundle in self._bundles.values():
+            if (
+                (bundle.tenant_schema or '').strip() == (tenant_schema or '').strip()
+                and (bundle.client_capture_id or '').strip()
+                == (client_capture_id or '').strip()
+                and (bundle.driver_id or '').strip() == (driver_id or '').strip()
+            ):
+                return bundle
+        return None
+
+    def save_bundle(self, bundle: PODCaptureBundle) -> None:
+        self._bundles[bundle.bundle_id] = bundle
+
+    def update_bundle(self, bundle: PODCaptureBundle) -> None:
+        self._bundles[bundle.bundle_id] = bundle
+
+    def get_bundle(self, bundle_id: str) -> PODCaptureBundle | None:
+        return self._bundles.get(bundle_id)
+
+    def save_media(self, bundle_id: str, rows: list[PODCaptureMedia]) -> None:
+        # In-memory tests treat media as replace/overwrite per bundle.
+        self._media[bundle_id] = list(rows)
+
+    def get_media(self, bundle_id: str) -> list[PODCaptureMedia]:
+        return list(self._media.get(bundle_id) or [])
+
+    def get_file_ref_registration(self, normalized_file_ref: str) -> Any | None:
+        return self._file_refs.get(normalized_file_ref)
+
+    def register_file_refs(
+        self,
+        rows: list[PODCaptureMedia],
+        *,
+        replace_bundle_id: str,
+    ) -> None:
+        for row in rows:
+            normalized = normalize_file_ref(row.file_ref)
+            if not normalized:
+                continue
+            self._file_refs[normalized] = SimpleNamespace(
+                promoted=False,
+                bundle_id=(replace_bundle_id or '').strip(),
+                tenant_schema=(row.tenant_schema or '').strip(),
+                driver_id=(row.driver_id or '').strip(),
+                shipment_id=(row.shipment_id or '').strip(),
+            )
+
+    def mark_bundle_media_promoted(self, bundle_id: str, *, action_log_id: str) -> None:
+        for reg in self._file_refs.values():
+            if (getattr(reg, 'bundle_id', '') or '').strip() == (bundle_id or '').strip():
+                reg.promoted = True
+
+
 class EvidenceStagingService:
     """
     Create, validate, and transition staged POD capture bundles.
@@ -50,8 +127,16 @@ class EvidenceStagingService:
                      ↘ expired | rejected
     """
 
-    def __init__(self, *, repository: DurableBundleRepository | None = None) -> None:
-        self._repo = repository or DurableBundleRepository()
+    def __init__(
+        self,
+        *,
+        repository: DurableBundleRepository | None = None,
+        store: _InMemoryStagingStore | None = None,
+    ) -> None:
+        # `store=` is a test-only alias preserved for older unit tests.
+        if store is not None and repository is not None:
+            raise ValueError('Provide only one of `repository` or `store`.')
+        self._repo = store or repository or DurableBundleRepository()
 
     @staticmethod
     def scope_from_context(context: PodCaptureContext) -> StagingScope:

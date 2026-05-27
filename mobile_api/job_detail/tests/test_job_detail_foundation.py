@@ -34,6 +34,9 @@ class JobDetailFoundationTests(SimpleTestCase):
                 'round_trip',
                 'alerts',
                 'sync_metadata',
+                'operational_issues',
+                'unresolved_issue_count',
+                'blocking_recommendation',
             },
         )
 

@@ -1,11 +1,15 @@
 # Iroad Mobile API — Postman
 
-Postman assets for the **Unified Driver Dashboard**, **Job Detail**, **Execute Action**, and **POD Capture** APIs.
+Postman assets for the **Unified Driver Dashboard**, **Job Detail**, **Execute Action**, **POD Capture**, and **Ops Staging** APIs.
 
 ## Files
 
 | File | Purpose |
 |------|---------|
+| `Iroad_Mobile_Driver_Ops_Staging.postman_collection.json` | **Hard POD + Payment + Issues** — bearer-only (no login) |
+| `Iroad_Mobile_Ops_Staging.postman_environment.json` | Ops staging environment (`bearer_token`, `tenant_header`, idempotency keys) |
+| `OPS_STAGING_SETUP.md` | Hard POD / Payment / Issues setup guide |
+| `OPS_STAGING_SAMPLE_PAYLOADS.md` | Ops staging request/response samples |
 | `Iroad_Mobile_Driver_POD_Capture.postman_collection.json` | **POD Capture** — 14 scenarios + execute promotion, bearer-only |
 | `Iroad_Mobile_POD_Capture.postman_environment.json` | POD Capture environment (`bearer_token`, `tenant_header`, bundle ids) |
 | `POD_CAPTURE_SETUP.md` | POD Capture setup guide |
@@ -28,6 +32,15 @@ Postman assets for the **Unified Driver Dashboard**, **Job Detail**, **Execute A
 5. Run **03 → 14. Execute — promote staged bundle**.
 
 See `POD_CAPTURE_SETUP.md` for all 14 scenarios.
+
+### Quick start — Ops Staging (Hard POD / Payment / Issues)
+
+1. Import `Iroad_Mobile_Driver_Ops_Staging.postman_collection.json` + `Iroad_Mobile_Ops_Staging.postman_environment.json`.
+2. Paste driver JWT into `bearer_token`; set `tenant_header`, `driver_id`, `shipment_id`.
+3. Run **01 → Hard POD list**, then **02 → submit**, **03 → payment**, **04 → issues**.
+4. Run **04 → 5. Job Detail** to verify `operational_issues` visibility.
+
+See `OPS_STAGING_SETUP.md` for full run order.
 
 ### Quick start — Execute Action
 

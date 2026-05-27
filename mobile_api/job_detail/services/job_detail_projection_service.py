@@ -68,9 +68,19 @@ class JobDetailProjectionService:
         context.job_header = build_job_header(context, request=request)
         context.workflow = build_workflow_section(context, request=request)
         context.timeline = build_timeline_section(context, request=request)
+        from mobile_api.job_detail.projections.job_detail_projection_builder import (
+            apply_operational_issues_visibility,
+        )
+
+        apply_operational_issues_visibility(context, request=request)
         context.pod_cod = build_pod_cod_section(context, request=request)
         context.round_trip = build_round_trip_section(context, request=request)
-        context.alerts = self._build_alerts_placeholder(context)
+        # Preserve any alerts already attached by projections/services (e.g.
+        # operational issue escalation alerts and execution warning overlays).
+        existing_alerts = dict(getattr(context, 'alerts', None) or {})
+        placeholder = self._build_alerts_placeholder(context)
+        existing_alerts.update(placeholder)
+        context.alerts = existing_alerts
         # ``sync_metadata`` / ETag finalized in ``finalize_job_detail_sync`` (context service).
         if not context.sync_metadata:
             context.sync_metadata = build_sync_metadata(context, request=request)
@@ -88,9 +98,13 @@ class JobDetailProjectionService:
     def _build_alerts_placeholder(self, context: JobDetailContext) -> dict[str, Any]:
         """TODO: operational alerts from reconciliation + compliance drift."""
         recon = context.reconciliation or {}
+        alerts: dict[str, Any] = {}
         if recon.get('any_drift'):
-            return {'has_drift': True}
-        return {}
+            alerts['has_drift'] = True
+        operational = (context.resolver_meta or {}).get('operational_reconciliation')
+        if isinstance(operational, dict):
+            alerts['reconciliation_alerts'] = list(operational.get('reconciliation_alerts') or [])
+        return alerts
 
 
 def _resolver_ok(context: JobDetailContext) -> bool:

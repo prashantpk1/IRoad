@@ -1,0 +1,1045 @@
+{
+  "info": {
+    "_postman_id": "8e3999cf-9b81-4b47-907f-00e14902d24c",
+    "name": "Iroad — Mobile Driver API (Ops Staging)",
+    "description": "Hard POD (list + submit), Payment Collection, and Delay/Issue Reporting.\n\n**Auth:** `Bearer {{bearer_token}}` (no login in this collection).\n**Tenant:** `X-Tenant-ID: {{tenant_header}}`.\n\nSee `OPS_STAGING_SETUP.md` and `OPS_STAGING_SAMPLE_PAYLOADS.md`.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{bearer_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (!pm.variables.get('request_id') || String(pm.variables.get('request_id')).indexOf('{{') >= 0) {",
+          "    pm.variables.set('request_id', 'postman-' + pm.variables.replaceIn('{{$guid}}'));",
+          "}",
+          "const bearer = pm.variables.get('bearer_token');",
+          "const access = pm.variables.get('access_token');",
+          "if ((!bearer || String(bearer).indexOf('{{') >= 0) && access && String(access).indexOf('{{') < 0) {",
+          "    pm.environment.set('bearer_token', access);",
+          "}",
+          "const schema = pm.variables.get('tenant_schema') || pm.variables.get('tenant_header');",
+          "if (schema && String(schema).indexOf('{{') < 0) {",
+          "    pm.environment.set('tenant_header', schema);",
+          "}",
+          "const tenant = pm.variables.get('tenant_header') || pm.variables.get('tenant_schema') || 'tenant_schema';",
+          "const driver = pm.variables.get('driver_id') || 'driver_id';",
+          "const ship = pm.variables.get('shipment_id') || 'shipment_id';",
+          "pm.variables.set('hard_pod_path_prefix', `mobile_driver_uploads/${tenant}/${driver}/${ship}/hard_pod/`);",
+          "pm.variables.set('payment_path_prefix', `mobile_driver_uploads/${tenant}/${driver}/${ship}/payment_collection/`);",
+          "pm.variables.set('issue_path_prefix', `mobile_driver_uploads/${tenant}/${driver}/${ship}/issues/`);"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8000/api/v1/mobile"
+    },
+    {
+      "key": "bearer_token",
+      "value": ""
+    },
+    {
+      "key": "tenant_header",
+      "value": ""
+    },
+    {
+      "key": "tenant_schema",
+      "value": ""
+    },
+    {
+      "key": "shipment_id",
+      "value": ""
+    },
+    {
+      "key": "driver_id",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "00 — Prerequisites",
+      "item": [
+        {
+          "name": "0. GET Shipment Job Detail (sync shipment + issues visibility)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenant_header}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipment/{{shipment_id}}/",
+            "description": "Optional sync. After reporting issues, re-run to see `operational_issues` on Job Detail."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+                  "const body = pm.response.json();",
+                  "pm.test('success envelope', function () { pm.expect(body.status).to.eql('success'); });",
+                  "const data = pm.response.json().data || {};",
+                  "pm.test('operational_issues visibility', function () {",
+                  "    pm.expect(data).to.have.property('operational_issues');",
+                  "    pm.expect(data).to.have.property('unresolved_issue_count');",
+                  "    pm.expect(data).to.have.property('blocking_recommendation');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "description": "Sync `shipment_id` from your tenant. No login — paste JWT first."
+    },
+    {
+      "name": "01 — Hard POD List",
+      "item": [
+        {
+          "name": "1. GET Pending Hard POD list",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenant_header}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/hard-pod/pending/?limit={{hard_pod_list_limit}}",
+            "description": "Read-only queue of Hard POD shipments for the authenticated driver."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+                  "const body = pm.response.json();",
+                  "pm.test('success envelope', function () { pm.expect(body.status).to.eql('success'); });",
+                  "const data = pm.response.json().data || {};",
+                  "pm.test('has items array', function () { pm.expect(data.items).to.be.an('array'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "description": "`GET /driver/hard-pod/pending/` — capability `mobile.driver.hard_pod`."
+    },
+    {
+      "name": "02 — Hard POD Submit",
+      "item": [
+        {
+          "name": "1. POST Submit custody (success)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenant_header}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/hard-pod/submit/",
+            "description": "Stages custody evidence. Does not mutate workflow — Execute Action required next.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_submission_id\": \"{{hard_pod_client_submission_id}}\",\n  \"shipment_id\": \"{{shipment_id}}\",\n  \"receiver_name\": \"{{hard_pod_receiver_name}}\",\n  \"receiver_contact\": \"{{hard_pod_receiver_contact}}\",\n  \"handoff_notes\": \"{{hard_pod_handoff_notes}}\",\n  \"latitude\": {{hard_pod_latitude}},\n  \"longitude\": {{hard_pod_longitude}},\n  \"media\": [\n    {\n      \"media_type\": \"photo\",\n      \"file_ref\": \"{{hard_pod_path_prefix}}scan-001.jpg\",\n      \"file_name\": \"scan-001.jpg\",\n      \"mime_type\": \"image/jpeg\",\n      \"sort_order\": 1\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set('hard_pod_client_submission_id', 'hard-pod-' + pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+                  "const body = pm.response.json();",
+                  "pm.test('success envelope', function () { pm.expect(body.status).to.eql('success'); });",
+                  "const data = pm.response.json().data || {};",
+                  "pm.test('custody_submission present', function () { pm.expect(data.custody_submission).to.be.an('object'); });",
+                  "if (data.custody_submission && data.custody_submission.client_submission_id) {",
+                  "    pm.environment.set('hard_pod_replay_client_submission_id', data.custody_submission.client_submission_id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2. POST Replay submit (same client_submission_id)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenant_header}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/hard-pod/submit/",
+            "description": "Idempotent replay — expect HTTP 200 and `replayed: true`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_submission_id\": \"{{hard_pod_replay_client_submission_id}}\",\n  \"shipment_id\": \"{{shipment_id}}\",\n  \"receiver_name\": \"{{hard_pod_receiver_name}}\",\n  \"receiver_contact\": \"{{hard_pod_receiver_contact}}\",\n  \"handoff_notes\": \"{{hard_pod_handoff_notes}}\",\n  \"latitude\": {{hard_pod_latitude}},\n  \"longitude\": {{hard_pod_longitude}},\n  \"media\": [\n    {\n      \"media_type\": \"photo\",\n      \"file_ref\": \"{{hard_pod_path_prefix}}scan-001.jpg\",\n      \"file_name\": \"scan-001.jpg\",\n      \"mime_type\": \"image/jpeg\",\n      \"sort_order\": 1\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200 replay', function () { pm.response.to.have.status(200); });",
+                  "const sub = (pm.response.json().data || {}).custody_submission || {};",
+                  "pm.test('replayed flag', function () { pm.expect(sub.replayed).to.eql(true); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3. POST Wrong shipment (foreign)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenant_header}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/hard-pod/submit/",
+            "description": "Expect 403 `forbidden` or 404 `job_not_found` for shipment not owned by driver.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_submission_id\": \"{{hard_pod_client_submission_id}}\",\n  \"shipment_id\": \"{{foreign_shipment_id}}\",\n  \"receiver_name\": \"{{hard_pod_receiver_name}}\",\n  \"receiver_contact\": \"{{hard_pod_receiver_contact}}\",\n  \"handoff_notes\": \"{{hard_pod_handoff_notes}}\",\n  \"latitude\": {{hard_pod_latitude}},\n  \"longitude\": {{hard_pod_longitude}},\n  \"media\": [\n    {\n      \"media_type\": \"photo\",\n      \"file_ref\": \"{{hard_pod_path_prefix}}scan-001.jpg\",\n      \"file_name\": \"scan-001.jpg\",\n      \"mime_type\": \"image/jpeg\",\n      \"sort_order\": 1\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set('hard_pod_client_submission_id', 'hard-pod-' + pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 403 or 404', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([403, 404]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4. POST Wrong driver / not Hard POD",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenant_header}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/hard-pod/submit/",
+            "description": "Use `non_hard_pod_shipment_id` (digital POD shipment) — expect `not_hard_pod_shipment` or `forbidden`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_submission_id\": \"{{hard_pod_client_submission_id}}\",\n  \"shipment_id\": \"{{non_hard_pod_shipment_id}}\",\n  \"receiver_name\": \"{{hard_pod_receiver_name}}\",\n  \"receiver_contact\": \"{{hard_pod_receiver_contact}}\",\n  \"handoff_notes\": \"{{hard_pod_handoff_notes}}\",\n  \"latitude\": {{hard_pod_latitude}},\n  \"longitude\": {{hard_pod_longitude}},\n  \"media\": [\n    {\n      \"media_type\": \"photo\",\n      \"file_ref\": \"{{hard_pod_path_prefix}}scan-001.jpg\",\n      \"file_name\": \"scan-001.jpg\",\n      \"mime_type\": \"image/jpeg\",\n      \"sort_order\": 1\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set('hard_pod_client_submission_id', 'hard-pod-' + pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 4xx', function () { pm.expect(pm.response.code).to.be.at.least(400); });"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "description": "`POST /driver/hard-pod/submit/` — prep-only custody staging."
+    },
+    {
+      "name": "03 — Payment Collection",
+      "item": [
+        {
+          "name": "1. POST Collect COD (full amount)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenant_header}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/payments/collect/",
+            "description": "Stages payment bundle for Execute Action A9. Expect 201 on first collect.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_payment_id\": \"{{payment_client_payment_id}}\",\n  \"shipment_id\": \"{{shipment_id}}\",\n  \"amount\": \"{{payment_amount_full}}\",\n  \"notes\": \"{{payment_notes}}\",\n  \"payment_mode\": \"COD\",\n  \"proof_media\": [\n    {\n      \"media_type\": \"photo\",\n      \"file_ref\": \"{{payment_path_prefix}}proof.jpg\",\n      \"file_name\": \"proof.jpg\",\n      \"mime_type\": \"image/jpeg\",\n      \"sort_order\": 1\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set('payment_client_payment_id', 'pay-' + pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+                  "const body = pm.response.json();",
+                  "pm.test('success envelope', function () { pm.expect(body.status).to.eql('success'); });",
+                  "const bundle = (pm.response.json().data || {}).payment_bundle || {};",
+                  "pm.test('payment_bundle present', function () { pm.expect(bundle.bundle_id).to.be.ok; });",
+                  "if (bundle.client_payment_id) {",
+                  "    pm.environment.set('payment_replay_client_payment_id', bundle.client_payment_id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2. POST Replay payment (same client_payment_id)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenant_header}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/payments/collect/",
+            "description": "Idempotent replay — HTTP 200, `replayed: true`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_payment_id\": \"{{payment_replay_client_payment_id}}\",\n  \"shipment_id\": \"{{shipment_id}}\",\n  \"amount\": \"{{payment_amount_full}}\",\n  \"notes\": \"{{payment_notes}}\",\n  \"payment_mode\": \"COD\",\n  \"proof_media\": [\n    {\n      \"media_type\": \"photo\",\n      \"file_ref\": \"{{payment_path_prefix}}proof.jpg\",\n      \"file_name\": \"proof.jpg\",\n      \"mime_type\": \"image/jpeg\",\n      \"sort_order\": 1\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200 replay', function () { pm.response.to.have.status(200); });",
+                  "pm.test('replayed', function () {",
+                  "    pm.expect((pm.response.json().data || {}).payment_bundle.replayed).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3. POST Duplicate payment (new key, same shipment)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenant_header}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/payments/collect/",
+            "description": "Run **after** step 1 on same shipment with a **new** `client_payment_id` — expect `duplicate_payment` 409/400.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_payment_id\": \"{{payment_duplicate_client_payment_id}}\",\n  \"shipment_id\": \"{{shipment_id}}\",\n  \"amount\": \"{{payment_amount_full}}\",\n  \"notes\": \"{{payment_notes}}\",\n  \"payment_mode\": \"COD\",\n  \"proof_media\": [\n    {\n      \"media_type\": \"photo\",\n      \"file_ref\": \"{{payment_path_prefix}}proof.jpg\",\n      \"file_name\": \"proof.jpg\",\n      \"mime_type\": \"image/jpeg\",\n      \"sort_order\": 1\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set('payment_duplicate_client_payment_id', 'pay-dup-' + pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('duplicate rejected', function () {",
+                  "    pm.expect(pm.response.code).to.be.at.least(400);",
+                  "    const err = pm.response.json().error || pm.response.json();",
+                  "    const code = err.code || (err.errors && err.errors[0] && err.errors[0].code) || '';",
+                  "    if (code) pm.expect(String(code)).to.include('duplicate');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4. POST Collect with variance (partial amount)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenant_header}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/payments/collect/",
+            "description": "Use a **fresh** COD shipment. `payment_amount_variance` < expected — stages with `variance_detected: true`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_payment_id\": \"{{payment_client_payment_id}}\",\n  \"shipment_id\": \"{{shipment_id}}\",\n  \"amount\": \"{{payment_amount_variance}}\",\n  \"notes\": \"{{payment_notes}}\",\n  \"payment_mode\": \"COD\",\n  \"proof_media\": [\n    {\n      \"media_type\": \"photo\",\n      \"file_ref\": \"{{payment_path_prefix}}proof.jpg\",\n      \"file_name\": \"proof.jpg\",\n      \"mime_type\": \"image/jpeg\",\n      \"sort_order\": 1\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set('payment_client_payment_id', 'pay-' + pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+                  "const body = pm.response.json();",
+                  "pm.test('success envelope', function () { pm.expect(body.status).to.eql('success'); });",
+                  "const recon = (pm.response.json().data || {}).reconciliation || {};",
+                  "pm.test('variance_detected', function () { pm.expect(recon.variance_detected).to.eql(true); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5. POST Wrong tenant header",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{wrong_tenant_header}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenant_header}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/payments/collect/",
+            "description": "Sends mismatched `X-Tenant-ID` — expect 403 `tenant_mismatch`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_payment_id\": \"{{payment_client_payment_id}}\",\n  \"shipment_id\": \"{{shipment_id}}\",\n  \"amount\": \"{{payment_amount_full}}\",\n  \"notes\": \"{{payment_notes}}\",\n  \"payment_mode\": \"COD\",\n  \"proof_media\": [\n    {\n      \"media_type\": \"photo\",\n      \"file_ref\": \"{{payment_path_prefix}}proof.jpg\",\n      \"file_name\": \"proof.jpg\",\n      \"mime_type\": \"image/jpeg\",\n      \"sort_order\": 1\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set('payment_client_payment_id', 'pay-' + pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('tenant mismatch', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([403, 400]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "description": "`POST /driver/payments/collect/` — capability `mobile.driver.payment_collection`."
+    },
+    {
+      "name": "04 — Delay / Issue Reporting",
+      "item": [
+        {
+          "name": "1. POST Delay report",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenant_header}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/issues/report/",
+            "description": "`issue_type: delay` — prep-only operational exception.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_issue_id\": \"{{issue_client_issue_id}}\",\n  \"shipment_id\": \"{{shipment_id}}\",\n  \"issue_type\": \"delay\",\n  \"severity\": \"medium\",\n  \"notes\": \"{{issue_delay_notes}}\",\n  \"latitude\": {{issue_latitude}},\n  \"longitude\": {{issue_longitude}},\n  \"media\": [\n    {\n      \"media_type\": \"photo\",\n      \"file_ref\": \"{{issue_path_prefix}}delay-traffic.jpg\",\n      \"file_name\": \"delay-traffic.jpg\",\n      \"mime_type\": \"image/jpeg\",\n      \"sort_order\": 1\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set('issue_client_issue_id', 'issue-' + pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+                  "const body = pm.response.json();",
+                  "pm.test('success envelope', function () { pm.expect(body.status).to.eql('success'); });",
+                  "const data = pm.response.json().data || {};",
+                  "pm.test('issue payload', function () { pm.expect(data.issue).to.be.an('object'); });",
+                  "if (data.issue && data.issue.client_issue_id) {",
+                  "    pm.environment.set('issue_replay_client_issue_id', data.issue.client_issue_id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2. POST Vehicle breakdown report",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenant_header}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/issues/report/",
+            "description": "High-impact type — `blocking_recommended` likely true.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_issue_id\": \"{{issue_breakdown_client_issue_id}}\",\n  \"shipment_id\": \"{{shipment_id}}\",\n  \"issue_type\": \"vehicle_breakdown\",\n  \"severity\": \"high\",\n  \"notes\": \"Engine failure — awaiting roadside assistance\",\n  \"latitude\": {{issue_latitude}},\n  \"longitude\": {{issue_longitude}},\n  \"media\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set('issue_breakdown_client_issue_id', 'issue-bd-' + pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+                  "const body = pm.response.json();",
+                  "pm.test('success envelope', function () { pm.expect(body.status).to.eql('success'); });",
+                  "const data = pm.response.json().data || {};",
+                  "pm.test('issue payload', function () { pm.expect(data.issue).to.be.an('object'); });",
+                  "if (data.issue && data.issue.client_issue_id) {",
+                  "    pm.environment.set('issue_replay_client_issue_id', data.issue.client_issue_id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3. POST Escalation flow (critical route_blocked)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenant_header}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/issues/report/",
+            "description": "Critical severity + high-impact type triggers auto-escalation in response.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_issue_id\": \"{{issue_escalation_client_issue_id}}\",\n  \"shipment_id\": \"{{shipment_id}}\",\n  \"issue_type\": \"route_blocked\",\n  \"severity\": \"critical\",\n  \"notes\": \"Highway closed — police diversion\",\n  \"latitude\": {{issue_latitude}},\n  \"longitude\": {{issue_longitude}},\n  \"media\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set('issue_escalation_client_issue_id', 'issue-esc-' + pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+                  "const body = pm.response.json();",
+                  "pm.test('success envelope', function () { pm.expect(body.status).to.eql('success'); });",
+                  "const data = pm.response.json().data || {};",
+                  "pm.test('issue payload', function () { pm.expect(data.issue).to.be.an('object'); });",
+                  "if (data.issue && data.issue.client_issue_id) {",
+                  "    pm.environment.set('issue_replay_client_issue_id', data.issue.client_issue_id);",
+                  "}",
+                  "const esc = (pm.response.json().data || {}).escalation || {};",
+                  "pm.test('auto-escalated state', function () {",
+                  "    pm.expect(['escalated', 'open']).to.include(esc.escalation_state);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4. POST Issue replay (same client_issue_id)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenant_header}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/issues/report/",
+            "description": "Replay delay report — HTTP 200, `replayed: true`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_issue_id\": \"{{issue_replay_client_issue_id}}\",\n  \"shipment_id\": \"{{shipment_id}}\",\n  \"issue_type\": \"delay\",\n  \"severity\": \"medium\",\n  \"notes\": \"{{issue_delay_notes}}\",\n  \"latitude\": {{issue_latitude}},\n  \"longitude\": {{issue_longitude}},\n  \"media\": [\n    {\n      \"media_type\": \"photo\",\n      \"file_ref\": \"{{issue_path_prefix}}delay-traffic.jpg\",\n      \"file_name\": \"delay-traffic.jpg\",\n      \"mime_type\": \"image/jpeg\",\n      \"sort_order\": 1\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200 replay', function () { pm.response.to.have.status(200); });",
+                  "pm.test('replayed', function () {",
+                  "    pm.expect((pm.response.json().data || {}).issue.replayed).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5. GET Job Detail — unresolved issues visibility",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenant_header}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipment/{{shipment_id}}/",
+            "description": "After reporting issues: `operational_issues`, `unresolved_issue_count`, `blocking_recommendation`, timeline issue milestones."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+                  "const body = pm.response.json();",
+                  "pm.test('success envelope', function () { pm.expect(body.status).to.eql('success'); });",
+                  "const data = pm.response.json().data || {};",
+                  "pm.test('operational_issues visibility', function () {",
+                  "    pm.expect(data).to.have.property('operational_issues');",
+                  "    pm.expect(data).to.have.property('unresolved_issue_count');",
+                  "    pm.expect(data).to.have.property('blocking_recommendation');",
+                  "});",
+                  "const data = pm.response.json().data || {};",
+                  "pm.test('unresolved count >= 1 after reports', function () {",
+                  "    if (pm.environment.get('issue_client_issue_id')) {",
+                  "        pm.expect(data.unresolved_issue_count).to.be.at.least(1);",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "description": "`POST /driver/issues/report/` — capability `mobile.driver.issues`."
+    }
+  ]
+}

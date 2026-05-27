@@ -194,8 +194,12 @@ class TimelineServiceTests(SimpleTestCase):
 
 
 class TimelineProjectionTests(SimpleTestCase):
+    @patch(
+        'mobile_api.job_detail.projections.job_detail_projection_builder.build_issue_timeline_events',
+        return_value=[],
+    )
     @patch.object(JobDetailTimelineService, 'build_preview_bundle')
-    def test_projection_contract_keys(self, mock_preview):
+    def test_projection_contract_keys(self, mock_preview, _mock_issue_timeline):
         mock_preview.return_value = {
             'scope': 'shipment',
             'preview_limit': 5,

@@ -1,0 +1,2 @@
+"""Payment collection tests."""
+

@@ -1,0 +1,1 @@
+"""Hard POD DTOs."""
