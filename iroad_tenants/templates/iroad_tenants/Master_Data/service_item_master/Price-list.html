@@ -245,7 +245,11 @@
     const isViewMode = {% if is_view %}true{% else %}false{% endif %};
     const serviceItems = [
       {% for si in active_service_items %}
-      { id: "{{ si.service_item_id }}", label: "{{ si.service_code|escapejs }} - {{ si.english_name|escapejs }}" },
+      {
+        id: "{{ si.service_item_id }}",
+        label: "{{ si.service_code|escapejs }} - {{ si.english_name|escapejs }}",
+        sellPrice: "{{ si.sell_price }}"
+      },
       {% endfor %}
     ];
     const tripItems = [
@@ -254,7 +258,9 @@
         id: "{{ ti.service_item_id }}",
         label: "{{ ti.service_code|escapejs }} - {{ ti.english_name|escapejs }}",
         origin: "{% if ti.route and ti.route.origin_point %}{{ ti.route.origin_point.display_label|escapejs }}{% endif %}",
-        destination: "{% if ti.route and ti.route.destination_point %}{{ ti.route.destination_point.display_label|escapejs }}{% endif %}"
+        destination: "{% if ti.route and ti.route.destination_point %}{{ ti.route.destination_point.display_label|escapejs }}{% endif %}",
+        outboundSellPrice: "{% if ti.outbound_sell_price is not None %}{{ ti.outbound_sell_price }}{% endif %}",
+        inboundSellPrice: "{% if ti.inbound_sell_price is not None %}{{ ti.inbound_sell_price }}{% endif %}"
       },
       {% endfor %}
     ];
@@ -314,6 +320,38 @@
       const outVal = outSell && String(outSell.value || "").trim() ? String(outSell.value).trim() : "";
       const inVal = inSell && String(inSell.value || "").trim() ? String(inSell.value).trim() : "";
       sell.value = outVal || inVal || "";
+    }
+
+    function formatPriceValue(val) {
+      if (val == null || String(val).trim() === "") return "";
+      const n = parseFloat(String(val).trim());
+      if (Number.isNaN(n)) return "";
+      return n.toFixed(2);
+    }
+
+    function findServiceItemCatalog(type, serviceItemId) {
+      const items = type === "Trip" ? tripItems : serviceItems;
+      return items.find(function (item) { return item.id === serviceItemId; }) || null;
+    }
+
+    function applySellPriceFromServiceItem(row) {
+      const typeSel = row.querySelector(".pl-service-type");
+      const svcSel = row.querySelector('select[aria-label="Service Item"]');
+      const sell = row.querySelector(".pl-sell");
+      const outSell = row.querySelector(".pl-out-sell");
+      const inSell = row.querySelector(".pl-in-sell");
+      if (!typeSel || !svcSel) return;
+      const serviceItemId = String(svcSel.value || "").trim();
+      if (!serviceItemId) return;
+      const catalogItem = findServiceItemCatalog(typeSel.value, serviceItemId);
+      if (!catalogItem) return;
+      if (typeSel.value === "Trip") {
+        if (outSell) outSell.value = formatPriceValue(catalogItem.outboundSellPrice);
+        if (inSell) inSell.value = formatPriceValue(catalogItem.inboundSellPrice);
+        syncTripSellPrice(row);
+        return;
+      }
+      if (sell) sell.value = formatPriceValue(catalogItem.sellPrice);
     }
 
     function populateServiceItems(row, keepValue) {
@@ -377,6 +415,7 @@
       });
       if (svcSel) svcSel.addEventListener("change", function () {
         updateTripRouteFromService(row);
+        applySellPriceFromServiceItem(row);
       });
       const outSell = row.querySelector(".pl-out-sell");
       const inSell = row.querySelector(".pl-in-sell");
