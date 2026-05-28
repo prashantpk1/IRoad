@@ -220,7 +220,8 @@ def _action_is_allowed(
                 TenantShipment.ShipmentStatus.DELIVERED,
             }
 
-        if action_matches(action, 'start job', 'a1', 'action 1'):
+        action_code = str(getattr(action, 'action_code', '') or '').strip().upper()
+        if action_matches(action, 'start job', 'action 1') or action_code == 'A1':
             return False
 
         if impact:

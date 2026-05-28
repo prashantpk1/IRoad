@@ -67,7 +67,9 @@ def scoped_shipment_action_logs(
             Q(shipment_id=shipment.pk) | Q(truck_movement_id=movement.pk),
         )
     if driver_id:
-        qs = qs.filter(driver_id=driver_id)
+        qs = qs.filter(
+            Q(driver_id=driver_id) | Q(driver_id__isnull=True),
+        )
     if exclude_log_id:
         qs = qs.exclude(log_id=exclude_log_id)
     return qs[:scan_limit]

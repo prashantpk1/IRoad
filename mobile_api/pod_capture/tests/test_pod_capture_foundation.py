@@ -7,7 +7,7 @@ from datetime import datetime, timezone as dt_timezone
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, override_settings
 
 from mobile_api.tests.transaction_test_case import TransactionTestCase
 
@@ -43,6 +43,7 @@ class PodCaptureSecurityGuardTests(SimpleTestCase):
             'mobile_driver_uploads/tenant_a/drv-1/ship-1/pod_capture/',
         )
 
+    @override_settings(MOBILE_POD_CAPTURE_ALLOW_ORPHAN_RETRY=False)
     def test_rejects_path_outside_prefix(self) -> None:
         from mobile_api.pod_capture.dto.pod_capture_context import PodCaptureContext
         from mobile_api.pod_capture.dto.staging_models import PODCaptureMediaItemInput

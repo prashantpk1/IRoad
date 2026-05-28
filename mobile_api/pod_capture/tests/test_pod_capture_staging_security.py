@@ -9,6 +9,7 @@ from types import SimpleNamespace
 
 from mobile_api.tests.transaction_test_case import TransactionTestCase
 from django.utils import timezone
+from django.test import override_settings
 
 from mobile_api.pod_capture.dto.pod_capture_context import PodCaptureContext
 from mobile_api.pod_capture.dto.staging_models import (
@@ -110,6 +111,7 @@ class EvidenceStagingSecurityTests(TransactionTestCase):
             self.staging.assert_bundle_scope(bundle, other)
         self.assertEqual(exc.exception.code, 'driver_scope_mismatch')
 
+    @override_settings(MOBILE_POD_CAPTURE_ALLOW_ORPHAN_RETRY=False)
     def test_orphan_upload_path_rejected(self) -> None:
         scope = _scope()
         with self.assertRaises(PodCaptureError) as exc:
@@ -119,6 +121,7 @@ class EvidenceStagingSecurityTests(TransactionTestCase):
             )
         self.assertEqual(exc.exception.code, 'orphan_upload')
 
+    @override_settings(MOBILE_POD_CAPTURE_ALLOW_ORPHAN_RETRY=False)
     def test_cross_shipment_file_ref_rejected(self) -> None:
         scope_a = _scope(shipment='ship-1')
         scope_b = _scope(shipment='ship-2')
