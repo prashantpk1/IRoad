@@ -5,6 +5,7 @@ Server-side enforcement of GPS / media / note requirements from Action Master me
 """
 from __future__ import annotations
 
+from types import SimpleNamespace
 from typing import Any
 
 from django.utils.translation import gettext_lazy as _
@@ -75,6 +76,7 @@ class EvidenceValidationService:
             requirements = dict(context.resolver_meta.get('pod_capture_compliance') or {})
             self._validate_gps(payload, requirements)
             self._validate_notes(payload, requirements)
+            self._validate_media(context, requirements)
             self._attach_operational_issue_warnings(context)
             return
 
@@ -125,10 +127,12 @@ class EvidenceValidationService:
                 driver_id=driver_pk,
                 shipment_id=shipment_key,
             )
-            bundle = PodCaptureBundleService().assert_orphan_bundle_prevented(
+            bundle_service = PodCaptureBundleService()
+            bundle = bundle_service.assert_orphan_bundle_prevented(
                 bundle_id,
                 scope=scope,
             )
+            bundle_media = bundle_service._staging.get_media(bundle.bundle_id)  # noqa: SLF001
         except PodCaptureError as exc:
             raise self._map_pod_capture_error(exc) from exc
 
@@ -141,6 +145,7 @@ class EvidenceValidationService:
         context.resolver_meta = dict(context.resolver_meta or {})
         context.resolver_meta['pod_capture_bundle_id'] = bundle.bundle_id
         context.resolver_meta['pod_capture_bundle'] = bundle
+        context.resolver_meta['pod_capture_bundle_media'] = list(bundle_media or [])
         context.resolver_meta['pod_capture_compliance'] = requirements
 
     @staticmethod
@@ -222,7 +227,20 @@ class EvidenceValidationService:
         context: ExecuteActionContext,
         requirements: dict[str, Any],
     ) -> None:
-        items = normalize_media_items(list((context.payload or {}).get('media') or []))
+        bundle_id = extract_capture_bundle_id(context.payload or {})
+        if bundle_id:
+            bundle_media = list((context.resolver_meta or {}).get('pod_capture_bundle_media') or [])
+            items = [
+                SimpleNamespace(
+                    media_type=str(getattr(row, 'media_type', '') or ''),
+                    file_ref=str(getattr(row, 'file_ref', '') or ''),
+                    upload=None,
+                    media_id='',
+                )
+                for row in bundle_media
+            ]
+        else:
+            items = normalize_media_items(list((context.payload or {}).get('media') or []))
         photo_min = int(requirements.get('photo_min_count') or 0)
         video_min = int(requirements.get('video_min_count') or 0)
         requires_photo = bool(requirements.get('photo')) or photo_min > 0

@@ -946,7 +946,7 @@
           ]
         },
         "url": "{{base_url}}/driver/payments/collect/",
-        "description": "PREREQUISITE: Run requests in order 04 → 05 → 06 etc.\ncontent_hash and workflow_version auto-update after\neach successful execute.\nIf you get 409 stale_content_hash:\n  1. Re-run Request 03 Job Detail to refresh hash\n  2. Then retry this request\nDo NOT skip any action in the sequence.\n\nFILE UPLOAD INSTRUCTIONS:\nFor any field with type FILE:\n  Click the file icon in Postman next to that field.\n  Select any JPG, PNG, or MP4 file from your device.\nAllowed file types: image/jpeg, image/png,\n  image/webp, video/mp4\nMax file size: 50MB per file\nContent-Type is set automatically by Postman.\nDo NOT set Content-Type header manually."
+        "description": "COD ORDERS ONLY — SKIP FOR CREDIT ORDERS.\n\nThis API fires A9 Collect Payment.\nOnly call this if the shipment is a COD order.\n\nHow to check if shipment is COD:\n  In Request 03 Job Detail response look at:\n  data.pod_cod.cod_pending\n  If cod_pending = true → shipment is COD → run this request\n  If cod_pending = false → shipment is Credit → SKIP this request\n\nFor the current test shipment SH-D004:\n  cod_pending = false → this is a Credit order\n  SKIP this request and go directly to Request 14 A10\n\nIf you get error not_cod_shipment:\n  Your shipment is a Credit order.\n  Skip this step entirely.\n\nFor a real COD test you need a shipment where\n  payment_type = COD in the booking.\n  Ask your admin to create a COD booking for testing."
       }
     },
     {
