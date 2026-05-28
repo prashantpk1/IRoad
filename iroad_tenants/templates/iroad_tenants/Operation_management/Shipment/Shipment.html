@@ -65,7 +65,7 @@
               {% if shipment_is_edit %}
               <div class="field">
                 <label class="form-label">Shipment Status</label>
-                <input type="text" class="form-control" value="{{ shipment_status_display|default:shipment_form_data.shipment_status }}" readonly />
+                <input type="text" class="form-control" value="{% if shipment_status_display %}{{ shipment_status_display }}{% else %}{{ shipment_form_data.shipment_status|default:'-' }}{% endif %}" readonly />
                 <span class="field-hint">Updated by Operation Action Log impacts</span>
               </div>
               <div class="field">

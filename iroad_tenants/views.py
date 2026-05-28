@@ -6704,6 +6704,7 @@ class TenantOperationShipmentCreateView(View):
             return response
         try:
             shipment_form_data = {
+                'shipment_status': (shipment.shipment_status or '').strip(),
                 'order_type': (request.POST.get('booking_order_type') or '').strip(),
                 'shipment_date': (request.POST.get('shipment_date') or '').strip(),
                 'client_account': (request.POST.get('client_account') or '').strip(),
@@ -14631,6 +14632,7 @@ def _tenant_shipment_cargo_from_post(request, cargo_id=None):
     cargo = None
     cargo_weight = Decimal('0')
     cargo_qty = Decimal('0')
+    two_dp = Decimal('0.01')
     cargo_unit = (request.POST.get('cargo_unit_1') or '').strip()
     raw_cargo_id = (cargo_id or request.POST.get('cargo_id_1') or '').strip()
     if raw_cargo_id:
@@ -14647,6 +14649,8 @@ def _tenant_shipment_cargo_from_post(request, cargo_id=None):
             cargo_qty = Decimal((request.POST.get('cargo_qty_1') or '').strip())
         except Exception:
             cargo_qty = Decimal('0')
+    cargo_weight = cargo_weight.quantize(two_dp)
+    cargo_qty = cargo_qty.quantize(two_dp)
     if cargo and not cargo_unit:
         cargo_unit = cargo.uom or ''
     return cargo, cargo_weight, cargo_unit, cargo_qty
