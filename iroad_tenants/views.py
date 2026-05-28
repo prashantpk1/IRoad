@@ -11662,7 +11662,7 @@ def _tenant_booking_form_options_context(tenant_registry, booking=None):
         'booking_line_type_options': ('Outbound', 'Backload'),
         'booking_order_type_options': ('Credit', 'COD'),
         'booking_trip_type_options': ('One-Way', 'Round'),
-        'booking_pod_type_options': ('Digital', 'Soft', 'Hard'),
+        'booking_pod_type_options': ('Signature', 'Photo', 'Digital'),
         'booking_pod_status_options': ('Pending', 'Received', 'Verified'),
         'booking_form_data': form_data,
         'booking_sales_report': _tenant_booking_sales_report_linkage(booking),
