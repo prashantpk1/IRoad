@@ -67,7 +67,7 @@ class ShipmentStageDerivationTests(SimpleTestCase):
     def test_after_pickup_is_loading_stage(self, _mock):
         self.assertEqual(
             derive_shipment_execution_stage(_shipment()),
-            STAGE_LOADING,
+            STAGE_PRE_TRANSIT,
         )
 
     @patch(
@@ -125,10 +125,14 @@ class PickupLoadingPolicyTests(SimpleTestCase):
         return_value=set(),
     )
     @patch(
+        'iroad_tenants.operation_execution._shipment_has_active_movement',
+        return_value=False,
+    )
+    @patch(
         'iroad_tenants.operation_runtime.shipment_execution_stage._shipment_pickup_loading_done',
         return_value=(False, False),
     )
-    def test_action_is_allowed_permits_a2_on_shipment(self, _logs, _ids):
+    def test_action_is_allowed_permits_a2_on_shipment(self, _logs, _movement, _ids):
         action = _action('A2', 'Pickup')
         shipment = _shipment()
         self.assertTrue(
@@ -140,10 +144,14 @@ class PickupLoadingPolicyTests(SimpleTestCase):
         return_value=set(),
     )
     @patch(
+        'iroad_tenants.operation_execution._shipment_has_active_movement',
+        return_value=False,
+    )
+    @patch(
         'iroad_tenants.operation_runtime.shipment_execution_stage._shipment_pickup_loading_done',
         return_value=(False, False),
     )
-    def test_action_is_allowed_blocks_a2_when_in_transit(self, _logs, _ids):
+    def test_action_is_allowed_blocks_a2_when_in_transit(self, _logs, _movement, _ids):
         action = _action('A2', 'Pickup')
         shipment = _shipment(status=TenantShipment.ShipmentStatus.IN_TRANSIT)
         self.assertFalse(

@@ -139,6 +139,34 @@ def _shipment_has_active_movement(shipment):
     )
 
 
+def _action_requires_movement(action) -> bool:
+    """
+    Returns True for actions that require an existing
+    active movement record to execute.
+    These are actions that advance or complete movement
+    but do NOT create it.
+    A4 creates movement — not included here.
+    """
+    action_code = (
+        getattr(action, 'action_code', '') or ''
+    ).upper().strip()
+
+    movement_dependent_codes = {
+        'A5', 'A8',
+    }
+    if action_code in movement_dependent_codes:
+        return True
+
+    movement_impact = (
+        getattr(action, 'movement_status_impact', '')
+        or ''
+    ).strip()
+    if movement_impact and action_code != 'A4':
+        return True
+
+    return False
+
+
 def _executed_action_ids(*, booking=None, shipment=None, movement=None, exclude_log_id=None):
     qs = TenantOperationActionLog.objects.exclude(operation_action__isnull=True)
     if exclude_log_id:
@@ -220,17 +248,35 @@ def _action_is_allowed(
         if current in _TERMINAL_SHIPMENT_STATUSES:
             return _is_reversal_action(action)
 
-        has_active_movement = _shipment_has_active_movement(shipment)
-        action_code = str(getattr(action, 'action_code', '') or '').strip().upper()
-        is_confirm_loaded = action_code == 'A4' or action_matches(action, 'confirm loaded', 'action 4')
-        requires_existing_movement = bool((action.movement_status_impact or '').strip()) and not bool(
-            action.auto_movement_post
+        has_active_movement = _shipment_has_active_movement(
+            shipment
         )
-        if is_confirm_loaded and not has_active_movement:
-            return current in {
-                TenantShipment.ShipmentStatus.CREATED,
-                TenantShipment.ShipmentStatus.LOADED,
-            }
+        action_code = str(getattr(action, 'action_code', '') or '').strip().upper()
+        is_confirm_loaded = (
+            action_code == 'A4'
+            or action_matches(action, 'confirm loaded',
+                              'confirm_loaded')
+        )
+
+        # A4 is the action that CREATES movement.
+        # Allow A4 when movement does not exist yet
+        # and shipment is in pre-movement status.
+        if is_confirm_loaded:
+            if not has_active_movement:
+                return current in {
+                    TenantShipment.ShipmentStatus.CREATED,
+                    TenantShipment.ShipmentStatus.LOADED,
+                }
+            else:
+                # Movement already exists — A4 already fired
+                return False
+
+        # All other movement-dependent actions (A5, A8 etc)
+        # require movement to exist first.
+        # This is a hard block — cannot be bypassed.
+        requires_existing_movement = _action_requires_movement(
+            action
+        )
         if requires_existing_movement and not has_active_movement:
             return False
 

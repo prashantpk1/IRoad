@@ -163,6 +163,11 @@ class Command(BaseCommand):
             f'Booking ID:  {booking.booking_id}'
         )
         self.stdout.write(
+            'NOTE: Driver must fire A4 (Confirm Loaded) '
+            'to create Movement record. '
+            'A5 will not work until A4 succeeds.'
+        )
+        self.stdout.write(
             'Run A1 through A10 in Postman to test the '
             'full flow on this fresh job.'
         )

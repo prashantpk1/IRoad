@@ -187,6 +187,11 @@ def _prefilter_shipment_candidates(
         clauses |= pickup_q | loading_q
         clauses |= Q(auto_movement_post=True) | Q(auto_pod_post=True)
         clauses |= Q(shipment_status_impact='')
+        # Always include Confirm Loaded (A4) in pre-transit
+        # stage regardless of Action Master flags.
+        # A4 is the movement birth action and must always
+        # be a candidate when shipment has no movement.
+        clauses |= Q(action_code='A4')
 
     if stage == STAGE_COD or (
         (shipment.order_type or '').upper() == 'COD'
