@@ -23,6 +23,7 @@ from iroad_tenants.operation_runtime.movement_state_machine import (
     is_movement_start_action,
     movement_impact_allowed_from_current,
 )
+from iroad_tenants.operation_runtime.shipment_execution_stage import STAGE_PRE_TRANSIT
 from tenant_workspace.models import TenantOperationAction, TenantTruckMovementLog
 
 
@@ -132,6 +133,52 @@ class MovementPolicyTests(SimpleTestCase):
         action = _action('A5', 'Depart In Transit', shipment_status_impact='In Transit', sequence_category='job')
         self.assertFalse(
             _action_is_allowed(action, movement=movement, shipment=None),
+        )
+
+    @patch('iroad_tenants.operation_execution._shipment_has_active_movement', return_value=False)
+    @patch('iroad_tenants.operation_execution._executed_action_ids', return_value=set())
+    def test_depart_in_transit_blocked_when_shipment_has_no_movement(self, _ids, _movement_guard):
+        shipment = MagicMock()
+        shipment.pk = uuid4()
+        shipment.shipment_status = 'Loaded'
+        shipment.order_type = 'Credit'
+        action = _action('A5', 'Depart In Transit', sequence_category='job')
+        action.movement_status_impact = 'In_Progress'
+        action.shipment_status_impact = 'In_Transit'
+        self.assertFalse(
+            _action_is_allowed(action, shipment=shipment),
+        )
+
+    @patch('iroad_tenants.operation_execution._shipment_has_active_movement', return_value=False)
+    @patch('iroad_tenants.operation_execution._executed_action_ids', return_value=set())
+    def test_confirm_loaded_allowed_when_shipment_has_no_movement(self, _ids, _movement_guard):
+        shipment = MagicMock()
+        shipment.pk = uuid4()
+        shipment.shipment_status = 'Created'
+        shipment.order_type = 'Credit'
+        action = _action('A4', 'Confirm Loaded', sequence_category='job')
+        action.movement_status_impact = 'In_Progress'
+        action.shipment_status_impact = ''
+        self.assertTrue(
+            _action_is_allowed(action, shipment=shipment),
+        )
+
+    @patch('iroad_tenants.operation_execution._shipment_has_active_movement', return_value=True)
+    @patch('iroad_tenants.operation_execution._executed_action_ids', return_value=set())
+    @patch(
+        'iroad_tenants.operation_execution.derive_shipment_execution_stage',
+        return_value=STAGE_PRE_TRANSIT,
+    )
+    def test_depart_in_transit_allowed_when_shipment_has_movement(self, _stage, _ids, _movement_guard):
+        shipment = MagicMock()
+        shipment.pk = uuid4()
+        shipment.shipment_status = 'Loaded'
+        shipment.order_type = 'Credit'
+        action = _action('A5', 'Depart In Transit', sequence_category='job')
+        action.movement_status_impact = 'In_Progress'
+        action.shipment_status_impact = 'In_Transit'
+        self.assertTrue(
+            _action_is_allowed(action, shipment=shipment),
         )
 
     @patch(

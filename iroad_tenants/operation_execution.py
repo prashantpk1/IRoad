@@ -129,6 +129,16 @@ def _booking_has_active_shipment(booking, booking_item_type=''):
     return qs.exists()
 
 
+def _shipment_has_active_movement(shipment):
+    if shipment is None:
+        return False
+    return (
+        TenantTruckMovementLog.objects.filter(shipment_id=shipment.pk)
+        .exclude(status=TenantTruckMovementLog.Status.CANCELLED)
+        .exists()
+    )
+
+
 def _executed_action_ids(*, booking=None, shipment=None, movement=None, exclude_log_id=None):
     qs = TenantOperationActionLog.objects.exclude(operation_action__isnull=True)
     if exclude_log_id:
@@ -210,6 +220,20 @@ def _action_is_allowed(
         if current in _TERMINAL_SHIPMENT_STATUSES:
             return _is_reversal_action(action)
 
+        has_active_movement = _shipment_has_active_movement(shipment)
+        action_code = str(getattr(action, 'action_code', '') or '').strip().upper()
+        is_confirm_loaded = action_code == 'A4' or action_matches(action, 'confirm loaded', 'action 4')
+        requires_existing_movement = bool((action.movement_status_impact or '').strip()) and not bool(
+            action.auto_movement_post
+        )
+        if is_confirm_loaded and not has_active_movement:
+            return current in {
+                TenantShipment.ShipmentStatus.CREATED,
+                TenantShipment.ShipmentStatus.LOADED,
+            }
+        if requires_existing_movement and not has_active_movement:
+            return False
+
         if action_matches(action, 'collect payment', 'a9', 'action 9'):
             if (shipment.order_type or '').upper() != 'COD':
                 return False
@@ -220,7 +244,6 @@ def _action_is_allowed(
                 TenantShipment.ShipmentStatus.DELIVERED,
             }
 
-        action_code = str(getattr(action, 'action_code', '') or '').strip().upper()
         if action_matches(action, 'start job', 'action 1') or action_code == 'A1':
             return False
 
