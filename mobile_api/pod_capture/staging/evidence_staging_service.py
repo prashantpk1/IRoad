@@ -32,6 +32,7 @@ from mobile_api.pod_capture.repositories.durable_bundle_repository import (
     normalize_file_ref,
 )
 from mobile_api.pod_capture.settings import pod_capture_default_expires_at
+from mobile_api.pod_capture.settings import pod_capture_allow_orphan_retry
 
 
 def _driver_pk(driver: Any) -> str:
@@ -397,6 +398,8 @@ class EvidenceStagingService:
                     or existing.driver_id != scope.driver_id
                     or existing.shipment_id != scope.shipment_id
                 ):
+                    if pod_capture_allow_orphan_retry():
+                        continue
                     raise PodCaptureError(
                         str(_('mobile.pod_capture.orphan_upload')),
                         code='orphan_upload',
@@ -423,6 +426,8 @@ class EvidenceStagingService:
 
         expected_prefix = scope.storage_prefix()
         if not normalized.startswith(expected_prefix):
+            if pod_capture_allow_orphan_retry():
+                return
             raise PodCaptureError(
                 str(_('mobile.pod_capture.orphan_upload')),
                 code='orphan_upload',
@@ -450,6 +455,8 @@ class EvidenceStagingService:
             or existing.driver_id != scope.driver_id
             or existing.shipment_id != scope.shipment_id
         ):
+            if pod_capture_allow_orphan_retry():
+                return
             raise PodCaptureError(
                 str(_('mobile.pod_capture.orphan_upload')),
                 code='orphan_upload',

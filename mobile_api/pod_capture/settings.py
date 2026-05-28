@@ -49,3 +49,7 @@ def pod_capture_require_storage_verification() -> bool:
 
 def pod_capture_enforce_immutability() -> bool:
     return bool(getattr(settings, 'MOBILE_POD_CAPTURE_ENFORCE_IMMUTABILITY', True))
+
+
+def pod_capture_allow_orphan_retry() -> bool:
+    return bool(getattr(settings, 'MOBILE_POD_CAPTURE_ALLOW_ORPHAN_RETRY', False))

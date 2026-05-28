@@ -820,3 +820,9 @@ MOBILE_POD_CAPTURE_ENFORCE_IMMUTABILITY = config(
     cast=bool,
 )
 
+MOBILE_POD_CAPTURE_ALLOW_ORPHAN_RETRY = config(
+    'MOBILE_POD_CAPTURE_ALLOW_ORPHAN_RETRY',
+    default=True,
+    cast=bool,
+)
+
