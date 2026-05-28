@@ -7,7 +7,9 @@ from datetime import datetime, timezone as dt_timezone
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-from django.test import SimpleTestCase, TransactionTestCase
+from django.test import SimpleTestCase
+
+from mobile_api.tests.transaction_test_case import TransactionTestCase
 
 from mobile_api.pod_capture.dto.staging_models import PODCaptureBundleStatus
 from mobile_api.pod_capture.exceptions import PodCaptureError

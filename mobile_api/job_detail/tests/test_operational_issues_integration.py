@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
-from django.test import TransactionTestCase
+from mobile_api.tests.transaction_test_case import TransactionTestCase
 
 from mobile_api.execution.dto.execute_action_context import ExecuteActionContext
 from mobile_api.execution.evidence.evidence_validation_service import (

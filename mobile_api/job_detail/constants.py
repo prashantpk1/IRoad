@@ -23,7 +23,7 @@ JOB_DETAIL_ACTION_LOG_SCAN_LIMIT = _int_setting(
 # Embedded Job Detail GET timeline preview (reuses projection cache when loaded).
 JOB_DETAIL_TIMELINE_PREVIEW_LIMIT = _int_setting(
     'MOBILE_JOB_DETAIL_TIMELINE_PREVIEW_LIMIT',
-    5,
+    20,
 )
 
 # Paginated timeline API (cursor); fetch limit+1 to detect has_more.

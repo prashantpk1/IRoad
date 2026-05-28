@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import uuid
 from types import SimpleNamespace
-from django.test import TransactionTestCase
+from mobile_api.tests.transaction_test_case import TransactionTestCase
 
 from mobile_api.issues.exceptions import IssueReportingError
 from mobile_api.issues.models.operational_issue import (

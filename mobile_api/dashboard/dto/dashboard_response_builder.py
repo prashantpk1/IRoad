@@ -16,7 +16,7 @@ from mobile_api.dashboard.selectors.pod_cod_policy import derive_pod_cod_flags
 
 _EMPTY_TIMELINE: dict[str, Any] = {
     'scope': '',
-    'preview_limit': 5,
+    'preview_limit': 20,
     'recent_count': 0,
     'recent_events': [],
     'has_more': False,

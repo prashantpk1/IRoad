@@ -8,7 +8,9 @@ from datetime import timedelta
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-from django.test import SimpleTestCase, TransactionTestCase
+from django.test import SimpleTestCase
+
+from mobile_api.tests.transaction_test_case import TransactionTestCase
 from django.utils import timezone
 
 from mobile_api.pod_capture.dto.promotion_models import PodPromotionRequest, PodPromotionScope

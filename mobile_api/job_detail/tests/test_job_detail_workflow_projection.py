@@ -6,7 +6,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, TestCase
 
 from mobile_api.dashboard.services.dashboard_status_reconciler import (
     INTEGRITY_DRIFT,
@@ -349,7 +349,7 @@ class JobDetailReconcileIntegrationTests(SimpleTestCase):
         self.assertTrue(ctx.reconciliation.get('workflow_integrity'))
 
 
-class JobDetailProjectionServiceOrderTests(SimpleTestCase):
+class JobDetailProjectionServiceOrderTests(TestCase):
     @patch.object(JobDetailProjectionService, '_build_alerts_placeholder', return_value={})
     @patch('mobile_api.job_detail.services.job_detail_projection_service.build_sync_metadata')
     @patch('mobile_api.job_detail.services.job_detail_projection_service.build_round_trip_section')

@@ -3,6 +3,7 @@ Tests for POD/COD compliance reconciliation.
 """
 from __future__ import annotations
 
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from django.test import SimpleTestCase
@@ -17,12 +18,14 @@ from tenant_workspace.models import TenantShipment
 
 
 def _action(code: str, label: str = ''):
-    a = MagicMock()
-    a.action_code = code
-    a.english_label = label or code
-    a.shipment_status_impact = ''
-    a.movement_status_impact = ''
-    return a
+    return SimpleNamespace(
+        action_code=code,
+        english_label=label or code,
+        auto_pod_post=False,
+        hard_copy_collection=False,
+        shipment_status_impact='',
+        movement_status_impact='',
+    )
 
 
 def _log(action):
@@ -81,7 +84,7 @@ class PodCodReconcilerTests(SimpleTestCase):
         )
 
         ctx.projection_cache = DashboardProjectionCache(
-            shipment_logs=[_log(_action('A8', 'Upload POD'))],
+            shipment_logs=[_log(_action('A7', 'Upload POD'))],
         )
 
         result = reconcile_pod_cod_compliance(ctx)

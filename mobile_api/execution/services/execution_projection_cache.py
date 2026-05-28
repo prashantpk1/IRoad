@@ -32,6 +32,7 @@ from mobile_api.job_detail.services.job_detail_status_reconciler import (
 )
 from mobile_api.job_detail.services.job_detail_sync_metadata import (
     build_job_detail_sync_metadata,
+    finalize_job_detail_sync,
     resolve_content_hash,
 )
 from mobile_api.services.operational_reconciliation_service import (
@@ -109,11 +110,27 @@ class ExecutionProjectionCache:
             self.ensure_pre_execute_reconcile(request=request)
             if not self._workflow_built:
                 self.ensure_workflow(request=request)
-            ctx.sync_metadata = build_job_detail_sync_metadata(ctx)
-            ctx.content_hash = resolve_content_hash(ctx)
+            self._ensure_fingerprint_projections(request=request)
+            # Same path as Job Detail GET: finalize after full projection slices.
+            finalize_job_detail_sync(ctx, request=request)
             sync_from_job_detail(self._execute_context, ctx)
             self._sync_built = True
         return dict(self._execute_context.sync_metadata or {})
+
+    def _ensure_fingerprint_projections(self, *, request: Any | None = None) -> None:
+        """Build projection inputs that ``build_content_fingerprint`` reads."""
+        ctx = self.job_detail_context
+        if not self._timeline_built:
+            ctx.timeline = build_timeline_section(ctx, request=request)
+            self._execute_context.timeline = dict(ctx.timeline or {})
+            self._timeline_built = True
+        if self._execute_context.job_type == 'shipment' and self._execute_context.shipment is not None:
+            if not self._pod_cod_built:
+                self._execute_context.pod_cod = build_pod_cod_section(ctx, request=request)
+                ctx.pod_cod = dict(self._execute_context.pod_cod or {})
+                self._pod_cod_built = True
+        self._execute_context.round_trip = build_round_trip_section(ctx, request=request)
+        ctx.round_trip = dict(self._execute_context.round_trip or {})
 
     def invalidate_after_mutation(self) -> None:
         """Force one fresh log scan after Action Log append."""

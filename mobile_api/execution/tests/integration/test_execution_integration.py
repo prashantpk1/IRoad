@@ -10,7 +10,9 @@ import unittest
 import uuid
 from unittest.mock import MagicMock, patch
 
-from django.test import SimpleTestCase, TransactionTestCase
+from django.test import SimpleTestCase
+
+from mobile_api.tests.transaction_test_case import TransactionTestCase
 
 from mobile_api.execution.dto.execute_action_context import ExecuteActionContext
 from mobile_api.execution.dto.execute_action_response_builder import (

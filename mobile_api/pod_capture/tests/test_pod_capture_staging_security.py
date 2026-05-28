@@ -7,7 +7,7 @@ import uuid
 from datetime import timedelta
 from types import SimpleNamespace
 
-from django.test import TransactionTestCase
+from mobile_api.tests.transaction_test_case import TransactionTestCase
 from django.utils import timezone
 
 from mobile_api.pod_capture.dto.pod_capture_context import PodCaptureContext

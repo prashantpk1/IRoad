@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, TestCase
 
 from mobile_api.job_detail.dto.job_detail_context import JobDetailContext
 from mobile_api.job_detail.projections.timeline_projection import build_timeline_section
@@ -193,7 +193,7 @@ class TimelineServiceTests(SimpleTestCase):
         self.assertIsNone(mock_fetch.call_args.kwargs['shipment'])
 
 
-class TimelineProjectionTests(SimpleTestCase):
+class TimelineProjectionTests(TestCase):
     @patch(
         'mobile_api.job_detail.projections.job_detail_projection_builder.build_issue_timeline_events',
         return_value=[],
@@ -202,7 +202,7 @@ class TimelineProjectionTests(SimpleTestCase):
     def test_projection_contract_keys(self, mock_preview, _mock_issue_timeline):
         mock_preview.return_value = {
             'scope': 'shipment',
-            'preview_limit': 5,
+            'preview_limit': 20,
             'timeline_preview': [{'log_id': '1'}],
             'timeline_cursor': 'tok',
             'has_more': True,

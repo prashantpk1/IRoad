@@ -7,7 +7,7 @@
   },
   "variable": [
     { "key": "base_url", "value": "http://127.0.0.1:8000/api/v1/mobile" },
-    { "key": "driver_phone", "value": "" },
+    { "key": "driver_email", "value": "" },
     { "key": "driver_password", "value": "" },
     { "key": "tenant_id", "value": "" },
     { "key": "access_token", "value": "" },
@@ -23,11 +23,11 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"phone\": \"{{driver_phone}}\",\n  \"password\": \"{{driver_password}}\",\n  \"tenant_id\": \"{{tenant_id}}\"\n}",
+          "raw": "{\n  \"email\": \"{{driver_email}}\",\n  \"password\": \"{{driver_password}}\",\n  \"tenant_id\": \"{{tenant_id}}\"\n}",
           "options": { "raw": { "language": "json" } }
         },
         "url": "{{base_url}}/driver/auth/login/",
-        "description": "STEP 1 — SAME LOGIN AS JOB FLOW.\nSend phone, password, tenant_id.\naccess_token is auto-saved.\nToken key in response is data.access_token.\nUse Authorization: Bearer {{access_token}} for all subsequent calls."
+        "description": "STEP 1 — SAME LOGIN AS JOB FLOW.\nSend email, password, tenant_id.\naccess_token is auto-saved.\nToken key in response is data.access_token.\nUse Authorization: Bearer {{access_token}} for all subsequent calls.\nNOTE: Login field is 'email' not 'phone'.\nSet driver_email in collection variables before running."
       },
       "event": [
         {

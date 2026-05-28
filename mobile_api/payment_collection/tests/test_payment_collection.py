@@ -7,7 +7,7 @@ import uuid
 from decimal import Decimal
 from types import SimpleNamespace
 
-from django.test import TransactionTestCase
+from mobile_api.tests.transaction_test_case import TransactionTestCase
 
 from mobile_api.payment_collection.exceptions import PaymentCollectionError
 from mobile_api.payment_collection.models import (

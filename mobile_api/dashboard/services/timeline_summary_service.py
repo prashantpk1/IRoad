@@ -17,7 +17,7 @@ from mobile_api.dashboard.services.dashboard_projection_cache import (
     get_projection_cache,
 )
 
-_DASHBOARD_TIMELINE_LIMIT = 5
+_DASHBOARD_TIMELINE_LIMIT = 20
 
 
 def build_timeline_summary(context: DriverDashboardContext) -> dict[str, Any]:

@@ -3,7 +3,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 from uuid import uuid4
 
-from django.test import TransactionTestCase
+from mobile_api.tests.transaction_test_case import TransactionTestCase
 from django.utils import timezone
 
 from mobile_api.execution.dto.execute_action_context import ExecuteActionContext

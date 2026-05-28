@@ -71,12 +71,18 @@ class ExecutionPrepareTests(SimpleTestCase):
             **kwargs,
         )
 
+    @patch('mobile_api.execution.services.execution_projection_cache.finalize_job_detail_sync')
     @patch(
-        'mobile_api.execution.services.execution_projection_cache.build_job_detail_sync_metadata'
+        'mobile_api.execution.services.execution_projection_cache.build_round_trip_section',
+        return_value={},
     )
     @patch(
-        'mobile_api.execution.services.execution_projection_cache.resolve_content_hash',
-        return_value='hash-server',
+        'mobile_api.execution.services.execution_projection_cache.build_pod_cod_section',
+        return_value={},
+    )
+    @patch(
+        'mobile_api.execution.services.execution_projection_cache.build_timeline_section',
+        return_value={'timeline_preview': [], 'timeline_cursor': ''},
     )
     @patch(
         'mobile_api.execution.services.execution_projection_cache.build_workflow_section'
@@ -96,8 +102,10 @@ class ExecutionPrepareTests(SimpleTestCase):
         _load_cache,
         mock_reconcile,
         mock_workflow,
-        _resolve_hash,
-        mock_sync_meta,
+        _timeline,
+        _pod_cod,
+        _round_trip,
+        mock_finalize,
     ):
         shipment = _shipment(status='Booked')
         ctx = self._context()
@@ -130,11 +138,15 @@ class ExecutionPrepareTests(SimpleTestCase):
             'next_action': {'action_code': 'A2'},
             'primary_action': {},
         }
-        mock_sync_meta.return_value = {
-            'content_hash': 'hash-server',
-            'workflow_version': 'wf-v1',
-            'entity_versions': {'shipment': 'v1'},
-        }
+        def _finalize(jd_ctx, request=None):
+            jd_ctx.sync_metadata = {
+                'content_hash': 'hash-server',
+                'workflow_version': 'wf-v1',
+                'entity_versions': {'shipment': 'v1'},
+            }
+            jd_ctx.content_hash = 'hash-server'
+
+        mock_finalize.side_effect = _finalize
 
         auth = ExecutionReconcileService().prepare_pre_execute(ctx)
 
@@ -147,13 +159,10 @@ class ExecutionPrepareTests(SimpleTestCase):
         self.assertEqual(auth['allowed_actions'][0]['action_code'], 'A2')
         self.assertEqual(auth['sync_metadata']['content_hash'], 'hash-server')
 
+    @patch('mobile_api.execution.services.execution_projection_cache.finalize_job_detail_sync')
     @patch(
-        'mobile_api.execution.services.execution_projection_cache.build_job_detail_sync_metadata',
-        return_value={'content_hash': 'm-hash'},
-    )
-    @patch(
-        'mobile_api.execution.services.execution_projection_cache.resolve_content_hash',
-        return_value='m-hash',
+        'mobile_api.execution.services.execution_projection_cache.build_timeline_section',
+        return_value={'timeline_preview': [], 'timeline_cursor': ''},
     )
     @patch(
         'mobile_api.execution.services.execution_projection_cache.build_workflow_section',
@@ -174,8 +183,8 @@ class ExecutionPrepareTests(SimpleTestCase):
         _load_cache,
         mock_reconcile,
         _workflow,
-        _hash,
-        _sync,
+        _timeline,
+        mock_finalize,
     ):
         movement = _movement()
         ctx = self._context(job_type='movement', job_id='mov-1')
@@ -200,6 +209,12 @@ class ExecutionPrepareTests(SimpleTestCase):
                 },
             },
         )
+
+        def _finalize(jd_ctx, request=None):
+            jd_ctx.sync_metadata = {'content_hash': 'm-hash', 'workflow_version': 'wf-v1'}
+            jd_ctx.content_hash = 'm-hash'
+
+        mock_finalize.side_effect = _finalize
 
         with patch(
             'mobile_api.execution.services.execution_projection_cache.reconcile_job_detail_pod_cod',

@@ -7,7 +7,9 @@ from contextlib import contextmanager
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-from django.test import SimpleTestCase, TransactionTestCase
+from django.test import SimpleTestCase
+
+from mobile_api.tests.transaction_test_case import TransactionTestCase
 
 from mobile_api.execution.dto.execute_action_result import ExecuteActionResult
 from mobile_api.execution.guards.execution_idempotency_guard import IdempotencyKeys

@@ -6,7 +6,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, TestCase
 
 from mobile_api.dashboard.selectors import booking_selection_policy as booking_policy
 from mobile_api.dashboard.selectors import pod_cod_policy
@@ -63,7 +63,7 @@ def _shipment(
     return s
 
 
-class PodCodProjectionTests(SimpleTestCase):
+class PodCodProjectionTests(TestCase):
     def test_pod_compliant_from_columns(self):
         shipment = _shipment(
             pod_status=TenantShipment.PodStatus.COMPLIANT,
@@ -93,9 +93,11 @@ class PodCodProjectionTests(SimpleTestCase):
 
     @patch('mobile_api.job_detail.services.job_detail_pod_cod_reconciler.get_projection_cache')
     def test_reconcile_log_evidence_pod_uploaded(self, mock_cache):
-        action = MagicMock()
+        action = MagicMock(spec=['action_code', 'english_label', 'auto_pod_post', 'hard_copy_collection', 'shipment_status_impact', 'movement_status_impact'])
         action.action_code = 'A7'
         action.english_label = 'Upload POD'
+        action.auto_pod_post = False
+        action.hard_copy_collection = False
         action.shipment_status_impact = ''
         action.movement_status_impact = ''
         log = MagicMock()

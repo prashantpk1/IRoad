@@ -3,11 +3,14 @@ Hard POD custody submit — replay, security, append-only tests.
 """
 from __future__ import annotations
 
+import hashlib
 import uuid
 from unittest.mock import MagicMock, patch
 
 from django.db import IntegrityError
-from django.test import SimpleTestCase, TransactionTestCase
+from django.test import SimpleTestCase
+
+from mobile_api.tests.transaction_test_case import TransactionTestCase
 from django.utils import timezone
 
 from mobile_api.hard_pod.exceptions import HardPodError
@@ -164,6 +167,27 @@ class HardPodSubmitServiceTests(TransactionTestCase):
         base.update(kwargs)
         return base
 
+    def _integrity_checksum_for_payload(self, payload: dict) -> str:
+        file_refs = [
+            str(m.get('file_ref') or '').replace('\\', '/').lstrip('/')
+            for m in (payload.get('media') or [])
+        ]
+        text = '|'.join(
+            [
+                self.tenant_schema,
+                self.driver_id,
+                self.shipment_id,
+                str(payload.get('client_submission_id') or '').strip(),
+                str(payload.get('receiver_name') or '').strip(),
+                str(payload.get('receiver_contact') or '').strip(),
+                str(payload.get('handoff_notes') or '').strip(),
+                str(payload.get('latitude') or '').strip(),
+                str(payload.get('longitude') or '').strip(),
+                ','.join(sorted(r for r in file_refs if r)),
+            ]
+        )
+        return hashlib.sha256(text.encode('utf-8')).hexdigest()
+
     @patch('mobile_api.hard_pod.services.hard_pod_submit_service.schema_context')
     @patch.object(HardPodSecurityGuard, 'resolve_and_assert_shipment')
     @patch.object(HardPodSecurityGuard, 'assert_media_paths')
@@ -287,19 +311,21 @@ class HardPodSubmitServiceTests(TransactionTestCase):
         mock_schema.return_value.__exit__ = MagicMock(return_value=False)
         mock_resolve.return_value = self.shipment
 
+        payload = self._payload()
         HardPODCustodySubmission.objects.create(
             tenant_schema=self.tenant_schema,
             driver_id=self.driver_id,
             shipment_id=self.shipment_id,
             client_submission_id=self.client_submission_id,
             receiver_name='Pre-existing',
+            integrity_checksum=self._integrity_checksum_for_payload(payload),
         )
 
         # Client retries the same submission key. The service must return replay.
         result = HardPodSubmitService().submit_custody(
             driver=self.driver,
             tenant_schema=self.tenant_schema,
-            payload=self._payload(),
+            payload=payload,
         )
 
         self.assertTrue(result['custody_submission']['replayed'])

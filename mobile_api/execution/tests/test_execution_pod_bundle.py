@@ -6,10 +6,13 @@ from __future__ import annotations
 from contextlib import contextmanager
 from datetime import timedelta
 from types import SimpleNamespace
+from typing import Any
 from unittest.mock import MagicMock, patch
 from uuid import UUID, uuid4
 
-from django.test import SimpleTestCase, TransactionTestCase
+from django.test import SimpleTestCase
+
+from mobile_api.tests.transaction_test_case import TransactionTestCase
 from django.utils import timezone
 
 from mobile_api.execution.dto.execute_action_context import ExecuteActionContext
@@ -34,11 +37,17 @@ from mobile_api.pod_capture.dto.staging_models import (
     StagingScope,
 )
 from mobile_api.pod_capture.exceptions import PodCaptureError
+from mobile_api.pod_capture.staging.evidence_promotion_service import (
+    EvidencePromotionService,
+)
 from mobile_api.pod_capture.staging.evidence_staging_service import (
     EvidenceStagingService,
     _InMemoryStagingStore,
 )
 from mobile_api.pod_capture.models import PODCaptureBundle as PODCaptureBundleORM
+from mobile_api.pod_capture.services.pod_capture_bundle_service import (
+    PodCaptureBundleService,
+)
 
 
 @contextmanager
@@ -61,12 +70,14 @@ def _shipment():
     )
 
 
-def _action_log():
+def _action_log(*, shipment: Any | None = None):
     log = MagicMock()
     log.pk = uuid4()
     log.log_id = log.pk
     log.log_no = 'OAL-POD-1'
     log.log_date = None
+    log.shipment = shipment
+    log.truck_movement = None
     log.media_rows = MagicMock()
     log.media_rows.filter.return_value.first.return_value = None
     log.media_rows.exclude.return_value.delete = MagicMock()
@@ -297,6 +308,18 @@ class ExecutePodBundleOrchestratorTests(TransactionTestCase):
             'media': [],
         }
 
+    def _promotion_service(self) -> EvidencePromotionService:
+        return EvidencePromotionService(
+            staging=self.staging,
+            bundle_service=PodCaptureBundleService(staging=self.staging),
+        )
+
+    @patch(
+        'mobile_api.pod_capture.staging.evidence_promotion_service.EvidencePromotionService',
+    )
+    @patch(
+        'mobile_api.pod_capture.services.pod_capture_bundle_service.PodCaptureBundleService',
+    )
     @patch(
         'mobile_api.pod_capture.staging.evidence_promotion_service.transaction.atomic',
     )
@@ -315,18 +338,23 @@ class ExecutePodBundleOrchestratorTests(TransactionTestCase):
         mock_bundle_staging_cls,
         mock_persist,
         mock_atomic,
+        mock_bundle_svc_cls,
+        mock_promo_svc_cls,
     ) -> None:
         mock_atomic.return_value.__enter__ = MagicMock(return_value=None)
         mock_atomic.return_value.__exit__ = MagicMock(return_value=False)
         mock_persist.return_value = [uuid4()]
         mock_promo_staging_cls.return_value = self.staging
         mock_bundle_staging_cls.return_value = self.staging
+        mock_bundle_svc_cls.return_value = PodCaptureBundleService(staging=self.staging)
+        mock_promo_svc_cls.return_value = self._promotion_service()
 
         orch = self._orchestrator()
-        action_log = _action_log()
+        shipment = _shipment()
+        action_log = _action_log(shipment=shipment)
 
         def _prepare(ctx, **kw):
-            ctx.shipment = _shipment()
+            ctx.shipment = shipment
             ctx.booking = ctx.shipment.booking
             ctx.operation_action = SimpleNamespace(
                 action_code='POD_CAP',
@@ -381,7 +409,7 @@ class ExecutePodBundleOrchestratorTests(TransactionTestCase):
                 driver=_driver(),
                 tenant_schema='tenant_a',
                 job_type='shipment',
-                job_id='ship-1',
+                job_id=str(shipment.pk),
                 action_code='POD_CAP',
                 payload=self._base_payload(),
                 request=None,
@@ -401,6 +429,12 @@ class ExecutePodBundleOrchestratorTests(TransactionTestCase):
         self.assertTrue(result.payload['pod_capture']['compliance']['validated'])
 
     @patch(
+        'mobile_api.pod_capture.staging.evidence_promotion_service.EvidencePromotionService',
+    )
+    @patch(
+        'mobile_api.pod_capture.services.pod_capture_bundle_service.PodCaptureBundleService',
+    )
+    @patch(
         'mobile_api.pod_capture.staging.evidence_promotion_service.transaction.atomic',
     )
     @patch(
@@ -418,12 +452,16 @@ class ExecutePodBundleOrchestratorTests(TransactionTestCase):
         mock_bundle_staging_cls,
         mock_persist,
         mock_atomic,
+        mock_bundle_svc_cls,
+        mock_promo_svc_cls,
     ) -> None:
         mock_atomic.return_value.__enter__ = MagicMock(return_value=None)
         mock_atomic.return_value.__exit__ = MagicMock(return_value=False)
         mock_persist.return_value = [uuid4()]
         mock_promo_staging_cls.return_value = self.staging
         mock_bundle_staging_cls.return_value = self.staging
+        mock_bundle_svc_cls.return_value = PodCaptureBundleService(staging=self.staging)
+        mock_promo_svc_cls.return_value = self._promotion_service()
 
         promoted = self.staging.mark_promoted(
             self.bundle,
@@ -432,9 +470,10 @@ class ExecutePodBundleOrchestratorTests(TransactionTestCase):
         self.assertEqual(promoted.status, PODCaptureBundleStatus.PROMOTED)
 
         orch = self._orchestrator()
+        shipment = _shipment()
 
         def _prepare(ctx, **kw):
-            ctx.shipment = _shipment()
+            ctx.shipment = shipment
             ctx.operation_action = SimpleNamespace(
                 action_code='POD_CAP',
                 auto_pod_post=True,
@@ -463,14 +502,17 @@ class ExecutePodBundleOrchestratorTests(TransactionTestCase):
         ), patch.object(
             orch,
             '_execute_kernel',
-            return_value=SimpleNamespace(action_log=_action_log(), reused_existing=False),
+            return_value=SimpleNamespace(
+                action_log=_action_log(shipment=shipment),
+                reused_existing=False,
+            ),
         ):
             with self.assertRaises(ExecuteActionError) as exc:
                 orch._run_execute_pipeline(
                     driver=_driver(),
                     tenant_schema='tenant_a',
                     job_type='shipment',
-                    job_id='ship-1',
+                    job_id=str(shipment.pk),
                     action_code='POD_CAP',
                     payload=self._base_payload(),
                     request=None,

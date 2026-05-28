@@ -8,7 +8,9 @@ from datetime import timedelta
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-from django.test import SimpleTestCase, TransactionTestCase
+from django.test import SimpleTestCase, TestCase
+
+from mobile_api.tests.transaction_test_case import TransactionTestCase
 from django.utils import timezone
 
 from mobile_api.hard_pod.projections.hard_pod_projection_builder import (
@@ -95,7 +97,7 @@ class HardPodProjectionBuilderTests(SimpleTestCase):
         )
 
 
-class HardPodReconciliationTests(SimpleTestCase):
+class HardPodReconciliationTests(TestCase):
     def test_missing_hard_pod_log_when_custody_without_log(self):
         shipment = _shipment()
         flags = reconcile_hard_pod_row(
@@ -121,7 +123,7 @@ class HardPodReconciliationTests(SimpleTestCase):
         self.assertTrue(flags['custody_vs_workflow_mismatch'])
 
 
-class HardPodProjectionServiceTests(SimpleTestCase):
+class HardPodProjectionServiceTests(TestCase):
     @patch('mobile_api.hard_pod.services.hard_pod_projection_service.pod_cod_policy')
     @patch('mobile_api.hard_pod.services.hard_pod_projection_service.log_evidence_flags')
     def test_build_row_shape(self, mock_evidence, mock_policy):
