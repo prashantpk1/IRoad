@@ -2,7 +2,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: iRoad\n"
 "POT-Creation-Date: 2026-04-20 00:00+0000\n"
-"PO-Revision-Date: 2026-05-25 10:40+0530\n"
+"PO-Revision-Date: 2026-05-28 09:42+0530\n"
 "Last-Translator: \n"
 "Language-Team: \n"
 "Language: ar\n"
@@ -10,390 +10,581 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "X-Generator: Poedit 3.9\n"
+
 msgid "2FA Adoption Rate"
 msgstr "معدل اعتماد التحقق الثنائي"
+
 msgid "Access Log"
 msgstr "سجل الوصول"
+
 msgid "Accounts inactive for 30+ days (Active only)"
 msgstr "الحسابات غير النشطة لأكثر من 30 يوماً (النشطة فقط)"
+
 msgid "Action"
 msgstr "الإجراء"
+
 msgid "Actions"
 msgstr "الإجراءات"
+
 msgid "Active"
 msgstr "نشط"
+
 msgid "Active Sessions Monitor"
 msgstr "مراقبة الجلسات النشطة"
+
 msgid "Active Subscribers"
 msgstr "المشتركين النشطين"
+
 msgid "Active users per role"
 msgstr "المستخدمون النشطون حسب الدور"
+
 msgid "Add"
 msgstr "إضافة"
+
 msgid "Add-ons Pricing"
 msgstr "أسعار الإضافات"
+
 msgid "Admin"
 msgstr "المسؤول"
+
 msgid "Admin Security"
 msgstr "أمن المسؤولين"
+
 msgid "Admin Users"
 msgstr "مستخدمين النظام"
+
 msgid "Administration"
 msgstr "الإدارة"
+
 msgid "Adoption"
 msgstr "الاعتماد"
+
 msgid "All accounts are active recently"
 msgstr "جميع الحسابات كانت نشطة مؤخراً"
+
 msgid "All clear"
 msgstr "الكل نشط"
+
 msgid "Amount"
 msgstr "المبلغ"
+
 msgid "Analytics"
 msgstr "التحليلات"
+
 msgid "Attention Center Shortcuts"
 msgstr "اختصارات مركز الاهتمام"
+
 msgid "Audit Log"
 msgstr "سجل التدقيق"
+
 msgid "Awaiting Payment"
 msgstr "في انتظار الدفع"
+
 msgid "Back"
 msgstr "رجوع"
+
 msgid "Bank Accounts"
 msgstr "الحسابات البنكية"
+
 msgid "Base Currency"
 msgstr "العملة الأساسية"
+
 msgid "Cancel"
 msgstr "إلغاء"
+
 msgid "Canned Responses"
 msgstr "الردود الجاهزة"
+
 msgid "Category"
 msgstr "الفئة"
+
 msgid "Churned"
 msgstr "منتهي"
+
 msgid "Close"
 msgstr "إغلاق"
+
 msgid "Comm Logs"
 msgstr "سجلات الاتصال"
+
 msgid "Communication & Alerts"
 msgstr "الاتصالات والتنبيهات"
+
 msgid "Companies"
 msgstr "الشركات"
+
 msgid "Company List"
 msgstr "قائمة الشركات"
+
 msgid "Configuration"
 msgstr "الإعدادات"
+
 msgid "Countries Master"
 msgstr "سجل الدول"
+
 msgid "Create"
 msgstr "إنشاء"
+
 msgid "Created At"
 msgstr "تاريخ الإنشاء"
+
 msgid "Currencies Master"
 msgstr "سجل العملات"
+
 msgid "Currency"
 msgstr "العملة"
+
 msgid "Dashboard"
 msgstr "لوحة القيادة"
+
 msgid "Days Since Login"
 msgstr "الأيام منذ آخر دخول"
+
 msgid "Delete"
 msgstr "حذف"
+
 msgid "Description"
 msgstr "الوصف"
+
 msgid "Done"
 msgstr "تم"
+
 msgid "Dropdown Master"
 msgstr "إدارة القوائم"
+
 msgid "Edit"
 msgstr "تعديل"
+
 msgid "Email"
 msgstr "البريد الإلكتروني"
+
 msgid "Email Configuration"
 msgstr "إعدادات البريد"
+
 msgid "Email Templates"
 msgstr "قوالب البريد"
+
 msgid "Events Mapping"
 msgstr "ربط الأحداث"
+
 msgid "Exchange Rates"
 msgstr "أسعار الصرف"
+
 msgid "FX Change Log"
 msgstr "سجل تغيير أسعار الصرف"
+
 msgid "Failed"
 msgstr "فاشل"
+
 msgid "Failed / Rejected Transactions"
 msgstr "المعاملات الفاشلة / المرفوضة"
+
 msgid "Fri"
 msgstr "جمعة"
+
 msgid "Gateway Settings"
 msgstr "إعدادات البوابات"
+
 msgid "General Tax Settings"
 msgstr "إعدادات الضرائب العامة"
+
 msgid "Global Master Data"
 msgstr "البيانات الأساسية العالمية"
+
 msgid "Global System Rules"
 msgstr "قواعد النظام العالمية"
+
 msgid "Grand Total"
 msgstr "الإجمالي الكلي"
+
 msgid "Here's what's happening with your system today"
 msgstr "نظرة عامة على نشاط نظامك اليوم"
+
 msgid "Hours Old"
 msgstr "ساعات مضت"
+
 msgid "IP Address"
 msgstr "عنوان IP"
+
 msgid "Inactive"
 msgstr "غير نشط"
+
 msgid "Internal Alerts"
 msgstr "التنبيهات الداخلية"
+
 msgid "LIVE DATA"
 msgstr "بيانات مباشرة"
+
 msgid "Languages"
 msgstr "اللغات"
+
 msgid "Last Login"
 msgstr "آخر تسجيل دخول"
+
 msgid "Legal Identity"
 msgstr "الهوية القانونية"
+
 msgid "Less"
 msgstr "أقل"
+
 msgid "Live Sessions"
 msgstr "الجلسات المباشرة"
+
 msgid "Locked"
 msgstr "مغلق"
+
 msgid "Login Activity Heatmap"
 msgstr "خريطة نشاط تسجيل الدخول"
+
 msgid "MRR — This Month"
 msgstr "الإيرادات الشهرية المتكررة - هذا الشهر"
+
 msgid "Module"
 msgstr "الوحدة"
+
 msgid "Mon"
 msgstr "إثنين"
+
 msgid "More"
 msgstr "أكثر"
+
 msgid "My Account"
 msgstr "حسابي"
+
 msgid "Name"
 msgstr "الاسم"
+
 msgid "Needs Approval"
 msgstr "بحاجة لموافقة"
+
 msgid "Next"
 msgstr "التالي"
+
 msgid "No audit entries yet."
 msgstr "لا توجد قيود تدقيق بعد."
+
 msgid "No data available"
 msgstr "لا توجد بيانات"
+
 msgid "No failed transactions."
 msgstr "لا توجد معاملات فاشلة."
+
 msgid "No notifications"
 msgstr "لا توجد إشعارات"
+
 msgid "No overdue tickets."
 msgstr "لا توجد تذاكر متأخرة."
+
 msgid "No pending orders. All clear!"
 msgstr "لا توجد طلبات معلقة. الكل نشط!"
+
 msgid "No records found"
 msgstr "لم يتم العثور على سجلات"
+
 msgid "No suspended tenants."
 msgstr "لا يوجد مستأجرين موقوفين."
+
 msgid "Notification Templates"
 msgstr "قوالب الإشعارات"
+
 msgid "Notifications"
 msgstr "الإشعارات"
+
 msgid "Open"
 msgstr "مفتوح"
+
 msgid "Over 48 Hours"
 msgstr "أكثر من 48 ساعة"
+
 msgid "Overdue"
 msgstr "متأخر"
+
 msgid "Overdue Support Tickets"
 msgstr "تذاكر الدعم المتأخرة"
+
 msgid "Payment Gateways"
 msgstr "بوابات الدفع"
+
 msgid "Payment Infrastructure"
 msgstr "البنية التحتية للمدفوعات"
+
 msgid "Payment Methods"
 msgstr "طرق الدفع"
+
 msgid "Pending"
 msgstr "قيد التفعيل"
+
 msgid "Pending Activation"
 msgstr "في انتظار التفعيل"
+
 msgid "Pending Approvals"
 msgstr "الموافقات المعلقة"
+
 msgid "Pending Bank Transfer Orders"
 msgstr "طلبات الدفع البنكي المعلقة"
+
 msgid "Pending Liquidity"
 msgstr "السيولة المعلقة"
+
 msgid "Previous"
 msgstr "السابق"
+
 msgid "Promo Codes"
 msgstr "أكواد الخصم"
+
 msgid "Queue"
 msgstr "قائمة الانتظار"
+
 msgid "Recent Admin Actions"
 msgstr "إجراءات المسؤولين الأخيرة"
+
 msgid "Recently Added Users"
 msgstr "المستخدمون المضافون حديثاً"
+
 msgid "Recently Suspended Tenants"
 msgstr "المستأجرون الموقوفون حديثاً"
+
 msgid "Record ID"
 msgstr "معرف السجل"
+
 msgid "Rejected"
 msgstr "مرفوض"
+
 msgid "Reports"
 msgstr "التقارير"
+
 msgid "Revenue Forecast & Trend"
 msgstr "توقعات الإيرادات والاتجاه"
+
 msgid "Role"
 msgstr "الدور"
+
 msgid "Role Distribution"
 msgstr "توزيع الأدوار"
+
 msgid "Role Name"
 msgstr "اسم الدور"
+
 msgid "Roles Master"
 msgstr "سجل الأدوار"
+
 msgid "Root Admin"
 msgstr "مدير النظام"
+
 msgid "Sat"
 msgstr "سبت"
+
 msgid "Save"
 msgstr "حفظ"
+
 msgid "Search shipments, clients, addresses..."
 msgstr "ابحث عن الشحنات والعملاء والعناوين..."
+
 msgid "Search..."
 msgstr "بحث..."
+
 msgid "Security & Audit"
 msgstr "الأمن والتدقيق"
+
 msgid "Settings"
 msgstr "الإعدادات"
+
 msgid "Sign out"
 msgstr "تسجيل الخروج"
+
 msgid "Staff Analytics — Role Distribution"
 msgstr "تحليلات الموظفين - توزيع الأدوار"
+
 msgid "Staff overview and activity insights"
 msgstr "نظرة عامة على الموظفين ورؤى النشاط"
+
 msgid "Stale Accounts"
 msgstr "الحسابات غير النشطة"
+
 msgid "Subscription Receipts"
 msgstr "إيصالات الاشتراك"
+
 msgid "Status"
 msgstr "الحالة"
+
 msgid "Subadmin"
 msgstr "مسؤول فرعي"
+
 msgid "Subject"
 msgstr "الموضوع"
+
 msgid "Subscribers CRM & Billing"
 msgstr "إدارة المشتركين والفوترة"
+
 msgid "Subscribers List"
 msgstr "قائمة المشتركين"
+
 msgid "Subscription Orders"
 msgstr "طلبات الاشتراك"
+
 msgid "Subscription Packages"
 msgstr "باقات الاشتراك"
+
 msgid "Subscription Plans"
 msgstr "باقات الاشتراك"
+
 msgid "Subscription Plans Management"
 msgstr "إدارة باقات الاشتراك"
+
 msgid "Subscription Report"
 msgstr "تقرير الاشتراكات"
+
 msgid "Subscriptions"
 msgstr "الاشتراكات"
+
 msgid "Sun"
 msgstr "أحد"
+
 msgid "Super Admin"
 msgstr "المشرف العام"
+
 msgid "Super Admin Dashboard"
 msgstr "لوحة تحكم المشرف العام"
+
 msgid "Super Administrator"
 msgstr "المسؤول العام"
+
 msgid "Support Categories"
 msgstr "فئات الدعم"
+
 msgid "Support Inbox"
 msgstr "صندوق الوارد للدعم"
+
 msgid "Support Management"
 msgstr "إدارة الدعم الفني"
+
 msgid "Support Tickets"
 msgstr "تذاكر الدعم"
+
 msgid "Suspended"
 msgstr "موقوف"
+
 msgid "Suspended Accounts"
 msgstr "الحسابات الموقوفة"
+
 msgid "Suspended Billing"
 msgstr "فوترة موقوفة"
+
 msgid "Suspended Violation"
 msgstr "موقوف لمخالفة"
+
 msgid "Switch Language"
 msgstr "تبديل اللغة"
+
 msgid "System"
 msgstr "النظام"
+
 msgid "System Banners"
 msgstr "لافتات النظام"
+
 msgid "System Configurations & Tax"
 msgstr "إعدادات النظام والضرائب"
+
 msgid "System Users Analytics"
 msgstr "تحليلات مستخدمي النظام"
+
 msgid "System Users Management"
 msgstr "إدارة مستخدمي النظام"
+
 msgid "System event list is hardcoded; Super Admin cannot create new event types from UI."
 msgstr "قائمة أحداث النظام ثابتة؛ لا يمكن للمشرف العام إنشاء أنواع أحداث جديدة من الواجهة."
+
 msgid "System overview — real-time platform insights"
 msgstr "نظرة عامة على النظام — رؤى المنصة في الوقت الفعلي"
+
 msgid "Tax Codes"
 msgstr "الأكواد الضريبية"
+
 msgid "Tenant Name"
 msgstr "اسم المستأجر"
+
 msgid "Thu"
 msgstr "خميس"
+
 msgid "Ticket Health"
 msgstr "صحة التذاكر"
+
 msgid "Ticket No"
 msgstr "رقم التذكرة"
+
 msgid "Timestamp"
 msgstr "الطابع الزمني"
+
 msgid "Total"
 msgstr "الإجمالي"
+
 msgid "Total Active Staff"
 msgstr "إجمالي الموظفين النشطين"
+
 msgid "Total Revenue This Month"
 msgstr "إجمالي الإيرادات هذا الشهر"
+
 msgid "Transactions Ledger"
 msgstr "سجل المعاملات"
+
 msgid "Tue"
 msgstr "ثلاثاء"
+
 msgid "Unassigned"
 msgstr "غير معين"
+
 msgid "Update"
 msgstr "تحديث"
+
 msgid "User Count"
 msgstr "عدد المستخدمين"
+
 msgid "User Management"
 msgstr "إدارة المستخدمين"
+
 msgid "Users Analytics"
 msgstr "تحليلات المستخدمين"
+
 msgid "View"
 msgstr "عرض"
+
 msgid "View Detail"
 msgstr "عرض التفاصيل"
+
 msgid "View Full Audit Log"
 msgstr "عرض سجل التدقيق الكامل"
+
 msgid "Wed"
 msgstr "أربعاء"
+
 msgid "Welcome back"
 msgstr "مرحباً بعودتك"
+
 msgid "You are yet to receive notifications"
 msgstr "لم تصلك إشعارات بعد"
 
 # Mobile API — Auth messages
 msgid "mobile.auth.token_expired"
 msgstr "انتهت صلاحية الجلسة. يرجى تسجيل الدخول مجدداً"
+
 msgid "mobile.auth.token_invalid"
 msgstr "رمز المصادقة غير صالح. يرجى تسجيل الدخول مجدداً"
+
 msgid "mobile.auth.unauthorized"
 msgstr "غير مصرح لك بالوصول. يرجى تسجيل الدخول"
+
 msgid "mobile.auth.forbidden"
 msgstr "ليس لديك صلاحية للوصول لهذا المورد"
+
 msgid "mobile.auth.admin_required"
 msgstr "هذه الصفحة تتطلب صلاحيات المسؤول"
+
 msgid "mobile.auth.driver_role_required"
 msgstr "هذا الإجراء متاح فقط لمستخدمي تطبيق السائقين بدور مسموح."
+
 msgid "mobile.auth.dispatcher_role_required"
 msgstr "هذا الإجراء متاح فقط للمستخدمين بدور مراقب العمليات."
+
 msgid "mobile.auth.capability_denied"
 msgstr "ليست لديك الصلاحية المطلوبة لهذه العملية."
 
@@ -402,28 +593,38 @@ msgstr "مطلوب سياق تنفيذ آمن لهذا الإجراء."
 
 msgid "mobile.jobs.execute.execution_context_driver_mismatch"
 msgstr "جلسة السائق لا تطابق سياق التنفيذ."
+
 msgid "mobile.validation.failed"
 msgstr "البيانات المدخلة غير صحيحة. يرجى المراجعة."
+
 msgid "mobile.validation.invalid_image"
 msgstr "يجب أن يكون الملف صورة صالحة بصيغة JPG أو JPEG أو PNG أو WEBP."
+
 msgid "mobile.validation.image_too_large"
 msgstr "يجب ألا يتجاوز حجم الصورة %(max_mb)s ميجابايت. حجم ملفك %(size_mb)s ميجابايت."
+
 msgid "mobile.validation.invalid_otp"
 msgstr "رمز التحقق غير صحيح."
+
 msgid "mobile.validation.otp_expired"
 msgstr "انتهت صلاحية رمز التحقق. يرجى طلب رمز جديد."
+
 msgid "mobile.validation.password_too_long"
 msgstr "كلمة المرور طويلة جداً (الحد الأقصى 128 حرفاً)."
 
 # Mobile API — Error messages
 msgid "mobile.error.not_found"
 msgstr "المورد المطلوب غير موجود"
+
 msgid "mobile.error.method_not_allowed"
 msgstr "طريقة الطلب غير مدعومة"
+
 msgid "mobile.error.rate_limit"
 msgstr "لقد تجاوزت الحد المسموح به من الطلبات."
+
 msgid "mobile.error.generic"
 msgstr "حدث خطأ في معالجة طلبك"
+
 msgid "mobile.error.server_error"
 msgstr "خطأ في الخادم. يرجى المحاولة لاحقاً"
 
@@ -435,129 +636,190 @@ msgstr "تم استرجاع البيانات بنجاح"
 # Mobile API — Driver Auth
 msgid "mobile.auth.email_required"
 msgstr "البريد الإلكتروني مطلوب"
+
 msgid "mobile.auth.email_invalid"
 msgstr "صيغة البريد الإلكتروني غير صحيحة"
+
 msgid "mobile.auth.password_required"
 msgstr "كلمة المرور مطلوبة"
+
 msgid "mobile.auth.password_min_length"
 msgstr "كلمة المرور يجب أن تكون 8 أحرف على الأقل"
+
 msgid "mobile.auth.confirm_password_required"
 msgstr "تأكيد كلمة المرور مطلوب"
+
 msgid "mobile.auth.passwords_do_not_match"
 msgstr "كلمتا المرور غير متطابقتين"
+
 msgid "mobile.auth.otp_required"
 msgstr "رمز التحقق مطلوب"
+
 msgid "mobile.auth.otp_invalid_length"
 msgstr "رمز التحقق يجب أن يكون 6 أرقام"
+
 msgid "mobile.auth.otp_digits_only"
 msgstr "رمز التحقق يجب أن يحتوي على أرقام فقط"
+
 msgid "mobile.auth.invalid_credentials"
 msgstr "البريد الإلكتروني أو كلمة المرور غير صحيحة"
+
 msgid "mobile.auth.invalid_tenant"
 msgstr "مؤسسة غير معروفة أو غير نشطة. تحقق من معرف المؤسسة وأعد المحاولة."
+
 msgid "mobile.auth.tenant_mismatch"
 msgstr "المؤسسة في الطلب لا تطابق هذه الجلسة. تحقق من ترويسة X-Tenant-ID أو سجّل الدخول مجدداً."
+
 msgid "mobile.auth.tenant_ambiguous"
 msgstr "هذا الحساب موجود في أكثر من مؤسسة. أرسل tenant_id (أو ترويسة X-Tenant-ID) وأعد المحاولة."
+
 msgid "mobile.auth.tenant_required"
 msgstr "المؤسسة مطلوبة. أرسل tenant_id في جسم الطلب أو ترويسة X-Tenant-ID."
+
 msgid "mobile.auth.tenant_ambiguous_operation"
 msgstr "تتطلب هذه العملية مؤسسة محددة لأن نفس البريد أو رمز التحقق موجود على أكثر من مستأجر. أرسل tenant_id أو X-Tenant-ID."
+
 msgid "mobile.auth.account_locked"
 msgstr "محاولات تسجيل دخول فاشلة كثيرة. أعد المحاولة لاحقاً أو أعد تعيين كلمة المرور."
+
 msgid "mobile.auth.account_inactive"
 msgstr "هذا الحساب غير نشط. يرجى التواصل مع الدعم"
+
 msgid "mobile.auth.account_deleted"
 msgstr "تم حذف هذا الحساب ولا يمكن استخدامه."
+
 msgid "mobile.auth.account_already_deleted"
 msgstr "تم حذف هذا الحساب مسبقاً."
+
 msgid "mobile.auth.account_deleted_success"
 msgstr "تم حذف حسابك بنجاح."
+
 msgid "web.auth.account_deleted"
 msgstr "تم حذف هذا الحساب ولا يمكن استخدامه لتسجيل الدخول."
+
 msgid "mobile.auth.not_a_driver"
 msgstr "هذا الحساب غير مرتبط بسائق"
+
 msgid "mobile.auth.driver_inactive"
 msgstr "حساب السائق غير نشط. يرجى التواصل مع الإدارة"
+
 msgid "mobile.auth.login_success"
 msgstr "تم تسجيل الدخول بنجاح"
+
 msgid "mobile.auth.otp_sent"
 msgstr "تم إرسال رمز التحقق إلى بريدك الإلكتروني إن كان مسجلاً"
+
 msgid "mobile.auth.forgot_password_accepted"
 msgstr "إذا كان هذا البريد مسجلاً لدى منظمتك، ستصلك رسالة تحتوي على رمز التحقق قريباً."
+
 msgid "mobile.auth.otp_verify_failed"
 msgstr "تعذر التحقق من الرمز. اطلب رمزاً جديداً أو أعد المحاولة."
+
 msgid "mobile.auth.reset_password_failed"
 msgstr "تعذر إكمال إعادة تعيين كلمة المرور. تحقق من الرمز وحاول مرة أخرى."
+
 msgid "mobile.auth.otp_not_found"
 msgstr "لم يتم العثور على رمز تحقق نشط"
+
 msgid "mobile.auth.otp_expired"
 msgstr "انتهت صلاحية رمز التحقق. يرجى طلب رمز جديد"
+
 msgid "mobile.auth.otp_max_attempts"
 msgstr "تم تجاوز الحد الأقصى لمحاولات التحقق"
+
 msgid "mobile.auth.otp_wrong"
 msgstr "رمز التحقق غير صحيح"
+
 msgid "mobile.auth.otp_verified"
 msgstr "تم التحقق من الرمز بنجاح"
+
 msgid "mobile.auth.otp_not_verified"
 msgstr "يجب التحقق من رمز OTP أولاً"
+
 msgid "mobile.auth.user_not_found"
 msgstr "المستخدم غير موجود"
+
 msgid "mobile.auth.password_reset_success"
 msgstr "تم تغيير كلمة المرور بنجاح"
+
 msgid "mobile.auth.logout_success"
 msgstr "تم تسجيل الخروج بنجاح"
+
 msgid "mobile.auth.logout_all_success"
 msgstr "تم تسجيل الخروج من جميع الأجهزة."
+
 msgid "mobile.auth.refresh_success"
 msgstr "تم تجديد الجلسة بنجاح."
+
 msgid "mobile.auth.refresh_invalid"
 msgstr "رمز التحديث غير صالح أو منتهي."
+
 msgid "mobile.auth.refresh_replay"
 msgstr "تم استخدام رمز التحديث هذا مسبقاً. سجّل الدخول مجدداً بالبريد وكلمة المرور."
+
 msgid "mobile.auth.change_password_otp_sent"
 msgstr "تم إرسال رمز التحقق."
+
 msgid "mobile.auth.change_password_otp_verified"
 msgstr "تم قبول رمز التحقق."
+
 msgid "mobile.auth.password_changed_successfully"
 msgstr "تم تحديث كلمة المرور بنجاح."
+
 msgid "mobile.auth.current_password_invalid"
 msgstr "كلمة المرور الحالية غير صحيحة."
+
 msgid "mobile.auth.change_password_requires_verified_otp"
 msgstr "يجب التحقق من الرمز قبل تغيير كلمة المرور."
 
 # Mobile API — Driver profile & change password
 msgid "mobile.profile.send_via_required"
 msgstr "يرجى اختيار طريقة استلام رمز التحقق."
+
 msgid "mobile.profile.send_via_invalid"
 msgstr "يجب أن تكون طريقة الإرسال إما البريد الإلكتروني أو الجوال."
+
 msgid "mobile.profile.current_password_required"
 msgstr "كلمة المرور الحالية مطلوبة."
+
 msgid "mobile.profile.current_password_blank"
 msgstr "كلمة المرور الحالية لا يمكن أن تكون فارغة."
+
 msgid "mobile.profile.photo_required"
 msgstr "صورة الملف الشخصي مطلوبة."
+
 msgid "mobile.profile.phone_missing_for_sms"
 msgstr "لا يوجد رقم جوال مسجل لهذا الحساب. أضف رقماً أو اختر البريد الإلكتروني."
+
 msgid "mobile.profile.new_password_same_as_current"
 msgstr "يجب أن تكون كلمة المرور الجديدة مختلفة عن الحالية."
+
 msgid "mobile.profile.fetch_success"
 msgstr "تم تحميل الملف الشخصي بنجاح."
+
 msgid "mobile.profile.photo_updated"
 msgstr "تم تحديث صورة الملف الشخصي بنجاح."
+
 msgid "mobile.profile.update_success"
 msgstr "تم تحديث الملف الشخصي بنجاح."
+
 msgid "mobile.profile.update_empty"
 msgstr "لا توجد حقول للتحديث. أرسل حقلاً واحداً على الأقل من الحقول المسموح بها."
+
 msgid "mobile.profile.arabic_name_required"
 msgstr "لا يمكن أن يكون الاسم العربي فارغاً عند إرساله."
+
 msgid "mobile.profile.full_name_required"
 msgstr "لا يمكن أن يكون الاسم الكامل فارغاً عند إرساله."
+
 msgid "mobile.profile.full_name_too_long"
 msgstr "الاسم الكامل أطول من المسموح."
+
 msgid "mobile.profile.mobile_digits_only"
 msgstr "يجب أن يحتوي رقم الجوال على أرقام فقط."
+
 msgid "mobile.profile.mobile_number_required"
 msgstr "لا يمكن أن يكون رقم جوال السائق فارغاً عند إرساله."
+
 msgid "mobile.profile.field_too_long"
 msgstr "هذا الحقل يتجاوز الحد الأقصى للطول."

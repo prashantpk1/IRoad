@@ -1,0 +1,331 @@
+{
+  "info": {
+    "_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "name": "IRoute — Driver Job Flow",
+    "description": "Complete driver mobile job flow from login to job closed.\nFollows A1 through A10 as defined in IRoute document.\nUse {{base_url}} variable = http://127.0.0.1:8000/api/v1/mobile\nUse {{access_token}} variable = filled automatically after login.\nUse {{job_id}} variable = filled after dashboard call.\nUse {{shipment_id}} variable = filled after A4 executes.\nUse {{capture_bundle_id}} variable = filled after POD capture.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://127.0.0.1:8000/api/v1/mobile" },
+    { "key": "driver_phone", "value": "" },
+    { "key": "driver_password", "value": "" },
+    { "key": "tenant_id", "value": "" },
+    { "key": "access_token", "value": "" },
+    { "key": "refresh_token", "value": "" },
+    { "key": "job_id", "value": "" },
+    { "key": "job_type", "value": "shipment" },
+    { "key": "shipment_id", "value": "" },
+    { "key": "capture_bundle_id", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "01 — Login (Get Access Token)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"phone\": \"{{driver_phone}}\",\n  \"password\": \"{{driver_password}}\",\n  \"tenant_id\": \"{{tenant_id}}\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": "{{base_url}}/driver/auth/login/",
+        "description": "STEP 1 — FIRST API TO CALL.\nSend driver phone, password, tenant_id in body.\nAfter success, access_token is auto-saved to collection variable.\nAll subsequent requests use Authorization: Bearer {{access_token}}.\nResponse key is data.access_token (not 'access', not 'token').\nIf login fails check: phone format, password, tenant_id is correct."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var resp = pm.response.json();",
+              "if (resp.status === 1 && resp.data && resp.data.access_token) {",
+              "    pm.collectionVariables.set(\"access_token\", resp.data.access_token);",
+              "    pm.collectionVariables.set(\"refresh_token\", resp.data.refresh_token);",
+              "    pm.test(\"Login successful, token saved\", function() { pm.expect(resp.status).to.eql(1); });",
+              "} else {",
+              "    pm.test(\"Login failed — check phone, password, tenant_id\", function() { pm.expect(resp.status).to.eql(1); });",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 — Dashboard (Get Active Job)",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": "{{base_url}}/driver/dashboard/",
+        "description": "STEP 2 — CALL AFTER LOGIN.\nReturns active job assigned to driver.\njob_id and job_type are auto-saved from response.\njob_type will be 'shipment' for normal delivery jobs.\nIf no active_job in response then no job is assigned yet.\nCheck data.active_job.job_id and data.active_job.job_type.\nThese variables are used in all job detail and action calls."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var resp = pm.response.json();",
+              "if (resp.data && resp.data.active_job) {",
+              "    pm.collectionVariables.set(\"job_id\", resp.data.active_job.job_id);",
+              "    pm.collectionVariables.set(\"job_type\", resp.data.active_job.job_type || \"shipment\");",
+              "    pm.test(\"Active job found, job_id saved\", function() { pm.expect(resp.data.active_job.job_id).to.exist; });",
+              "} else {",
+              "    pm.test(\"No active job assigned to driver\", function() { pm.expect(resp.data.active_job).to.exist; });",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 — Job Detail (See Current State)",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/",
+        "description": "STEP 3 — CALL TO SEE FULL JOB STATE BEFORE ANY ACTION.\nURL uses job_type and job_id from dashboard response.\njob_type is usually 'shipment'.\nResponse shows current state, next allowed action, cargo, addresses.\nCheck data.next_action to know which action to fire next.\nCheck data.shipment_id — will be null until A4 fires.\nThis API can be called anytime to refresh job state."
+      }
+    },
+    {
+      "name": "04 — Execute A1 — Start Job",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"client_action_id\": \"a1-{{$guid}}\",\n  \"workflow_version\": \"1.0\",\n  \"content_hash\": \"{{$guid}}\",\n  \"latitude\": 24.7136,\n  \"longitude\": 46.6753,\n  \"notes\": \"Starting job\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A1/execute/",
+        "description": "STEP 4 — FIRST DRIVER ACTION IN THE JOB.\naction_code A1 is in the URL path, not in the body.\nclient_action_id must be unique per firing — use a UUID.\ncontent_hash is required — use any UUID for testing.\nlatitude and longitude are GPS coordinates.\nAfter A1 fires: Booking Execution Date is stamped.\nBooking Item status moves to In Execution.\nNext action to fire is A2 Pickup Arrival."
+      }
+    },
+    {
+      "name": "05 — Execute A2 — Pickup Arrival",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"client_action_id\": \"a2-{{$guid}}\",\n  \"workflow_version\": \"1.0\",\n  \"content_hash\": \"{{$guid}}\",\n  \"latitude\": 24.7136,\n  \"longitude\": 46.6753,\n  \"notes\": \"Arrived at pickup site\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A2/execute/",
+        "description": "STEP 5 — DRIVER ARRIVED AT PICKUP LOCATION.\nAudit only action — captures GPS and timestamp.\nDoes not change Shipment or Booking status.\nJust records that driver reached the loading address.\nNext action to fire is A3 Start Loading."
+      }
+    },
+    {
+      "name": "06 — Execute A3 — Start Loading",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"client_action_id\": \"a3-{{$guid}}\",\n  \"workflow_version\": \"1.0\",\n  \"content_hash\": \"{{$guid}}\",\n  \"latitude\": 24.7136,\n  \"longitude\": 46.6753,\n  \"notes\": \"Loading started\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A3/execute/",
+        "description": "STEP 6 — LOADING HAS STARTED.\nAudit only action — captures GPS and timestamp.\nDoes not change Shipment or Booking status.\nPREREQUISITE FOR A4 — A3 must fire before A4 can fire.\nNext action is A4 Confirm Loaded which is the POINT OF NO RETURN."
+      }
+    },
+    {
+      "name": "07 — Execute A4 — Confirm Loaded (POINT OF NO RETURN)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"client_action_id\": \"a4-{{$guid}}\",\n  \"workflow_version\": \"1.0\",\n  \"content_hash\": \"{{$guid}}\",\n  \"latitude\": 24.7136,\n  \"longitude\": 46.6753,\n  \"notes\": \"Cargo loaded and confirmed\",\n  \"media\": [\n    {\n      \"media_type\": \"photo\",\n      \"file_ref\": \"loaded_truck_photo_1.jpg\",\n      \"file_name\": \"loaded_truck_1.jpg\",\n      \"description\": \"Front view of loaded truck\",\n      \"sort_order\": 1\n    },\n    {\n      \"media_type\": \"photo\",\n      \"file_ref\": \"loaded_truck_photo_2.jpg\",\n      \"file_name\": \"loaded_truck_2.jpg\",\n      \"description\": \"Side view of loaded truck\",\n      \"sort_order\": 2\n    }\n  ]\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A4/execute/",
+        "description": "STEP 7 — MOST IMPORTANT ACTION. POINT OF NO RETURN.\nAfter this fires THREE things are atomically created:\n  1. Shipment record (status = Loaded)\n  2. Truck Movement Log record (status = Scheduled)\n  3. Booking Item status advances to In Execution\nAll three succeed together or none succeed.\nIf app crashes mid-action nothing is created — safe to retry.\nAFTER THIS ACTION: job cannot be cancelled normally.\nshipment_id is auto-saved from response for use in later APIs.\nMedia is REQUIRED — photos of loaded cargo.\nAt least 2 photos should be sent.\nNext action is A5 Depart In Transit."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var resp = pm.response.json();",
+              "if (resp.data && resp.data.shipment_id) {",
+              "    pm.collectionVariables.set(\"shipment_id\", resp.data.shipment_id);",
+              "    pm.test(\"Shipment created, shipment_id saved\", function() { pm.expect(resp.data.shipment_id).to.exist; });",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "08 — Execute A5 — Depart In Transit",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"client_action_id\": \"a5-{{$guid}}\",\n  \"workflow_version\": \"1.0\",\n  \"content_hash\": \"{{$guid}}\",\n  \"latitude\": 24.7136,\n  \"longitude\": 46.6753,\n  \"notes\": \"Departed from pickup location\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A5/execute/",
+        "description": "STEP 8 — TRUCK HAS DEPARTED.\nAdvances EXISTING records — does NOT create new ones.\nShipment status changes: Loaded → In Transit\nTruck Movement Log status changes: Scheduled → In Progress\nStart Time is stamped on Movement Log.\nGPS at departure point is captured.\nNext action is A6 Delivery Arrival."
+      }
+    },
+    {
+      "name": "09 — Execute A6 — Delivery Arrival",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"client_action_id\": \"a6-{{$guid}}\",\n  \"workflow_version\": \"1.0\",\n  \"content_hash\": \"{{$guid}}\",\n  \"latitude\": 21.3891,\n  \"longitude\": 39.8579,\n  \"notes\": \"Arrived at delivery location\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A6/execute/",
+        "description": "STEP 9 — DRIVER ARRIVED AT DELIVERY LOCATION.\nShipment status changes: In Transit → At Delivery\nGPS at delivery point is captured.\nAfter this delivery address can no longer be changed.\nNext step is POD Capture (separate API) then A7 Upload POD."
+      }
+    },
+    {
+      "name": "10 — POD Capture (Upload Evidence Before A7)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"client_capture_id\": \"pod-cap-{{$guid}}\",\n  \"content_hash\": \"{{$guid}}\",\n  \"workflow_version\": \"1.0\",\n  \"pod_type\": \"soft_copy\",\n  \"target_action_code\": \"A7\",\n  \"latitude\": 21.3891,\n  \"longitude\": 39.8579,\n  \"notes\": \"Delivery note signed by receiver\",\n  \"media\": [\n    {\n      \"media_type\": \"photo\",\n      \"file_ref\": \"signed_delivery_note_page1.jpg\",\n      \"file_name\": \"delivery_note_p1.jpg\",\n      \"description\": \"Page 1 of signed delivery note\",\n      \"sort_order\": 1\n    }\n  ]\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": "{{base_url}}/driver/jobs/shipments/{{shipment_id}}/pod/capture/",
+        "description": "STEP 10 — STAGE POD EVIDENCE BEFORE FIRING A7.\nThis is a STAGING API — does NOT create the POD Record yet.\nDoes NOT change Shipment status.\nDoes NOT write to Action Log.\nIt only stages Layer 1 (Digital GPS/photos) and Layer 2 (Soft Copy scans).\nUses shipment_id variable saved from A4 response.\ncapture_bundle_id is auto-saved for use in A7 execute call.\nMUST call this before A7.\nThen pass capture_bundle_id to the A7 execute request body."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var resp = pm.response.json();",
+              "if (resp.data && resp.data.capture_bundle_id) {",
+              "    pm.collectionVariables.set(\"capture_bundle_id\", resp.data.capture_bundle_id);",
+              "    pm.test(\"POD bundle staged, capture_bundle_id saved\", function() { pm.expect(resp.data.capture_bundle_id).to.exist; });",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "11 — Execute A7 — Upload POD (Creates POD Record)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"client_action_id\": \"a7-{{$guid}}\",\n  \"workflow_version\": \"1.0\",\n  \"content_hash\": \"{{$guid}}\",\n  \"latitude\": 21.3891,\n  \"longitude\": 39.8579,\n  \"capture_bundle_id\": \"{{capture_bundle_id}}\",\n  \"notes\": \"POD submitted with signed delivery note\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A7/execute/",
+        "description": "STEP 11 — UPLOAD POD AND CREATE POD RECORD.\nREQUIRES capture_bundle_id from Step 10 POD Capture call.\nPass capture_bundle_id in the body (also accepted as bundle_id or pod_capture_bundle_id).\nWhen A7 fires it atomically:\n  1. Creates the POD Record (POD-YYYY-NNNN)\n  2. Advances Shipment status: At Delivery → POD Submitted\n  3. Writes Action Log entry\nLayer 1 = Digital Evidence (GPS, photos already staged in bundle)\nLayer 2 = Soft Copy (scanned delivery note already staged in bundle)\nLayer 3 = Hard Copy handled separately by Ops on desktop — NOT here.\nAfter A7: Ops must verify POD before Shipment can advance.\nFor COD orders: A9 Collect Payment fires after A7.\nFor Credit orders: A8 Unloading Completed fires after A7."
+      }
+    },
+    {
+      "name": "12 — Execute A8 — Unloading Completed",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"client_action_id\": \"a8-{{$guid}}\",\n  \"workflow_version\": \"1.0\",\n  \"content_hash\": \"{{$guid}}\",\n  \"latitude\": 21.3891,\n  \"longitude\": 39.8579,\n  \"notes\": \"Unloading completed\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A8/execute/",
+        "description": "STEP 12 — UNLOADING IS DONE.\nTruck Movement Log status changes: In Progress → Completed\nEnd Time is stamped on Movement Log.\nAsset-side leg is now CLOSED at this point.\nShipment commercial side stays open until A10.\nFor COD orders: fire A9 Collect Payment before or after A8.\nFor Credit orders: A8 leads directly to A10 Job Closed\n(after POD is verified by Ops)."
+      }
+    },
+    {
+      "name": "13 — Payment Collection — A9 COD Only (Collect Cash)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"client_payment_id\": \"pay-{{$guid}}\",\n  \"shipment_id\": \"{{shipment_id}}\",\n  \"amount\": 1500.00,\n  \"notes\": \"Cash collected from customer\",\n  \"payment_mode\": \"cash\",\n  \"proof_media\": [\n    {\n      \"media_type\": \"photo\",\n      \"file_ref\": \"payment_receipt.jpg\",\n      \"file_name\": \"receipt.jpg\",\n      \"description\": \"Payment receipt photo\",\n      \"sort_order\": 1\n    }\n  ]\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": "{{base_url}}/driver/payments/collect/",
+        "description": "STEP 13 — COD CASH COLLECTION (ONLY FOR COD ORDER TYPE).\nSKIP THIS STEP FOR CREDIT ORDERS.\nThis calls Payment Collection API which internally fires A9.\nUses shipment_id variable saved from A4.\namount = actual cash collected from customer.\nIf amount differs from expected COD Amount:\n  - Driver is NOT blocked.\n  - Variance is FLAGGED for Ops follow-up.\n  - Treasury Transaction is still created with actual amount.\n  - Shipment COD Payment Status = Collected regardless.\nAfter this fires:\n  - Driver Treasury Transaction created (Debit, Client Pay)\n  - Driver wallet balance increases by collected amount\n  - Ops will initiate Internal Transfer to collection wallet later\nNext action is A10 Job Closed (after POD verified by Ops)."
+      }
+    },
+    {
+      "name": "14 — Execute A10 — Job Closed (Terminal Action)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"client_action_id\": \"a10-{{$guid}}\",\n  \"workflow_version\": \"1.0\",\n  \"content_hash\": \"{{$guid}}\",\n  \"latitude\": 21.3891,\n  \"longitude\": 39.8579,\n  \"notes\": \"Job completed and closed\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A10/execute/",
+        "description": "STEP 14 — FINAL ACTION. CLOSES THE JOB.\nPREREQUISITES THAT MUST BE MET BEFORE A10 CAN FIRE:\n  - A8 Unloading Completed must have fired\n  - POD must be Compliant (verified by Ops)\n  - For COD: COD Payment Status must be Collected (A9 fired)\nWhen A10 fires:\n  - Shipment status: Delivered → Closed (TERMINAL)\n  - Booking Item status: In Execution → Executed\n  - Booking derived status recomputes to Executed\nAfter A10: Driver returns to Home in On Call mode.\nAfter A10: Shipment becomes eligible for SIR billing sweep.\nNothing can reverse this action."
+      }
+    },
+    {
+      "name": "15 — Report Issue (Optional — Any Time)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"client_issue_id\": \"issue-{{$guid}}\",\n  \"shipment_id\": \"{{shipment_id}}\",\n  \"issue_type\": \"delay\",\n  \"severity\": \"medium\",\n  \"notes\": \"Traffic delay on main route\",\n  \"latitude\": 24.7136,\n  \"longitude\": 46.6753,\n  \"media\": []\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": "{{base_url}}/driver/issues/report/",
+        "description": "OPTIONAL — CAN BE CALLED AT ANY POINT DURING THE JOB.\nissue_type values: delay, vehicle_breakdown, customer_unavailable,\n  payment_dispute, pod_issue, accident, route_blocked, other\nseverity values: low, medium, high, critical\nThis does NOT stop the job flow.\nIssue is sent to Ops supervisor for acknowledgement.\nDriver continues normal action flow alongside."
+      }
+    }
+  ]
+}

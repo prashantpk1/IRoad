@@ -1,0 +1,169 @@
+{
+  "info": {
+    "_postman_id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+    "name": "IRoute — Driver Empty Move Flow",
+    "description": "HOW TO USE THIS COLLECTION:\n1. Set driver_phone, driver_password, tenant_id in collection variables.\n2. Run Request 01 Login first.\n3. Run Request 02 Dashboard — if current_empty_move exists movement_job_id is saved.\n4. If no empty move exists: an empty move record must first be created \n   (typically via driver app On Call mode or admin desktop assignment).\n   Then refresh dashboard to get movement_job_id.\n5. Run steps 03 through 06 in order.\n6. Cancel (Step 07) is only valid before Step 05 fires.\n7. action_codes for empty move actions must be verified against \n   Action Master database rows where scope=On_Call and category=Empty_Move.\n   The exact codes depend on your Action Master seed data from Prompt 1.\n\nComplete empty move flow for driver between jobs.\nEmpty move = truck movement with no cargo, no booking.\nThree reasons: Return, Maintenance, Repositioning.\njob_type is 'movement' for all empty move calls.\nUse {{base_url}} variable = http://127.0.0.1:8000/api/v1/mobile\nUse {{access_token}} variable = filled by login.\nUse {{movement_job_id}} variable = filled after dashboard call.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://127.0.0.1:8000/api/v1/mobile" },
+    { "key": "driver_phone", "value": "" },
+    { "key": "driver_password", "value": "" },
+    { "key": "tenant_id", "value": "" },
+    { "key": "access_token", "value": "" },
+    { "key": "movement_job_id", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "01 — Login (Get Access Token)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"phone\": \"{{driver_phone}}\",\n  \"password\": \"{{driver_password}}\",\n  \"tenant_id\": \"{{tenant_id}}\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": "{{base_url}}/driver/auth/login/",
+        "description": "STEP 1 — SAME LOGIN AS JOB FLOW.\nSend phone, password, tenant_id.\naccess_token is auto-saved.\nToken key in response is data.access_token.\nUse Authorization: Bearer {{access_token}} for all subsequent calls."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var resp = pm.response.json();",
+              "if (resp.status === 1 && resp.data && resp.data.access_token) {",
+              "    pm.collectionVariables.set(\"access_token\", resp.data.access_token);",
+              "    pm.test(\"Login successful, token saved\", function() { pm.expect(resp.status).to.eql(1); });",
+              "} else {",
+              "    pm.test(\"Login FAILED — check credentials\", function() { pm.expect(resp.status).to.eql(1); });",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 — Dashboard (Check for Empty Move or On Call State)",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": "{{base_url}}/driver/dashboard/",
+        "description": "STEP 2 — CHECK DASHBOARD FOR CURRENT STATE.\nIf driver is between jobs (On Call mode) no active_job will appear.\nLook at data.current_empty_move for any active empty move.\nIf current_empty_move exists save its job_id as movement_job_id.\nEmpty move job_type is 'movement' (not 'shipment').\nIf no empty move exists driver needs to start one via A_EMPTY_START action.\nDashboard shows driver mode: Job / On Call / Offline."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var resp = pm.response.json();",
+              "if (resp.data && resp.data.current_empty_move) {",
+              "    pm.collectionVariables.set(\"movement_job_id\", resp.data.current_empty_move.job_id);",
+              "    pm.test(\"Empty move found, movement_job_id saved\", function() { pm.expect(resp.data.current_empty_move.job_id).to.exist; });",
+              "} else {",
+              "    pm.test(\"No current empty move — driver in On Call mode, ready to start new empty move\", function() { pm.expect(true).to.be.true; });",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 — Empty Move Job Detail (Current State)",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": "{{base_url}}/driver/jobs/movement/{{movement_job_id}}/",
+        "description": "STEP 3 — GET DETAIL OF THE EMPTY MOVE RECORD.\nURL uses job_type = 'movement' (hardcoded for empty moves).\nUses movement_job_id from dashboard response.\nResponse shows: movement reason, from/to location, current status.\nStatus will be Scheduled before start, In Progress during, Completed after.\nNo Booking or Shipment linked to this record.\nNo cargo, no client, no commercial obligation.\nThis is pure asset movement for fleet tracking."
+      }
+    },
+    {
+      "name": "04 — Empty Move Timeline (Action History)",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": "{{base_url}}/driver/jobs/movement/{{movement_job_id}}/timeline/",
+        "description": "STEP 4 — OPTIONAL: VIEW ACTION HISTORY FOR THIS MOVE.\nShows all actions fired on this empty move in reverse chronological order.\nUseful for debugging or confirming what has already fired.\nCan be called at any point during the empty move flow."
+      }
+    },
+    {
+      "name": "05 — Execute Start Empty Move (Scheduled → In Progress)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"client_action_id\": \"em-start-{{$guid}}\",\n  \"workflow_version\": \"1.0\",\n  \"content_hash\": \"{{$guid}}\",\n  \"latitude\": 24.7136,\n  \"longitude\": 46.6753,\n  \"notes\": \"Starting empty move — returning to base\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": "{{base_url}}/driver/jobs/movement/{{movement_job_id}}/actions/A_EMPTY_START/execute/",
+        "description": "STEP 5 — DRIVER STARTS THE EMPTY MOVE.\nNOTE: action_code for empty move start may be named differently.\nCheck Action Master in database for the exact code where:\n  scope = On_Call AND category = Empty_Move AND sequence_number = 1\nReplace A_EMPTY_START in URL with that exact code.\nWhen this fires:\n  Truck Movement Log status: Scheduled → In Progress\n  Start Time is stamped\nNo Shipment is created (empty move has no cargo).\nNo Booking Item is involved.\nGPS at departure is captured.\nThree valid reasons for empty move:\n  Return = truck returning to base after delivery\n  Maintenance = truck going for service/repair\n  Repositioning = truck moving between hubs for next job"
+      }
+    },
+    {
+      "name": "06 — Execute Complete Empty Move (In Progress → Completed)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"client_action_id\": \"em-complete-{{$guid}}\",\n  \"workflow_version\": \"1.0\",\n  \"content_hash\": \"{{$guid}}\",\n  \"latitude\": 24.6877,\n  \"longitude\": 46.7219,\n  \"notes\": \"Arrived at destination — empty move complete\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": "{{base_url}}/driver/jobs/movement/{{movement_job_id}}/actions/A_EMPTY_COMPLETE/execute/",
+        "description": "STEP 6 — DRIVER ARRIVES AT DESTINATION. EMPTY MOVE DONE.\nNOTE: action_code for empty move complete may be named differently.\nCheck Action Master in database for the exact code where:\n  scope = On_Call AND category = Empty_Move AND sequence_number = 2\nReplace A_EMPTY_COMPLETE in URL with that exact code.\nWhen this fires:\n  Truck Movement Log status: In Progress → Completed\n  End Time is stamped\nThe Movement Log row is now terminal — cannot be changed.\nDriver returns to On Call mode ready for next assignment.\nFleet utilisation dashboard updates with distance and time."
+      }
+    },
+    {
+      "name": "07 — Execute Cancel Empty Move (Optional — Before Start Only)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"client_action_id\": \"em-cancel-{{$guid}}\",\n  \"workflow_version\": \"1.0\",\n  \"content_hash\": \"{{$guid}}\",\n  \"latitude\": 24.7136,\n  \"longitude\": 46.6753,\n  \"notes\": \"Empty move cancelled — plan changed\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": "{{base_url}}/driver/jobs/movement/{{movement_job_id}}/actions/A_EMPTY_CANCEL/execute/",
+        "description": "OPTIONAL STEP — CANCEL BEFORE STARTING ONLY.\nNOTE: action_code for empty move cancel may be named differently.\nCheck Action Master in database for the exact code where:\n  scope = On_Call AND category = Empty_Move AND sequence_number = 3\nReplace A_EMPTY_CANCEL in URL with that exact code.\nIMPORTANT RULES:\n  - Cancel is ONLY allowed when status is Scheduled.\n  - Once In Progress cancel is NOT allowed.\n  - Once Completed cancel is NOT allowed.\nWhen cancelled:\n  Movement Log status = Cancelled\n  Row stays in storage for audit (never deleted)\n  Row is excluded from all KPI calculations\nUse this if the trip was planned but never happened."
+      }
+    },
+    {
+      "name": "08 — Report Issue During Empty Move (Optional)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"client_issue_id\": \"issue-{{$guid}}\",\n  \"shipment_id\": null,\n  \"issue_type\": \"vehicle_breakdown\",\n  \"severity\": \"high\",\n  \"notes\": \"Truck breakdown during return empty move\",\n  \"latitude\": 24.7136,\n  \"longitude\": 46.6753,\n  \"media\": []\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": "{{base_url}}/driver/issues/report/",
+        "description": "OPTIONAL — REPORT AN ISSUE DURING EMPTY MOVE.\nshipment_id is null for empty moves (no shipment attached).\nissue_type values: delay, vehicle_breakdown, customer_unavailable,\n  payment_dispute, pod_issue, accident, route_blocked, other\nseverity values: low, medium, high, critical\nvehicle_breakdown is the most common issue during empty moves.\nThis does NOT stop or cancel the empty move automatically.\nOps supervisor receives the report and follows up."
+      }
+    }
+  ]
+}
