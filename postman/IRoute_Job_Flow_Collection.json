@@ -674,7 +674,7 @@
             },
             {
               "key": "pod_type",
-              "value": "digital",
+              "value": "soft",
               "type": "text"
             },
             {
@@ -721,11 +721,36 @@
               "key": "media[0][file_ref]",
               "value": "",
               "type": "file"
+            },
+            {
+              "key": "media[1][media_type]",
+              "value": "signature",
+              "type": "text"
+            },
+            {
+              "key": "media[1][file_name]",
+              "value": "signature.jpg",
+              "type": "text"
+            },
+            {
+              "key": "media[1][description]",
+              "value": "Customer signature",
+              "type": "text"
+            },
+            {
+              "key": "media[1][sort_order]",
+              "value": "2",
+              "type": "text"
+            },
+            {
+              "key": "media[1][file_ref]",
+              "value": "",
+              "type": "file"
             }
           ]
         },
         "url": "{{base_url}}/driver/jobs/shipments/{{shipment_id}}/pod/capture/",
-        "description": "STEP 10 — STAGE POD EVIDENCE.\nPREREQUISITE: Run Request 10a first to get\npod_content_hash and pod_workflow_version.\nThese are auto-filled from 10a response.\n\nSelect a real photo for media[0][file_ref].\nClick the file icon and choose any JPG or PNG.\n\nOn success capture_bundle_id is saved automatically.\nPass that bundle to Request 11 Execute A7."
+        "description": "STEP 10 — STAGE POD EVIDENCE.\nPREREQUISITE: Run Request 10a first to get\npod_content_hash and pod_workflow_version.\nThese are auto-filled from 10a response.\n\nTWO files required for POD Capture:\nFILE 1: media[0][file_ref]\n  media_type = photo\n  Select any JPG or PNG delivery note scan.\nFILE 2: media[1][file_ref]\n  media_type = signature\n  Select any JPG or PNG signature image.\nBoth file rows must have a real file selected.\nClick the file icon on each row in Postman.\n\nValid pod_type values: photo, video, document,\n  signature, soft, digital, multi_page\nValid media_type values: photo, video, \n  document, signature\n\nOn success capture_bundle_id is auto-saved\nfor use in Request 11 Execute A7."
       },
       "event": [
         {

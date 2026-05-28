@@ -222,7 +222,7 @@ class PodCaptureValidationService:
     @staticmethod
     def _assert_media_integrity(items: list[PODCaptureMediaItemInput]) -> None:
         for item in items:
-            if not item.file_ref and not item.upload:
+            if not item.file_ref:
                 raise PodCaptureValidationService._validation_error(
                     'media_file_required',
                     str(_('mobile.pod_capture.media_file_required')),

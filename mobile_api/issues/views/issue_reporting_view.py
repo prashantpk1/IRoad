@@ -47,6 +47,7 @@ class IssueReportingAPIView(MobileAPIView):
         self._service = IssueReportingService()
 
     def post(self, request):
+        serializer_data = request.data
         if any(str(k).startswith('media[') for k in request.FILES.keys()):
             processed = process_media_files(
                 request.FILES,
@@ -54,11 +55,11 @@ class IssueReportingAPIView(MobileAPIView):
                 subfolder='issue_evidence',
             )
             if processed:
-                data = request.data.copy()
-                data['media'] = processed
-                request._full_data = data
+                merged_data = {k: request.data.get(k) for k in request.data.keys()}
+                merged_data['media'] = processed
+                serializer_data = merged_data
 
-        serializer = IssueReportingRequestSerializer(data=request.data)
+        serializer = IssueReportingRequestSerializer(data=serializer_data)
         if not serializer.is_valid():
             return self.validation_error(serializer)
 

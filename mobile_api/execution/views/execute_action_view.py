@@ -59,6 +59,7 @@ class ExecuteActionAPIView(MobileAPIView):
         self._orchestrator = ExecuteActionOrchestrator()
 
     def post(self, request, job_type: str, job_id: str, action_code: str):
+        serializer_data = request.data
         if any(str(k).startswith('media[') for k in request.FILES.keys()):
             processed = process_media_files(
                 request.FILES,
@@ -66,11 +67,11 @@ class ExecuteActionAPIView(MobileAPIView):
                 subfolder='evidence',
             )
             if processed:
-                data = request.data.copy()
-                data['media'] = processed
-                request._full_data = data
+                merged_data = {k: request.data.get(k) for k in request.data.keys()}
+                merged_data['media'] = processed
+                serializer_data = merged_data
 
-        serializer = ExecuteActionRequestSerializer(data=request.data)
+        serializer = ExecuteActionRequestSerializer(data=serializer_data)
         if not serializer.is_valid():
             return self.validation_error(serializer)
 

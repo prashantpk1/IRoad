@@ -804,6 +804,11 @@ MOBILE_API_MAX_PAGE_SIZE = 100
 # Mobile API — POD capture (durable staging)
 # ─────────────────────────────────────────
 MOBILE_POD_BUNDLE_TTL_HOURS = config('MOBILE_POD_BUNDLE_TTL_HOURS', default=72, cast=int)
+MOBILE_POD_CAPTURE_REQUIRE_SYNC_METADATA = config(
+    'MOBILE_POD_CAPTURE_REQUIRE_SYNC_METADATA',
+    default=False,
+    cast=bool,
+)
 MOBILE_POD_CAPTURE_REQUIRE_STORAGE_VERIFICATION = config(
     'MOBILE_POD_CAPTURE_REQUIRE_STORAGE_VERIFICATION',
     default=True,
