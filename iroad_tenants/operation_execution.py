@@ -7,6 +7,7 @@ Admin manual entry remains supported; rules filter dropdown and block invalid PO
 
 from __future__ import annotations
 
+from django.core.exceptions import ValidationError
 from django.db.models import Q
 
 from iroad_tenants.operation_runtime.shipment_execution_stage import (
@@ -24,6 +25,7 @@ from tenant_workspace.models import (
     TenantOperationAction,
     TenantOperationActionLog,
     TenantShipment,
+    TenantTruckMovementLog,
 )
 
 
@@ -461,6 +463,20 @@ def validate_operation_action_allowed(
     )
     if allowed.filter(pk=operation_action.pk).exists():
         return None
+
+    action_code = str(getattr(operation_action, 'action_code', '') or '').strip().upper()
+    if action_code == 'A4' and shipment is not None:
+        has_movement = (
+            TenantTruckMovementLog.objects.filter(shipment_id=shipment.pk)
+            .exclude(status=TenantTruckMovementLog.Status.CANCELLED)
+            .exists()
+        )
+        if not has_movement:
+            raise ValidationError(
+                'Data integrity error: Shipment exists without Movement. '
+                'Contact admin to repair this record. '
+                'error_code: shipment_without_movement'
+            )
 
     context_bits = []
     if shipment is not None:

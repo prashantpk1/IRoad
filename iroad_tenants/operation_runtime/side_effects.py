@@ -211,6 +211,15 @@ def apply_execution_side_effects(action_log, *, created_by_label='') -> None:
     ):
         truck_movement = _require_loaded_movement_for_action(action_log, shipment)
 
+    if action.auto_shipment_post and action.auto_movement_post:
+        if shipment is not None and truck_movement is None:
+            raise ValidationError(
+                'Atomic birth failed: Shipment was created '
+                'but Movement was not. '
+                'Both must succeed or neither should persist. '
+                'Transaction will roll back.'
+            )
+
     if shipment is not None and action.auto_pod_post:
         pod_document = birth_pod_from_action_log(
             action_log,
