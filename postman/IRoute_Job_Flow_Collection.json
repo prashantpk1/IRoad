@@ -350,23 +350,95 @@
           {
             "key": "Authorization",
             "value": "Bearer {{access_token}}"
-          },
-          {
-            "key": "Content-Type",
-            "value": "application/json"
           }
         ],
         "body": {
-          "mode": "raw",
-          "raw": "{\n  \"client_action_id\": \"a4-{{$guid}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": 24.7136,\n  \"longitude\": 46.6753,\n  \"notes\": \"Cargo loaded and confirmed\",\n  \"media\": [\n    {\n      \"media_type\": \"photo\",\n      \"file_ref\": \"loaded_truck_photo_1.jpg\",\n      \"file_name\": \"loaded_truck_1.jpg\",\n      \"description\": \"Front view of loaded truck\",\n      \"sort_order\": 1\n    },\n    {\n      \"media_type\": \"photo\",\n      \"file_ref\": \"loaded_truck_photo_2.jpg\",\n      \"file_name\": \"loaded_truck_2.jpg\",\n      \"description\": \"Side view of loaded truck\",\n      \"sort_order\": 2\n    }\n  ]\n}",
-          "options": {
-            "raw": {
-              "language": "json"
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "client_action_id",
+              "value": "a4-{{$guid}}",
+              "type": "text"
+            },
+            {
+              "key": "workflow_version",
+              "value": "{{workflow_version}}",
+              "type": "text"
+            },
+            {
+              "key": "content_hash",
+              "value": "{{content_hash}}",
+              "type": "text"
+            },
+            {
+              "key": "latitude",
+              "value": "24.7136",
+              "type": "text"
+            },
+            {
+              "key": "longitude",
+              "value": "46.6753",
+              "type": "text"
+            },
+            {
+              "key": "notes",
+              "value": "Cargo loaded and confirmed",
+              "type": "text"
+            },
+            {
+              "key": "media[0][media_type]",
+              "value": "photo",
+              "type": "text"
+            },
+            {
+              "key": "media[0][file_name]",
+              "value": "loaded_truck_1.jpg",
+              "type": "text"
+            },
+            {
+              "key": "media[0][description]",
+              "value": "Front view of loaded truck",
+              "type": "text"
+            },
+            {
+              "key": "media[0][sort_order]",
+              "value": "1",
+              "type": "text"
+            },
+            {
+              "key": "media[0][file_ref]",
+              "value": "",
+              "type": "file"
+            },
+            {
+              "key": "media[1][media_type]",
+              "value": "photo",
+              "type": "text"
+            },
+            {
+              "key": "media[1][file_name]",
+              "value": "loaded_truck_2.jpg",
+              "type": "text"
+            },
+            {
+              "key": "media[1][description]",
+              "value": "Side view of loaded truck",
+              "type": "text"
+            },
+            {
+              "key": "media[1][sort_order]",
+              "value": "2",
+              "type": "text"
+            },
+            {
+              "key": "media[1][file_ref]",
+              "value": "",
+              "type": "file"
             }
-          }
+          ]
         },
         "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A4/execute/",
-        "description": "PREREQUISITE: Run requests in order 04 → 05 → 06 etc.\ncontent_hash and workflow_version auto-update after\neach successful execute.\nIf you get 409 stale_content_hash:\n  1. Re-run Request 03 Job Detail to refresh hash\n  2. Then retry this request\nDo NOT skip any action in the sequence."
+        "description": "PREREQUISITE: Run requests in order 04 → 05 → 06 etc.\ncontent_hash and workflow_version auto-update after\neach successful execute.\nIf you get 409 stale_content_hash:\n  1. Re-run Request 03 Job Detail to refresh hash\n  2. Then retry this request\nDo NOT skip any action in the sequence.\n\nFILE UPLOAD INSTRUCTIONS:\nFor any field with type FILE:\n  Click the file icon in Postman next to that field.\n  Select any JPG, PNG, or MP4 file from your device.\nAllowed file types: image/jpeg, image/png,\n  image/webp, video/mp4\nMax file size: 50MB per file\nContent-Type is set automatically by Postman.\nDo NOT set Content-Type header manually."
       },
       "event": [
         {
@@ -531,23 +603,80 @@
           {
             "key": "Authorization",
             "value": "Bearer {{access_token}}"
-          },
-          {
-            "key": "Content-Type",
-            "value": "application/json"
           }
         ],
         "body": {
-          "mode": "raw",
-          "raw": "{\n  \"client_capture_id\": \"pod-cap-{{$guid}}\",\n  \"content_hash\": \"{{$guid}}\",\n  \"workflow_version\": \"1.0\",\n  \"pod_type\": \"soft_copy\",\n  \"target_action_code\": \"A7\",\n  \"latitude\": 21.3891,\n  \"longitude\": 39.8579,\n  \"notes\": \"Delivery note signed by receiver\",\n  \"media\": [\n    {\n      \"media_type\": \"photo\",\n      \"file_ref\": \"signed_delivery_note_page1.jpg\",\n      \"file_name\": \"delivery_note_p1.jpg\",\n      \"description\": \"Page 1 of signed delivery note\",\n      \"sort_order\": 1\n    }\n  ]\n}",
-          "options": {
-            "raw": {
-              "language": "json"
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "client_capture_id",
+              "value": "pod-cap-{{$guid}}",
+              "type": "text"
+            },
+            {
+              "key": "content_hash",
+              "value": "{{content_hash}}",
+              "type": "text"
+            },
+            {
+              "key": "workflow_version",
+              "value": "{{workflow_version}}",
+              "type": "text"
+            },
+            {
+              "key": "pod_type",
+              "value": "soft_copy",
+              "type": "text"
+            },
+            {
+              "key": "target_action_code",
+              "value": "A7",
+              "type": "text"
+            },
+            {
+              "key": "latitude",
+              "value": "21.3891",
+              "type": "text"
+            },
+            {
+              "key": "longitude",
+              "value": "39.8579",
+              "type": "text"
+            },
+            {
+              "key": "notes",
+              "value": "Delivery note signed by receiver",
+              "type": "text"
+            },
+            {
+              "key": "media[0][media_type]",
+              "value": "photo",
+              "type": "text"
+            },
+            {
+              "key": "media[0][file_name]",
+              "value": "delivery_note_p1.jpg",
+              "type": "text"
+            },
+            {
+              "key": "media[0][description]",
+              "value": "Page 1 of signed delivery note",
+              "type": "text"
+            },
+            {
+              "key": "media[0][sort_order]",
+              "value": "1",
+              "type": "text"
+            },
+            {
+              "key": "media[0][file_ref]",
+              "value": "",
+              "type": "file"
             }
-          }
+          ]
         },
         "url": "{{base_url}}/driver/jobs/shipments/{{shipment_id}}/pod/capture/",
-        "description": "PREREQUISITE: Run requests in order 04 → 05 → 06 etc.\ncontent_hash and workflow_version auto-update after\neach successful execute.\nIf you get 409 stale_content_hash:\n  1. Re-run Request 03 Job Detail to refresh hash\n  2. Then retry this request\nDo NOT skip any action in the sequence."
+        "description": "PREREQUISITE: Run requests in order 04 → 05 → 06 etc.\ncontent_hash and workflow_version auto-update after\neach successful execute.\nIf you get 409 stale_content_hash:\n  1. Re-run Request 03 Job Detail to refresh hash\n  2. Then retry this request\nDo NOT skip any action in the sequence.\n\nFILE UPLOAD INSTRUCTIONS:\nFor any field with type FILE:\n  Click the file icon in Postman next to that field.\n  Select any JPG, PNG, or MP4 file from your device.\nAllowed file types: image/jpeg, image/png,\n  image/webp, video/mp4\nMax file size: 50MB per file\nContent-Type is set automatically by Postman.\nDo NOT set Content-Type header manually."
       },
       "event": [
         {
@@ -685,23 +814,65 @@
           {
             "key": "Authorization",
             "value": "Bearer {{access_token}}"
-          },
-          {
-            "key": "Content-Type",
-            "value": "application/json"
           }
         ],
         "body": {
-          "mode": "raw",
-          "raw": "{\n  \"client_payment_id\": \"pay-{{$guid}}\",\n  \"shipment_id\": \"{{shipment_id}}\",\n  \"amount\": 1500.00,\n  \"notes\": \"Cash collected from customer\",\n  \"payment_mode\": \"cash\",\n  \"proof_media\": [\n    {\n      \"media_type\": \"photo\",\n      \"file_ref\": \"payment_receipt.jpg\",\n      \"file_name\": \"receipt.jpg\",\n      \"description\": \"Payment receipt photo\",\n      \"sort_order\": 1\n    }\n  ]\n}",
-          "options": {
-            "raw": {
-              "language": "json"
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "client_payment_id",
+              "value": "pay-{{$guid}}",
+              "type": "text"
+            },
+            {
+              "key": "shipment_id",
+              "value": "{{shipment_id}}",
+              "type": "text"
+            },
+            {
+              "key": "amount",
+              "value": "1500.00",
+              "type": "text"
+            },
+            {
+              "key": "notes",
+              "value": "Cash collected from customer",
+              "type": "text"
+            },
+            {
+              "key": "payment_mode",
+              "value": "cash",
+              "type": "text"
+            },
+            {
+              "key": "proof_media[0][media_type]",
+              "value": "photo",
+              "type": "text"
+            },
+            {
+              "key": "proof_media[0][file_name]",
+              "value": "receipt.jpg",
+              "type": "text"
+            },
+            {
+              "key": "proof_media[0][description]",
+              "value": "Payment receipt photo",
+              "type": "text"
+            },
+            {
+              "key": "proof_media[0][sort_order]",
+              "value": "1",
+              "type": "text"
+            },
+            {
+              "key": "proof_media[0][file_ref]",
+              "value": "",
+              "type": "file"
             }
-          }
+          ]
         },
         "url": "{{base_url}}/driver/payments/collect/",
-        "description": "PREREQUISITE: Run requests in order 04 → 05 → 06 etc.\ncontent_hash and workflow_version auto-update after\neach successful execute.\nIf you get 409 stale_content_hash:\n  1. Re-run Request 03 Job Detail to refresh hash\n  2. Then retry this request\nDo NOT skip any action in the sequence."
+        "description": "PREREQUISITE: Run requests in order 04 → 05 → 06 etc.\ncontent_hash and workflow_version auto-update after\neach successful execute.\nIf you get 409 stale_content_hash:\n  1. Re-run Request 03 Job Detail to refresh hash\n  2. Then retry this request\nDo NOT skip any action in the sequence.\n\nFILE UPLOAD INSTRUCTIONS:\nFor any field with type FILE:\n  Click the file icon in Postman next to that field.\n  Select any JPG, PNG, or MP4 file from your device.\nAllowed file types: image/jpeg, image/png,\n  image/webp, video/mp4\nMax file size: 50MB per file\nContent-Type is set automatically by Postman.\nDo NOT set Content-Type header manually."
       }
     },
     {
@@ -768,23 +939,75 @@
           {
             "key": "Authorization",
             "value": "Bearer {{access_token}}"
-          },
-          {
-            "key": "Content-Type",
-            "value": "application/json"
           }
         ],
         "body": {
-          "mode": "raw",
-          "raw": "{\n  \"client_issue_id\": \"issue-{{$guid}}\",\n  \"shipment_id\": \"{{shipment_id}}\",\n  \"issue_type\": \"delay\",\n  \"severity\": \"medium\",\n  \"notes\": \"Traffic delay on main route\",\n  \"latitude\": 24.7136,\n  \"longitude\": 46.6753,\n  \"media\": []\n}",
-          "options": {
-            "raw": {
-              "language": "json"
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "client_issue_id",
+              "value": "issue-{{$guid}}",
+              "type": "text"
+            },
+            {
+              "key": "shipment_id",
+              "value": "{{shipment_id}}",
+              "type": "text"
+            },
+            {
+              "key": "issue_type",
+              "value": "delay",
+              "type": "text"
+            },
+            {
+              "key": "severity",
+              "value": "medium",
+              "type": "text"
+            },
+            {
+              "key": "notes",
+              "value": "Traffic delay on main route",
+              "type": "text"
+            },
+            {
+              "key": "latitude",
+              "value": "24.7136",
+              "type": "text"
+            },
+            {
+              "key": "longitude",
+              "value": "46.6753",
+              "type": "text"
+            },
+            {
+              "key": "media[0][media_type]",
+              "value": "photo",
+              "type": "text"
+            },
+            {
+              "key": "media[0][file_name]",
+              "value": "issue_photo.jpg",
+              "type": "text"
+            },
+            {
+              "key": "media[0][description]",
+              "value": "Issue evidence photo",
+              "type": "text"
+            },
+            {
+              "key": "media[0][sort_order]",
+              "value": "1",
+              "type": "text"
+            },
+            {
+              "key": "media[0][file_ref]",
+              "value": "",
+              "type": "file"
             }
-          }
+          ]
         },
         "url": "{{base_url}}/driver/issues/report/",
-        "description": "OPTIONAL — CAN BE CALLED AT ANY POINT DURING THE JOB.\nissue_type values: delay, vehicle_breakdown, customer_unavailable,\n  payment_dispute, pod_issue, accident, route_blocked, other\nseverity values: low, medium, high, critical\nThis does NOT stop the job flow.\nIssue is sent to Ops supervisor for acknowledgement.\nDriver continues normal action flow alongside."
+        "description": "OPTIONAL — CAN BE CALLED AT ANY POINT DURING THE JOB.\nissue_type values: delay, vehicle_breakdown, customer_unavailable,\n  payment_dispute, pod_issue, accident, route_blocked, other\nseverity values: low, medium, high, critical\nThis does NOT stop the job flow.\nIssue is sent to Ops supervisor for acknowledgement.\nDriver continues normal action flow alongside.\n\nFILE UPLOAD INSTRUCTIONS:\nFor any field with type FILE:\n  Click the file icon in Postman next to that field.\n  Select any JPG, PNG, or MP4 file from your device.\nAllowed file types: image/jpeg, image/png,\n  image/webp, video/mp4\nMax file size: 50MB per file\nContent-Type is set automatically by Postman.\nDo NOT set Content-Type header manually."
       }
     }
   ]

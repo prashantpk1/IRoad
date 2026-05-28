@@ -11,6 +11,7 @@ import logging
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils.translation import gettext as _
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from mobile_api.execution.exceptions import ExecuteActionError
 from mobile_api.execution.serializers.execute_action_serializer import (
     ExecuteActionRequestSerializer,
@@ -30,6 +31,7 @@ from mobile_api.permissions import (
 )
 from mobile_api.rbac import get_mobile_jwt_payload
 from mobile_api.throttling import MobileUserThrottle
+from mobile_api.utils.file_upload_handler import process_media_files
 from mobile_api.views.base import MobileAPIView
 
 logger = logging.getLogger('mobile_api.execution')
@@ -50,12 +52,24 @@ class ExecuteActionAPIView(MobileAPIView):
     ]
     required_mobile_capability = 'mobile.driver.execute'
     throttle_classes = [MobileUserThrottle]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         self._orchestrator = ExecuteActionOrchestrator()
 
     def post(self, request, job_type: str, job_id: str, action_code: str):
+        if any(str(k).startswith('media[') for k in request.FILES.keys()):
+            processed = process_media_files(
+                request.FILES,
+                request.data,
+                subfolder='evidence',
+            )
+            if processed:
+                data = request.data.copy()
+                data['media'] = processed
+                request._full_data = data
+
         serializer = ExecuteActionRequestSerializer(data=request.data)
         if not serializer.is_valid():
             return self.validation_error(serializer)

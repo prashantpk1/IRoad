@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 
 from django.utils.translation import gettext as _
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 
 from mobile_api.helpers.mobile_driver_session import resolve_mobile_driver_session
 from mobile_api.job_detail.services.job_detail_driver_resolver import (
@@ -29,6 +30,7 @@ from mobile_api.permissions import (
 )
 from mobile_api.rbac import get_mobile_jwt_payload
 from mobile_api.throttling import MobileUserThrottle
+from mobile_api.utils.file_upload_handler import process_media_files
 from mobile_api.views.base import MobileAPIView
 
 logger = logging.getLogger('mobile_api.payment_collection')
@@ -40,12 +42,25 @@ class PaymentCollectionAPIView(MobileAPIView):
     permission_classes = [IsMobileAuthenticated, IsDriver, HasViewMobileCapability]
     required_mobile_capability = 'mobile.driver.payment_collection'
     throttle_classes = [MobileUserThrottle]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         self._service = PaymentCollectionService()
 
     def post(self, request):
+        if any(str(k).startswith('proof_media[') for k in request.FILES.keys()):
+            processed = process_media_files(
+                request.FILES,
+                request.data,
+                prefix='proof_media',
+                subfolder='payment_evidence',
+            )
+            if processed:
+                data = request.data.copy()
+                data['proof_media'] = processed
+                request._full_data = data
+
         serializer = PaymentCollectionRequestSerializer(data=request.data)
         if not serializer.is_valid():
             return self.validation_error(serializer)
