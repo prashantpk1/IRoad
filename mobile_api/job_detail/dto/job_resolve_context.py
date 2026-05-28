@@ -28,6 +28,7 @@ class JobResolveContext:
     ownership_validated: bool = False
 
     entity_row: Any | None = None
+    shipment: Any | None = None
     booking: Any | None = None
 
     error_code: str | None = None

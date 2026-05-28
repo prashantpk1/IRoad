@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
     "name": "IRoute — Driver Job Flow",
-    "description": "Complete driver mobile job flow from login to job closed.\nFollows A1 through A10 as defined in IRoute document.\nUse {{base_url}} variable = http://127.0.0.1:8000/api/v1/mobile\nUse {{access_token}} variable = filled automatically after login.\nUse {{job_id}} variable = filled after dashboard call.\nUse {{shipment_id}} variable = filled after A4 executes.\nUse {{capture_bundle_id}} variable = filled after POD capture.",
+    "description": "Complete driver mobile job flow from login to job closed.\nFollows A1 through A10 as defined in IRoute document.\nUse {{base_url}} variable = http://127.0.0.1:8000/api/v1/mobile\nUse {{access_token}} variable = filled automatically after login.\nUse {{job_id}} variable = filled after dashboard call.\nUse {{shipment_id}} variable = filled after A4 executes.\nUse {{capture_bundle_id}} variable = filled after POD capture.\n\nFLOW ORDER:\n01 Login\n02 Dashboard\n03 Job Detail\n04 Execute A1\n05 Execute A2\n06 Execute A3\n07 Execute A4\n08 Execute A5\n09 Execute A6\n10a POD Capture Sync (GET hash)\n10 POD Capture (POST with photo)\n11 Execute A7\n12 Execute A8\n13 Payment Collection (COD only)\n14 Execute A10\n15 Report Issue",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -52,6 +52,14 @@
     },
     {
       "key": "workflow_version",
+      "value": ""
+    },
+    {
+      "key": "pod_content_hash",
+      "value": ""
+    },
+    {
+      "key": "pod_workflow_version",
       "value": ""
     }
   ],
@@ -596,6 +604,47 @@
       ]
     },
     {
+      "name": "10a — POD Capture Sync (Get Hash Before Upload)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
+        ],
+        "url": "{{base_url}}/driver/jobs/shipments/{{shipment_id}}/pod/capture/",
+        "description": "STEP 10a — MUST CALL THIS BEFORE REQUEST 10.\nReturns content_hash and workflow_version\nspecifically for POD Capture API.\nThese are DIFFERENT from Job Detail hash.\nPOD Capture hash = shipment.updated_at ISO string.\nJob Detail hash = full fingerprint digest.\nDo NOT mix them up.\npod_content_hash and pod_workflow_version are\nsaved automatically for use in Request 10."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var resp = pm.response.json();",
+              "if (resp.status === 1 && resp.data) {",
+              "    pm.collectionVariables.set(",
+              "        \"pod_content_hash\",",
+              "        resp.data.content_hash",
+              "    );",
+              "    pm.collectionVariables.set(",
+              "        \"pod_workflow_version\",",
+              "        resp.data.workflow_version",
+              "    );",
+              "    pm.test(",
+              "        \"POD sync hash saved\",",
+              "        function() {",
+              "            pm.expect(resp.data.content_hash).to.exist;",
+              "        }",
+              "    );",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
       "name": "10 — POD Capture (Upload Evidence Before A7)",
       "request": {
         "method": "POST",
@@ -615,17 +664,17 @@
             },
             {
               "key": "content_hash",
-              "value": "{{content_hash}}",
+              "value": "{{pod_content_hash}}",
               "type": "text"
             },
             {
               "key": "workflow_version",
-              "value": "{{workflow_version}}",
+              "value": "{{pod_workflow_version}}",
               "type": "text"
             },
             {
               "key": "pod_type",
-              "value": "soft_copy",
+              "value": "digital",
               "type": "text"
             },
             {
@@ -676,7 +725,7 @@
           ]
         },
         "url": "{{base_url}}/driver/jobs/shipments/{{shipment_id}}/pod/capture/",
-        "description": "PREREQUISITE: Run requests in order 04 → 05 → 06 etc.\ncontent_hash and workflow_version auto-update after\neach successful execute.\nIf you get 409 stale_content_hash:\n  1. Re-run Request 03 Job Detail to refresh hash\n  2. Then retry this request\nDo NOT skip any action in the sequence.\n\nFILE UPLOAD INSTRUCTIONS:\nFor any field with type FILE:\n  Click the file icon in Postman next to that field.\n  Select any JPG, PNG, or MP4 file from your device.\nAllowed file types: image/jpeg, image/png,\n  image/webp, video/mp4\nMax file size: 50MB per file\nContent-Type is set automatically by Postman.\nDo NOT set Content-Type header manually."
+        "description": "STEP 10 — STAGE POD EVIDENCE.\nPREREQUISITE: Run Request 10a first to get\npod_content_hash and pod_workflow_version.\nThese are auto-filled from 10a response.\n\nSelect a real photo for media[0][file_ref].\nClick the file icon and choose any JPG or PNG.\n\nOn success capture_bundle_id is saved automatically.\nPass that bundle to Request 11 Execute A7."
       },
       "event": [
         {

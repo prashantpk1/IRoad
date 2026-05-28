@@ -124,6 +124,7 @@ def resolve_shipment_job(
             workflow_source=WORKFLOW_SOURCE_ENTITY_RESOLVER,
             ownership_validated=True,
             entity_row=shipment,
+            shipment=shipment,
             booking=booking,
         )
 
