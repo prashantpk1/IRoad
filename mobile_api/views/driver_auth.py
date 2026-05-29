@@ -56,6 +56,7 @@ from mobile_api.serializers.driver_auth import (
     ResetPasswordSerializer,
     LogoutSerializer,
 )
+from mobile_api.helpers.driver_identity import identity_from_validated
 from mobile_api.services.driver_auth_service import (
     driver_delete_account,
     driver_login,
@@ -332,15 +333,18 @@ class DriverForgotPasswordView(MobileAPIView):
         if not serializer.is_valid():
             return self.validation_error(serializer)
 
-        email = serializer.validated_data['email']
+        identity = identity_from_validated(serializer.validated_data)
         body_tid = (serializer.validated_data.get('tenant_id') or '').strip()
         explicit_schema, terr = _public_auth_tenant_from_body(body_tid)
         if terr == 'invalid_tenant':
             return _tenant_context_error_response(self, terr)
 
         resolution = resolve_driver_password_reset_tenant(
-            email,
+            email=identity.email,
+            phone=identity.phone,
+            extension=identity.extension,
             explicit_tenant=explicit_schema,
+            identity=identity,
         )
         if not resolution.get('ok'):
             code = resolution.get('error_code', 'tenant_ambiguous')
@@ -353,8 +357,11 @@ class DriverForgotPasswordView(MobileAPIView):
             )
 
         result = driver_forgot_password(
-            email=email,
+            email=identity.email,
+            phone=identity.phone,
+            extension=identity.extension,
             tenant_schema=resolution.get('schema_name', '') or '',
+            identity=identity,
             request=request,
         )
 
@@ -397,21 +404,20 @@ class DriverVerifyOtpView(MobileAPIView):
         if not serializer.is_valid():
             return self.validation_error(serializer)
 
-        email = serializer.validated_data['email']
+        identity = identity_from_validated(serializer.validated_data)
         otp_code = serializer.validated_data['otp_code']
         body_tid = (serializer.validated_data.get('tenant_id') or '').strip()
-        # Public auth: optional body tenant_id only (same as reset-password).
-        # tenant_schema, terr = resolve_mobile_auth_tenant_context(
-        #     request, body_tenant_id=body_tid,
-        # )
         tenant_schema, terr = _public_auth_tenant_from_body(body_tid)
         if terr == 'invalid_tenant':
             return _tenant_context_error_response(self, terr)
 
         result = driver_verify_otp(
-            email=email,
+            email=identity.email,
+            phone=identity.phone,
+            extension=identity.extension,
             otp_code=otp_code,
             tenant_schema=tenant_schema,
+            identity=identity,
             request=request,
         )
 
@@ -456,7 +462,7 @@ class DriverResetPasswordView(MobileAPIView):
         if not serializer.is_valid():
             return self.validation_error(serializer)
 
-        email = serializer.validated_data['email']
+        identity = identity_from_validated(serializer.validated_data)
         otp_code = serializer.validated_data['otp_code']
         new_password = serializer.validated_data['new_password']
         body_tid = (serializer.validated_data.get('tenant_id') or '').strip()
@@ -465,10 +471,13 @@ class DriverResetPasswordView(MobileAPIView):
             return _tenant_context_error_response(self, terr)
 
         result = driver_reset_password(
-            email=email,
+            email=identity.email,
+            phone=identity.phone,
+            extension=identity.extension,
             otp_code=otp_code,
             new_password=new_password,
             tenant_schema=tenant_schema,
+            identity=identity,
             request=request,
         )
 

@@ -301,6 +301,34 @@
 					]
 				},
 				{
+					"name": "Forgot Password (Phone)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"extension\": \"{{driver_extension}}\",\n  \"phone\": \"{{driver_phone}}\",\n  \"tenant_id\": \"{{tenant_id}}\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": "{{base_url}}/api/v1/mobile/driver/auth/forgot-password/",
+						"description": "Request password-reset OTP using phone+extension (same as login 01b). OTP is sent to the driver's registered email."
+					},
+					"response": []
+				},
+				{
 					"name": "Verify OTP",
 					"request": {
 						"method": "POST",
@@ -347,6 +375,34 @@
 					]
 				},
 				{
+					"name": "Verify OTP (Phone)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"extension\": \"{{driver_extension}}\",\n  \"phone\": \"{{driver_phone}}\",\n  \"otp_code\": \"{{otp_code}}\",\n  \"tenant_id\": \"{{tenant_id}}\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": "{{base_url}}/api/v1/mobile/driver/auth/verify-otp/",
+						"description": "Verify reset-password OTP using phone+extension identity."
+					},
+					"response": []
+				},
+				{
 					"name": "Reset Password",
 					"request": {
 						"method": "POST",
@@ -383,6 +439,34 @@
 							"body": "{\n  \"status\": 1,\n  \"message\": \"Password reset successful.\",\n  \"data\": {}\n}"
 						}
 					]
+				},
+				{
+					"name": "Reset Password (Phone)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{accept_language}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"extension\": \"{{driver_extension}}\",\n  \"phone\": \"{{driver_phone}}\",\n  \"otp_code\": \"{{otp_code}}\",\n  \"new_password\": \"NewPassword@123\",\n  \"confirm_password\": \"NewPassword@123\",\n  \"tenant_id\": \"{{tenant_id}}\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": "{{base_url}}/api/v1/mobile/driver/auth/reset-password/",
+						"description": "Complete password reset using phone+extension identity (after Verify OTP Phone)."
+					},
+					"response": []
 				},
 				{
 					"name": "Logout",

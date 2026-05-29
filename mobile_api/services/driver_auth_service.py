@@ -33,6 +33,14 @@ from mobile_api.helpers.auth import (
     try_consume_refresh_jti_once,
     verify_token,
 )
+from mobile_api.helpers.driver_identity import (
+    DriverAuthIdentity,
+    get_driver_user_by_phone,
+    identity_from_validated,
+    normalize_extension as _normalize_login_extension,
+    normalize_phone_digits as _normalize_login_phone_digits,
+    resolve_canonical_email_for_identity,
+)
 from mobile_api.helpers.mobile_driver_session import resolve_mobile_driver_session
 from mobile_api.helpers.mobile_tenant import resolve_active_tenant_registry
 from mobile_api.serializers.localized import serialize_localized_name
@@ -65,73 +73,6 @@ def generate_otp() -> str:
 
 
 # ── Driver Lookup ─────────────────────────────────────────────────
-
-def _normalize_login_phone_digits(phone: str) -> str:
-    return ''.join(ch for ch in (phone or '').strip() if ch.isdigit())
-
-
-def _normalize_login_extension(extension: str) -> str:
-    ext = (extension or '').strip()
-    if not ext:
-        return ''
-    if not ext.startswith('+'):
-        ext = f'+{ext}'
-    return ext
-
-
-def _extension_lookup_variants(extension: str) -> list[str]:
-    """DB may store ``+966`` or ``966`` — match both."""
-    ext = _normalize_login_extension(extension)
-    if not ext:
-        return []
-    variants = {ext}
-    if ext.startswith('+'):
-        variants.add(ext[1:])
-    else:
-        variants.add(f'+{ext}')
-    return list(variants)
-
-
-def get_driver_user_by_phone(
-    phone: str,
-    extension: str,
-    tenant_schema: str,
-):
-    """
-    Find ``TenantUser`` by ``mobile_no`` + ``mobile_country_code``.
-
-    Falls back to active ``DriverMaster.mobile_number`` when the user row
-    has no mobile set but the driver profile does.
-    """
-    num = _normalize_login_phone_digits(phone)
-    if not num:
-        return None
-    codes = _extension_lookup_variants(extension)
-    try:
-        from tenant_workspace.models import DriverMaster, TenantUser
-
-        with schema_context(tenant_schema):
-            qs = TenantUser.all_objects.filter(mobile_no=num)
-            if codes:
-                tenant_user = qs.filter(
-                    mobile_country_code__in=codes,
-                ).first()
-            else:
-                tenant_user = qs.first()
-            if tenant_user is not None:
-                return tenant_user
-
-            driver = (
-                DriverMaster.objects.filter(mobile_number=num)
-                .select_related('user_account_id')
-                .first()
-            )
-            if driver is None or not driver.user_account_id_id:
-                return None
-            return driver.user_account_id
-    except Exception as e:
-        logger.error('get_driver_user_by_phone error: %s', e)
-        return None
 
 
 def get_driver_user_by_email(email: str, tenant_schema: str):
@@ -448,6 +389,31 @@ def _schema_eligible_for_driver_password_reset(
         return False
 
 
+def _schema_eligible_for_driver_password_reset_by_phone(
+    phone: str,
+    extension: str,
+    schema_name: str,
+) -> bool:
+    """True when this schema has an active driver for phone+extension."""
+    try:
+        from tenant_workspace.models import DriverMaster, TenantUser
+
+        with schema_context(schema_name):
+            tenant_user = get_driver_user_by_phone(phone, extension, schema_name)
+            if tenant_user is None or getattr(tenant_user, 'is_deleted', False):
+                return False
+            if tenant_user.status != TenantUser.Status.ACTIVE:
+                return False
+            driver = DriverMaster.objects.filter(
+                user_account_id=tenant_user.pk,
+            ).first()
+            if driver is None or str(driver.driver_status) != DriverMaster.Status.ACTIVE:
+                return False
+        return True
+    except Exception:
+        return False
+
+
 def _list_eligible_password_reset_schemas(email_norm: str) -> list[str]:
     """Schemas where ``email`` belongs to an active driver (deterministic order)."""
     try:
@@ -473,18 +439,86 @@ def _list_eligible_password_reset_schemas(email_norm: str) -> list[str]:
         return []
 
 
+def _list_eligible_password_reset_schemas_by_phone(
+    phone: str,
+    extension: str,
+) -> list[str]:
+    try:
+        from iroad_tenants.models import TenantRegistry
+
+        out: list[str] = []
+        registries = (
+            TenantRegistry.objects.select_related('tenant_profile')
+            .order_by('schema_name')
+        )
+        for reg in registries:
+            profile = getattr(reg, 'tenant_profile', None)
+            if profile and getattr(profile, 'account_status', None) != 'Active':
+                continue
+            if _schema_eligible_for_driver_password_reset_by_phone(
+                phone,
+                extension,
+                reg.schema_name,
+            ):
+                out.append(reg.schema_name)
+        return out
+    except Exception as exc:
+        logger.error('_list_eligible_password_reset_schemas_by_phone error: %s', exc)
+        return []
+
+
+def _password_reset_eligible_schemas(identity: DriverAuthIdentity) -> list[str]:
+    if identity.email_normalized:
+        return _list_eligible_password_reset_schemas(identity.email_normalized)
+    if identity.use_phone:
+        return _list_eligible_password_reset_schemas_by_phone(
+            identity.phone,
+            identity.extension,
+        )
+    return []
+
+
+def _password_reset_explicit_schema_eligible(
+    identity: DriverAuthIdentity,
+    schema: str,
+) -> bool:
+    if identity.email_normalized:
+        return _schema_eligible_for_driver_password_reset(
+            identity.email_normalized,
+            schema,
+        )
+    if identity.use_phone:
+        return _schema_eligible_for_driver_password_reset_by_phone(
+            identity.phone,
+            identity.extension,
+            schema,
+        )
+    return False
+
+
 def resolve_driver_password_reset_tenant(
-    email: str,
     *,
+    email: str = '',
+    phone: str = '',
+    extension: str = '',
     explicit_tenant: str,
+    identity: DriverAuthIdentity | None = None,
 ) -> dict:
     """
-    Resolve tenant for forgot-password (email only, no password).
+    Resolve tenant for forgot-password (email or phone+extension, no password).
 
     Mirrors ``resolve_driver_login_tenant``: optional explicit ``tenant_id`` from
     the JSON body only; otherwise auto-discovery across active subscribers.
     """
-    email_norm = (email or '').strip().lower()
+    resolved = identity or DriverAuthIdentity(
+        email=(email or '').strip().lower() if (email or '').strip() else '',
+        phone=_normalize_login_phone_digits(phone or ''),
+        extension=(
+            _normalize_login_extension(extension or '')
+            if _normalize_login_phone_digits(phone or '')
+            else (extension or '').strip()
+        ),
+    )
     explicit = (explicit_tenant or '').strip()
 
     if explicit:
@@ -496,7 +530,7 @@ def resolve_driver_password_reset_tenant(
                 'error': _('mobile.auth.invalid_tenant'),
             }
         schema = reg.schema_name
-        if not _schema_eligible_for_driver_password_reset(email_norm, schema):
+        if not _password_reset_explicit_schema_eligible(resolved, schema):
             return {
                 'ok': True,
                 'schema_name': schema,
@@ -504,7 +538,7 @@ def resolve_driver_password_reset_tenant(
             }
         return {'ok': True, 'schema_name': schema, 'mode': 'explicit'}
 
-    eligible = _list_eligible_password_reset_schemas(email_norm)
+    eligible = _password_reset_eligible_schemas(resolved)
     if not eligible:
         return {'ok': True, 'schema_name': '', 'mode': 'none'}
 
@@ -699,6 +733,50 @@ def _list_otp_match_schemas(
     except Exception as e:
         logger.error('_list_otp_match_schemas error: %s', e)
     return matches
+
+
+def resolve_tenant_schema_for_otp_identity(
+    identity: DriverAuthIdentity,
+    otp_code: str,
+    otp_status: str,
+) -> tuple[str | None, str]:
+    """
+    Resolve tenant from identity + OTP row (email or phone+extension).
+
+    Returns ``(schema_name, kind)`` where ``kind`` is ``unique``, ``none``, or
+    ``ambiguous``.
+    """
+    if identity.email_normalized:
+        return resolve_tenant_schema_for_otp_with_kind(
+            identity.email_normalized,
+            otp_code,
+            otp_status,
+        )
+    if not identity.use_phone:
+        return None, 'none'
+
+    matches: list[str] = []
+    otp_in = (otp_code or '').strip()
+    for schema in _list_eligible_password_reset_schemas_by_phone(
+        identity.phone,
+        identity.extension,
+    ):
+        email_n = resolve_canonical_email_for_identity(identity, schema)
+        if not email_n:
+            continue
+        with schema_context(schema):
+            exists = DriverPasswordResetOTP.objects.filter(
+                email=email_n,
+                otp_code=otp_in,
+                status=otp_status,
+            ).exists()
+        if exists:
+            matches.append(schema)
+    if len(matches) == 1:
+        return matches[0], 'unique'
+    if len(matches) > 1:
+        return None, 'ambiguous'
+    return None, 'none'
 
 
 def resolve_tenant_schema_for_otp_with_kind(
@@ -977,29 +1055,17 @@ def driver_login(
     with transaction.atomic():
         with schema_context(tenant_schema):
             if use_phone:
-                num = phone_norm
-                codes = _extension_lookup_variants(extension_norm)
-                qs = TenantUser.all_objects.select_for_update().filter(
-                    mobile_no=num,
+                tenant_user = get_driver_user_by_phone(
+                    phone_norm,
+                    extension_norm,
+                    tenant_schema,
                 )
-                if codes:
-                    tenant_user = qs.filter(
-                        mobile_country_code__in=codes,
-                    ).first()
-                else:
-                    tenant_user = qs.first()
-                if tenant_user is None:
-                    tenant_user = get_driver_user_by_phone(
-                        phone_norm,
-                        extension_norm,
-                        tenant_schema,
+                if tenant_user is not None:
+                    tenant_user = (
+                        TenantUser.all_objects.select_for_update()
+                        .filter(pk=tenant_user.pk)
+                        .first()
                     )
-                    if tenant_user is not None:
-                        tenant_user = (
-                            TenantUser.all_objects.select_for_update()
-                            .filter(pk=tenant_user.pk)
-                            .first()
-                        )
             else:
                 tenant_user = (
                     TenantUser.all_objects.select_for_update()
@@ -1384,9 +1450,12 @@ def driver_refresh_session(
 # ── API 2: Forgot Password ────────────────────────────────────────
 
 def driver_forgot_password(
-    email: str,
-    tenant_schema: str,
     *,
+    email: str = '',
+    phone: str = '',
+    extension: str = '',
+    tenant_schema: str,
+    identity: DriverAuthIdentity | None = None,
     request=None,
 ) -> dict:
     """
@@ -1404,7 +1473,14 @@ def driver_forgot_password(
         timing_jitter_small,
     )
 
-    email_n = (email or '').strip().lower()
+    resolved = identity or identity_from_validated(
+        {
+            'email': email,
+            'phone': phone,
+            'extension': extension,
+        }
+    )
+    email_n = resolve_canonical_email_for_identity(resolved, tenant_schema)
 
     def ok_no_send() -> dict:
         timing_jitter_small()
@@ -1519,10 +1595,13 @@ def _pwreset_otp_max_attempts() -> int:
 
 
 def driver_verify_otp(
-    email: str,
+    *,
+    email: str = '',
+    phone: str = '',
+    extension: str = '',
     otp_code: str,
     tenant_schema: str,
-    *,
+    identity: DriverAuthIdentity | None = None,
     request=None,
 ) -> dict:
     """
@@ -1540,7 +1619,13 @@ def driver_verify_otp(
         verify_otp_rate_record_attempt,
     )
 
-    email_n = (email or '').strip().lower()
+    resolved = identity or identity_from_validated(
+        {
+            'email': email,
+            'phone': phone,
+            'extension': extension,
+        }
+    )
     otp_in = (otp_code or '').strip()
 
     def fail_verify() -> dict:
@@ -1552,25 +1637,39 @@ def driver_verify_otp(
         }
 
     ts_work = (tenant_schema or '').strip()
+    email_n = resolve_canonical_email_for_identity(resolved, ts_work)
+    if not email_n and ts_work:
+        return fail_verify()
+
     if not ts_work:
-        sch, kind = resolve_tenant_schema_for_otp_with_kind(
-            email=email_n,
-            otp_code=otp_in,
-            otp_status=DriverPasswordResetOTP.Status.PENDING,
+        sch, kind = resolve_tenant_schema_for_otp_identity(
+            resolved,
+            otp_in,
+            DriverPasswordResetOTP.Status.PENDING,
         )
         if kind == 'ambiguous':
             audit_password_reset_event(
                 'verify_tenant_ambiguous',
                 tenant_schema='-',
-                email=email_n,
+                email=email_n or resolved.phone,
                 request=request,
             )
             timing_jitter_small()
-            matches = _list_otp_match_schemas(
-                email_n,
-                otp_in,
-                DriverPasswordResetOTP.Status.PENDING,
-            )
+            if resolved.use_phone:
+                matches = [
+                    s
+                    for s in _list_eligible_password_reset_schemas_by_phone(
+                        resolved.phone,
+                        resolved.extension,
+                    )
+                    if resolve_canonical_email_for_identity(resolved, s)
+                ]
+            else:
+                matches = _list_otp_match_schemas(
+                    email_n,
+                    otp_in,
+                    DriverPasswordResetOTP.Status.PENDING,
+                )
             candidates = [_ambiguous_candidate_payload(s) for s in matches]
             candidates.sort(
                 key=lambda c: (
@@ -1585,10 +1684,12 @@ def driver_verify_otp(
                 'candidates': candidates,
             }
         ts_work = (sch or '').strip()
+        if ts_work and not email_n:
+            email_n = resolve_canonical_email_for_identity(resolved, ts_work)
 
     rate_key = ts_work or '_'
     if not verify_otp_rate_allow(
-        email=email_n,
+        email=email_n or resolved.phone,
         tenant_schema=rate_key,
         request=request,
     ):
@@ -1681,11 +1782,14 @@ def driver_verify_otp(
 # ── API 4: Reset Password ─────────────────────────────────────────
 
 def driver_reset_password(
-    email: str,
+    *,
+    email: str = '',
+    phone: str = '',
+    extension: str = '',
     otp_code: str,
     new_password: str,
     tenant_schema: str,
-    *,
+    identity: DriverAuthIdentity | None = None,
     request=None,
 ) -> dict:
     """
@@ -1703,7 +1807,13 @@ def driver_reset_password(
         timing_jitter_small,
     )
 
-    email_n = (email or '').strip().lower()
+    resolved = identity or identity_from_validated(
+        {
+            'email': email,
+            'phone': phone,
+            'extension': extension,
+        }
+    )
     otp_in = (otp_code or '').strip()
 
     def fail_reset() -> dict:
@@ -1715,19 +1825,33 @@ def driver_reset_password(
         }
 
     ts_work = (tenant_schema or '').strip()
+    email_n = resolve_canonical_email_for_identity(resolved, ts_work)
+    if not email_n and ts_work:
+        return fail_reset()
+
     if not ts_work:
-        sch, kind = resolve_tenant_schema_for_otp_with_kind(
-            email=email_n,
-            otp_code=otp_in,
-            otp_status=DriverPasswordResetOTP.Status.VERIFIED,
+        sch, kind = resolve_tenant_schema_for_otp_identity(
+            resolved,
+            otp_in,
+            DriverPasswordResetOTP.Status.VERIFIED,
         )
         if kind == 'ambiguous':
             timing_jitter_small()
-            matches = _list_otp_match_schemas(
-                email_n,
-                otp_in,
-                DriverPasswordResetOTP.Status.VERIFIED,
-            )
+            if resolved.use_phone:
+                matches = [
+                    s
+                    for s in _list_eligible_password_reset_schemas_by_phone(
+                        resolved.phone,
+                        resolved.extension,
+                    )
+                    if resolve_canonical_email_for_identity(resolved, s)
+                ]
+            else:
+                matches = _list_otp_match_schemas(
+                    email_n,
+                    otp_in,
+                    DriverPasswordResetOTP.Status.VERIFIED,
+                )
             candidates = [_ambiguous_candidate_payload(s) for s in matches]
             candidates.sort(
                 key=lambda c: (
@@ -1742,6 +1866,8 @@ def driver_reset_password(
                 'candidates': candidates,
             }
         ts_work = (sch or '').strip()
+        if ts_work and not email_n:
+            email_n = resolve_canonical_email_for_identity(resolved, ts_work)
 
     if not reset_password_rate_allow(request=request):
         audit_password_reset_event(

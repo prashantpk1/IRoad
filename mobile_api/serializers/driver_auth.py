@@ -7,6 +7,8 @@ Input validation only — no model binding.
 from rest_framework import serializers
 from django.utils.translation import gettext_lazy as _
 
+from mobile_api.helpers.driver_identity import validate_email_or_phone_identity_data
+
 
 class DriverLoginSerializer(serializers.Serializer):
     """
@@ -82,22 +84,10 @@ class DriverLoginSerializer(serializers.Serializer):
         return (value or '').strip().lower()
 
     def validate(self, data):
-        email = (data.get('email') or '').strip()
-        phone = (data.get('phone') or '').strip()
-        extension = (data.get('extension') or '').strip()
-
-        if email and phone:
-            raise serializers.ValidationError(
-                _('Provide either email or phone+extension, not both.'),
-            )
-        if not email and not phone:
-            raise serializers.ValidationError(
-                _('Either email or phone is required.'),
-            )
-        if phone and not extension:
-            raise serializers.ValidationError(
-                _('extension is required when using phone login.'),
-            )
+        identity = validate_email_or_phone_identity_data(data)
+        data['email'] = identity.email
+        data['phone'] = identity.phone
+        data['extension'] = identity.extension
         return data
 
 
@@ -137,11 +127,23 @@ class ForgotPasswordSerializer(serializers.Serializer):
     ``X-Tenant-ID`` is not used; tenant is resolved from email when omitted.
     """
     email = serializers.EmailField(
-        required=True,
+        required=False,
+        allow_blank=True,
         error_messages={
-            'required': _('mobile.auth.email_required'),
             'invalid': _('mobile.auth.email_invalid'),
-        }
+        },
+    )
+    extension = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=10,
+        write_only=True,
+    )
+    phone = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=20,
+        write_only=True,
     )
     tenant_id = serializers.CharField(
         required=False,
@@ -149,6 +151,18 @@ class ForgotPasswordSerializer(serializers.Serializer):
         max_length=64,
         write_only=True,
     )
+
+    def validate_email(self, value: str) -> str:
+        if not (value or '').strip():
+            return ''
+        return (value or '').strip().lower()
+
+    def validate(self, data):
+        identity = validate_email_or_phone_identity_data(data)
+        data['email'] = identity.email
+        data['phone'] = identity.phone
+        data['extension'] = identity.extension
+        return data
 
 
 class VerifyOtpSerializer(serializers.Serializer):
@@ -160,11 +174,23 @@ class VerifyOtpSerializer(serializers.Serializer):
     resolve the tenant (no ``X-Tenant-ID``).
     """
     email = serializers.EmailField(
-        required=True,
+        required=False,
+        allow_blank=True,
         error_messages={
-            'required': _('mobile.auth.email_required'),
             'invalid': _('mobile.auth.email_invalid'),
-        }
+        },
+    )
+    extension = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=10,
+        write_only=True,
+    )
+    phone = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=20,
+        write_only=True,
     )
     otp_code = serializers.CharField(
         required=True,
@@ -177,12 +203,24 @@ class VerifyOtpSerializer(serializers.Serializer):
         }
     )
 
+    def validate_email(self, value: str) -> str:
+        if not (value or '').strip():
+            return ''
+        return (value or '').strip().lower()
+
     def validate_otp_code(self, value):
         if not value.isdigit():
             raise serializers.ValidationError(
                 _('mobile.auth.otp_digits_only')
             )
         return value
+
+    def validate(self, data):
+        identity = validate_email_or_phone_identity_data(data)
+        data['email'] = identity.email
+        data['phone'] = identity.phone
+        data['extension'] = identity.extension
+        return data
 
     tenant_id = serializers.CharField(
         required=False,
@@ -200,11 +238,23 @@ class ResetPasswordSerializer(serializers.Serializer):
     Optional ``tenant_id`` when needed; otherwise OTP + email resolve the tenant.
     """
     email = serializers.EmailField(
-        required=True,
+        required=False,
+        allow_blank=True,
         error_messages={
-            'required': _('mobile.auth.email_required'),
             'invalid': _('mobile.auth.email_invalid'),
-        }
+        },
+    )
+    extension = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=10,
+        write_only=True,
+    )
+    phone = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=20,
+        write_only=True,
     )
     otp_code = serializers.CharField(
         required=True,
@@ -234,12 +284,21 @@ class ResetPasswordSerializer(serializers.Serializer):
         }
     )
 
+    def validate_email(self, value: str) -> str:
+        if not (value or '').strip():
+            return ''
+        return (value or '').strip().lower()
+
     def validate(self, data):
         if data.get('new_password') != data.get('confirm_password'):
             raise serializers.ValidationError({
                 'confirm_password':
                     _('mobile.auth.passwords_do_not_match')
             })
+        identity = validate_email_or_phone_identity_data(data)
+        data['email'] = identity.email
+        data['phone'] = identity.phone
+        data['extension'] = identity.extension
         return data
 
     def validate_otp_code(self, value):
