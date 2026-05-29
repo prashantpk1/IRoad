@@ -64,6 +64,13 @@ class JobHeaderProjectionTests(SimpleTestCase):
             booking=None,
         )
         booking = SimpleNamespace(
+            execution_date=None,
+            booking_date=None,
+            client_account=SimpleNamespace(
+                display_name='Test Client',
+                name_english='Test Client',
+                name_arabic='',
+            ),
             route_display='',
             route_direction='forward',
             route=SimpleNamespace(
@@ -97,6 +104,8 @@ class JobHeaderProjectionTests(SimpleTestCase):
         header = build_job_header(context)
         self.assertEqual(header['job_no'], 'SH-100')
         self.assertEqual(header['order_type'], 'COD')
+        self.assertEqual(header['client_name'], 'Test Client')
+        self.assertEqual(header['execution_date'], '')
         self.assertEqual(header['route']['route_display'], 'Jeddah → Riyadh')
         self.assertEqual(header['route']['route_display_start'], 'Jeddah')
         self.assertEqual(header['route']['route_display_end'], 'Riyadh')

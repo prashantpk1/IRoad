@@ -14,6 +14,10 @@ from mobile_api.dashboard.projections.shipment_projection import (
     build_active_shipment_slice,
 )
 from mobile_api.dashboard.selectors import booking_selection_policy as policy
+from mobile_api.helpers.job_booking_meta import (
+    resolve_client_name,
+    resolve_execution_date,
+)
 
 
 def build_booking_card(
@@ -86,6 +90,8 @@ def build_booking_card(
         'business_progress_percentage': biz_pct,
         'progress_percentage': exec_pct,
         'booking_execution_stage': booking_stage or '',
+        'client_name': resolve_client_name(booking=booking, request=request),
+        'execution_date': resolve_execution_date(booking=booking),
     }
     if meta:
         payload['round_trip'] = meta
@@ -140,4 +146,6 @@ def _empty_booking_card() -> dict[str, Any]:
         'business_progress_percentage': 0,
         'progress_percentage': 0,
         'booking_execution_stage': '',
+        'client_name': '',
+        'execution_date': '',
     }

@@ -7,6 +7,10 @@ from __future__ import annotations
 
 from typing import Any
 
+from mobile_api.helpers.job_booking_meta import (
+    resolve_client_name,
+    resolve_execution_date,
+)
 from mobile_api.helpers.order_type import resolve_order_type_text
 
 
@@ -40,6 +44,15 @@ def build_dashboard_active_job(
                 shipment=shipment,
                 booking=booking,
             ),
+            'client_name': resolve_client_name(
+                shipment=shipment,
+                booking=booking,
+                request=request,
+            ),
+            'execution_date': resolve_execution_date(
+                shipment=shipment,
+                booking=booking,
+            ),
         }
         block.update(
             build_shipment_location_block(
@@ -55,6 +68,7 @@ def build_dashboard_active_job(
             movement, 'pk', None
         )
         movement_shipment = getattr(movement, 'shipment', None)
+        movement_booking = booking or getattr(movement, 'booking', None)
         block = {
             'job_type': 'movement',
             'job_id': str(movement_id) if movement_id is not None else '',
@@ -62,7 +76,16 @@ def build_dashboard_active_job(
             'entity_type': 'movement',
             'order_type': resolve_order_type_text(
                 shipment=movement_shipment,
-                booking=booking or getattr(movement, 'booking', None),
+                booking=movement_booking,
+            ),
+            'client_name': resolve_client_name(
+                shipment=movement_shipment,
+                booking=movement_booking,
+                request=request,
+            ),
+            'execution_date': resolve_execution_date(
+                shipment=movement_shipment,
+                booking=movement_booking,
             ),
         }
         block.update(build_movement_location_block(movement, request=request))

@@ -55,6 +55,7 @@ class DashboardBookingSelector:
             TenantShipment.objects.select_related(
                 'loading_address',
                 'delivery_address',
+                'client_account',
             )
             .order_by('shipment_sequence', 'created_at')
         )
@@ -78,6 +79,7 @@ class DashboardBookingSelector:
                 'route__destination_point',
                 'loading_address',
                 'delivery_address',
+                'client_account',
             )
             .prefetch_related(
                 Prefetch('shipments', queryset=shipments_qs),

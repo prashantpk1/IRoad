@@ -16,6 +16,7 @@ _SHIPMENT_SELECT = (
     'booking',
     'booking__assigned_truck',
     'booking__booking_line_backload_truck',
+    'booking__client_account',
     'booking__route',
     'booking__route__origin_point',
     'booking__route__destination_point',
