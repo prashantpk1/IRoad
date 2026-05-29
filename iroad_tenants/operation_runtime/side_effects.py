@@ -110,18 +110,19 @@ def _should_auto_mark_delivered_for_cod(action, shipment) -> bool:
     }
 
 
-def _ensure_auto_cod_delivered_verify_log(
+def _ensure_auto_delivered_verify_log(
     shipment,
     *,
     action_log: TenantOperationActionLog,
     created_by_label: str = '',
+    source_channel: str = 'auto_cod_verify',
+    notes: str = 'Auto POD verified after COD collection',
 ) -> None:
     """
     Log-primary reconciler: append a Delivered-impact row so authoritative_status
     advances with the column (tenant Action Master ``A_POD_VERIFY`` when present).
     """
     from iroad_tenants.operation_runtime.action_master_catalog import (
-        AUTO_COD_VERIFY_CHANNEL,
         resolve_auto_cod_verify_action,
     )
 
@@ -141,10 +142,10 @@ def _ensure_auto_cod_delivered_verify_log(
             'log_date': timezone.now(),
             'operation_action': verify_action,
             'source': 'System',
-            'source_channel': AUTO_COD_VERIFY_CHANNEL,
-            'source_ref': AUTO_COD_VERIFY_CHANNEL,
+            'source_channel': source_channel,
+            'source_ref': source_channel,
             'created_by_label': created_by_label or 'system',
-            'notes': 'Auto POD verified after COD collection',
+            'notes': notes,
             'booking': getattr(shipment, 'booking', None),
             'shipment': shipment,
             'truck': getattr(shipment, 'truck', None),
@@ -154,7 +155,7 @@ def _ensure_auto_cod_delivered_verify_log(
     )
     if log_row.operation_action_id != verify_action.pk:
         log_row.operation_action = verify_action
-        log_row.source_channel = AUTO_COD_VERIFY_CHANNEL
+        log_row.source_channel = source_channel
         log_row.save(
             update_fields=['operation_action', 'source_channel', 'updated_at'],
         )
@@ -168,10 +169,12 @@ def _apply_auto_delivered_for_cod(
 ) -> None:
     if not _should_auto_mark_delivered_for_cod(action_log.operation_action, shipment):
         return
-    _ensure_auto_cod_delivered_verify_log(
+    _ensure_auto_delivered_verify_log(
         shipment,
         action_log=action_log,
         created_by_label=created_by_label,
+        source_channel='auto_cod_verify',
+        notes='Auto POD verified after COD collection',
     )
     shipment.shipment_status = TenantShipment.ShipmentStatus.DELIVERED
     shipment.save(update_fields=['shipment_status', 'updated_at'])
@@ -352,6 +355,13 @@ def apply_execution_side_effects(action_log, *, created_by_label='') -> None:
             created_by_label=created_by_label,
         )
     elif _should_auto_mark_delivered_for_credit(action, shipment):
+        _ensure_auto_delivered_verify_log(
+            shipment,
+            action_log=action_log,
+            created_by_label=created_by_label,
+            source_channel='auto_pod_verify',
+            notes='Auto POD verified after credit POD completion',
+        )
         shipment.shipment_status = shipment.ShipmentStatus.DELIVERED
         shipment.save(update_fields=['shipment_status', 'updated_at'])
 
