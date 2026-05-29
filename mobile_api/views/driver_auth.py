@@ -156,7 +156,9 @@ class DriverLoginView(MobileAPIView):
         if not serializer.is_valid():
             return self.validation_error(serializer)
 
-        email = serializer.validated_data['email']
+        email = (serializer.validated_data.get('email') or '').strip()
+        phone = (serializer.validated_data.get('phone') or '').strip()
+        extension = (serializer.validated_data.get('extension') or '').strip()
         password = serializer.validated_data['password']
         body_tenant = (serializer.validated_data.get('tenant_id') or '').strip()
         tenant_schema = ''
@@ -178,6 +180,8 @@ class DriverLoginView(MobileAPIView):
 
         result = driver_login(
             email=email,
+            phone=phone,
+            extension=extension,
             password=password,
             tenant_schema=tenant_schema,
             request=request,

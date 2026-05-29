@@ -23,11 +23,23 @@ class DriverLoginSerializer(serializers.Serializer):
       ``device_name`` — Human-readable model, e.g. ``iPhone 16``, ``Samsung Galaxy S24``.
     """
     email = serializers.EmailField(
-        required=True,
+        required=False,
+        allow_blank=True,
         error_messages={
-            'required': _('mobile.auth.email_required'),
             'invalid': _('mobile.auth.email_invalid'),
-        }
+        },
+    )
+    extension = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=10,
+        write_only=True,
+    )
+    phone = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=20,
+        write_only=True,
     )
     password = serializers.CharField(
         required=True,
@@ -65,7 +77,28 @@ class DriverLoginSerializer(serializers.Serializer):
     )
 
     def validate_email(self, value: str) -> str:
+        if not (value or '').strip():
+            return ''
         return (value or '').strip().lower()
+
+    def validate(self, data):
+        email = (data.get('email') or '').strip()
+        phone = (data.get('phone') or '').strip()
+        extension = (data.get('extension') or '').strip()
+
+        if email and phone:
+            raise serializers.ValidationError(
+                _('Provide either email or phone+extension, not both.'),
+            )
+        if not email and not phone:
+            raise serializers.ValidationError(
+                _('Either email or phone is required.'),
+            )
+        if phone and not extension:
+            raise serializers.ValidationError(
+                _('extension is required when using phone login.'),
+            )
+        return data
 
 
 class DriverRefreshSerializer(serializers.Serializer):

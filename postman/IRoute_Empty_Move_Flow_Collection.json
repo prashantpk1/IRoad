@@ -19,6 +19,14 @@
       "value": ""
     },
     {
+      "key": "driver_extension",
+      "value": ""
+    },
+    {
+      "key": "driver_phone",
+      "value": ""
+    },
+    {
       "key": "tenant_id",
       "value": ""
     },
@@ -60,7 +68,7 @@
           }
         },
         "url": "{{base_url}}/driver/auth/login/",
-        "description": "STEP 1 — SAME LOGIN AS JOB FLOW.\nSend email, password, tenant_id.\naccess_token is auto-saved.\nToken key in response is data.access_token.\nUse Authorization: Bearer {{access_token}} for all subsequent calls.\nNOTE: Login field is 'email' not 'phone'.\nSet driver_email in collection variables before running."
+        "description": "EMAIL LOGIN — Use this OR Request 01b for phone login.\nOnly run one login request per session.\n\nSTEP 1 — SAME LOGIN AS JOB FLOW.\nSend email, password, tenant_id.\naccess_token is auto-saved.\nToken key in response is data.access_token.\nUse Authorization: Bearer {{access_token}} for all subsequent calls.\nSet driver_email in collection variables before running.\n\nAlternative body (phone login — use Request 01b instead):\n{\n  \"extension\": \"{{driver_extension}}\",\n  \"phone\": \"{{driver_phone}}\",\n  \"password\": \"{{driver_password}}\",\n  \"tenant_id\": \"{{tenant_id}}\"\n}"
       },
       "event": [
         {
@@ -74,6 +82,60 @@
               "    pm.test(\"Login successful, token saved\", function() { pm.expect(resp.status).to.eql(1); });",
               "} else {",
               "    pm.test(\"Login FAILED — check credentials\", function() { pm.expect(resp.status).to.eql(1); });",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "01b — Login via Phone Number (Alternative)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"extension\": \"{{driver_extension}}\",\n  \"phone\": \"{{driver_phone}}\",\n  \"password\": \"{{driver_password}}\",\n  \"tenant_id\": \"{{tenant_id}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": "{{base_url}}/driver/auth/login/",
+        "description": "ALTERNATIVE LOGIN — USE PHONE NUMBER INSTEAD OF EMAIL.\n\nUse this request if the driver does not have an email\nor prefers to login with phone number.\n\nRequired fields:\n  extension = country code e.g. +966 or +91\n  phone = phone number without extension e.g. 987456321\n  password = driver password\n\nSet driver_extension and driver_phone in\ncollection variables before running.\n\nSame response as email login.\naccess_token is auto-saved after success.\n\nOnly run ONE login request (01 or 01b).\nBoth save the same access_token variable."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var resp = pm.response.json();",
+              "if (resp.status === 1 && resp.data &&",
+              "    resp.data.access_token) {",
+              "    pm.collectionVariables.set(",
+              "        \"access_token\", resp.data.access_token",
+              "    );",
+              "    pm.collectionVariables.set(",
+              "        \"refresh_token\", resp.data.refresh_token",
+              "    );",
+              "    pm.test(\"Login successful, token saved\",",
+              "        function() {",
+              "            pm.expect(resp.status).to.eql(1);",
+              "        }",
+              "    );",
+              "} else {",
+              "    pm.test(\"Login FAILED — check credentials\",",
+              "        function() {",
+              "            pm.expect(resp.status).to.eql(1);",
+              "        }",
+              "    );",
               "}"
             ]
           }

@@ -5,6 +5,24 @@
 		"description": "## IRoad Mobile Driver APIs\n\nAuth, profile, organization profile, and change-password.\n\n### Base URL\nUse `{{base_url}}` (no trailing slash). Paths under `/api/v1/mobile/`.\n\n### Headers\n- **X-Tenant-ID** — not used on public auth; authenticated routes use JWT `tenant_schema` only.\n- **Accept-Language** — `en` or `ar` via `{{accept_language}}`.\n- **Authorization** — `Bearer {{access_token}}` on protected routes.\n\n### Auth (email only — no tenant_id)\nLogin, refresh, forgot-password, verify-otp, and reset-password resolve tenant from email/OTP/token. Do not send `tenant_id` in JSON or `X-Tenant-ID` on these flows.\n\n### Order\n1. Login (saves tokens) 2. Refresh / Logout 3. Forgot → Verify OTP → Reset 4. Profile APIs",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
+	"variable": [
+		{
+			"key": "driver_extension",
+			"value": ""
+		},
+		{
+			"key": "driver_phone",
+			"value": ""
+		},
+		{
+			"key": "driver_password",
+			"value": ""
+		},
+		{
+			"key": "tenant_id",
+			"value": ""
+		}
+	],
 	"item": [
 		{
 			"name": "Driver Auth",
@@ -57,7 +75,7 @@
 							}
 						},
 						"url": "{{base_url}}/api/v1/mobile/driver/auth/login/",
-						"description": "Authenticate with email + password; tenant is resolved server-side. No X-Tenant-ID or tenant_id in body."
+						"description": "EMAIL LOGIN — Use this OR Request 01b for phone login.\nOnly run one login request per session.\n\nAuthenticate with email + password; tenant is resolved server-side.\n\nAlternative body (phone login — use Request 01b instead):\n{\n  \"extension\": \"{{driver_extension}}\",\n  \"phone\": \"{{driver_phone}}\",\n  \"password\": \"{{driver_password}}\",\n  \"tenant_id\": \"{{tenant_id}}\"\n}"
 					},
 					"response": [
 						{
@@ -138,6 +156,61 @@
 							"body": "{\n  \"status\": 0,\n  \"message\": \"Invalid email or password.\",\n  \"data\": {}\n}"
 						}
 					]
+				},
+				{
+					"name": "01b — Login via Phone Number (Alternative)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var resp = pm.response.json();",
+									"if (resp.status === 1 && resp.data &&",
+									"    resp.data.access_token) {",
+									"    pm.collectionVariables.set(",
+									"        \"access_token\", resp.data.access_token",
+									"    );",
+									"    pm.collectionVariables.set(",
+									"        \"refresh_token\", resp.data.refresh_token",
+									"    );",
+									"    pm.test(\"Login successful, token saved\",",
+									"        function() {",
+									"            pm.expect(resp.status).to.eql(1);",
+									"        }",
+									"    );",
+									"} else {",
+									"    pm.test(\"Login FAILED — check credentials\",",
+									"        function() {",
+									"            pm.expect(resp.status).to.eql(1);",
+									"        }",
+									"    );",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"extension\": \"{{driver_extension}}\",\n  \"phone\": \"{{driver_phone}}\",\n  \"password\": \"{{driver_password}}\",\n  \"tenant_id\": \"{{tenant_id}}\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": "{{base_url}}/driver/auth/login/",
+						"description": "ALTERNATIVE LOGIN — USE PHONE NUMBER INSTEAD OF EMAIL.\n\nUse this request if the driver does not have an email\nor prefers to login with phone number.\n\nRequired fields:\n  extension = country code e.g. +966 or +91\n  phone = phone number without extension e.g. 987456321\n  password = driver password\n\nSet driver_extension and driver_phone in\ncollection variables before running.\n\nSame response as email login.\naccess_token is auto-saved after success.\n\nOnly run ONE login request (01 or 01b).\nBoth save the same access_token variable."
+					},
+					"response": []
 				},
 				{
 					"name": "Refresh Token",

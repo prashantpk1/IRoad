@@ -66,6 +66,74 @@ def generate_otp() -> str:
 
 # ── Driver Lookup ─────────────────────────────────────────────────
 
+def _normalize_login_phone_digits(phone: str) -> str:
+    return ''.join(ch for ch in (phone or '').strip() if ch.isdigit())
+
+
+def _normalize_login_extension(extension: str) -> str:
+    ext = (extension or '').strip()
+    if not ext:
+        return ''
+    if not ext.startswith('+'):
+        ext = f'+{ext}'
+    return ext
+
+
+def _extension_lookup_variants(extension: str) -> list[str]:
+    """DB may store ``+966`` or ``966`` — match both."""
+    ext = _normalize_login_extension(extension)
+    if not ext:
+        return []
+    variants = {ext}
+    if ext.startswith('+'):
+        variants.add(ext[1:])
+    else:
+        variants.add(f'+{ext}')
+    return list(variants)
+
+
+def get_driver_user_by_phone(
+    phone: str,
+    extension: str,
+    tenant_schema: str,
+):
+    """
+    Find ``TenantUser`` by ``mobile_no`` + ``mobile_country_code``.
+
+    Falls back to active ``DriverMaster.mobile_number`` when the user row
+    has no mobile set but the driver profile does.
+    """
+    num = _normalize_login_phone_digits(phone)
+    if not num:
+        return None
+    codes = _extension_lookup_variants(extension)
+    try:
+        from tenant_workspace.models import DriverMaster, TenantUser
+
+        with schema_context(tenant_schema):
+            qs = TenantUser.all_objects.filter(mobile_no=num)
+            if codes:
+                tenant_user = qs.filter(
+                    mobile_country_code__in=codes,
+                ).first()
+            else:
+                tenant_user = qs.first()
+            if tenant_user is not None:
+                return tenant_user
+
+            driver = (
+                DriverMaster.objects.filter(mobile_number=num)
+                .select_related('user_account_id')
+                .first()
+            )
+            if driver is None or not driver.user_account_id_id:
+                return None
+            return driver.user_account_id
+    except Exception as e:
+        logger.error('get_driver_user_by_phone error: %s', e)
+        return None
+
+
 def get_driver_user_by_email(email: str, tenant_schema: str):
     """
     Find TenantUser by email.
@@ -142,6 +210,126 @@ def _mobile_login_lockout_settings() -> tuple[int, int]:
         getattr(settings, 'MOBILE_API_LOGIN_LOCKOUT_MINUTES', 15) or 15
     )
     return max_attempts, lockout_minutes
+
+
+def _schema_eligible_for_driver_login_by_phone(
+    phone: str,
+    extension: str,
+    password: str,
+    schema_name: str,
+) -> bool:
+    """True when this schema has an active driver for phone+extension+password."""
+    try:
+        from tenant_workspace.models import DriverMaster, TenantUser
+
+        with schema_context(schema_name):
+            tenant_user = get_driver_user_by_phone(phone, extension, schema_name)
+            if tenant_user is None or getattr(tenant_user, 'is_deleted', False):
+                return False
+            if not check_password(password, tenant_user.password_hash):
+                return False
+            if tenant_user.status != TenantUser.Status.ACTIVE:
+                return False
+            driver = DriverMaster.objects.filter(
+                user_account_id=tenant_user.pk,
+            ).first()
+            if driver is None or str(driver.driver_status) != DriverMaster.Status.ACTIVE:
+                return False
+        return True
+    except Exception:
+        return False
+
+
+def _list_eligible_login_schemas_by_phone(
+    phone: str,
+    extension: str,
+    password: str,
+) -> list[str]:
+    try:
+        from iroad_tenants.models import TenantRegistry
+
+        out: list[str] = []
+        registries = (
+            TenantRegistry.objects.select_related('tenant_profile')
+            .order_by('schema_name')
+        )
+        for reg in registries:
+            profile = getattr(reg, 'tenant_profile', None)
+            if profile and getattr(profile, 'account_status', None) != 'Active':
+                continue
+            if _schema_eligible_for_driver_login_by_phone(
+                phone,
+                extension,
+                password,
+                reg.schema_name,
+            ):
+                out.append(reg.schema_name)
+        return out
+    except Exception as exc:
+        logger.error('_list_eligible_login_schemas_by_phone error: %s', exc)
+        return []
+
+
+def resolve_driver_login_tenant_by_phone(
+    phone: str,
+    extension: str,
+    password: str,
+    *,
+    explicit_tenant: str,
+) -> dict:
+    """Same disambiguation rules as email login, keyed by mobile credentials."""
+    explicit = (explicit_tenant or '').strip()
+    if getattr(settings, 'MOBILE_API_LOGIN_REQUIRE_EXPLICIT_TENANT', False):
+        if not explicit:
+            return {
+                'ok': False,
+                'error_code': 'tenant_required',
+                'error': _('mobile.auth.tenant_required'),
+            }
+    if explicit:
+        reg = resolve_active_tenant_registry(explicit)
+        if reg is None:
+            return {
+                'ok': False,
+                'error_code': 'invalid_tenant',
+                'error': _('mobile.auth.invalid_tenant'),
+            }
+        if not _schema_eligible_for_driver_login_by_phone(
+            phone,
+            extension,
+            password,
+            reg.schema_name,
+        ):
+            return {
+                'ok': False,
+                'error_code': 'invalid_credentials',
+                'error': _('mobile.auth.invalid_credentials'),
+            }
+        return {'ok': True, 'schema_name': reg.schema_name, 'mode': 'explicit'}
+
+    eligible = _list_eligible_login_schemas_by_phone(phone, extension, password)
+    if not eligible:
+        return {
+            'ok': False,
+            'error_code': 'invalid_credentials',
+            'error': _('mobile.auth.invalid_credentials'),
+        }
+    if len(eligible) == 1:
+        return {'ok': True, 'schema_name': eligible[0], 'mode': 'auto'}
+
+    candidates = [_ambiguous_candidate_payload(s) for s in eligible]
+    candidates.sort(
+        key=lambda c: (
+            (c.get('company_name') or '').lower(),
+            c.get('schema_name') or '',
+        ),
+    )
+    return {
+        'ok': False,
+        'error_code': 'tenant_ambiguous',
+        'error': _('mobile.auth.tenant_ambiguous'),
+        'candidates': candidates,
+    }
 
 
 def _schema_eligible_for_driver_login(
@@ -699,11 +887,13 @@ def driver_login(
     password: str,
     tenant_schema: str,
     *,
+    phone: str = '',
+    extension: str = '',
     request=None,
     device: dict | None = None,
 ) -> dict:
     """
-    Authenticate driver by email + password with transactional lockout + audit.
+    Authenticate driver by email **or** phone+extension + password.
 
     ``tenant_schema`` should be the resolved hint (body ``tenant_id``, header
     ``X-Tenant-ID``, or middleware). When empty, tenant is resolved from
@@ -715,8 +905,12 @@ def driver_login(
     """
     max_attempts, lockout_minutes = _mobile_login_lockout_settings()
     email_norm = (email or '').strip().lower()
+    phone_norm = _normalize_login_phone_digits(phone)
+    extension_norm = _normalize_login_extension(extension)
+    use_phone = bool(phone_norm) and bool(extension_norm)
     ip = _client_ip_from_request(request)
     device = device or {}
+    throttle_key = email_norm or f'{extension_norm}:{phone_norm}'
 
     try:
         from mobile_api.helpers.login_throttle import (
@@ -724,7 +918,7 @@ def driver_login(
             driver_login_burst_record,
         )
 
-        if not driver_login_burst_allow(email=email_norm, request=request):
+        if not driver_login_burst_allow(email=throttle_key, request=request):
             logger.info(
                 'mobile.driver_login burst_rate_limited ip=%s',
                 ip or '-',
@@ -734,15 +928,23 @@ def driver_login(
                 'error': _('mobile.auth.invalid_credentials'),
                 'error_code': 'invalid_credentials',
             }
-        driver_login_burst_record(email=email_norm, request=request)
+        driver_login_burst_record(email=throttle_key, request=request)
     except Exception as exc:
         logger.error('driver_login burst throttle error: %s', exc)
 
-    resolution = resolve_driver_login_tenant(
-        email,
-        password,
-        explicit_tenant=(tenant_schema or '').strip(),
-    )
+    if use_phone:
+        resolution = resolve_driver_login_tenant_by_phone(
+            phone_norm,
+            extension_norm,
+            password,
+            explicit_tenant=(tenant_schema or '').strip(),
+        )
+    else:
+        resolution = resolve_driver_login_tenant(
+            email,
+            password,
+            explicit_tenant=(tenant_schema or '').strip(),
+        )
     if not resolution.get('ok'):
         err_code = resolution.get('error_code', 'auth_failed')
         out = {
@@ -774,11 +976,36 @@ def driver_login(
 
     with transaction.atomic():
         with schema_context(tenant_schema):
-            tenant_user = (
-                TenantUser.all_objects.select_for_update()
-                .filter(email__iexact=email_norm)
-                .first()
-            )
+            if use_phone:
+                num = phone_norm
+                codes = _extension_lookup_variants(extension_norm)
+                qs = TenantUser.all_objects.select_for_update().filter(
+                    mobile_no=num,
+                )
+                if codes:
+                    tenant_user = qs.filter(
+                        mobile_country_code__in=codes,
+                    ).first()
+                else:
+                    tenant_user = qs.first()
+                if tenant_user is None:
+                    tenant_user = get_driver_user_by_phone(
+                        phone_norm,
+                        extension_norm,
+                        tenant_schema,
+                    )
+                    if tenant_user is not None:
+                        tenant_user = (
+                            TenantUser.all_objects.select_for_update()
+                            .filter(pk=tenant_user.pk)
+                            .first()
+                        )
+            else:
+                tenant_user = (
+                    TenantUser.all_objects.select_for_update()
+                    .filter(email__iexact=email_norm)
+                    .first()
+                )
 
             if tenant_user is None:
                 logger.warning(
