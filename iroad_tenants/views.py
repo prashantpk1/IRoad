@@ -83,6 +83,8 @@ from tenant_workspace.ops_display import (
     client_account_label,
     driver_label,
     location_label,
+    resolve_action_log_route,
+    resolve_action_log_truck_code,
     shipment_booking_no,
     shipment_route_endpoints,
 )
@@ -9602,27 +9604,11 @@ def _tenant_operation_action_log_detail_dict(action_log):
     booking_item = shipment.booking_item_ref if shipment else ''
     shipment_no = shipment.shipment_no if shipment else ''
     movement_no = action_log.truck_movement.movement_no if action_log.truck_movement_id else ''
-    truck_code = action_log.truck.truck_code if action_log.truck_id else ''
-    if not truck_code and shipment and shipment.truck_id:
-        truck_code = shipment.truck.truck_code
+    truck_code = resolve_action_log_truck_code(action_log)
     driver_display = driver_label(action_log.driver) if action_log.driver_id else '-'
     if driver_display == '-' and shipment and shipment.driver_id:
         driver_display = driver_label(shipment.driver)
-    from_location = '-'
-    to_location = '-'
-    if shipment is not None:
-        if shipment.loading_address_id:
-            from_location = (
-                shipment.loading_address.display_name
-                or shipment.loading_address.address_code
-                or '-'
-            )
-        if shipment.delivery_address_id:
-            to_location = (
-                shipment.delivery_address.display_name
-                or shipment.delivery_address.address_code
-                or '-'
-            )
+    from_location, to_location = resolve_action_log_route(action_log)
     user_display = '-'
     if action_log.created_by_id:
         user_display = action_log.created_by.full_name or action_log.created_by.username
@@ -10928,12 +10914,21 @@ class TenantOperationActionLogDetailView(View):
                     'operation_action',
                     'created_by',
                     'booking',
+                    'booking__loading_address',
+                    'booking__delivery_address',
                     'shipment',
                     'shipment__loading_address',
                     'shipment__delivery_address',
+                    'shipment__truck',
+                    'shipment__booking',
+                    'shipment__booking__assigned_truck',
+                    'shipment__booking__booking_line_backload_truck',
                     'truck',
                     'driver',
                     'truck_movement',
+                    'truck_movement__from_location_point',
+                    'truck_movement__to_location_point',
+                    'truck_movement__truck',
                 )
                 .filter(log_id=log_id)
                 .first()
@@ -15178,6 +15173,7 @@ class TenantOperationShipmentDetailView(View):
                 .filter(booking_id=shipment.booking_id)
                 .first()
             )
+            shipment_pk = shipment.shipment_id
             context.update(
                 {
                     'shipment': shipment,
@@ -15189,6 +15185,20 @@ class TenantOperationShipmentDetailView(View):
                     ),
                     'additional_charges': shipment.total_additional_charges,
                     'tenant_schema_name': tenant_registry.schema_name,
+                    'back_to_list_url': reverse('iroad_tenants:tenant_operation_shipment_list'),
+                    'edit_shipment_url': reverse(
+                        'iroad_tenants:tenant_operation_shipment_edit',
+                        kwargs={'shipment_id': shipment_pk},
+                    ),
+                    'update_shipment_url': reverse(
+                        'iroad_tenants:tenant_operation_shipment_update',
+                        kwargs={'shipment_id': shipment_pk},
+                    ),
+                    'print_shipment_url': reverse(
+                        'iroad_tenants:tenant_shipment_print',
+                        kwargs={'shipment_id': shipment_pk},
+                    ),
+                    'activity_log': _tenant_shipment_activity_entries(shipment),
                 }
             )
             return render(request, self.template_name, context)

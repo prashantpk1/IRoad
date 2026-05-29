@@ -1,0 +1,270 @@
+{
+  "info": {
+    "_postman_id": "d5e6f7a8-9012-3456-abcd-walletflow01",
+    "name": "IRoute — Driver Wallet Flow",
+    "description": "Driver My Wallet tab — COD treasury balance and transactions (read-only).\nPer IRoute Ch.13 — Driver Treasury Transaction on driver wallet.\nUse {{base_url}} = http://127.0.0.1:8000/api/v1/mobile\nUse {{access_token}} = filled automatically after login.\nUse {{transaction_id}} = filled after Wallet List call.\nUse {{wallet_filter_shipment_no}} and {{wallet_filter_date}} for filter popup.\n\nFLOW ORDER:\n01 Login\n02 Wallet List (summary + recent transactions)\n03 Filter Preview — Results Found (count_only=true)\n04 Apply Filter (shipment_no + date)\n05 Transaction Detail (read-only)\n\nNOTE: Run COD job flow (A9 Collect Payment) before wallet shows transactions.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8000/api/v1/mobile"
+    },
+    {
+      "key": "driver_email",
+      "value": ""
+    },
+    {
+      "key": "driver_password",
+      "value": ""
+    },
+    {
+      "key": "tenant_id",
+      "value": ""
+    },
+    {
+      "key": "access_token",
+      "value": ""
+    },
+    {
+      "key": "refresh_token",
+      "value": ""
+    },
+    {
+      "key": "tenant_schema",
+      "value": ""
+    },
+    {
+      "key": "driver_id",
+      "value": ""
+    },
+    {
+      "key": "transaction_id",
+      "value": ""
+    },
+    {
+      "key": "transaction_no",
+      "value": "TT-000001"
+    },
+    {
+      "key": "wallet_filter_shipment_no",
+      "value": "SH-2026-1001"
+    },
+    {
+      "key": "wallet_filter_date",
+      "value": "10-02-2026"
+    }
+  ],
+  "item": [
+    {
+      "name": "01 — Login (Get Access Token)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{driver_email}}\",\n  \"password\": \"{{driver_password}}\",\n  \"tenant_id\": \"{{tenant_id}}\",\n  \"device_platform\": \"Android\",\n  \"device_id\": \"postman-fcm-token\",\n  \"device_name\": \"Postman Client\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": "{{base_url}}/driver/auth/login/",
+        "description": "STEP 1 — Login. Capability: mobile.driver.wallet."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var resp = pm.response.json();",
+              "if (resp.status === 1 && resp.data && resp.data.access_token) {",
+              "    pm.collectionVariables.set('access_token', resp.data.access_token);",
+              "    pm.collectionVariables.set('refresh_token', resp.data.refresh_token || '');",
+              "    var org = resp.data.organization || {};",
+              "    if (org.schema_name) { pm.collectionVariables.set('tenant_schema', org.schema_name); }",
+              "    var driver = resp.data.driver || {};",
+              "    var did = driver.driver_id || driver.id || '';",
+              "    if (did) { pm.collectionVariables.set('driver_id', String(did)); }",
+              "    pm.test('Login successful, token saved', function () { pm.expect(resp.status).to.eql(1); });",
+              "} else {",
+              "    pm.test('Login failed — check email, password, tenant_id', function () { pm.expect(resp.status).to.eql(1); });",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 — Wallet List (Summary + Recent Transactions)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept-Language",
+            "value": "en"
+          }
+        ],
+        "url": "{{base_url}}/driver/wallet/",
+        "description": "STEP 2 — MY WALLET SCREEN.\ndata.summary.total_cash_collected = driver wallet balance (SAR).\ndata.items = recent treasury transactions (Client Collection debits, Custody Collection credits).\nAuto-saves transaction_id from first item for Step 05."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var resp = pm.response.json();",
+              "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('status success', function () { pm.expect(resp.status).to.eql(1); });",
+              "var data = resp.data || {};",
+              "pm.test('summary present', function () { pm.expect(data.summary).to.be.an('object'); });",
+              "pm.test('items is array', function () { pm.expect(data.items).to.be.an('array'); });",
+              "if (data.summary && data.summary.total_cash_collected) {",
+              "    console.log('Total Cash Collected:', data.summary.currency, data.summary.total_cash_collected);",
+              "}",
+              "if (data.items && data.items.length > 0) {",
+              "    var first = data.items[0];",
+              "    if (first.transaction_id) { pm.collectionVariables.set('transaction_id', first.transaction_id); }",
+              "    if (first.transaction_no) { pm.collectionVariables.set('transaction_no', first.transaction_no); }",
+              "    if (first.shipment_no) { pm.collectionVariables.set('wallet_filter_shipment_no', first.shipment_no); }",
+              "    if (first.transaction_date) { pm.collectionVariables.set('wallet_filter_date', first.transaction_date); }",
+              "    pm.test('Transactions returned', function () { pm.expect(data.items.length).to.be.above(0); });",
+              "} else {",
+              "    pm.test('No transactions yet — collect COD payment (A9) first', function () { pm.expect(true).to.be.true; });",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 — Filter Preview (Results Found — count_only)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/driver/wallet/?count_only=true&shipment_no={{wallet_filter_shipment_no}}&date={{wallet_filter_date}}",
+        "description": "STEP 3 — FILTER WALLET POPUP PREVIEW.\ncount_only=true → items empty, results_found only."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var resp = pm.response.json();",
+              "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+              "var data = resp.data || {};",
+              "pm.test('count_only — items empty', function () { pm.expect(data.items).to.eql([]); });",
+              "pm.test('results_found is number', function () { pm.expect(data.results_found).to.be.a('number'); });",
+              "console.log('Results Found:', data.results_found);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 — Apply Filter (Shipment No + Date)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/driver/wallet/?shipment_no={{wallet_filter_shipment_no}}&date={{wallet_filter_date}}",
+        "description": "STEP 4 — APPLY FILTER.\nReturns filtered data.items."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var resp = pm.response.json();",
+              "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+              "var data = resp.data || {};",
+              "if (data.items && data.items.length > 0 && data.items[0].transaction_id) {",
+              "    pm.collectionVariables.set('transaction_id', data.items[0].transaction_id);",
+              "}",
+              "pm.test('Filtered results', function () {",
+              "    pm.expect(data.results_found).to.eql(data.items.length);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 — Transaction Detail (Read-Only)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept-Language",
+            "value": "en"
+          }
+        ],
+        "url": "{{base_url}}/driver/wallet/transactions/{{transaction_id}}/",
+        "description": "STEP 5 — TRANSACTION DETAILS SCREEN.\nRead-only. Accepts transaction_id (UUID) or transaction_no.\nShows Received Amount, transaction no/date, linked shipment card."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var resp = pm.response.json();",
+              "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+              "var data = resp.data || {};",
+              "pm.test('summary present', function () { pm.expect(data.summary).to.be.an('object'); });",
+              "pm.test('read_only flag', function () { pm.expect(data.read_only).to.eql(true); });",
+              "console.log('Type:', data.summary.transaction_type_label, 'Amount:', data.summary.currency, data.summary.amount);"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

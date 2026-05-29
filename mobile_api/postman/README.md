@@ -16,6 +16,8 @@ Postman assets for the **Unified Driver Dashboard**, **Job Detail**, **Execute A
 | `POD_CAPTURE_SAMPLE_PAYLOADS.md` | POD request/response samples |
 | `Iroad_Mobile_Driver_Execute_Action.postman_collection.json` | **Execute Action** — 12 scenarios, bearer-only (no login) |
 | `Iroad_Mobile_Driver_Job_Detail.postman_collection.json` | **Job Detail** — auth, job GET, timeline pagination, examples |
+| `Iroad_Mobile_Driver_History.postman_collection.json` | **History** — list, filter preview, read-only detail |
+| `HISTORY_SETUP.md` | History setup guide |
 | `Iroad_Mobile_Driver_Dashboard.postman_collection.json` | **Dashboard** — current job, ETag polling, examples |
 | `Iroad_Mobile_Local.postman_environment.json` | Shared local environment (auth + dashboard + job detail + execute vars) |
 | `EXECUTE_ACTION_SETUP.md` | Execute Action setup guide |
@@ -41,6 +43,16 @@ See `POD_CAPTURE_SETUP.md` for all 14 scenarios.
 4. Run **04 → 5. Job Detail** to verify `operational_issues` visibility.
 
 See `OPS_STAGING_SETUP.md` for full run order.
+
+### Quick start — History
+
+1. Import `Iroad_Mobile_Driver_History.postman_collection.json` + `Iroad_Mobile_Local.postman_environment.json`.
+2. Run **01 → Driver Login**.
+3. Run **02 → Get History List (all)**.
+4. Run **03 → Filter Preview** then **Apply Filter**.
+5. Run **04 → Get History Detail**.
+
+See `HISTORY_SETUP.md`.
 
 ### Quick start — Execute Action
 

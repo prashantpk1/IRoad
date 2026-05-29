@@ -461,11 +461,11 @@
                 <tr>
                   <td><span class="eal-entity-id">{{ m.movement_no }}</span></td>
                   <td>{{ m.movement_date|date:"d M Y" }}</td>
-                  <td>{{ m.from_location|default:"—" }}</td>
-                  <td>{{ m.to_location|default:"—" }}</td>
+                  <td>{% if m.from_location_point %}{{ m.from_location_point.display_label }}{% else %}—{% endif %}</td>
+                  <td>{% if m.to_location_point %}{{ m.to_location_point.display_label }}{% else %}—{% endif %}</td>
                   <td style="font-weight:600">{% if m.distance_km %}{{ m.distance_km|floatformat:0 }}&nbsp;km{% else %}—{% endif %}</td>
                   <td>
-                    {% if m.shipment_ref %}
+                    {% if m.shipment_id %}
                     <span class="status-badge tm-mov-loaded">Loaded trip</span>
                     {% elif m.empty_move_reason %}
                     <span class="status-badge tm-mov-empty">{{ m.empty_move_reason }}</span>

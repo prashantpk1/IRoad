@@ -14,15 +14,18 @@ from tenant_workspace.models import TenantShipment, TenantTruckMovementLog
 
 _SHIPMENT_SELECT = (
     'booking',
+    'booking__assigned_truck',
+    'booking__booking_line_backload_truck',
     'booking__route',
     'booking__route__origin_point',
     'booking__route__destination_point',
     'booking__loading_address',
     'booking__delivery_address',
-    'loading_address',
-    'delivery_address',
     'driver',
     'client_account',
+    'loading_address',
+    'delivery_address',
+    'truck',
 )
 _MOVEMENT_SELECT = (
     'booking',

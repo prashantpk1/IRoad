@@ -38,6 +38,7 @@ Authenticated driver routes resolve the subscriber from `tenant_schema`. Any opt
 |------------|------|-------------|
 | `mobile.driver.profile` | `driver` | Driver profile APIs |
 | `mobile.driver.organization` | `driver` | Organization profile API |
+| `mobile.driver.history` | `driver` | Driver History list + detail (read-only) |
 | `mobile.driver.auth_session` | `driver` | Authenticated driver session operations |
 | `mobile.operations.read` | `dispatcher`, `tenant_admin` | `GET /api/v1/mobile/operational/health/` |
 | `mobile.operations.write` | `dispatcher`, `tenant_admin` | Reserved for future operational mobile APIs |

@@ -375,10 +375,10 @@
                       <tr>
                         <td class="ops-col-sn">1</td>
                         <td class="ops-col-address">
-                          <select class="form-select {% if form_errors.loading_address %}is-invalid{% endif %}"{% if not shipment_field_locks.lock_loading_address %} name="loading_address_1"{% endif %}{% if shipment_field_locks.lock_loading_address %} disabled{% endif %}>
-                        {% if shipment_field_locks.lock_loading_address %}
-                        <input type="hidden" name="loading_address_1" value="{{ shipment_form_data.loading_address|default:'' }}" />
-                        {% endif %}
+                          {% if shipment_field_locks.lock_loading_address %}
+                          <input type="hidden" name="loading_address_1" value="{{ shipment_form_data.loading_address|default:'' }}" />
+                          {% endif %}
+                          <select id="loadingAddressSelect" class="form-select {% if form_errors.loading_address %}is-invalid{% endif %}"{% if not shipment_field_locks.lock_loading_address %} name="loading_address_1"{% endif %}{% if shipment_field_locks.lock_loading_address %} disabled{% endif %}>
                           <option value="" {% if not shipment_form_data.loading_address %}selected{% endif %} disabled>
                             -Select loading address-
                           </option>
@@ -420,10 +420,10 @@
                       <tr>
                         <td class="ops-col-sn">1</td>
                         <td class="ops-col-address">
-                          <select class="form-select {% if form_errors.delivery_address %}is-invalid{% endif %}"{% if not shipment_field_locks.lock_delivery_address %} name="delivery_address_1"{% endif %}{% if shipment_field_locks.lock_delivery_address %} disabled{% endif %}>
-                        {% if shipment_field_locks.lock_delivery_address %}
-                        <input type="hidden" name="delivery_address_1" value="{{ shipment_form_data.delivery_address|default:'' }}" />
-                        {% endif %}
+                          {% if shipment_field_locks.lock_delivery_address %}
+                          <input type="hidden" name="delivery_address_1" value="{{ shipment_form_data.delivery_address|default:'' }}" />
+                          {% endif %}
+                          <select id="deliveryAddressSelect" class="form-select {% if form_errors.delivery_address %}is-invalid{% endif %}"{% if not shipment_field_locks.lock_delivery_address %} name="delivery_address_1"{% endif %}{% if shipment_field_locks.lock_delivery_address %} disabled{% endif %}>
                           <option value="" {% if not shipment_form_data.delivery_address %}selected{% endif %} disabled>
                             -Select delivery address-
                           </option>
@@ -488,10 +488,10 @@
                         />
                       </td>
                       <td class="ops-col-cargo">
-                        <select class="form-select {% if form_errors.cargo_id %}is-invalid{% endif %}" id="cargoSelect"{% if not shipment_field_locks.lock_cargo %} name="cargo_id_1"{% endif %}{% if shipment_field_locks.lock_cargo %} disabled{% endif %}>
                         {% if shipment_field_locks.lock_cargo %}
                         <input type="hidden" name="cargo_id_1" value="{{ shipment_form_data.cargo_id|default:'' }}" />
                         {% endif %}
+                        <select class="form-select {% if form_errors.cargo_id %}is-invalid{% endif %}" id="cargoSelect"{% if not shipment_field_locks.lock_cargo %} name="cargo_id_1"{% endif %}{% if shipment_field_locks.lock_cargo %} disabled{% endif %}>
                           <option value="" {% if not shipment_form_data.cargo_id %}selected{% endif %} disabled>
                             -Select cargo-
                           </option>
@@ -579,6 +579,12 @@
             </button>
           </div>
           <div class="form-actions-right">
+            {% if shipment_is_edit %}
+            <a href="{% url 'iroad_tenants:tenant_operation_shipment_detail' shipment.shipment_id %}" class="btn btn-outline-secondary me-2">
+              <i class="bi bi-arrow-left"></i>
+              Back
+            </a>
+            {% endif %}
             <button type="submit" class="btn btn-primary">
               <i class="bi bi-check-circle"></i>
               {% if shipment_is_edit %}Update Shipment{% else %}Save Shipment{% endif %}
@@ -634,8 +640,8 @@
         var codAmountInput = document.getElementById("codAmount");
         var shipmentTruckDisplay = document.getElementById("shipmentTruckDisplay");
         var shipmentDriverDisplay = document.getElementById("shipmentDriverDisplay");
-        var loadingAddressSelect = document.querySelector("select[name='loading_address_1']");
-        var deliveryAddressSelect = document.querySelector("select[name='delivery_address_1']");
+        var loadingAddressSelect = document.getElementById("loadingAddressSelect");
+        var deliveryAddressSelect = document.getElementById("deliveryAddressSelect");
         var cargoBookingItemInput = document.getElementById("cargoBookingItem");
         var cargoSelect = document.getElementById("cargoSelect");
         var cargoWeightInput = document.getElementById("cargoWeight");

@@ -198,42 +198,54 @@
             {% endif %}
           </td>
           <td>
-            <div class="eal-actions-cell">
-              <a
-                href="{% url 'iroad_tenants:driver_master_detail' row.driver_id %}"
-                class="eal-row-btn text-decoration-none"
-                title="View"
-              >
-                <i class="bi bi-eye"></i>
-              </a>
-              <a
-                href="{% url 'iroad_tenants:driver_master_edit' row.driver_id %}"
-                class="eal-row-btn text-decoration-none"
-                title="Edit"
-              >
-                <i class="bi bi-pencil"></i>
-              </a>
-              {% if row.driver_status == 'Active' %}
+            <div class="dropdown eal-actions-cell">
               <button
+                class="eal-row-btn"
                 type="button"
-                class="eal-row-btn danger dm-status-trigger"
-                title="Deactivate"
-                data-driver-id="{{ row.driver_id }}"
-                data-new-status="Inactive"
+                data-bs-toggle="dropdown"
+                data-bs-boundary="viewport"
+                aria-expanded="false"
+                title="Actions"
               >
-                <i class="bi bi-trash3"></i>
+                <i class="bi bi-three-dots-vertical"></i>
               </button>
-              {% else %}
-              <button
-                type="button"
-                class="eal-row-btn danger dm-status-trigger"
-                title="Activate"
-                data-driver-id="{{ row.driver_id }}"
-                data-new-status="Active"
+              <ul
+                class="dropdown-menu dropdown-menu-end shadow-sm"
+                style="border-radius: 8px; border-color: #e2e8f0; min-width: 180px;"
               >
-                <i class="bi bi-trash3"></i>
-              </button>
-              {% endif %}
+                <li>
+                  <a class="dropdown-item" href="{% url 'iroad_tenants:driver_master_edit' row.driver_id %}">
+                    <i class="bi bi-pencil text-primary me-2"></i>Edit
+                  </a>
+                </li>
+                <li>
+                  <a class="dropdown-item" href="{% url 'iroad_tenants:driver_master_detail' row.driver_id %}">
+                    <i class="bi bi-eye text-info me-2"></i>View
+                  </a>
+                </li>
+                <li><hr class="dropdown-divider" /></li>
+                <li>
+                  {% if row.driver_status == 'Active' %}
+                  <button
+                    type="button"
+                    class="dropdown-item text-danger dm-status-trigger"
+                    data-driver-id="{{ row.driver_id }}"
+                    data-new-status="Inactive"
+                  >
+                    <i class="bi bi-trash3 me-2"></i>Deactivate
+                  </button>
+                  {% else %}
+                  <button
+                    type="button"
+                    class="dropdown-item dm-status-trigger"
+                    data-driver-id="{{ row.driver_id }}"
+                    data-new-status="Active"
+                  >
+                    <i class="bi bi-arrow-counterclockwise me-2"></i>Activate
+                  </button>
+                  {% endif %}
+                </li>
+              </ul>
             </div>
           </td>
         </tr>

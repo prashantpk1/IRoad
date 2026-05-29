@@ -1,0 +1,278 @@
+{
+  "info": {
+    "_postman_id": "c4d5e6f7-8901-2345-abcd-historyflow01",
+    "name": "IRoute — Driver History Flow",
+    "description": "Driver History tab — completed jobs audit trail (read-only).\nPer IRoute document §14.7.1 — Closed/Cancelled shipments only.\nUse {{base_url}} = http://127.0.0.1:8000/api/v1/mobile\nUse {{access_token}} = filled automatically after login.\nUse {{shipment_id}} = filled after History List call.\nUse {{history_filter_shipment_no}} and {{history_filter_date}} for filter popup.\n\nFLOW ORDER:\n01 Login\n02 History List (all completed jobs)\n03 Filter Preview — Results Found (count_only=true)\n04 Apply Filter (shipment_no + date)\n05 History Detail (read-only — use shipment_id from list)\n\nNOTE: Complete a job (A10 Job Closed) before History list will show data.\nHistory does NOT fire actions — read-only audit from Action Log.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8000/api/v1/mobile"
+    },
+    {
+      "key": "driver_email",
+      "value": ""
+    },
+    {
+      "key": "driver_password",
+      "value": ""
+    },
+    {
+      "key": "tenant_id",
+      "value": ""
+    },
+    {
+      "key": "access_token",
+      "value": ""
+    },
+    {
+      "key": "refresh_token",
+      "value": ""
+    },
+    {
+      "key": "tenant_schema",
+      "value": ""
+    },
+    {
+      "key": "driver_id",
+      "value": ""
+    },
+    {
+      "key": "shipment_id",
+      "value": ""
+    },
+    {
+      "key": "shipment_no",
+      "value": "SH-2026-1001"
+    },
+    {
+      "key": "history_filter_shipment_no",
+      "value": "SH-2026-1001"
+    },
+    {
+      "key": "history_filter_date",
+      "value": "10-02-2026"
+    }
+  ],
+  "item": [
+    {
+      "name": "01 — Login (Get Access Token)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{driver_email}}\",\n  \"password\": \"{{driver_password}}\",\n  \"tenant_id\": \"{{tenant_id}}\",\n  \"device_platform\": \"Android\",\n  \"device_id\": \"postman-fcm-token\",\n  \"device_name\": \"Postman Client\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": "{{base_url}}/driver/auth/login/",
+        "description": "STEP 1 — FIRST API TO CALL.\nSend driver email, password, tenant_id in body.\nAfter success, access_token is auto-saved to collection variable.\nAll subsequent requests use Authorization: Bearer {{access_token}}.\nResponse key is data.access_token.\nSet driver_email and driver_password in collection variables before running.\nCapability required for History: mobile.driver.history (driver role)."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var resp = pm.response.json();",
+              "if (resp.status === 1 && resp.data && resp.data.access_token) {",
+              "    pm.collectionVariables.set('access_token', resp.data.access_token);",
+              "    pm.collectionVariables.set('refresh_token', resp.data.refresh_token || '');",
+              "    var org = resp.data.organization || {};",
+              "    if (org.schema_name) { pm.collectionVariables.set('tenant_schema', org.schema_name); }",
+              "    var driver = resp.data.driver || {};",
+              "    var did = driver.driver_id || driver.id || '';",
+              "    if (did) { pm.collectionVariables.set('driver_id', String(did)); }",
+              "    pm.test('Login successful, token saved', function () { pm.expect(resp.status).to.eql(1); });",
+              "} else {",
+              "    pm.test('Login failed — check email, password, tenant_id', function () { pm.expect(resp.status).to.eql(1); });",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 — History List (All Completed Jobs)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept-Language",
+            "value": "en"
+          }
+        ],
+        "url": "{{base_url}}/driver/history/",
+        "description": "STEP 2 — HISTORY TAB LIST SCREEN.\nReturns completed terminal shipments (Closed or Cancelled) for this driver.\nReverse chronological order.\nEach card in data.items shows:\n  shipment_no, booking_no, status (Completed/Cancelled),\n  route.type (Round/Outbound/Inbound), origin_city, destination_city,\n  payment_method (COD), client_name, job_date, actions_fired_count.\nshipment_id is auto-saved from first item for Step 05.\nIf items is empty — driver has no closed shipments yet.\nRun full Job Flow (A1–A10) first to create history data."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var resp = pm.response.json();",
+              "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('status success', function () { pm.expect(resp.status).to.eql(1); });",
+              "var data = resp.data || {};",
+              "pm.test('items is array', function () { pm.expect(data.items).to.be.an('array'); });",
+              "if (data.items && data.items.length > 0) {",
+              "    var first = data.items[0];",
+              "    if (first.shipment_id) {",
+              "        pm.collectionVariables.set('shipment_id', first.shipment_id);",
+              "    }",
+              "    if (first.shipment_no) {",
+              "        pm.collectionVariables.set('shipment_no', first.shipment_no);",
+              "        pm.collectionVariables.set('history_filter_shipment_no', first.shipment_no);",
+              "    }",
+              "    if (first.job_date) {",
+              "        pm.collectionVariables.set('history_filter_date', first.job_date);",
+              "    }",
+              "    pm.test('History cards returned', function () { pm.expect(data.items.length).to.be.above(0); });",
+              "} else {",
+              "    pm.test('No history yet — complete a job first (A10)', function () { pm.expect(true).to.be.true; });",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 — Filter Preview (Results Found — count_only)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/driver/history/?count_only=true&shipment_no={{history_filter_shipment_no}}&date={{history_filter_date}}",
+        "description": "STEP 3 — FILTER POPUP PREVIEW (before Apply Filter).\nMaps to mobile UI 'Results Found: N' bar.\nQuery params:\n  count_only=true  → items always empty, only results_found count returned\n  shipment_no      → partial match e.g. SH-2026-1001\n  date             → DD-MM-YYYY (10-02-2026) or YYYY-MM-DD (2026-02-10)\nCheck data.results_found in response.\nDoes NOT return card list — call Step 04 to apply filter."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var resp = pm.response.json();",
+              "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('status success', function () { pm.expect(resp.status).to.eql(1); });",
+              "var data = resp.data || {};",
+              "pm.test('count_only — items empty', function () { pm.expect(data.items).to.eql([]); });",
+              "pm.test('results_found is number', function () { pm.expect(data.results_found).to.be.a('number'); });",
+              "console.log('Results Found:', data.results_found);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 — Apply Filter (Shipment No + Date)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/driver/history/?shipment_no={{history_filter_shipment_no}}&date={{history_filter_date}}",
+        "description": "STEP 4 — APPLY FILTER (Filter popup 'Apply Filter' button).\nSame filters as Step 03 but WITHOUT count_only.\nReturns full data.items card list matching filters.\nUpdate history_filter_shipment_no and history_filter_date variables before running.\nExample: shipment_no=SH-2026-1001, date=10-02-2026"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var resp = pm.response.json();",
+              "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+              "var data = resp.data || {};",
+              "if (data.items && data.items.length > 0 && data.items[0].shipment_id) {",
+              "    pm.collectionVariables.set('shipment_id', data.items[0].shipment_id);",
+              "}",
+              "pm.test('Filtered results', function () {",
+              "    pm.expect(data.results_found).to.eql(data.items.length);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 — History Detail (Read-Only Workflow Timeline)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept-Language",
+            "value": "en"
+          }
+        ],
+        "url": "{{base_url}}/driver/history/{{shipment_id}}/",
+        "description": "STEP 5 — HISTORY DETAIL SCREEN (tap a card from list).\nRead-only — does NOT fire any actions.\nURL: /driver/history/{{shipment_id}}/\nUse shipment_id from Step 02 or 04 (UUID from list). Backend also accepts shipment_no in the same URL if needed.\nResponse data.summary, workflow_status, timeline.events, actions_fired_count.\nMaps to UI History Detail screen."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var resp = pm.response.json();",
+              "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('status success', function () { pm.expect(resp.status).to.eql(1); });",
+              "var data = resp.data || {};",
+              "pm.test('summary present', function () { pm.expect(data.summary).to.be.an('object'); });",
+              "pm.test('workflow_status array', function () { pm.expect(data.workflow_status).to.be.an('array'); });",
+              "pm.test('read_only flag', function () { pm.expect(data.summary.read_only).to.eql(true); });",
+              "var steps = data.workflow_status || [];",
+              "var completed = steps.filter(function (s) { return s.completed; });",
+              "console.log('Workflow steps completed:', completed.length, '/', steps.length);",
+              "console.log('Actions fired:', data.actions_fired_count);"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

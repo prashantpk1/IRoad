@@ -1,0 +1,232 @@
+{
+  "info": {
+    "_postman_id": "b2c3d4e5-6789-01ab-cdef-driverwallet01",
+    "name": "Iroad — Mobile Driver API (Wallet)",
+    "description": "Driver My Wallet — same flat flow as postman/IRoute_Wallet_Flow_Collection.json.\nPer IRoute Ch.13 — read-only treasury view.\n\nFLOW: 01 Login → 02 Wallet List → 03 Filter Preview → 04 Apply Filter → 05 Transaction Detail",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8000/api/v1/mobile"
+    },
+    {
+      "key": "driver_email",
+      "value": ""
+    },
+    {
+      "key": "driver_password",
+      "value": ""
+    },
+    {
+      "key": "tenant_id",
+      "value": ""
+    },
+    {
+      "key": "access_token",
+      "value": ""
+    },
+    {
+      "key": "refresh_token",
+      "value": ""
+    },
+    {
+      "key": "tenant_schema",
+      "value": ""
+    },
+    {
+      "key": "driver_id",
+      "value": ""
+    },
+    {
+      "key": "transaction_id",
+      "value": ""
+    },
+    {
+      "key": "transaction_no",
+      "value": "TT-000001"
+    },
+    {
+      "key": "wallet_filter_shipment_no",
+      "value": "SH-2026-1001"
+    },
+    {
+      "key": "wallet_filter_date",
+      "value": "10-02-2026"
+    }
+  ],
+  "item": [
+    {
+      "name": "01 — Login (Get Access Token)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{driver_email}}\",\n  \"password\": \"{{driver_password}}\",\n  \"tenant_id\": \"{{tenant_id}}\",\n  \"device_platform\": \"Android\",\n  \"device_id\": \"postman-fcm-token\",\n  \"device_name\": \"Postman Client\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": "{{base_url}}/driver/auth/login/"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var resp = pm.response.json();",
+              "if (resp.status === 1 && resp.data && resp.data.access_token) {",
+              "    pm.collectionVariables.set('access_token', resp.data.access_token);",
+              "    pm.collectionVariables.set('refresh_token', resp.data.refresh_token || '');",
+              "    var org = resp.data.organization || {};",
+              "    if (org.schema_name) { pm.collectionVariables.set('tenant_schema', org.schema_name); }",
+              "    var driver = resp.data.driver || {};",
+              "    var did = driver.driver_id || driver.id || '';",
+              "    if (did) { pm.collectionVariables.set('driver_id', String(did)); }",
+              "    pm.test('Login successful', function () { pm.expect(resp.status).to.eql(1); });",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 — Wallet List (Summary + Recent Transactions)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/driver/wallet/"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var resp = pm.response.json();",
+              "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+              "var data = resp.data || {};",
+              "if (data.items && data.items.length > 0) {",
+              "    var first = data.items[0];",
+              "    if (first.transaction_id) { pm.collectionVariables.set('transaction_id', first.transaction_id); }",
+              "    if (first.shipment_no) { pm.collectionVariables.set('wallet_filter_shipment_no', first.shipment_no); }",
+              "    if (first.transaction_date) { pm.collectionVariables.set('wallet_filter_date', first.transaction_date); }",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 — Filter Preview (Results Found — count_only)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/driver/wallet/?count_only=true&shipment_no={{wallet_filter_shipment_no}}&date={{wallet_filter_date}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var data = pm.response.json().data || {};",
+              "pm.test('items empty', function () { pm.expect(data.items).to.eql([]); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 — Apply Filter (Shipment No + Date)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/driver/wallet/?shipment_no={{wallet_filter_shipment_no}}&date={{wallet_filter_date}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var data = pm.response.json().data || {};",
+              "if (data.items && data.items[0] && data.items[0].transaction_id) {",
+              "    pm.collectionVariables.set('transaction_id', data.items[0].transaction_id);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 — Transaction Detail (Read-Only)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/driver/wallet/transactions/{{transaction_id}}/"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var data = pm.response.json().data || {};",
+              "pm.test('read_only', function () { pm.expect(data.read_only).to.eql(true); });"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
