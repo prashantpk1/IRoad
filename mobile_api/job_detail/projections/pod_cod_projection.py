@@ -83,18 +83,28 @@ def _resolve_display_flags(
         has_logs and not integrity.get('compliance_drift')
     )
 
+    pod_complete = policy.pod_status_is_complete(
+        getattr(shipment, 'pod_status', None),
+    )
+    pod_type = (getattr(shipment, 'pod_type', None) or '').strip().casefold()
+    hard_pod_type = pod_type == TenantShipment.PodType.HARD.casefold()
+    hard_pod_log = bool(evidence.get('hard_pod_log', False))
+
     if log_primary or evidence.get('pod_uploaded'):
         if evidence.get('pod_uploaded'):
             flags['pod_pending'] = False
-            pod_type = (getattr(shipment, 'pod_type', None) or '').strip().casefold()
-            if pod_type == TenantShipment.PodType.HARD.casefold():
-                flags['hard_pod_pending'] = not evidence.get('hard_pod_log', False)
-                flags['pod_compliant'] = evidence.get('hard_pod_log', False) or policy.pod_status_is_complete(
-                    getattr(shipment, 'pod_status', None)
+            if hard_pod_type:
+                flags['hard_pod_pending'] = (
+                    not pod_complete and hard_pod_type and not hard_pod_log
                 )
+                flags['pod_compliant'] = pod_complete or hard_pod_log
             else:
                 flags['pod_compliant'] = True
                 flags['hard_pod_pending'] = False
+
+    if pod_complete and hard_pod_type:
+        flags['hard_pod_pending'] = False
+        flags['pod_compliant'] = True
 
     if log_primary or evidence.get('cod_collected_log'):
         if evidence.get('cod_collected_log') and policy.is_cod_shipment(shipment):

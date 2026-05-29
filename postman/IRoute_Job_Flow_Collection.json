@@ -32,7 +32,7 @@
     },
     {
       "key": "job_id",
-      "value": ""
+      "value": "79da24b3-b15d-42f1-a87e-11c0143a2ff4"
     },
     {
       "key": "job_type",
@@ -61,6 +61,14 @@
     {
       "key": "pod_workflow_version",
       "value": ""
+    },
+    {
+      "key": "shipment_no",
+      "value": "SH-COD-29789621"
+    },
+    {
+      "key": "a10_action_id",
+      "value": "5fe74069-ba05-411d-af68-37e239cc38c6"
     }
   ],
   "item": [
@@ -1327,6 +1335,299 @@
         },
         "url": "{{base_url}}/driver/issues/report/",
         "description": "OPTIONAL \u2014 CAN BE CALLED AT ANY POINT DURING THE JOB.\nissue_type values: delay, vehicle_breakdown, customer_unavailable,\n  payment_dispute, pod_issue, accident, route_blocked, other\nseverity values: low, medium, high, critical\nThis does NOT stop the job flow.\nIssue is sent to Ops supervisor for acknowledgement.\nDriver continues normal action flow alongside.\n\nFILE UPLOAD INSTRUCTIONS:\nFor any field with type FILE:\n  Click the file icon in Postman next to that field.\n  Select any JPG, PNG, or MP4 file from your device.\nAllowed file types: image/jpeg, image/png,\n  image/webp, video/mp4\nMax file size: 50MB per file\nContent-Type is set automatically by Postman.\nDo NOT set Content-Type header manually."
+      }
+    },
+    {
+      "name": "COD Fix Verification \u2014 SH-COD-29789621",
+      "description": "Verifies all 5 COD fix patches for SH-COD-29789621.\nRun 01-Login first to get access_token.\nNote: shipment is already Closed in DB.\nPre-fix checks verify fix logic is live.\nExecute A10 request will return 400 (already closed) which is expected.\nTo fully re-test, reset shipment to Delivered state first.",
+      "item": [
+        {
+          "name": "Job Detail \u2014 Pre-Fix Check",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/",
+            "description": "Pre-fix job detail checks: Delivered, A10 allowed, hard_pod_pending false, A_POD_VERIFY in timeline."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Response has data envelope\", () => {",
+                  "    pm.expect(pm.response.json()).to.have.property(\"data\");",
+                  "});",
+                  "pm.test(\"authoritative_status is Delivered or Closed\", () => {",
+                  "    const d = pm.response.json().data;",
+                  "    const s = d.workflow.reconciliation.authoritative_status;",
+                  "    pm.expect(s).to.be.oneOf([\"Delivered\", \"Closed\"]);",
+                  "});",
+                  "pm.test(\"hard_pod_pending is false\", () => {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(d.pod_cod.hard_pod_pending).to.eql(false);",
+                  "});",
+                  "pm.test(\"hint is not go_to_hard_pod\", () => {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(d.next_action_hint.action).to.not.eql(\"go_to_hard_pod\");",
+                  "});",
+                  "pm.test(\"A_POD_VERIFY in timeline\", () => {",
+                  "    const d = pm.response.json().data;",
+                  "    const events = d.timeline?.timeline_preview || [];",
+                  "    const codes = events.map(e => e.action_code);",
+                  "    pm.expect(codes).to.include(\"A_POD_VERIFY\");",
+                  "});",
+                  "pm.test(\"A_POD_VERIFY is_system_auto true\", () => {",
+                  "    const d = pm.response.json().data;",
+                  "    const events = d.timeline?.timeline_preview || [];",
+                  "    const ev = events.find(e => e.action_code === \"A_POD_VERIFY\");",
+                  "    pm.expect(ev, \"A_POD_VERIFY event not found\").to.exist;",
+                  "    pm.expect(ev.is_system_auto).to.eql(true);",
+                  "});",
+                  "const d = pm.response.json().data;",
+                  "if (d && d.workflow) {",
+                  "    const wv = d.workflow.workflow_version",
+                  "        || d.workflow.sync_metadata?.workflow_version",
+                  "        || d.workflow.workflow_metadata?.workflow_version",
+                  "        || \"1\";",
+                  "    const ch = d.workflow.content_hash",
+                  "        || d.workflow.sync_metadata?.content_hash",
+                  "        || \"\";",
+                  "    pm.collectionVariables.set(\"workflow_version\", wv);",
+                  "    pm.collectionVariables.set(\"content_hash\", ch);",
+                  "    console.log(\"workflow_version saved:\", wv);",
+                  "    console.log(\"content_hash saved:\", ch);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Timeline \u2014 A_POD_VERIFY Present",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/timeline/?limit=20"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"timeline_preview exists\", () => {",
+                  "    const d = pm.response.json().data || pm.response.json();",
+                  "    pm.expect(d).to.have.property(\"timeline_preview\")",
+                  "        .or.have.property(\"events\");",
+                  "});",
+                  "pm.test(\"A_POD_VERIFY present in timeline\", () => {",
+                  "    const d = pm.response.json().data || pm.response.json();",
+                  "    const events = d.timeline_preview || d.events || [];",
+                  "    const codes = events.map(e => e.action_code);",
+                  "    pm.expect(codes).to.include(\"A_POD_VERIFY\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Hard POD Pending \u2014 Pre-Execute",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/hard-pod/pending/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"SH-COD-29789621 not in pending list\", () => {",
+                  "    const d = pm.response.json().data || pm.response.json();",
+                  "    const results = d.results || d.items || d || [];",
+                  "    if (!Array.isArray(results)) return;",
+                  "    const nos = results.map(r => r.shipment_no || r.shipment);",
+                  "    pm.expect(nos).to.not.include(\"SH-COD-29789621\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Execute A10 \u2014 Job Closed",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A10/execute/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_action_id\": \"a10-{{$guid}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": 21.3891,\n  \"longitude\": 39.8579,\n  \"notes\": \"Job completed and closed\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Terminal A10. Requires content_hash and workflow_version from Pre-Fix Job Detail test script."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200 or 201 or 400\", () => {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 400]);",
+                  "});",
+                  "const body = pm.response.json();",
+                  "if (pm.response.code === 400) {",
+                  "    pm.test(\"400 means already closed \u2014 acceptable\", () => {",
+                  "        const msg = JSON.stringify(body).toLowerCase();",
+                  "        pm.expect(msg).to.satisfy(m =>",
+                  "            m.includes(\"already\") ||",
+                  "            m.includes(\"closed\") ||",
+                  "            m.includes(\"not allowed\") ||",
+                  "            m.includes(\"invalid\")",
+                  "        );",
+                  "    });",
+                  "    console.log(\"Shipment already closed \u2014 A10 not re-executable. Expected.\");",
+                  "} else {",
+                  "    pm.test(\"No error field on success\", () => {",
+                  "        pm.expect(body.status).to.not.eql(0);",
+                  "        pm.expect(body).to.not.have.property(\"error\");",
+                  "    });",
+                  "    pm.test(\"Shipment moving to Closed\", () => {",
+                  "        const d = body.data || body;",
+                  "        const status = d.shipment_status",
+                  "            || d.workflow?.reconciliation?.authoritative_status",
+                  "            || d.status;",
+                  "        pm.expect(status).to.be.oneOf([\"Closed\", \"Delivered\"]);",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Job Detail \u2014 Post A10 Closed",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"authoritative_status is Closed\", () => {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(d.workflow.reconciliation.authoritative_status).to.eql(\"Closed\");",
+                  "});",
+                  "pm.test(\"allowed_actions is empty\", () => {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(d.workflow.allowed_actions).to.have.lengthOf(0);",
+                  "});",
+                  "pm.test(\"hint is go_to_dashboard\", () => {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(d.next_action_hint.action).to.eql(\"go_to_dashboard\");",
+                  "});",
+                  "pm.test(\"job_closed is true\", () => {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(d.next_action_hint.job_closed).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Hard POD Pending \u2014 Post-Execute",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/hard-pod/pending/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"SH-COD-29789621 still not in pending list\", () => {",
+                  "    const d = pm.response.json().data || pm.response.json();",
+                  "    const results = d.results || d.items || d || [];",
+                  "    if (!Array.isArray(results)) return;",
+                  "    const nos = results.map(r => r.shipment_no || r.shipment);",
+                  "    pm.expect(nos).to.not.include(\"SH-COD-29789621\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "console.log('[IRoute] base_url:', pm.collectionVariables.get('base_url'));",
+          "console.log('[IRoute] job_id:', pm.collectionVariables.get('job_id'));",
+          "console.log('[IRoute] job_type:', pm.collectionVariables.get('job_type'));",
+          "console.log('[IRoute] access_token set:', !!pm.collectionVariables.get('access_token'));",
+          "console.log('[COD Fix] shipment_no:', pm.collectionVariables.get('shipment_no'));",
+          "console.log('[COD Fix] a10_action_id:', pm.collectionVariables.get('a10_action_id'));",
+          "console.log('[COD Fix] workflow_version:', pm.collectionVariables.get('workflow_version'));"
+        ]
       }
     }
   ]

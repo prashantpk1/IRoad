@@ -29,6 +29,10 @@ def log_evidence_flags(logs: list[Any]) -> dict[str, bool]:
         action = getattr(log, 'operation_action', None)
         if action is None:
             continue
+        code = (getattr(action, 'action_code', '') or '').strip().upper()
+        channel = (getattr(log, 'source_channel', '') or '').strip()
+        if code == 'A_POD_VERIFY' or channel == 'auto_cod_verify':
+            flags['hard_pod_log'] = True
         role = classify_pod_action_role(action)
         if role == PodActionRole.POD_UPLOAD:
             flags['pod_uploaded'] = True

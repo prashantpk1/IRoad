@@ -163,9 +163,17 @@ def _prefilter_shipment_candidates(
         reversal_q |= Q(english_label__icontains='reject')
         reversal_q |= Q(english_label__icontains='undo')
         reversal_q |= Q(english_label__icontains='cancel shipment')
-        return qs.filter(
-            Q(shipment_status_impact='') | reversal_q,
-        ).exclude(
+        candidate_q = Q(shipment_status_impact='') | reversal_q
+        if (
+            stage == STAGE_COMPLETION
+            and current == TenantShipment.ShipmentStatus.DELIVERED
+        ):
+            closed_tokens = _SHIPMENT_IMPACT_DB_TOKENS.get(
+                TenantShipment.ShipmentStatus.CLOSED,
+                (TenantShipment.ShipmentStatus.CLOSED,),
+            )
+            candidate_q |= Q(shipment_status_impact__in=closed_tokens)
+        return qs.filter(candidate_q).exclude(
             Q(booking_status_impact__gt='') & Q(shipment_status_impact=''),
         )
 

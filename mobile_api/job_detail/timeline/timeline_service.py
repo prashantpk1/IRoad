@@ -36,6 +36,9 @@ from tenant_workspace.models import TenantOperationAction
 
 JobType = Literal['shipment', 'movement']
 
+AUTO_ACTION_CHANNELS = frozenset({'auto_cod_verify'})
+AUTO_ACTION_CODES = frozenset({'A_POD_VERIFY'})
+
 
 @dataclass
 class TimelinePageResult:
@@ -255,6 +258,56 @@ class JobDetailTimelineService:
             filtered.append(action)
         return filtered
 
+    def _append_system_auto_events(
+        self,
+        events: list[dict[str, Any]],
+        logs: list[Any],
+        *,
+        request: Any | None = None,
+    ) -> list[dict[str, Any]]:
+        _ = request
+        existing_log_ids = {
+            str(e.get('log_id') or '').strip()
+            for e in events
+            if e.get('log_id')
+        }
+        out = list(events)
+        for log in sorted(logs, key=lambda row: getattr(row, 'log_date', None) or ''):
+            action = getattr(log, 'operation_action', None)
+            if action is None:
+                continue
+            code = (getattr(action, 'action_code', '') or '').strip()
+            channel = (getattr(log, 'source_channel', '') or '').strip()
+            if code not in AUTO_ACTION_CODES and channel not in AUTO_ACTION_CHANNELS:
+                continue
+            log_id = str(getattr(log, 'log_id', None) or getattr(log, 'pk', '') or '')
+            if not log_id or log_id in existing_log_ids:
+                continue
+            log_date = getattr(log, 'log_date', None)
+            out.append(
+                {
+                    'log_id': log_id,
+                    'log_no': str(getattr(log, 'log_no', '') or ''),
+                    'log_date': log_date.isoformat() if hasattr(log_date, 'isoformat') else '',
+                    'action_code': code,
+                    'action_label': (
+                        getattr(action, 'english_label', None) or code
+                    ),
+                    'timeline_state': 'performed',
+                    'sequence_number': 999,
+                    'source': str(getattr(log, 'source', '') or '') or 'System',
+                    'source_channel': channel,
+                    'status_impact': (getattr(action, 'shipment_status_impact', '') or '').strip()
+                    or None,
+                    'is_system_auto': True,
+                    'is_performed': True,
+                    'authority': 'action_log',
+                    'append_only': True,
+                },
+            )
+            existing_log_ids.add(log_id)
+        return out
+
     def _workflow_events_for_context(
         self,
         context: JobDetailContext,
@@ -268,7 +321,8 @@ class JobDetailTimelineService:
         actions = self._filter_workflow_actions_for_context(actions, context=context)
         if not actions:
             return []
-        return merge_actions_with_timeline_logs(actions, logs, request=request)
+        events = merge_actions_with_timeline_logs(actions, logs, request=request)
+        return self._append_system_auto_events(events, logs, request=request)
 
     def _bundle_from_workflow_events(
         self,
@@ -318,7 +372,11 @@ class JobDetailTimelineService:
             cursor=None,
             limit=max(len(actions) * 3, limit + 1),
         )
-        events = merge_actions_with_timeline_logs(actions, logs, request=request)
+        events = self._workflow_events_for_context(
+            context,
+            logs=logs,
+            request=request,
+        )
         return TimelinePageResult(
             timeline_preview=events[:limit],
             timeline_cursor='',

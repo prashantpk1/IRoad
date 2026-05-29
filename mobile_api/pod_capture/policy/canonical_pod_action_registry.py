@@ -38,7 +38,7 @@ POD_UPLOAD_LABEL_NEEDLES = (
     'capture pod',
 )
 
-DELIVERED_STATUS_NEEDLES = ('deliver', 'delivered', 'delivery complete')
+DELIVERED_STATUS_NEEDLES = ('delivered', 'delivery complete', 'mark delivered')
 HARD_POD_NEEDLES = ('hard pod', 'hard copy', 'hard-copy', 'hardcopy', 'delivery note')
 
 

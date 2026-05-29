@@ -76,6 +76,7 @@ class JobDetailResponseBuilder:
             pod_cod=pod_cod,
             action_code=None,
             order_type=order_type,
+            shipment=getattr(context, 'shipment', None),
         )
 
         return JobDetailApiPayload(

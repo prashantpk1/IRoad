@@ -7,12 +7,52 @@ from __future__ import annotations
 
 from typing import Any
 
+from tenant_workspace.models import TenantShipment
+
+
+def _normalize_allowed_actions(actions: Any) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    if actions is None:
+        return out
+    for row in actions:
+        if isinstance(row, dict):
+            out.append(dict(row))
+            continue
+        out.append(
+            {
+                'action_code': str(getattr(row, 'action_code', '') or ''),
+                'english_label': str(getattr(row, 'english_label', '') or ''),
+            },
+        )
+    return out
+
+
+def _column_shipment_status(
+    workflow: dict[str, Any],
+    shipment: Any | None,
+) -> str:
+    """DB column status (not log-derived authoritative status)."""
+    if shipment is not None:
+        return (getattr(shipment, 'shipment_status', '') or '').strip()
+    reconciliation = workflow.get('reconciliation') or {}
+    column = (reconciliation.get('column_status') or '').strip()
+    if column:
+        return column
+    metadata = workflow.get('workflow_metadata') or {}
+    return (
+        (metadata.get('status_for_workflow') or '').strip()
+        or (workflow.get('current_stage') or '').strip()
+    )
+
 
 def build_next_action_hint(
-    workflow: dict[str, Any] | None,
-    pod_cod: dict[str, Any] | None,
+    workflow: dict[str, Any] | None = None,
+    pod_cod: dict[str, Any] | None = None,
     action_code: str | None = None,
     order_type: str = 'Credit',
+    *,
+    shipment: Any | None = None,
+    allowed_actions: Any | None = None,
 ) -> dict[str, Any]:
     """
     Build next_action_hint dict for mobile app.
@@ -26,16 +66,24 @@ def build_next_action_hint(
       - Special screen triggers
       - Terminal state (job closed)
     """
-    workflow = workflow or {}
+    workflow = dict(workflow or {})
     pod_cod = pod_cod or {}
+
+    if allowed_actions is not None:
+        normalized = _normalize_allowed_actions(allowed_actions)
+        workflow['allowed_actions'] = normalized
+        if normalized and not workflow.get('next_action'):
+            workflow['next_action'] = dict(normalized[0])
 
     allowed = workflow.get('allowed_actions', [])
     next_action = workflow.get('next_action', {})
     next_code = (next_action or {}).get('action_code', '')
-    metadata = workflow.get('workflow_metadata', {}) or {}
-    sub_stage = metadata.get('execution_sub_stage', '')
-    operational_stage = metadata.get('operational_stage', '')
-    current_stage = (workflow.get('current_stage') or '').strip()
+    if not next_code and allowed:
+        first = allowed[0] if isinstance(allowed[0], dict) else {}
+        next_code = str(first.get('action_code') or '').strip()
+
+    shipment_status = _column_shipment_status(workflow, shipment)
+    is_job_closed = shipment_status == TenantShipment.ShipmentStatus.CLOSED
 
     pod_pending = pod_cod.get('pod_pending', True)
     pod_compliant = pod_cod.get('pod_compliant', False)
@@ -46,14 +94,9 @@ def build_next_action_hint(
     delivery_blocked = pod_cod.get('delivery_blocked', False)
 
     is_cod = (order_type or '').upper() == 'COD'
-    is_closed = (
-        operational_stage == 'Closed'
-        or current_stage == 'Closed'
-        or sub_stage == 'completion'
-    )
 
-    # TERMINAL STATE — Job is closed
-    if is_closed or action_code == 'A10':
+    # TERMINAL STATE — shipment column Closed (Delivered still needs A10)
+    if is_job_closed or action_code == 'A10':
         return {
             'action': 'go_to_dashboard',
             'screen': 'dashboard',
@@ -140,16 +183,20 @@ def build_next_action_hint(
 
     # Hard POD pending
     if hard_pod_pending:
-        return {
-            'action': 'go_to_hard_pod',
-            'screen': 'hard_pod',
-            'reason': (
-                'Physical documents required. '
-                'Submit hard copy delivery note.'
-            ),
-            'job_closed': False,
-            'show_completion_screen': False,
-        }
+        if shipment_status not in {
+            TenantShipment.ShipmentStatus.CLOSED,
+            TenantShipment.ShipmentStatus.DELIVERED,
+        }:
+            return {
+                'action': 'go_to_hard_pod',
+                'screen': 'hard_pod',
+                'reason': (
+                    'Physical documents required. '
+                    'Submit hard copy delivery note.'
+                ),
+                'job_closed': False,
+                'show_completion_screen': False,
+            }
 
     # Delivery blocked by POD not compliant
     if delivery_blocked and not pod_compliant:
@@ -186,7 +233,7 @@ def build_next_action_hint(
         }
 
     # POD compliant, A8 done, waiting for Delivered
-    if pod_compliant and not is_closed:
+    if pod_compliant and not is_job_closed:
         if is_cod and not cod_collected:
             return {
                 'action': 'go_to_payment_collection',

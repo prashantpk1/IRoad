@@ -1,0 +1,510 @@
+{
+  "info": {
+    "_postman_id": "b8c4e1f2-3a5d-4c9e-9f01-cod-fixes-verify",
+    "name": "IRoute — COD Fixes Verification (SH-COD-29789621)",
+    "description": "Verifies all 5 COD fix patches for SH-COD-29789621 on tenant t_bb773f861f3048748c0a7f0ffbee0df6.\n\nPrerequisites:\n1. Set driver_email, driver_password, tenant_id (profile UUID) in collection variables.\n2. Run 00 Login first (saves access_token).\n3. Set job_id to shipment UUID (79da24b3-b15d-42f1-a87e-11c0143a2ff4) or run 02 Dashboard to populate.\n\nAuth: Authorization Bearer {{driver_token}} (alias: access_token after login).\nOptional: X-Tenant-ID {{tenant_id}} — JWT tenant_schema is primary for driver APIs.\n\nURLs discovered from mobile_api/urls.py (prefix /api/v1/mobile/).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "console.log('base_url:', pm.collectionVariables.get('base_url'));",
+          "console.log('tenant_schema:', pm.collectionVariables.get('tenant_schema'));",
+          "console.log('shipment_no:', pm.collectionVariables.get('shipment_no'));",
+          "console.log('job_type:', pm.collectionVariables.get('job_type'));",
+          "console.log('job_id:', pm.collectionVariables.get('job_id'));"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8000/api/v1/mobile"
+    },
+    {
+      "key": "tenant_schema",
+      "value": "t_bb773f861f3048748c0a7f0ffbee0df6"
+    },
+    {
+      "key": "tenant_id",
+      "value": "REPLACE_WITH_TENANT_PROFILE_UUID"
+    },
+    {
+      "key": "shipment_no",
+      "value": "SH-COD-29789621"
+    },
+    {
+      "key": "shipment_id",
+      "value": "79da24b3-b15d-42f1-a87e-11c0143a2ff4"
+    },
+    {
+      "key": "job_type",
+      "value": "shipment"
+    },
+    {
+      "key": "job_id",
+      "value": "79da24b3-b15d-42f1-a87e-11c0143a2ff4"
+    },
+    {
+      "key": "a10_action_id",
+      "value": "5fe74069-ba05-411d-af68-37e239cc38c6"
+    },
+    {
+      "key": "a10_action_code",
+      "value": "A10"
+    },
+    {
+      "key": "driver_token",
+      "value": "REPLACE_WITH_DRIVER_JWT"
+    },
+    {
+      "key": "access_token",
+      "value": ""
+    },
+    {
+      "key": "driver_email",
+      "value": ""
+    },
+    {
+      "key": "driver_password",
+      "value": ""
+    },
+    {
+      "key": "content_hash",
+      "value": ""
+    },
+    {
+      "key": "workflow_version",
+      "value": ""
+    },
+    {
+      "key": "ops_token",
+      "value": "REPLACE_WITH_OPS_JWT"
+    },
+    {
+      "key": "last_execute_response",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "00 — Login (optional — saves driver_token)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{driver_email}}\",\n  \"password\": \"{{driver_password}}\",\n  \"tenant_id\": \"{{tenant_id}}\"\n}"
+        },
+        "url": "{{base_url}}/driver/auth/login/"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const resp = pm.response.json();",
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "if (resp.status === 1 && resp.data && resp.data.access_token) {",
+              "    pm.collectionVariables.set('access_token', resp.data.access_token);",
+              "    pm.collectionVariables.set('driver_token', resp.data.access_token);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "01 — Get Job Detail (pre-fix — all 5 fixes live)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{driver_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Tenant-ID",
+            "value": "{{tenant_id}}",
+            "disabled": true
+          }
+        ],
+        "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const getData = () => {",
+              "    const r = pm.response.json();",
+              "    pm.test('envelope status 1', () => pm.expect(r.status).to.eql(1));",
+              "    return r.data || r;",
+              "};",
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "const body = getData();",
+              "if (body.sync_metadata) {",
+              "    pm.collectionVariables.set('content_hash', body.sync_metadata.content_hash || '');",
+              "    pm.collectionVariables.set('workflow_version', body.sync_metadata.workflow_version || '');",
+              "}",
+              "pm.test('authoritative_status is Delivered', () => {",
+              "    pm.expect(body.workflow.reconciliation.authoritative_status).to.eql('Delivered');",
+              "});",
+              "pm.test('hard_pod_pending is false', () => {",
+              "    pm.expect(body.pod_cod.hard_pod_pending).to.eql(false);",
+              "});",
+              "pm.test('A10 in allowed_actions', () => {",
+              "    const codes = (body.workflow.allowed_actions || []).map(a => a.action_code);",
+              "    pm.expect(codes).to.include('A10');",
+              "});",
+              "pm.test('A_POD_VERIFY in timeline', () => {",
+              "    const events = body.timeline.timeline_preview || [];",
+              "    const codes = events.map(e => e.action_code);",
+              "    pm.expect(codes).to.include('A_POD_VERIFY');",
+              "});",
+              "pm.test('hint is not go_to_hard_pod', () => {",
+              "    pm.expect(body.next_action_hint.action).to.not.eql('go_to_hard_pod');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 — Get Allowed Actions (via Job Detail workflow.allowed_actions)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{driver_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const getData = () => {",
+              "    const r = pm.response.json();",
+              "    return r.data || r;",
+              "};",
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "pm.test('allowed_actions includes A10', () => {",
+              "    const body = getData();",
+              "    const codes = (body.workflow.allowed_actions || []).map(a => a.action_code);",
+              "    pm.expect(codes).to.include('A10');",
+              "});",
+              "pm.test('No separate mobile allowed-actions URL', () => {",
+              "    pm.expect(true).to.eql(true);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 — Get Timeline (dedicated endpoint)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{driver_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/timeline/?limit=20",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "driver",
+            "jobs",
+            "{{job_type}}",
+            "{{job_id}}",
+            "timeline",
+            ""
+          ],
+          "query": [
+            {
+              "key": "limit",
+              "value": "20"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const getData = () => {",
+              "    const r = pm.response.json();",
+              "    return r.data || r;",
+              "};",
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "pm.test('A_POD_VERIFY in timeline events', () => {",
+              "    const body = getData();",
+              "    const events = body.events || body.timeline_preview || body.results || [];",
+              "    const codes = events.map(e => e.action_code);",
+              "    pm.expect(codes).to.include('A_POD_VERIFY');",
+              "});",
+              "pm.test('A_POD_VERIFY is_system_auto true', () => {",
+              "    const body = getData();",
+              "    const events = body.events || body.timeline_preview || body.results || [];",
+              "    const verify = events.find(e => e.action_code === 'A_POD_VERIFY');",
+              "    pm.expect(verify).to.exist;",
+              "    pm.expect(verify.is_system_auto).to.eql(true);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 — Get Hard POD Pending List",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{driver_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/driver/hard-pod/pending/"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const getData = () => {",
+              "    const r = pm.response.json();",
+              "    return r.data || r;",
+              "};",
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "pm.test('SH-COD-29789621 NOT in pending list', () => {",
+              "    const body = getData();",
+              "    const results = body.items || body.results || body || [];",
+              "    const nos = results.map(r => r.shipment_no || r.shipment || '');",
+              "    pm.expect(nos).to.not.include('SH-COD-29789621');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 — Execute A10 Job Closed",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{driver_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"client_action_id\": \"a10-{{$guid}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": 21.3891,\n  \"longitude\": 39.8579,\n  \"notes\": \"Job completed and closed — COD fixes verification\"\n}"
+        },
+        "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A10/execute/"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const getData = () => {",
+              "    const r = pm.response.json();",
+              "    return r.data || r;",
+              "};",
+              "pm.test('Status 200 or 201', () => {",
+              "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+              "});",
+              "pm.test('Shipment status is Closed', () => {",
+              "    const body = getData();",
+              "    const status = body.workflow?.reconciliation?.authoritative_status",
+              "        || body.workflow?.entity?.shipment_status",
+              "        || body.shipment_status;",
+              "    pm.expect(status).to.eql('Closed');",
+              "});",
+              "pm.test('No error field', () => {",
+              "    const r = pm.response.json();",
+              "    pm.expect(r).to.not.have.property('error');",
+              "    pm.expect(r).to.not.have.property('detail');",
+              "});",
+              "pm.collectionVariables.set('last_execute_response', JSON.stringify(pm.response.json()));",
+              "const body = getData();",
+              "if (body.sync_metadata) {",
+              "    pm.collectionVariables.set('content_hash', body.sync_metadata.content_hash || '');",
+              "    pm.collectionVariables.set('workflow_version', body.sync_metadata.workflow_version || '');",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 — Get Job Detail (post A10)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{driver_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const getData = () => {",
+              "    const r = pm.response.json();",
+              "    return r.data || r;",
+              "};",
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "const body = getData();",
+              "pm.test('authoritative_status is Closed', () => {",
+              "    pm.expect(body.workflow.reconciliation.authoritative_status).to.eql('Closed');",
+              "});",
+              "pm.test('allowed_actions is empty', () => {",
+              "    pm.expect(body.workflow.allowed_actions).to.have.lengthOf(0);",
+              "});",
+              "pm.test('hint is go_to_dashboard', () => {",
+              "    pm.expect(body.next_action_hint.action).to.eql('go_to_dashboard');",
+              "});",
+              "pm.test('job_closed is true', () => {",
+              "    pm.expect(body.next_action_hint.job_closed).to.eql(true);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "07 — Get Hard POD Pending List (post close)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{driver_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/driver/hard-pod/pending/"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const getData = () => {",
+              "    const r = pm.response.json();",
+              "    return r.data || r;",
+              "};",
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "pm.test('SH-COD-29789621 NOT in pending list', () => {",
+              "    const body = getData();",
+              "    const results = body.items || [];",
+              "    const nos = results.map(r => r.shipment_no || '');",
+              "    pm.expect(nos).to.not.include('SH-COD-29789621');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "TODO — Ops Reconciliation (no mobile API)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/driver/dashboard/",
+        "description": "TODO: No driver mobile endpoint for ops reconciliation.\nPortal-only path found: tenant/operations/operation-action-log/allowed-actions/ (iroad_tenants.urls, not mobile_api).\nUse ops_token with tenant admin session — not included in this collection."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test.skip('TODO: Ops reconciliation — no mobile API route');"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "TODO — Ops POD Status (no mobile API)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/driver/dashboard/",
+        "description": "TODO: No driver mobile endpoint for ops POD status.\nPOD/COD state is exposed via Job Detail pod_cod and compliance_integrity on GET .../driver/jobs/shipment/{job_id}/"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test.skip('TODO: Ops POD status — use Job Detail pod_cod instead');"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

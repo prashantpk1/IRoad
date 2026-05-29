@@ -25,7 +25,12 @@ from iroad_tenants.operation_runtime.pod_action import (
     apply_pod_posting_from_action_log,
     birth_pod_from_action_log,
 )
-from tenant_workspace.models import TenantOperationActionLog, TenantTruckMovementLog
+from tenant_workspace.models import (
+    TenantOperationAction,
+    TenantOperationActionLog,
+    TenantShipment,
+    TenantTruckMovementLog,
+)
 
 
 def _is_collect_payment_action(action) -> bool:
@@ -74,6 +79,104 @@ def _should_auto_mark_delivered_for_credit(action, shipment) -> bool:
         shipment.ShipmentStatus.AT_DELIVERY,
         shipment.ShipmentStatus.POD_SUBMITTED,
     }
+
+
+def _pod_status_is_complete(shipment) -> bool:
+    pod_status = (getattr(shipment, 'pod_status', None) or '').strip()
+    return pod_status in {
+        TenantShipment.PodStatus.COMPLIANT,
+        TenantShipment.PodStatus.HARD_COPY_RECEIVED,
+    }
+
+
+def _should_auto_mark_delivered_for_cod(action, shipment) -> bool:
+    """After A9 on COD: advance to Delivered when POD is complete and cash collected."""
+    if shipment is None or not _is_collect_payment_action(action):
+        return False
+    if (shipment.order_type or '').strip().upper() != 'COD':
+        return False
+    if (
+        getattr(shipment, 'collection_status', None)
+        != TenantShipment.CollectionStatus.COLLECTED
+    ):
+        return False
+    if not _pod_status_is_complete(shipment):
+        return False
+    current = (shipment.shipment_status or '').strip()
+    return current in {
+        TenantShipment.ShipmentStatus.IN_TRANSIT,
+        TenantShipment.ShipmentStatus.AT_DELIVERY,
+        TenantShipment.ShipmentStatus.POD_SUBMITTED,
+    }
+
+
+def _ensure_auto_cod_delivered_verify_log(
+    shipment,
+    *,
+    action_log: TenantOperationActionLog,
+    created_by_label: str = '',
+) -> None:
+    """
+    Log-primary reconciler: append a Delivered-impact row so authoritative_status
+    advances with the column (tenant Action Master ``A_POD_VERIFY`` when present).
+    """
+    verify_action = TenantOperationAction.objects.filter(
+        action_code='A_POD_VERIFY',
+        status=TenantOperationAction.Status.ACTIVE,
+    ).first()
+    if verify_action is None:
+        verify_action = (
+            TenantOperationAction.objects.filter(
+                status=TenantOperationAction.Status.ACTIVE,
+                shipment_status_impact__icontains='Deliver',
+            )
+            .exclude(action_code__iexact='A10')
+            .order_by('sequence_number')
+            .first()
+        )
+    if verify_action is None:
+        return
+
+    shipment_pk = str(getattr(shipment, 'pk', '') or getattr(shipment, 'shipment_id', ''))
+    idempotency_key = f'auto-pod-verify-{shipment_pk}'
+    log_no = f'LOG-POD-VERIFY-{shipment_pk[:24]}'
+
+    TenantOperationActionLog.objects.get_or_create(
+        idempotency_key=idempotency_key,
+        defaults={
+            'log_no': log_no,
+            'log_sequence': 99,
+            'log_date': timezone.now(),
+            'operation_action': verify_action,
+            'source': 'System',
+            'source_channel': 'auto_cod_verify',
+            'source_ref': 'auto_cod_verify',
+            'created_by_label': created_by_label or 'system',
+            'notes': 'Auto POD verified after COD collection',
+            'booking': getattr(shipment, 'booking', None),
+            'shipment': shipment,
+            'truck': getattr(shipment, 'truck', None),
+            'driver': getattr(action_log, 'driver', None) or getattr(shipment, 'driver', None),
+            'truck_movement': getattr(action_log, 'truck_movement', None),
+        },
+    )
+
+
+def _apply_auto_delivered_for_cod(
+    shipment,
+    *,
+    action_log: TenantOperationActionLog,
+    created_by_label: str = '',
+) -> None:
+    if not _should_auto_mark_delivered_for_cod(action_log.operation_action, shipment):
+        return
+    _ensure_auto_cod_delivered_verify_log(
+        shipment,
+        action_log=action_log,
+        created_by_label=created_by_label,
+    )
+    shipment.shipment_status = TenantShipment.ShipmentStatus.DELIVERED
+    shipment.save(update_fields=['shipment_status', 'updated_at'])
 
 
 def _assert_a3_fired_for_a4(action_log) -> None:
@@ -264,6 +367,20 @@ def apply_execution_side_effects(action_log, *, created_by_label='') -> None:
             shipment=shipment,
             action_log=action_log,
             amount=getattr(action_log, '_mobile_cod_amount', None),
+        )
+        shipment.refresh_from_db(
+            fields=[
+                'collection_status',
+                'shipment_status',
+                'pod_status',
+                'order_type',
+                'updated_at',
+            ],
+        )
+        _apply_auto_delivered_for_cod(
+            shipment,
+            action_log=action_log,
+            created_by_label=created_by_label,
         )
 
     if truck_movement is not None and (action.movement_status_impact or '').strip():
