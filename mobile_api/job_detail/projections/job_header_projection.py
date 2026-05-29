@@ -8,6 +8,10 @@ from __future__ import annotations
 from typing import Any
 
 from mobile_api.job_detail.dto.job_detail_context import JobDetailContext
+from mobile_api.job_detail.projections.job_location_projection import (
+    build_movement_location_block,
+    build_shipment_location_block,
+)
 
 
 def build_job_header(
@@ -18,24 +22,34 @@ def build_job_header(
     """
     Build the unified ``job`` header block.
 
-    TODO:
-      - shipment: shipment_no, booking_item_type, addresses, client, driver slice
-      - movement: movement_no, from/to, movement_source, empty-move flags
-      - include reconciled authoritative status when available
+    Includes route, pickup (loading), and drop (delivery) addresses for navigation.
     """
-    _ = request
-    base = {
+    base: dict[str, Any] = {
         'job_type': context.job_type,
         'job_id': context.job_id,
         'job_no': '',
         'entity_type': context.job_type,
+        'route': {},
+        'pickup_address': {},
+        'drop_address': {},
     }
+
     if context.job_type == 'shipment' and context.shipment is not None:
-        # TODO: map shipment + booking fields
         base['job_no'] = str(getattr(context.shipment, 'shipment_no', '') or '')
+        base.update(
+            build_shipment_location_block(
+                context.shipment,
+                booking=context.booking,
+                request=request,
+            ),
+        )
         return base
+
     if context.job_type == 'movement' and context.movement is not None:
-        # TODO: map movement fields
         base['job_no'] = str(getattr(context.movement, 'movement_no', '') or '')
+        base.update(
+            build_movement_location_block(context.movement, request=request),
+        )
         return base
+
     return base

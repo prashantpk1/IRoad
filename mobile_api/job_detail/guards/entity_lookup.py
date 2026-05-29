@@ -12,8 +12,29 @@ from typing import Any
 
 from tenant_workspace.models import TenantShipment, TenantTruckMovementLog
 
-_SHIPMENT_SELECT = ('booking', 'driver', 'client_account')
-_MOVEMENT_SELECT = ('booking', 'driver', 'shipment', 'truck')
+_SHIPMENT_SELECT = (
+    'booking',
+    'booking__route',
+    'booking__route__origin_point',
+    'booking__route__destination_point',
+    'booking__loading_address',
+    'booking__delivery_address',
+    'loading_address',
+    'delivery_address',
+    'driver',
+    'client_account',
+)
+_MOVEMENT_SELECT = (
+    'booking',
+    'booking__route',
+    'driver',
+    'shipment',
+    'shipment__loading_address',
+    'shipment__delivery_address',
+    'from_location_point',
+    'to_location_point',
+    'truck',
+)
 
 
 def _is_uuid(value: str) -> bool:
