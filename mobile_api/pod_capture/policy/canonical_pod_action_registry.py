@@ -101,6 +101,8 @@ def is_delivered_status_action(action: Any | None) -> bool:
     """
     if action is None:
         return False
+    if (getattr(action, 'action_code', '') or '').strip().upper() == 'A_POD_VERIFY':
+        return True
     impact = resolve_shipment_status_impact(
         (getattr(action, 'shipment_status_impact', None) or '').strip()
     )

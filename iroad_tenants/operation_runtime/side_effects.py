@@ -120,20 +120,12 @@ def _ensure_auto_cod_delivered_verify_log(
     Log-primary reconciler: append a Delivered-impact row so authoritative_status
     advances with the column (tenant Action Master ``A_POD_VERIFY`` when present).
     """
-    verify_action = TenantOperationAction.objects.filter(
-        action_code='A_POD_VERIFY',
-        status=TenantOperationAction.Status.ACTIVE,
-    ).first()
-    if verify_action is None:
-        verify_action = (
-            TenantOperationAction.objects.filter(
-                status=TenantOperationAction.Status.ACTIVE,
-                shipment_status_impact__icontains='Deliver',
-            )
-            .exclude(action_code__iexact='A10')
-            .order_by('sequence_number')
-            .first()
-        )
+    from iroad_tenants.operation_runtime.action_master_catalog import (
+        AUTO_COD_VERIFY_CHANNEL,
+        resolve_auto_cod_verify_action,
+    )
+
+    verify_action = resolve_auto_cod_verify_action()
     if verify_action is None:
         return
 
@@ -141,7 +133,7 @@ def _ensure_auto_cod_delivered_verify_log(
     idempotency_key = f'auto-pod-verify-{shipment_pk}'
     log_no = f'LOG-POD-VERIFY-{shipment_pk[:24]}'
 
-    TenantOperationActionLog.objects.get_or_create(
+    log_row, _created = TenantOperationActionLog.objects.get_or_create(
         idempotency_key=idempotency_key,
         defaults={
             'log_no': log_no,
@@ -149,8 +141,8 @@ def _ensure_auto_cod_delivered_verify_log(
             'log_date': timezone.now(),
             'operation_action': verify_action,
             'source': 'System',
-            'source_channel': 'auto_cod_verify',
-            'source_ref': 'auto_cod_verify',
+            'source_channel': AUTO_COD_VERIFY_CHANNEL,
+            'source_ref': AUTO_COD_VERIFY_CHANNEL,
             'created_by_label': created_by_label or 'system',
             'notes': 'Auto POD verified after COD collection',
             'booking': getattr(shipment, 'booking', None),
@@ -160,6 +152,12 @@ def _ensure_auto_cod_delivered_verify_log(
             'truck_movement': getattr(action_log, 'truck_movement', None),
         },
     )
+    if log_row.operation_action_id != verify_action.pk:
+        log_row.operation_action = verify_action
+        log_row.source_channel = AUTO_COD_VERIFY_CHANNEL
+        log_row.save(
+            update_fields=['operation_action', 'source_channel', 'updated_at'],
+        )
 
 
 def _apply_auto_delivered_for_cod(

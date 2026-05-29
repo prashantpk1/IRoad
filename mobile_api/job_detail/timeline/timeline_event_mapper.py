@@ -70,6 +70,7 @@ def map_log_to_timeline_event(
 ) -> dict[str, Any]:
     """Map one Action Log ORM row to a timeline event DTO (append-only derived)."""
     action = getattr(log_row, 'operation_action', None)
+    source_channel = str(getattr(log_row, 'source_channel', '') or '').strip()
     log_id = str(getattr(log_row, 'log_id', None) or getattr(log_row, 'pk', '') or '')
     event_type = classify_event_type(action)
     impact = ''
@@ -87,8 +88,13 @@ def map_log_to_timeline_event(
         'log_date': log_date.isoformat() if hasattr(log_date, 'isoformat') else '',
         'created_at': created_at.isoformat() if hasattr(created_at, 'isoformat') else '',
         'event_type': event_type,
-        'action_code': str(getattr(action, 'action_code', '') or ''),
+        'action_code': (
+            'A_POD_VERIFY'
+            if source_channel == 'auto_cod_verify'
+            else str(getattr(action, 'action_code', '') or '')
+        ),
         'action_label': _action_label(log_row, request=request),
+        'is_system_auto': source_channel == 'auto_cod_verify',
         'source': str(getattr(log_row, 'source', '') or ''),
         'source_channel': str(getattr(log_row, 'source_channel', '') or ''),
         'notes': str(getattr(log_row, 'notes', '') or ''),
