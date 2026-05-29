@@ -24,6 +24,7 @@ def build_booking_card(
     selection: DriverBookingSelectionResult | None = None,
     active_shipment: Any | None = None,
     round_trip_meta: dict[str, Any] | None = None,
+    request: Any | None = None,
 ) -> dict[str, Any]:
     """
     Map a booking (+ optional selection result) to the job card contract.
@@ -76,7 +77,11 @@ def build_booking_card(
         'shipments_execution_completed': exec_completed,
         'shipments_business_completed': biz_completed,
         'shipments_completed': exec_completed,
-        'active_shipment': build_active_shipment_slice(active),
+        'active_shipment': build_active_shipment_slice(
+            active,
+            booking=booking,
+            request=request,
+        ),
         'execution_progress_percentage': exec_pct,
         'business_progress_percentage': biz_pct,
         'progress_percentage': exec_pct,
@@ -91,12 +96,14 @@ def build_booking_card_from_selection(
     selection: DriverBookingSelectionResult,
     *,
     tenant_schema: str = '',
+    request: Any | None = None,
 ) -> dict[str, Any]:
     """Build job card directly from ``select_current_driver_booking`` output."""
     return build_booking_card(
         selection.booking,
         tenant_schema=tenant_schema,
         selection=selection,
+        request=request,
     )
 
 

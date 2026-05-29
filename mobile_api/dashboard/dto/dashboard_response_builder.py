@@ -27,6 +27,7 @@ class DashboardApiPayload(TypedDict, total=False):
     """Typed contract for dashboard ``data``."""
 
     current_job: dict[str, Any]
+    active_job: dict[str, Any]
     current_empty_move: dict[str, Any]
     workflow: dict[str, Any]
     pod_cod_summary: dict[str, Any]
@@ -39,10 +40,16 @@ class DashboardApiPayload(TypedDict, total=False):
 class DashboardResponseBuilder:
     """Maps ``DriverDashboardContext`` → API-ready ``DashboardApiPayload``."""
 
-    def build(self, context: DriverDashboardContext) -> DashboardApiPayload:
+    def build(
+        self,
+        context: DriverDashboardContext,
+        *,
+        request: Any | None = None,
+    ) -> DashboardApiPayload:
         summary = context.summary or {}
         return DashboardApiPayload(
             current_job=self._build_current_job(context),
+            active_job=self._build_active_job(context, request=request),
             current_empty_move=self._build_current_empty_move(context),
             workflow=self._build_workflow(context),
             pod_cod_summary=self._build_pod_cod_summary(context),
@@ -54,6 +61,24 @@ class DashboardResponseBuilder:
 
     def _build_current_job(self, context: DriverDashboardContext) -> dict[str, Any]:
         return dict(context.booking_projection or {})
+
+    def _build_active_job(
+        self,
+        context: DriverDashboardContext,
+        *,
+        request: Any | None = None,
+    ) -> dict[str, Any]:
+        """Top-level job pointer + route/addresses (Postman + mobile home screen)."""
+        from mobile_api.dashboard.projections.job_location_dashboard import (
+            build_dashboard_active_job,
+        )
+
+        return build_dashboard_active_job(
+            shipment=context.active_shipment,
+            booking=context.active_booking,
+            movement=context.active_empty_movement,
+            request=request,
+        )
 
     def _build_current_empty_move(
         self, context: DriverDashboardContext

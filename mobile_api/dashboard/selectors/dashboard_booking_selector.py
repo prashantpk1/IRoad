@@ -51,9 +51,12 @@ class DashboardBookingSelector:
         if driver_pk is None:
             return None
 
-        shipments_qs = TenantShipment.objects.order_by(
-            'shipment_sequence',
-            'created_at',
+        shipments_qs = (
+            TenantShipment.objects.select_related(
+                'loading_address',
+                'delivery_address',
+            )
+            .order_by('shipment_sequence', 'created_at')
         )
         bookings = (
             TenantBooking.objects.filter(
@@ -68,6 +71,13 @@ class DashboardBookingSelector:
                 'booking_date',
                 Coalesce('execution_date', 'booking_date'),
                 'booking_sequence',
+            )
+            .select_related(
+                'route',
+                'route__origin_point',
+                'route__destination_point',
+                'loading_address',
+                'delivery_address',
             )
             .prefetch_related(
                 Prefetch('shipments', queryset=shipments_qs),

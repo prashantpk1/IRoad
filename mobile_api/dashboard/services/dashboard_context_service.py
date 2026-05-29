@@ -277,6 +277,7 @@ class DashboardContextService:
                 context.booking_projection = build_booking_card_from_selection(
                     context.booking_selection,
                     tenant_schema=tenant_schema,
+                    request=request,
                 )
             if context.empty_move_selection is not None:
                 context.movement_projection = self._movement_projection.project_empty_move(
@@ -310,4 +311,4 @@ class DashboardContextService:
         request: Any | None = None,
     ) -> dict:
         _ = request
-        return dict(self._response_builder.build(context))
+        return dict(self._response_builder.build(context, request=request))

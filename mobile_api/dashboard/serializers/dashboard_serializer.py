@@ -9,7 +9,11 @@ from rest_framework import serializers
 
 
 class DashboardCurrentJobSerializer(serializers.Serializer):
-    """Nested ``current_job`` — populated in a later iteration."""
+    """Nested ``current_job`` booking card (includes ``active_shipment``)."""
+
+
+class DashboardActiveJobSerializer(serializers.Serializer):
+    """Top-level ``active_job`` — job_id + route + pickup/drop (Job Detail parity)."""
 
     # TODO: Add explicit fields when contract stabilizes.
 
@@ -50,6 +54,7 @@ class DashboardResponseSerializer(serializers.Serializer):
     """
 
     current_job = serializers.DictField(required=False, default=dict)
+    active_job = serializers.DictField(required=False, default=dict)
     current_empty_move = serializers.DictField(required=False, default=dict)
     workflow = serializers.DictField(required=False, default=dict)
     pod_cod_summary = serializers.DictField(required=False, default=dict)
