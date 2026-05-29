@@ -77,6 +77,10 @@ class WalletListViewTests(SimpleTestCase):
             items=[{'transaction_no': 'TT-000001', 'amount': '4500.00'}],
             count=1,
             results_found=1,
+            total_records=1,
+            total_pages=1,
+            current_page=1,
+            page_size=10,
         )
 
         request = self.factory.get(
@@ -103,6 +107,10 @@ class WalletListViewTests(SimpleTestCase):
             items=[],
             count=0,
             results_found=2,
+            total_records=2,
+            total_pages=1,
+            current_page=1,
+            page_size=10,
         )
 
         request = self.factory.get(

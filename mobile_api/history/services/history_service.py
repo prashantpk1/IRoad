@@ -26,6 +26,11 @@ from mobile_api.job_detail.guards.ownership import (
     assert_driver_active,
     driver_owns_shipment_leg,
 )
+from mobile_api.list_pagination import (
+    ListPaginationParams,
+    empty_pagination_page,
+    paginate_sequence,
+)
 from iroad_tenants.services.timeline_query import (
     base_action_log_queryset,
     shipment_action_log_scope_q,
@@ -87,6 +92,7 @@ class HistoryService:
         shipment_no: str = '',
         job_date: str | None = None,
         count_only: bool = False,
+        pagination: ListPaginationParams | None = None,
         request: Any | None = None,
     ) -> HistoryListPage:
         schema = (tenant_schema or '').strip()
@@ -112,22 +118,35 @@ class HistoryService:
             job_date=parse_history_date(job_date) if job_date else None,
             count_only=bool(count_only),
         )
+        page_params = pagination or ListPaginationParams(page=1, page_size=10)
 
         with schema_context(schema):
             owned = self._selector.filter_owned_terminal_shipments(driver, filters=filters)
             results_found = len(owned)
 
             if filters.count_only:
+                shell = empty_pagination_page(
+                    page=page_params.page,
+                    page_size=page_params.page_size,
+                )
                 return HistoryListPage(
                     items=[],
                     count=0,
                     results_found=results_found,
+                    total_records=results_found,
+                    total_pages=(
+                        (results_found + page_params.page_size - 1) // page_params.page_size
+                        if results_found
+                        else 0
+                    ),
+                    current_page=page_params.page,
+                    page_size=page_params.page_size,
                 )
 
-            items = []
+            cards = []
             for shipment in owned:
                 log_count = self._count_forward_actions(shipment)
-                items.append(
+                cards.append(
                     build_history_card(
                         shipment,
                         actions_fired_count=log_count,
@@ -135,10 +154,19 @@ class HistoryService:
                     )
                 )
 
+            page = paginate_sequence(
+                cards,
+                page=page_params.page,
+                page_size=page_params.page_size,
+            )
             return HistoryListPage(
-                items=items,
-                count=len(items),
+                items=page['items'],
+                count=page['count'],
                 results_found=results_found,
+                total_records=page['total_records'],
+                total_pages=page['total_pages'],
+                current_page=page['current_page'],
+                page_size=page['page_size'],
             )
 
     def get_history_detail(

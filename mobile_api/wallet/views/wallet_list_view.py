@@ -15,6 +15,7 @@ from mobile_api.job_detail.services.job_detail_driver_resolver import (
     resolve_job_detail_driver,
     tenant_schema_for_request,
 )
+from mobile_api.list_pagination import parse_list_pagination
 from mobile_api.permissions import HasViewMobileCapability, IsDriver, IsMobileAuthenticated
 from mobile_api.throttling import MobileUserThrottle
 from mobile_api.views.base import MobileAPIView
@@ -33,6 +34,8 @@ class WalletListAPIView(MobileAPIView):
       - ``shipment_no`` — filter by shipment number (partial) or transaction no
       - ``date`` — transaction date (``YYYY-MM-DD`` or ``DD-MM-YYYY``)
       - ``count_only`` — filter modal preview (`results_found` only)
+      - ``page`` — page number (default ``1``)
+      - ``page_size`` — rows per page (default ``10``, max ``100``)
     """
 
     permission_classes = [IsMobileAuthenticated, IsDriver, HasViewMobileCapability]
@@ -63,6 +66,10 @@ class WalletListAPIView(MobileAPIView):
                 shipment_no=request.query_params.get('shipment_no'),
                 transaction_date=request.query_params.get('date'),
                 count_only=count_only,
+                pagination=parse_list_pagination(
+                    request.query_params.get('page'),
+                    request.query_params.get('page_size'),
+                ),
             )
         except WalletError as exc:
             logger.warning('wallet_list denied code=%s', exc.code)
@@ -78,6 +85,10 @@ class WalletListAPIView(MobileAPIView):
             'items': page.items,
             'count': page.count,
             'results_found': page.results_found,
+            'total_records': page.total_records,
+            'total_pages': page.total_pages,
+            'current_page': page.current_page,
+            'page_size': page.page_size,
         }
         serializer = WalletListResponseSerializer(data=payload)
         serializer.is_valid(raise_exception=True)

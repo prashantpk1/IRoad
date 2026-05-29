@@ -18,6 +18,7 @@ from mobile_api.job_detail.services.job_detail_driver_resolver import (
     resolve_job_detail_driver,
     tenant_schema_for_request,
 )
+from mobile_api.list_pagination import parse_list_pagination
 from mobile_api.permissions import HasViewMobileCapability, IsDriver, IsMobileAuthenticated
 from mobile_api.throttling import MobileUserThrottle
 from mobile_api.views.base import MobileAPIView
@@ -33,8 +34,8 @@ class HistoryListAPIView(MobileAPIView):
       - ``shipment_no`` — partial or exact shipment number filter
       - ``date`` — job/shipment date (``YYYY-MM-DD`` or ``DD-MM-YYYY``)
       - ``count_only`` — when ``1``/``true``, return ``results_found`` only (filter preview)
-
-    Returns the full filtered list in one response (no pagination).
+      - ``page`` — page number (default ``1``)
+      - ``page_size`` — rows per page (default ``10``, max ``100``)
     """
 
     permission_classes = [IsMobileAuthenticated, IsDriver, HasViewMobileCapability]
@@ -65,6 +66,10 @@ class HistoryListAPIView(MobileAPIView):
                 shipment_no=request.query_params.get('shipment_no'),
                 job_date=request.query_params.get('date'),
                 count_only=count_only,
+                pagination=parse_list_pagination(
+                    request.query_params.get('page'),
+                    request.query_params.get('page_size'),
+                ),
                 request=request,
             )
         except HistoryError as exc:
@@ -80,6 +85,10 @@ class HistoryListAPIView(MobileAPIView):
             'items': page.items,
             'count': page.count,
             'results_found': page.results_found,
+            'total_records': page.total_records,
+            'total_pages': page.total_pages,
+            'current_page': page.current_page,
+            'page_size': page.page_size,
         }
         serializer = HistoryListResponseSerializer(data=payload)
         serializer.is_valid(raise_exception=True)

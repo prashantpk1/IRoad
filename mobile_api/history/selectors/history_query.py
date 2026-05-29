@@ -7,7 +7,7 @@ Operational rules (IRoute §14.7.1):
   - History = terminal legs only (``Closed`` or ``Cancelled``).
   - Reverse chronological by job/shipment date.
   - Driver must own the shipment leg (same rules as Job Detail).
-  - Full list in one response (no cursor pagination).
+  - Paginated via ``page`` and ``page_size`` query params.
 """
 from __future__ import annotations
 
@@ -58,11 +58,15 @@ class HistoryListFilters:
 
 @dataclass
 class HistoryListPage:
-    """History list response (all matching rows, capped)."""
+    """History list response (paginated)."""
 
     items: list[dict[str, Any]]
     count: int
     results_found: int
+    total_records: int = 0
+    total_pages: int = 0
+    current_page: int = 1
+    page_size: int = 10
 
 
 class HistoryQuerySelector:

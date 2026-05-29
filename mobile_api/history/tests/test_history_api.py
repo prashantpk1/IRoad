@@ -79,6 +79,10 @@ class HistoryListViewTests(SimpleTestCase):
             items=[{'shipment_no': 'SH-2026-1001'}],
             count=1,
             results_found=1,
+            total_records=1,
+            total_pages=1,
+            current_page=1,
+            page_size=10,
         )
 
         request = self.factory.get(
@@ -93,6 +97,38 @@ class HistoryListViewTests(SimpleTestCase):
         self.assertEqual(response.data['status'], 1)
         self.assertEqual(len(response.data['data']['items']), 1)
         self.assertEqual(response.data['data']['results_found'], 1)
+        self.assertEqual(response.data['data']['total_records'], 1)
+        self.assertEqual(response.data['data']['current_page'], 1)
+
+    @patch('mobile_api.history.views.history_list_view.HistoryService.list_history')
+    @patch('mobile_api.history.views.history_list_view.resolve_job_detail_driver')
+    def test_list_pagination_query_params(self, mock_resolve, mock_list):
+        from mobile_api.history.selectors.history_query import HistoryListPage
+
+        mock_resolve.return_value = (self.driver, None, None)
+        mock_list.return_value = HistoryListPage(
+            items=[],
+            count=0,
+            results_found=25,
+            total_records=25,
+            total_pages=3,
+            current_page=2,
+            page_size=10,
+        )
+
+        request = self.factory.get(
+            '/api/v1/mobile/driver/history/',
+            {'page': '2', 'page_size': '10'},
+        )
+        payload = _jwt_payload(driver_id=self.driver.pk)
+        force_authenticate(request, user=MobileUser(payload), token=payload)
+
+        response = self.view(request)
+        self.assertEqual(response.status_code, 200)
+        mock_list.assert_called_once()
+        pagination = mock_list.call_args.kwargs['pagination']
+        self.assertEqual(pagination.page, 2)
+        self.assertEqual(pagination.page_size, 10)
 
     @patch('mobile_api.history.views.history_list_view.HistoryService.list_history')
     @patch('mobile_api.history.views.history_list_view.resolve_job_detail_driver')
@@ -220,6 +256,70 @@ class HistoryCardProjectionTests(SimpleTestCase):
         self.assertEqual(route['route_display_start'], 'delhi')
         self.assertEqual(route['route_display_end'], 'Mumbai')
 
+    def test_resolve_trip_type_from_booking(self):
+        from mobile_api.history.projections.history_card_projection import resolve_trip_type
+
+        booking = MagicMock()
+        booking.trip_type = 'Round'
+        shipment = MagicMock()
+        shipment.trip_type = 'One-Way'
+        self.assertEqual(resolve_trip_type(booking, shipment), 'Round')
+
+    def test_resolve_trip_type_falls_back_to_shipment(self):
+        from mobile_api.history.projections.history_card_projection import resolve_trip_type
+
+        shipment = MagicMock()
+        shipment.trip_type = 'One-Way'
+        self.assertEqual(resolve_trip_type(None, shipment), 'One-Way')
+
+    def test_route_type_label_round_trip(self):
+        from mobile_api.history.projections.history_card_projection import route_type_label
+
+        booking = MagicMock()
+        booking.trip_type = 'Round'
+        shipment = MagicMock()
+        shipment.booking_item_type = 'Outbound'
+        self.assertEqual(route_type_label(booking, shipment), 'Round')
+
+    def test_route_type_label_inbound_leg(self):
+        from mobile_api.history.projections.history_card_projection import route_type_label
+
+        booking = MagicMock()
+        booking.trip_type = 'One-Way'
+        shipment = MagicMock()
+        shipment.booking_item_type = 'Backload'
+        self.assertEqual(route_type_label(booking, shipment), 'Inbound')
+
+    def test_build_history_card_includes_trip_type(self):
+        from mobile_api.history.projections.history_card_projection import build_history_card
+
+        booking = MagicMock()
+        booking.booking_id = uuid4()
+        booking.booking_no = 'BK-001'
+        booking.trip_type = 'One-Way'
+        booking.route_display = ''
+        booking.route = None
+        booking.route_direction = ''
+
+        shipment = MagicMock()
+        shipment.pk = uuid4()
+        shipment.shipment_id = shipment.pk
+        shipment.shipment_no = 'SH-001'
+        shipment.shipment_status = TenantShipment.ShipmentStatus.CLOSED
+        shipment.order_type = 'COD'
+        shipment.shipment_date = date(2026, 2, 10)
+        shipment.booking = booking
+        shipment.booking_item_type = 'Outbound'
+        shipment.route_display = ''
+        shipment.loading_address = None
+        shipment.delivery_address = None
+        shipment.truck = None
+        shipment.client_account = None
+        shipment.trip_type = ''
+
+        card = build_history_card(shipment)
+        self.assertEqual(card['trip_type'], 'One-Way')
+
     def test_build_history_card_route_from_route_master(self):
         from mobile_api.history.projections.history_card_projection import build_history_card
 
@@ -239,6 +339,7 @@ class HistoryCardProjectionTests(SimpleTestCase):
         booking = MagicMock()
         booking.booking_id = uuid4()
         booking.booking_no = 'BK-001'
+        booking.trip_type = 'Round'
         booking.route = route_master
         booking.route_direction = 'forward'
         booking.route_display = 'delhi — Goa'
@@ -260,6 +361,7 @@ class HistoryCardProjectionTests(SimpleTestCase):
         shipment.trip_type = ''
 
         card = build_history_card(shipment)
+        self.assertEqual(card['trip_type'], 'Round')
         self.assertEqual(card['route']['route_code'], 'RT-AAAB')
         self.assertEqual(card['route']['route_type'], 'Domestic')
         self.assertEqual(card['route']['route_display_start'], 'Alec Sexton4')

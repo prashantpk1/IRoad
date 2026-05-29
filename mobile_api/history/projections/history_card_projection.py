@@ -97,15 +97,20 @@ def resolve_history_route(shipment: Any, booking: Any | None = None) -> dict[str
     }
 
 
+def resolve_trip_type(booking: Any | None, shipment: Any) -> str:
+    """Booking/shipment trip type for API (One-Way, Round, etc.)."""
+    if booking is not None:
+        return booking_policy.normalized_trip_type(booking)
+    return str(getattr(shipment, 'trip_type', '') or '').strip()
+
+
 def route_type_label(booking: Any | None, shipment: Any) -> str:
     """
     UI route pill: Round | Outbound | Inbound.
 
     Round-trip bookings surface ``Round``; otherwise leg type drives the tag.
     """
-    trip = booking_policy.normalized_trip_type(booking) if booking else (
-        str(getattr(shipment, 'trip_type', '') or '').strip()
-    )
+    trip = resolve_trip_type(booking, shipment)
     if trip.casefold() == 'round':
         return 'Round'
 
@@ -170,6 +175,7 @@ def build_history_card(
         'shipment_no': str(getattr(shipment, 'shipment_no', '') or ''),
         'booking_id': str(booking_id) if booking_id is not None else '',
         'booking_no': str(getattr(booking, 'booking_no', '') or '') if booking else '',
+        'trip_type': resolve_trip_type(booking, shipment),
         'status': display_status,
         'final_state': final_state,
         'route': {

@@ -14,6 +14,10 @@ class HistoryListResponseSerializer(serializers.Serializer):
     items = serializers.ListField(child=serializers.DictField(), required=False, default=list)
     count = serializers.IntegerField(required=False, default=0)
     results_found = serializers.IntegerField(required=False, default=0)
+    total_records = serializers.IntegerField(required=False, default=0)
+    total_pages = serializers.IntegerField(required=False, default=0)
+    current_page = serializers.IntegerField(required=False, default=1)
+    page_size = serializers.IntegerField(required=False, default=10)
 
 
 class HistoryDetailResponseSerializer(serializers.Serializer):

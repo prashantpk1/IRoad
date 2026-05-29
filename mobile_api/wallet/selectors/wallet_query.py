@@ -18,7 +18,6 @@ from typing import Any
 from django.db.models import Q
 
 from iroad_tenants.driver_treasury_ops import ensure_active_driver_treasury
-from mobile_api.wallet.constants import WALLET_LIST_MAX_RESULTS
 from tenant_workspace.models import DriverTreasuryTransaction
 
 _TXN_SELECT = (
@@ -47,16 +46,20 @@ class WalletListFilters:
 
 @dataclass
 class WalletListPage:
-    """Wallet list response."""
+    """Wallet list response (paginated)."""
 
     summary: dict[str, Any]
     items: list[dict[str, Any]]
     count: int
     results_found: int
+    total_records: int = 0
+    total_pages: int = 0
+    current_page: int = 1
+    page_size: int = 10
 
 
 class WalletQuerySelector:
-    """Build driver wallet transaction list (no pagination)."""
+    """Build driver wallet transaction list (paginated)."""
 
     @classmethod
     def active_treasury(cls, driver: Any):
@@ -94,23 +97,23 @@ class WalletQuerySelector:
         driver: Any,
         *,
         filters: WalletListFilters,
-        max_results: int | None = None,
-    ) -> tuple[Any | None, list[Any]]:
-        cap = max(1, int(max_results or WALLET_LIST_MAX_RESULTS))
+        page: int = 1,
+        page_size: int = 10,
+    ) -> tuple[Any | None, list[Any], int]:
         treasury = cls.active_treasury(driver)
         if treasury is None:
-            return None, []
+            return None, [], 0
 
         qs = cls.apply_filters(
             cls.base_transactions_qs(treasury),
             filters=filters,
         )
-        rows: list[Any] = []
-        for txn in qs.iterator(chunk_size=200):
-            rows.append(txn)
-            if len(rows) >= cap:
-                break
-        return treasury, rows
+        total = qs.count()
+        page = max(1, int(page or 1))
+        page_size = max(1, int(page_size or 1))
+        offset = (page - 1) * page_size
+        rows = list(qs[offset : offset + page_size])
+        return treasury, rows, total
 
     @classmethod
     def get_transaction_for_driver(

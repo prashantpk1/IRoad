@@ -13,6 +13,7 @@ from django.utils.translation import gettext_lazy as _
 from django_tenants.utils import schema_context
 
 from mobile_api.job_detail.guards.ownership import assert_driver_active
+from mobile_api.list_pagination import ListPaginationParams
 from mobile_api.wallet.constants import WALLET_DEFAULT_CURRENCY
 from mobile_api.wallet.exceptions import WalletError
 from mobile_api.wallet.projections.wallet_card_projection import (
@@ -79,6 +80,7 @@ class WalletService:
         shipment_no: str = '',
         transaction_date: str | None = None,
         count_only: bool = False,
+        pagination: ListPaginationParams | None = None,
         currency: str | None = None,
     ) -> WalletListPage:
         schema = (tenant_schema or '').strip()
@@ -105,29 +107,58 @@ class WalletService:
             count_only=bool(count_only),
         )
         cur = (currency or WALLET_DEFAULT_CURRENCY or 'SAR').strip() or 'SAR'
+        page_params = pagination or ListPaginationParams(page=1, page_size=10)
 
         with schema_context(schema):
-            treasury, rows = self._selector.list_transactions(driver, filters=filters)
-            results_found = len(rows)
-            summary = build_wallet_summary(treasury, currency=cur)
-
             if filters.count_only:
+                treasury = self._selector.active_treasury(driver)
+                summary = build_wallet_summary(treasury, currency=cur)
+                qs = self._selector.apply_filters(
+                    self._selector.base_transactions_qs(treasury),
+                    filters=filters,
+                )
+                results_found = qs.count() if treasury is not None else 0
+                total_pages = (
+                    (results_found + page_params.page_size - 1) // page_params.page_size
+                    if results_found
+                    else 0
+                )
                 return WalletListPage(
                     summary=summary,
                     items=[],
                     count=0,
                     results_found=results_found,
+                    total_records=results_found,
+                    total_pages=total_pages,
+                    current_page=page_params.page,
+                    page_size=page_params.page_size,
                 )
 
+            treasury, rows, total = self._selector.list_transactions(
+                driver,
+                filters=filters,
+                page=page_params.page,
+                page_size=page_params.page_size,
+            )
+            summary = build_wallet_summary(treasury, currency=cur)
             items = [
                 build_wallet_transaction_card(txn, currency=cur)
                 for txn in rows
             ]
+            total_pages = (
+                (total + page_params.page_size - 1) // page_params.page_size
+                if total
+                else 0
+            )
             return WalletListPage(
                 summary=summary,
                 items=items,
                 count=len(items),
-                results_found=results_found,
+                results_found=total,
+                total_records=total,
+                total_pages=total_pages,
+                current_page=page_params.page,
+                page_size=page_params.page_size,
             )
 
     def get_transaction_detail(
