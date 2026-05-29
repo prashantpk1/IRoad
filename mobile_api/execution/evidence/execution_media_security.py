@@ -32,6 +32,9 @@ _ALLOWED_PREFIXES = (
     'tenant_operation_action_media/',
     'mobile_driver_uploads/',
     'tenant-uploads/',
+    # Direct multipart uploads from execute / ops endpoints
+    # (see mobile_api.utils.file_upload_handler.save_uploaded_file).
+    'mobile/',
 )
 
 _EXTENSION_BY_MEDIA: dict[str, frozenset[str]] = {

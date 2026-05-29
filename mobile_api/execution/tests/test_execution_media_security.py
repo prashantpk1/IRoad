@@ -54,6 +54,19 @@ class ExecutionMediaSecurityTests(SimpleTestCase):
         items = ExecutionMediaSecurityService().validate_media(ctx)
         self.assertEqual(len(items), 1)
 
+    @patch('mobile_api.execution.evidence.execution_media_security.mobile_execution_verify_media_storage', return_value=False)
+    def test_accepts_multipart_execute_upload_path(self, _mock_verify):
+        ctx = self._context(
+            media=[
+                {
+                    'media_type': 'photo',
+                    'file_ref': 'mobile/evidence/a1b2c3d4e5f6.jpg',
+                },
+            ],
+        )
+        items = ExecutionMediaSecurityService().validate_media(ctx)
+        self.assertEqual(len(items), 1)
+
     @patch('django.core.files.storage.default_storage')
     @patch('mobile_api.execution.evidence.execution_media_security.mobile_execution_verify_media_storage', return_value=True)
     def test_requires_storage_exists_when_enabled(self, _mock_flag, mock_storage):
