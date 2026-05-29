@@ -154,6 +154,7 @@ class PaymentCollectionService:
         duplicate = self._validation.validate_duplicate_payment(
             shipment=shipment,
             driver=driver,
+            tenant_schema=schema,
         )
         if duplicate:
             raise PaymentCollectionError(

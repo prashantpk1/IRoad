@@ -69,7 +69,7 @@ class _DummyValidation:
             'variance_detected': submitted != expected,
         }
 
-    def validate_duplicate_payment(self, *, shipment, driver):
+    def validate_duplicate_payment(self, *, shipment, driver, tenant_schema=None):
         return bool(self._duplicate)
 
     def validate_proof_media_paths(self, *, media_items, tenant_schema, driver_pk, shipment_pk):

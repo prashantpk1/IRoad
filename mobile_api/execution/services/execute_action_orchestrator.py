@@ -285,11 +285,11 @@ class ExecuteActionOrchestrator:
 
     def _attach_payment_bundle_for_cod(self, context: ExecuteActionContext) -> None:
         """
-        If the action is COD collection (A9 semantics), consume a staged payment bundle.
+        COD collection (A9): resolve amount for treasury side effects.
 
-        This is read-only at this point: it sets ``payload.mobile_cod_amount`` and
-        records bundle metadata for response shaping. Treasury mutation remains
-        in kernel side effects (Action 9).
+        When a staged ``PaymentCollectionBundle`` exists (prep API), it is the
+        source of truth for amount and variance. Otherwise the driver may post
+        ``mobile_cod_amount`` directly on Execute Action (normal mobile flow).
         """
         if context.idempotent_replay:
             return
@@ -326,14 +326,48 @@ class ExecuteActionOrchestrator:
             .order_by('-created_at')
             .first()
         )
+        context.payload = dict(context.payload or {})
+
         if bundle is None:
-            raise ExecuteActionError(
-                'Missing staged payment bundle for COD collection.',
-                code='payment_bundle_missing',
-                http_status=409,
-                message_key='mobile.payment_collection.bundle_not_found',
-                refresh_required=True,
+            raw_amount = context.payload.get('mobile_cod_amount')
+            if raw_amount is None or str(raw_amount).strip() == '':
+                raise ExecuteActionError(
+                    'COD collection requires mobile_cod_amount or a staged payment bundle.',
+                    code='mobile_cod_amount_required',
+                    http_status=400,
+                    message_key='mobile.jobs.execute.mobile_cod_amount_required',
+                    refresh_required=True,
+                )
+            try:
+                collected = Decimal(str(raw_amount))
+            except Exception as exc:
+                raise ExecuteActionError(
+                    'Invalid mobile_cod_amount for COD collection.',
+                    code='invalid_mobile_cod_amount',
+                    http_status=400,
+                    message_key='mobile.validation.failed',
+                    refresh_required=True,
+                ) from exc
+            if collected <= 0:
+                raise ExecuteActionError(
+                    'mobile_cod_amount must be greater than zero.',
+                    code='invalid_mobile_cod_amount',
+                    http_status=400,
+                    message_key='mobile.validation.failed',
+                    refresh_required=True,
+                )
+            context.payload['mobile_cod_amount'] = collected
+            expected = Decimal(
+                str(getattr(context.shipment, 'cod_amount', None) or Decimal('0'))
             )
+            context.resolver_meta = dict(context.resolver_meta or {})
+            context.resolver_meta['payment_collection_variance'] = (
+                ExecuteActionOrchestrator._build_payment_variance_from_amounts(
+                    collected,
+                    expected,
+                )
+            )
+            return
 
         # Scope checks: wrong bundle/shipment should hard fail.
         if (bundle.shipment_id or '').strip() != shipment_pk:
@@ -345,8 +379,7 @@ class ExecuteActionOrchestrator:
                 refresh_required=True,
             )
 
-        # Override mobile_cod_amount for Action 9 side effects (treasury posting).
-        context.payload = dict(context.payload or {})
+        # Staged bundle is source of truth for Action 9 treasury posting.
         context.payload['mobile_cod_amount'] = Decimal(str(bundle.amount))
 
         context.resolver_meta = dict(context.resolver_meta or {})
@@ -402,7 +435,7 @@ class ExecuteActionOrchestrator:
             )
 
         variance = (context.resolver_meta or {}).get('payment_collection_variance')
-        if variance is None:
+        if variance is None and bundle is not None:
             variance = ExecuteActionOrchestrator._build_payment_variance(bundle)
 
         payload['success'] = True
@@ -426,6 +459,16 @@ class ExecuteActionOrchestrator:
     def _build_payment_variance(bundle: Any) -> dict[str, Any] | None:
         collected = Decimal(str(getattr(bundle, 'amount', 0) or 0))
         expected = Decimal(str(getattr(bundle, 'expected_amount', 0) or 0))
+        return ExecuteActionOrchestrator._build_payment_variance_from_amounts(
+            collected,
+            expected,
+        )
+
+    @staticmethod
+    def _build_payment_variance_from_amounts(
+        collected: Decimal,
+        expected: Decimal,
+    ) -> dict[str, Any] | None:
         if collected == expected:
             return {
                 'has_variance': False,

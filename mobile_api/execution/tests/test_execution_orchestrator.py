@@ -442,66 +442,73 @@ class ExecuteActionOrchestratorTests(SimpleTestCase):
         self.assertEqual(result.payload['variance']['variance_type'], 'short')
         self.assertEqual(result.payload['variance']['variance_amount'], '50.00')
 
-    def test_a9_missing_payment_bundle_rejected(self):
+    def test_a9_requires_mobile_cod_amount_without_staged_bundle(self):
         orch = self._orchestrator()
+        context = ExecuteActionContext(
+            driver=_driver(),
+            tenant_schema='tenant-1',
+            user_id='user-1',
+            job_type='shipment',
+            job_id='ship-1',
+            action_code='A9',
+            payload=self._base_payload(),
+            idempotency_key='client-uuid-execute-1',
+        )
+        context.shipment = _shipment()
+        context.operation_action = _collect_payment_action()
 
-        def _capture_prepare(ctx, **kw):
-            ctx.shipment = _shipment()
-            ctx.booking = ctx.shipment.booking
-            ctx.workflow = {
-                'allowed_actions': [{'action_code': 'A9'}],
-                'next_action': {'action_code': 'A9'},
-                'primary_action': {'action_code': 'A9'},
-            }
-            ctx.sync_metadata = {'content_hash': 'h1', 'workflow_version': 'v1'}
-            return {}
-
-        with patch.object(
-            orch._reconcile_service,
-            'prepare_pre_execute',
-            side_effect=_capture_prepare,
-        ), patch.object(
-            orch._idempotency_guard,
-            'normalize_request_keys',
-            return_value=SimpleNamespace(
-                idempotency_key='client-uuid-execute-1',
-                source_ref='',
-            ),
-        ), patch.object(
-            orch._idempotency_guard,
-            'detect_idempotent_replay',
-            return_value=False,
-        ), patch.object(
-            orch._validation_service,
-            'validate_pre_execute_after_idempotency',
-            return_value=SimpleNamespace(ok=True, idempotent_replay=False),
-        ), patch.object(
-            orch._evidence_service,
-            'validate_required_evidence',
-            return_value=None,
-        ), patch.object(
-            orch._validation_service,
-            'resolve_operation_action',
-            return_value=_collect_payment_action(),
-        ), patch(
+        with patch(
             'mobile_api.payment_collection.models.PaymentCollectionBundle',
-        ) as bundle_model:
+        ) as bundle_model, patch(
+            'mobile_api.execution.services.execute_action_orchestrator.EvidenceValidationService',
+        ) as evidence_svc:
+            evidence_svc._driver_pk.return_value = 'drv-1'
+            evidence_svc._shipment_key.return_value = 'ship-1'
             bundle_model.objects.filter.return_value.order_by.return_value.first.return_value = None
 
             with self.assertRaises(ExecuteActionError) as ctx_exc:
-                orch._run_execute_pipeline(
-                    driver=_driver(),
-                    tenant_schema='tenant-1',
-                    job_type='shipment',
-                    job_id='ship-1',
-                    action_code='A9',
-                    payload=self._base_payload(),
-                    request=None,
-                    tenant_user=None,
-                    user_id='user-1',
-                )
+                orch._attach_payment_bundle_for_cod(context)
 
-        self.assertEqual(ctx_exc.exception.code, 'payment_bundle_missing')
+        self.assertEqual(ctx_exc.exception.code, 'mobile_cod_amount_required')
+        self.assertEqual(ctx_exc.exception.http_status, 400)
+
+    def test_a9_accepts_mobile_cod_amount_without_staged_bundle(self):
+        orch = self._orchestrator()
+        context = ExecuteActionContext(
+            driver=_driver(),
+            tenant_schema='tenant-1',
+            user_id='user-1',
+            job_type='shipment',
+            job_id='ship-1',
+            action_code='A9',
+            payload={
+                **self._base_payload(),
+                'mobile_cod_amount': Decimal('1500.00'),
+            },
+            idempotency_key='client-uuid-execute-1',
+        )
+        context.shipment = SimpleNamespace(
+            pk='ship-1',
+            shipment_id='ship-1',
+            order_type='COD',
+            cod_amount=Decimal('1500.00'),
+        )
+        context.operation_action = _collect_payment_action()
+
+        with patch(
+            'mobile_api.payment_collection.models.PaymentCollectionBundle',
+        ) as bundle_model, patch(
+            'mobile_api.execution.services.execute_action_orchestrator.EvidenceValidationService',
+        ) as evidence_svc:
+            evidence_svc._driver_pk.return_value = 'drv-1'
+            evidence_svc._shipment_key.return_value = 'ship-1'
+            bundle_model.objects.filter.return_value.order_by.return_value.first.return_value = None
+            orch._attach_payment_bundle_for_cod(context)
+
+        self.assertEqual(context.payload['mobile_cod_amount'], Decimal('1500.00'))
+        variance = (context.resolver_meta or {}).get('payment_collection_variance')
+        self.assertIsNotNone(variance)
+        self.assertFalse(variance['has_variance'])
 
     def test_a9_wrong_shipment_payment_bundle_rejected(self):
         orch = self._orchestrator()

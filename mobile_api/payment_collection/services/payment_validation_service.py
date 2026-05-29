@@ -204,6 +204,7 @@ class PaymentValidationService:
         *,
         shipment: Any,
         driver: Any,
+        tenant_schema: str,
     ) -> bool:
         """
         True when the driver has already collected COD payment
@@ -215,11 +216,16 @@ class PaymentValidationService:
         if getattr(shipment, 'collection_status', None) == TenantShipment.CollectionStatus.COLLECTED:
             return True
 
-        treasury = ensure_active_driver_treasury(driver, auto_create=False)
-        if treasury is None:
+        schema = (tenant_schema or '').strip()
+        if not schema:
             return False
-        return cod_client_collection_exists(
-            shipment=shipment,
-            driver_treasury=treasury,
-        )
+
+        with schema_context(schema):
+            treasury = ensure_active_driver_treasury(driver, auto_create=False)
+            if treasury is None:
+                return False
+            return cod_client_collection_exists(
+                shipment=shipment,
+                driver_treasury=treasury,
+            )
 

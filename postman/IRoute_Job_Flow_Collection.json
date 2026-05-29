@@ -1090,72 +1090,89 @@
       ]
     },
     {
-      "name": "13 \u2014 Payment Collection \u2014 A9 COD Only (Collect Cash)",
+      "name": "13 \u2014 Execute A9 \u2014 Collect Payment COD Only",
       "request": {
         "method": "POST",
         "header": [
           {
             "key": "Authorization",
             "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
           }
         ],
         "body": {
-          "mode": "formdata",
-          "formdata": [
-            {
-              "key": "client_payment_id",
-              "value": "pay-{{$guid}}",
-              "type": "text"
-            },
-            {
-              "key": "shipment_id",
-              "value": "{{shipment_id}}",
-              "type": "text"
-            },
-            {
-              "key": "amount",
-              "value": "1500.00",
-              "type": "text"
-            },
-            {
-              "key": "notes",
-              "value": "Cash collected from customer",
-              "type": "text"
-            },
-            {
-              "key": "payment_mode",
-              "value": "cash",
-              "type": "text"
-            },
-            {
-              "key": "proof_media[0][media_type]",
-              "value": "photo",
-              "type": "text"
-            },
-            {
-              "key": "proof_media[0][file_name]",
-              "value": "receipt.jpg",
-              "type": "text"
-            },
-            {
-              "key": "proof_media[0][description]",
-              "value": "Payment receipt photo",
-              "type": "text"
-            },
-            {
-              "key": "proof_media[0][sort_order]",
-              "value": "1",
-              "type": "text"
-            },
-            {
-              "key": "proof_media[0][file_ref]",
-              "value": "",
-              "type": "file"
+          "mode": "raw",
+          "raw": "{\n  \"client_action_id\": \"a9-{{$guid}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"mobile_cod_amount\": 1500.00,\n  \"notes\": \"Cash collected from customer \u2014 1500.00 SAR\",\n  \"latitude\": 21.3891,\n  \"longitude\": 39.8579\n}",
+          "options": {
+            "raw": {
+              "language": "json"
             }
-          ]
+          }
+        },
+        "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A9/execute/",
+        "description": "STEP 13 \u2014 COD PAYMENT COLLECTION (COD ORDERS ONLY).\nSKIP THIS STEP FOR CREDIT ORDERS.\n\nTHIS USES EXECUTE ACTION API \u2014 same as all other actions.\nNOT the /payments/collect/ staging API.\n\nREQUIRED FIELDS:\n  mobile_cod_amount = actual cash collected from customer\n  notes = required (note says what amount was collected)\n  workflow_version and content_hash from Job Detail\n\nWHAT HAPPENS WHEN A9 FIRES:\n  - Driver Treasury Transaction created (Debit, Client Pay)\n  - Driver wallet balance increases by collected amount\n  - Shipment COD Payment Status = Collected\n  - If amount differs from expected: variance flagged for Ops\n  - Driver is NEVER blocked due to variance\n\nVARIANCE HANDLING:\n  Change mobile_cod_amount to actual amount received.\n  If different from 1500.00 that is fine.\n  System records variance and Ops follows up.\n  Driver proceeds normally to A10.\n\nIMPORTANT: Always run 03 Job Detail before this request\nto refresh content_hash and workflow_version.\n\nNext action after A9: A10 Job Closed."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var resp = pm.response.json();",
+              "if (resp.status === 1 && resp.data && resp.data.sync_metadata) {",
+              "    pm.collectionVariables.set(",
+              "        \"content_hash\",",
+              "        resp.data.sync_metadata.content_hash",
+              "    );",
+              "    pm.collectionVariables.set(",
+              "        \"workflow_version\",",
+              "        resp.data.sync_metadata.workflow_version",
+              "    );",
+              "    pm.test(",
+              "        \"A9 COD payment collected\",",
+              "        function() { pm.expect(resp.status).to.eql(1); }",
+              "    );",
+              "    var hint = resp.data && resp.data.next_action_hint;",
+              "    if (hint) {",
+              "        console.log(\"Next: \" + hint.action + \" \u2014 \" + hint.reason);",
+              "        if (hint.job_closed) {",
+              "            console.log(\"*** JOB CLOSED \u2014 GO TO DASHBOARD ***\");",
+              "        }",
+              "    }",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "13B \u2014 Payment Staging API (Optional Reference Only)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"client_payment_id\": \"pay-{{$guid}}\",\n  \"shipment_id\": \"{{shipment_id}}\",\n  \"amount\": 1500.00,\n  \"notes\": \"COD collection staging\",\n  \"payment_mode\": \"cash\",\n  \"proof_media\": []\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
         },
         "url": "{{base_url}}/driver/payments/collect/",
-        "description": "COD ORDERS ONLY \u2014 SKIP FOR CREDIT ORDERS.\n\nThis API fires A9 Collect Payment.\nOnly call this if the shipment is a COD order.\n\nHow to check if shipment is COD:\n  In Request 03 Job Detail response look at:\n  data.pod_cod.cod_pending\n  If cod_pending = true \u2192 shipment is COD \u2192 run this request\n  If cod_pending = false \u2192 shipment is Credit \u2192 SKIP this request\n\nFor the current test shipment SH-D004:\n  cod_pending = false \u2192 this is a Credit order\n  SKIP this request and go directly to Request 14 A10\n\nIf you get error not_cod_shipment:\n  Your shipment is a Credit order.\n  Skip this step entirely.\n\nFor a real COD test you need a shipment where\n  payment_type = COD in the booking.\n  Ask your admin to create a COD booking for testing."
+        "description": "REFERENCE ONLY \u2014 NOT REQUIRED FOR COD FLOW.\n\nThis is a staging API for pre-registering payment intent.\nIt does NOT fire A9.\nIt does NOT collect the payment.\nIt does NOT create a Treasury Transaction.\n\nUSE THIS ONLY IF:\n  Your app needs to stage payment metadata\n  before the driver physically collects cash.\n\nFOR NORMAL COD FLOW: Use Request 13 Execute A9 instead.\n\nWARNING: This API validates file paths strictly.\nDo NOT attach files unless paths follow this pattern:\n  mobile_driver_uploads/{tenant}/{driver}/{shipment}/\n  payment_collection/filename.jpg\nSend proof_media as empty array [] for testing."
       }
     },
     {
