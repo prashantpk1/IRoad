@@ -27,7 +27,7 @@ from iroad_tenants.operation_runtime.idempotency import (
 )
 from iroad_tenants.operation_runtime.latest_state import sync_shipment_status_from_action_log
 from iroad_tenants.services.operation_execution_service import OperationExecutionService
-from tenant_workspace.models import TenantOperationActionLog
+from tenant_workspace.models import TenantOperationActionLog, TenantShipment
 
 
 @dataclass(frozen=True)
@@ -219,7 +219,27 @@ class ActionExecutionService:
                 created_by_label=created_by_label,
             )
             if sync_shipment_after and action_log.shipment_id:
-                sync_shipment_status_from_action_log(action_log.shipment)
+                shipment_after = action_log.shipment
+
+                status_before_sync = shipment_after.shipment_status
+
+                sync_shipment_status_from_action_log(shipment_after)
+
+                shipment_after.refresh_from_db()
+                status_after_sync = shipment_after.shipment_status
+
+                if (
+                    status_before_sync == TenantShipment.ShipmentStatus.DELIVERED
+                    and status_after_sync
+                    == TenantShipment.ShipmentStatus.POD_SUBMITTED
+                    and (shipment_after.order_type or '').upper() != 'COD'
+                ):
+                    shipment_after.shipment_status = (
+                        TenantShipment.ShipmentStatus.DELIVERED
+                    )
+                    shipment_after.save(
+                        update_fields=['shipment_status', 'updated_at']
+                    )
         except IntegrityError:
             existing = cls._find_idempotent_existing(
                 idempotency_key=normalized_key,

@@ -123,6 +123,8 @@ class ExecuteActionExecutionSerializer(serializers.Serializer):
     log_no = serializers.CharField(required=False, allow_blank=True)
     log_date = serializers.CharField(required=False, allow_null=True)
     idempotency_key = serializers.CharField(required=False, allow_blank=True)
+    job_closed = serializers.BooleanField(required=False, default=False)
+    next_step = serializers.CharField(required=False, allow_blank=True, default='')
 
 
 class ExecuteActionTimelinePreviewSerializer(serializers.Serializer):
@@ -143,3 +145,4 @@ class ExecuteActionResponseSerializer(serializers.Serializer):
     timeline_preview = serializers.DictField(required=False)
     sync_metadata = serializers.DictField()
     alerts = serializers.DictField(required=False)
+    next_action_hint = serializers.DictField(required=False)

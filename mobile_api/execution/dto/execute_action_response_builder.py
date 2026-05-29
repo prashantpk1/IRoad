@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from typing import Any, TypedDict
 
 from mobile_api.execution.dto.execute_action_context import ExecuteActionContext
+from mobile_api.utils.next_action_hint_builder import build_next_action_hint
 
 _EMPTY_TIMELINE_PREVIEW: dict[str, Any] = {
     'scope': '',
@@ -37,6 +38,7 @@ class ExecuteActionApiPayload(TypedDict, total=False):
     timeline_preview: dict[str, Any]
     sync_metadata: dict[str, Any]
     alerts: dict[str, Any]
+    next_action_hint: dict[str, Any]
 
 
 @dataclass
@@ -44,13 +46,37 @@ class ExecuteActionResponseBuilder:
     """Assembles the canonical Execute Action API payload from orchestration context."""
 
     def build(self, context: ExecuteActionContext) -> ExecuteActionApiPayload:
+        workflow = self._build_workflow(context)
+        pod_cod = self._build_pod_cod(context)
+        execution = self._build_execution(context)
+
+        order_type = ''
+        try:
+            order_type = (
+                context.shipment.order_type
+                if hasattr(context, 'shipment') and context.shipment
+                else ''
+            )
+        except Exception:
+            order_type = ''
+
+        next_hint = build_next_action_hint(
+            workflow=workflow,
+            pod_cod=pod_cod,
+            action_code=context.action_code,
+            order_type=order_type,
+        )
+        execution['job_closed'] = next_hint.get('job_closed', False)
+        execution['next_step'] = next_hint.get('action', 'refresh_job_detail')
+
         return ExecuteActionApiPayload(
-            execution=self._build_execution(context),
-            workflow=self._build_workflow(context),
-            pod_cod=self._build_pod_cod(context),
+            execution=execution,
+            workflow=workflow,
+            pod_cod=pod_cod,
             timeline_preview=self._build_timeline_preview(context),
             sync_metadata=self._build_sync_metadata(context),
             alerts=self._build_alerts(context),
+            next_action_hint=next_hint,
         )
 
     def _build_execution(self, context: ExecuteActionContext) -> dict[str, Any]:

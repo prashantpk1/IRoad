@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from typing import Any, TypedDict
 
 from mobile_api.job_detail.dto.job_detail_context import JobDetailContext
+from mobile_api.utils.next_action_hint_builder import build_next_action_hint
 
 _EMPTY_JOB: dict[str, Any] = {
     'job_type': '',
@@ -43,6 +44,7 @@ class JobDetailApiPayload(TypedDict, total=False):
     operational_issues: list[dict[str, Any]]
     unresolved_issue_count: int
     blocking_recommendation: bool
+    next_action_hint: dict[str, Any]
 
 
 @dataclass
@@ -56,17 +58,38 @@ class JobDetailResponseBuilder:
         TODO: enforce empty-move omission rules for ``pod_cod`` / ``round_trip``.
         """
         visibility = self._build_operational_issues_visibility(context)
+        workflow = self._build_workflow(context)
+        pod_cod = self._build_pod_cod(context)
+
+        order_type = ''
+        try:
+            order_type = (
+                context.shipment.order_type
+                if hasattr(context, 'shipment') and context.shipment
+                else ''
+            )
+        except Exception:
+            order_type = ''
+
+        next_hint = build_next_action_hint(
+            workflow=workflow,
+            pod_cod=pod_cod,
+            action_code=None,
+            order_type=order_type,
+        )
+
         return JobDetailApiPayload(
             job=self._build_job(context),
-            workflow=self._build_workflow(context),
+            workflow=workflow,
             timeline=self._build_timeline(context),
-            pod_cod=self._build_pod_cod(context),
+            pod_cod=pod_cod,
             round_trip=self._build_round_trip(context),
             alerts=self._build_alerts(context),
             sync_metadata=self._build_sync_metadata(context),
             operational_issues=list(visibility.get('operational_issues') or []),
             unresolved_issue_count=int(visibility.get('unresolved_issue_count') or 0),
             blocking_recommendation=bool(visibility.get('blocking_recommendation')),
+            next_action_hint=next_hint,
         )
 
     def _build_job(self, context: JobDetailContext) -> dict[str, Any]:

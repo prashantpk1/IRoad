@@ -83,6 +83,14 @@ def _success_result(*, reused=False):
                 'entity_versions': {'shipment': 'v2'},
             },
             'alerts': {},
+            'next_action_hint': {
+                'action': 'execute_action',
+                'screen': 'job_detail',
+                'action_code': 'A3',
+                'reason': 'Execute A3',
+                'job_closed': False,
+                'show_completion_screen': False,
+            },
         },
         http_status=200 if reused else 201,
     )
@@ -154,6 +162,7 @@ class ExecuteActionAPITests(SimpleTestCase):
                 'timeline_preview',
                 'sync_metadata',
                 'alerts',
+                'next_action_hint',
             },
         )
         self.assertIn('allowed_actions', data['workflow'])

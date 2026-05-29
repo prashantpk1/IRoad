@@ -37,6 +37,7 @@ class ExecuteActionFoundationTests(SimpleTestCase):
                 'timeline_preview',
                 'sync_metadata',
                 'alerts',
+                'next_action_hint',
             },
         )
 

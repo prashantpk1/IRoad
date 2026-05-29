@@ -37,6 +37,7 @@ class JobDetailFoundationTests(SimpleTestCase):
                 'operational_issues',
                 'unresolved_issue_count',
                 'blocking_recommendation',
+                'next_action_hint',
             },
         )
 

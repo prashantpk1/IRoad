@@ -66,3 +66,4 @@ class JobDetailResponseSerializer(serializers.Serializer):
     round_trip = serializers.DictField(required=False, default=dict)
     alerts = serializers.DictField(required=False, default=dict)
     sync_metadata = JobDetailSyncMetadataSerializer(required=False)
+    next_action_hint = serializers.DictField(required=False)
