@@ -76,6 +76,8 @@ class DashboardJobLocationTests(SimpleTestCase):
         block = build_active_shipment_slice(shipment)
         self.assertEqual(block['job_id'], str(shipment_id))
         self.assertEqual(block['route']['route_display'], 'Route A')
+        self.assertEqual(block['route']['route_display_start'], 'Route A')
+        self.assertEqual(block['route']['route_display_end'], '')
         self.assertEqual(block['pickup_address']['address_id'], str(pickup_id))
 
     def test_dashboard_payload_includes_active_job(self):

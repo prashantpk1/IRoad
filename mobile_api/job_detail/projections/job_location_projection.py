@@ -5,7 +5,11 @@ Route and address blocks for the Job Detail ``job`` section (read-only).
 """
 from __future__ import annotations
 
+import re
 from typing import Any
+
+# Combined route labels: "Delhi — Goa", "Delhi → Goa", "Delhi - Goa"
+_ROUTE_LABEL_SPLIT_RE = re.compile(r'\s*[—–\-→>]+\s*', re.UNICODE)
 
 
 def _localized_label(request: Any | None, english: str, arabic: str) -> str:
@@ -57,6 +61,33 @@ def serialize_address(
     }
 
 
+def _location_display_name(
+    location: Any | None,
+    *,
+    request: Any | None = None,
+) -> str:
+    """Human-readable endpoint name from ``TenantLocationMaster``."""
+    if location is None:
+        return ''
+    english = (getattr(location, 'location_name_english', '') or '').strip()
+    arabic = (getattr(location, 'location_name_arabic', '') or '').strip()
+    display = (getattr(location, 'display_label', '') or english or '').strip()
+    return _localized_label(request, english or display, arabic) or display
+
+
+def _split_combined_route_label(text: str) -> tuple[str, str]:
+    """Parse ``route_display`` / ``route_label`` into start and end when FKs are missing."""
+    combined = (text or '').strip()
+    if not combined:
+        return '', ''
+    parts = _ROUTE_LABEL_SPLIT_RE.split(combined, maxsplit=1)
+    if len(parts) == 2:
+        start, end = parts[0].strip(), parts[1].strip()
+        if start and end:
+            return start, end
+    return combined, ''
+
+
 def serialize_location_point(
     location: Any | None,
     *,
@@ -87,27 +118,44 @@ def serialize_route(
     *,
     shipment: Any | None = None,
     booking: Any | None = None,
+    request: Any | None = None,
 ) -> dict[str, Any]:
     """Route summary for shipment jobs (booking route FK + display strings)."""
     route = getattr(booking, 'route', None) if booking is not None else None
+    origin = getattr(route, 'origin_point', None) if route is not None else None
+    destination = (
+        getattr(route, 'destination_point', None) if route is not None else None
+    )
+    route_label = (getattr(route, 'route_label', '') or '').strip() if route else ''
+
+    route_display_start = ''
+    route_display_end = ''
+    if origin is not None and destination is not None:
+        route_display_start = _location_display_name(origin, request=request)
+        route_display_end = _location_display_name(destination, request=request)
+
     route_display = ''
     if shipment is not None:
         route_display = (getattr(shipment, 'route_display', '') or '').strip()
     if not route_display and booking is not None:
         route_display = (getattr(booking, 'route_display', '') or '').strip()
-    if not route_display and route is not None:
-        route_display = (getattr(route, 'route_label', '') or '').strip()
-    if not route_display and route is not None:
-        origin = getattr(route, 'origin_point', None)
-        destination = getattr(route, 'destination_point', None)
-        if origin is not None and destination is not None:
-            o_label = (getattr(origin, 'display_label', '') or '').strip()
-            d_label = (getattr(destination, 'display_label', '') or '').strip()
-            if o_label and d_label:
-                route_display = f'{o_label} → {d_label}'
+    if (
+        not route_display
+        and route_display_start
+        and route_display_end
+    ):
+        route_display = f'{route_display_start} → {route_display_end}'
+    if not route_display and route_label:
+        route_display = route_label
+    if not route_display_start and not route_display_end:
+        route_display_start, route_display_end = _split_combined_route_label(
+            route_display or route_label,
+        )
 
     out: dict[str, Any] = {
         'route_display': route_display,
+        'route_display_start': route_display_start,
+        'route_display_end': route_display_end,
         'route_direction': '',
     }
     if booking is not None:
@@ -119,7 +167,7 @@ def serialize_route(
                     getattr(route, 'route_id', None) or getattr(route, 'pk', '') or ''
                 ),
                 'route_code': str(getattr(route, 'route_code', '') or ''),
-                'route_label': str(getattr(route, 'route_label', '') or ''),
+                'route_label': route_label,
                 'route_type': str(getattr(route, 'route_type', '') or ''),
             },
         )
@@ -143,7 +191,11 @@ def build_shipment_location_block(
         or (getattr(booking, 'delivery_address', None) if booking else None)
     )
     return {
-        'route': serialize_route(shipment=shipment, booking=booking),
+        'route': serialize_route(
+            shipment=shipment,
+            booking=booking,
+            request=request,
+        ),
         'pickup_address': serialize_address(pickup, request=request),
         'drop_address': serialize_address(drop, request=request),
     }

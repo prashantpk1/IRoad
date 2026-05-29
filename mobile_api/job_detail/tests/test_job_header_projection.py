@@ -70,8 +70,16 @@ class JobHeaderProjectionTests(SimpleTestCase):
                 route_code='RT-01',
                 route_label='Jeddah — Riyadh',
                 route_type='Domestic',
-                origin_point=None,
-                destination_point=None,
+                origin_point=SimpleNamespace(
+                    display_label='Jeddah',
+                    location_name_english='Jeddah',
+                    location_name_arabic='',
+                ),
+                destination_point=SimpleNamespace(
+                    display_label='Riyadh',
+                    location_name_english='Riyadh',
+                    location_name_arabic='',
+                ),
             ),
             loading_address=None,
             delivery_address=None,
@@ -88,6 +96,8 @@ class JobHeaderProjectionTests(SimpleTestCase):
         header = build_job_header(context)
         self.assertEqual(header['job_no'], 'SH-100')
         self.assertEqual(header['route']['route_display'], 'Jeddah → Riyadh')
+        self.assertEqual(header['route']['route_display_start'], 'Jeddah')
+        self.assertEqual(header['route']['route_display_end'], 'Riyadh')
         self.assertEqual(header['route']['route_code'], 'RT-01')
         self.assertEqual(header['pickup_address']['address_id'], str(pickup_id))
         self.assertEqual(header['pickup_address']['map_link'], 'https://maps.example/pickup')
