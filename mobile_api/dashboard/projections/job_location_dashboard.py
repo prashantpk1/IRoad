@@ -7,6 +7,9 @@ from __future__ import annotations
 
 from typing import Any
 
+from mobile_api.helpers.order_type import resolve_order_type_text
+
+
 def build_dashboard_active_job(
     *,
     shipment: Any | None = None,
@@ -33,6 +36,10 @@ def build_dashboard_active_job(
             'job_id': str(shipment_id) if shipment_id is not None else '',
             'job_no': str(getattr(shipment, 'shipment_no', '') or ''),
             'entity_type': 'shipment',
+            'order_type': resolve_order_type_text(
+                shipment=shipment,
+                booking=booking,
+            ),
         }
         block.update(
             build_shipment_location_block(
@@ -47,11 +54,16 @@ def build_dashboard_active_job(
         movement_id = getattr(movement, 'movement_id', None) or getattr(
             movement, 'pk', None
         )
+        movement_shipment = getattr(movement, 'shipment', None)
         block = {
             'job_type': 'movement',
             'job_id': str(movement_id) if movement_id is not None else '',
             'job_no': str(getattr(movement, 'movement_no', '') or ''),
             'entity_type': 'movement',
+            'order_type': resolve_order_type_text(
+                shipment=movement_shipment,
+                booking=booking or getattr(movement, 'booking', None),
+            ),
         }
         block.update(build_movement_location_block(movement, request=request))
         return block

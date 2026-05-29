@@ -25,6 +25,7 @@ class DashboardJobLocationTests(SimpleTestCase):
             pk=shipment_id,
             shipment_id=shipment_id,
             shipment_no='SH-100',
+            order_type='COD',
             booking_item_type='Outbound',
             shipment_status='In Transit',
             trip_type='One-Way',
@@ -86,6 +87,7 @@ class DashboardJobLocationTests(SimpleTestCase):
             pk=shipment_id,
             shipment_id=shipment_id,
             shipment_no='SH-200',
+            order_type='',
             booking_item_type='Outbound',
             shipment_status='Loaded',
             trip_type='One-Way',
@@ -104,3 +106,4 @@ class DashboardJobLocationTests(SimpleTestCase):
         self.assertIn('active_job', payload)
         self.assertEqual(payload['active_job']['job_id'], str(shipment_id))
         self.assertEqual(payload['active_job']['job_type'], 'shipment')
+        self.assertEqual(payload['active_job']['order_type'], 'Credit')

@@ -17,6 +17,7 @@ class JobHeaderProjectionTests(SimpleTestCase):
         route_id = uuid4()
         shipment = SimpleNamespace(
             shipment_no='SH-100',
+            order_type='COD',
             route_display='Jeddah → Riyadh',
             loading_address=SimpleNamespace(
                 address_id=pickup_id,
@@ -95,6 +96,7 @@ class JobHeaderProjectionTests(SimpleTestCase):
         )
         header = build_job_header(context)
         self.assertEqual(header['job_no'], 'SH-100')
+        self.assertEqual(header['order_type'], 'COD')
         self.assertEqual(header['route']['route_display'], 'Jeddah → Riyadh')
         self.assertEqual(header['route']['route_display_start'], 'Jeddah')
         self.assertEqual(header['route']['route_display_end'], 'Riyadh')

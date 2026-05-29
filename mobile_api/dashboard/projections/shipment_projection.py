@@ -7,6 +7,9 @@ from __future__ import annotations
 
 from typing import Any
 
+from mobile_api.helpers.order_type import resolve_order_type_text
+
+
 def build_active_shipment_slice(
     shipment: Any | None,
     *,
@@ -33,6 +36,7 @@ def build_active_shipment_slice(
         'job_type': 'shipment',
         'job_id': str(shipment_id) if shipment_id is not None else '',
         'job_no': str(getattr(shipment, 'shipment_no', '') or ''),
+        'order_type': resolve_order_type_text(shipment=shipment, booking=booking),
     }
     payload.update(
         build_shipment_location_block(
