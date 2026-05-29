@@ -31,6 +31,7 @@ from mobile_api.job_detail.timeline.timeline_event_mapper import (
     sort_logs_newest_first,
 )
 from iroad_tenants.services.timeline_service import TimelineService
+from iroad_tenants.operation_runtime.impacts import operation_action_matches
 from tenant_workspace.models import TenantOperationAction
 
 JobType = Literal['shipment', 'movement']
@@ -221,6 +222,39 @@ class JobDetailTimelineService:
                 return []
             raise
 
+    def _filter_workflow_actions_for_context(
+        self,
+        actions: list[Any],
+        *,
+        context: JobDetailContext,
+    ) -> list[Any]:
+        """
+        Keep only workflow actions applicable to this job type/context.
+
+        - Shipment timelines do not show booking-start action (A1).
+        - Credit shipments do not show COD collection action (A9).
+        """
+        if not actions:
+            return []
+        if context.job_type != 'shipment' or context.shipment is None:
+            return list(actions)
+
+        is_cod = (getattr(context.shipment, 'order_type', '') or '').strip().upper() == 'COD'
+        filtered: list[Any] = []
+        for action in actions:
+            if operation_action_matches(action, 'start job', 'a1', 'action 1'):
+                continue
+            if (not is_cod) and operation_action_matches(
+                action,
+                'collect payment',
+                'a9',
+                'action 9',
+                'cod',
+            ):
+                continue
+            filtered.append(action)
+        return filtered
+
     def _workflow_events_for_context(
         self,
         context: JobDetailContext,
@@ -229,6 +263,9 @@ class JobDetailTimelineService:
         request: Any | None,
     ) -> list[dict[str, Any]]:
         actions = self._workflow_actions()
+        if not actions:
+            return []
+        actions = self._filter_workflow_actions_for_context(actions, context=context)
         if not actions:
             return []
         return merge_actions_with_timeline_logs(actions, logs, request=request)
@@ -260,6 +297,13 @@ class JobDetailTimelineService:
         request: Any | None,
     ) -> TimelinePageResult:
         actions = self._workflow_actions()
+        if not actions:
+            return TimelinePageResult(
+                timeline_preview=[],
+                timeline_cursor='',
+                has_more=False,
+            )
+        actions = self._filter_workflow_actions_for_context(actions, context=context)
         if not actions:
             return TimelinePageResult(
                 timeline_preview=[],

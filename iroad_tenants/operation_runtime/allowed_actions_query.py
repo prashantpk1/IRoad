@@ -149,7 +149,11 @@ def _prefilter_shipment_candidates(
         exclude_log_id=exclude_log_id,
     )
 
-    qs = qs.filter(auto_shipment_post=False)
+    qs = qs.filter(
+        Q(auto_shipment_post=False)
+        | Q(action_code__iexact='A4')
+        | Q(english_label__icontains='confirm loaded')
+    )
 
     if current in _TERMINAL_SHIPMENT_STATUSES or stage in (STAGE_COMPLETION, STAGE_CANCELLED):
         reversal_q = Q()

@@ -241,9 +241,6 @@ def _action_is_allowed(
 
     # --- Shipment linked: forward / side-effect actions ---
     if shipment is not None:
-        if action.auto_shipment_post:
-            return False
-
         current = shipment.shipment_status or ''
         if current in _TERMINAL_SHIPMENT_STATUSES:
             return _is_reversal_action(action)
@@ -257,6 +254,9 @@ def _action_is_allowed(
             or action_matches(action, 'confirm loaded',
                               'confirm_loaded')
         )
+
+        if action.auto_shipment_post and not is_confirm_loaded:
+            return False
 
         # A4 is the action that CREATES movement.
         # Allow A4 when movement does not exist yet

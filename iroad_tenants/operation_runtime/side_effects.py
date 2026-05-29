@@ -64,6 +64,18 @@ def _is_unloading_completed_action(action) -> bool:
     )
 
 
+def _should_auto_mark_delivered_for_credit(action, shipment) -> bool:
+    if shipment is None or not _is_unloading_completed_action(action):
+        return False
+    if (shipment.order_type or '').strip().upper() == 'COD':
+        return False
+    return (shipment.shipment_status or '').strip() in {
+        shipment.ShipmentStatus.IN_TRANSIT,
+        shipment.ShipmentStatus.AT_DELIVERY,
+        shipment.ShipmentStatus.POD_SUBMITTED,
+    }
+
+
 def _assert_a3_fired_for_a4(action_log) -> None:
     if not _is_confirm_loaded_action(action_log.operation_action):
         return
@@ -238,6 +250,9 @@ def apply_execution_side_effects(action_log, *, created_by_label='') -> None:
             action=action,
             created_by_label=created_by_label,
         )
+    elif _should_auto_mark_delivered_for_credit(action, shipment):
+        shipment.shipment_status = shipment.ShipmentStatus.DELIVERED
+        shipment.save(update_fields=['shipment_status', 'updated_at'])
 
     if shipment is not None and (
         getattr(action, 'auto_treasury_post', False)

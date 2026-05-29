@@ -157,6 +157,7 @@ class MovementPolicyTests(SimpleTestCase):
         shipment.shipment_status = 'Created'
         shipment.order_type = 'Credit'
         action = _action('A4', 'Confirm Loaded', sequence_category='job')
+        action.auto_shipment_post = True
         action.movement_status_impact = 'In_Progress'
         action.shipment_status_impact = ''
         self.assertTrue(

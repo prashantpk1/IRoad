@@ -12,6 +12,7 @@ from iroad_tenants.operation_runtime.constants import (
 )
 from iroad_tenants.operation_runtime.impacts import operation_action_matches
 from tenant_workspace.models import (
+    resolve_operation_action_log_for_pod,
     TenantShipment,
     TenantShipmentDocument,
     TenantShipmentPodPage,
@@ -23,6 +24,12 @@ def birth_pod_from_action_log(action_log, *, created_by_label=''):
     shipment = action_log.shipment
     if shipment is None:
         return None
+    is_upload_pod_action = operation_action_matches(
+        action_log.operation_action,
+        'upload pod',
+        'a7',
+        'action 7',
+    )
     source_document = (
         TenantShipmentDocument.objects.filter(
             shipment=shipment,
@@ -32,9 +39,16 @@ def birth_pod_from_action_log(action_log, *, created_by_label=''):
         .first()
     )
     if source_document is None:
-        raise ValidationError(
-            'Auto POD Post requires at least one delivery-note document on the shipment.'
-        )
+        if is_upload_pod_action:
+            source_document = _auto_create_delivery_note_for_a7(
+                action_log,
+                shipment=shipment,
+                created_by_label=created_by_label,
+            )
+        else:
+            raise ValidationError(
+                'Auto POD Post requires at least one delivery-note document on the shipment.'
+            )
     existing_pod = TenantShipmentDocument.objects.filter(
         source_document_id=source_document.pk,
     ).first()
@@ -84,6 +98,15 @@ def birth_pod_from_action_log(action_log, *, created_by_label=''):
             source_document,
             {},
         )
+        action_log_value = row.get('action_log')
+        action_log_obj = None
+        if getattr(action_log_value, 'pk', None):
+            action_log_obj = action_log_value
+        else:
+            action_log_obj = resolve_operation_action_log_for_pod(
+                action_log_value,
+                shipment=shipment,
+            )
         TenantShipmentPodPage.objects.create(
             document=document,
             line_no=idx,
@@ -92,7 +115,7 @@ def birth_pod_from_action_log(action_log, *, created_by_label=''):
             if source_page
             else row.get('doc_page', ''),
             source=row.get('source') or 'Action Log',
-            action_log=row.get('action_log') or action_log.log_no,
+            action_log=action_log_obj,
             physical_location=row.get('physical_location') or 'With Driver',
             soft_copy_status=row.get('soft_copy_status') or 'Not Collected',
             digital_evidence_status=row.get('digital_evidence_status') or 'Not Collected',
@@ -100,16 +123,53 @@ def birth_pod_from_action_log(action_log, *, created_by_label=''):
             attachment_label=row.get('attachment_label') or '',
         )
 
-    if operation_action_matches(
-        action_log.operation_action,
-        'upload pod',
-        'a7',
-        'action 7',
-    ):
+    if is_upload_pod_action:
         shipment.pod_type = TenantShipment.PodType.DIGITAL
         shipment.save(update_fields=['pod_type', 'updated_at'])
 
     return document
+
+
+def _auto_create_delivery_note_for_a7(action_log, *, shipment, created_by_label=''):
+    """
+    A7 mobile flow may stage POD evidence before office creates Shipment Document.
+    Create a minimal delivery-note source so auto POD posting can proceed.
+    """
+    from iroad_tenants.views import (
+        SHIPMENT_DOCUMENTS_AUTO_FORM_CODE,
+        SHIPMENT_DOCUMENTS_AUTO_FORM_LABEL,
+        SHIPMENT_DOCUMENTS_REF_PREFIX,
+        _next_auto_number_for_form,
+        _tenant_shipment_document_apply_foreign_keys,
+    )
+
+    record_no, record_sequence = _next_auto_number_for_form(
+        form_code=SHIPMENT_DOCUMENTS_AUTO_FORM_CODE,
+        form_label=SHIPMENT_DOCUMENTS_AUTO_FORM_LABEL,
+        prefix=SHIPMENT_DOCUMENTS_REF_PREFIX,
+    )
+    source_document = TenantShipmentDocument(
+        record_no=record_no,
+        record_sequence=record_sequence,
+        record_date=timezone.localdate(),
+        document_type='delivery_note',
+        document_ref_no=shipment.shipment_no or record_no,
+        document_date=timezone.localdate(),
+        is_delivery_note=True,
+        physical_location='With Driver',
+        page_count=1,
+        status=TenantShipmentDocument.Status.UPLOADED,
+        notes='Auto-created during A7 to satisfy POD source document requirement.',
+        created_by_label=(created_by_label or '')[:200]
+        or 'mobile_a7_auto_delivery_note',
+    )
+    _tenant_shipment_document_apply_foreign_keys(
+        source_document,
+        booking=shipment.booking if shipment.booking_id else None,
+        shipment=shipment,
+    )
+    source_document.save()
+    return source_document
 
 
 def apply_pod_posting_from_action_log(

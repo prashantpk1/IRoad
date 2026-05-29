@@ -15980,12 +15980,6 @@ def _tenant_shipment_pod_resolve_line_source_page(doc_page_value, source_documen
     if not value or source_document is None:
         return None
 
-    document_page = source_document.document_pages.filter(pk=value).first()
-    if document_page is not None:
-        pod_page = source_document.pod_pages.filter(line_no=document_page.line_no).first()
-        if pod_page is not None:
-            return pod_page
-
     valid_pages = {
         str(page.pk): page
         for page in source_document.pod_pages.order_by('line_no')
@@ -16001,6 +15995,21 @@ def _tenant_shipment_pod_resolve_line_source_page(doc_page_value, source_documen
             if page.line_no == line_no:
                 return page
         return None
+
+    try:
+        import uuid
+
+        uuid.UUID(value)
+    except (TypeError, ValueError, AttributeError):
+        form_errors.setdefault('pod_pages', 'Each line must reference a valid document page.')
+        return None
+
+    document_page = source_document.document_pages.filter(pk=value).first()
+    if document_page is not None:
+        pod_page = source_document.pod_pages.filter(line_no=document_page.line_no).first()
+        if pod_page is not None:
+            return pod_page
+
     form_errors.setdefault('pod_pages', 'Each line must reference a valid document page.')
     return None
 
