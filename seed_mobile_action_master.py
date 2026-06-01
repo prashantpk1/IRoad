@@ -16,20 +16,6 @@ import argparse
 import os
 DEFAULT_SCHEMA = 't_bb773f861f3048748c0a7f0ffbee0df6'
 
-# Re-export production catalog (includes A_POD_VERIFY).
-from iroad_tenants.operation_runtime.action_master_catalog import (  # noqa: E402
-    PRODUCTION_ACTION_MASTER as CANONICAL_ACTIONS,
-)
-
-LEGACY_CODE_MAP = {
-    'A2': ('ACT-AAAC',),
-    'A3': ('ACT-AAAD',),
-    'A5': ('OA-AAAE',),
-    'A6': ('OA-AAAF',),
-    'A7': ('OA-AAAG',),
-}
-
-
 def setup_django() -> None:
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
     debug_value = os.environ.get('DEBUG', '')
@@ -42,6 +28,22 @@ def setup_django() -> None:
     import django
 
     django.setup()
+
+
+setup_django()
+
+# Re-export production catalog (includes A_POD_VERIFY).
+from iroad_tenants.operation_runtime.action_master_catalog import (  # noqa: E402
+    PRODUCTION_ACTION_MASTER as CANONICAL_ACTIONS,
+)
+
+LEGACY_CODE_MAP = {
+    'A2': ('ACT-AAAC',),
+    'A3': ('ACT-AAAD',),
+    'A5': ('OA-AAAE',),
+    'A6': ('OA-AAAF',),
+    'A7': ('OA-AAAG',),
+}
 
 
 def changed_fields(instance, defaults: dict[str, Any]) -> list[str]:

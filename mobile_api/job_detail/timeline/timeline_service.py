@@ -239,6 +239,39 @@ class JobDetailTimelineService:
         """
         if not actions:
             return []
+
+        if context.job_type == 'movement':
+            filtered: list[Any] = []
+            for action in actions:
+                cat = (getattr(action, 'sequence_category', '') or '').strip().lower()
+                code = (getattr(action, 'action_code', '') or '').strip().upper()
+                if cat == 'empty_move' or code.startswith('EM'):
+                    filtered.append(action)
+            return filtered
+
+        if context.job_type == 'shipment':
+            is_cod = False
+            if context.shipment is not None:
+                is_cod = (getattr(context.shipment, 'order_type', '') or '').strip().upper() == 'COD'
+            filtered: list[Any] = []
+            for action in actions:
+                cat = (getattr(action, 'sequence_category', '') or '').strip().lower()
+                code = (getattr(action, 'action_code', '') or '').strip().upper()
+                if cat == 'empty_move' or code.startswith('EM'):
+                    continue
+                if operation_action_matches(action, 'start job', 'a1', 'action 1'):
+                    continue
+                if (not is_cod) and operation_action_matches(
+                    action,
+                    'collect payment',
+                    'a9',
+                    'action 9',
+                    'cod',
+                ):
+                    continue
+                filtered.append(action)
+            return filtered
+
         if context.job_type != 'shipment' or context.shipment is None:
             return list(actions)
 

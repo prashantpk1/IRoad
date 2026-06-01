@@ -192,6 +192,55 @@ class TimelineServiceTests(SimpleTestCase):
         self.assertIs(mock_fetch.call_args.kwargs['movement'], movement)
         self.assertIsNone(mock_fetch.call_args.kwargs['shipment'])
 
+    def test_filter_workflow_actions_for_movement_and_shipment_contexts(self):
+        act_a1 = _action(code='A1', label='Start Job')
+        act_a1.sequence_category = 'job'
+
+        act_a2 = _action(code='A2', label='Pickup Arrival')
+        act_a2.sequence_category = 'job'
+
+        act_em1 = _action(code='EM1', label='Start Movement')
+        act_em1.sequence_category = 'empty_move'
+
+        act_em2 = _action(code='EM2', label='Depart Empty')
+        act_em2.sequence_category = 'empty_move'
+
+        actions = [act_a1, act_a2, act_em1, act_em2]
+        svc = JobDetailTimelineService()
+
+        # Case 1: Movement job
+        movement = MagicMock()
+        ctx_movement = JobDetailContext(
+            driver=_driver(),
+            tenant_schema='t',
+            user_id='u',
+            job_type='movement',
+            job_id=str(uuid4()),
+            movement=movement,
+        )
+        filtered_movement = svc._filter_workflow_actions_for_context(actions, context=ctx_movement)
+        self.assertEqual(
+            [a.action_code for a in filtered_movement],
+            ['EM1', 'EM2'],
+        )
+
+        # Case 2: Shipment job
+        shipment = MagicMock()
+        shipment.order_type = 'COD'
+        ctx_shipment = JobDetailContext(
+            driver=_driver(),
+            tenant_schema='t',
+            user_id='u',
+            job_type='shipment',
+            job_id=str(uuid4()),
+            shipment=shipment,
+        )
+        filtered_shipment = svc._filter_workflow_actions_for_context(actions, context=ctx_shipment)
+        self.assertEqual(
+            [a.action_code for a in filtered_shipment],
+            ['A2'],
+        )
+
 
 class TimelineProjectionTests(TestCase):
     @patch(

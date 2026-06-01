@@ -42,5 +42,5 @@ class ActionMasterCatalogTests(SimpleTestCase):
         }
         self.assertEqual(
             mobile_codes,
-            {f'A{i}' for i in range(1, 11)},
+            {f'A{i}' for i in range(1, 11)} | {f'EM{i}' for i in range(1, 5)},
         )
