@@ -19,7 +19,11 @@ from mobile_api.history.projections.history_card_projection import (
     payment_method_tag,
     resolve_history_route,
     resolve_job_date,
+    resolve_trip_type,
     route_type_label,
+)
+from mobile_api.job_detail.projections.job_location_projection import (
+    build_shipment_location_block,
 )
 from mobile_api.history.selectors.order_type_resolver import resolve_order_type
 from mobile_api.job_detail.timeline.timeline_event_mapper import map_log_to_timeline_event
@@ -271,7 +275,16 @@ def build_history_detail(
         and not getattr(getattr(row, 'operation_action', None), 'admin_only', False)
     )
 
+    location_block = build_shipment_location_block(
+        shipment,
+        booking=booking,
+        request=request,
+    )
+
     return {
+        'trip_type': resolve_trip_type(booking, shipment),
+        'pickup_address': location_block.get('pickup_address') or {},
+        'drop_address': location_block.get('drop_address') or {},
         'summary': summary,
         'workflow_status': build_workflow_status(shipment, logs, request=request),
         'timeline': {

@@ -426,3 +426,84 @@ class HistoryCardProjectionTests(SimpleTestCase):
         payload = build_history_detail(shipment, [])
         self.assertEqual(payload['summary']['truck']['truck_code'], 'TRK-001')
         self.assertEqual(payload['summary']['truck']['plate_number'], 'ABC 1234')
+
+    def test_history_detail_includes_trip_type_and_addresses(self):
+        from mobile_api.history.projections.history_detail_projection import (
+            build_history_detail,
+        )
+
+        pickup = MagicMock()
+        pickup.address_id = uuid4()
+        pickup.address_code = 'AD-PICK'
+        pickup.display_name = 'Warehouse A'
+        pickup.english_label = 'Warehouse A'
+        pickup.arabic_label = ''
+        pickup.address_category = 'Warehouse'
+        pickup.address_line_1 = 'Line 1'
+        pickup.address_line_2 = ''
+        pickup.city = 'Riyadh'
+        pickup.province = ''
+        pickup.district = ''
+        pickup.street = ''
+        pickup.building_no = ''
+        pickup.postal_code = ''
+        pickup.map_link = 'https://maps.example/pickup'
+        pickup.contact_name = ''
+        pickup.mobile_no_1 = ''
+        pickup.mobile_no_2 = ''
+        pickup.site_instructions = ''
+
+        drop = MagicMock()
+        drop.address_id = uuid4()
+        drop.address_code = 'AD-DROP'
+        drop.display_name = 'Customer B'
+        drop.english_label = 'Customer B'
+        drop.arabic_label = ''
+        drop.address_category = 'Customer'
+        drop.address_line_1 = 'Line 2'
+        drop.address_line_2 = ''
+        drop.city = 'Jeddah'
+        drop.province = ''
+        drop.district = ''
+        drop.street = ''
+        drop.building_no = ''
+        drop.postal_code = ''
+        drop.map_link = 'https://maps.example/drop'
+        drop.contact_name = ''
+        drop.mobile_no_1 = ''
+        drop.mobile_no_2 = ''
+        drop.site_instructions = ''
+
+        booking = MagicMock()
+        booking.booking_id = uuid4()
+        booking.booking_no = 'BK-RT-001'
+        booking.trip_type = 'Round'
+        booking.route = None
+        booking.route_display = ''
+        booking.route_direction = ''
+        booking.loading_address = pickup
+        booking.delivery_address = drop
+
+        shipment = MagicMock()
+        shipment.pk = uuid4()
+        shipment.shipment_id = shipment.pk
+        shipment.shipment_no = 'SH-RT-001'
+        shipment.order_type = 'Credit'
+        shipment.shipment_status = TenantShipment.ShipmentStatus.CLOSED
+        shipment.shipment_date = None
+        shipment.loading_address = pickup
+        shipment.delivery_address = drop
+        shipment.route_display = ''
+        shipment.booking = booking
+        shipment.truck = None
+        shipment.booking_item_type = 'Outbound'
+        shipment.trip_type = ''
+
+        payload = build_history_detail(shipment, [])
+        self.assertEqual(payload['trip_type'], 'Round')
+        self.assertEqual(payload['pickup_address']['address_code'], 'AD-PICK')
+        self.assertEqual(payload['pickup_address']['city'], 'Riyadh')
+        self.assertEqual(payload['pickup_address']['map_link'], 'https://maps.example/pickup')
+        self.assertEqual(payload['drop_address']['address_code'], 'AD-DROP')
+        self.assertEqual(payload['drop_address']['city'], 'Jeddah')
+        self.assertEqual(payload['drop_address']['map_link'], 'https://maps.example/drop')

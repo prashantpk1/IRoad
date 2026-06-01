@@ -23,6 +23,9 @@ class HistoryListResponseSerializer(serializers.Serializer):
 class HistoryDetailResponseSerializer(serializers.Serializer):
     """GET /driver/history/<shipment_id>/ detail envelope."""
 
+    trip_type = serializers.CharField(required=False, allow_blank=True, default='')
+    pickup_address = serializers.DictField(required=False, default=dict)
+    drop_address = serializers.DictField(required=False, default=dict)
     summary = serializers.DictField(required=False, default=dict)
     workflow_status = serializers.ListField(
         child=serializers.DictField(),
