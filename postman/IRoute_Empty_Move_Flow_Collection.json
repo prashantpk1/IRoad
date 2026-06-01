@@ -229,7 +229,7 @@
       }
     },
     {
-      "name": "05 — Execute Start Empty Move (Scheduled → In Progress)",
+      "name": "05 — Execute EM1 Start Movement",
       "request": {
         "method": "POST",
         "header": [
@@ -251,8 +251,8 @@
             }
           }
         },
-        "url": "{{base_url}}/driver/jobs/movement/{{movement_job_id}}/actions/A_EMPTY_START/execute/",
-        "description": "STEP 5 — DRIVER STARTS THE EMPTY MOVE.\nNOTE: action_code for empty move start may be named differently.\nCheck Action Master in database for the exact code where:\n  scope = On_Call AND category = Empty_Move AND sequence_number = 1\nReplace A_EMPTY_START in URL with that exact code.\nWhen this fires:\n  Truck Movement Log status: Scheduled → In Progress\n  Start Time is stamped\nNo Shipment is created (empty move has no cargo).\nNo Booking Item is involved.\nGPS at departure is captured.\nThree valid reasons for empty move:\n  Return = truck returning to base after delivery\n  Maintenance = truck going for service/repair\n  Repositioning = truck moving between hubs for next job\n\nPREREQUISITE: Run empty move execute requests in order and do not skip steps. content_hash/workflow_version auto-update after each successful execute. If you get 409 stale_content_hash, re-run Request 03 then retry."
+        "url": "{{base_url}}/driver/jobs/movement/{{movement_job_id}}/actions/EM1/execute/",
+        "description": "Fires EM1 action to transition Truck Movement Log status Scheduled -> In Progress."
       },
       "event": [
         {
@@ -261,23 +261,11 @@
             "type": "text/javascript",
             "exec": [
               "var resp = pm.response.json();",
+              "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
               "if (resp.status === 1 && resp.data && resp.data.sync_metadata) {",
-              "    pm.collectionVariables.set(",
-              "        \"content_hash\",",
-              "        resp.data.sync_metadata.content_hash",
-              "    );",
-              "    pm.collectionVariables.set(",
-              "        \"workflow_version\",",
-              "        resp.data.sync_metadata.workflow_version",
-              "    );",
-              "    pm.test(",
-              "        \"Sync hash updated from empty move execute\",",
-              "        function() {",
-              "            pm.expect(",
-              "                resp.data.sync_metadata.content_hash",
-              "            ).to.exist;",
-              "        }",
-              "    );",
+              "    pm.collectionVariables.set(\"content_hash\", resp.data.sync_metadata.content_hash);",
+              "    pm.collectionVariables.set(\"workflow_version\", resp.data.sync_metadata.workflow_version);",
+              "    pm.test(\"Sync hash updated from empty move execute\", function() { pm.expect(resp.data.sync_metadata.content_hash).to.exist; });",
               "}"
             ]
           }
@@ -285,7 +273,200 @@
       ]
     },
     {
-      "name": "06 — Execute Complete Empty Move (In Progress → Completed)",
+      "name": "05a — Refresh Job Detail (Post EM1)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
+        ],
+        "url": "{{base_url}}/driver/jobs/movement/{{movement_job_id}}/",
+        "description": "Refresh state and assert allowed actions contain EM2."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var resp = pm.response.json();",
+              "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+              "if (resp.data && resp.data.sync_metadata) {",
+              "    pm.collectionVariables.set(\"content_hash\", resp.data.sync_metadata.content_hash);",
+              "    pm.collectionVariables.set(\"workflow_version\", resp.data.sync_metadata.workflow_version);",
+              "}",
+              "pm.test(\"Allowed actions contains EM2\", function() {",
+              "    var allowed = (resp.data && resp.data.workflow && resp.data.workflow.allowed_actions) || [];",
+              "    var codes = allowed.map(function(a) { return a.action_code; });",
+              "    pm.expect(codes).to.include(\"EM2\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "05b — Execute EM2 Depart Empty",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"client_action_id\": \"em-depart-{{$guid}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": 24.7136,\n  \"longitude\": 46.6753,\n  \"notes\": \"Departing empty\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": "{{base_url}}/driver/jobs/movement/{{movement_job_id}}/actions/EM2/execute/",
+        "description": "Fires EM2 action to log departure."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var resp = pm.response.json();",
+              "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+              "if (resp.status === 1 && resp.data && resp.data.sync_metadata) {",
+              "    pm.collectionVariables.set(\"content_hash\", resp.data.sync_metadata.content_hash);",
+              "    pm.collectionVariables.set(\"workflow_version\", resp.data.sync_metadata.workflow_version);",
+              "    pm.test(\"Sync hash updated from empty move execute\", function() { pm.expect(resp.data.sync_metadata.content_hash).to.exist; });",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "05b — Refresh Job Detail (Post EM2)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
+        ],
+        "url": "{{base_url}}/driver/jobs/movement/{{movement_job_id}}/",
+        "description": "Refresh state and assert allowed actions contain EM3."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var resp = pm.response.json();",
+              "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+              "if (resp.data && resp.data.sync_metadata) {",
+              "    pm.collectionVariables.set(\"content_hash\", resp.data.sync_metadata.content_hash);",
+              "    pm.collectionVariables.set(\"workflow_version\", resp.data.sync_metadata.workflow_version);",
+              "}",
+              "pm.test(\"Allowed actions contains EM3\", function() {",
+              "    var allowed = (resp.data && resp.data.workflow && resp.data.workflow.allowed_actions) || [];",
+              "    var codes = allowed.map(function(a) { return a.action_code; });",
+              "    pm.expect(codes).to.include(\"EM3\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "05c — Execute EM3 Arrival At Destination",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"client_action_id\": \"em-arrive-{{$guid}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": 24.6877,\n  \"longitude\": 46.7219,\n  \"notes\": \"Arriving empty\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": "{{base_url}}/driver/jobs/movement/{{movement_job_id}}/actions/EM3/execute/",
+        "description": "Fires EM3 action to log arrival."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var resp = pm.response.json();",
+              "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+              "if (resp.status === 1 && resp.data && resp.data.sync_metadata) {",
+              "    pm.collectionVariables.set(\"content_hash\", resp.data.sync_metadata.content_hash);",
+              "    pm.collectionVariables.set(\"workflow_version\", resp.data.sync_metadata.workflow_version);",
+              "    pm.test(\"Sync hash updated from empty move execute\", function() { pm.expect(resp.data.sync_metadata.content_hash).to.exist; });",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "05c — Refresh Job Detail (Post EM3)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
+        ],
+        "url": "{{base_url}}/driver/jobs/movement/{{movement_job_id}}/",
+        "description": "Refresh state and assert allowed actions contain EM4."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var resp = pm.response.json();",
+              "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+              "if (resp.data && resp.data.sync_metadata) {",
+              "    pm.collectionVariables.set(\"content_hash\", resp.data.sync_metadata.content_hash);",
+              "    pm.collectionVariables.set(\"workflow_version\", resp.data.sync_metadata.workflow_version);",
+              "}",
+              "pm.test(\"Allowed actions contains EM4\", function() {",
+              "    var allowed = (resp.data && resp.data.workflow && resp.data.workflow.allowed_actions) || [];",
+              "    var codes = allowed.map(function(a) { return a.action_code; });",
+              "    pm.expect(codes).to.include(\"EM4\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 — Execute EM4 Complete Movement",
       "request": {
         "method": "POST",
         "header": [
@@ -307,8 +488,8 @@
             }
           }
         },
-        "url": "{{base_url}}/driver/jobs/movement/{{movement_job_id}}/actions/A_EMPTY_COMPLETE/execute/",
-        "description": "STEP 6 — DRIVER ARRIVES AT DESTINATION. EMPTY MOVE DONE.\nNOTE: action_code for empty move complete may be named differently.\nCheck Action Master in database for the exact code where:\n  scope = On_Call AND category = Empty_Move AND sequence_number = 2\nReplace A_EMPTY_COMPLETE in URL with that exact code.\nWhen this fires:\n  Truck Movement Log status: In Progress → Completed\n  End Time is stamped\nThe Movement Log row is now terminal — cannot be changed.\nDriver returns to On Call mode ready for next assignment.\nFleet utilisation dashboard updates with distance and time.\n\nPREREQUISITE: Run empty move execute requests in order and do not skip steps. content_hash/workflow_version auto-update after each successful execute. If you get 409 stale_content_hash, re-run Request 03 then retry."
+        "url": "{{base_url}}/driver/jobs/movement/{{movement_job_id}}/actions/EM4/execute/",
+        "description": "STEP 6 — DRIVER ARRIVES AT DESTINATION. EMPTY MOVE DONE.\nFires EM4 action to transition status In Progress -> Completed."
       },
       "event": [
         {
@@ -317,24 +498,46 @@
             "type": "text/javascript",
             "exec": [
               "var resp = pm.response.json();",
+              "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
               "if (resp.status === 1 && resp.data && resp.data.sync_metadata) {",
-              "    pm.collectionVariables.set(",
-              "        \"content_hash\",",
-              "        resp.data.sync_metadata.content_hash",
-              "    );",
-              "    pm.collectionVariables.set(",
-              "        \"workflow_version\",",
-              "        resp.data.sync_metadata.workflow_version",
-              "    );",
-              "    pm.test(",
-              "        \"Sync hash updated from empty move execute\",",
-              "        function() {",
-              "            pm.expect(",
-              "                resp.data.sync_metadata.content_hash",
-              "            ).to.exist;",
-              "        }",
-              "    );",
+              "    pm.collectionVariables.set(\"content_hash\", resp.data.sync_metadata.content_hash);",
+              "    pm.collectionVariables.set(\"workflow_version\", resp.data.sync_metadata.workflow_version);",
+              "    pm.test(\"Sync hash updated from empty move execute\", function() { pm.expect(resp.data.sync_metadata.content_hash).to.exist; });",
               "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "06a — Final Refresh Job Detail (Post EM4)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
+        ],
+        "url": "{{base_url}}/driver/jobs/movement/{{movement_job_id}}/",
+        "description": "Refresh state and assert status is Completed and allowed actions is empty."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var resp = pm.response.json();",
+              "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+              "var status = (resp.data && resp.data.reconciliation && resp.data.reconciliation.authoritative_status) || (resp.data && resp.data.workflow && resp.data.workflow.workflow_metadata && resp.data.workflow.workflow_metadata.status_for_workflow) || \"\";",
+              "pm.test(\"Movement status is Completed\", function() {",
+              "    pm.expect(status).to.eql(\"Completed\");",
+              "});",
+              "pm.test(\"Allowed actions is empty\", function() {",
+              "    var allowed = (resp.data && resp.data.workflow && resp.data.workflow.allowed_actions) || [];",
+              "    pm.expect(allowed.length).to.eql(0);",
+              "});"
             ]
           }
         }
@@ -374,22 +577,9 @@
             "exec": [
               "var resp = pm.response.json();",
               "if (resp.status === 1 && resp.data && resp.data.sync_metadata) {",
-              "    pm.collectionVariables.set(",
-              "        \"content_hash\",",
-              "        resp.data.sync_metadata.content_hash",
-              "    );",
-              "    pm.collectionVariables.set(",
-              "        \"workflow_version\",",
-              "        resp.data.sync_metadata.workflow_version",
-              "    );",
-              "    pm.test(",
-              "        \"Sync hash updated from empty move execute\",",
-              "        function() {",
-              "            pm.expect(",
-              "                resp.data.sync_metadata.content_hash",
-              "            ).to.exist;",
-              "        }",
-              "    );",
+              "    pm.collectionVariables.set(\"content_hash\", resp.data.sync_metadata.content_hash);",
+              "    pm.collectionVariables.set(\"workflow_version\", resp.data.sync_metadata.workflow_version);",
+              "    pm.test(\"Sync hash updated from empty move execute\", function() { pm.expect(resp.data.sync_metadata.content_hash).to.exist; });",
               "}"
             ]
           }
