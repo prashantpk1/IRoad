@@ -1,0 +1,378 @@
+{
+  "info": {
+    "_postman_id": "c8f4a2b1-9d3e-4f5a-b6c7-8e9f0a1b2c3d",
+    "name": "IRoad — Driver Auth (Email + Phone)",
+    "description": "## Driver login and forgot-password (dual identity)\n\nTests **email** and **phone + extension** on the same endpoints.\n\n### Base URL\nSet `{{base_url}}` to your API root **including** `/api/v1/mobile` (no trailing slash).\n\nExample: `http://127.0.0.1:8000/api/v1/mobile`\n\n### Headers (all requests)\n- `Content-Type: application/json`\n- `Accept-Language: {{accept_language}}` (`en` or `ar`)\n\n### Rules\n- Use **either** email **or** phone+extension per request — not both.\n- Do **not** send `X-Tenant-ID` on these public auth routes.\n- **Do not send `tenant_id`** — tenant is resolved from email/phone/OTP on the server.\n- Forgot-password OTP is always sent to the driver's **registered email** (even when you start the flow with phone).\n\n### Suggested test order\n\n**Login**\n1. Run **01 Login (Email)** *or* **02 Login (Phone)** — not both unless re-testing.\n\n**Forgot password (email)**\n1. Forgot Password (Email)\n2. Verify OTP (Email) — set `otp_code` from email/logs\n3. Reset Password (Email)\n4. Login again with new password\n\n**Forgot password (phone)**\n1. Forgot Password (Phone)\n2. Verify OTP (Phone)\n3. Reset Password (Phone)\n4. Login (Phone) with new password\n\nImport environment `IRoad-Mobile-Driver-Auth.postman_environment.json` or use your existing Driver environment.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://127.0.0.1:8000/api/v1/mobile" },
+    { "key": "accept_language", "value": "en" },
+    { "key": "email", "value": "vuhuxyzon@yopmail.com" },
+    { "key": "password", "value": "Test@1234" },
+    { "key": "driver_extension", "value": "+966" },
+    { "key": "driver_phone", "value": "963258741" },
+    { "key": "driver_password", "value": "Test@1234" },
+    { "key": "otp_code", "value": "123456" },
+    { "key": "new_password", "value": "NewPassword@123" },
+    { "key": "confirm_password", "value": "NewPassword@123" },
+    { "key": "device_platform", "value": "Android" },
+    { "key": "device_id", "value": "postman-fcm-test-token" },
+    { "key": "device_name", "value": "Postman Client" },
+    { "key": "access_token", "value": "" },
+    { "key": "refresh_token", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "01 — Login",
+      "description": "Authenticate driver. Run **one** of Email or Phone per session.",
+      "item": [
+        {
+          "name": "01 Login (Email)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var json = pm.response.json();",
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('status === 1', function () { pm.expect(json.status).to.eql(1); });",
+                  "if (json.status === 1 && json.data) {",
+                  "    if (json.data.access_token) {",
+                  "        pm.collectionVariables.set('access_token', json.data.access_token);",
+                  "        try { pm.environment.set('access_token', json.data.access_token); } catch (e) {}",
+                  "    }",
+                  "    if (json.data.refresh_token) {",
+                  "        pm.collectionVariables.set('refresh_token', json.data.refresh_token);",
+                  "        try { pm.environment.set('refresh_token', json.data.refresh_token); } catch (e) {}",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept-Language", "value": "{{accept_language}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\",\n  \"device_platform\": \"{{device_platform}}\",\n  \"device_id\": \"{{device_id}}\",\n  \"device_name\": \"{{device_name}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/driver/auth/login/",
+            "description": "POST `/driver/auth/login/` with **email** + **password**. No `tenant_id` required.\n\nSaves `access_token` and `refresh_token` to collection (and environment if loaded)."
+          },
+          "response": []
+        },
+        {
+          "name": "02 Login (Phone + Extension)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var json = pm.response.json();",
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('status === 1', function () { pm.expect(json.status).to.eql(1); });",
+                  "if (json.status === 1 && json.data) {",
+                  "    if (json.data.access_token) {",
+                  "        pm.collectionVariables.set('access_token', json.data.access_token);",
+                  "        try { pm.environment.set('access_token', json.data.access_token); } catch (e) {}",
+                  "    }",
+                  "    if (json.data.refresh_token) {",
+                  "        pm.collectionVariables.set('refresh_token', json.data.refresh_token);",
+                  "        try { pm.environment.set('refresh_token', json.data.refresh_token); } catch (e) {}",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept-Language", "value": "{{accept_language}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"extension\": \"{{driver_extension}}\",\n  \"phone\": \"{{driver_phone}}\",\n  \"password\": \"{{driver_password}}\",\n  \"device_platform\": \"{{device_platform}}\",\n  \"device_id\": \"{{device_id}}\",\n  \"device_name\": \"{{device_name}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/driver/auth/login/",
+            "description": "POST `/driver/auth/login/` with **extension** + **phone** + **password**.\n\nDefault: extension `+966`, phone `963258741`. No `tenant_id` required."
+          },
+          "response": []
+        },
+        {
+          "name": "03 Refresh Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var json = pm.response.json();",
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('status === 1', function () { pm.expect(json.status).to.eql(1); });",
+                  "if (json.status === 1 && json.data) {",
+                  "    if (json.data.access_token) {",
+                  "        pm.collectionVariables.set('access_token', json.data.access_token);",
+                  "        try { pm.environment.set('access_token', json.data.access_token); } catch (e) {}",
+                  "    }",
+                  "    if (json.data.refresh_token) {",
+                  "        pm.collectionVariables.set('refresh_token', json.data.refresh_token);",
+                  "        try { pm.environment.set('refresh_token', json.data.refresh_token); } catch (e) {}",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept-Language", "value": "{{accept_language}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/driver/auth/refresh/",
+            "description": "Rotate JWT pair after login. Uses `{{refresh_token}}` from login."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "02 — Forgot Password (Email)",
+      "description": "Full reset flow using **email** identity. Run in order: 01 → 02 → 03.",
+      "item": [
+        {
+          "name": "01 Forgot Password (Email)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var json = pm.response.json();",
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('status === 1', function () { pm.expect(json.status).to.eql(1); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept-Language", "value": "{{accept_language}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/driver/auth/forgot-password/",
+            "description": "Request OTP. Body: **email** only (no phone fields)."
+          },
+          "response": []
+        },
+        {
+          "name": "02 Verify OTP (Email)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var json = pm.response.json();",
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('status === 1', function () { pm.expect(json.status).to.eql(1); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept-Language", "value": "{{accept_language}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"otp_code\": \"{{otp_code}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/driver/auth/verify-otp/",
+            "description": "Verify 6-digit OTP. Set `otp_code` from email or server logs."
+          },
+          "response": []
+        },
+        {
+          "name": "03 Reset Password (Email)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var json = pm.response.json();",
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('status === 1', function () { pm.expect(json.status).to.eql(1); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept-Language", "value": "{{accept_language}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"otp_code\": \"{{otp_code}}\",\n  \"new_password\": \"{{new_password}}\",\n  \"confirm_password\": \"{{confirm_password}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/driver/auth/reset-password/",
+            "description": "Set new password after OTP verified. `new_password` and `confirm_password` must match (min 8 chars)."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "03 — Forgot Password (Phone)",
+      "description": "Full reset flow using **extension + phone**. OTP is still delivered to the driver's email. Run in order: 01 → 02 → 03.",
+      "item": [
+        {
+          "name": "01 Forgot Password (Phone)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var json = pm.response.json();",
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('status === 1', function () { pm.expect(json.status).to.eql(1); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept-Language", "value": "{{accept_language}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"extension\": \"{{driver_extension}}\",\n  \"phone\": \"{{driver_phone}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/driver/auth/forgot-password/",
+            "description": "Request OTP using **phone + extension** (no email in body). Server resolves canonical email for OTP storage."
+          },
+          "response": []
+        },
+        {
+          "name": "02 Verify OTP (Phone)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var json = pm.response.json();",
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('status === 1', function () { pm.expect(json.status).to.eql(1); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept-Language", "value": "{{accept_language}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"extension\": \"{{driver_extension}}\",\n  \"phone\": \"{{driver_phone}}\",\n  \"otp_code\": \"{{otp_code}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/driver/auth/verify-otp/",
+            "description": "Verify OTP with **phone + extension** identity."
+          },
+          "response": []
+        },
+        {
+          "name": "03 Reset Password (Phone)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var json = pm.response.json();",
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('status === 1', function () { pm.expect(json.status).to.eql(1); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept-Language", "value": "{{accept_language}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"extension\": \"{{driver_extension}}\",\n  \"phone\": \"{{driver_phone}}\",\n  \"otp_code\": \"{{otp_code}}\",\n  \"new_password\": \"{{new_password}}\",\n  \"confirm_password\": \"{{confirm_password}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/driver/auth/reset-password/",
+            "description": "Reset password with **phone + extension** after OTP verified."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "04 — Optional (after login)",
+      "item": [
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept-Language", "value": "{{accept_language}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/driver/auth/logout/",
+            "description": "Requires valid `access_token` from login."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
