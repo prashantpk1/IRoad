@@ -282,6 +282,7 @@ class DashboardContextService:
             if context.empty_move_selection is not None:
                 context.movement_projection = self._movement_projection.project_empty_move(
                     selection=context.empty_move_selection,
+                    request=request,
                 )
             context.workflow_projection = build_workflow_for_dashboard_context(
                 context,

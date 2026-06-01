@@ -35,6 +35,7 @@ class MovementProjectionService:
         *,
         tenant_schema: str = '',
         exclude_booking_id: Any | None = None,
+        request: Any | None = None,
     ) -> tuple[DriverEmptyMoveSelectionResult | None, dict[str, Any], dict[str, Any]]:
         """
         Select active empty move and return ``(selection, card, summary)``.
@@ -46,7 +47,7 @@ class MovementProjectionService:
         )
         if selection is None:
             return None, {}, {}
-        card = self.project_empty_move(selection=selection)
+        card = self.project_empty_move(selection=selection, request=request)
         summary = self.build_movement_summary(selection=selection)
         return selection, card, summary
 
@@ -57,12 +58,13 @@ class MovementProjectionService:
         selection: DriverEmptyMoveSelectionResult | None = None,
         tenant_schema: str = '',
         driver: Any | None = None,
+        request: Any | None = None,
     ) -> dict[str, Any]:
         """Project the empty-move card contract."""
         _ = (tenant_schema, driver)
         if selection is not None:
-            return build_empty_move_card(selection=selection)
-        return build_empty_move_card(movement)
+            return build_empty_move_card(selection=selection, request=request)
+        return build_empty_move_card(movement, request=request)
 
     def build_movement_summary(
         self,
@@ -80,9 +82,10 @@ class MovementProjectionService:
         tenant_schema: str,
         driver: Any,
         is_empty_move: bool = False,
+        request: Any | None = None,
     ) -> dict[str, Any]:
         """Compat: only empty moves produce a card."""
         _ = (tenant_schema, driver)
         if not is_empty_move or movement is None:
             return {}
-        return build_empty_move_card(movement)
+        return build_empty_move_card(movement, request=request)

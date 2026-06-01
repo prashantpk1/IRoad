@@ -6,7 +6,9 @@ Route and address blocks for the Job Detail ``job`` section (read-only).
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import Any, Literal
+
+from django.db.utils import OperationalError, ProgrammingError
 
 # Combined route labels: "Delhi — Goa", "Delhi → Goa", "Delhi - Goa"
 _ROUTE_LABEL_SPLIT_RE = re.compile(r'\s*[—–\-→>]+\s*', re.UNICODE)
@@ -86,6 +88,31 @@ def _split_combined_route_label(text: str) -> tuple[str, str]:
         if start and end:
             return start, end
     return combined, ''
+
+
+def _movement_location_point(
+    movement: Any,
+    side: Literal['from', 'to'],
+) -> Any | None:
+    """
+    Resolve movement from/to location without raising when the tenant schema
+    has no ``tenant_location_master`` table (stale FK ids still on the row).
+    """
+    field = f'{side}_location_point'
+    fk_id = getattr(movement, f'{field}_id', None)
+    if not fk_id:
+        return None
+    cache = movement._state.fields_cache
+    if field in cache:
+        return cache[field]
+    try:
+        from tenant_workspace.models import TenantLocationMaster
+
+        location = TenantLocationMaster.objects.filter(pk=fk_id).first()
+    except (ProgrammingError, OperationalError):
+        location = None
+    cache[field] = location
+    return location
 
 
 def serialize_location_point(
@@ -215,12 +242,12 @@ def build_movement_location_block(
             request=request,
         )
         block['movement_from'] = serialize_location_point(
-            getattr(movement, 'from_location_point', None),
+            _movement_location_point(movement, 'from'),
             request=request,
             map_link=getattr(movement, 'from_location_map_link', '') or '',
         )
         block['movement_to'] = serialize_location_point(
-            getattr(movement, 'to_location_point', None),
+            _movement_location_point(movement, 'to'),
             request=request,
             map_link=getattr(movement, 'to_location_map_link', '') or '',
         )
@@ -229,12 +256,12 @@ def build_movement_location_block(
     return {
         'route': {},
         'pickup_address': serialize_location_point(
-            getattr(movement, 'from_location_point', None),
+            _movement_location_point(movement, 'from'),
             request=request,
             map_link=getattr(movement, 'from_location_map_link', '') or '',
         ),
         'drop_address': serialize_location_point(
-            getattr(movement, 'to_location_point', None),
+            _movement_location_point(movement, 'to'),
             request=request,
             map_link=getattr(movement, 'to_location_map_link', '') or '',
         ),

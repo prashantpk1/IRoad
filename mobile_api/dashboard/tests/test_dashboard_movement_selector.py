@@ -188,7 +188,22 @@ class MovementSelectionPolicyTests(SimpleTestCase):
 
 
 class MovementProjectionTests(SimpleTestCase):
-    def test_build_empty_move_card_from_selection(self):
+    @patch(
+        'mobile_api.dashboard.projections.movement_projection.build_movement_location_block',
+        return_value={
+            'pickup_address': {
+                'location_id': 'loc-from',
+                'display_name': 'Goa',
+                'label': 'Goa',
+            },
+            'drop_address': {
+                'location_id': 'loc-to',
+                'display_name': 'delhi',
+                'label': 'delhi',
+            },
+        },
+    )
+    def test_build_empty_move_card_from_selection(self, _mock_loc):
         movement = _movement()
         selection = DriverEmptyMoveSelectionResult(
             movement=movement,
@@ -200,6 +215,8 @@ class MovementProjectionTests(SimpleTestCase):
         self.assertEqual(card['movement_no'], 'EM-1')
         self.assertEqual(card['movement_stage'], STAGE_CREATED)
         self.assertEqual(card['progress_percentage'], 10)
+        self.assertEqual(card['pickup_address']['display_name'], 'Goa')
+        self.assertEqual(card['drop_address']['display_name'], 'delhi')
 
     @patch(
         'mobile_api.dashboard.selectors.movement_selection_policy.movement_log_milestone_flags',

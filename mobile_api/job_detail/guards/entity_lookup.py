@@ -35,8 +35,6 @@ _MOVEMENT_SELECT = (
     'shipment',
     'shipment__loading_address',
     'shipment__delivery_address',
-    'from_location_point',
-    'to_location_point',
     'truck',
 )
 
