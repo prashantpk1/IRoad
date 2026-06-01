@@ -1,16 +1,20 @@
 from django.core.management.base import BaseCommand
 
-from superadmin.billing_helpers import apply_due_scheduled_downgrades
+from superadmin.billing_helpers import process_due_subscription_billing
 
 
 class Command(BaseCommand):
     help = (
-        'Apply tenant plan downgrades that are scheduled for today or earlier '
-        '(subscription cycle end). Safe to run manually or via cron.'
+        'Apply due plan downgrades and suspend tenants past subscription grace. '
+        'Safe to run manually or via cron when Celery Beat is not running.'
     )
 
     def handle(self, *args, **options):
-        n = apply_due_scheduled_downgrades()
+        result = process_due_subscription_billing()
         self.stdout.write(
-            self.style.SUCCESS(f'Applied {n} scheduled downgrade(s).'),
+            self.style.SUCCESS(
+                'Applied %(scheduled_downgrades_applied)s scheduled downgrade(s); '
+                'suspended %(tenants_suspended)s tenant(s).'
+                % result
+            ),
         )

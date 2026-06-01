@@ -32,6 +32,7 @@ from django_tenants.utils import schema_context
 import os
 import uuid
 from superadmin.billing_helpers import (
+    apply_due_scheduled_downgrade_for_tenant,
     build_dual_currency_display,
     generate_invoice_pdf_bytes,
     calculate_pro_rata_credit,
@@ -2439,7 +2440,11 @@ class TenantSubscriptionPlanView(View):
             response = redirect('login')
             clear_tenant_portal_cookie(response, request=request)
             return response
-        context.update(self._load_plan_context(context['tenant']))
+        tenant = context['tenant']
+        if apply_due_scheduled_downgrade_for_tenant(tenant):
+            tenant.refresh_from_db()
+            context['tenant'] = tenant
+        context.update(self._load_plan_context(tenant))
         return render(request, 'iroad_tenants/Subscription_Manage/Subscription-plan.html', context)
 
     def post(self, request):
@@ -2504,7 +2509,11 @@ class TenantSubscriptionPlanView(View):
             return _tenant_redirect(request, 'iroad_tenants:tenant_subscription_plan')
 
         if action_type == 'Downgrade':
-            error = validate_downgrade_order(tenant, plan)
+            error = validate_downgrade_order(
+                tenant,
+                plan,
+                currency_code=currency.currency_code,
+            )
             if error:
                 messages.error(request, error, extra_tags='tenant')
                 return _tenant_redirect(request, 'iroad_tenants:tenant_subscription_plan')
@@ -6607,17 +6616,28 @@ class TenantOperationShipmentListView(View):
             clear_tenant_portal_cookie(response, request=request)
             return response
         try:
-            shipment_records = list(
-                TenantShipment.objects.select_related(
-                    'truck',
-                    'driver',
-                    'booking',
-                    'client_account',
-                    'loading_address',
-                    'delivery_address',
-                    'cargo',
-                ).order_by('-created_at')[:100]
-            )
+            search_q = (request.GET.get('search') or '').strip()
+            shipment_qs = TenantShipment.objects.select_related(
+                'truck',
+                'driver',
+                'booking',
+                'client_account',
+                'loading_address',
+                'delivery_address',
+                'cargo',
+            ).order_by('-created_at')
+            if search_q:
+                shipment_qs = shipment_qs.filter(
+                    Q(shipment_no__icontains=search_q)
+                    | Q(booking__booking_no__icontains=search_q)
+                    | Q(client_account__display_name__icontains=search_q)
+                    | Q(truck__truck_code__icontains=search_q)
+                    | Q(driver__driver_code__icontains=search_q)
+                    | Q(shipment_status__icontains=search_q)
+                )
+            paginator = Paginator(shipment_qs, 10)
+            shipment_page = paginator.get_page(request.GET.get('page') or 1)
+            shipment_records = list(shipment_page.object_list)
             for shipment in shipment_records:
                 shipment.booking_action_id = (
                     shipment.booking_id
@@ -6629,6 +6649,11 @@ class TenantOperationShipmentListView(View):
             context.update(
                 {
                     'shipment_records': shipment_records,
+                    'shipment_page': shipment_page,
+                    'shipment_search_query': search_q,
+                    'pagination_total': paginator.count,
+                    'pagination_start': shipment_page.start_index() if paginator.count else 0,
+                    'pagination_end': shipment_page.end_index() if paginator.count else 0,
                     'shipment_stats': {
                         'active': stats_qs.filter(
                             shipment_status__in=_tenant_shipment_active_statuses(),
@@ -6998,12 +7023,18 @@ class TenantOperationShipmentDocumentsListView(View):
                 'shipment',
             ).order_by('-created_at')
             stats_qs = TenantShipmentDocument.objects.all()
+            paginator = Paginator(qs, 10)
+            shipment_documents_page = paginator.get_page(request.GET.get('page') or 1)
             context.update(
                 {
-                    'shipment_documents_page': Paginator(
-                        list(qs),
-                        10,
-                    ).get_page(request.GET.get('page') or 1),
+                    'shipment_documents_page': shipment_documents_page,
+                    'pagination_total': paginator.count,
+                    'pagination_start': (
+                        shipment_documents_page.start_index() if paginator.count else 0
+                    ),
+                    'pagination_end': (
+                        shipment_documents_page.end_index() if paginator.count else 0
+                    ),
                     'shipment_document_stats': {
                         'total_documents': stats_qs.count(),
                         'total_pages': stats_qs.aggregate(total=Sum('page_count')).get('total') or 0,
@@ -8004,7 +8035,7 @@ class TenantOperationDocumentHandoverListView(View):
                     | Q(status__icontains=search_q)
                 )
 
-            paginator = Paginator(handover_qs, 25)
+            paginator = Paginator(handover_qs, 10)
             page_obj = paginator.get_page(request.GET.get('page') or 1)
             all_handovers = TenantDocumentHandover.objects.all()
             context.update(
@@ -9252,7 +9283,7 @@ class TenantOperationActionsListView(View):
                     | Q(sequence_category__icontains=search_q)
                     | Q(status__icontains=search_q)
                 )
-            paginator = Paginator(action_qs, 25)
+            paginator = Paginator(action_qs, 10)
             page_obj = paginator.get_page(request.GET.get('page') or 1)
             context.update(
                 {
@@ -11193,7 +11224,7 @@ class TenantOperationSurchargeSalesListView(View):
                     | Q(client_account__display_name__icontains=search_q)
                 )
 
-            paginator = Paginator(surcharge_qs, 25)
+            paginator = Paginator(surcharge_qs, 10)
             page_obj = paginator.get_page(request.GET.get('page') or 1)
             surcharge_rows = []
             for surcharge in page_obj.object_list:
@@ -14205,18 +14236,30 @@ class TenantOperationShipmentListView(View):
             clear_tenant_portal_cookie(response, request=request)
             return response
         try:
-            shipment_records = list(
-                TenantShipment.objects.select_related(
-                    'truck',
-                    'driver',
-                    'booking',
-                    'booking__client_account',
-                    'client_account',
-                    'loading_address',
-                    'delivery_address',
-                    'cargo',
-                ).order_by('-created_at')[:100]
-            )
+            search_q = (request.GET.get('search') or '').strip()
+            shipment_qs = TenantShipment.objects.select_related(
+                'truck',
+                'driver',
+                'booking',
+                'booking__client_account',
+                'client_account',
+                'loading_address',
+                'delivery_address',
+                'cargo',
+            ).order_by('-created_at')
+            if search_q:
+                shipment_qs = shipment_qs.filter(
+                    Q(shipment_no__icontains=search_q)
+                    | Q(booking__booking_no__icontains=search_q)
+                    | Q(client_account__display_name__icontains=search_q)
+                    | Q(booking__client_account__display_name__icontains=search_q)
+                    | Q(truck__truck_code__icontains=search_q)
+                    | Q(driver__driver_code__icontains=search_q)
+                    | Q(shipment_status__icontains=search_q)
+                )
+            paginator = Paginator(shipment_qs, 10)
+            shipment_page = paginator.get_page(request.GET.get('page') or 1)
+            shipment_records = list(shipment_page.object_list)
             for shipment in shipment_records:
                 shipment.booking_action_id = (
                     shipment.booking_id
@@ -14232,6 +14275,11 @@ class TenantOperationShipmentListView(View):
             context.update(
                 {
                     'shipment_records': shipment_records,
+                    'shipment_page': shipment_page,
+                    'shipment_search_query': search_q,
+                    'pagination_total': paginator.count,
+                    'pagination_start': shipment_page.start_index() if paginator.count else 0,
+                    'pagination_end': shipment_page.end_index() if paginator.count else 0,
                     'shipment_stats': {
                         'active': stats_qs.filter(
                             shipment_status__in=_tenant_shipment_active_statuses(),
@@ -16488,12 +16536,18 @@ class TenantOperationShipmentDocumentsListView(View):
                 'shipment',
             ).order_by('-created_at')
             stats_qs = TenantShipmentDocument.objects.all()
+            paginator = Paginator(qs, 10)
+            shipment_documents_page = paginator.get_page(request.GET.get('page') or 1)
             context.update(
                 {
-                    'shipment_documents_page': Paginator(
-                        list(qs),
-                        10,
-                    ).get_page(request.GET.get('page') or 1),
+                    'shipment_documents_page': shipment_documents_page,
+                    'pagination_total': paginator.count,
+                    'pagination_start': (
+                        shipment_documents_page.start_index() if paginator.count else 0
+                    ),
+                    'pagination_end': (
+                        shipment_documents_page.end_index() if paginator.count else 0
+                    ),
                     'shipment_document_stats': {
                         'total_documents': stats_qs.count(),
                         'total_pages': stats_qs.aggregate(total=Sum('page_count')).get('total') or 0,
@@ -17785,7 +17839,7 @@ class TenantOperationDocumentHandoverListView(View):
                     | Q(status__icontains=search_q)
                 )
 
-            paginator = Paginator(handover_qs, 25)
+            paginator = Paginator(handover_qs, 10)
             page_obj = paginator.get_page(request.GET.get('page') or 1)
             all_handovers = TenantDocumentHandover.objects.all()
             context.update(
@@ -18227,7 +18281,7 @@ class TenantOperationTruckMovementLogListView(View):
                     | Q(status__icontains=search_q)
                 )
 
-            paginator = Paginator(movement_qs, 25)
+            paginator = Paginator(movement_qs, 10)
             page_obj = paginator.get_page(request.GET.get('page') or 1)
             all_movements = TenantTruckMovementLog.objects.all()
             context.update(
@@ -18641,7 +18695,7 @@ class TenantOperationActionsListView(View):
                     | Q(sequence_category__icontains=search_q)
                     | Q(status__icontains=search_q)
                 )
-            paginator = Paginator(action_qs, 25)
+            paginator = Paginator(action_qs, 10)
             page_obj = paginator.get_page(request.GET.get('page') or 1)
             context.update(
                 {
@@ -19058,7 +19112,7 @@ class TenantOperationSurchargeSalesListView(View):
                     | Q(client_account__display_name__icontains=search_q)
                 )
 
-            paginator = Paginator(surcharge_qs, 25)
+            paginator = Paginator(surcharge_qs, 10)
             page_obj = paginator.get_page(request.GET.get('page') or 1)
             surcharge_rows = []
             for surcharge in page_obj.object_list:

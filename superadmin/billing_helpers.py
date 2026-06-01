@@ -121,8 +121,14 @@ def refresh_order_projected_fields(order):
 
     elif classification == 'Downgrade' and plan_line:
         plan = plan_line.plan
-        proj_plan = plan
-        proj_expiry = tenant.subscription_expiry_date
+        eff = tenant.subscription_expiry_date
+        if eff and eff > date.today():
+            # Scheduled at cycle end: limits switch on effective date.
+            proj_plan = plan
+            proj_expiry = eff
+        else:
+            proj_plan = plan
+            proj_expiry = eff or date.today()
         if plan.max_internal_users != -1:
             proj_u = plan.max_internal_users
         if plan.max_internal_trucks != -1:
@@ -392,8 +398,13 @@ def scan_active_subscriptions_for_renewal(days_until_expiry=14):
         ).exists()
         
         if not existing:
-            # Use the automated renewal helper to create next cycle's draft/payment
-            create_automated_renewal_after_scheduled_downgrade(tenant, tenant.current_plan)
+            # Cycle-end downgrades create their own renewal; do not renew on old plan.
+            if tenant.scheduled_downgrade_plan_id:
+                continue
+            create_automated_renewal_after_scheduled_downgrade(
+                tenant,
+                tenant.current_plan,
+            )
             generated += 1
             
     return generated
@@ -690,6 +701,65 @@ def calculate_pro_rata_credit(tenant, plan_price):
     return -credit.quantize(Decimal('0.01'))
 
 
+def default_tenant_billing_currency(tenant):
+    """Last order currency, else first active currency."""
+    from .models import Currency, SubscriptionOrder
+
+    code = (
+        SubscriptionOrder.objects.filter(tenant=tenant)
+        .order_by('-created_at')
+        .values_list('currency_id', flat=True)
+        .first()
+    )
+    if code:
+        return code
+    return (
+        Currency.objects.filter(is_active=True)
+        .order_by('currency_code')
+        .values_list('currency_code', flat=True)
+        .first()
+        or 'SAR'
+    )
+
+
+def compare_plan_to_current(tenant, target_plan, currency_code=None):
+    """
+    Classify target plan vs tenant.current_plan using 1-cycle list price.
+    Returns: 'current', 'upgrade', 'downgrade', or 'other' (same price / unknown).
+    """
+    if not tenant or not target_plan:
+        return 'other'
+    if not tenant.current_plan_id:
+        return 'other'
+    if tenant.current_plan_id == target_plan.plan_id:
+        return 'current'
+    currency_code = currency_code or default_tenant_billing_currency(tenant)
+    cur_px = resolve_upgrade_credit_basis_price(tenant.current_plan, currency_code)
+    tgt_px = resolve_upgrade_credit_basis_price(target_plan, currency_code)
+    if cur_px > tgt_px:
+        return 'downgrade'
+    if cur_px < tgt_px:
+        return 'upgrade'
+    return 'other'
+
+
+def build_plan_action_map(tenant, currency_code=None):
+    """
+    Map plan_id (str) -> action key for CRM order UI filtering.
+    Values: current, upgrade, downgrade, other.
+    """
+    from .models import SubscriptionPlan
+
+    if not tenant:
+        return {}
+    currency_code = currency_code or default_tenant_billing_currency(tenant)
+    plans = SubscriptionPlan.objects.filter(is_active=True, is_deleted=False)
+    out = {}
+    for plan in plans:
+        out[str(plan.plan_id)] = compare_plan_to_current(tenant, plan, currency_code)
+    return out
+
+
 def tenant_usage_exceeds_plan_limits(tenant, plan):
     """
     Compare tenant active caps to plan limits. -1 on plan means unlimited.
@@ -719,7 +789,7 @@ def tenant_usage_exceeds_plan_limits(tenant, plan):
     return msgs
 
 
-def validate_downgrade_order(tenant, target_plan):
+def validate_downgrade_order(tenant, target_plan, currency_code=None):
     """
     Enforce Section 2.3.2.B: subscriber must have a current plan, cycle end date,
     and usage within the lower plan caps. Returns error string or None.
@@ -728,6 +798,13 @@ def validate_downgrade_order(tenant, target_plan):
         return 'Subscriber must have a current plan to downgrade.'
     if tenant.current_plan_id == target_plan.plan_id:
         return 'Select a different plan than the current subscription plan.'
+    currency_code = currency_code or default_tenant_billing_currency(tenant)
+    tier = compare_plan_to_current(tenant, target_plan, currency_code)
+    if tier != 'downgrade':
+        return (
+            'Select a lower-tier plan than the current subscription '
+            f'(priced in {currency_code}).'
+        )
     if not tenant.subscription_expiry_date:
         return (
             'Subscriber must have a subscription expiry date to schedule a '
@@ -757,12 +834,105 @@ def fulfill_immediate_plan_downgrade(tenant, target_plan):
         tenant.active_max_drivers = target_plan.max_active_drivers
 
 
+def suspend_tenants_past_subscription_grace(as_of=None):
+    """
+    Suspend Active tenants whose subscription_expiry_date is before
+    as_of minus the configured grace period. Returns number suspended.
+    """
+    from .models import TenantProfile
+
+    as_of = as_of or date.today()
+    grace = get_subscription_grace_days()
+    cutoff = as_of - timedelta(days=grace)
+    qs = TenantProfile.objects.filter(
+        account_status='Active',
+        subscription_expiry_date__isnull=False,
+        subscription_expiry_date__lt=cutoff,
+    )
+    from superadmin.redis_helpers import revoke_all_tenant_sessions
+
+    suspended = 0
+    for tenant in qs.iterator():
+        tenant.account_status = 'Suspended_Billing'
+        tenant.save(update_fields=['account_status', 'updated_at'])
+        revoke_all_tenant_sessions(str(tenant.tenant_id))
+        suspended += 1
+    return suspended
+
+
+def process_due_subscription_billing(as_of=None):
+    """
+    Apply cycle-end downgrades and post-grace suspensions.
+    Used by Celery tasks and superadmin CRM views when Beat is not running.
+    Returns dict with counts for logging/monitoring.
+    """
+    applied = apply_due_scheduled_downgrades(as_of=as_of)
+    suspended = suspend_tenants_past_subscription_grace(as_of=as_of)
+    return {'scheduled_downgrades_applied': applied, 'tenants_suspended': suspended}
+
+
+def _apply_one_scheduled_downgrade(tenant_pk, as_of):
+    """
+    Apply a single tenant's due scheduled downgrade inside a transaction.
+    Returns True if applied.
+    """
+    from django.db import transaction as db_transaction
+    from .models import SubscriptionPlan, TenantProfile
+
+    with db_transaction.atomic():
+        tenant = TenantProfile.objects.select_for_update().filter(pk=tenant_pk).first()
+        if not tenant or not tenant.scheduled_downgrade_plan_id:
+            return False
+        eff = tenant.scheduled_downgrade_effective_date
+        if not eff or eff > as_of:
+            return False
+        plan = SubscriptionPlan.objects.filter(
+            pk=tenant.scheduled_downgrade_plan_id,
+            is_deleted=False,
+        ).first()
+        if not plan:
+            tenant.scheduled_downgrade_plan = None
+            tenant.scheduled_downgrade_effective_date = None
+            tenant.save(
+                update_fields=[
+                    'scheduled_downgrade_plan',
+                    'scheduled_downgrade_effective_date',
+                    'updated_at',
+                ],
+            )
+            return False
+        fulfill_immediate_plan_downgrade(tenant, plan)
+        tenant.save()
+    tenant = TenantProfile.objects.filter(pk=tenant_pk).first()
+    if not tenant:
+        return True
+    try:
+        create_automated_renewal_after_scheduled_downgrade(tenant, plan)
+    except Exception:
+        logger.exception(
+            'Scheduled downgrade renewal billing failed tenant=%s',
+            tenant.tenant_id,
+        )
+    return True
+
+
+def apply_due_scheduled_downgrade_for_tenant(tenant, as_of=None):
+    """Apply pending downgrade for one tenant when effective date has passed."""
+    as_of = as_of or date.today()
+    if not tenant.scheduled_downgrade_plan_id:
+        return False
+    if not tenant.scheduled_downgrade_effective_date:
+        return False
+    if tenant.scheduled_downgrade_effective_date > as_of:
+        return False
+    return _apply_one_scheduled_downgrade(tenant.pk, as_of)
+
+
 def apply_due_scheduled_downgrades(as_of=None):
     """
     For tenants with scheduled_downgrade_effective_date <= as_of, apply the
     pending plan and clear schedule. Returns number of tenants updated.
     """
-    from django.db import transaction as db_transaction
     from .models import TenantProfile
 
     as_of = as_of or date.today()
@@ -775,26 +945,8 @@ def apply_due_scheduled_downgrades(as_of=None):
     )
     applied = 0
     for tid in candidate_ids:
-        with db_transaction.atomic():
-            tenant = TenantProfile.objects.select_for_update().select_related(
-                'scheduled_downgrade_plan',
-            ).filter(pk=tid).first()
-            if not tenant or not tenant.scheduled_downgrade_plan_id:
-                continue
-            eff = tenant.scheduled_downgrade_effective_date
-            if not eff or eff > as_of:
-                continue
-            plan = tenant.scheduled_downgrade_plan
-            fulfill_immediate_plan_downgrade(tenant, plan)
-            tenant.save()
+        if _apply_one_scheduled_downgrade(tid, as_of):
             applied += 1
-            try:
-                create_automated_renewal_after_scheduled_downgrade(tenant, plan)
-            except Exception:
-                logger.exception(
-                    'Scheduled downgrade renewal billing failed tenant=%s',
-                    tenant.tenant_id,
-                )
     return applied
 
 
@@ -1369,9 +1521,15 @@ def provision_tenant_from_order(order):
 
     elif classification == 'Downgrade':
         # Section 2.3.2.B: retain current plan until cycle end; then switch.
+        from .models import SubscriptionPlan
+
         if order.plan_lines.exists():
             plan_line = order.plan_lines.first()
-            target_plan = plan_line.plan
+            target_plan = SubscriptionPlan.objects.filter(
+                pk=plan_line.plan_id,
+            ).first()
+            if not target_plan:
+                target_plan = plan_line.plan
             eff = tenant.subscription_expiry_date
             if eff and eff <= date.today():
                 fulfill_immediate_plan_downgrade(tenant, target_plan)

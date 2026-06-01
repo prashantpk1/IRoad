@@ -180,7 +180,7 @@ def apply_scheduled_downgrades_task(self):
         from superadmin.billing_helpers import apply_due_scheduled_downgrades
 
         applied = apply_due_scheduled_downgrades()
-        logger.info(f'Applied {applied} scheduled downgrade(s)')
+        logger.info('Applied %s scheduled downgrade(s)', applied)
         return {'applied': applied}
     except Exception as exc:
         logger.error(f'apply_scheduled_downgrades_task failed: {exc}')
@@ -196,42 +196,43 @@ def check_subscription_expiry_task(self):
         from datetime import date, timedelta
 
         from superadmin.models import TenantProfile
-        from superadmin.billing_helpers import get_subscription_grace_days
+        from superadmin.billing_helpers import (
+            get_subscription_grace_days,
+            suspend_tenants_past_subscription_grace,
+        )
         from superadmin.communication_helpers import dispatch_internal_alerts
-        from superadmin.redis_helpers import revoke_all_tenant_sessions
 
         grace = get_subscription_grace_days()
         cutoff = date.today() - timedelta(days=grace)
-        qs = TenantProfile.objects.filter(
-            account_status='Active',
-            subscription_expiry_date__isnull=False,
-            subscription_expiry_date__lt=cutoff,
+        before = set(
+            TenantProfile.objects.filter(
+                account_status='Active',
+                subscription_expiry_date__isnull=False,
+                subscription_expiry_date__lt=cutoff,
+            ).values_list('pk', flat=True)
         )
-        suspended = 0
-        for tenant in qs.iterator():
-            tenant.account_status = 'Suspended_Billing'
-            tenant.save(update_fields=['account_status', 'updated_at'])
-            revoke_all_tenant_sessions(str(tenant.tenant_id))
-            revoke_tenant_sessions_task.delay(str(tenant.tenant_id))
-            dispatch_internal_alerts(
-                'Subscription_Expired',
-                context_dict={
-                    'tenant_id': str(tenant.tenant_id),
-                    'company_name': tenant.company_name,
-                    'primary_email': tenant.primary_email,
-                    'subscription_expiry_date': (
-                        tenant.subscription_expiry_date.isoformat()
-                        if tenant.subscription_expiry_date
-                        else ''
-                    ),
-                    'grace_days': grace,
-                    'message': (
-                        f'Subscription expired for "{tenant.company_name}". '
-                        'Tenant has been suspended for billing.'
-                    ),
-                },
-            )
-            suspended += 1
+        suspended = suspend_tenants_past_subscription_grace()
+        if suspended:
+            for tenant in TenantProfile.objects.filter(pk__in=before):
+                revoke_tenant_sessions_task.delay(str(tenant.tenant_id))
+                dispatch_internal_alerts(
+                    'Subscription_Expired',
+                    context_dict={
+                        'tenant_id': str(tenant.tenant_id),
+                        'company_name': tenant.company_name,
+                        'primary_email': tenant.primary_email,
+                        'subscription_expiry_date': (
+                            tenant.subscription_expiry_date.isoformat()
+                            if tenant.subscription_expiry_date
+                            else ''
+                        ),
+                        'grace_days': grace,
+                        'message': (
+                            f'Subscription expired for "{tenant.company_name}". '
+                            'Tenant has been suspended for billing.'
+                        ),
+                    },
+                )
         logger.info(
             'Subscription expiry check: cutoff=%s suspended=%s',
             cutoff,

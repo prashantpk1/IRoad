@@ -270,6 +270,7 @@
   </div>
 </template>
 
+{{ plan_action_map|json_script:"crm-order-plan-actions" }}
 <script>
 (function () {
   const pricingRaw = document.getElementById('crm-order-pricing');
@@ -330,6 +331,44 @@
     return sorted[sorted.length - 1];
   }
 
+  function planActionForOption(opt) {
+    if (!opt || !opt.value) {
+      return '';
+    }
+    return planActionMap[normUuid(opt.value)] || planActionMap[String(opt.value)] || '';
+  }
+
+  function filterPlanOptionsForClassification() {
+    const v = clsEl.value;
+    let selectedStillVisible = false;
+    Array.from(planEl.options).forEach(function (opt) {
+      if (!opt.value) {
+        opt.hidden = false;
+        opt.disabled = false;
+        return;
+      }
+      const action = planActionForOption(opt);
+      let show = true;
+      if (v === 'Downgrade') {
+        show = action === 'downgrade';
+      } else if (v === 'Upgrade') {
+        show = action === 'upgrade';
+      } else if (v === 'Renewal') {
+        show = action === 'current';
+      } else if (v === 'New_Subscription') {
+        show = !action || action !== 'current';
+      }
+      opt.hidden = !show;
+      opt.disabled = !show;
+      if (opt.selected && show) {
+        selectedStillVisible = true;
+      }
+    });
+    if (!selectedStillVisible) {
+      planEl.value = '';
+    }
+  }
+
   function showSections() {
     const v = clsEl.value;
     const showPlan = planIds.includes(v);
@@ -337,6 +376,9 @@
     addonSec.style.display = v === 'Add_ons' ? 'block' : 'none';
     upgradeWrap.style.display = v === 'Upgrade' ? 'block' : 'none';
     planEl.required = showPlan;
+    if (showPlan) {
+      filterPlanOptionsForClassification();
+    }
     if (v === 'Add_ons' && addonRows.children.length === 0) {
       addAddonRow();
     }

@@ -108,6 +108,8 @@ from .billing_helpers import (
     get_plan_cycle_days,
     get_standard_billing_cycle_days,
     get_tax_code_for_tenant,
+    apply_due_scheduled_downgrade_for_tenant,
+    build_plan_action_map,
     refresh_order_projected_fields,
     resolve_upgrade_credit_basis_price,
     send_invoice_paid_notification,
@@ -1822,7 +1824,7 @@ class DashboardView(LoginRequiredMixin, View):
             status='Active'
         ).annotate(
             staff_count=Count('admin_users')
-        ).values('role_name_en', 'staff_count')
+        ).values('role_name_en', 'role_name_ar', 'staff_count')
 
         stale_cutoff = now - timedelta(days=30)
         stale_accounts = AdminUser.objects.filter(
@@ -8296,6 +8298,16 @@ class TenantDetailView(LoginRequiredMixin, View):
             ),
             pk=pk,
         )
+        if apply_due_scheduled_downgrade_for_tenant(tenant):
+            tenant = get_object_or_404(
+                TenantProfile.objects.select_related(
+                    'country',
+                    'current_plan',
+                    'scheduled_downgrade_plan',
+                    'assigned_sales_rep',
+                ),
+                pk=pk,
+            )
         notes = (
             tenant.crm_notes.select_related('admin')
             .order_by('-created_at')[:10]
@@ -8570,12 +8582,23 @@ class OrderCreateView(RootRequiredMixin, View):
             is_active=True,
             plan_pricing__in=pricing_qs,
         ).distinct().order_by('currency_code')
-        if tenant_obj and tenant_obj.current_plan:
-            for cur in active_currencies:
-                op = resolve_upgrade_credit_basis_price(
-                    tenant_obj.current_plan, cur.currency_code)
-                cr = calculate_pro_rata_credit(tenant_obj, op)
-                upgrade_credits_by_currency[cur.currency_code] = str(cr)
+        default_currency = (
+            active_currencies.first().currency_code
+            if active_currencies.exists()
+            else ''
+        )
+        plan_action_map = {}
+        if tenant_obj:
+            plan_action_map = build_plan_action_map(
+                tenant_obj,
+                default_currency,
+            )
+            if tenant_obj.current_plan:
+                for cur in active_currencies:
+                    op = resolve_upgrade_credit_basis_price(
+                        tenant_obj.current_plan, cur.currency_code)
+                    cr = calculate_pro_rata_credit(tenant_obj, op)
+                    upgrade_credits_by_currency[cur.currency_code] = str(cr)
 
         return render(request, self.template_name, {
             'tenants': TenantProfile.objects.order_by('company_name'),
@@ -8592,6 +8615,7 @@ class OrderCreateView(RootRequiredMixin, View):
             'pricing_data': pricing_json,
             'addons_data': addons_json,
             'upgrade_credits_by_currency': upgrade_credits_by_currency,
+            'plan_action_map': plan_action_map,
         })
 
     def post(self, request):
@@ -8700,7 +8724,11 @@ class OrderCreateView(RootRequiredMixin, View):
                     order.delete()
                     return redirect('order_create')
                 if classification == 'Downgrade':
-                    err = validate_downgrade_order(tenant, plan)
+                    err = validate_downgrade_order(
+                        tenant,
+                        plan,
+                        currency_code=currency.currency_code,
+                    )
                     if err:
                         messages.error(request, err)
                         order.delete()
@@ -9048,8 +9076,16 @@ class OrderPreviewAjaxView(RootRequiredMixin, View):
             proj_et = selected_plan.max_external_trucks
             proj_d = selected_plan.max_active_drivers
         elif classification == 'Downgrade' and selected_plan:
+            tier_err = validate_downgrade_order(
+                tenant,
+                selected_plan,
+                currency_code=currency.currency_code,
+            )
+            if tier_err:
+                return JsonResponse({'ok': False, 'error': tier_err}, status=400)
+            eff = tenant.subscription_expiry_date
             proj_plan = selected_plan
-            proj_expiry = tenant.subscription_expiry_date
+            proj_expiry = eff or date.today()
             proj_u = selected_plan.max_internal_users
             proj_it = selected_plan.max_internal_trucks
             proj_et = selected_plan.max_external_trucks
@@ -9122,14 +9158,22 @@ class OrderDetailView(LoginRequiredMixin, View):
         invoice = order.invoices.order_by('-issue_date').first()
         downgrade_schedule = None
         if order.order_classification == 'Downgrade' and order.order_status == 'Paid':
-            plan_line = order.plan_lines.first() if order.plan_lines.exists() else None
+            tenant = order.tenant
+            pending_plan = tenant.scheduled_downgrade_plan
+            eff_date = tenant.scheduled_downgrade_effective_date
             plan_name = ''
-            if plan_line:
-                plan_name = (
-                    (plan_line.plan_name_en_snapshot or '').strip()
-                    or plan_line.plan.plan_name_en
+            if pending_plan:
+                plan_name = pending_plan.plan_name_en
+            else:
+                plan_line = (
+                    order.plan_lines.first() if order.plan_lines.exists() else None
                 )
-            eff_date = order.projected_expiry_date
+                if plan_line:
+                    plan_name = (
+                        (plan_line.plan_name_en_snapshot or '').strip()
+                        or plan_line.plan.plan_name_en
+                    )
+                eff_date = eff_date or order.projected_expiry_date
             if plan_name and eff_date:
                 downgrade_schedule = {
                     'plan_name': plan_name,

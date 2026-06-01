@@ -299,19 +299,39 @@
           <div class="eal-pagination">
             <div class="eal-pagination-info">
               Showing
-              <strong>{% if shipment_records %}1&ndash;{{ shipment_records|length }}{% else %}0{% endif %}</strong>
+              <strong>{% if pagination_total %}{{ pagination_start }}&ndash;{{ pagination_end }}{% else %}0{% endif %}</strong>
               of
-              <strong>{{ shipment_records|length }}</strong>
+              <strong>{{ pagination_total|default:0 }}</strong>
               shipments
             </div>
             <div class="eal-pagination-controls">
-              <button class="eal-page-btn" title="Previous">
+              {% if shipment_page.has_previous %}
+              <a
+                class="eal-page-btn"
+                title="Previous"
+                href="?{% if shipment_search_query %}search={{ shipment_search_query|urlencode }}&{% endif %}page={{ shipment_page.previous_page_number }}"
+              >
+                <i class="bi bi-chevron-left"></i>
+              </a>
+              {% else %}
+              <button class="eal-page-btn" title="Previous" disabled>
                 <i class="bi bi-chevron-left"></i>
               </button>
-              <button class="eal-page-btn active">1</button>
-              <button class="eal-page-btn" title="Next">
+              {% endif %}
+              <button class="eal-page-btn active">{{ shipment_page.number|default:1 }}</button>
+              {% if shipment_page.has_next %}
+              <a
+                class="eal-page-btn"
+                title="Next"
+                href="?{% if shipment_search_query %}search={{ shipment_search_query|urlencode }}&{% endif %}page={{ shipment_page.next_page_number }}"
+              >
+                <i class="bi bi-chevron-right"></i>
+              </a>
+              {% else %}
+              <button class="eal-page-btn" title="Next" disabled>
                 <i class="bi bi-chevron-right"></i>
               </button>
+              {% endif %}
             </div>
           </div>
         </div>

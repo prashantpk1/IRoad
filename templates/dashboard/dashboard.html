@@ -471,16 +471,49 @@
     </a>
   </div>
 </div>
+{% endblock %}
 
 {% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{{ revenue_labels|json_script:"revenue-labels-data" }}
+{{ revenue_data|json_script:"revenue-data-data" }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
 <script>
 document.addEventListener("DOMContentLoaded", function() {
     initEnhancedCharts();
+    updateDateTime();
+    setInterval(updateDateTime, 1000);
+
+    document.querySelectorAll('.ticket-hours-old').forEach((el) => {
+        const created = new Date(el.dataset.created);
+        if (!Number.isNaN(created.getTime())) {
+            const hours = Math.floor((Date.now() - created.getTime()) / (1000 * 60 * 60));
+            el.textContent = `${hours}h`;
+        }
+    });
 });
+
+function isDashboardArabic() {
+    return document.documentElement.lang.startsWith('ar') || document.body.dir === 'rtl';
+}
+
+function doughnutDisplayValues(values) {
+    const total = values.reduce((sum, v) => sum + Number(v || 0), 0);
+    return total > 0 ? values : [1];
+}
+
+function doughnutDisplayColors(values, colors, emptyColor) {
+    const total = values.reduce((sum, v) => sum + Number(v || 0), 0);
+    return total > 0 ? colors : [emptyColor || '#e2e8f0'];
+}
 
 function initEnhancedCharts() {
     if (typeof Chart === 'undefined') return;
+
+    const isArabic = isDashboardArabic();
+    const revenueLabelsEl = document.getElementById('revenue-labels-data');
+    const revenueDataEl = document.getElementById('revenue-data-data');
+    const revenueLabels = revenueLabelsEl ? JSON.parse(revenueLabelsEl.textContent) : [];
+    const revenueSeries = revenueDataEl ? JSON.parse(revenueDataEl.textContent) : [];
 
     // Common configurations
     Chart.defaults.font.family = "'Inter', sans-serif";
@@ -491,7 +524,11 @@ function initEnhancedCharts() {
     Chart.defaults.plugins.tooltip.titleFont = { size: 13, weight: 'bold' };
 
     // 1. Revenue Chart (Enhanced)
-    const revCtx = document.getElementById('revenueChart').getContext('2d');
+    const revenueCanvas = document.getElementById('revenueChart');
+    if (!revenueCanvas) {
+        return;
+    }
+    const revCtx = revenueCanvas.getContext('2d');
     const revGradient = revCtx.createLinearGradient(0, 0, 0, 300);
     revGradient.addColorStop(0, 'rgba(80, 81, 249, 0.2)');
     revGradient.addColorStop(1, 'rgba(80, 81, 249, 0.0)');
@@ -499,10 +536,10 @@ function initEnhancedCharts() {
     new Chart(revCtx, {
         type: 'line',
         data: {
-            labels: {{ revenue_labels|safe|default:"[]" }},
+            labels: revenueLabels,
             datasets: [{
                 label: isArabic ? 'الإيرادات (ريال)' : 'Revenue (SAR)',
-                data: {{ revenue_data|safe|default:"[]" }},
+                data: revenueSeries,
                 borderColor: '#5051f9',
                 backgroundColor: revGradient,
                 fill: true,
@@ -531,14 +568,17 @@ function initEnhancedCharts() {
     });
 
     // 2. Ticket Health Chart
-    const ticketCtx = document.getElementById('ticketHealthChart').getContext('2d');
+    const ticketValues = [{{ open_tickets|default:0 }}, {{ overdue_tickets|default:0 }}];
+    const ticketCanvas = document.getElementById('ticketHealthChart');
+    if (ticketCanvas) {
+    const ticketCtx = ticketCanvas.getContext('2d');
     new Chart(ticketCtx, {
         type: 'doughnut',
         data: {
             labels: [isArabic ? 'مفتوح' : 'Open', isArabic ? 'متأخر' : 'Overdue'],
             datasets: [{
-                data: [{{ open_tickets|default:0 }}, {{ overdue_tickets|default:0 }}],
-                backgroundColor: ['#6366f1', '#f43f5e'],
+                data: doughnutDisplayValues(ticketValues),
+                backgroundColor: doughnutDisplayColors(ticketValues, ['#6366f1', '#f43f5e']),
                 borderWidth: 0,
                 hoverOffset: 4
             }]
@@ -550,16 +590,20 @@ function initEnhancedCharts() {
             plugins: { legend: { display: false } }
         }
     });
+    }
 
     // 3. Financial Hub Chart
-    const financeCtx = document.getElementById('financeHubChart').getContext('2d');
+    const financeValues = [{{ pending_orders|default:0 }}, {{ pending_bank_txns|default:0 }}];
+    const financeCanvas = document.getElementById('financeHubChart');
+    if (financeCanvas) {
+    const financeCtx = financeCanvas.getContext('2d');
     new Chart(financeCtx, {
         type: 'doughnut',
         data: {
             labels: [isArabic ? 'طلبات' : 'Orders', isArabic ? 'تحويلات' : 'Transfers'],
             datasets: [{
-                data: [{{ pending_orders|default:0 }}, {{ pending_bank_txns|default:0 }}],
-                backgroundColor: ['#10b981', '#f59e0b'],
+                data: doughnutDisplayValues(financeValues),
+                backgroundColor: doughnutDisplayColors(financeValues, ['#10b981', '#f59e0b']),
                 borderWidth: 0,
                 hoverOffset: 4
             }]
@@ -571,9 +615,12 @@ function initEnhancedCharts() {
             plugins: { legend: { display: false } }
         }
     });
+    }
 
     // 4. Role Distribution Chart
-    const roleCtx = document.getElementById('roleDistributionChart').getContext('2d');
+    const roleCanvas = document.getElementById('roleDistributionChart');
+    if (roleCanvas) {
+    const roleCtx = roleCanvas.getContext('2d');
     const roleColors = ['#5051f9', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4'];
     
     document.querySelectorAll('.role-legend-dot').forEach((dot, idx) => {
@@ -602,6 +649,7 @@ function initEnhancedCharts() {
             }
         }
     });
+    }
 
     // 5. Login Activity Heatmap Logic (Real Data)
     const heatmapGrid = document.getElementById('loginHeatmapGrid');
@@ -668,52 +716,32 @@ function initEnhancedCharts() {
 
 }
 
-
 function updateDateTime() {
     const now = new Date();
     const dateEl = document.getElementById('dashDate');
     const timeEl = document.getElementById('dashTime');
-    
-    // Detect RTL/Arabic from body or html
-    const isArabic = document.documentElement.lang.startsWith('ar') || document.body.dir === 'rtl';
+    const isArabic = isDashboardArabic();
     const locale = isArabic ? 'ar-SA' : 'en-US';
-    
+
     if (dateEl) {
         try {
-            dateEl.textContent = now.toLocaleDateString(locale, { 
-                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
+            dateEl.textContent = now.toLocaleDateString(locale, {
+                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
             });
-        } catch(e) {
+        } catch (e) {
             dateEl.textContent = now.toDateString();
         }
     }
     if (timeEl) {
         try {
-            timeEl.textContent = now.toLocaleTimeString(locale, { 
-                hour: '2-digit', minute: '2-digit', second: '2-digit' 
+            timeEl.textContent = now.toLocaleTimeString(locale, {
+                hour: '2-digit', minute: '2-digit', second: '2-digit'
             });
-        } catch(e) {
+        } catch (e) {
             timeEl.textContent = now.toTimeString().split(' ')[0];
         }
     }
 }
-);
-    }
-    if (timeEl) {
-        timeEl.textContent = now.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    }
-}
-updateDateTime();
-setInterval(updateDateTime, 1000);
-
-document.querySelectorAll('.ticket-hours-old').forEach((el) => {
-    const created = new Date(el.dataset.created);
-    if (!Number.isNaN(created.getTime())) {
-        const hours = Math.floor((Date.now() - created.getTime()) / (1000 * 60 * 60));
-        el.textContent = `${hours}h`;
-    }
-});
 </script>
-{% endblock %}
 {% endblock %}
 

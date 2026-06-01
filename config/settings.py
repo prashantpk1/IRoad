@@ -306,6 +306,14 @@ CELERY_BEAT_SCHEDULE = {
         'schedule': crontab(hour=2, minute=0),
         'args': (90,),
     },
+    'check-subscription-expiry-daily': {
+        'task': 'iroad.billing.check_subscription_expiry',
+        'schedule': crontab(hour=1, minute=0),
+    },
+    'apply-scheduled-downgrades-daily': {
+        'task': 'iroad.billing.apply_scheduled_downgrades',
+        'schedule': crontab(hour=2, minute=0),
+    },
 }
 
 # Push notifications (FCM legacy HTTP)
