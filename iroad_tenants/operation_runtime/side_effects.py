@@ -50,6 +50,11 @@ def _is_confirm_loaded_action(action) -> bool:
 
 
 def _is_depart_in_transit_action(action) -> bool:
+    if action is not None:
+        category = (getattr(action, 'sequence_category', None) or '').strip()
+        code = (getattr(action, 'action_code', None) or '').strip().upper()
+        if category == 'empty_move' or code.startswith('EM'):
+            return False
     return operation_action_matches(
         action,
         'depart in transit',

@@ -760,6 +760,9 @@ def update_driver_profile(
         jwt_payload=jwt_payload,
         request=request,
     )
+
+
+def _validate_profile_photo_upload(uploaded_file) -> None:
     """Raise ValidationError if upload violates Phase-1 image rules."""
     name = getattr(uploaded_file, 'name', '') or ''
     ext = os.path.splitext(name)[1].lower()

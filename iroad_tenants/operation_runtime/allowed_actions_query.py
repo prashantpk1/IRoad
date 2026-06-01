@@ -143,6 +143,7 @@ def _prefilter_shipment_candidates(
     shipment,
     exclude_log_id=None,
 ) -> QuerySet:
+    qs = qs.exclude(Q(sequence_category__iexact='empty_move') | Q(action_code__istartswith='EM'))
     current = (shipment.shipment_status or '').strip()
     stage = derive_shipment_execution_stage(
         shipment,
@@ -253,6 +254,7 @@ def _prefilter_shipment_candidates(
 
 
 def _prefilter_booking_candidates(qs: QuerySet, *, booking) -> QuerySet:
+    qs = qs.exclude(Q(sequence_category__iexact='empty_move') | Q(action_code__istartswith='EM'))
     if booking.booking_status == TenantBooking.Status.CANCELLED:
         reversal_q = Q()
         for prefix in _REVERSAL_CODE_PREFIXES:
@@ -285,7 +287,7 @@ def _prefilter_movement_only_candidates(qs: QuerySet, *, movement) -> QuerySet:
     )
     if empty_move:
         qs = qs.exclude(
-            Q(sequence_category__iexact='job') & Q(movement_status_impact=''),
+            Q(sequence_category__iexact='job') | Q(action_code__istartswith='A'),
         )
     return qs.filter(
         Q(movement_status_impact__gt='')

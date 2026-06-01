@@ -241,6 +241,10 @@ def _action_is_allowed(
 
     # --- Shipment linked: forward / side-effect actions ---
     if shipment is not None:
+        category = (getattr(action, 'sequence_category', None) or '').strip().lower()
+        code = (getattr(action, 'action_code', None) or '').strip().upper()
+        if category == 'empty_move' or code.startswith('EM'):
+            return False
         current = shipment.shipment_status or ''
         if current in _TERMINAL_SHIPMENT_STATUSES:
             return _is_reversal_action(action)
@@ -357,6 +361,10 @@ def _action_is_allowed(
 
     # --- Booking only (no shipment on form) ---
     if booking is not None:
+        category = (getattr(action, 'sequence_category', None) or '').strip().lower()
+        code = (getattr(action, 'action_code', None) or '').strip().upper()
+        if category == 'empty_move' or code.startswith('EM'):
+            return False
         if booking.booking_status == TenantBooking.Status.CANCELLED:
             return _is_reversal_action(action)
 

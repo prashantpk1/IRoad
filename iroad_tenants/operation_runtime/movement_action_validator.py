@@ -57,8 +57,10 @@ def action_applies_to_movement_context(action, *, empty_move: bool) -> bool:
         return False
 
     cat = (getattr(action, 'sequence_category', None) or '').strip().lower()
-    if empty_move and cat == 'job' and not (action.movement_status_impact or '').strip():
-        return False
+    code = (getattr(action, 'action_code', None) or '').strip().upper()
+    if empty_move:
+        if cat == 'job' or code.startswith('A'):
+            return False
     if (action.movement_status_impact or '').strip():
         return True
     if cat in ('empty_move', 'empty move'):
