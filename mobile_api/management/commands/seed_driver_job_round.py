@@ -4,6 +4,75 @@ import datetime
 import uuid
 
 
+def _address_display_name(address) -> str:
+    if address is None:
+        return ''
+    return (
+        getattr(address, 'display_name', '')
+        or getattr(address, 'english_label', '')
+        or getattr(address, 'address_code', '')
+        or ''
+    ).strip()
+
+
+def _resolve_round_trip_routes(loading_address, delivery_address):
+    """
+    Route FK + forward/reverse display strings for round-trip booking legs.
+
+    Matches portal round-trip: outbound uses forward route, backload reverse.
+    """
+    route = None
+    try:
+        from tenant_workspace.models import TenantRouteMaster
+
+        route = (
+            TenantRouteMaster.objects.select_related(
+                'origin_point',
+                'destination_point',
+            ).first()
+        )
+        if not route:
+            route = TenantRouteMaster.objects.first()
+    except ImportError:
+        route = None
+
+    forward_display = ''
+    reverse_display = ''
+    if route is not None:
+        origin = getattr(route, 'origin_point', None)
+        destination = getattr(route, 'destination_point', None)
+        if origin is not None and destination is not None:
+            origin_label = (
+                getattr(origin, 'display_label', '')
+                or getattr(origin, 'location_name_english', '')
+                or ''
+            ).strip()
+            dest_label = (
+                getattr(destination, 'display_label', '')
+                or getattr(destination, 'location_name_english', '')
+                or ''
+            ).strip()
+            if origin_label and dest_label:
+                forward_display = f'{origin_label} -> {dest_label}'
+                reverse_display = f'{dest_label} -> {origin_label}'
+        if not forward_display:
+            forward_display = (
+                getattr(route, 'route_display', None)
+                or getattr(route, 'route_label', None)
+                or ''
+            ).strip()
+            reverse_display = forward_display
+
+    if not forward_display:
+        origin_label = _address_display_name(loading_address)
+        dest_label = _address_display_name(delivery_address)
+        if origin_label and dest_label:
+            forward_display = f'{origin_label} -> {dest_label}'
+            reverse_display = f'{dest_label} -> {origin_label}'
+
+    return route, forward_display[:120], reverse_display[:120]
+
+
 class Command(BaseCommand):
     help = (
         'Seed a fresh Round Trip Credit job '
@@ -125,6 +194,11 @@ class Command(BaseCommand):
             self.stderr.write('No addresses found.')
             return
 
+        route, forward_route_display, reverse_route_display = _resolve_round_trip_routes(
+            loading_address,
+            delivery_address,
+        )
+
         # --- Generate unique numbers ---
         today = datetime.date.today()
         unique_suffix = uuid.uuid4().hex[:8].upper()
@@ -160,28 +234,46 @@ class Command(BaseCommand):
             f'Backload drop:        {backload_delivery_address.display_name} '
             f'({backload_delivery_address.address_code})',
         )
+        if route is not None:
+            self.stdout.write(
+                f'Route:                {getattr(route, "route_code", "")} '
+                f'({forward_route_display})',
+            )
+        else:
+            self.stdout.write(f'Route (computed):     {forward_route_display or "(none)"}')
+        self.stdout.write(f'Backload route:       {reverse_route_display or "(none)"}')
+        self.stdout.write(f'Execution date:       {today}')
 
         if dry_run:
             self.stdout.write('DRY RUN — nothing saved.')
             return
 
+        booking_kwargs = {
+            'booking_no': booking_no,
+            'client_account': client,
+            'booking_status': 'Confirmed',
+            'trip_type': 'Round',
+            'order_type': 'Credit',
+            'sourcing_mode': 'Internal',
+            'loading_address': loading_address,
+            'delivery_address': delivery_address,
+            'assigned_driver': driver,
+            'assigned_truck': truck,
+            'booking_line_backload_driver': backload_driver,
+            'booking_line_backload_truck': backload_truck,
+            'booking_date': today,
+            'execution_date': today,
+            'route_direction': 'forward',
+            'route_display': forward_route_display,
+            'loading_booking_item': 'Outbound',
+            'delivery_booking_item': 'Outbound',
+            'created_by_label': 'seed_driver_job_round',
+        }
+        if route is not None:
+            booking_kwargs['route'] = route
+
         with transaction.atomic():
-            booking = TenantBooking.objects.create(
-                booking_no=booking_no,
-                client_account=client,
-                booking_status='Confirmed',
-                trip_type='Round',
-                order_type='Credit',
-                sourcing_mode='Internal',
-                loading_address=loading_address,
-                delivery_address=delivery_address,
-                assigned_driver=driver,
-                assigned_truck=truck,
-                booking_line_backload_driver=backload_driver,
-                booking_line_backload_truck=backload_truck,
-                booking_date=today,
-                created_by_label='seed_driver_job_round',
-            )
+            booking = TenantBooking.objects.create(**booking_kwargs)
             self.stdout.write(
                 f'Booking created: {booking.booking_no} ({booking.booking_id})',
             )
@@ -202,6 +294,7 @@ class Command(BaseCommand):
                 truck=truck,
                 loading_address=loading_address,
                 delivery_address=delivery_address,
+                route_display=forward_route_display,
                 created_by_label='seed_driver_job_round',
             )
             self.stdout.write(
@@ -225,6 +318,7 @@ class Command(BaseCommand):
                 truck=backload_truck,
                 loading_address=delivery_address,
                 delivery_address=backload_delivery_address,
+                route_display=reverse_route_display,
                 created_by_label='seed_driver_job_round',
             )
             self.stdout.write(

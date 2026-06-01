@@ -5,6 +5,10 @@ from django.db import connection, transaction
 import datetime
 import uuid
 
+from mobile_api.management.commands.seed_driver_job_round import (
+    _resolve_round_trip_routes,
+)
+
 
 class Command(BaseCommand):
     help = (
@@ -141,6 +145,11 @@ class Command(BaseCommand):
             self.stderr.write('No addresses found.')
             return
 
+        route, forward_route_display, reverse_route_display = _resolve_round_trip_routes(
+            loading_address,
+            delivery_address,
+        )
+
         # --- Generate unique numbers ---
         today = datetime.date.today()
         unique_suffix = uuid.uuid4().hex[:8].upper()
@@ -178,30 +187,48 @@ class Command(BaseCommand):
             f'Backload drop:        {backload_delivery_address.display_name} '
             f'({backload_delivery_address.address_code})',
         )
+        if route is not None:
+            self.stdout.write(
+                f'Route:                {getattr(route, "route_code", "")} '
+                f'({forward_route_display})',
+            )
+        else:
+            self.stdout.write(f'Route (computed):     {forward_route_display or "(none)"}')
+        self.stdout.write(f'Backload route:       {reverse_route_display or "(none)"}')
+        self.stdout.write(f'Execution date:       {today}')
 
         if dry_run:
             self.stdout.write('DRY RUN — nothing saved.')
             return
 
+        booking_kwargs = {
+            'booking_no': booking_no,
+            'client_account': client,
+            'booking_status': 'Confirmed',
+            'trip_type': 'Round',
+            'order_type': 'COD',
+            'sourcing_mode': 'Internal',
+            'loading_address': loading_address,
+            'delivery_address': delivery_address,
+            'assigned_driver': driver,
+            'assigned_truck': truck,
+            'booking_line_backload_driver': backload_driver,
+            'booking_line_backload_truck': backload_truck,
+            'booking_line_cod_amount': cod_amount,
+            'booking_line_backload_cod_amount': backload_cod_amount,
+            'booking_date': today,
+            'execution_date': today,
+            'route_direction': 'forward',
+            'route_display': forward_route_display,
+            'loading_booking_item': 'Outbound',
+            'delivery_booking_item': 'Outbound',
+            'created_by_label': 'seed_driver_job_round_cod',
+        }
+        if route is not None:
+            booking_kwargs['route'] = route
+
         with transaction.atomic():
-            booking = TenantBooking.objects.create(
-                booking_no=booking_no,
-                client_account=client,
-                booking_status='Confirmed',
-                trip_type='Round',
-                order_type='COD',
-                sourcing_mode='Internal',
-                loading_address=loading_address,
-                delivery_address=delivery_address,
-                assigned_driver=driver,
-                assigned_truck=truck,
-                booking_line_backload_driver=backload_driver,
-                booking_line_backload_truck=backload_truck,
-                booking_line_cod_amount=cod_amount,
-                booking_line_backload_cod_amount=backload_cod_amount,
-                booking_date=today,
-                created_by_label='seed_driver_job_round_cod',
-            )
+            booking = TenantBooking.objects.create(**booking_kwargs)
             self.stdout.write(
                 f'Booking created: {booking.booking_no} ({booking.booking_id})',
             )
@@ -222,6 +249,7 @@ class Command(BaseCommand):
                 truck=truck,
                 loading_address=loading_address,
                 delivery_address=delivery_address,
+                route_display=forward_route_display,
                 cod_amount=cod_amount,
                 created_by_label='seed_driver_job_round_cod',
             )
@@ -246,6 +274,7 @@ class Command(BaseCommand):
                 truck=backload_truck,
                 loading_address=delivery_address,
                 delivery_address=backload_delivery_address,
+                route_display=reverse_route_display,
                 cod_amount=backload_cod_amount,
                 created_by_label='seed_driver_job_round_cod',
             )
