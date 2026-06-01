@@ -291,8 +291,6 @@ def apply_execution_side_effects(action_log, *, created_by_label='') -> None:
                     target_line = line
                     break
         if target_line is None:
-            from django.core.exceptions import ValidationError
-
             raise ValidationError(
                 'Auto Shipment Post requires a confirmed booking line without an active shipment.'
             )
@@ -408,8 +406,6 @@ def apply_execution_side_effects(action_log, *, created_by_label='') -> None:
             ):
                 completion_err = validate_movement_completion_stage(truck_movement)
                 if completion_err:
-                    from django.core.exceptions import ValidationError
-
                     raise ValidationError(completion_err)
             truck_movement.status = movement_status
             update_fields = ['status', 'updated_at']
