@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
+{% load i18n %}
 
-{% block page_title %}Global System Rules{% endblock %}
+{% block page_title %}{% translate "Global System Rules" %}{% endblock %}
 
 {% block extra_css %}
   <style>
@@ -103,21 +104,21 @@
   <div class="page-header">
     <nav aria-label="breadcrumb">
       <ol class="breadcrumb">
-        <li class="breadcrumb-item">System Config</li>
-        <li class="breadcrumb-item active" aria-current="page">Global System Rules</li>
+        <li class="breadcrumb-item">{% translate "System Config" %}</li>
+        <li class="breadcrumb-item active" aria-current="page">{% translate "Global System Rules" %}</li>
       </ol>
     </nav>
     <div class="page-header-row">
       <div class="page-header-left">
-        <h1 class="page-title">Global System Rules</h1>
-        <p class="page-subtitle text-muted font-weight-normal">Control platform-wide billing and date behavior</p>
+        <h1 class="page-title">{% translate "Global System Rules" %}</h1>
+        <p class="page-subtitle text-muted font-weight-normal">{% translate "Control platform-wide billing and date behavior" %}</p>
       </div>
     </div>
   </div>
 
   <div class="info-note">
     <p>
-      These settings govern billing cycles and subscription expiry calculations.
+      {% translate "These settings govern billing cycles and subscription expiry calculations." %}
     </p>
   </div>
 
@@ -144,32 +145,32 @@
         <div class="field-group">
           <div class="fields-grid cols-2">
             <div class="field">
-              <label class="form-label">Rule ID</label>
+              <label class="form-label">{% translate "Rule ID" %}</label>
               <div class="readonly-value">{{ obj.rule_id }}</div>
             </div>
             <div class="field">
-              <label class="form-label">System Timezone</label>
+              <label class="form-label">{% translate "System Timezone" %}</label>
               {{ form.system_timezone }}
               {% for error in form.system_timezone.errors %}
                 <div class="field-error">{{ error }}</div>
               {% endfor %}
             </div>
             <div class="field">
-              <label class="form-label">Default Date Format</label>
+              <label class="form-label">{% translate "Default Date Format" %}</label>
               {{ form.default_date_format }}
               {% for error in form.default_date_format.errors %}
                 <div class="field-error">{{ error }}</div>
               {% endfor %}
             </div>
             <div class="field">
-              <label class="form-label">Grace Period Days</label>
+              <label class="form-label">{% translate "Grace Period Days" %}</label>
               {{ form.grace_period_days }}
               {% for error in form.grace_period_days.errors %}
                 <div class="field-error">{{ error }}</div>
               {% endfor %}
             </div>
             <div class="field">
-              <label class="form-label">Standard Billing Cycle</label>
+              <label class="form-label">{% translate "Standard Billing Cycle" %}</label>
               {{ form.standard_billing_cycle }}
               {% for error in form.standard_billing_cycle.errors %}
                 <div class="field-error">{{ error }}</div>
@@ -179,22 +180,22 @@
         </div>
         <div class="fields-grid cols-2 audit-grid">
           <div class="field">
-            <label class="form-label">Updated By</label>
+            <label class="form-label">{% translate "Updated By" %}</label>
             <div class="readonly-value">
               {% if obj.updated_by %}
                 {{ obj.updated_by.email }}
               {% else %}
-                Not updated yet
+                {% translate "Not updated yet" %}
               {% endif %}
             </div>
           </div>
           <div class="field">
-            <label class="form-label">Updated At</label>
+            <label class="form-label">{% translate "Updated At" %}</label>
             <div class="readonly-value">
               {% if obj.updated_at %}
                 {{ obj.updated_at|date:"M d, Y, g:i a" }}
               {% else %}
-                Not updated yet
+                {% translate "Not updated yet" %}
               {% endif %}
             </div>
           </div>
@@ -207,7 +208,7 @@
       <div class="form-actions-right">
         <button type="submit" class="eal-btn eal-btn-primary">
           <i class="bi bi-save"></i>
-          Save
+          {% translate "Save" %}
         </button>
       </div>
     </div>

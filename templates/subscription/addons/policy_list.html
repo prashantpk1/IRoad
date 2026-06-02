@@ -39,6 +39,13 @@
     align-items: center;
     gap: 8px;
   }
+  tr.policy-row-active {
+    border-left: 4px solid #22c55e;
+  }
+  html[dir="rtl"] tr.policy-row-active {
+    border-left: none;
+    border-right: 4px solid #22c55e;
+  }
 </style>
 {% endblock %}
 
@@ -54,7 +61,7 @@
         {% if request.user.is_root %}
           <a href="{% url 'addons_policy_create' %}" class="eal-btn eal-btn-primary">
             <i class="bi bi-plus-lg"></i>
-            <span>Add New Add-ons</span>
+            <span>{% translate "Add New Add-ons" %}</span>
           </a>
         {% endif %}
       </div>
@@ -63,7 +70,7 @@
 </div>
 
 <div class="alert alert-info" style="border-radius: 10px; margin-bottom: 20px;">
-  Only ONE policy active at a time.
+  {% translate "Only ONE policy active at a time." %}
 </div>
 <div class="eal-table-card">
 
@@ -94,7 +101,7 @@
       <div class="db-table-filters">
         <a href="?q={{ search_query }}&status=All&sort={{ current_sort }}&dir={{ current_dir }}" 
            class="filter-chip {% if status_filter == 'All' %}active{% endif %}">
-          All
+          {% translate "All" %}
         </a>
         <a href="?q={{ search_query }}&status=Active&sort={{ current_sort }}&dir={{ current_dir }}" 
            class="filter-chip {% if status_filter == 'Active' %}active{% endif %}">
@@ -111,7 +118,7 @@
       {% if search_query or status_filter != 'All' %}
         <a href="{% url 'addons_policy_list' %}" class="eal-btn eal-btn-outline" style="border-style: dashed; color: var(--text-muted); height: 32px; padding: 0 12px; font-size: 11px">
           <i class="bi bi-x-circle"></i>
-          <span>Clear Filters</span>
+          <span>{% translate "Clear Filters" %}</span>
         </a>
       {% endif %}
     </div>
@@ -134,7 +141,7 @@
             </th>
             <th class="sortable">
               <a href="?q={{ search_query }}&status={{ status_filter }}&sort=policy_name&dir={% if current_sort == 'policy_name' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                <span>Policy Name</span>
+                <span>{% translate "Policy Name" %}</span>
                 {% if current_sort == 'policy_name' %}
                   <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
                 {% else %}
@@ -144,7 +151,7 @@
             </th>
             <th class="sortable">
               <a href="?q={{ search_query }}&status={{ status_filter }}&sort=user_price&dir={% if current_sort == 'user_price' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                <span>User</span>
+                <span>{% translate "User" %}</span>
                 {% if current_sort == 'user_price' %}
                   <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
                 {% else %}
@@ -154,7 +161,7 @@
             </th>
             <th class="sortable">
               <a href="?q={{ search_query }}&status={{ status_filter }}&sort=truck_price&dir={% if current_sort == 'truck_price' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                <span>Truck</span>
+                <span>{% translate "Truck" %}</span>
                 {% if current_sort == 'truck_price' %}
                   <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
                 {% else %}
@@ -162,21 +169,9 @@
                 {% endif %}
               </a>
             </th>
-            {% comment %}MVP scope: External Trucks hidden from UI
-            <th class="sortable">
-              <a href="?q={{ search_query }}&status={{ status_filter }}&sort=ext_truck_price&dir={% if current_sort == 'ext_truck_price' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                <span>Ext.Truck</span>
-                {% if current_sort == 'ext_truck_price' %}
-                  <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
-                {% else %}
-                  <i class="bi bi-caret-up text-muted" style="opacity: 0.3"></i>
-                {% endif %}
-              </a>
-            </th>
-            {% endcomment %}
             <th class="sortable">
               <a href="?q={{ search_query }}&status={{ status_filter }}&sort=driver_price&dir={% if current_sort == 'driver_price' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                <span>Driver</span>
+                <span>{% translate "Driver" %}</span>
                 {% if current_sort == 'driver_price' %}
                   <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
                 {% else %}
@@ -186,7 +181,7 @@
             </th>
             <th class="sortable">
               <a href="?q={{ search_query }}&status={{ status_filter }}&sort=shipment_price&dir={% if current_sort == 'shipment_price' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                <span>Shipment</span>
+                <span>{% translate "Shipment" %}</span>
                 {% if current_sort == 'shipment_price' %}
                   <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
                 {% else %}
@@ -196,7 +191,7 @@
             </th>
             <th class="sortable">
               <a href="?q={{ search_query }}&status={{ status_filter }}&sort=storage_price&dir={% if current_sort == 'storage_price' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                <span>Storage/GB</span>
+                <span>{% translate "Storage/GB" %}</span>
                 {% if current_sort == 'storage_price' %}
                   <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
                 {% else %}
@@ -206,7 +201,7 @@
             </th>
             <th class="sortable">
               <a href="?q={{ search_query }}&status={{ status_filter }}&sort=status&dir={% if current_sort == 'status' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                <span>Status</span>
+                <span>{% translate "Status" %}</span>
                 {% if current_sort == 'status' %}
                   <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
                 {% else %}
@@ -214,41 +209,38 @@
                 {% endif %}
               </a>
             </th>
-            <th>ACTIONS</th>
+            <th>{% translate "Actions" %}</th>
           </tr>
         </thead>
         <tbody>
           {% for p in policies %}
-            <tr style="{% if p.is_active %}border-left: 4px solid #22c55e;{% endif %}">
+            <tr class="{% if p.is_active %}policy-row-active{% endif %}">
               <td>{{ p.list_rank }}</td>
-              <td><span class="fw-bold">{{ p.policy_name }}</span></td>
+              <td><span class="fw-bold bidi-ltr" dir="ltr">{{ p.policy_name }}</span></td>
               <td>{{ p.extra_internal_user_price }}</td>
               <td>{{ p.extra_internal_truck_price }}</td>
-              {% comment %}MVP scope: External Trucks hidden from UI
-              <td>{{ p.extra_external_truck_price }}</td>
-              {% endcomment %}
               <td>{{ p.extra_driver_price }}</td>
               <td>{{ p.extra_shipment_price }}</td>
               <td>{{ p.extra_storage_gb_price }}</td>
               <td>
                 {% if p.is_active %}
-                  <span class="status-badge active">Active</span>
+                  <span class="status-badge active bidi-ltr" dir="ltr">Active</span>
                 {% else %}
-                  <span class="status-badge inactive">Inactive</span>
+                  <span class="status-badge inactive bidi-ltr" dir="ltr">Inactive</span>
                 {% endif %}
               </td>
               <td>
                 <div class="eal-actions-cell">
                   {% if request.user.is_root %}
-                    <a href="{% url 'addons_policy_edit' p.policy_id %}" class="eal-row-btn" title="Edit">
+                    <a href="{% url 'addons_policy_edit' p.policy_id %}" class="eal-row-btn" title="{% translate 'Edit' %}">
                       <i class="bi bi-pencil"></i>
                     </a>
-                    <a href="{% url 'addons_policy_edit' p.policy_id %}" class="eal-row-btn" title="{% if p.is_active %}Deactivate{% else %}Activate{% endif %}">
+                    <a href="{% url 'addons_policy_edit' p.policy_id %}" class="eal-row-btn" title="{% if p.is_active %}{% translate 'Deactivate' %}{% else %}{% translate 'Activate' %}{% endif %}">
                       <i class="bi bi-arrow-repeat"></i>
                     </a>
-                    <form method="post" action="{% url 'addons_policy_delete' p.policy_id %}" style="display:inline" onsubmit="return confirm('Remove this policy?');">
+                    <form method="post" action="{% url 'addons_policy_delete' p.policy_id %}" style="display:inline" onsubmit="return confirm('{% translate "Remove this policy?" %}');">
                       {% csrf_token %}
-                      <button type="submit" class="eal-row-btn" title="Delete (Soft)">
+                      <button type="submit" class="eal-row-btn" title="{% translate 'Delete (Soft)' %}">
                         <i class="bi bi-trash"></i>
                       </button>
                     </form>

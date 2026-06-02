@@ -1,19 +1,20 @@
 {% extends 'base.html' %}
+{% load i18n %}
 
-{% block page_title %}IRoad Base Currency{% endblock %}
+{% block page_title %}{% translate "IRoad Base Currency" %}{% endblock %}
 
 {% block content %}
   <div class="page-header">
     <nav aria-label="breadcrumb">
       <ol class="breadcrumb">
-        <li class="breadcrumb-item">System Config</li>
-        <li class="breadcrumb-item active" aria-current="page">IRoad Base Currency</li>
+        <li class="breadcrumb-item">{% translate "System Config" %}</li>
+        <li class="breadcrumb-item active" aria-current="page">{% translate "IRoad Base Currency" %}</li>
       </ol>
     </nav>
     <div class="page-header-row">
       <div class="page-header-left">
-        <h1 class="page-title">IRoad Base Currency</h1>
-        <p class="page-subtitle text-muted font-weight-normal">Set the accounting root currency for the platform</p>
+        <h1 class="page-title">{% translate "IRoad Base Currency" %}</h1>
+        <p class="page-subtitle text-muted font-weight-normal">{% translate "Set the accounting root currency for the platform" %}</p>
       </div>
     </div>
   </div>
@@ -21,8 +22,8 @@
      
       <div class="alert alert-danger mb-0">
         <p class="mb-0 fw-semibold">
-      This is the accounting root currency for all financial reports.
-      Once financial transactions are recorded, this cannot be changed.
+      {% translate "This is the accounting root currency for all financial reports." %}
+      {% translate "Once financial transactions are recorded, this cannot be changed." %}
         </p>
       </div>
       </div>
@@ -31,11 +32,11 @@
    
   <div class="alert alert-warning mb-3">
     <p class="mb-0 fw-semibold">
-      Current base currency:
+      {% translate "Current base currency:" %}
       {% if obj.base_currency %}
-        {{ obj.base_currency.currency_code }} - {{ obj.base_currency.name_en }}
+        {{ obj.base_currency.currency_code }} - {% if LANGUAGE_CODE|slice:':2' == 'ar' and obj.base_currency.name_ar %}{{ obj.base_currency.name_ar }}{% else %}{{ obj.base_currency.name_en }}{% endif %}
       {% else %}
-        Not configured
+        {% translate "Not configured" %}
       {% endif %}
     </p>
   </div>
@@ -64,7 +65,7 @@
         <div class="field-group">
           <div class="fields-grid cols-2">
             <div class="field">
-              <label class="form-label">Base Currency</label>
+              <label class="form-label">{% translate "Base Currency" %}</label>
               {{ form.base_currency }}
               {% for error in form.base_currency.errors %}
                 <div class="mt-1 text-danger fw-semibold">{{ error }}</div>
@@ -80,19 +81,19 @@
       <div class="form-actions-right">
         <button type="submit" class="eal-btn eal-btn-primary">
           <i class="bi bi-save"></i>
-          <span>Save</span>
+          <span>{% translate "Save" %}</span>
         </button>
       </div>
     </div>
   </form>
 
   <div class="small text-muted fw-semibold mt-3">
-    Last updated by:
+    {% translate "Last updated by:" %}
     {% if obj.updated_by %}
       {{ obj.updated_by.email }}
     {% else %}
-      Unknown
+      {% translate "Unknown" %}
     {% endif %}
-    at {{ obj.updated_at }}
+    {% translate "at" %} {{ obj.updated_at }}
   </div>
 {% endblock %}

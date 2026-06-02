@@ -26,11 +26,11 @@
   {% if is_edit and plan and plan.updated_at %}
   <div class="edit-info-bar">
     <i class="bi bi-clock-history"></i>
-    Last updated
+    {% translate "Last updated" %}
     {% if plan.updated_by %}
-      by <strong>{{ plan.updated_by.first_name }} {{ plan.updated_by.last_name }}</strong>
+      {% translate "by" %} <strong>{{ plan.updated_by.first_name }} {{ plan.updated_by.last_name }}</strong>
     {% endif %}
-    at <strong>{{ plan.updated_at|date:"d M Y, H:i" }}</strong>
+    {% translate "at" %} <strong>{{ plan.updated_at|date:"d M Y, H:i" }}</strong>
   </div>
   {% endif %}
 
@@ -44,20 +44,20 @@
 
     <div class="form-card">
       <div class="form-card-body">
-        <h3 style="margin:0 0 12px 0">Plan Details</h3>
+        <h3 style="margin:0 0 12px 0">{% translate "Plan Details" %}</h3>
         <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:12px; margin-bottom:16px">
           <div>
-            <label class="form-label">Plan Name (EN)</label>
+            <label class="form-label">{% translate "Plan Name (English)" %}</label>
             {{ form.plan_name_en }}
             {% for e in form.plan_name_en.errors %}<div style="color:#b91c1c; font-weight:600">{{ e }}</div>{% endfor %}
           </div>
           <div>
-            <label class="form-label">Plan Name (AR)</label>
+            <label class="form-label">{% translate "Plan Name (Arabic)" %}</label>
             {{ form.plan_name_ar }}
             {% for e in form.plan_name_ar.errors %}<div style="color:#b91c1c; font-weight:600">{{ e }}</div>{% endfor %}
           </div>
           <div>
-            <label class="form-label">Base Cycle Days</label>
+            <label class="form-label">{% translate "Base Cycle Days" %}</label>
             {{ form.base_cycle_days }}
             {% for e in form.base_cycle_days.errors %}<div style="color:#b91c1c; font-weight:600">{{ e }}</div>{% endfor %}
           </div>
@@ -69,29 +69,29 @@
           </div>
           <div>
             <div class="form-label d-block mb-0">{% translate "Has driver app" %}</div>
-            <div class="form-check form-switch mt-2">
-              {{ form.has_driver_app }}
-              <label class="form-check-label ms-1" for="id_plan_has_driver_app">
+            <div class="form-check form-switch mt-2 ps-0">
+              <label class="form-check-label" for="id_plan_has_driver_app">
                 <span class="fw-medium">{% translate "Enabled" %}</span>
                 <span class="text-muted small d-block">{% translate "Allow tenant drivers to use the mobile app on this plan." %}</span>
               </label>
+              {{ form.has_driver_app }}
             </div>
             {% for e in form.has_driver_app.errors %}<div style="color:#b91c1c; font-weight:600">{{ e }}</div>{% endfor %}
           </div>
           <div>
             <div class="form-label d-block mb-0">{% translate "Status" %}</div>
-            <div class="form-check form-switch mt-2">
-              {{ form.is_active }}
-              <label class="form-check-label ms-1" for="id_plan_is_active">
+            <div class="form-check form-switch mt-2 ps-0">
+              <label class="form-check-label" for="id_plan_is_active">
                 <span class="fw-medium">{% translate "Active" %}</span>
                 <span class="text-muted small d-block">{% translate "When off, new tenants cannot subscribe to this plan." %}</span>
               </label>
+              {{ form.is_active }}
             </div>
             {% for e in form.is_active.errors %}<div style="color:#b91c1c; font-weight:600">{{ e }}</div>{% endfor %}
           </div>
         </div>
 
-        <h3 style="margin:0 0 12px 0">Resource Limits</h3>
+        <h3 style="margin:0 0 12px 0">{% translate "Resource Limits" %}</h3>
         <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:12px; margin-bottom:16px">
           {% for f in form %}
             {% if f.name == 'max_internal_users' or f.name == 'max_internal_trucks' or f.name == 'max_active_drivers' or f.name == 'max_monthly_shipments' or f.name == 'max_storage_gb' %}
@@ -101,7 +101,7 @@
                 <div style="margin-top:6px">
                   <label style="display:flex; align-items:center; gap:8px">
                     <input type="checkbox" class="unlimited-toggle" data-target="{{ f.id_for_label }}" {% if f.value == -1 %}checked{% endif %} />
-                    <span>Unlimited</span>
+                    <span>{% translate "Unlimited" %}</span>
                   </label>
                 </div>
                 {% if f.help_text %}<small style="color:#64748b">{{ f.help_text }}</small>{% endif %}
@@ -111,31 +111,31 @@
           {% endfor %}
         </div>
 
-        <h3 style="margin:0 0 12px 0">Pricing Cycles</h3>
+        <h3 style="margin:0 0 12px 0">{% translate "Pricing Cycles" %}</h3>
         <div style="display:grid; grid-template-columns:minmax(240px, 360px); gap:12px; margin-bottom:12px">
           <div>
-            <label class="form-label">Currency</label>
+            <label class="form-label">{% translate "Currency" %}</label>
             <select class="form-select" id="global-pricing-currency" name="global_currency" required>
-              <option value="">Select</option>
+              <option value="">{% translate "Select" %}</option>
               {% for c in currencies %}
                 <option value="{{ c.currency_code }}" {% if c.currency_code == global_currency_code %}selected{% endif %}>
-                  {{ c.name_en }} ({{ c.currency_code }})
+                  {% if LANGUAGE_CODE|slice:':2' == 'ar' and c.name_ar %}{{ c.name_ar }}{% else %}{{ c.name_en }}{% endif %} ({{ c.currency_code }})
                 </option>
               {% endfor %}
             </select>
           </div>
         </div>
         <div style="margin-bottom:12px">
-          <button type="button" id="add-pricing-row" class="eal-btn eal-btn-primary" style="padding:8px 12px">Add Row</button>
+          <button type="button" id="add-pricing-row" class="eal-btn eal-btn-primary" style="padding:8px 12px">{% translate "Add Row" %}</button>
         </div>
         <div style="overflow-x:auto; margin-bottom:16px">
           <table class="data-table" id="pricing-table">
             <thead>
               <tr>
-                <th>Cycles</th>
-                <th>Price</th>
-                <th class="text-center" style="width: 120px;">Admin only</th>
-                <th>Delete</th>
+                <th>{% translate "Cycles" %}</th>
+                <th>{% translate "Price" %}</th>
+                <th class="text-center" style="width: 120px;">{% translate "Admin only" %}</th>
+                <th>{% translate "Delete" %}</th>
               </tr>
             </thead>
             <tbody>
@@ -155,7 +155,7 @@
                     </div>
                   </td>
                   <td>
-                    <button type="button" class="eal-row-btn remove-row" title="Remove">
+                    <button type="button" class="eal-row-btn remove-row" title="{% translate 'Remove' %}">
                       <i class="bi bi-trash"></i>
                     </button>
                     <input type="hidden" name="pricing-{{ row.row_index }}-delete" value="{% if row.delete %}1{% else %}0{% endif %}" class="delete-flag" />
@@ -210,7 +210,7 @@
         </div>
       </td>
       <td>
-        <button type="button" class="eal-row-btn remove-row" title="Remove">
+        <button type="button" class="eal-row-btn remove-row" title="{% translate 'Remove' %}">
           <i class="bi bi-trash"></i>
         </button>
         <input type="hidden" name="pricing-__INDEX__-delete" value="0" class="delete-flag" />

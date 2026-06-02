@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load i18n %}
+{% load i18n i18n_fields %}
 
 {% block title %}{% translate "Promo Code Details" %}{% endblock %}
 
@@ -128,7 +128,7 @@
                 <i class="bi bi-check-lg" style="color: white; margin-bottom: 0; font-size: 10px;"></i>
               </div>
               <i class="bi bi-layers"></i>
-              <span class="card-label">{{ plan.plan_name_en }}</span>
+              <span class="card-label{% if LANGUAGE_CODE|slice:':2' == 'ar' and plan.plan_name_ar %} arabic-text{% endif %}">{% bilingual_field plan 'plan_name_en' 'plan_name_ar' plan.plan_name_en %}</span>
             </div>
           </label>
         {% endfor %}

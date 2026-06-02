@@ -1,7 +1,9 @@
 {% load static %}
 {% load i18n %}
+{% get_current_language as CURRENT_LANGUAGE %}
+{% with lang_code=CURRENT_LANGUAGE|default:LANGUAGE_CODE|default:'en'|slice:':2' %}
 <!DOCTYPE html>
-<html lang="{{ LANGUAGE_CODE|default:'en' }}" dir="{% if LANGUAGE_CODE|slice:':2' == 'ar' %}rtl{% else %}ltr{% endif %}">
+<html lang="{{ CURRENT_LANGUAGE|default:LANGUAGE_CODE|default:'en' }}" dir="{% if lang_code == 'ar' %}rtl{% else %}ltr{% endif %}">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -15,6 +17,12 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
+    {% if lang_code == 'ar' %}
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    {% endif %}
 
     <!-- Bootstrap 5 CSS -->
     <link
@@ -32,6 +40,9 @@
     <link rel="stylesheet" href="{% static 'css/style.css' %}" />
     <link rel="stylesheet" href="{% static 'css/dashboard.css' %}" />
     <link rel="stylesheet" href="{% static 'css/responsive.css' %}" />
+    {% if lang_code == 'ar' %}
+    <link rel="stylesheet" href="{% static 'css/rtl.css' %}" />
+    {% endif %}
     <!-- Custom CSS -->
     <!-- <link rel="stylesheet" href="{% static 'css_up/style.css' %}" />
     <link rel="stylesheet" href="{% static 'css_up/dashboard.css' %}" />
@@ -40,7 +51,7 @@
     {% block extra_css %}{% endblock %}
   </head>
 
-  <body>
+  <body dir="{% if lang_code == 'ar' %}rtl{% else %}ltr{% endif %}" class="{% if lang_code == 'ar' %}rtl-layout{% endif %}">
     <!-- Mobile Menu Toggle -->
     <button class="mobile-menu-toggle" aria-label="Toggle menu">
       <i class="bi bi-list"></i>
@@ -224,3 +235,4 @@
     {% block extra_js %}{% endblock %}
   </body>
 </html>
+{% endwith %}

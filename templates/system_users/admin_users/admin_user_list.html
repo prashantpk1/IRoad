@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load i18n %}
+{% load i18n_fields %}
 
 {% block page_title %}{% translate "Admin Users" %}{% endblock %}
 
@@ -54,7 +55,7 @@
         {% if request.user.is_root %}
           <a href="{% url 'admin_user_create' %}" class="eal-btn eal-btn-primary">
             <i class="bi bi-plus-lg"></i>
-            <span>Invite New User</span>
+            <span>{% translate "Invite New User" %}</span>
           </a>
         {% endif %}
       </div>
@@ -70,7 +71,7 @@
         <input
           type="text"
           name="q"
-          placeholder="Search by name or email"
+          placeholder="{% translate 'Search by name or email' %}"
           value="{{ search_query }}"
         />
         <input type="hidden" name="sort" value="{{ current_sort }}">
@@ -80,7 +81,7 @@
       <div class="db-table-filters">
         <a href="?q={{ search_query }}&status=All&role={{ role_filter }}&sort={{ current_sort }}&dir={{ current_dir }}" 
            class="filter-chip {% if status_filter == 'All' %}active{% endif %}">
-          All
+          {% translate "All" %}
         </a>
         <a href="?q={{ search_query }}&status=Pending_Activation&role={{ role_filter }}&sort={{ current_sort }}&dir={{ current_dir }}" 
            class="filter-chip {% if status_filter == 'Pending_Activation' %}active{% endif %}">
@@ -101,10 +102,10 @@
 
       <div style="width: 180px">
         <select name="role" class="eal-select" onchange="this.form.submit()">
-          <option value="All" {% if role_filter == 'All' %}selected{% endif %}>All Roles</option>
+          <option value="All" {% if role_filter == 'All' %}selected{% endif %}>{% translate "All Roles" %}</option>
           {% for r in roles %}
             <option value="{{ r.pk }}" {% if role_filter == r.pk|stringformat:"s" %}selected{% endif %}>
-              {{ r.role_name_en }}
+              {% bilingual_field r 'role_name_en' 'role_name_ar' r.role_name_en %}
             </option>
           {% endfor %}
         </select>
@@ -113,7 +114,7 @@
       {% if search_query or status_filter != 'All' or role_filter != 'All' %}
         <a href="{% url 'admin_user_list' %}" class="eal-btn eal-btn-outline" style="border-style: dashed; color: var(--text-muted); height: 32px; padding: 0 12px; font-size: 11px">
           <i class="bi bi-x-circle"></i>
-          <span>Clear Filters</span>
+          <span>{% translate "Clear Filters" %}</span>
         </a>
       {% endif %}
     </div>
@@ -137,7 +138,7 @@
             </th>
             <th class="sortable">
               <a href="?q={{ search_query }}&status={{ status_filter }}&role={{ role_filter }}&sort=name&dir={% if current_sort == 'name' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                <span>Name</span>
+                <span>{% translate "Name" %}</span>
                 {% if current_sort == 'name' %}
                   <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
                 {% else %}
@@ -147,7 +148,7 @@
             </th>
             <th class="sortable">
               <a href="?q={{ search_query }}&status={{ status_filter }}&role={{ role_filter }}&sort=email&dir={% if current_sort == 'email' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                <span>Email</span>
+                <span>{% translate "Email" %}</span>
                 {% if current_sort == 'email' %}
                   <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
                 {% else %}
@@ -157,7 +158,7 @@
             </th>
             <th class="sortable">
               <a href="?q={{ search_query }}&status={{ status_filter }}&role={{ role_filter }}&sort=role&dir={% if current_sort == 'role' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                <span>Role</span>
+                <span>{% translate "Role" %}</span>
                 {% if current_sort == 'role' %}
                   <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
                 {% else %}
@@ -167,7 +168,7 @@
             </th>
             <th class="sortable" style="width: 150px">
               <a href="?q={{ search_query }}&status={{ status_filter }}&role={{ role_filter }}&sort=status&dir={% if current_sort == 'status' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                <span>Status</span>
+                <span>{% translate "Status" %}</span>
                 {% if current_sort == 'status' %}
                   <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
                 {% else %}
@@ -175,10 +176,10 @@
                 {% endif %}
               </a>
             </th>
-            <th style="width: 120px">2FA</th>
+            <th style="width: 120px">{% translate "2FA" %}</th>
             <th class="sortable" style="width: 170px">
               <a href="?q={{ search_query }}&status={{ status_filter }}&role={{ role_filter }}&sort=last_login_at&dir={% if current_sort == 'last_login_at' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                <span>Last Login</span>
+                <span>{% translate "Last Login" %}</span>
                 {% if current_sort == 'last_login_at' %}
                   <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
                 {% else %}
@@ -199,29 +200,35 @@
                     {{ u.first_name }} {{ u.last_name }}
                   </span>
                   {% if u.is_root %}
-                    <span class="status-badge warning" style="margin-left: 6px;">Root</span>
+                    <span class="status-badge warning bidi-ltr" style="margin-left: 6px;" dir="ltr">Root</span>
                   {% endif %}
                 </div>
               </td>
               <td>{{ u.email }}</td>
-              <td>{{ u.role.role_name_en|default:"-" }}</td>
+              <td>{% if u.role %}{% bilingual_field u.role 'role_name_en' 'role_name_ar' '-' %}{% else %}-{% endif %}</td>
               <td>
                 {% if u.status == 'Pending_Activation' %}
-                  <span class="status-badge pending">Pending</span>
+                  <span class="status-badge pending bidi-ltr" dir="ltr">Pending Activation</span>
                 {% elif u.status == 'Active' %}
-                  <span class="status-badge active">Active</span>
+                  <span class="status-badge active bidi-ltr" dir="ltr">Active</span>
                 {% else %}
-                  <span class="status-badge inactive">Suspended</span>
+                  <span class="status-badge inactive bidi-ltr" dir="ltr">Suspended</span>
                 {% endif %}
               </td>
               <td>
                 {% if u.two_factor_enabled %}
-                  <span class="status-badge active">Enabled</span>
+                  <span class="status-badge active bidi-ltr" dir="ltr">Enabled</span>
                 {% else %}
-                  <span class="status-badge inactive">Disabled</span>
+                  <span class="status-badge inactive bidi-ltr" dir="ltr">Disabled</span>
                 {% endif %}
               </td>
-              <td>{{ u.last_login_at|default:"-" }}</td>
+              <td class="bidi-ltr" dir="ltr">
+                {% if u.last_login_at %}
+                  {% language 'en' %}{{ u.last_login_at|date:"M j, Y, P" }}{% endlanguage %}
+                {% else %}
+                  -
+                {% endif %}
+              </td>
               <td>
                 <div class="eal-actions-cell">
                   <a href="{% url 'admin_user_detail' u.pk %}" class="eal-row-btn" title="{% translate 'View details' %}">
@@ -233,12 +240,12 @@
                   {% if u.status == 'Pending_Activation' %}
                     <form method="post" action="{% url 'admin_user_resend_invite' u.pk %}">
                       {% csrf_token %}
-                      <button type="submit" class="eal-row-btn" title="Resend Invitation">
+                      <button type="submit" class="eal-row-btn" title="{% translate 'Resend Invitation' %}">
                         <i class="bi bi-send"></i>
                       </button>
                     </form>
                   {% else %}
-                    <button type="button" class="eal-row-btn" disabled title="Invite resend not available for active users">
+                    <button type="button" class="eal-row-btn" disabled title="{% translate 'Invite resend not available for active users' %}">
                       <i class="bi bi-send"></i>
                     </button>
                   {% endif %}
@@ -247,20 +254,20 @@
                     <form method="post" action="{% url 'admin_user_toggle_status' u.pk %}">
                       {% csrf_token %}
                       {% if u.status == 'Suspended' %}
-                        <button type="submit" class="eal-row-btn" title="Activate">
+                        <button type="submit" class="eal-row-btn" title="{% translate 'Activate' %}">
                           <i class="bi bi-check-circle"></i>
                         </button>
                       {% else %}
-                        <button type="submit" class="eal-row-btn" title="Suspend">
+                        <button type="submit" class="eal-row-btn" title="{% translate 'Suspend' %}">
                           <i class="bi bi-slash-circle"></i>
                         </button>
                       {% endif %}
                     </form>
                   {% endif %}
                   {% if u.status != 'Active' %}
-                    <form method="post" action="{% url 'admin_user_delete' u.pk %}" onsubmit="return confirm('Remove this admin user?');">
+                    <form method="post" action="{% url 'admin_user_delete' u.pk %}" onsubmit="return confirm('{% translate "Remove this admin user?" %}');">
                       {% csrf_token %}
-                      <button type="submit" class="eal-row-btn" title="Delete (Soft)">
+                      <button type="submit" class="eal-row-btn" title="{% translate 'Delete (Soft)' %}">
                         <i class="bi bi-trash"></i>
                       </button>
                     </form>
@@ -277,8 +284,8 @@
       <div class="empty-icon">
         <i class="bi bi-collection"></i>
       </div>
-      <h4 class="empty-title">No admin users found</h4>
-      <p class="empty-text">Try adjusting your search or filters.</p>
+      <h4 class="empty-title">{% translate "No admin users found" %}</h4>
+      <p class="empty-text">{% translate "Try adjusting your search or filters." %}</p>
     </div>
   {% endif %}
 

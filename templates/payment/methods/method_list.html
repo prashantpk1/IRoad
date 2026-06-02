@@ -68,7 +68,7 @@
         {% if request.user.is_root %}
             <a href="{% url 'payment_method_create' %}" class="eal-btn eal-btn-primary">
               <i class="bi bi-plus-lg"></i>
-              <span>Add Payment Method</span>
+              <span>{% translate "Add Payment Method" %}</span>
             </a>
           {% endif %}
       </div>
@@ -94,7 +94,7 @@
             <input
               type="text"
               name="q"
-              placeholder="Search method or gateway/bank"
+              placeholder="{% translate 'Search method or gateway/bank' %}"
               value="{{ search_query }}"
             />
             <input type="hidden" name="method_type" value="{{ type_filter }}">
@@ -121,9 +121,9 @@
 
           <div style="width: 220px;">
             <select name="method_type" class="eal-select" onchange="this.form.submit()">
-              <option value="All" {% if type_filter == 'All' %}selected{% endif %}>All</option>
-              <option value="Online_Gateway" {% if type_filter == 'Online_Gateway' %}selected{% endif %}>Online Gateway</option>
-              <option value="Offline_Bank" {% if type_filter == 'Offline_Bank' %}selected{% endif %}>Offline Bank</option>
+              <option value="All" {% if type_filter == 'All' %}selected{% endif %}>{% translate "All" %}</option>
+              <option value="Online_Gateway" {% if type_filter == 'Online_Gateway' %}selected{% endif %}>{% translate "Online Gateway" %}</option>
+              <option value="Offline_Bank" {% if type_filter == 'Offline_Bank' %}selected{% endif %}>{% translate "Offline Bank" %}</option>
             </select>
           </div>
 
@@ -153,7 +153,7 @@
               </th>
               <th class="sortable" style="width: 80px">
                 <a href="?q={{ search_query }}&method_type={{ type_filter }}&status={{ status_filter }}&sort=display_order&dir={% if current_sort == 'display_order' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                  <span>Display Order</span>
+                  <span>{% translate "Display Order" %}</span>
                   {% if current_sort == 'display_order' %}
                     <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
                   {% else %}
@@ -163,7 +163,7 @@
               </th>
               <th class="sortable">
                 <a href="?q={{ search_query }}&method_type={{ type_filter }}&status={{ status_filter }}&sort=name&dir={% if current_sort == 'name' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                  <span>Method Name EN</span>
+                  <span>{% translate "Method Name EN" %}</span>
                   {% if current_sort == 'name' %}
                     <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
                   {% else %}
@@ -173,7 +173,7 @@
               </th>
                 <th class="sortable" style="width: 150px">
                   <a href="?q={{ search_query }}&method_type={{ type_filter }}&status={{ status_filter }}&sort=type&dir={% if current_sort == 'type' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                    <span>Type badge</span>
+                    <span>{% translate "Type badge" %}</span>
                     {% if current_sort == 'type' %}
                       <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
                     {% else %}
@@ -181,10 +181,10 @@
                     {% endif %}
                   </a>
                 </th>
-                <th style="min-width: 220px">Currencies badges</th>
+                <th style="min-width: 220px">{% translate "Currencies badges" %}</th>
               <th class="sortable" style="min-width: 220px">
                 <a href="?q={{ search_query }}&method_type={{ type_filter }}&status={{ status_filter }}&sort=source&dir={% if current_sort == 'source' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                  <span>Gateway/Bank</span>
+                  <span>{% translate "Gateway/Bank" %}</span>
                   {% if current_sort == 'source' %}
                     <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
                   {% else %}
@@ -194,7 +194,7 @@
               </th>
               <th class="sortable" style="width: 120px">
                 <a href="?q={{ search_query }}&method_type={{ type_filter }}&status={{ status_filter }}&sort=status&dir={% if current_sort == 'status' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                  <span>Status</span>
+                  <span>{% translate "Status" %}</span>
                   {% if current_sort == 'status' %}
                     <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
                   {% else %}
@@ -202,7 +202,7 @@
                   {% endif %}
                 </a>
               </th>
-              <th style="width: 120px; text-align: left; padding-left: 16px;">ACTIONS</th>
+              <th style="width: 120px; text-align: left; padding-left: 16px;">{% translate "Actions" %}</th>
             </tr>
           </thead>
           <tbody>
@@ -210,12 +210,12 @@
               <tr>
                 <td>{{ method.list_rank }}</td>
                 <td>{{ method.display_order }}</td>
-                <td>{{ method.method_name_en }}</td>
+                <td>{% if LANGUAGE_CODE|slice:':2' == 'ar' and method.method_name_ar %}{{ method.method_name_ar }}{% else %}{{ method.method_name_en }}{% endif %}</td>
                 <td>
                   {% if method.method_type == 'Online_Gateway' %}
-                    <span class="status-badge active">Online</span>
+                    <span class="status-badge active">{% translate "Online" %}</span>
                   {% else %}
-                    <span class="status-badge inactive">Offline</span>
+                    <span class="status-badge inactive">{% translate "Offline" %}</span>
                   {% endif %}
                 </td>
                 <td>
@@ -236,25 +236,25 @@
                 </td>
                 <td>
                   {% if method.is_active %}
-                    <span class="status-badge active">Active</span>
+                    <span class="status-badge active">{% translate "Active" %}</span>
                   {% else %}
-                    <span class="status-badge inactive">Inactive</span>
+                    <span class="status-badge inactive">{% translate "Inactive" %}</span>
                   {% endif %}
                 </td>
                 <td>
                   {% if request.user.is_root %}
                     <div class="eal-actions-cell">
-                      <a href="{% url 'payment_method_edit' method.method_id %}" class="eal-row-btn icon-only-btn" title="Edit">
+                      <a href="{% url 'payment_method_edit' method.method_id %}" class="eal-row-btn icon-only-btn" title="{% translate 'Edit' %}">
 <i class="bi bi-pencil"></i>
 </a>
                       <form method="post" action="{% url 'payment_method_toggle' method.method_id %}" style="display: inline">
                         {% csrf_token %}
                         {% if method.is_active %}
-                          <button type="submit" class="eal-row-btn icon-only-btn" title="Deactivate">
+                          <button type="submit" class="eal-row-btn icon-only-btn" title="{% translate 'Deactivate' %}">
 <i class="bi bi-slash-circle"></i>
 </button>
                         {% else %}
-                          <button type="submit" class="eal-row-btn icon-only-btn" title="Activate">
+                          <button type="submit" class="eal-row-btn icon-only-btn" title="{% translate 'Activate' %}">
 <i class="bi bi-check-circle"></i>
 </button>
                         {% endif %}
@@ -272,8 +272,8 @@
     {% else %}
       <div class="notification-empty">
         <div class="empty-icon"><i class="bi bi-credit-card"></i></div>
-        <h4 class="empty-title">No payment methods found</h4>
-        <p class="empty-text">No payment method records match your current filters.</p>
+        <h4 class="empty-title">{% translate "No payment methods found" %}</h4>
+        <p class="empty-text">{% translate "No payment method records match your current filters." %}</p>
       </div>
     {% endif %}
 

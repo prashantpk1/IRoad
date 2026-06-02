@@ -1,11 +1,11 @@
 {% extends 'base.html' %}
 {% load i18n %}
 
-{% block title %}{{ page_title }}{% endblock %}
-{% block page_title %}{{ page_title }}{% endblock %}
+{% block title %}{% translate page_title %}{% endblock %}
+{% block page_title %}{% translate page_title %}{% endblock %}
 
 {% block breadcrumb_items %}
-  <li class="breadcrumb-item active" aria-current="page">{{ page_title }}</li>
+  <li class="breadcrumb-item active" aria-current="page">{% translate page_title %}</li>
 {% endblock %}
 
 {% block extra_css %}
@@ -46,7 +46,7 @@
 <div class="page-header">
   <div class="page-header-row">
     <div class="page-header-left">
-      <h1 class="page-title">{{ page_title }}</h1>
+      <h1 class="page-title">{% translate page_title %}</h1>
       <p class="page-subtitle">{% translate "Bullets under pricing tiers on home and pricing pages." %}</p>
     </div>
     <div class="page-header-right">
@@ -141,7 +141,7 @@
               {% endif %}
             </a>
           </th>
-          <th>{% translate "ACTIONS" %}</th>
+          <th>{% translate "Actions" %}</th>
         </tr>
       </thead>
       <tbody>

@@ -1,10 +1,10 @@
 {% extends 'base.html' %}
 {% load i18n %}
-{% block title %}{% translate "Transaction Details" %}{% endblock %}
+{% block title %}{% if LANGUAGE_CODE|slice:':2' == 'ar' %}تفاصيل المعاملة{% else %}{% translate "Transaction Details" %}{% endif %}{% endblock %}
 
 {% block breadcrumb_items %}
 <li class="breadcrumb-item"><a href="{% url 'transaction_list' %}">{% translate "Transactions" %}</a></li>
-<li class="breadcrumb-item active" aria-current="page">{% translate "Transaction Details" %}</li>
+<li class="breadcrumb-item active" aria-current="page">{% if LANGUAGE_CODE|slice:':2' == 'ar' %}تفاصيل المعاملة{% else %}{% translate "Transaction Details" %}{% endif %}</li>
 {% endblock %}
 
 {% block content %}
@@ -13,14 +13,14 @@
 <div class="page-header">
   <div class="page-header-row">
     <div class="page-header-left">
-      <h1 class="page-title">{% translate "Transaction Details" %}</h1>
-      <p class="page-subtitle">{% translate "Review payment, references, and manual review status." %}</p>
+      <h1 class="page-title">{% if LANGUAGE_CODE|slice:':2' == 'ar' %}تفاصيل المعاملة{% else %}{% translate "Transaction Details" %}{% endif %}</h1>
+      <p class="page-subtitle">{% if LANGUAGE_CODE|slice:':2' == 'ar' %}راجع الدفع والمراجع وحالة المراجعة اليدوية.{% else %}{% translate "Review payment, references, and manual review status." %}{% endif %}</p>
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
         <a href="{% url 'transaction_list' %}" class="eal-btn eal-btn-outline">
           <i class="bi bi-arrow-left"></i>
-          <span>{% translate "Back to ledger" %}</span>
+          <span>{% if LANGUAGE_CODE|slice:':2' == 'ar' %}العودة إلى السجل{% else %}{% translate "Back to ledger" %}{% endif %}</span>
         </a>
       </div>
     </div>
@@ -34,8 +34,8 @@
       <i class="bi bi-credit-card-2-front"></i>
     </div>
     <div class="form-card-header-text">
-      <h3 class="form-card-title">{% translate "Payment Information" %}</h3>
-      <p class="form-card-desc">{% translate "Core transaction details and references." %}</p>
+      <h3 class="form-card-title">{% if LANGUAGE_CODE|slice:':2' == 'ar' %}معلومات الدفع{% else %}{% translate "Payment Information" %}{% endif %}</h3>
+      <p class="form-card-desc">{% if LANGUAGE_CODE|slice:':2' == 'ar' %}تفاصيل المعاملة الأساسية والمراجع.{% else %}{% translate "Core transaction details and references." %}{% endif %}</p>
     </div>
   </div>
   <div class="form-card-body">
@@ -46,34 +46,34 @@
       </div>
       <div class="col-12 col-md-4">
         <label class="form-label">{% translate "Type" %}</label>
-        <input class="form-control" value="{{ txn.get_transaction_type_display }}" readonly>
+        <input class="form-control" value="{% if txn.transaction_type == 'Order_Payment' %}{% translate 'Order Payment' %}{% elif txn.transaction_type == 'Wallet_TopUp' %}{% translate 'Wallet Top-Up' %}{% elif txn.transaction_type == 'Refund' %}{% translate 'Refund' %}{% else %}{{ txn.get_transaction_type_display }}{% endif %}" readonly>
       </div>
       <div class="col-12 col-md-4">
         <label class="form-label">{% translate "Status" %}</label>
-        <input class="form-control" value="{{ txn.get_status_display }}" readonly>
+        <input class="form-control" value="{% if txn.status == 'Completed' %}{% translate 'Completed' %}{% elif txn.status == 'Pending' %}{% translate 'Pending' %}{% elif txn.status == 'Rejected' %}{% translate 'Rejected' %}{% elif txn.status == 'Failed' %}{% translate 'Failed' %}{% else %}{{ txn.get_status_display }}{% endif %}" readonly>
       </div>
       <div class="col-12 col-md-4">
-        <label class="form-label">{% translate "Currency / Amount" %}</label>
+        <label class="form-label">{% if LANGUAGE_CODE|slice:':2' == 'ar' %}العملة / المبلغ{% else %}{% translate "Currency / Amount" %}{% endif %}</label>
         <input class="form-control" value="{{ txn.currency_id }} {{ txn.amount|floatformat:2 }}" readonly>
       </div>
       <div class="col-12 col-md-4">
-        <label class="form-label">{% translate "Base equivalent" %}</label>
+        <label class="form-label">{% if LANGUAGE_CODE|slice:':2' == 'ar' %}المعادل الأساسي{% else %}{% translate "Base equivalent" %}{% endif %}</label>
         <input class="form-control" value="{{ txn.base_currency_equivalent_amount|floatformat:2 }}" readonly>
       </div>
       <div class="col-12 col-md-4">
-        <label class="form-label">{% translate "FX snapshot" %}</label>
+        <label class="form-label">{% if LANGUAGE_CODE|slice:':2' == 'ar' %}لقطة سعر الصرف{% else %}{% translate "FX snapshot" %}{% endif %}</label>
         <input class="form-control" value="{{ txn.exchange_rate_snapshot }}" readonly>
       </div>
       <div class="col-12 col-md-4">
         <label class="form-label">{% translate "Payment method" %}</label>
-        <input class="form-control" value="{% if txn.payment_method %}{{ txn.payment_method.method_name_en }} ({{ txn.payment_method.get_method_type_display }}){% else %}—{% endif %}" readonly>
+        <input class="form-control" value="{% if txn.payment_method %}{% if LANGUAGE_CODE|slice:':2' == 'ar' and txn.payment_method.method_name_ar %}{{ txn.payment_method.method_name_ar }}{% else %}{{ txn.payment_method.method_name_en }}{% endif %} ({% if txn.payment_method.method_type == 'Online_Gateway' %}{% translate 'Online Gateway' %}{% elif txn.payment_method.method_type == 'Offline_Bank' %}{% translate 'Offline Bank Transfer' %}{% else %}{{ txn.payment_method.get_method_type_display }}{% endif %}){% else %}—{% endif %}" readonly>
       </div>
       <div class="col-12 col-md-4">
-        <label class="form-label">{% translate "Gateway ref" %}</label>
+        <label class="form-label">{% if LANGUAGE_CODE|slice:':2' == 'ar' %}مرجع البوابة{% else %}{% translate "Gateway ref" %}{% endif %}</label>
         <input class="form-control" value="{{ txn.gateway_ref|default:'—' }}" readonly>
       </div>
       <div class="col-12 col-md-4">
-        <label class="form-label">{% translate "Linked order" %}</label>
+        <label class="form-label">{% if LANGUAGE_CODE|slice:':2' == 'ar' %}الطلب المرتبط{% else %}{% translate "Linked order" %}{% endif %}</label>
         {% if txn.order %}
           <a href="{% url 'order_detail' txn.order.order_id %}" class="form-control d-block text-decoration-none" style="color: var(--primary-color); background: #f8fafc;">{{ txn.order.order_id }}</a>
         {% else %}
@@ -81,7 +81,7 @@
         {% endif %}
       </div>
       <div class="col-12 col-md-4">
-        <label class="form-label">{% translate "Created" %}</label>
+        <label class="form-label">{% if LANGUAGE_CODE|slice:':2' == 'ar' %}تاريخ الإنشاء{% else %}{% translate "Created" %}{% endif %}</label>
         <input class="form-control" value="{{ txn.created_at|date:'d M Y, H:i' }}" readonly>
       </div>
     </div>
@@ -96,14 +96,14 @@
       <i class="bi bi-paperclip"></i>
     </div>
     <div class="form-card-header-text">
-      <h3 class="form-card-title">{% translate "Receipt / Attachment" %}</h3>
-      <p class="form-card-desc">{% translate "Uploaded payment receipt or reference document." %}</p>
+      <h3 class="form-card-title">{% if LANGUAGE_CODE|slice:':2' == 'ar' %}الإيصال / المرفق{% else %}{% translate "Receipt / Attachment" %}{% endif %}</h3>
+      <p class="form-card-desc">{% if LANGUAGE_CODE|slice:':2' == 'ar' %}إيصال الدفع المرفوع أو مستند مرجعي.{% else %}{% translate "Uploaded payment receipt or reference document." %}{% endif %}</p>
     </div>
   </div>
   <div class="form-card-body">
     <a href="{{ txn.attachment.url }}" target="_blank" rel="noopener" class="eal-btn eal-btn-outline">
       <i class="bi bi-download"></i>
-      <span>{% translate "Open attachment" %}</span>
+      <span>{% if LANGUAGE_CODE|slice:':2' == 'ar' %}فتح المرفق{% else %}{% translate "Open attachment" %}{% endif %}</span>
     </a>
   </div>
 </div>
@@ -117,14 +117,14 @@
       <i class="bi bi-check-circle"></i>
     </div>
     <div class="form-card-header-text">
-      <h3 class="form-card-title">{% translate "Review" %}</h3>
-      <p class="form-card-desc">{% translate "Review decision and notes." %}</p>
+      <h3 class="form-card-title">{% if LANGUAGE_CODE|slice:':2' == 'ar' %}المراجعة{% else %}{% translate "Review" %}{% endif %}</h3>
+      <p class="form-card-desc">{% if LANGUAGE_CODE|slice:':2' == 'ar' %}قرار المراجعة والملاحظات.{% else %}{% translate "Review decision and notes." %}{% endif %}</p>
     </div>
   </div>
   <div class="form-card-body">
     <div class="row g-3">
       <div class="col-12 col-md-6">
-        <label class="form-label">{% translate "Reviewed by" %}</label>
+        <label class="form-label">{% if LANGUAGE_CODE|slice:':2' == 'ar' %}تمت المراجعة بواسطة{% else %}{% translate "Reviewed by" %}{% endif %}</label>
         <input class="form-control" value="{{ txn.reviewed_by.email }}" readonly>
       </div>
       {% if txn.review_notes %}

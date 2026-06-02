@@ -1,19 +1,20 @@
 {% extends 'base.html' %}
+{% load i18n %}
 
-{% block page_title %}General Tax Settings{% endblock %}
+{% block page_title %}{% translate "General Tax Settings" %}{% endblock %}
 
 {% block content %}
   <div class="page-header">
     <nav aria-label="breadcrumb">
       <ol class="breadcrumb">
-        <li class="breadcrumb-item">System Config</li>
-        <li class="breadcrumb-item active" aria-current="page">General Tax Settings</li>
+        <li class="breadcrumb-item">{% translate "System Config" %}</li>
+        <li class="breadcrumb-item active" aria-current="page">{% translate "General Tax Settings" %}</li>
       </ol>
     </nav>
     <div class="page-header-row">
       <div class="page-header-left">
-        <h1 class="page-title">General Tax Settings</h1>
-        <p class="page-subtitle text-muted font-weight-normal">Configure tax inclusion and geo-verification behavior</p>
+        <h1 class="page-title">{% translate "General Tax Settings" %}</h1>
+        <p class="page-subtitle text-muted font-weight-normal">{% translate "Configure tax inclusion and geo-verification behavior" %}</p>
       </div>
     </div>
   </div>
@@ -41,7 +42,7 @@
         <div class="field-group">
           <div class="fields-grid cols-2">
             <div class="field">
-              <label class="form-label">Prices Include Tax</label>
+              <label class="form-label">{% translate "Prices Include Tax" %}</label>
               <div style="display: flex; align-items: center; gap: 10px">
                 {{ form.prices_include_tax }}
               </div>
@@ -50,7 +51,7 @@
               {% endfor %}
             </div>
             <div class="field">
-              <label class="form-label">Location Verification</label>
+              <label class="form-label">{% translate "Location Verification" %}</label>
               {{ form.location_verification }}
               {% for error in form.location_verification.errors %}
                 <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
@@ -60,19 +61,19 @@
         </div>
 
         <div style="margin-top: 16px; margin-bottom: 8px; padding: 12px 14px; border-radius: 10px; background: #f8fafc; border:1px solid #e5e7eb">
-          <p style="margin: 0 0 10px 0; font-weight: 700; color: #0f172a">What each option means</p>
+          <p style="margin: 0 0 10px 0; font-weight: 700; color: #0f172a">{% translate "What each option means" %}</p>
           <div style="display: grid; gap: 10px">
             <div>
-              <p style="margin: 0; font-weight: 700; color: #0f172a">Profile Only</p>
-              <p style="margin: 4px 0 0 0; color: #475569">Use the tenant/customer profile country for tax determination.</p>
+              <p style="margin: 0; font-weight: 700; color: #0f172a">{% translate "Profile Only" %}</p>
+              <p style="margin: 4px 0 0 0; color: #475569">{% translate "Use the tenant/customer profile country for tax determination." %}</p>
             </div>
             <div>
-              <p style="margin: 0; font-weight: 700; color: #0f172a">Audit Only</p>
-              <p style="margin: 4px 0 0 0; color: #475569">Use audit/location verification data for tax determination.</p>
+              <p style="margin: 0; font-weight: 700; color: #0f172a">{% translate "Audit Only" %}</p>
+              <p style="margin: 4px 0 0 0; color: #475569">{% translate "Use audit/location verification data for tax determination." %}</p>
             </div>
             <div>
-              <p style="margin: 0; font-weight: 700; color: #0f172a">Enforce Profile Match</p>
-              <p style="margin: 4px 0 0 0; color: #475569">Require profile and verification data to match before applying country-specific tax.</p>
+              <p style="margin: 0; font-weight: 700; color: #0f172a">{% translate "Enforce Profile Match" %}</p>
+              <p style="margin: 4px 0 0 0; color: #475569">{% translate "Require profile and verification data to match before applying country-specific tax." %}</p>
             </div>
           </div>
         </div>
@@ -84,7 +85,7 @@
         <div class="form-actions-right">
           <button type="submit" class="eal-btn eal-btn-primary">
             <i class="bi bi-save"></i>
-            Save
+            {% translate "Save" %}
           </button>
         </div>
       </div>
@@ -92,12 +93,12 @@
   </form>
 
   <div style="margin-top: 14px; color: #64748b; font-weight: 600">
-    Last updated by:
+    {% translate "Last updated by:" %}
     {% if obj.updated_by %}
       {{ obj.updated_by.email }}
     {% else %}
-      Unknown
+      {% translate "Unknown" %}
     {% endif %}
-    at {{ obj.updated_at }}
+    {% translate "at" %} {{ obj.updated_at }}
   </div>
 {% endblock %}

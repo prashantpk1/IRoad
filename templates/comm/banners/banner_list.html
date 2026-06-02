@@ -51,7 +51,7 @@
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
-        <a href="{% url 'banner_create' %}" class="eal-btn eal-btn-primary">Add Banner</a>
+        <a href="{% url 'banner_create' %}" class="eal-btn eal-btn-primary">{% translate "Add Banner" %}</a>
       </div>
     </div>
   </div>
@@ -62,7 +62,7 @@
       <div class="eal-toolbar-left" style="width:100%; display:flex; gap:16px; align-items:center; flex-wrap:wrap;">
         <div class="eal-search" style="flex:1; min-width:240px; margin-bottom: 0;">
           <i class="bi bi-search"></i>
-          <input type="text" name="q" value="{{ search_query }}" placeholder="Search by title or message" />
+          <input type="text" name="q" value="{{ search_query }}" placeholder="{% translate 'Search by title or message' %}" />
           <input type="hidden" name="severity" value="{{ severity_filter }}">
           <input type="hidden" name="status" value="{{ status_filter }}">
           <input type="hidden" name="sort" value="{{ current_sort }}">
@@ -86,10 +86,10 @@
         </div>
         <div style="width:220px">
           <select class="eal-select" name="severity" onchange="this.form.submit()">
-            <option value="All" {% if severity_filter == 'All' %}selected{% endif %}>All Severities</option>
-            <option value="Info" {% if severity_filter == 'Info' %}selected{% endif %}>Info</option>
-            <option value="Warning" {% if severity_filter == 'Warning' %}selected{% endif %}>Warning</option>
-            <option value="Critical" {% if severity_filter == 'Critical' %}selected{% endif %}>Critical</option>
+            <option value="All" {% if severity_filter == 'All' %}selected{% endif %}>{% translate "All Severities" %}</option>
+            <option value="Info" {% if severity_filter == 'Info' %}selected{% endif %}>{% translate "Info" %}</option>
+            <option value="Warning" {% if severity_filter == 'Warning' %}selected{% endif %}>{% translate "Warning" %}</option>
+            <option value="Critical" {% if severity_filter == 'Critical' %}selected{% endif %}>{% translate "Critical" %}</option>
           </select>
         </div>
         {% if search_query or severity_filter != 'All' or status_filter != 'All' %}
@@ -174,23 +174,23 @@
                 {% endif %}
               </a>
             </th>
-            <th>{% translate "ACTIONS" %}</th>
+            <th>{% translate "Actions" %}</th>
           </tr>
         </thead>
         <tbody>
           {% for row in banners %}
             <tr>
               <td>{{ row.list_rank }}</td>
-              <td>{{ row.title_en }}</td>
+              <td>{% if LANGUAGE_CODE|slice:':2' == 'ar' and row.title_ar %}{{ row.title_ar }}{% else %}{{ row.title_en }}{% endif %}</td>
               <td>
-                {% if row.severity == 'Info' %}<span class="status-badge active">Info</span>{% elif row.severity == 'Warning' %}<span class="status-badge warning">Warning</span>{% else %}<span class="status-badge inactive">Critical</span>{% endif %}
+                {% if row.severity == 'Info' %}<span class="status-badge active">{% translate "Info" %}</span>{% elif row.severity == 'Warning' %}<span class="status-badge warning">{% translate "Warning" %}</span>{% else %}<span class="status-badge inactive">{% translate "Critical" %}</span>{% endif %}
               </td>
-              <td>{{ row.is_dismissible|yesno:'Yes,No' }}</td>
+              <td>{% if row.is_dismissible %}{% translate "Yes" %}{% else %}{% translate "No" %}{% endif %}</td>
               <td>{{ row.valid_from|date:'Y-m-d H:i' }}</td>
               <td>{{ row.valid_until|date:'Y-m-d H:i' }}</td>
               <td>
-                {% if row.is_active %}<span class="status-badge active">Active</span>{% else %}<span class="status-badge inactive">Inactive</span>{% endif %}
-                {% if row.is_expired %}<span class="status-badge expired">EXPIRED</span>{% endif %}
+                {% if row.is_active %}<span class="status-badge active">{% translate "Active" %}</span>{% else %}<span class="status-badge inactive">{% translate "Inactive" %}</span>{% endif %}
+                {% if row.is_expired %}<span class="status-badge expired">{% translate "Expired" %}</span>{% endif %}
               </td>
               <td>
                 <div class="eal-actions-cell">
@@ -205,7 +205,7 @@
                 <div class="notification-empty">
                   <div class="empty-icon"><i class="bi bi-inbox"></i></div>
                   <h4 class="empty-title">{% translate "No Data Found" %}</h4>
-                  <p class="empty-text">No banners found.</p>
+                  <p class="empty-text">{% translate "No banners found." %}</p>
                 </div>
               </td>
             </tr>

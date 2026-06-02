@@ -22,19 +22,19 @@
   {% if is_edit and policy and policy.updated_at %}
   <div class="edit-info-bar">
     <i class="bi bi-clock-history"></i>
-    Last updated
+    {% translate "Last updated" %}
     {% if policy.updated_by %}
-      by <strong>{{ policy.updated_by.first_name }} {{ policy.updated_by.last_name }}</strong>
+      {% translate "by" %} <strong>{{ policy.updated_by.first_name }} {{ policy.updated_by.last_name }}</strong>
     {% endif %}
-    at <strong>{{ policy.updated_at|date:"d M Y, H:i" }}</strong>
+    {% translate "at" %} <strong>{{ policy.updated_at|date:"d M Y, H:i" }}</strong>
   </div>
   {% endif %}
 
   <div class="alert alert-info" style="border-radius: 10px;">
-    All prices are per 1 standard billing cycle.
+    {% translate "All prices are per 1 standard billing cycle." %}
   </div>
   <div class="alert alert-warning" style="border-radius: 10px;">
-    Activating this will deactivate all other policies.
+    {% translate "Activating this will deactivate all other policies." %}
   </div>
   <div class="form-card">
     <div class="form-card-body">
@@ -65,12 +65,12 @@
             {% elif field.name == 'is_active' %}
               <div>
                 <div class="form-label d-block mb-0">{% translate "Status" %}</div>
-                <div class="form-check form-switch mt-2">
-                  {{ field }}
-                  <label class="form-check-label ms-1" for="{{ field.id_for_label }}">
+                <div class="form-check form-switch mt-2 ps-0">
+                  <label class="form-check-label" for="{{ field.id_for_label }}">
                     <span class="fw-medium">{% translate "Active" %}</span>
                     <span class="text-muted small d-block">{% translate "When on, this policy is the active add-ons tariff. Other policies will be deactivated." %}</span>
                   </label>
+                  {{ field }}
                 </div>
                 {% for e in field.errors %}
                   <div style="color:#b91c1c; font-weight:600">{{ e }}</div>
@@ -80,7 +80,7 @@
           {% endfor %}
         </div>
 
-        <h3 style="margin: 18px 0 12px 0">Pricing Per Resource</h3>
+        <h3 style="margin: 18px 0 12px 0">{% translate "Pricing Per Resource" %}</h3>
         <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:12px">
           {% for field in form %}
             {% if field.name != 'policy_name' and field.name != 'is_active' and field.name != 'extra_external_truck_price' %}
@@ -122,13 +122,14 @@ document.addEventListener('DOMContentLoaded', function () {
   var form = document.getElementById('addons-policy-form');
   if (!form) return;
 
+  var requiredMsg = "{% filter escapejs %}{% translate 'Please fill all required fields before submitting.' %}{% endfilter %}";
   var errorBox = document.getElementById('addons-policy-client-error');
   var requiredFields = form.querySelectorAll('[required]');
 
   function clearClientError() {
     if (errorBox) {
       errorBox.classList.add('d-none');
-      errorBox.textContent = 'Please fill all required fields before submitting.';
+      errorBox.textContent = requiredMsg;
     }
     requiredFields.forEach(function (field) {
       field.classList.remove('is-invalid');
@@ -150,7 +151,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (firstInvalid) {
       e.preventDefault();
       if (errorBox) {
-        errorBox.textContent = 'Please fill all required fields before submitting.';
+        errorBox.textContent = requiredMsg;
         errorBox.classList.remove('d-none');
       }
       firstInvalid.focus();

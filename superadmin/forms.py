@@ -258,6 +258,20 @@ class AdminUserForm(forms.ModelForm):
         self.fields['role'].queryset = active_roles
         self.fields['role'].required = True
 
+        from django.utils.translation import gettext as _
+
+        def _role_label(role):
+            from django.utils import translation
+
+            if translation.get_language()[:2] == 'ar' and role.role_name_ar:
+                return role.role_name_ar
+            return role.role_name_en
+
+        self.fields['role'].label_from_instance = _role_label
+        self.fields['status'].choices = [
+            (value, _(label)) for value, label in AdminUser.STATUS_CHOICES
+        ]
+
     def clean_email(self):
         value = self.cleaned_data.get('email', '').strip().lower()
         qs = AdminUser.objects.filter(email=value)
@@ -334,18 +348,24 @@ class CountryForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         is_edit = kwargs.pop('is_edit', False)
         super().__init__(*args, **kwargs)
+        from django.utils.translation import gettext as _
+
         apply_premium_styling(self)
+        self.fields['country_code'].label = _('Country code')
+        self.fields['name_en'].label = _('English name')
+        self.fields['name_ar'].label = _('Arabic name')
+        self.fields['is_active'].label = _('Is active')
 
         if 'name_ar' in self.fields:
             self.fields['name_ar'].widget.attrs.setdefault('dir', 'rtl')
             self.fields['name_ar'].widget.attrs.setdefault(
-                'placeholder', 'الاسم بالعربية'
+                'placeholder', _('Arabic name')
             )
 
         if is_edit and 'country_code' in self.fields:
             self.fields['country_code'].disabled = True
             self.fields['country_code'].help_text = (
-                'Country code cannot be changed once saved.'
+                _('Country code cannot be changed once saved.')
             )
 
         if 'is_active' in self.fields:
@@ -356,6 +376,7 @@ class CountryForm(forms.ModelForm):
             })
 
     def clean_country_code(self):
+        from django.utils.translation import gettext as _
         # Disabled fields are not included in `cleaned_data`, so fallback to
         # the instance value when editing.
         value = self.cleaned_data.get('country_code')
@@ -366,7 +387,7 @@ class CountryForm(forms.ModelForm):
             value = value.upper().strip()
             if not re.fullmatch(r'[A-Z]+', value):
                 raise forms.ValidationError(
-                    'Country code must contain letters only.'
+                    _('Country code must contain letters only.')
                 )
         return value
 
@@ -386,7 +407,15 @@ class CurrencyForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         is_edit = kwargs.pop('is_edit', False)
         super().__init__(*args, **kwargs)
+        from django.utils.translation import gettext as _
+
         apply_premium_styling(self)
+        self.fields['currency_code'].label = _('Currency code')
+        self.fields['name_en'].label = _('English name')
+        self.fields['name_ar'].label = _('Arabic name')
+        self.fields['currency_symbol'].label = _('Currency symbol')
+        self.fields['decimal_places'].label = _('Decimal places')
+        self.fields['is_active'].label = _('Is active')
 
         # Ensure dropdowns / templates show a default if user doesn't supply it.
         if 'decimal_places' in self.fields:
@@ -395,7 +424,7 @@ class CurrencyForm(forms.ModelForm):
         if is_edit and 'currency_code' in self.fields:
             self.fields['currency_code'].disabled = True
             self.fields['currency_code'].help_text = (
-                'Currency code cannot be changed once saved.'
+                _('Currency code cannot be changed once saved.')
             )
 
         if 'is_active' in self.fields:
@@ -406,6 +435,7 @@ class CurrencyForm(forms.ModelForm):
             })
 
     def clean_currency_code(self):
+        from django.utils.translation import gettext as _
         value = self.cleaned_data.get('currency_code')
         if value is None:
             value = getattr(self.instance, 'currency_code', '') if self.instance else ''
@@ -414,11 +444,12 @@ class CurrencyForm(forms.ModelForm):
             value = value.upper().strip()
             if not re.fullmatch(r'[A-Z]+', value):
                 raise forms.ValidationError(
-                    'Currency code must contain letters only.'
+                    _('Currency code must contain letters only.')
                 )
         return value
 
     def clean_decimal_places(self):
+        from django.utils.translation import gettext as _
         value = self.cleaned_data.get('decimal_places', None)
         if value is None:
             if getattr(self.instance, 'pk', None):
@@ -427,7 +458,7 @@ class CurrencyForm(forms.ModelForm):
 
         if value not in [0, 1, 2, 3]:
             raise forms.ValidationError(
-                'Decimal places must be 0, 1, 2, or 3.'
+                _('Decimal places must be 0, 1, 2, or 3.')
             )
         return value
 
@@ -461,7 +492,19 @@ class TaxCodeForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         is_edit = kwargs.pop('is_edit', False)
         super().__init__(*args, **kwargs)
+        from django.utils.translation import gettext as _
+
         apply_premium_styling(self)
+        self.fields['tax_code'].label = _('Tax code')
+        self.fields['name_en'].label = _('English name')
+        self.fields['name_ar'].label = _('Arabic name')
+        self.fields['rate_percent'].label = _('Rate percentage (%)')
+        self.fields['applicable_country_code'].label = _('Applicable country')
+        self.fields['is_active'].label = _('Is active')
+        self.fields['default_type'].label = _('Default Type')
+        self.fields['default_type'].choices = [
+            (value, _(label)) for value, label in self.DEFAULT_CHOICES
+        ]
         if is_edit:
             self.fields['tax_code'].disabled = True
             
@@ -484,6 +527,7 @@ class TaxCodeForm(forms.ModelForm):
             })
 
     def clean(self):
+        from django.utils.translation import gettext as _
         cleaned = super().clean()
         applicable_country = cleaned.get('applicable_country_code')
         default_type = cleaned.get('default_type')
@@ -499,14 +543,14 @@ class TaxCodeForm(forms.ModelForm):
 
         if is_default_for_country and is_international_default:
             raise forms.ValidationError(
-                'A tax code cannot be both country default and '
-                'international default at the same time.'
+                _('A tax code cannot be both country default and '
+                  'international default at the same time.')
             )
 
         if is_default_for_country and applicable_country is None:
             raise forms.ValidationError(
-                'Country must be selected when setting as '
-                'country default.'
+                _('Country must be selected when setting as '
+                  'country default.')
             )
 
         if is_default_for_country and applicable_country is not None:
@@ -519,8 +563,8 @@ class TaxCodeForm(forms.ModelForm):
                 qs = qs.exclude(pk=self.instance.pk)
             if qs.exists():
                 raise forms.ValidationError(
-                    'A default tax code already exists for this country. '
-                    'Deactivate it first.'
+                    _('A default tax code already exists for this country. '
+                      'Deactivate it first.')
                 )
 
         if is_international_default:
@@ -532,8 +576,8 @@ class TaxCodeForm(forms.ModelForm):
                 qs = qs.exclude(pk=self.instance.pk)
             if qs.exists():
                 raise forms.ValidationError(
-                    'An international default tax code already exists. '
-                    'Deactivate it first.'
+                    _('An international default tax code already exists. '
+                      'Deactivate it first.')
                 )
 
         return cleaned
@@ -546,7 +590,16 @@ class GeneralTaxSettingsForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        from django.utils.translation import gettext as _
+
         apply_premium_styling(self)
+        self.fields['prices_include_tax'].label = _('Prices include tax')
+        self.fields['location_verification'].label = _('Location verification')
+        if self.fields['location_verification'].choices:
+            self.fields['location_verification'].choices = [
+                (value, _(label) if label else label)
+                for value, label in self.fields['location_verification'].choices
+            ]
 
 
 class LegalIdentityForm(forms.ModelForm):
@@ -566,10 +619,21 @@ class LegalIdentityForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        from django.utils.translation import gettext as _
+
         apply_premium_styling(self)
         self.fields['company_country_code'].queryset = (
             Country.objects.filter(is_active=True).order_by('name_en')
         )
+        self.fields['company_logo'].label = _('Company logo')
+        self.fields['company_name_en'].label = _('Company name (EN)')
+        self.fields['company_name_ar'].label = _('Company name (AR)')
+        self.fields['company_country_code'].label = _('Company country')
+        self.fields['commercial_register'].label = _('Commercial register')
+        self.fields['tax_number'].label = _('Tax number')
+        self.fields['registered_address'].label = _('Registered address')
+        self.fields['support_email'].label = _('Support email')
+        self.fields['support_phone'].label = _('Support phone')
         # Required identity fields for legal profile completeness.
         required_fields = {
             'company_logo',
@@ -593,30 +657,38 @@ class GlobalSystemRulesForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        from django.utils.translation import gettext as _
+
         apply_premium_styling(self)
+        self.fields['system_timezone'].label = _('System timezone')
+        self.fields['default_date_format'].label = _('Default date format')
+        self.fields['grace_period_days'].label = _('Grace period days')
+        self.fields['standard_billing_cycle'].label = _('Standard billing cycle')
 
     def clean_system_timezone(self):
+        from django.utils.translation import gettext as _
         value = self.cleaned_data.get('system_timezone')
         if value not in pytz.all_timezones:
             raise forms.ValidationError(
-                "Invalid timezone. Use format like "
-                "'Asia/Riyadh' or 'UTC'."
+                _("Invalid timezone. Use format like 'Asia/Riyadh' or 'UTC'.")
             )
         return value
 
     def clean_standard_billing_cycle(self):
+        from django.utils.translation import gettext as _
         value = self.cleaned_data.get('standard_billing_cycle')
         if value is not None and value < 1:
             raise forms.ValidationError(
-                'Billing cycle must be at least 1 day.'
+                _('Billing cycle must be at least 1 day.')
             )
         return value
 
     def clean_grace_period_days(self):
+        from django.utils.translation import gettext as _
         value = self.cleaned_data.get('grace_period_days')
         if value is not None and value < 0:
             raise forms.ValidationError(
-                'Grace period cannot be negative.'
+                _('Grace period cannot be negative.')
             )
         return value
 
@@ -628,10 +700,13 @@ class BaseCurrencyForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        from django.utils.translation import gettext as _
+
         apply_premium_styling(self)
         self.fields['base_currency'].queryset = (
             Currency.objects.filter(is_active=True).order_by('name_en')
         )
+        self.fields['base_currency'].label = _('Base currency')
 
 
 class ExchangeRateForm(forms.ModelForm):
@@ -642,17 +717,23 @@ class ExchangeRateForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         base_currency_code = kwargs.pop('base_currency_code', None)
         super().__init__(*args, **kwargs)
+        from django.utils.translation import gettext as _
+
         apply_premium_styling(self)
         qs = Currency.objects.filter(is_active=True)
         if base_currency_code:
             qs = qs.exclude(currency_code=base_currency_code)
         self.fields['currency'].queryset = qs.order_by('name_en')
+        self.fields['currency'].label = _('Currency')
+        self.fields['exchange_rate'].label = _('Exchange rate')
+        self.fields['is_active'].label = _('Is active')
 
     def clean_exchange_rate(self):
+        from django.utils.translation import gettext as _
         value = self.cleaned_data.get('exchange_rate')
         if value is not None and value <= 0:
             raise forms.ValidationError(
-                'Exchange rate must be greater than 0.'
+                _('Exchange rate must be greater than 0.')
             )
         return value
 
@@ -688,6 +769,8 @@ class SubscriptionPlanForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         apply_premium_styling(self)
 
+        from django.utils.translation import gettext as _
+
         switch = lambda el_id: forms.CheckboxInput(
             attrs={
                 'class': 'form-check-input',
@@ -700,24 +783,42 @@ class SubscriptionPlanForm(forms.ModelForm):
         if 'has_driver_app' in self.fields:
             self.fields['has_driver_app'].widget = switch('id_plan_has_driver_app')
 
+        if 'backup_restore_level' in self.fields:
+            self.fields['backup_restore_level'].choices = [
+                (value, _(label)) for value, label in SubscriptionPlan.BACKUP_LEVEL_CHOICES
+            ]
+
+        field_labels = {
+            'max_internal_users': _('Max internal users'),
+            'max_internal_trucks': _('Max internal trucks'),
+            'max_active_drivers': _('Max active drivers'),
+            'max_monthly_shipments': _('Max monthly shipments'),
+            'max_storage_gb': _('Max storage (GB)'),
+        }
+        for field_name, label in field_labels.items():
+            if field_name in self.fields:
+                self.fields[field_name].label = label
+
         for field_name in self.MAX_FIELDS:
             if field_name in self.fields:
-                self.fields[field_name].help_text = 'Enter -1 for Unlimited'
+                self.fields[field_name].help_text = _('Enter -1 for Unlimited')
 
     def clean(self):
+        from django.utils.translation import gettext as _
+
         cleaned = super().clean()
 
         for field_name in self.MAX_FIELDS:
             value = cleaned.get(field_name)
             if value is not None and value < -1:
                 raise forms.ValidationError(
-                    'Enter -1 for unlimited or a positive number.'
+                    _('Enter -1 for unlimited or a positive number.')
                 )
 
         base_cycle_days = cleaned.get('base_cycle_days')
         if base_cycle_days is not None and base_cycle_days < 1:
             raise forms.ValidationError(
-                'Base cycle days must be at least 1.'
+                _('Base cycle days must be at least 1.')
             )
 
         return cleaned
@@ -778,6 +879,9 @@ class AddOnsPricingPolicyForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         apply_premium_styling(self)
+
+        from django.utils.translation import gettext as _
+
         if 'is_active' in self.fields:
             self.fields['is_active'].widget = forms.CheckboxInput(
                 attrs={
@@ -787,15 +891,52 @@ class AddOnsPricingPolicyForm(forms.ModelForm):
                 }
             )
 
+        field_labels = {
+            'policy_name': _('Policy name'),
+            'extra_internal_user_price': _('Extra internal user price'),
+            'extra_internal_truck_price': _('Extra internal truck price'),
+            'extra_driver_price': _('Extra driver price'),
+            'extra_shipment_price': _('Extra shipment price'),
+            'extra_storage_gb_price': _('Extra storage gb price'),
+        }
+        for field_name, label in field_labels.items():
+            if field_name in self.fields:
+                self.fields[field_name].label = label
+
     def clean(self):
+        from django.utils.translation import gettext as _
+
         cleaned = super().clean()
         for field_name in self.PRICE_FIELDS:
             value = cleaned.get(field_name)
             if value is not None and value < 0:
                 raise forms.ValidationError(
-                    'Price cannot be negative.'
+                    _('Price cannot be negative.')
                 )
         return cleaned
+
+
+def subscription_plan_choice_label(plan):
+    """Show plan_name_ar in Arabic UI when populated; otherwise plan_name_en."""
+    from django.utils import translation
+
+    if translation.get_language()[:2] == 'ar' and plan.plan_name_ar:
+        return plan.plan_name_ar
+    return plan.plan_name_en
+
+
+def localized_choice_label(instance, en_attr='name_en', ar_attr='name_ar'):
+    """Use *_ar in Arabic UI when present; otherwise fallback to *_en."""
+    from django.utils import translation
+
+    is_ar = translation.get_language()[:2] == 'ar'
+    ar_value = getattr(instance, ar_attr, None)
+    en_value = getattr(instance, en_attr, None)
+    if is_ar and ar_value:
+        return ar_value
+    if en_value:
+        return en_value
+    return str(instance)
 
 
 class PromoCodeForm(forms.ModelForm):
@@ -825,10 +966,41 @@ class PromoCodeForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         apply_premium_styling(self)
+        from django.utils import translation
+
+        is_ar = translation.get_language()[:2] == 'ar'
+
         self.fields['applicable_plans'].queryset = (
             SubscriptionPlan.objects.filter(is_active=True).order_by('plan_name_en')
         )
-        self.fields['code'].help_text = 'Code is auto-converted to uppercase.'
+        self.fields['applicable_plans'].label_from_instance = (
+            subscription_plan_choice_label
+        )
+        self.fields['code'].help_text = (
+            'يتم تحويل الكود تلقائياً إلى أحرف كبيرة.'
+            if is_ar
+            else 'Code is auto-converted to uppercase.'
+        )
+
+        # Force bilingual labels/choices even when translation catalog is incomplete.
+        self.fields['code'].label = 'الكود' if is_ar else 'Code'
+        self.fields['discount_type'].label = 'نوع الخصم' if is_ar else 'Discount type'
+        self.fields['discount_value'].label = 'قيمة الخصم' if is_ar else 'Discount value'
+        self.fields['discount_duration'].label = 'مدة الخصم' if is_ar else 'Discount duration'
+        self.fields['valid_from'].label = 'صالح من' if is_ar else 'Valid from'
+        self.fields['valid_until'].label = 'صالح حتى' if is_ar else 'Valid until'
+        self.fields['max_uses'].label = 'أقصى عدد استخدامات' if is_ar else 'Max uses'
+        self.fields['is_active'].label = 'نشط' if is_ar else 'Active'
+        self.fields['applicable_plans'].label = 'الباقات المطبقة' if is_ar else 'Applicable Plans'
+
+        self.fields['discount_type'].choices = [
+            ('Percentage', 'نسبة مئوية' if is_ar else 'Percentage'),
+            ('Fixed_Amount', 'مبلغ ثابت' if is_ar else 'Fixed Amount'),
+        ]
+        self.fields['discount_duration'].choices = [
+            ('Apply_Once', 'مرة واحدة' if is_ar else 'Apply Once'),
+            ('Recurring', 'متكرر' if is_ar else 'Recurring'),
+        ]
 
         switch = forms.CheckboxInput(
             attrs={
@@ -906,52 +1078,65 @@ class BankAccountForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        from django.utils.translation import gettext as _
+
         apply_premium_styling(self)
         self.fields['currency'].queryset = (
             Currency.objects.filter(is_active=True).order_by('name_en')
         )
+        self.fields['bank_name'].label = _('Bank name')
+        self.fields['account_holder_name'].label = _('Account holder name')
+        self.fields['iban_number'].label = _('IBAN number')
+        self.fields['account_number'].label = _('Account number')
+        self.fields['swift_code'].label = _('SWIFT code')
+        self.fields['currency'].label = _('Currency')
+        self.fields['allow_cross_currency_payments'].label = _('Allow cross-currency payments')
+        self.fields['is_active'].label = _('Is active')
 
     def clean_iban_number(self):
+        from django.utils.translation import gettext as _
         value = self.cleaned_data.get('iban_number', '')
         value = value.upper().replace(' ', '').strip()
         if len(value) < 15 or len(value) > 34:
             raise forms.ValidationError(
-                'IBAN must be between 15 and 34 characters.'
+                _('IBAN must be between 15 and 34 characters.')
             )
         if not value[:2].isalpha():
             raise forms.ValidationError(
-                'IBAN must start with a 2-letter country code '
-                '(e.g. SA, AE, GB).'
+                _('IBAN must start with a 2-letter country code '
+                  '(e.g. SA, AE, GB).')
             )
         if not value[2:4].isdigit():
             raise forms.ValidationError(
-                'IBAN characters 3-4 must be digits.'
+                _('IBAN characters 3-4 must be digits.')
             )
         if not value.isalnum():
             raise forms.ValidationError(
-                'IBAN must contain only letters and numbers.'
+                _('IBAN must contain only letters and numbers.')
             )
         return value
 
     def clean_account_number(self):
+        from django.utils.translation import gettext as _
         value = self.cleaned_data.get('account_number', '')
         if not value.isdigit():
             raise forms.ValidationError(
-                'Account number must contain digits only.'
+                _('Account number must contain digits only.')
             )
         return value
 
     def clean_swift_code(self):
+        from django.utils.translation import gettext as _
         value = self.cleaned_data.get('swift_code', '')
         if value:
             value = value.upper().strip()
             if len(value) not in [8, 11]:
                 raise forms.ValidationError(
-                    'SWIFT code must be 8 or 11 characters.'
+                    _('SWIFT code must be 8 or 11 characters.')
                 )
             if not value.isalnum():
                 raise forms.ValidationError(
-                    'SWIFT code must be alphanumeric only.'
+                    _('SWIFT code must be alphanumeric only.')
                 )
         return value
 
@@ -971,26 +1156,38 @@ class PaymentGatewayForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        from django.utils.translation import gettext as _
+
         apply_premium_styling(self)
+        self.fields['gateway_name'].label = _('Gateway name')
+        self.fields['environment'].label = _('Environment')
+        self.fields['credentials_payload'].label = _('Credentials payload')
+        self.fields['is_active'].label = _('Is active')
+        if self.fields['environment'].choices:
+            self.fields['environment'].choices = [
+                (value, _(label) if label else label)
+                for value, label in self.fields['environment'].choices
+            ]
         self.fields['credentials_payload'].help_text = (
-            'Enter JSON object e.g. '
-            '{"public_key": "pk_test_...", "secret_key": "sk_..."}'
+            _('Enter JSON object e.g. ')
+            + '{"public_key": "pk_test_...", "secret_key": "sk_..."}'
         )
 
     def clean_credentials_payload(self):
+        from django.utils.translation import gettext as _
         value = self.cleaned_data.get('credentials_payload')
         if value is None:
             raise forms.ValidationError(
-                'Credentials payload is required.'
+                _('Credentials payload is required.')
             )
         if not isinstance(value, dict):
             raise forms.ValidationError(
-                'Credentials must be a JSON object '
-                '(e.g. {"key": "value"}), not an array.'
+                _('Credentials must be a JSON object '
+                  '(e.g. {"key": "value"}), not an array.')
             )
         if len(value) == 0:
             raise forms.ValidationError(
-                'Credentials object cannot be empty.'
+                _('Credentials object cannot be empty.')
             )
         return value
 
@@ -1012,6 +1209,8 @@ class PaymentMethodForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        from django.utils.translation import gettext as _
+
         apply_premium_styling(self)
         self.fields['gateway'].queryset = (
             PaymentGateway.objects.filter(is_active=True).order_by('gateway_name')
@@ -1019,8 +1218,25 @@ class PaymentMethodForm(forms.ModelForm):
         self.fields['dedicated_bank_account'].queryset = (
             BankAccount.objects.filter(is_active=True).order_by('bank_name')
         )
+        self.fields['method_name_en'].label = _('Method name (EN)')
+        self.fields['method_name_ar'].label = _('Method name (AR)')
+        self.fields['method_type'].label = _('Method type')
+        self.fields['supported_currencies'].label = _('Supported currencies')
+        self.fields['gateway'].label = _('Gateway')
+        self.fields['dedicated_bank_account'].label = _('Dedicated bank account')
+        self.fields['logo'].label = _('Logo')
+        self.fields['display_order'].label = _('Display order')
+        self.fields['is_active'].label = _('Is active')
+        if self.fields['method_type'].choices:
+            self.fields['method_type'].choices = [
+                (value, _(label) if label else label)
+                for value, label in self.fields['method_type'].choices
+            ]
+        self.fields['gateway'].empty_label = _('Select')
+        self.fields['dedicated_bank_account'].empty_label = _('Select')
 
     def clean(self):
+        from django.utils.translation import gettext as _
         cleaned = super().clean()
         method_type = cleaned.get('method_type')
         gateway = cleaned.get('gateway')
@@ -1029,36 +1245,36 @@ class PaymentMethodForm(forms.ModelForm):
 
         if method_type == 'Online_Gateway' and not gateway:
             raise forms.ValidationError(
-                'A payment gateway must be selected for '
-                'Online Gateway methods.'
+                _('A payment gateway must be selected for '
+                  'Online Gateway methods.')
             )
 
         if method_type == 'Online_Gateway' and bank_account:
             raise forms.ValidationError(
-                'Dedicated bank account must be empty for '
-                'Online Gateway methods.'
+                _('Dedicated bank account must be empty for '
+                  'Online Gateway methods.')
             )
 
         if method_type == 'Offline_Bank' and gateway:
             raise forms.ValidationError(
-                'Payment gateway must be empty for '
-                'Offline Bank methods.'
+                _('Payment gateway must be empty for '
+                  'Offline Bank methods.')
             )
 
         if not supported_currencies:
             raise forms.ValidationError(
-                'At least one supported currency is required.'
+                _('At least one supported currency is required.')
             )
 
         if not isinstance(supported_currencies, list):
             raise forms.ValidationError(
-                'Supported currencies must be a JSON array '
-                'e.g. ["SAR", "USD"]'
+                _('Supported currencies must be a JSON array '
+                  'e.g. ["SAR", "USD"]')
             )
 
         if len(supported_currencies) == 0:
             raise forms.ValidationError(
-                'At least one currency must be in the list.'
+                _('At least one currency must be in the list.')
             )
 
         from .models import Currency
@@ -1067,8 +1283,7 @@ class PaymentMethodForm(forms.ModelForm):
                     currency_code=code,
                     is_active=True).exists():
                 raise forms.ValidationError(
-                    f"Currency '{code}' is not active "
-                    f"or does not exist."
+                    _("Currency '%(code)s' is not active or does not exist.") % {'code': code}
                 )
 
         return cleaned
@@ -1193,6 +1408,30 @@ class EventMappingForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         apply_premium_styling(self)
+        from django.utils.translation import gettext as _
+
+        # Keep all form labels/choices translatable in Arabic UI.
+        self.fields['system_event'].label = _('System event')
+        self.fields['primary_channel'].label = _('Primary channel')
+        self.fields['primary_template'].label = _('Primary template')
+        self.fields['fallback_channel'].label = _('Fallback channel')
+        self.fields['fallback_template'].label = _('Fallback template')
+        self.fields['is_active'].label = _('Is active')
+
+        self.fields['system_event'].choices = [
+            (value, _(label)) for value, label in self.fields['system_event'].choices
+        ]
+        self.fields['primary_channel'].choices = [
+            (value, _(label)) for value, label in self.fields['primary_channel'].choices
+        ]
+        self.fields['fallback_channel'].choices = [
+            (value, _(label)) for value, label in self.fields['fallback_channel'].choices
+        ]
+
+        # Use a localized empty option instead of dashed placeholder.
+        self.fields['primary_template'].empty_label = _('Select')
+        self.fields['fallback_template'].empty_label = _('Select')
+
         self.fields['primary_template'].queryset = (
             NotificationTemplate.objects.filter(is_active=True)
         )
@@ -1296,11 +1535,52 @@ class PushNotificationForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        from django.utils.translation import gettext as _
+
         apply_premium_styling(self)
+
+        label_map = {
+            'internal_name': _('Internal name'),
+            'trigger_mode': _('Trigger mode'),
+            'title_en': _('English title'),
+            'title_ar': _('Arabic title'),
+            'message_en': _('English message'),
+            'message_ar': _('Arabic message'),
+            'action_link': _('Action link'),
+            'linked_event': _('Linked event'),
+            'target_audience': _('Target audience'),
+            'specific_target_id': _('Specific target ID'),
+            'scheduled_at': _('Scheduled at'),
+            'dispatch_status': _('Dispatch status'),
+            'is_active': _('Is active'),
+        }
+        for field_name, label in label_map.items():
+            if field_name in self.fields:
+                self.fields[field_name].label = label
+
+        if 'trigger_mode' in self.fields and self.fields['trigger_mode'].choices:
+            self.fields['trigger_mode'].choices = [
+                (value, _(choice_label) if choice_label else choice_label)
+                for value, choice_label in self.fields['trigger_mode'].choices
+            ]
+        if 'target_audience' in self.fields and self.fields['target_audience'].choices:
+            self.fields['target_audience'].choices = [
+                (value, _(choice_label) if choice_label else choice_label)
+                for value, choice_label in self.fields['target_audience'].choices
+            ]
+        if 'dispatch_status' in self.fields and self.fields['dispatch_status'].choices:
+            self.fields['dispatch_status'].choices = [
+                (value, _(choice_label) if choice_label else choice_label)
+                for value, choice_label in self.fields['dispatch_status'].choices
+            ]
+        if 'linked_event' in self.fields:
+            self.fields['linked_event'].empty_label = _('Select')
+
         if self.instance and self.instance.pk and self.instance.dispatch_status == 'Completed':
             self.fields['dispatch_status'].disabled = True
 
     def clean(self):
+        from django.utils.translation import gettext as _
         cleaned = super().clean()
         trigger_mode = cleaned.get('trigger_mode')
         linked_event = cleaned.get('linked_event')
@@ -1311,8 +1591,8 @@ class PushNotificationForm(forms.ModelForm):
         if trigger_mode == 'System_Event':
             if not linked_event:
                 raise forms.ValidationError(
-                    'Linked event is required for '
-                    'System Event mode.'
+                    _('Linked event is required for '
+                      'System Event mode.')
                 )
             # System-event rules act like active routing definitions, not campaigns.
             cleaned['target_audience'] = None
@@ -1323,13 +1603,13 @@ class PushNotificationForm(forms.ModelForm):
         if trigger_mode == 'Manual_Broadcast':
             if not target_audience:
                 raise forms.ValidationError(
-                    'Target audience is required for '
-                    'Manual Broadcast mode.'
+                    _('Target audience is required for '
+                      'Manual Broadcast mode.')
                 )
             if target_audience == 'Specific' and not specific_target_id:
                 raise forms.ValidationError(
-                    'Specific target ID is required when '
-                    'audience is Specific.'
+                    _('Specific target ID is required when '
+                      'audience is Specific.')
                 )
             if target_audience != 'Specific':
                 cleaned['specific_target_id'] = ''
@@ -1338,7 +1618,7 @@ class PushNotificationForm(forms.ModelForm):
             cleaned['is_active'] = True
             if cleaned.get('dispatch_status') == 'Completed':
                 raise forms.ValidationError(
-                    'Dispatch status "Completed" is system-managed and cannot be set manually.'
+                    _('Dispatch status "Completed" is system-managed and cannot be set manually.')
                 )
             # Scheduled campaigns are marked Scheduled; otherwise keep as Draft.
             if scheduled_at and cleaned.get('dispatch_status') == 'Draft':
@@ -1401,20 +1681,33 @@ class InternalAlertRouteForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        from django.utils.translation import gettext as _
+
         apply_premium_styling(self)
         self.fields['notify_role'].queryset = (
             Role.objects.filter(status='Active').order_by('role_name_en')
         )
+        self.fields['trigger_event'].label = _('Trigger event')
+        self.fields['notify_role'].label = _('Notify role')
+        self.fields['notify_custom_email'].label = _('Notify custom email')
+        self.fields['is_active'].label = _('Is active')
+        self.fields['trigger_event'].choices = [
+            (value, _(label) if label else label)
+            for value, label in self.fields['trigger_event'].choices
+        ]
+        self.fields['notify_role'].empty_label = _('Select')
 
     def clean(self):
+        from django.utils.translation import gettext as _
+
         cleaned = super().clean()
         notify_role = cleaned.get('notify_role')
         notify_custom_email = cleaned.get('notify_custom_email')
 
         if not notify_role and not notify_custom_email:
             raise forms.ValidationError(
-                'At least one of Role or Custom Email '
-                'must be provided.'
+                _('At least one of Role or Custom Email '
+                  'must be provided.')
             )
 
         return cleaned
@@ -1437,8 +1730,33 @@ class TenantProfileCreateForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         apply_premium_styling(self)
+        from django.utils.translation import gettext as _
+
+        label_map = {
+            'company_name': _('Company name'),
+            'registration_number': _('Registration number'),
+            'tax_number': _('Tax number'),
+            'primary_email': _('Primary email'),
+            'primary_phone': _('Primary phone'),
+            'country': _('Country'),
+            'account_status': _('Account status'),
+            'assigned_sales_rep': _('Assigned sales rep'),
+        }
+        for field_name, label in label_map.items():
+            if field_name in self.fields:
+                self.fields[field_name].label = label
+
+        if 'account_status' in self.fields:
+            self.fields['account_status'].choices = [
+                (value, _(label))
+                for value, label in self.fields['account_status'].choices
+            ]
+
         self.fields['country'].queryset = (
             Country.objects.filter(is_active=True).order_by('name_en')
+        )
+        self.fields['country'].label_from_instance = (
+            lambda c: localized_choice_label(c, 'name_en', 'name_ar')
         )
         self.fields['country'].required = False
         self.fields['tax_number'].required = False
@@ -1450,11 +1768,15 @@ class TenantProfileCreateForm(forms.ModelForm):
         self.fields['assigned_sales_rep'].required = False
 
     def clean_primary_email(self):
+        from django.utils.translation import gettext as _
+
         value = (self.cleaned_data.get('primary_email') or '').strip().lower()
         if not value:
-            raise ValidationError('Primary email is required.')
+            raise ValidationError(_('Primary email is required.'))
         if TenantProfile.objects.filter(primary_email__iexact=value).exists():
-            raise ValidationError('Primary email must be unique across tenants.')
+            raise ValidationError(
+                _('Primary email must be unique across tenants.')
+            )
         return value
 
 
@@ -1475,8 +1797,33 @@ class TenantProfileUpdateForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         apply_premium_styling(self)
+        from django.utils.translation import gettext as _
+
+        label_map = {
+            'company_name': _('Company name'),
+            'registration_number': _('Registration number'),
+            'tax_number': _('Tax number'),
+            'primary_email': _('Primary email'),
+            'primary_phone': _('Primary phone'),
+            'country': _('Country'),
+            'account_status': _('Account status'),
+            'assigned_sales_rep': _('Assigned sales rep'),
+        }
+        for field_name, label in label_map.items():
+            if field_name in self.fields:
+                self.fields[field_name].label = label
+
+        if 'account_status' in self.fields:
+            self.fields['account_status'].choices = [
+                (value, _(label))
+                for value, label in self.fields['account_status'].choices
+            ]
+
         self.fields['country'].queryset = (
             Country.objects.filter(is_active=True).order_by('name_en')
+        )
+        self.fields['country'].label_from_instance = (
+            lambda c: localized_choice_label(c, 'name_en', 'name_ar')
         )
         self.fields['country'].required = False
         self.fields['tax_number'].required = False
@@ -1492,14 +1839,18 @@ class TenantProfileUpdateForm(forms.ModelForm):
             pass
 
     def clean_primary_email(self):
+        from django.utils.translation import gettext as _
+
         value = (self.cleaned_data.get('primary_email') or '').strip().lower()
         if not value:
-            raise ValidationError('Primary email is required.')
+            raise ValidationError(_('Primary email is required.'))
         qs = TenantProfile.objects.filter(primary_email__iexact=value)
         if self.instance.pk:
             qs = qs.exclude(pk=self.instance.pk)
         if qs.exists():
-            raise ValidationError('Primary email must be unique across tenants.')
+            raise ValidationError(
+                _('Primary email must be unique across tenants.')
+            )
         return value
 
 

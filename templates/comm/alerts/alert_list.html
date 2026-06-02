@@ -51,7 +51,7 @@
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
-        <a href="{% url 'alert_route_create' %}" class="eal-btn eal-btn-primary">Add Alert Route</a>
+        <a href="{% url 'alert_route_create' %}" class="eal-btn eal-btn-primary">{% translate "Add Alert Route" %}</a>
       </div>
     </div>
   </div>
@@ -62,7 +62,7 @@
       <div class="eal-toolbar-left" style="width:100%; display:flex; gap:16px; flex-wrap:wrap; align-items:center;">
         <div class="eal-search" style="flex:1; min-width:240px; margin-bottom: 0;">
           <i class="bi bi-search"></i>
-          <input type="text" name="q" value="{{ search_query }}" placeholder="Search by role or email" />
+          <input type="text" name="q" value="{{ search_query }}" placeholder="{% translate 'Search by role or email' %}" />
           <input type="hidden" name="trigger_event" value="{{ trigger_filter }}">
           <input type="hidden" name="status" value="{{ status_filter }}">
           <input type="hidden" name="sort" value="{{ current_sort }}">
@@ -88,7 +88,7 @@
 
         <div style="width:260px">
           <select class="eal-select" name="trigger_event" onchange="this.form.submit()">
-            <option value="All" {% if trigger_filter == 'All' %}selected{% endif %}>All Trigger Events</option>
+            <option value="All" {% if trigger_filter == 'All' %}selected{% endif %}>{% translate "All Trigger Events" %}</option>
             {% for code, label in trigger_choices %}
               <option value="{{ code }}" {% if trigger_filter == code %}selected{% endif %}>{{ label }}</option>
             {% endfor %}
@@ -157,7 +157,7 @@
               {% endif %}
             </a>
           </th>
-          <th>{% translate "ACTIONS" %}</th>
+          <th>{% translate "Actions" %}</th>
         </tr>
       </thead>
       <tbody>
@@ -165,9 +165,9 @@
           <tr>
             <td>{{ row.list_rank }}</td>
             <td>{{ row.get_trigger_event_display }}</td>
-            <td>{{ row.notify_role.role_name_en|default:'-' }}</td>
+            <td>{% if row.notify_role %}{% if LANGUAGE_CODE|slice:':2' == 'ar' and row.notify_role.role_name_ar %}{{ row.notify_role.role_name_ar }}{% else %}{{ row.notify_role.role_name_en }}{% endif %}{% else %}-{% endif %}</td>
             <td>{{ row.notify_custom_email|default:'-' }}</td>
-            <td>{% if row.is_active %}<span class="status-badge active">Active</span>{% else %}<span class="status-badge inactive">Inactive</span>{% endif %}</td>
+            <td>{% if row.is_active %}<span class="status-badge active">{% translate "Active" %}</span>{% else %}<span class="status-badge inactive">{% translate "Inactive" %}</span>{% endif %}</td>
             <td>
               <div class="eal-actions-cell">
                 <a href="{% url 'alert_route_edit' row.route_id %}" class="eal-row-btn"><i class="bi bi-pencil"></i></a>
@@ -181,7 +181,7 @@
               <div class="notification-empty">
                 <div class="empty-icon"><i class="bi bi-inbox"></i></div>
                 <h4 class="empty-title">{% translate "No Data Found" %}</h4>
-                <p class="empty-text">No routes found.</p>
+                <p class="empty-text">{% translate "No routes found." %}</p>
               </div>
             </td>
           </tr>

@@ -108,7 +108,13 @@
         <select name="current_plan" class="eal-select" onchange="this.form.submit()">
           <option value="">{% translate "Plan: All" %}</option>
           {% for p in plans %}
-            <option value="{{ p.plan_id }}" {% if plan_filter == p.plan_id|stringformat:"s" %}selected{% endif %}>{{ p.plan_name_en }}</option>
+            <option value="{{ p.plan_id }}" {% if plan_filter == p.plan_id|stringformat:"s" %}selected{% endif %}>
+              {% if LANGUAGE_CODE|slice:':2' == 'ar' and p.plan_name_ar %}
+                {{ p.plan_name_ar }}
+              {% else %}
+                {{ p.plan_name_en }}
+              {% endif %}
+            </option>
           {% endfor %}
         </select>
       </div>
@@ -216,7 +222,7 @@
               {% endif %}
             </a>
           </th>
-          <th>{% translate "ACTIONS" %}</th>
+          <th>{% translate "Actions" %}</th>
         </tr>
       </thead>
       <tbody>
@@ -263,7 +269,7 @@
                   ><i class="bi bi-shield-x"></i></a>
                   <a href="{% url 'tenant_edit' t.tenant_id %}" class="eal-row-btn" title="{% translate 'Edit' %}"><i class="bi bi-pencil"></i></a>
                   {% if t.account_status != 'Active' %}
-                    <form method="post" action="{% url 'tenant_delete' t.tenant_id %}" style="display:inline" onsubmit="return confirm('Remove this tenant?');">
+                    <form method="post" action="{% url 'tenant_delete' t.tenant_id %}" style="display:inline" onsubmit="return confirm('{% translate "Remove this tenant?" %}');">
                       {% csrf_token %}
                       <button type="submit" class="eal-row-btn" title="{% translate 'Delete (Soft)' %}"><i class="bi bi-trash"></i></button>
                     </form>

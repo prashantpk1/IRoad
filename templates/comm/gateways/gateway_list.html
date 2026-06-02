@@ -53,7 +53,7 @@
         {% if request.user.is_root %}
             <a href="{% url 'comm_gateway_create' %}" class="eal-btn eal-btn-primary">
               <i class="bi bi-plus-lg"></i>
-              <span>Add Gateway</span>
+              <span>{% translate "Add Gateway" %}</span>
             </a>
           {% endif %}
       </div>
@@ -205,7 +205,7 @@
                   {% endif %}
                 </a>
               </th>
-              <th>ACTIONS</th>
+              <th>{% translate "Actions" %}</th>
             </tr>
           </thead>
           <tbody>
@@ -214,9 +214,9 @@
                 <td>{{ gateway.list_rank }}</td>
                 <td>
                   {% if gateway.gateway_type == 'Email' %}
-                    <span class="status-badge inactive">Email</span>
+                    <span class="status-badge inactive">{% translate "Email" %}</span>
                   {% else %}
-                    <span class="status-badge active">SMS</span>
+                    <span class="status-badge active">{% translate "SMS" %}</span>
                   {% endif %}
                 </td>
                 <td>{{ gateway.provider_name }}</td>
@@ -226,26 +226,26 @@
                 <td>{{ gateway.encryption_type|default:'-' }}</td>
                 <td>
                   {% if gateway.is_active %}
-                    <span class="status-badge active">Active</span>
+                    <span class="status-badge active">{% translate "Active" %}</span>
                   {% else %}
-                    <span class="status-badge inactive">Inactive</span>
+                    <span class="status-badge inactive">{% translate "Inactive" %}</span>
                   {% endif %}
                 </td>
                 <td>
                   {% if request.user.is_root %}
                     <div class="eal-actions-cell">
-                      <a href="{% url 'comm_gateway_edit' gateway.gateway_id %}" class="eal-row-btn icon-only-btn" title="Edit">
+                      <a href="{% url 'comm_gateway_edit' gateway.gateway_id %}" class="eal-row-btn icon-only-btn" title="{% translate 'Edit' %}">
 <i class="bi bi-pencil"></i>
 </a>
                       <form method="post" action="{% url 'comm_gateway_toggle' gateway.gateway_id %}" style="display: inline">
                         {% csrf_token %}
-                        <button type="submit" class="eal-row-btn icon-only-btn" title="{% if gateway.is_active %}Deactivate{% else %}Activate{% endif %}">
+                        <button type="submit" class="eal-row-btn icon-only-btn" title="{% if gateway.is_active %}{% translate 'Deactivate' %}{% else %}{% translate 'Activate' %}{% endif %}">
 <i class="bi bi-arrow-repeat"></i>
 </button>
                       </form>
-                      <form method="post" action="{% url 'comm_gateway_delete' gateway.gateway_id %}" style="display: inline" onsubmit="return confirm('Remove this gateway?');">
+                      <form method="post" action="{% url 'comm_gateway_delete' gateway.gateway_id %}" style="display: inline" onsubmit="return confirm('{% translate "Remove this gateway?" %}');">
                         {% csrf_token %}
-                        <button type="submit" class="eal-row-btn icon-only-btn" title="Delete (Soft)">
+                        <button type="submit" class="eal-row-btn icon-only-btn" title="{% translate 'Delete (Soft)' %}">
 <i class="bi bi-trash"></i>
 </button>
                       </form>
@@ -262,8 +262,8 @@
     {% else %}
       <div class="notification-empty">
         <div class="empty-icon"><i class="bi bi-broadcast"></i></div>
-        <h4 class="empty-title">No communication gateways found.</h4>
-        <p class="empty-text">Add a gateway to send email or SMS.</p>
+        <h4 class="empty-title">{% translate "No communication gateways found." %}</h4>
+        <p class="empty-text">{% translate "Add a gateway to send email or SMS." %}</p>
       </div>
     {% endif %}
     {% include 'partials/pagination.html' with page_obj=gateways %}

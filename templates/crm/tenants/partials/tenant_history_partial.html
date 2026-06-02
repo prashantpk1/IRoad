@@ -18,7 +18,23 @@
                 <td>
                     <a href="{% url 'order_detail' order.order_id %}" class="fw-bold text-primary">#{{ order.order_id|stringformat:".8s" }}</a>
                 </td>
-                <td><span class="value-badge">{{ order.get_order_classification_display }}</span></td>
+                <td>
+                    <span class="value-badge">
+                        {% if order.order_classification == 'New_Subscription' %}
+                            {% translate "New Subscription" %}
+                        {% elif order.order_classification == 'Renewal' %}
+                            {% translate "Renewal" %}
+                        {% elif order.order_classification == 'Upgrade' %}
+                            {% translate "Upgrade" %}
+                        {% elif order.order_classification == 'Downgrade' %}
+                            {% translate "Downgrade" %}
+                        {% elif order.order_classification == 'Add_ons' %}
+                            {% translate "Add-ons" %}
+                        {% else %}
+                            {{ order.get_order_classification_display }}
+                        {% endif %}
+                    </span>
+                </td>
                 <td><span class="fw-semibold">{{ order.grand_total|floatformat:2 }} {{ order.currency_id }}</span></td>
                 <td>
                     {% if order.order_status == 'Paid' %}

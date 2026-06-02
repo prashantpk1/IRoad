@@ -62,11 +62,11 @@
       </div>
       <div class="col-12 col-md-6">
         <label class="form-label">{% translate "Country" %}</label>
-        <input class="form-control" value="{{ tenant.country.name_en|default:'-' }}" readonly>
+        <input class="form-control" value="{% if tenant.country %}{% if LANGUAGE_CODE|slice:':2' == 'ar' and tenant.country.name_ar %}{{ tenant.country.name_ar }}{% else %}{{ tenant.country.name_en }}{% endif %}{% else %}-{% endif %}" readonly>
       </div>
       <div class="col-12 col-md-6">
         <label class="form-label">{% translate "Account status" %}</label>
-        <input class="form-control" value="{{ tenant.get_account_status_display }}" readonly>
+        <input class="form-control" value="{% if tenant.account_status == 'Active' %}{% translate 'Active' %}{% elif tenant.account_status == 'Suspended_Billing' %}{% translate 'Suspended - Billing' %}{% elif tenant.account_status == 'Suspended_Violation' %}{% translate 'Suspended - Violation' %}{% elif tenant.account_status == 'Churned' %}{% translate 'Churned' %}{% else %}{{ tenant.get_account_status_display }}{% endif %}" readonly>
       </div>
       <div class="col-12 col-md-6">
         <label class="form-label">{% translate "Assigned sales rep" %}</label>
@@ -98,7 +98,7 @@
   <div class="form-card-body d-flex flex-wrap gap-2">
     <a href="{% url 'order_create' %}?tenant={{ tenant.tenant_id }}" class="eal-btn eal-btn-primary">
       <i class="bi bi-cart-plus"></i>
-      <span>{% translate "Add Subsciption/Add-ons" %}</span>
+      <span>{% translate "Add Subscription/Add-ons" %}</span>
     </a>
     {% if request.user.is_root %}
       <a href="{% url 'tenant_edit' tenant.tenant_id %}" class="eal-btn eal-btn-outline">
@@ -128,7 +128,7 @@
     <div class="row g-3">
       <div class="col-12 col-md-4">
         <label class="form-label">{% translate "Current plan" %}</label>
-        <input class="form-control" value="{{ tenant.current_plan.plan_name_en|default:'-' }}" readonly>
+        <input class="form-control" value="{% if tenant.current_plan %}{% if LANGUAGE_CODE|slice:':2' == 'ar' and tenant.current_plan.plan_name_ar %}{{ tenant.current_plan.plan_name_ar }}{% else %}{{ tenant.current_plan.plan_name_en }}{% endif %}{% else %}-{% endif %}" readonly>
       </div>
       <div class="col-12 col-md-4">
         <label class="form-label">{% translate "Start date" %}</label>
@@ -143,7 +143,7 @@
     {% if tenant.scheduled_downgrade_plan %}
     <div class="row g-3 mt-1">
       <div class="col-12">
-        {% with plan_name=tenant.scheduled_downgrade_plan.plan_name_en eff_date=tenant.scheduled_downgrade_effective_date|date:"d M Y" %}
+        {% with plan_name=tenant.scheduled_downgrade_plan.plan_name_ar|default:tenant.scheduled_downgrade_plan.plan_name_en eff_date=tenant.scheduled_downgrade_effective_date|date:"d M Y" %}
         <div class="alert alert-info mb-0 py-2" role="status">
           <strong>{% translate "Pending plan change" %}</strong>
           {% blocktranslate with plan=plan_name date=eff_date %}
@@ -161,11 +161,11 @@
     <div class="row g-3">
       <div class="col-6 col-md-3">
         <label class="form-label">{% translate "Users" %}</label>
-        <input class="form-control" value="{% if tenant.current_plan %}{% if tenant.active_max_users == -1 or tenant.current_plan.max_internal_users == -1 %}Unlimited{% else %}{{ tenant.active_max_users|default:'0' }}{% endif %}{% else %}0{% endif %}" readonly>
+        <input class="form-control" value="{% if tenant.current_plan %}{% if tenant.active_max_users == -1 or tenant.current_plan.max_internal_users == -1 %}{% translate 'Unlimited' %}{% else %}{{ tenant.active_max_users|default:'0' }}{% endif %}{% else %}0{% endif %}" readonly>
       </div>
       <div class="col-6 col-md-3">
         <label class="form-label">{% translate "Internal trucks" %}</label>
-        <input class="form-control" value="{% if tenant.current_plan %}{% if tenant.active_max_internal_trucks == -1 or tenant.current_plan.max_internal_trucks == -1 %}Unlimited{% else %}{{ tenant.active_max_internal_trucks|default:'0' }}{% endif %}{% else %}0{% endif %}" readonly>
+        <input class="form-control" value="{% if tenant.current_plan %}{% if tenant.active_max_internal_trucks == -1 or tenant.current_plan.max_internal_trucks == -1 %}{% translate 'Unlimited' %}{% else %}{{ tenant.active_max_internal_trucks|default:'0' }}{% endif %}{% else %}0{% endif %}" readonly>
       </div>
       {% comment %}MVP scope: External Trucks hidden from CRM profile UI
       <div class="col-6 col-md-3">
@@ -175,7 +175,7 @@
       {% endcomment %}
       <div class="col-6 col-md-3">
         <label class="form-label">{% translate "Drivers" %}</label>
-        <input class="form-control" value="{% if tenant.current_plan %}{% if tenant.active_max_drivers == -1 or tenant.current_plan.max_active_drivers == -1 %}Unlimited{% else %}{{ tenant.active_max_drivers|default:'0' }}{% endif %}{% else %}0{% endif %}" readonly>
+        <input class="form-control" value="{% if tenant.current_plan %}{% if tenant.active_max_drivers == -1 or tenant.current_plan.max_active_drivers == -1 %}{% translate 'Unlimited' %}{% else %}{{ tenant.active_max_drivers|default:'0' }}{% endif %}{% else %}0{% endif %}" readonly>
       </div>
     </div>
 

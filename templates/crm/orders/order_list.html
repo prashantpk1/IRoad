@@ -180,7 +180,7 @@
           </th>
           <th class="sortable">
             <a href="?q={{ search_query }}&order_status={{ status_filter }}&order_classification={{ classification_filter }}&sort=created_by&dir={% if sort == 'created_by' and dir == 'asc' %}desc{% else %}asc{% endif %}">
-              <span>{% translate "Created By" %}</span>
+              <span>{% translate "Created by" %}</span>
               {% if sort == 'created_by' %}
                 <i class="bi bi-caret-{% if dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
               {% else %}
@@ -198,7 +198,7 @@
               {% endif %}
             </a>
           </th>
-          <th>{% translate "ACTIONS" %}</th>
+          <th>{% translate "Actions" %}</th>
         </tr>
       </thead>
       <tbody>
@@ -207,15 +207,29 @@
           <td>{{ o.list_rank }}</td>
           <td><span class="fw-bold">{{ o.tenant.company_name }}</span></td>
           <td>
-            <span class="value-badge">{{ o.get_order_classification_display }}</span>
+            <span class="value-badge">
+              {% if o.order_classification == 'New_Subscription' %}
+                {% translate "New Subscription" %}
+              {% elif o.order_classification == 'Renewal' %}
+                {% translate "Renewal" %}
+              {% elif o.order_classification == 'Upgrade' %}
+                {% translate "Upgrade" %}
+              {% elif o.order_classification == 'Downgrade' %}
+                {% translate "Downgrade" %}
+              {% else %}
+                {{ o.get_order_classification_display }}
+              {% endif %}
+            </span>
           </td>
           <td><span class="text-muted small fw-bold">{{ o.currency_id }}</span></td>
           <td><span class="fw-semibold text-primary">{{ o.grand_total|floatformat:2 }}</span></td>
           <td>
             {% if o.order_status == 'Paid' %}
               <span class="status-badge active">{% translate "Paid" %}</span>
-            {% elif o.order_status == 'Pending_Payment' or o.order_status == 'Draft' %}
-              <span class="status-badge warning">{{ o.get_order_status_display }}</span>
+            {% elif o.order_status == 'Pending_Payment' %}
+              <span class="status-badge warning">{% translate "Pending Payment" %}</span>
+            {% elif o.order_status == 'Draft' %}
+              <span class="status-badge warning">{% translate "Draft" %}</span>
             {% else %}
               <span class="status-badge neutral">{{ o.get_order_status_display }}</span>
             {% endif %}

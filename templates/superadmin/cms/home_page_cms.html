@@ -2,17 +2,17 @@
 {% load static %}
 {% load i18n %}
 
-{% block title %}Home Page CMS{% endblock %}
+{% block title %}{% translate "Home Page CMS" %}{% endblock %}
 
 {% block breadcrumb_items %}
-  <li class="breadcrumb-item active" aria-current="page">Home Page CMS</li>
+  <li class="breadcrumb-item active" aria-current="page">{% translate "Home Page CMS" %}</li>
 {% endblock %}
 
 {% block content %}
 <div class="page-header">
   <div class="page-header-row d-flex flex-wrap align-items-center justify-content-between gap-3">
     <div class="page-header-left">
-      <h1 class="page-title">Home Page CMS</h1>
+      <h1 class="page-title">{% translate "Home Page CMS" %}</h1>
       <p class="page-subtitle text-muted mb-0">{% translate "Edit bilingual home page content." %}</p>
     </div>
     <div class="page-header-right">
@@ -290,14 +290,14 @@
         <div class="col-md-4"><label class="form-label">{{ form.features_review_count_label_en.label }}</label>{{ form.features_review_count_label_en }}{{ form.features_review_count_label_en.errors }}</div>
         <div class="col-md-4"><label class="form-label">{{ form.features_review_count_label_ar.label }}</label>{{ form.features_review_count_label_ar }}{{ form.features_review_count_label_ar.errors }}</div>
         <hr class="col-12">
-        <div class="col-12"><h6 class="text-muted">Feature block A</h6></div>
+        <div class="col-12"><h6 class="text-muted">{% translate "Feature block A" %}</h6></div>
         <div class="col-md-6">{% if home.feature_a_image %}<img src="{{ home.feature_a_image.url }}" style="max-height:72px" class="mb-2 d-block rounded border" alt="">{% endif %}<label class="form-label">{{ form.feature_a_image.label }}</label>{{ form.feature_a_image }}{{ form.feature_a_image.errors }}</div>
         <div class="col-md-6">{% if home.feature_a_icon %}<img src="{{ home.feature_a_icon.url }}" style="max-height:48px" class="mb-2 d-block" alt="">{% endif %}<label class="form-label">{{ form.feature_a_icon.label }}</label>{{ form.feature_a_icon }}{{ form.feature_a_icon.errors }}</div>
         <div class="col-md-6"><label class="form-label">{{ form.feature_a_title_en.label }}</label>{{ form.feature_a_title_en }}{{ form.feature_a_title_en.errors }}</div>
         <div class="col-md-6"><label class="form-label">{{ form.feature_a_title_ar.label }}</label>{{ form.feature_a_title_ar }}{{ form.feature_a_title_ar.errors }}</div>
         <div class="col-md-6"><label class="form-label">{{ form.feature_a_body_en.label }}</label>{{ form.feature_a_body_en }}{{ form.feature_a_body_en.errors }}</div>
         <div class="col-md-6"><label class="form-label">{{ form.feature_a_body_ar.label }}</label>{{ form.feature_a_body_ar }}{{ form.feature_a_body_ar.errors }}</div>
-        <div class="col-12"><h6 class="text-muted">Feature block B</h6></div>
+        <div class="col-12"><h6 class="text-muted">{% translate "Feature block B" %}</h6></div>
         <div class="col-md-6"><label class="form-label">{{ form.feature_b_title_en.label }}</label>{{ form.feature_b_title_en }}{{ form.feature_b_title_en.errors }}</div>
         <div class="col-md-6"><label class="form-label">{{ form.feature_b_title_ar.label }}</label>{{ form.feature_b_title_ar }}{{ form.feature_b_title_ar.errors }}</div>
         <div class="col-md-6"><label class="form-label">{{ form.feature_b_body_en.label }}</label>{{ form.feature_b_body_en }}{{ form.feature_b_body_en.errors }}</div>
@@ -307,14 +307,14 @@
         <div class="col-md-6"><label class="form-label">{{ form.feature_b_list_item_1_ar.label }}</label>{{ form.feature_b_list_item_1_ar }}{{ form.feature_b_list_item_1_ar.errors }}</div>
         <div class="col-md-6"><label class="form-label">{{ form.feature_b_list_item_2_en.label }}</label>{{ form.feature_b_list_item_2_en }}{{ form.feature_b_list_item_2_en.errors }}</div>
         <div class="col-md-6"><label class="form-label">{{ form.feature_b_list_item_2_ar.label }}</label>{{ form.feature_b_list_item_2_ar }}{{ form.feature_b_list_item_2_ar.errors }}</div>
-        <div class="col-12"><h6 class="text-muted">Feature block C</h6></div>
+        <div class="col-12"><h6 class="text-muted">{% translate "Feature block C" %}</h6></div>
         <div class="col-md-6">{% if home.feature_c_image %}<img src="{{ home.feature_c_image.url }}" style="max-height:72px" class="mb-2 d-block rounded border" alt="">{% endif %}<label class="form-label">{{ form.feature_c_image.label }}</label>{{ form.feature_c_image }}{{ form.feature_c_image.errors }}</div>
         <div class="col-md-6">{% if home.feature_c_icon %}<img src="{{ home.feature_c_icon.url }}" style="max-height:48px" class="mb-2 d-block" alt="">{% endif %}<label class="form-label">{{ form.feature_c_icon.label }}</label>{{ form.feature_c_icon }}{{ form.feature_c_icon.errors }}</div>
         <div class="col-md-6"><label class="form-label">{{ form.feature_c_title_en.label }}</label>{{ form.feature_c_title_en }}{{ form.feature_c_title_en.errors }}</div>
         <div class="col-md-6"><label class="form-label">{{ form.feature_c_title_ar.label }}</label>{{ form.feature_c_title_ar }}{{ form.feature_c_title_ar.errors }}</div>
         <div class="col-md-6"><label class="form-label">{{ form.feature_c_body_en.label }}</label>{{ form.feature_c_body_en }}{{ form.feature_c_body_en.errors }}</div>
         <div class="col-md-6"><label class="form-label">{{ form.feature_c_body_ar.label }}</label>{{ form.feature_c_body_ar }}{{ form.feature_c_body_ar.errors }}</div>
-        <div class="col-12"><h6 class="text-muted">Feature block D</h6></div>
+        <div class="col-12"><h6 class="text-muted">{% translate "Feature block D" %}</h6></div>
         <div class="col-md-6"><label class="form-label">{{ form.feature_d_title_en.label }}</label>{{ form.feature_d_title_en }}{{ form.feature_d_title_en.errors }}</div>
         <div class="col-md-6"><label class="form-label">{{ form.feature_d_title_ar.label }}</label>{{ form.feature_d_title_ar }}{{ form.feature_d_title_ar.errors }}</div>
         <div class="col-md-6"><label class="form-label">{{ form.feature_d_body_en.label }}</label>{{ form.feature_d_body_en }}{{ form.feature_d_body_en.errors }}</div>

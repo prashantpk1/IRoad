@@ -23,18 +23,18 @@
   {% if form.instance.pk and form.instance.updated_at %}
   <div class="edit-info-bar">
     <i class="bi bi-clock-history"></i>
-    Last updated
+    {% translate "Last updated" %}
     {% if form.instance.updated_by %}
-      by <strong>{{ form.instance.updated_by.first_name }} {{ form.instance.updated_by.last_name }}</strong>
+      {% translate "by" %} <strong>{{ form.instance.updated_by.first_name }} {{ form.instance.updated_by.last_name }}</strong>
     {% endif %}
-    at <strong>{{ form.instance.updated_at|date:"d M Y, H:i" }}</strong>
+    {% translate "at" %} <strong>{{ form.instance.updated_at|date:"d M Y, H:i" }}</strong>
   </div>
   {% endif %}
 
   <div class="form-card">
     <div class="form-card-body">
       <div class="alert alert-warning" style="margin-bottom: 16px; border-radius: 10px">
-        <p style="margin: 0; font-weight: 600">Credentials are sensitive and will not be displayed after saving.</p>
+        <p style="margin: 0; font-weight: 600">{% translate "Credentials are sensitive and will not be displayed after saving." %}</p>
       </div>
 
       {% if form.non_field_errors %}
@@ -50,16 +50,16 @@
       >
         {% csrf_token %}
         <div class="fields-grid cols-2">
-          <div class="field"><label class="form-label">Gateway Type</label>{{ form.gateway_type }}</div>
-          <div class="field"><label class="form-label">Provider Name</label>{{ form.provider_name }}</div>
-          <div class="field"><label class="form-label">Host/URL</label>{{ form.host_url }}</div>
-          <div class="field" id="port-wrap"><label class="form-label">Port</label>{{ form.port }}</div>
-          <div class="field"><label class="form-label">Username/API Key</label>{{ form.username_key }}</div>
-          <div class="field"><label class="form-label">Password/Secret</label>{{ form.password_secret }}</div>
-          <div class="field"><label class="form-label">Sender ID</label>{{ form.sender_id }}</div>
-          <div class="field" id="enc-wrap"><label class="form-label">Encryption</label>{{ form.encryption_type }}</div>
+          <div class="field"><label class="form-label">{% translate "Gateway Type" %}</label>{{ form.gateway_type }}</div>
+          <div class="field"><label class="form-label">{% translate "Provider Name" %}</label>{{ form.provider_name }}</div>
+          <div class="field"><label class="form-label">{% translate "Host/URL" %}</label>{{ form.host_url }}</div>
+          <div class="field" id="port-wrap"><label class="form-label">{% translate "Port" %}</label>{{ form.port }}</div>
+          <div class="field"><label class="form-label">{% translate "Username/API Key" %}</label>{{ form.username_key }}</div>
+          <div class="field"><label class="form-label">{% translate "Password/Secret" %}</label>{{ form.password_secret }}</div>
+          <div class="field"><label class="form-label">{% translate "Sender ID" %}</label>{{ form.sender_id }}</div>
+          <div class="field" id="enc-wrap"><label class="form-label">{% translate "Encryption" %}</label>{{ form.encryption_type }}</div>
           <div class="field" id="sms-test-phone-wrap" style="display:none;">
-            <label class="form-label">Test Recipient Phone</label>
+            <label class="form-label">{% translate "Test Recipient Phone" %}</label>
             <input
               type="text"
               class="form-control"
@@ -67,10 +67,10 @@
               name="test_recipient_phone"
               placeholder="+9665XXXXXXXX"
             />
-            <small class="text-muted">Used only by the Test Connection button for SMS gateways.</small>
+            <small class="text-muted">{% translate "Used only by the Test Connection button for SMS gateways." %}</small>
           </div>
           <div class="field">
-            <label class="form-label">Active</label>
+            <label class="form-label">{% translate "Active" %}</label>
             <div class="form-check form-switch" style="padding-left: 0;">
               {{ form.is_active }}
             </div>
@@ -139,6 +139,9 @@
     }
 
     const activeField = document.getElementById('id_is_active');
+    const testingText = "{% filter escapejs %}{% translate 'Testing...' %}{% endfilter %}";
+    const testConnectionText = "{% filter escapejs %}{% translate 'Test Connection' %}{% endfilter %}";
+    const systemErrorText = "{% filter escapejs %}{% translate 'System error occurred while testing connection.' %}{% endfilter %}";
     if (activeField) {
       activeField.classList.add('form-check-input');
       activeField.style.marginLeft = '0';
@@ -152,7 +155,7 @@
         resultArea.style.display = 'none';
         testBtn.disabled = true;
         testSpinner.style.display = 'inline-block';
-        testBtnText.innerText = 'Testing...';
+        testBtnText.innerText = testingText;
 
         const formData = new FormData();
         formData.append('csrfmiddlewaretoken', document.querySelector('[name="csrfmiddlewaretoken"]').value);
@@ -191,12 +194,12 @@
           .catch(function () {
             resultArea.style.display = 'block';
             resultAlert.className = 'alert alert-danger';
-            resultAlert.innerText = 'System error occurred while testing connection.';
+            resultAlert.innerText = systemErrorText;
           })
           .finally(function () {
             testBtn.disabled = false;
             testSpinner.style.display = 'none';
-            testBtnText.innerText = 'Test Connection';
+            testBtnText.innerText = testConnectionText;
           });
       });
     }

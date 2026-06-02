@@ -1,8 +1,8 @@
 {% extends 'base.html' %}
 {% load i18n %}
-{% block title %}{% if is_edit %}{% translate "Edit Event Mapping" %}{% else %}{% translate "Add Event Mapping" %}{% endif %}{% endblock %}
+{% block title %}{% if LANGUAGE_CODE|slice:':2' == 'ar' %}{% if is_edit %}تعديل ربط الحدث{% else %}إضافة ربط حدث{% endif %}{% else %}{% if is_edit %}{% translate "Edit Event Mapping" %}{% else %}{% translate "Add Event Mapping" %}{% endif %}{% endif %}{% endblock %}
 
-{% block page_title %}{% if is_edit %}{% translate "Edit Event Mapping" %}{% else %}{% translate "Add Event Mapping" %}{% endif %}{% endblock %}
+{% block page_title %}{% if LANGUAGE_CODE|slice:':2' == 'ar' %}{% if is_edit %}تعديل ربط الحدث{% else %}إضافة ربط حدث{% endif %}{% else %}{% if is_edit %}{% translate "Edit Event Mapping" %}{% else %}{% translate "Add Event Mapping" %}{% endif %}{% endif %}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -38,7 +38,7 @@
 {% endblock %}
 
 {% block breadcrumb_items %}
-<li class="breadcrumb-item active" aria-current="page">{% if is_edit %}{% translate "Edit Event Mapping" %}{% else %}{% translate "Add Event Mapping" %}{% endif %}</li>
+<li class="breadcrumb-item active" aria-current="page">{% if LANGUAGE_CODE|slice:':2' == 'ar' %}{% if is_edit %}تعديل ربط الحدث{% else %}إضافة ربط حدث{% endif %}{% else %}{% if is_edit %}{% translate "Edit Event Mapping" %}{% else %}{% translate "Add Event Mapping" %}{% endif %}{% endif %}</li>
 {% endblock %}
 
 {% block content %}
@@ -46,14 +46,14 @@
 <div class="page-header">
   <div class="page-header-row">
     <div class="page-header-left">
-      <h1 class="page-title">{% if is_edit %}{% translate "Edit Event Mapping" %}{% else %}{% translate "Add Event Mapping" %}{% endif %}</h1>
-      <p class="page-subtitle">{% translate "Map each system event to primary and optional fallback templates." %}</p>
+      <h1 class="page-title">{% if LANGUAGE_CODE|slice:':2' == 'ar' %}{% if is_edit %}تعديل ربط الحدث{% else %}إضافة ربط حدث{% endif %}{% else %}{% if is_edit %}{% translate "Edit Event Mapping" %}{% else %}{% translate "Add Event Mapping" %}{% endif %}{% endif %}</h1>
+      <p class="page-subtitle">{% if LANGUAGE_CODE|slice:':2' == 'ar' %}اربط كل حدث نظام بالقوالب الأساسية وقوالب الرجوع الاختيارية.{% else %}{% translate "Map each system event to primary and optional fallback templates." %}{% endif %}</p>
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
         <a href="{% url 'event_mapping_list' %}" class="eal-btn eal-btn-outline">
           <i class="bi bi-arrow-left"></i>
-          <span>{% translate "Back to list" %}</span>
+          <span>{% if LANGUAGE_CODE|slice:':2' == 'ar' %}العودة إلى القائمة{% else %}{% translate "Back to list" %}{% endif %}</span>
         </a>
       </div>
     </div>
@@ -86,44 +86,44 @@
           <i class="bi bi-diagram-3"></i>
         </div>
         <div class="form-card-header-text">
-          <h3 class="form-card-title">{% translate "Mapping Details" %}</h3>
-          <p class="form-card-desc">{% translate "Primary and fallback channels must be different." %}</p>
+          <h3 class="form-card-title">{% if LANGUAGE_CODE|slice:':2' == 'ar' %}تفاصيل الربط{% else %}{% translate "Mapping Details" %}{% endif %}</h3>
+          <p class="form-card-desc">{% if LANGUAGE_CODE|slice:':2' == 'ar' %}يجب أن تكون القناة الأساسية والاحتياطية مختلفتين.{% else %}{% translate "Primary and fallback channels must be different." %}{% endif %}</p>
         </div>
       </div>
       <div class="form-card-body">
         <div class="field-group">
           <div class="row g-3">
             <div class="col-12 col-md-6">
-              <label class="form-label" for="{{ form.system_event.id_for_label }}">{{ form.system_event.label }}</label>
+              <label class="form-label" for="{{ form.system_event.id_for_label }}">{% if LANGUAGE_CODE|slice:':2' == 'ar' %}حدث النظام{% else %}{{ form.system_event.label }}{% endif %}</label>
               {{ form.system_event }}
               {% for error in form.system_event.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
             </div>
             <div class="col-12 col-md-6">
-              <label class="form-label" for="{{ form.primary_channel.id_for_label }}">{{ form.primary_channel.label }}</label>
+              <label class="form-label" for="{{ form.primary_channel.id_for_label }}">{% if LANGUAGE_CODE|slice:':2' == 'ar' %}القناة الأساسية{% else %}{{ form.primary_channel.label }}{% endif %}</label>
               {{ form.primary_channel }}
               {% for error in form.primary_channel.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
             </div>
             <div class="col-12 col-md-6">
-              <label class="form-label" for="{{ form.primary_template.id_for_label }}">{{ form.primary_template.label }}</label>
+              <label class="form-label" for="{{ form.primary_template.id_for_label }}">{% if LANGUAGE_CODE|slice:':2' == 'ar' %}القالب الأساسي{% else %}{{ form.primary_template.label }}{% endif %}</label>
               {{ form.primary_template }}
               {% for error in form.primary_template.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
             </div>
             <div class="col-12 col-md-6">
-              <label class="form-label" for="{{ form.fallback_channel.id_for_label }}">{{ form.fallback_channel.label }}</label>
+              <label class="form-label" for="{{ form.fallback_channel.id_for_label }}">{% if LANGUAGE_CODE|slice:':2' == 'ar' %}القناة الاحتياطية{% else %}{{ form.fallback_channel.label }}{% endif %}</label>
               {{ form.fallback_channel }}
               {% for error in form.fallback_channel.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
             </div>
             <div class="col-12 col-md-6" id="fallback-template-wrap">
-              <label class="form-label" for="{{ form.fallback_template.id_for_label }}">{{ form.fallback_template.label }}</label>
+              <label class="form-label" for="{{ form.fallback_template.id_for_label }}">{% if LANGUAGE_CODE|slice:':2' == 'ar' %}القالب الاحتياطي{% else %}{{ form.fallback_template.label }}{% endif %}</label>
               {{ form.fallback_template }}
               {% for error in form.fallback_template.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
             </div>
             <div class="col-12 col-md-6">
-              <div class="form-label d-block mb-0">{{ form.is_active.label }}</div>
+              <div class="form-label d-block mb-0">{% if LANGUAGE_CODE|slice:':2' == 'ar' %}نشط{% else %}{{ form.is_active.label }}{% endif %}</div>
               <div class="form-check form-switch mt-2">
                 {{ form.is_active }}
                 <label class="form-check-label ms-1" for="{{ form.is_active.id_for_label }}">
-                  <span class="fw-medium">{% translate "Active Status" %}</span>
+                  <span class="fw-medium">{% if LANGUAGE_CODE|slice:':2' == 'ar' %}الحالة النشطة{% else %}{% translate "Active Status" %}{% endif %}</span>
                 </label>
               </div>
               {% for error in form.is_active.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
@@ -137,22 +137,26 @@
       <div class="form-actions-left">
         <a href="{% url 'event_mapping_list' %}" class="eal-btn eal-btn-outline">
           <i class="bi bi-x-lg"></i>
-          <span>{% translate "Cancel" %}</span>
+          <span>{% if LANGUAGE_CODE|slice:':2' == 'ar' %}إلغاء{% else %}{% translate "Cancel" %}{% endif %}</span>
         </a>
       </div>
       <div class="form-actions-right">
         <button type="submit" class="eal-btn eal-btn-primary">
           <i class="bi bi-send"></i>
-          <span>{% if is_edit %}{% translate "Update Mapping" %}{% else %}{% translate "Save Mapping" %}{% endif %}</span>
+          <span>{% if LANGUAGE_CODE|slice:':2' == 'ar' %}{% if is_edit %}تحديث الربط{% else %}حفظ الربط{% endif %}{% else %}{% if is_edit %}{% translate "Update Mapping" %}{% else %}{% translate "Save Mapping" %}{% endif %}{% endif %}</span>
         </button>
       </div>
     </div>
   </div>
   </form>
+<div id="event-form-ui-strings" hidden
+  data-select-label="{% translate 'Select' %}"
+></div>
 {{ channel_templates|json_script:"event-channel-templates" }}
 <script>
   (function () {
     const catalogNode = document.getElementById('event-channel-templates');
+    const uiStrings = document.getElementById('event-form-ui-strings');
     const templateCatalog = catalogNode ? JSON.parse(catalogNode.textContent) : [];
     const primaryChannel = document.getElementById('id_primary_channel');
     const primaryTemplate = document.getElementById('id_primary_template');
@@ -166,7 +170,9 @@
       selectEl.innerHTML = '';
       const emptyOption = document.createElement('option');
       emptyOption.value = '';
-      emptyOption.textContent = '---------';
+      emptyOption.textContent = (uiStrings && uiStrings.dataset.selectLabel)
+        ? uiStrings.dataset.selectLabel
+        : 'Select';
       selectEl.appendChild(emptyOption);
       if (!channelValue) {
         selectEl.value = '';

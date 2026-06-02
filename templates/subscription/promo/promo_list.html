@@ -48,7 +48,7 @@
         {% if request.user.is_root %}
           <a href="{% url 'promo_code_create' %}" class="eal-btn eal-btn-primary">
             <i class="bi bi-plus-lg"></i>
-            <span>Add Promo Code</span>
+            <span>{% translate "Add Promo Code" %}</span>
           </a>
         {% endif %}
       </div>
@@ -64,7 +64,7 @@
         <input
           type="text"
           name="q"
-          placeholder="Search by code or name"
+          placeholder="{% translate 'Search by code or name' %}"
           value="{{ search_query }}"
         />
         <input type="hidden" name="status" value="{{ status_filter }}">
@@ -75,24 +75,24 @@
       <div class="db-table-filters">
         <a href="?q={{ search_query }}&status=All&sort={{ current_sort }}&dir={{ current_dir }}" 
            class="filter-chip {% if status_filter == 'All' %}active{% endif %}">
-          All Status
+          {% translate "All Status" %}
         </a>
         <a href="?q={{ search_query }}&status=Active&sort={{ current_sort }}&dir={{ current_dir }}" 
            class="filter-chip {% if status_filter == 'Active' %}active{% endif %}">
           <i class="bi bi-circle-fill text-success" style="font-size: 6px"></i> 
-          Active
+          {% translate "Active" %}
         </a>
         <a href="?q={{ search_query }}&status=Inactive&sort={{ current_sort }}&dir={{ current_dir }}" 
            class="filter-chip {% if status_filter == 'Inactive' %}active{% endif %}">
           <i class="bi bi-circle-fill text-secondary" style="font-size: 6px"></i> 
-          Inactive
+          {% translate "Inactive" %}
         </a>
       </div>
 
       {% if search_query or status_filter != 'All' %}
         <a href="{% url 'promo_code_list' %}" class="eal-btn eal-btn-outline" style="border-style: dashed; color: var(--text-muted); height: 32px; padding: 0 12px; font-size: 11px">
           <i class="bi bi-x-circle"></i>
-          <span>Clear Filters</span>
+          <span>{% translate "Clear Filters" %}</span>
         </a>
       {% endif %}
     </div>
@@ -115,7 +115,7 @@
             </th>
             <th class="sortable">
               <a href="?q={{ search_query }}&status={{ status_filter }}&sort=code&dir={% if current_sort == 'code' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                <span>Code</span>
+                <span>{% translate "Code" %}</span>
                 {% if current_sort == 'code' %}
                   <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
                 {% else %}
@@ -125,7 +125,7 @@
             </th>
             <th class="sortable">
               <a href="?q={{ search_query }}&status={{ status_filter }}&sort=type&dir={% if current_sort == 'type' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                <span>Type</span>
+                <span>{% translate "Type" %}</span>
                 {% if current_sort == 'type' %}
                   <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
                 {% else %}
@@ -135,7 +135,7 @@
             </th>
             <th class="sortable">
               <a href="?q={{ search_query }}&status={{ status_filter }}&sort=value&dir={% if current_sort == 'value' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                <span>Value</span>
+                <span>{% translate "Value" %}</span>
                 {% if current_sort == 'value' %}
                   <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
                 {% else %}
@@ -145,7 +145,7 @@
             </th>
             <th class="sortable">
               <a href="?q={{ search_query }}&status={{ status_filter }}&sort=duration&dir={% if current_sort == 'duration' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                <span>Duration</span>
+                <span>{% translate "Duration" %}</span>
                 {% if current_sort == 'duration' %}
                   <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
                 {% else %}
@@ -155,7 +155,7 @@
             </th>
             <th class="sortable">
               <a href="?q={{ search_query }}&status={{ status_filter }}&sort=valid_from&dir={% if current_sort == 'valid_from' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                <span>Valid From</span>
+                <span>{% translate "Valid From" %}</span>
                 {% if current_sort == 'valid_from' %}
                   <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
                 {% else %}
@@ -165,7 +165,7 @@
             </th>
             <th class="sortable">
               <a href="?q={{ search_query }}&status={{ status_filter }}&sort=valid_until&dir={% if current_sort == 'valid_until' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                <span>Valid Until</span>
+                <span>{% translate "Valid Until" %}</span>
                 {% if current_sort == 'valid_until' %}
                   <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
                 {% else %}
@@ -175,7 +175,7 @@
             </th>
             <th class="sortable" style="width: 100px">
               <a href="?q={{ search_query }}&status={{ status_filter }}&sort=uses&dir={% if current_sort == 'uses' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                <span>Uses</span>
+                <span>{% translate "Uses" %}</span>
                 {% if current_sort == 'uses' %}
                   <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
                 {% else %}
@@ -185,7 +185,7 @@
             </th>
             <th class="sortable" style="width: 140px">
               <a href="?q={{ search_query }}&status={{ status_filter }}&sort=status&dir={% if current_sort == 'status' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                <span>Status</span>
+                <span>{% translate "Status" %}</span>
                 {% if current_sort == 'status' %}
                   <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
                 {% else %}
@@ -193,7 +193,7 @@
                 {% endif %}
               </a>
             </th>
-            <th style="width: 120px;"">ACTIONS</th>
+            <th style="width: 120px;">{% translate "Actions" %}</th>
           </tr>
         </thead>
         <tbody>
@@ -203,11 +203,25 @@
               <td><span class="fw-bold" style="font-family: monospace; color: #4338ca;">{{ p.code }}</span></td>
               <td>
                 <span class="status-badge" style="background: #f1f5f9; color: #475569; border: none;">
-                  {{ p.get_discount_type_display }}
+                  {% if p.discount_type == 'Percentage' %}
+                    {% if LANGUAGE_CODE|slice:':2' == 'ar' %}نسبة مئوية{% else %}Percentage{% endif %}
+                  {% elif p.discount_type == 'Fixed_Amount' %}
+                    {% if LANGUAGE_CODE|slice:':2' == 'ar' %}مبلغ ثابت{% else %}Fixed Amount{% endif %}
+                  {% else %}
+                    {{ p.get_discount_type_display }}
+                  {% endif %}
                 </span>
               </td>
               <td><span class="fw-bold">{{ p.discount_value }}</span></td>
-              <td>{{ p.get_discount_duration_display }}</td>
+              <td>
+                {% if p.discount_duration == 'Apply_Once' %}
+                  {% if LANGUAGE_CODE|slice:':2' == 'ar' %}مرة واحدة{% else %}Apply Once{% endif %}
+                {% elif p.discount_duration == 'Recurring' %}
+                  {% if LANGUAGE_CODE|slice:':2' == 'ar' %}متكرر{% else %}Recurring{% endif %}
+                {% else %}
+                  {{ p.get_discount_duration_display }}
+                {% endif %}
+              </td>
               <td><small class="text-muted">{{ p.valid_from|date:"M d, Y" }}</small></td>
               <td>
                 {% if p.valid_until %}
@@ -223,33 +237,33 @@
               </td>
               <td>
                 {% if p.valid_until and p.valid_until < now or p.max_uses and p.current_uses >= p.max_uses %}
-                  <span class="status-badge expired">Expired</span>
+                  <span class="status-badge expired">{% translate "Expired" %}</span>
                 {% elif p.valid_from > now %}
-                  <span class="status-badge warning" style="background: #fef3c7; color: #92400e;">Scheduled</span>
+                  <span class="status-badge warning" style="background: #fef3c7; color: #92400e;">{% translate "Scheduled" %}</span>
                 {% elif p.is_active %}
-                  <span class="status-badge active">Active</span>
+                  <span class="status-badge active">{% translate "Active" %}</span>
                 {% else %}
-                  <span class="status-badge inactive">Inactive</span>
+                  <span class="status-badge inactive">{% translate "Inactive" %}</span>
                 {% endif %}
               </td>
               <td>
                 <div class="eal-actions-cell">
-                  <a href="{% url 'promo_code_detail' p.promo_code_id %}" class="eal-row-btn" title="View details">
+                  <a href="{% url 'promo_code_detail' p.promo_code_id %}" class="eal-row-btn" title="{% translate 'View details' %}">
                     <i class="bi bi-eye"></i>
                   </a>
                   {% if request.user.is_root %}
-                    <a href="{% url 'promo_code_edit' p.promo_code_id %}" class="eal-row-btn" title="Edit">
+                    <a href="{% url 'promo_code_edit' p.promo_code_id %}" class="eal-row-btn" title="{% translate 'Edit' %}">
                       <i class="bi bi-pencil"></i>
                     </a>
                     <form method="post" action="{% url 'promo_code_toggle' p.promo_code_id %}" style="display:inline">
                       {% csrf_token %}
-                      <button type="submit" class="eal-row-btn" title="{% if p.is_active %}Deactivate{% else %}Activate{% endif %}">
+                      <button type="submit" class="eal-row-btn" title="{% if p.is_active %}{% translate 'Deactivate' %}{% else %}{% translate 'Activate' %}{% endif %}">
                         <i class="bi bi-arrow-repeat"></i>
                       </button>
                     </form>
-                    <form method="post" action="{% url 'promo_code_delete' p.promo_code_id %}" style="display:inline" onsubmit="return confirm('Remove this promo code?');">
+                    <form method="post" action="{% url 'promo_code_delete' p.promo_code_id %}" style="display:inline">
                       {% csrf_token %}
-                      <button type="submit" class="eal-row-btn" title="Delete (Soft)">
+                      <button type="submit" class="eal-row-btn" title="{% translate 'Delete (Soft)' %}">
                         <i class="bi bi-trash"></i>
                       </button>
                     </form>
@@ -258,7 +272,7 @@
               </td>
             </tr>
           {% empty %}
-            <tr><td colspan="10">No promo codes found.</td></tr>
+            <tr><td colspan="10">{% translate "No promo codes found." %}</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -266,8 +280,8 @@
   {% else %}
     <div class="notification-empty">
       <div class="empty-icon"><i class="bi bi-ticket-perforated"></i></div>
-      <h4 class="empty-title">No promo codes found.</h4>
-      <p class="empty-text">Adjust filters or add a new promo code.</p>
+      <h4 class="empty-title">{% translate "No promo codes found." %}</h4>
+      <p class="empty-text">{% translate "Adjust filters or add a new promo code." %}</p>
     </div>
   {% endif %}
 

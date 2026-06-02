@@ -8,6 +8,7 @@ from iroad_tenants.services.cod_execution_service import CODExecutionService
 from iroad_tenants.services.latest_state_service import LatestStateService
 from iroad_tenants.services.operation_execution_service import OperationExecutionService
 from iroad_tenants.services.pod_execution_service import PODExecutionService
+from iroad_tenants.services.tenant_schema_registry import ensure_tenant_schema_registry
 from iroad_tenants.services.timeline_service import TimelineService
 
 
@@ -25,5 +26,6 @@ __all__ = [
     'LatestStateService',
     'OperationExecutionService',
     'PODExecutionService',
+    'ensure_tenant_schema_registry',
     'TimelineService',
 ]

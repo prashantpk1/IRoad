@@ -4,9 +4,7 @@
 <div class="eal-pagination">
   <div class="eal-pagination-info">
     {% if page_obj.paginator.count %}
-      {% blocktranslate with s=page_obj.start_index e=page_obj.end_index t=page_obj.paginator.count %}
-Showing <strong>{{ s }}-{{ e }}</strong> of <strong>{{ t }}</strong>
-      {% endblocktranslate %}
+      {% translate "Showing" %} <strong>{{ page_obj.start_index }}-{{ page_obj.end_index }}</strong> {% translate "of" %} <strong>{{ page_obj.paginator.count }}</strong>
     {% else %}
       <span>{% translate "No entries to display" %}</span>
     {% endif %}
@@ -15,14 +13,15 @@ Showing <strong>{{ s }}-{{ e }}</strong> of <strong>{{ t }}</strong>
     {% if page_obj.has_previous %}
       <a
         href="?page={{ page_obj.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value|urlencode }}{% endif %}{% endfor %}"
-        class="eal-page-btn"
+        class="eal-page-btn eal-page-prev"
         title="{% translate 'Previous' %}"
+        aria-label="{% translate 'Previous' %}"
       >
-        <i class="bi {% if request.session.is_rtl or request.session.django_language == 'ar' %}bi-chevron-right{% else %}bi-chevron-left{% endif %}"></i>
+        <i class="bi bi-chevron-left" aria-hidden="true"></i>
       </a>
     {% else %}
-      <button type="button" class="eal-page-btn" disabled title="{% translate 'Previous' %}">
-        <i class="bi {% if request.session.is_rtl or request.session.django_language == 'ar' %}bi-chevron-right{% else %}bi-chevron-left{% endif %}"></i>
+      <button type="button" class="eal-page-btn eal-page-prev" disabled title="{% translate 'Previous' %}" aria-label="{% translate 'Previous' %}">
+        <i class="bi bi-chevron-left" aria-hidden="true"></i>
       </button>
     {% endif %}
 
@@ -49,14 +48,15 @@ Showing <strong>{{ s }}-{{ e }}</strong> of <strong>{{ t }}</strong>
     {% if page_obj.has_next %}
       <a
         href="?page={{ page_obj.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value|urlencode }}{% endif %}{% endfor %}"
-        class="eal-page-btn"
+        class="eal-page-btn eal-page-next"
         title="{% translate 'Next' %}"
+        aria-label="{% translate 'Next' %}"
       >
-        <i class="bi {% if request.session.is_rtl or request.session.django_language == 'ar' %}bi-chevron-left{% else %}bi-chevron-right{% endif %}"></i>
+        <i class="bi bi-chevron-right" aria-hidden="true"></i>
       </a>
     {% else %}
-      <button type="button" class="eal-page-btn" disabled title="{% translate 'Next' %}">
-        <i class="bi {% if request.session.is_rtl or request.session.django_language == 'ar' %}bi-chevron-left{% else %}bi-chevron-right{% endif %}"></i>
+      <button type="button" class="eal-page-btn eal-page-next" disabled title="{% translate 'Next' %}" aria-label="{% translate 'Next' %}">
+        <i class="bi bi-chevron-right" aria-hidden="true"></i>
       </button>
     {% endif %}
   </div>

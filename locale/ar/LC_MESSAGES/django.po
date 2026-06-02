@@ -26,6 +26,18 @@ msgstr "الإجراء"
 msgid "Actions"
 msgstr "الإجراءات"
 
+msgid "Account Status"
+msgstr "حالة الحساب"
+
+msgid "Account metadata"
+msgstr "بيانات الحساب"
+
+msgid "Activate"
+msgstr "تفعيل"
+
+msgid "Deactivate"
+msgstr "إلغاء التفعيل"
+
 msgid "Active"
 msgstr "نشط"
 
@@ -41,8 +53,38 @@ msgstr "المستخدمون النشطون حسب الدور"
 msgid "Add"
 msgstr "إضافة"
 
+msgid "Add New Role"
+msgstr "إضافة دور جديد"
+
+msgid "Add Plan"
+msgstr "إضافة باقة"
+
+msgid "Add Row"
+msgstr "إضافة صف"
+
+msgid "Add Role"
+msgstr "إضافة دور"
+
 msgid "Add-ons Pricing"
 msgstr "أسعار الإضافات"
+
+msgid "Add-ons Pricing Policy"
+msgstr "سياسة أسعار الإضافات"
+
+msgid "Add Add-ons Policy"
+msgstr "إضافة سياسة الإضافات"
+
+msgid "Edit Add-ons Policy"
+msgstr "تعديل سياسة الإضافات"
+
+msgid "Update Add-ons Policy"
+msgstr "تحديث سياسة الإضافات"
+
+msgid "Add New Add-ons"
+msgstr "إضافة إضافات جديدة"
+
+msgid "Admin only"
+msgstr "للمسؤول فقط"
 
 msgid "Admin"
 msgstr "المسؤول"
@@ -62,14 +104,44 @@ msgstr "الاعتماد"
 msgid "All accounts are active recently"
 msgstr "جميع الحسابات كانت نشطة مؤخراً"
 
+msgid "Allow tenant drivers to use the mobile app on this plan."
+msgstr "السماح لسائقي المستأجر باستخدام تطبيق الجوال على هذه الباقة."
+
+msgid "Activating this will deactivate all other policies."
+msgstr "تفعيل هذه السياسة سيعطّل جميع السياسات الأخرى."
+
+msgid "All prices are per 1 standard billing cycle."
+msgstr "جميع الأسعار محسوبة لدورة فوترة قياسية واحدة."
+
 msgid "All clear"
 msgstr "الكل نشط"
+
+msgid "All"
+msgstr "الكل"
+
+msgid "All Roles"
+msgstr "جميع الأدوار"
+
+msgid "All Status"
+msgstr "جميع الحالات"
 
 msgid "Amount"
 msgstr "المبلغ"
 
+msgid "An invitation email will be sent to the user. They will set their password upon first login."
+msgstr "سيتم إرسال بريد دعوة إلى المستخدم. سيقوم بتعيين كلمة المرور عند أول تسجيل دخول."
+
 msgid "Analytics"
 msgstr "التحليلات"
+
+msgid "at"
+msgstr "في"
+
+msgid "Assigned Role"
+msgstr "الدور المعيّن"
+
+msgid "Assign system permissions and manage account status."
+msgstr "تعيين صلاحيات النظام وإدارة حالة الحساب."
 
 msgid "Attention Center Shortcuts"
 msgstr "اختصارات مركز الاهتمام"
@@ -77,14 +149,38 @@ msgstr "اختصارات مركز الاهتمام"
 msgid "Audit Log"
 msgstr "سجل التدقيق"
 
+msgid "Audit information"
+msgstr "معلومات الدور"
+
 msgid "Awaiting Payment"
 msgstr "في انتظار الدفع"
 
 msgid "Back"
 msgstr "رجوع"
 
+msgid "Back to list"
+msgstr "العودة إلى القائمة"
+
+msgid "by"
+msgstr "بواسطة"
+
+msgid "Backup Level"
+msgstr "مستوى النسخ الاحتياطي"
+
+msgid "Backup restore level"
+msgstr "مستوى النسخ الاحتياطي والاستعادة"
+
 msgid "Bank Accounts"
 msgstr "الحسابات البنكية"
+
+msgid "Base Cycle Days"
+msgstr "أيام الدورة الأساسية"
+
+msgid "Base cycle days must be at least 1."
+msgstr "يجب أن تكون أيام الدورة الأساسية 1 على الأقل."
+
+msgid "Enter -1 for unlimited or a positive number."
+msgstr "أدخل -1 لغير محدود أو رقماً موجباً."
 
 msgid "Base Currency"
 msgstr "العملة الأساسية"
@@ -100,6 +196,15 @@ msgstr "الفئة"
 
 msgid "Churned"
 msgstr "منتهي"
+
+msgid "Clear"
+msgstr "مسح"
+
+msgid "Clear Filters"
+msgstr "مسح عوامل التصفية"
+
+msgid "Clear filters"
+msgstr "مسح عوامل التصفية"
 
 msgid "Close"
 msgstr "إغلاق"
@@ -119,6 +224,9 @@ msgstr "قائمة الشركات"
 msgid "Configuration"
 msgstr "الإعدادات"
 
+msgid "Core role settings used by access control."
+msgstr "إعدادات الدور الأساسية المستخدمة في التحكم بالوصول."
+
 msgid "Countries Master"
 msgstr "سجل الدول"
 
@@ -128,11 +236,41 @@ msgstr "إنشاء"
 msgid "Created At"
 msgstr "تاريخ الإنشاء"
 
+msgid "Created at"
+msgstr "تاريخ الإنشاء"
+
+msgid "Created by"
+msgstr "أنشئ بواسطة"
+
+msgid "Creation and last update metadata."
+msgstr "بيانات الإنشاء وآخر تحديث."
+
+msgid "Create a policy to manage add-on pricing."
+msgstr "أنشئ سياسة لإدارة أسعار الإضافات."
+
 msgid "Currencies Master"
 msgstr "سجل العملات"
 
 msgid "Currency"
 msgstr "العملة"
+
+msgid "Create a policy to manage add-on pricing."
+msgstr "أنشئ سياسة لإدارة أسعار الإضافات."
+
+msgid "Cycle Days"
+msgstr "أيام الدورة"
+
+msgid "Cycles"
+msgstr "الدورات"
+
+msgid "Custom"
+msgstr "مخصص"
+
+msgid "Custom role"
+msgstr "دور مخصص"
+
+msgid "Cycle Days"
+msgstr "أيام الدورة"
 
 msgid "Dashboard"
 msgstr "لوحة القيادة"
@@ -143,17 +281,50 @@ msgstr "الأيام منذ آخر دخول"
 msgid "Delete"
 msgstr "حذف"
 
+msgid "Delete (Soft)"
+msgstr "حذف (مؤقت)"
+
+msgid "Define access permissions and role properties."
+msgstr "تحديد صلاحيات الوصول وخصائص الدور."
+
 msgid "Description"
 msgstr "الوصف"
 
+msgid "Details"
+msgstr "التفاصيل"
+
+msgid "Disabled"
+msgstr "معطّل"
+
 msgid "Done"
 msgstr "تم"
+
+msgid "Driver App"
+msgstr "تطبيق السائق"
+
+msgid "Driver"
+msgstr "السائق"
 
 msgid "Dropdown Master"
 msgstr "إدارة القوائم"
 
 msgid "Edit"
 msgstr "تعديل"
+
+msgid "Edit Admin User"
+msgstr "تعديل مستخدم النظام"
+
+msgid "Edit Plan"
+msgstr "تعديل الباقة"
+
+msgid "Edit Role"
+msgstr "تعديل الدور"
+
+msgid "Edit User"
+msgstr "تعديل المستخدم"
+
+msgid "Email Address"
+msgstr "البريد الإلكتروني"
 
 msgid "Email"
 msgstr "البريد الإلكتروني"
@@ -164,11 +335,20 @@ msgstr "إعدادات البريد"
 msgid "Email Templates"
 msgstr "قوالب البريد"
 
+msgid "Enabled"
+msgstr "مفعّل"
+
+msgid "Enter -1 for Unlimited"
+msgstr "أدخل -1 لغير محدود"
+
 msgid "Events Mapping"
 msgstr "ربط الأحداث"
 
 msgid "Exchange Rates"
 msgstr "أسعار الصرف"
+
+msgid "First Name"
+msgstr "الاسم الأول"
 
 msgid "FX Change Log"
 msgstr "سجل تغيير أسعار الصرف"
@@ -200,14 +380,26 @@ msgstr "الإجمالي الكلي"
 msgid "Here's what's happening with your system today"
 msgstr "نظرة عامة على نشاط نظامك اليوم"
 
+msgid "Has driver app"
+msgstr "تطبيق السائق"
+
 msgid "Hours Old"
 msgstr "ساعات مضت"
 
 msgid "IP Address"
 msgstr "عنوان IP"
 
+msgid "Immutable"
+msgstr "غير قابل للتعديل"
+
 msgid "Inactive"
 msgstr "غير نشط"
+
+msgid "Invite New User"
+msgstr "دعوة مستخدم جديد"
+
+msgid "Invite resend not available for active users"
+msgstr "إعادة إرسال الدعوة غير متاحة للمستخدمين النشطين"
 
 msgid "Internal Alerts"
 msgstr "التنبيهات الداخلية"
@@ -221,8 +413,20 @@ msgstr "اللغات"
 msgid "Last Login"
 msgstr "آخر تسجيل دخول"
 
+msgid "Last login"
+msgstr "آخر تسجيل دخول"
+
+msgid "Last updated"
+msgstr "آخر تحديث"
+
+msgid "Last Name"
+msgstr "اسم العائلة"
+
 msgid "Legal Identity"
 msgstr "الهوية القانونية"
+
+msgid "Last updated by"
+msgstr "آخر تحديث بواسطة"
 
 msgid "Less"
 msgstr "أقل"
@@ -233,11 +437,35 @@ msgstr "الجلسات المباشرة"
 msgid "Locked"
 msgstr "مغلق"
 
+msgid "Manage your records here"
+msgstr "إدارة السجلات من هنا"
+
+msgid "Manage administrative access and profile settings."
+msgstr "إدارة صلاحيات النظام وإعدادات الملف الشخصي."
+
+msgid "Manage system access levels and permissions"
+msgstr "إدارة مستويات الوصول إلى النظام والصلاحيات"
+
 msgid "Login Activity Heatmap"
 msgstr "خريطة نشاط تسجيل الدخول"
 
 msgid "MRR — This Month"
 msgstr "الإيرادات الشهرية المتكررة - هذا الشهر"
+
+msgid "Max active drivers"
+msgstr "الحد الأقصى للسائقين النشطين"
+
+msgid "Max internal trucks"
+msgstr "الحد الأقصى للشاحنات الداخلية"
+
+msgid "Max internal users"
+msgstr "الحد الأقصى للمستخدمين الداخليين"
+
+msgid "Max monthly shipments"
+msgstr "الحد الأقصى للشحنات الشهرية"
+
+msgid "Max storage (GB)"
+msgstr "الحد الأقصى للتخزين (جيجابايت)"
 
 msgid "Module"
 msgstr "الوحدة"
@@ -257,14 +485,29 @@ msgstr "الاسم"
 msgid "Needs Approval"
 msgstr "بحاجة لموافقة"
 
+msgid "New Invite"
+msgstr "دعوة جديدة"
+
 msgid "Next"
 msgstr "التالي"
+
+msgid "No admin users found"
+msgstr "لم يتم العثور على مستخدمين"
 
 msgid "No audit entries yet."
 msgstr "لا توجد قيود تدقيق بعد."
 
 msgid "No data available"
 msgstr "لا توجد بيانات"
+
+msgid "No entries to display"
+msgstr "لا توجد سجلات لعرضها"
+
+msgid "No plans found"
+msgstr "لم يتم العثور على باقات"
+
+msgid "No subscription plans match your current filters."
+msgstr "لا توجد باقات اشتراك تطابق عوامل التصفية الحالية."
 
 msgid "No failed transactions."
 msgstr "لا توجد معاملات فاشلة."
@@ -281,6 +524,12 @@ msgstr "لا توجد طلبات معلقة. الكل نشط!"
 msgid "No records found"
 msgstr "لم يتم العثور على سجلات"
 
+msgid "No roles found"
+msgstr "لم يتم العثور على أدوار"
+
+msgid "No system roles match your current search or filters."
+msgstr "لا توجد أدوار نظام تطابق بحثك أو عوامل التصفية الحالية."
+
 msgid "No suspended tenants."
 msgstr "لا يوجد مستأجرين موقوفين."
 
@@ -290,8 +539,20 @@ msgstr "قوالب الإشعارات"
 msgid "Notifications"
 msgstr "الإشعارات"
 
+msgid "No policy records found."
+msgstr "لم يتم العثور على سجلات سياسات."
+
+msgid "No policies match your filters."
+msgstr "لا توجد سياسات تطابق عوامل التصفية."
+
+msgid "Only ONE policy active at a time."
+msgstr "يُسمح بسياسة واحدة نشطة فقط في كل مرة."
+
 msgid "Open"
 msgstr "مفتوح"
+
+msgid "Orders"
+msgstr "طلبات"
 
 msgid "Over 48 Hours"
 msgstr "أكثر من 48 ساعة"
@@ -311,6 +572,12 @@ msgstr "البنية التحتية للمدفوعات"
 msgid "Payment Methods"
 msgstr "طرق الدفع"
 
+msgid "Personal Details"
+msgstr "البيانات الشخصية"
+
+msgid "Phone Number"
+msgstr "رقم الهاتف"
+
 msgid "Pending"
 msgstr "قيد التفعيل"
 
@@ -329,8 +596,164 @@ msgstr "السيولة المعلقة"
 msgid "Previous"
 msgstr "السابق"
 
+msgid "Plan Name (English)"
+msgstr "اسم الباقة (إنجليزي)"
+
+msgid "Plan Name (Arabic)"
+msgstr "اسم الباقة (عربي)"
+
+msgid "Plan Details"
+msgstr "تفاصيل الباقة"
+
+msgid "Plan Name AR"
+msgstr "اسم الباقة (عربي)"
+
+msgid "Plan Name EN"
+msgstr "اسم الباقة (إنجليزي)"
+
+msgid "Policy Name"
+msgstr "اسم السياسة"
+
+msgid "Policy name"
+msgstr "اسم السياسة"
+
+msgid "Policy Details"
+msgstr "تفاصيل السياسة"
+
+msgid "Pricing Per Resource"
+msgstr "التسعير لكل مورد"
+
+msgid "Extra internal user price"
+msgstr "سعر المستخدم الداخلي الإضافي"
+
+msgid "Extra internal truck price"
+msgstr "سعر الشاحنة الداخلية الإضافية"
+
+msgid "Extra driver price"
+msgstr "سعر السائق الإضافي"
+
+msgid "Extra shipment price"
+msgstr "سعر الشحنة الإضافية"
+
+msgid "Extra storage gb price"
+msgstr "سعر التخزين الإضافي (جيجابايت)"
+
+msgid "When on, this policy is the active add-ons tariff. Other policies will be deactivated."
+msgstr "عند التفعيل، تصبح هذه السياسة تعرفة الإضافات النشطة. سيتم تعطيل السياسات الأخرى."
+
+msgid "Please fill all required fields before submitting."
+msgstr "يرجى تعبئة جميع الحقول المطلوبة قبل الإرسال."
+
+msgid "Price cannot be negative."
+msgstr "لا يمكن أن يكون السعر سالباً."
+
+msgid "Price"
+msgstr "السعر"
+
+msgid "Pricing Cycles"
+msgstr "دورات التسعير"
+
+msgid "Pricing Rows"
+msgstr "صفوف التسعير"
+
 msgid "Promo Codes"
 msgstr "أكواد الخصم"
+
+msgid "Add Promo Code"
+msgstr "إضافة كود خصم"
+
+msgid "Edit Promo Code"
+msgstr "تعديل كود خصم"
+
+msgid "Update Promo"
+msgstr "تحديث الكود"
+
+msgid "Add Promo"
+msgstr "إضافة الكود"
+
+msgid "Promo Configuration"
+msgstr "إعداد الكود الترويجي"
+
+msgid "Set discount rules, validity window, and applicable plans."
+msgstr "اضبط قواعد الخصم وفترة الصلاحية والباقات المطبقة."
+
+msgid "Code Details"
+msgstr "تفاصيل الكود"
+
+msgid "Validity & Limits"
+msgstr "الصلاحية والحدود"
+
+msgid "Applicable Plans"
+msgstr "الباقات المطبقة"
+
+msgid "Code"
+msgstr "الكود"
+
+msgid "Discount type"
+msgstr "نوع الخصم"
+
+msgid "Discount value"
+msgstr "قيمة الخصم"
+
+msgid "Discount duration"
+msgstr "مدة الخصم"
+
+msgid "Valid from"
+msgstr "صالح من"
+
+msgid "Valid until"
+msgstr "صالح حتى"
+
+msgid "Valid From"
+msgstr "صالح من"
+
+msgid "Valid Until"
+msgstr "صالح حتى"
+
+msgid "Max uses"
+msgstr "أقصى عدد استخدامات"
+
+msgid "When type is Percentage, maximum is 100."
+msgstr "عندما يكون النوع نسبة مئوية، الحد الأقصى هو 100."
+
+msgid "If off, the code cannot be used regardless of dates."
+msgstr "عند الإيقاف، لا يمكن استخدام الكود بغض النظر عن التواريخ."
+
+msgid "Select one or more plans this promo code applies to. Leave empty to apply to ALL plans."
+msgstr "اختر باقة واحدة أو أكثر ينطبق عليها كود الخصم. اتركه فارغاً للتطبيق على جميع الباقات."
+
+msgid "No active plans available."
+msgstr "لا توجد باقات نشطة متاحة."
+
+msgid "Please fix the following:"
+msgstr "يرجى تصحيح ما يلي:"
+
+msgid "Expired"
+msgstr "منتهي الصلاحية"
+
+msgid "Scheduled"
+msgstr "مجدوَل"
+
+msgid "Search by code or name"
+msgstr "ابحث بالكود أو الاسم"
+
+msgid "No promo codes found."
+msgstr "لا توجد أكواد خصم."
+
+msgid "Adjust filters or add a new promo code."
+msgstr "عدّل الفلاتر أو أضف كود خصم جديد."
+
+msgid "Type"
+msgstr "النوع"
+
+msgid "Value"
+msgstr "القيمة"
+
+msgid "Duration"
+msgstr "المدة"
+
+msgid "Uses"
+msgstr "الاستخدامات"
 
 msgid "Queue"
 msgstr "قائمة الانتظار"
@@ -347,8 +770,29 @@ msgstr "المستأجرون الموقوفون حديثاً"
 msgid "Record ID"
 msgstr "معرف السجل"
 
+msgid "Resend Invitation"
+msgstr "إعادة إرسال الدعوة"
+
+msgid "Read-only values from the directory. Two-factor status changes when the user completes 2FA setup."
+msgstr "قيم للقراءة فقط من الدليل. تتغير حالة التحقق الثنائي عند إكمال المستخدم إعداد 2FA."
+
+msgid "Resource Limits"
+msgstr "حدود الموارد"
+
 msgid "Rejected"
 msgstr "مرفوض"
+
+msgid "Remove"
+msgstr "إزالة"
+
+msgid "Remove this admin user?"
+msgstr "هل تريد إزالة هذا المستخدم؟"
+
+msgid "Remove this plan?"
+msgstr "هل تريد إزالة هذه الباقة؟"
+
+msgid "Remove this policy?"
+msgstr "هل تريد إزالة هذه السياسة؟"
 
 msgid "Reports"
 msgstr "التقارير"
@@ -365,11 +809,44 @@ msgstr "توزيع الأدوار"
 msgid "Role Name"
 msgstr "اسم الدور"
 
+msgid "Role & Access Control"
+msgstr "الدور والتحكم بالوصول"
+
+msgid "Role AR"
+msgstr "اسم الدور (عربي)"
+
+msgid "Role Configuration"
+msgstr "إعداد الدور"
+
+msgid "Role EN"
+msgstr "اسم الدور (إنجليزي)"
+
+msgid "Role details"
+msgstr "تفاصيل الدور"
+
+msgid "Role information"
+msgstr "معلومات الدور"
+
+msgid "Role Name (Arabic)"
+msgstr "اسم الدور (عربي)"
+
+msgid "Role Name (English)"
+msgstr "اسم الدور (إنجليزي)"
+
+msgid "Role type"
+msgstr "نوع الدور"
+
+msgid "Roles"
+msgstr "الأدوار"
+
 msgid "Roles Master"
 msgstr "سجل الأدوار"
 
 msgid "Root Admin"
 msgstr "مدير النظام"
+
+msgid "Root"
+msgstr "أساسي"
 
 msgid "Sat"
 msgstr "سبت"
@@ -383,20 +860,67 @@ msgstr "ابحث عن الشحنات والعملاء والعناوين..."
 msgid "Search..."
 msgstr "بحث..."
 
+msgid "Search by Role Name"
+msgstr "البحث باسم الدور"
+
+msgid "Search by name or email"
+msgstr "البحث بالاسم أو البريد الإلكتروني"
+
+msgid "Search by name, code..."
+msgstr "البحث بالاسم أو الرمز..."
+
+msgid "Search by policy name..."
+msgstr "البحث باسم السياسة..."
+
 msgid "Security & Audit"
 msgstr "الأمن والتدقيق"
 
 msgid "Settings"
 msgstr "الإعدادات"
 
+msgid "Send Invitation"
+msgstr "إرسال الدعوة"
+
+msgid "Select"
+msgstr "اختر"
+
+msgid "Set name, description, and operational status for system access."
+msgstr "تعيين الاسم والوصف والحالة التشغيلية للوصول إلى النظام."
+
+msgid "Shipment"
+msgstr "الشحنة"
+
 msgid "Sign out"
 msgstr "تسجيل الخروج"
+
+msgid ""
+"Showing <strong>%(s)s-%(e)s</strong> of <strong>%(t)s</strong>"
+msgstr ""
+"عرض <strong>%(s)s-%(e)s</strong> من <strong>%(t)s</strong>"
 
 msgid "Staff Analytics — Role Distribution"
 msgstr "تحليلات الموظفين - توزيع الأدوار"
 
 msgid "Staff overview and activity insights"
 msgstr "نظرة عامة على الموظفين ورؤى النشاط"
+
+msgid "Storage/GB"
+msgstr "التخزين/جيجابايت"
+
+msgid "Standard profile information for the administrative user."
+msgstr "معلومات الملف الشخصي القياسية لمستخدم النظام."
+
+msgid "Standard, Extended, or Premium backup/restore tier for subscribers on this plan."
+msgstr "مستوى النسخ الاحتياطي والاستعادة: قياسي، موسّع، أو مميز للمشتركين على هذه الباقة."
+
+msgid "Standard"
+msgstr "قياسي"
+
+msgid "Extended"
+msgstr "موسّع"
+
+msgid "Premium"
+msgstr "مميز"
 
 msgid "Stale Accounts"
 msgstr "الحسابات غير النشطة"
@@ -419,8 +943,317 @@ msgstr "إدارة المشتركين والفوترة"
 msgid "Subscribers List"
 msgstr "قائمة المشتركين"
 
+msgid "Subscribers"
+msgstr "المشتركون"
+
+msgid "Edit Tenant"
+msgstr "تعديل المستأجر"
+
+msgid "Update subscriber account settings and status."
+msgstr "حدّث إعدادات وحالة حساب المشترك."
+
+msgid "Register a new subscriber in the system."
+msgstr "سجّل مشتركاً جديداً في النظام."
+
+msgid "Profile & Identity"
+msgstr "الملف والهوية"
+
+msgid "Update subscriber core identity details."
+msgstr "حدّث بيانات الهوية الأساسية للمشترك."
+
+msgid "Account Settings"
+msgstr "إعدادات الحساب"
+
+msgid "Control administrative status and account management."
+msgstr "تحكم في الحالة الإدارية وإدارة الحساب."
+
+msgid "Suspension will trigger the Kill Switch for all tenant users."
+msgstr "إيقاف الحساب سيُفعّل القفل الفوري لجميع مستخدمي المستأجر."
+
+msgid "Update Tenant"
+msgstr "تحديث المستأجر"
+
+msgid "New Subscriber Details"
+msgstr "تفاصيل مشترك جديد"
+
+msgid "Enter primary details to register a new subscriber."
+msgstr "أدخل البيانات الأساسية لتسجيل مشترك جديد."
+
+msgid "Create Tenant"
+msgstr "إنشاء مستأجر"
+
+msgid "Company name"
+msgstr "اسم الشركة"
+
+msgid "Tax number"
+msgstr "الرقم الضريبي"
+
+msgid "Country"
+msgstr "الدولة"
+
+msgid "Registration number"
+msgstr "رقم التسجيل"
+
+msgid "Primary email"
+msgstr "البريد الإلكتروني الرئيسي"
+
+msgid "Primary phone"
+msgstr "الهاتف الرئيسي"
+
+msgid "Assigned sales rep"
+msgstr "مندوب المبيعات المعيّن"
+
+msgid "Account status"
+msgstr "حالة الحساب"
+
+msgid "Primary email is required."
+msgstr "البريد الإلكتروني الرئيسي مطلوب."
+
+msgid "Primary email must be unique across tenants."
+msgstr "يجب أن يكون البريد الإلكتروني الرئيسي فريداً بين المستأجرين."
+
+msgid "Sort, search, filter, and manage subscriber accounts."
+msgstr "فرز وابحث وصفِّ وأدر حسابات المشتركين."
+
+msgid "Add Tenant"
+msgstr "إضافة مستأجر"
+
+msgid "Search company or email..."
+msgstr "ابحث باسم الشركة أو البريد الإلكتروني..."
+
+msgid "Rep: All"
+msgstr "المندوب: الكل"
+
+msgid "Plan"
+msgstr "الباقة"
+
+msgid "Plan Selection"
+msgstr "اختيار الباقة"
+
+msgid "Choose a subscription plan, number of cycles, and review pricing."
+msgstr "اختر باقة اشتراك وعدد الدورات وراجع التسعير."
+
+msgid "Plan price"
+msgstr "سعر الباقة"
+
+msgid "Line total (preview)"
+msgstr "إجمالي السطر (معاينة)"
+
+msgid "Line total"
+msgstr "إجمالي السطر"
+
+msgid "Pro-rata adjustment (credit)"
+msgstr "تعديل التناسب (رصيد)"
+
+msgid "Pro-rata"
+msgstr "تناسب"
+
+msgid "Discount"
+msgstr "الخصم"
+
+msgid "Tax"
+msgstr "الضريبة"
+
+msgid "Add-ons"
+msgstr "الإضافات"
+
+msgid "Add or remove add-on resources for the subscription."
+msgstr "أضف أو أزل موارد الإضافات للاشتراك."
+
+msgid "Add row"
+msgstr "إضافة صف"
+
+msgid "Unit prices follow the active add-ons policy. Line totals use remaining days in the current cycle (server-validated on save)."
+msgstr "تتبع أسعار الوحدة سياسة الإضافات النشطة. إجماليات السطر تستخدم الأيام المتبقية في الدورة الحالية (يُتحقق منها عند الحفظ)."
+
+msgid "Estimated credit for unused time on the current plan — in selected order currency (same as save)."
+msgstr "رصيد تقديري للوقت غير المستخدم في الباقة الحالية — بعملة الطلب المختارة (كما عند الحفظ)."
+
+msgid "No credit calculated. Ensure the subscriber has a current plan and dates, and pricing exists for the selected currency."
+msgstr "لم يُحسب رصيد. تأكد أن للمشترك باقة حالية وتواريخ، وأن التسعير موجود للعملة المختارة."
+
+msgid "Select a subscriber to load upgrade credit for the chosen currency."
+msgstr "اختر مشتركاً لتحميل رصيد الترقية للعملة المختارة."
+
+msgid "Action"
+msgstr "الإجراء"
+
+msgid "Add-on type"
+msgstr "نوع الإضافة"
+
+msgid "Qty"
+msgstr "الكمية"
+
+msgid "Unit"
+msgstr "الوحدة"
+
+msgid "Plan: All"
+msgstr "الباقة: الكل"
+
+msgid "Current Plan"
+msgstr "الباقة الحالية"
+
+msgid "Expiry Date"
+msgstr "تاريخ الانتهاء"
+
+msgid "Last modified"
+msgstr "آخر تعديل"
+
+msgid "No subscribers found"
+msgstr "لا يوجد مشتركون"
+
+msgid "There are no subscribers matching your current filters."
+msgstr "لا يوجد مشتركون مطابقون للفلاتر الحالية."
+
+msgid "Remove this tenant?"
+msgstr "هل تريد إزالة هذا المستأجر؟"
+
 msgid "Subscription Orders"
 msgstr "طلبات الاشتراك"
+
+msgid "Create Subscription Order"
+msgstr "إنشاء طلب اشتراك"
+
+msgid "Configure order header, plan selection, add-ons, and review totals."
+msgstr "اضبط رأس الطلب، واختيار الباقة، والإضافات، وراجع الإجماليات."
+
+msgid "Order Header"
+msgstr "رأس الطلب"
+
+msgid "Select tenant, classification, currency, and payment method."
+msgstr "اختر المستأجر، والتصنيف، والعملة، وطريقة الدفع."
+
+msgid "Payment method"
+msgstr "طريقة الدفع"
+
+msgid "Promo code (optional)"
+msgstr "كود الخصم (اختياري)"
+
+msgid "Totals Preview"
+msgstr "معاينة الإجماليات"
+
+msgid "Review the calculated totals before saving."
+msgstr "راجع الإجماليات المحسوبة قبل الحفظ."
+
+msgid "Sub total"
+msgstr "الإجمالي الفرعي"
+
+msgid "Grand total"
+msgstr "الإجمالي الكلي"
+
+msgid "Base currency equivalent"
+msgstr "المعادل بالعملة الأساسية"
+
+msgid "Exchange rate snapshot"
+msgstr "لقطة سعر الصرف"
+
+msgid "Projected expiry date"
+msgstr "تاريخ الانتهاء المتوقع"
+
+msgid "Projected plan"
+msgstr "الباقة المتوقعة"
+
+msgid "Projected max users"
+msgstr "الحد الأقصى المتوقع للمستخدمين"
+
+msgid "Projected max trucks (internal)"
+msgstr "الحد الأقصى المتوقع للشاحنات (داخلي)"
+
+msgid "Projected max drivers"
+msgstr "الحد الأقصى المتوقع للسائقين"
+
+msgid "Projected state preview"
+msgstr "معاينة الحالة المتوقعة"
+
+msgid "Projected values are calculated in real-time using billing backend logic."
+msgstr "يتم حساب القيم المتوقعة في الوقت الفعلي باستخدام منطق نظام الفوترة الخلفي."
+
+msgid "Submit"
+msgstr "إرسال"
+
+msgid "No pricing for this currency. Choose another currency or add plan pricing."
+msgstr "لا توجد تسعيرة لهذه العملة. اختر عملة أخرى أو أضف تسعير الباقة."
+
+msgid "No pricing for this plan. Add pricing cycles in Subscription Plans."
+msgstr "لا توجد تسعيرة لهذه الباقة. أضف دورات التسعير في باقات الاشتراك."
+
+msgid "Promo check is temporarily unavailable."
+msgstr "التحقق من كود الخصم غير متاح مؤقتاً."
+
+msgid "Promo is valid. Select plan/add-ons to calculate discount."
+msgstr "كود الخصم صالح. اختر باقة/إضافات لحساب الخصم."
+
+msgid "Promo applied. Discount:"
+msgstr "تم تطبيق كود الخصم. الخصم:"
+
+msgid "Invalid or Expired Code."
+msgstr "كود غير صالح أو منتهي الصلاحية."
+
+msgid "Live preview warning:"
+msgstr "تنبيه المعاينة المباشرة:"
+
+msgid "Live preview is temporarily unavailable. Showing local estimate only."
+msgstr "المعاينة المباشرة غير متاحة مؤقتاً. يتم عرض تقدير محلي فقط."
+
+msgid "Select a subscriber before continuing with billing operations."
+msgstr "اختر مشتركاً قبل متابعة عمليات الفوترة."
+
+msgid "Sort, search, filter, and manage subscription orders."
+msgstr "فرز وابحث وصفِّ وأدر طلبات الاشتراك."
+
+msgid "Create Order"
+msgstr "إنشاء طلب"
+
+msgid "Search tenant company..."
+msgstr "ابحث باسم شركة المستأجر..."
+
+msgid "All Classifications"
+msgstr "كل التصنيفات"
+
+msgid "Classification"
+msgstr "التصنيف"
+
+msgid "Tenant"
+msgstr "المستأجر"
+
+msgid "Paid"
+msgstr "مدفوع"
+
+msgid "Draft"
+msgstr "مسودة"
+
+msgid "Date"
+msgstr "التاريخ"
+
+msgid "Pending Payment"
+msgstr "قيد الدفع"
+
+msgid "New Subscription"
+msgstr "اشتراك جديد"
+
+msgid "Renewal"
+msgstr "تجديد"
+
+msgid "Upgrade"
+msgstr "ترقية"
+
+msgid "Downgrade"
+msgstr "تخفيض"
+
+msgid "Showing"
+msgstr "عرض"
+
+msgid "of"
+msgstr "من"
+
+msgid "No orders found"
+msgstr "لا توجد طلبات"
+
+msgid "No orders match your current filters."
+msgstr "لا توجد طلبات مطابقة للفلاتر الحالية."
+
+msgid "Cur"
+msgstr "العملة"
 
 msgid "Subscription Packages"
 msgstr "باقات الاشتراك"
@@ -470,14 +1303,29 @@ msgstr "الحسابات الموقوفة"
 msgid "Suspended Billing"
 msgstr "فوترة موقوفة"
 
+msgid "Suspended - Billing"
+msgstr "موقوف - فوترة"
+
+msgid "Suspended - Violation"
+msgstr "موقوف - مخالفة"
+
 msgid "Suspended Violation"
 msgstr "موقوف لمخالفة"
+
+msgid "Suspend"
+msgstr "إيقاف"
 
 msgid "Switch Language"
 msgstr "تبديل اللغة"
 
 msgid "System"
 msgstr "النظام"
+
+msgid "System Default"
+msgstr "افتراضي النظام"
+
+msgid "System default (immutable)"
+msgstr "افتراضي النظام (غير قابل للتعديل)"
 
 msgid "System Banners"
 msgstr "لافتات النظام"
@@ -503,6 +1351,12 @@ msgstr "الأكواد الضريبية"
 msgid "Tenant Name"
 msgstr "اسم المستأجر"
 
+msgid "This is a system default role and certain properties are immutable."
+msgstr "هذا دور افتراضي للنظام وبعض خصائصه غير قابلة للتعديل."
+
+msgid "Two-factor authentication"
+msgstr "التحقق الثنائي"
+
 msgid "Thu"
 msgstr "خميس"
 
@@ -514,6 +1368,9 @@ msgstr "رقم التذكرة"
 
 msgid "Timestamp"
 msgstr "الطابع الزمني"
+
+msgid "Toggle Status"
+msgstr "تبديل الحالة"
 
 msgid "Total"
 msgstr "الإجمالي"
@@ -527,8 +1384,554 @@ msgstr "إجمالي الإيرادات هذا الشهر"
 msgid "Transactions Ledger"
 msgstr "سجل المعاملات"
 
+msgid "Subscription Receipts"
+msgstr "إيصالات الاشتراك"
+
+msgid "Communication Gateways"
+msgstr "بوابات الاتصال"
+
+msgid "Notification Templates"
+msgstr "قوالب الإشعارات"
+
+msgid "Events Mapping Engine"
+msgstr "محرك ربط الأحداث"
+
+msgid "Edit Event Mapping"
+msgstr "تعديل ربط الحدث"
+
+msgid "Add Event Mapping"
+msgstr "إضافة ربط حدث"
+
+msgid "Map each system event to primary and optional fallback templates."
+msgstr "اربط كل حدث نظام بالقوالب الأساسية وقوالب الرجوع الاختيارية."
+
+msgid "Mapping Details"
+msgstr "تفاصيل الربط"
+
+msgid "Primary and fallback channels must be different."
+msgstr "يجب أن تكون القناة الأساسية والاحتياطية مختلفتين."
+
+msgid "System event"
+msgstr "حدث النظام"
+
+msgid "Primary channel"
+msgstr "القناة الأساسية"
+
+msgid "Primary template"
+msgstr "القالب الأساسي"
+
+msgid "Fallback channel"
+msgstr "القناة الاحتياطية"
+
+msgid "Fallback template"
+msgstr "القالب الاحتياطي"
+
+msgid "Is active"
+msgstr "نشط"
+
+msgid "Save Mapping"
+msgstr "حفظ الربط"
+
+msgid "Update Mapping"
+msgstr "تحديث الربط"
+
+msgid "OTP Requested"
+msgstr "طلب رمز التحقق"
+
+msgid "Password Changed"
+msgstr "تم تغيير كلمة المرور"
+
+msgid "Invoice Paid"
+msgstr "تم دفع الفاتورة"
+
+msgid "Subscription Activated"
+msgstr "تم تفعيل الاشتراك"
+
+msgid "Subscription Expired"
+msgstr "انتهى الاشتراك"
+
+msgid "Subscription Renewed"
+msgstr "تم تجديد الاشتراك"
+
+msgid "Account Suspended"
+msgstr "تم تعليق الحساب"
+
+msgid "Shipment Assigned to Driver"
+msgstr "تم تعيين الشحنة إلى السائق"
+
+msgid "Welcome Email"
+msgstr "بريد الترحيب"
+
+msgid "Password Reset Requested"
+msgstr "تم طلب إعادة تعيين كلمة المرور"
+
+msgid "Payment Failed"
+msgstr "فشل الدفع"
+
+msgid "Support Ticket Created"
+msgstr "تم إنشاء تذكرة دعم"
+
+msgid "Support Ticket Replied"
+msgstr "تم الرد على تذكرة الدعم"
+
+msgid "Add Mapping"
+msgstr "إضافة ربط"
+
+msgid "System Event"
+msgstr "حدث النظام"
+
+msgid "Primary Channel"
+msgstr "القناة الأساسية"
+
+msgid "Primary Template"
+msgstr "القالب الأساسي"
+
+msgid "Fallback Channel"
+msgstr "القناة الاحتياطية"
+
+msgid "Fallback Template"
+msgstr "القالب الاحتياطي"
+
+msgid "Not Configured"
+msgstr "غير مُعدّ"
+
+msgid "Configure"
+msgstr "تهيئة"
+
+msgid "No events found."
+msgstr "لا توجد أحداث."
+
+msgid "Add Template"
+msgstr "إضافة قالب"
+
+msgid "Template name"
+msgstr "اسم القالب"
+
+msgid "Channel: All"
+msgstr "القناة: الكل"
+
+msgid "Category: All"
+msgstr "الفئة: الكل"
+
+msgid "Transactional"
+msgstr "تشغيلي"
+
+msgid "Promotional"
+msgstr "ترويجي"
+
+msgid "Primary Subject"
+msgstr "العنوان الأساسي"
+
+msgid "Preview Template"
+msgstr "معاينة القالب"
+
+msgid "Edit Template"
+msgstr "تعديل القالب"
+
+msgid "Remove this template?"
+msgstr "هل تريد إزالة هذا القالب؟"
+
+msgid "No templates found."
+msgstr "لا توجد قوالب."
+
+msgid "Add Subscription/Add-ons"
+msgstr "إضافة اشتراك/إضافات"
+
+msgid "Subscriber profile (master directory), subscription state, and CRM notes."
+msgstr "ملف المشترك (الدليل الرئيسي)، وحالة الاشتراك، وملاحظات إدارة العملاء."
+
+msgid "Profile"
+msgstr "الملف الشخصي"
+
+msgid "Registration #"
+msgstr "رقم التسجيل"
+
+msgid "Phone"
+msgstr "الهاتف"
+
+msgid "Registered"
+msgstr "تاريخ التسجيل"
+
+msgid "Quick Actions"
+msgstr "إجراءات سريعة"
+
+msgid "Core identity and contact information."
+msgstr "بيانات الهوية الأساسية ومعلومات الاتصال."
+
+msgid "Common actions for this subscriber."
+msgstr "إجراءات شائعة لهذا المشترك."
+
+msgid "Current plan, limits, and billing details."
+msgstr "الباقة الحالية والحدود وتفاصيل الفوترة."
+
+msgid "Subscription State"
+msgstr "حالة الاشتراك"
+
+msgid "Current plan"
+msgstr "الباقة الحالية"
+
+msgid "Start date"
+msgstr "تاريخ البدء"
+
+msgid "Expiry date"
+msgstr "تاريخ الانتهاء"
+
+msgid "Pending plan change"
+msgstr "تغيير باقة معلّق"
+
+msgid "Downgrade to \"%(plan)s\" scheduled for %(date)s."
+msgstr "تمت جدولة التخفيض إلى \"%(plan)s\" بتاريخ %(date)s."
+
+msgid "Active limits"
+msgstr "الحدود النشطة"
+
+msgid "Internal trucks"
+msgstr "الشاحنات الداخلية"
+
+msgid "Drivers"
+msgstr "السائقون"
+
+msgid "Wallet balance"
+msgstr "رصيد المحفظة"
+
+msgid "Total LTV"
+msgstr "إجمالي قيمة العميل"
+
+msgid "CRM Notes"
+msgstr "ملاحظات إدارة العملاء"
+
+msgid "Internal notes and interaction history."
+msgstr "ملاحظات داخلية وسجل التفاعلات."
+
+msgid "Type"
+msgstr "النوع"
+
+msgid "Note"
+msgstr "ملاحظة"
+
+msgid "Enter note content"
+msgstr "أدخل محتوى الملاحظة"
+
+msgid "Add Note"
+msgstr "إضافة ملاحظة"
+
+msgid "Edit Status"
+msgstr "تعديل الحالة"
+
+msgid "History"
+msgstr "السجل"
+
+msgid "No notes yet."
+msgstr "لا توجد ملاحظات بعد."
+
+msgid "Order & Billing History"
+msgstr "سجل الطلبات والفوترة"
+
+msgid "Fetching history..."
+msgstr "جارٍ جلب السجل..."
+
+msgid "Failed to load history. Please try again."
+msgstr "فشل تحميل السجل. يرجى المحاولة مرة أخرى."
+
+msgid "No order history found for this tenant."
+msgstr "لا يوجد سجل طلبات لهذا المستأجر."
+
+msgid "View Full Order History"
+msgstr "عرض سجل الطلبات الكامل"
+
+msgid "Transaction Details"
+msgstr "تفاصيل المعاملة"
+
+msgid "Review payment, references, and manual review status."
+msgstr "راجع الدفع والمراجع وحالة المراجعة اليدوية."
+
+msgid "Back to ledger"
+msgstr "العودة إلى السجل"
+
+msgid "Payment Information"
+msgstr "معلومات الدفع"
+
+msgid "Core transaction details and references."
+msgstr "تفاصيل المعاملة الأساسية والمراجع."
+
+msgid "Currency / Amount"
+msgstr "العملة / المبلغ"
+
+msgid "Base equivalent"
+msgstr "المعادل الأساسي"
+
+msgid "FX snapshot"
+msgstr "لقطة سعر الصرف"
+
+msgid "Gateway ref"
+msgstr "مرجع البوابة"
+
+msgid "Linked order"
+msgstr "الطلب المرتبط"
+
+msgid "Created"
+msgstr "تاريخ الإنشاء"
+
+msgid "Receipt / Attachment"
+msgstr "الإيصال / المرفق"
+
+msgid "Uploaded payment receipt or reference document."
+msgstr "إيصال الدفع المرفوع أو مستند مرجعي."
+
+msgid "Open attachment"
+msgstr "فتح المرفق"
+
+msgid "Review"
+msgstr "المراجعة"
+
+msgid "Review decision and notes."
+msgstr "قرار المراجعة والملاحظات."
+
+msgid "Reviewed by"
+msgstr "تمت المراجعة بواسطة"
+
+msgid "Offline Bank — Manual Decision"
+msgstr "تحويل بنكي غير متصل — قرار يدوي"
+
+msgid "Approve or reject this offline bank payment."
+msgstr "وافق أو ارفض هذا الدفع البنكي غير المتصل."
+
+msgid "Attachment / Receipt"
+msgstr "المرفق / الإيصال"
+
+msgid "Choose receipt then click Approve."
+msgstr "اختر الإيصال ثم اضغط موافقة."
+
+msgid "Reject — review notes required"
+msgstr "رفض — ملاحظات المراجعة مطلوبة"
+
+msgid "Reason for rejection"
+msgstr "سبب الرفض"
+
+msgid "Reject"
+msgstr "رفض"
+
+msgid "Approve"
+msgstr "موافقة"
+
+msgid "Online Gateway"
+msgstr "بوابة دفع إلكترونية"
+
+msgid "Offline Bank Transfer"
+msgstr "تحويل بنكي غير متصل"
+
+msgid "Refund"
+msgstr "استرداد"
+
+msgid "Try different filters or add a template."
+msgstr "جرّب فلاتر مختلفة أو أضف قالباً."
+
+msgid "Template Preview"
+msgstr "معاينة القالب"
+
+msgid "Desktop View"
+msgstr "عرض سطح المكتب"
+
+msgid "Mobile View"
+msgstr "عرض الجوال"
+
+msgid "Previews may vary slightly depending on email clients."
+msgstr "قد تختلف المعاينات قليلاً حسب برامج البريد الإلكتروني."
+
+msgid "Preview unavailable"
+msgstr "المعاينة غير متاحة"
+
+msgid "We could not load this template preview right now. Please try again or open Edit Template to review content."
+msgstr "تعذر تحميل معاينة هذا القالب الآن. يرجى المحاولة مرة أخرى أو فتح تعديل القالب لمراجعة المحتوى."
+
+msgid "EN"
+msgstr "EN"
+
+msgid "AR"
+msgstr "AR"
+
+msgid "Gateway Type"
+msgstr "نوع البوابة"
+
+msgid "Provider Name"
+msgstr "اسم المزوّد"
+
+msgid "Host/URL"
+msgstr "المضيف/الرابط"
+
+msgid "Username/API Key"
+msgstr "اسم المستخدم/مفتاح API"
+
+msgid "Password/Secret"
+msgstr "كلمة المرور/السر"
+
+msgid "Credentials are sensitive and will not be displayed after saving."
+msgstr "بيانات الاعتماد حساسة ولن يتم عرضها بعد الحفظ."
+
+msgid "Test Recipient Phone"
+msgstr "هاتف المستلم للاختبار"
+
+msgid "Used only by the Test Connection button for SMS gateways."
+msgstr "يُستخدم فقط بواسطة زر اختبار الاتصال لبوابات الرسائل النصية."
+
+msgid "Testing..."
+msgstr "جارٍ الاختبار..."
+
+msgid "System error occurred while testing connection."
+msgstr "حدث خطأ في النظام أثناء اختبار الاتصال."
+
+msgid "Type Badge"
+msgstr "نوع البوابة"
+
+msgid "Provider"
+msgstr "المزوّد"
+
+msgid "Host"
+msgstr "المضيف"
+
+msgid "Port"
+msgstr "المنفذ"
+
+msgid "Sender ID"
+msgstr "معرّف المرسل"
+
+msgid "Encryption"
+msgstr "التشفير"
+
+msgid "SMS"
+msgstr "رسائل نصية"
+
+msgid "Add Gateway"
+msgstr "إضافة بوابة"
+
+msgid "No communication gateways found."
+msgstr "لا توجد بوابات اتصال."
+
+msgid "Add a gateway to send email or SMS."
+msgstr "أضف بوابة لإرسال البريد الإلكتروني أو الرسائل النصية."
+
+msgid "Remove this gateway?"
+msgstr "هل تريد إزالة هذه البوابة؟"
+
+msgid "Invoices"
+msgstr "الفواتير"
+
+msgid "Sort, search, filter, and manage subscription receipts."
+msgstr "فرز وابحث وصفِّ وأدر إيصالات الاشتراك."
+
+msgid "Invoice no. or customer..."
+msgstr "رقم الفاتورة أو العميل..."
+
+msgid "Currency: All"
+msgstr "العملة: الكل"
+
+msgid "Tenant: All"
+msgstr "المستأجر: الكل"
+
+msgid "Clear"
+msgstr "مسح"
+
+msgid "Invoice No."
+msgstr "رقم الفاتورة"
+
+msgid "Tax Amount"
+msgstr "مبلغ الضريبة"
+
+msgid "Issue Date"
+msgstr "تاريخ الإصدار"
+
+msgid "No invoices found"
+msgstr "لا توجد فواتير"
+
+msgid "No invoices match your current filters."
+msgstr "لا توجد فواتير مطابقة للفلاتر الحالية."
+
+msgid "Issued"
+msgstr "مصدرة"
+
+msgid "Void"
+msgstr "ملغاة"
+
+msgid "Transactions"
+msgstr "المعاملات"
+
+msgid "Manual Wallet Top-Up"
+msgstr "شحن المحفظة اليدوي"
+
+msgid "This will be marked completed immediately and added to the tenant wallet balance."
+msgstr "سيتم وسمها كمكتملة فوراً وإضافتها إلى رصيد محفظة المستأجر."
+
+msgid "Top-Up Details"
+msgstr "تفاصيل الشحن"
+
+msgid "Select tenant, currency, amount, and optional references."
+msgstr "اختر المستأجر والعملة والمبلغ والمراجع الاختيارية."
+
+msgid "Gateway ref (optional)"
+msgstr "مرجع البوابة (اختياري)"
+
+msgid "Choose File"
+msgstr "اختر ملف"
+
+msgid "No file chosen"
+msgstr "لم يتم اختيار ملف"
+
+msgid "Process Top-Up"
+msgstr "تنفيذ الشحن"
+
+msgid "Sort, search, filter, and manage payment transactions."
+msgstr "فرز وابحث وصفِّ وأدر معاملات الدفع."
+
+msgid "Add Wallet Top-Up"
+msgstr "إضافة شحن محفظة"
+
+msgid "Tenant or gateway ref..."
+msgstr "المستأجر أو مرجع البوابة..."
+
+msgid "All Types"
+msgstr "كل الأنواع"
+
+msgid "Base Equiv."
+msgstr "المعادل الأساسي"
+
+msgid "Gateway Ref"
+msgstr "مرجع البوابة"
+
+msgid "No transactions found"
+msgstr "لا توجد معاملات"
+
+msgid "No transactions match your current filters."
+msgstr "لا توجد معاملات مطابقة للفلاتر الحالية."
+
+msgid "Completed"
+msgstr "مكتمل"
+
+msgid "Order Payment"
+msgstr "دفع الطلب"
+
+msgid "Wallet Top-Up"
+msgstr "شحن المحفظة"
+
+msgid "Refund"
+msgstr "استرداد"
+
+msgid "Try adjusting search or status, or clear filters."
+msgstr "جرّب تعديل البحث أو الحالة، أو امسح عوامل التصفية."
+
+msgid "Try adjusting your search or filters."
+msgstr "جرّب تعديل البحث أو عوامل التصفية."
+
+msgid "Truck"
+msgstr "الشاحنة"
+
+msgid "Transfers"
+msgstr "تحويلات"
+
 msgid "Tue"
 msgstr "ثلاثاء"
+
+msgid "Unlimited"
+msgstr "غير محدود"
 
 msgid "Unassigned"
 msgstr "غير معين"
@@ -536,8 +1939,26 @@ msgstr "غير معين"
 msgid "Update"
 msgstr "تحديث"
 
+msgid "Update Account"
+msgstr "تحديث الحساب"
+
+msgid "Update Role"
+msgstr "تحديث الدور"
+
+msgid "Update Plan"
+msgstr "تحديث الباقة"
+
+msgid "Updated at"
+msgstr "تاريخ التحديث"
+
+msgid "Updated by"
+msgstr "حدّث بواسطة"
+
 msgid "User Count"
 msgstr "عدد المستخدمين"
+
+msgid "User"
+msgstr "المستخدم"
 
 msgid "User Management"
 msgstr "إدارة المستخدمين"
@@ -551,17 +1972,35 @@ msgstr "عرض"
 msgid "View Detail"
 msgstr "عرض التفاصيل"
 
+msgid "View details"
+msgstr "عرض التفاصيل"
+
 msgid "View Full Audit Log"
 msgstr "عرض سجل التدقيق الكامل"
 
+msgid "When off, new tenants cannot subscribe to this plan."
+msgstr "عند الإيقاف، لا يمكن للمستأجرين الجدد الاشتراك في هذه الباقة."
+
 msgid "Wed"
 msgstr "أربعاء"
+
+msgid "Website CMS"
+msgstr "إدارة محتوى الموقع"
+
+msgid "When off, the role is Inactive."
+msgstr "عند الإيقاف، يصبح الدور غير نشط."
 
 msgid "Welcome back"
 msgstr "مرحباً بعودتك"
 
 msgid "You are yet to receive notifications"
 msgstr "لم تصلك إشعارات بعد"
+
+msgid "© 2026 iRoad Technology. All rights reserved."
+msgstr "© 2026 iRoad Technology. جميع الحقوق محفوظة."
+
+msgid "2FA"
+msgstr "التحقق الثنائي"
 
 # Mobile API — Auth messages
 msgid "mobile.auth.token_expired"
@@ -823,3 +2262,930 @@ msgstr "لا يمكن أن يكون رقم جوال السائق فارغاً ع
 
 msgid "mobile.profile.field_too_long"
 msgstr "هذا الحقل يتجاوز الحد الأقصى للطول."
+
+msgid "Push Notifications"
+msgstr "الإشعارات الفورية"
+
+msgid "Add Push Notification"
+msgstr "إضافة إشعار فوري"
+
+msgid "All Trigger Modes"
+msgstr "كل أوضاع التشغيل"
+
+msgid "Manual"
+msgstr "يدوي"
+
+msgid "Trigger Mode Badge"
+msgstr "نوع التشغيل"
+
+msgid "Search name, audience, event..."
+msgstr "ابحث بالاسم أو الجمهور أو الحدث..."
+
+msgid "No push notifications found."
+msgstr "لم يتم العثور على إشعارات فورية."
+
+msgid "Internal name"
+msgstr "الاسم الداخلي"
+
+msgid "Trigger mode"
+msgstr "وضع التشغيل"
+
+msgid "English title"
+msgstr "العنوان بالإنجليزية"
+
+msgid "Arabic title"
+msgstr "العنوان بالعربية"
+
+msgid "English message"
+msgstr "الرسالة بالإنجليزية"
+
+msgid "Arabic message"
+msgstr "الرسالة بالعربية"
+
+msgid "Action link"
+msgstr "رابط الإجراء"
+
+msgid "Linked event"
+msgstr "الحدث المرتبط"
+
+msgid "Target audience"
+msgstr "الجمهور المستهدف"
+
+msgid "Specific target ID"
+msgstr "معرّف الهدف المحدد"
+
+msgid "Scheduled at"
+msgstr "مجدول في"
+
+msgid "Dispatch status"
+msgstr "حالة الإرسال"
+
+msgid "Manual Broadcast"
+msgstr "بث يدوي"
+
+msgid "Specific"
+msgstr "محدد"
+
+msgid "Linked event is required for System Event mode."
+msgstr "الحدث المرتبط مطلوب عند وضع حدث النظام."
+
+msgid "Target audience is required for Manual Broadcast mode."
+msgstr "الجمهور المستهدف مطلوب عند وضع البث اليدوي."
+
+msgid "Specific target ID is required when audience is Specific."
+msgstr "معرّف الهدف المحدد مطلوب عندما يكون الجمهور محددًا."
+
+msgid "Dispatch status \"Completed\" is system-managed and cannot be set manually."
+msgstr "حالة الإرسال \"مكتمل\" تُدار من النظام ولا يمكن تعيينها يدويًا."
+
+msgid "Add Banner"
+msgstr "إضافة لافتة"
+
+msgid "Search by title or message"
+msgstr "ابحث بالعنوان أو الرسالة"
+
+msgid "All Severities"
+msgstr "كل مستويات الشدة"
+
+msgid "Info"
+msgstr "معلومة"
+
+msgid "Warning"
+msgstr "تحذير"
+
+msgid "Critical"
+msgstr "حرج"
+
+msgid "Expired"
+msgstr "منتهي"
+
+msgid "No banners found."
+msgstr "لم يتم العثور على لافتات."
+
+msgid "Yes"
+msgstr "نعم"
+
+msgid "No"
+msgstr "لا"
+
+msgid "Title (EN)"
+msgstr "العنوان (EN)"
+
+msgid "Add Alert Route"
+msgstr "إضافة مسار تنبيه"
+
+msgid "Search by role or email"
+msgstr "ابحث حسب الدور أو البريد الإلكتروني"
+
+msgid "All Trigger Events"
+msgstr "كل أحداث التشغيل"
+
+msgid "No routes found."
+msgstr "لم يتم العثور على مسارات."
+
+msgid "Search recipient, trigger, client, error..."
+msgstr "ابحث بالمستلم أو المشغل أو العميل أو الخطأ..."
+
+msgid "All Channels"
+msgstr "كل القنوات"
+
+msgid "Push"
+msgstr "إشعار فوري"
+
+msgid "Sent"
+msgstr "تم الإرسال"
+
+msgid "No communication logs found."
+msgstr "لم يتم العثور على سجلات اتصال."
+
+msgid "Add Account"
+msgstr "إضافة حساب"
+
+msgid "Search by bank name or IBAN"
+msgstr "ابحث باسم البنك أو رقم الآيبان"
+
+msgid "All currencies"
+msgstr "كل العملات"
+
+msgid "Bank Name"
+msgstr "اسم البنك"
+
+msgid "Account Holder"
+msgstr "صاحب الحساب"
+
+msgid "IBAN (masked ****1234)"
+msgstr "الآيبان (مخفي ****1234)"
+
+msgid "Account No"
+msgstr "رقم الحساب"
+
+msgid "No bank accounts found"
+msgstr "لم يتم العثور على حسابات بنكية"
+
+msgid "No bank account records match your current filters."
+msgstr "لا توجد سجلات حسابات بنكية تطابق عوامل التصفية الحالية."
+
+msgid "Trigger event"
+msgstr "حدث التشغيل"
+
+msgid "Notify role"
+msgstr "دور الإشعار"
+
+msgid "Notify custom email"
+msgstr "البريد الإلكتروني المخصص للإشعار"
+
+msgid "At least one of Role or Custom Email must be provided."
+msgstr "يجب توفير أحد الخيارين على الأقل: الدور أو البريد الإلكتروني المخصص."
+
+msgid "Search by gateway name"
+msgstr "ابحث باسم البوابة"
+
+msgid "Gateway Name"
+msgstr "اسم البوابة"
+
+msgid "Environment badge"
+msgstr "شارة البيئة"
+
+msgid "Live"
+msgstr "حي"
+
+msgid "Test"
+msgstr "اختبار"
+
+msgid "Remove this gateway?"
+msgstr "هل تريد إزالة هذه البوابة؟"
+
+msgid "No gateways found"
+msgstr "لم يتم العثور على بوابات"
+
+msgid "No payment gateways records match your current filters."
+msgstr "لا توجد سجلات بوابات دفع تطابق عوامل التصفية الحالية."
+
+msgid "Key"
+msgstr "المفتاح"
+
+msgid "Value"
+msgstr "القيمة"
+
+msgid "e.g. public_key"
+msgstr "مثال: public_key"
+
+msgid "Enter value"
+msgstr "أدخل القيمة"
+
+msgid "Existing credentials will stay unchanged unless you edit rows."
+msgstr "ستبقى بيانات الاعتماد الحالية كما هي ما لم تقم بتعديل الصفوف."
+
+msgid "IBAN stored uppercase, spaces removed."
+msgstr "يتم حفظ الآيبان بأحرف كبيرة مع إزالة المسافات."
+
+msgid "Bank Details"
+msgstr "تفاصيل البنك"
+
+msgid "Enter the bank account information used for offline payments."
+msgstr "أدخل معلومات الحساب البنكي المستخدمة للمدفوعات غير المتصلة."
+
+msgid "Account Holder Name"
+msgstr "اسم صاحب الحساب"
+
+msgid "IBAN Number"
+msgstr "رقم الآيبان"
+
+msgid "Account Number"
+msgstr "رقم الحساب"
+
+msgid "SWIFT Code"
+msgstr "رمز سويفت"
+
+msgid "Cross-currency payments"
+msgstr "مدفوعات متعددة العملات"
+
+msgid "Allow cross-currency payments"
+msgstr "السماح بالمدفوعات متعددة العملات"
+
+msgid "When enabled, this account can receive transfers for invoices in other currencies using internal FX conversion."
+msgstr "عند التفعيل، يمكن لهذا الحساب استقبال تحويلات لفواتير بعملات أخرى باستخدام تحويل داخلي للعملات."
+
+msgid "Active account"
+msgstr "حساب نشط"
+
+msgid "Search method or gateway/bank"
+msgstr "ابحث بالطريقة أو البوابة/البنك"
+
+msgid "Online Gateway"
+msgstr "بوابة إلكترونية"
+
+msgid "Offline Bank"
+msgstr "بنك غير متصل"
+
+msgid "Display Order"
+msgstr "ترتيب العرض"
+
+msgid "Method Name EN"
+msgstr "اسم الطريقة EN"
+
+msgid "Type badge"
+msgstr "شارة النوع"
+
+msgid "Currencies badges"
+msgstr "شارات العملات"
+
+msgid "Gateway/Bank"
+msgstr "البوابة/البنك"
+
+msgid "Online"
+msgstr "متصل"
+
+msgid "Offline"
+msgstr "غير متصل"
+
+msgid "No payment methods found"
+msgstr "لم يتم العثور على طرق دفع"
+
+msgid "No payment method records match your current filters."
+msgstr "لا توجد سجلات طرق دفع تطابق عوامل التصفية الحالية."
+
+msgid "Method name (EN)"
+msgstr "اسم الطريقة (EN)"
+
+msgid "Method name (AR)"
+msgstr "اسم الطريقة (AR)"
+
+msgid "Method type"
+msgstr "نوع الطريقة"
+
+msgid "Supported currencies"
+msgstr "العملات المدعومة"
+
+msgid "Display order"
+msgstr "ترتيب العرض"
+
+msgid "Gateway name"
+msgstr "اسم البوابة"
+
+msgid "Credentials payload"
+msgstr "بيانات الاعتماد"
+
+msgid "Enter JSON object e.g. "
+msgstr "أدخل كائن JSON مثل "
+
+msgid "Credentials payload is required."
+msgstr "بيانات الاعتماد مطلوبة."
+
+msgid "Credentials must be a JSON object (e.g. {\"key\": \"value\"}), not an array."
+msgstr "يجب أن تكون بيانات الاعتماد كائن JSON (مثل {\"key\": \"value\"}) وليست مصفوفة."
+
+msgid "Credentials object cannot be empty."
+msgstr "لا يمكن أن يكون كائن بيانات الاعتماد فارغًا."
+
+msgid "A payment gateway must be selected for Online Gateway methods."
+msgstr "يجب اختيار بوابة دفع لطرق البوابة الإلكترونية."
+
+msgid "Dedicated bank account must be empty for Online Gateway methods."
+msgstr "يجب أن يكون الحساب البنكي المخصص فارغًا لطرق البوابة الإلكترونية."
+
+msgid "Payment gateway must be empty for Offline Bank methods."
+msgstr "يجب أن تكون بوابة الدفع فارغة لطرق البنك غير المتصل."
+
+msgid "At least one supported currency is required."
+msgstr "مطلوب عملة مدعومة واحدة على الأقل."
+
+msgid "Supported currencies must be a JSON array e.g. [\"SAR\", \"USD\"]"
+msgstr "يجب أن تكون العملات المدعومة مصفوفة JSON مثل [\"SAR\", \"USD\"]"
+
+msgid "At least one currency must be in the list."
+msgstr "يجب أن تحتوي القائمة على عملة واحدة على الأقل."
+
+msgid "Currency '%(code)s' is not active or does not exist."
+msgstr "العملة '%(code)s' غير نشطة أو غير موجودة."
+
+msgid "IBAN must be between 15 and 34 characters."
+msgstr "يجب أن يكون الآيبان بين 15 و34 حرفًا."
+
+msgid "IBAN must start with a 2-letter country code (e.g. SA, AE, GB)."
+msgstr "يجب أن يبدأ الآيبان برمز دولة مكوّن من حرفين (مثل SA أو AE أو GB)."
+
+msgid "IBAN characters 3-4 must be digits."
+msgstr "يجب أن يكون الحرفان 3-4 من الآيبان أرقامًا."
+
+msgid "IBAN must contain only letters and numbers."
+msgstr "يجب أن يحتوي الآيبان على أحرف وأرقام فقط."
+
+msgid "Account number must contain digits only."
+msgstr "يجب أن يحتوي رقم الحساب على أرقام فقط."
+
+msgid "SWIFT code must be 8 or 11 characters."
+msgstr "يجب أن يكون رمز سويفت 8 أو 11 حرفًا."
+
+msgid "SWIFT code must be alphanumeric only."
+msgstr "يجب أن يحتوي رمز سويفت على أحرف وأرقام فقط."
+
+msgid "Sort, search, filter, and manage country records."
+msgstr "رتّب وابحث وصفِّ وأدر سجلات الدول."
+
+msgid "Sort, search, filter, and manage currency records."
+msgstr "رتّب وابحث وصفِّ وأدر سجلات العملات."
+
+msgid "Country code"
+msgstr "رمز الدولة"
+
+msgid "English name"
+msgstr "الاسم بالإنجليزية"
+
+msgid "Arabic name"
+msgstr "الاسم بالعربية"
+
+msgid "Country code cannot be changed once saved."
+msgstr "لا يمكن تغيير رمز الدولة بعد الحفظ."
+
+msgid "Country code must contain letters only."
+msgstr "يجب أن يحتوي رمز الدولة على أحرف فقط."
+
+msgid "Currency code"
+msgstr "رمز العملة"
+
+msgid "Currency symbol"
+msgstr "رمز العملة"
+
+msgid "Decimal places"
+msgstr "المنازل العشرية"
+
+msgid "Currency code cannot be changed once saved."
+msgstr "لا يمكن تغيير رمز العملة بعد الحفظ."
+
+msgid "Currency code must contain letters only."
+msgstr "يجب أن يحتوي رمز العملة على أحرف فقط."
+
+msgid "Decimal places must be 0, 1, 2, or 3."
+msgstr "يجب أن تكون المنازل العشرية 0 أو 1 أو 2 أو 3."
+
+msgid "Website CMS"
+msgstr "إدارة محتوى الموقع"
+
+msgid "Home Page"
+msgstr "الصفحة الرئيسية"
+
+msgid "Home Content"
+msgstr "محتوى الصفحة الرئيسية"
+
+msgid "Service Cards"
+msgstr "بطاقات الخدمات"
+
+msgid "Pricing Tiers"
+msgstr "شرائح التسعير"
+
+msgid "Pricing Benefits"
+msgstr "مزايا التسعير"
+
+msgid "Testimonials"
+msgstr "آراء العملاء"
+
+msgid "Map Locations"
+msgstr "مواقع الخريطة"
+
+msgid "About Page"
+msgstr "صفحة من نحن"
+
+msgid "About Content"
+msgstr "محتوى من نحن"
+
+msgid "Approach Pillars"
+msgstr "مرتكزات النهج"
+
+msgid "How It Works"
+msgstr "كيف يعمل"
+
+msgid "About FAQs"
+msgstr "أسئلة من نحن"
+
+msgid "Pricing Page"
+msgstr "صفحة التسعير"
+
+msgid "Pricing Content"
+msgstr "محتوى التسعير"
+
+msgid "Interactive Steps"
+msgstr "الخطوات التفاعلية"
+
+msgid "Pricing FAQs"
+msgstr "أسئلة التسعير"
+
+msgid "Contact Page"
+msgstr "صفحة التواصل"
+
+msgid "Contact Content"
+msgstr "محتوى التواصل"
+
+msgid "Demo Requests"
+msgstr "طلبات العرض التجريبي"
+
+msgid "Legal Pages"
+msgstr "الصفحات القانونية"
+
+msgid "Mobile About Us"
+msgstr "من نحن - الجوال"
+
+msgid "System Configurations & Tax"
+msgstr "إعدادات النظام والضرائب"
+
+msgid "Add Tax Code"
+msgstr "إضافة كود ضريبي"
+
+msgid "Toggle Status"
+msgstr "تبديل الحالة"
+
+msgid "Remove this tax code?"
+msgstr "هل تريد إزالة هذا الكود الضريبي؟"
+
+msgid "No tax codes found"
+msgstr "لم يتم العثور على أكواد ضريبية"
+
+msgid "No tax code records match your current filters."
+msgstr "لا توجد سجلات أكواد ضريبية تطابق عوامل التصفية الحالية."
+
+msgid "Tax code"
+msgstr "الكود الضريبي"
+
+msgid "Rate percentage (%)"
+msgstr "نسبة الضريبة (%)"
+
+msgid "Applicable country"
+msgstr "الدولة المطبقة"
+
+msgid "A tax code cannot be both country default and international default at the same time."
+msgstr "لا يمكن أن يكون الكود الضريبي افتراضيًا للدولة وافتراضيًا دوليًا في الوقت نفسه."
+
+msgid "Country must be selected when setting as country default."
+msgstr "يجب اختيار دولة عند تعيينه كافتراضي للدولة."
+
+msgid "A default tax code already exists for this country. Deactivate it first."
+msgstr "يوجد كود ضريبي افتراضي بالفعل لهذه الدولة. قم بتعطيله أولاً."
+
+msgid "An international default tax code already exists. Deactivate it first."
+msgstr "يوجد كود ضريبي افتراضي دولي بالفعل. قم بتعطيله أولاً."
+
+msgid "Prices include tax"
+msgstr "الأسعار تشمل الضريبة"
+
+msgid "Location verification"
+msgstr "التحقق من الموقع"
+
+msgid "Configure tax inclusion and geo-verification behavior"
+msgstr "إعداد سلوك تضمين الضريبة والتحقق الجغرافي"
+
+msgid "What each option means"
+msgstr "ماذا يعني كل خيار"
+
+msgid "Profile Only"
+msgstr "الملف الشخصي فقط"
+
+msgid "Use the tenant/customer profile country for tax determination."
+msgstr "استخدم دولة ملف المستأجر/العميل لتحديد الضريبة."
+
+msgid "Audit Only"
+msgstr "التدقيق فقط"
+
+msgid "Use audit/location verification data for tax determination."
+msgstr "استخدم بيانات التدقيق/التحقق من الموقع لتحديد الضريبة."
+
+msgid "Enforce Profile Match"
+msgstr "فرض تطابق الملف"
+
+msgid "Require profile and verification data to match before applying country-specific tax."
+msgstr "يتطلب تطابق بيانات الملف والتحقق قبل تطبيق ضريبة خاصة بالدولة."
+
+msgid "Last updated by:"
+msgstr "آخر تحديث بواسطة:"
+
+msgid "Unknown"
+msgstr "غير معروف"
+
+msgid "Control platform-wide billing and date behavior"
+msgstr "التحكم في الفوترة وسلوك التاريخ على مستوى المنصة"
+
+msgid "These settings govern billing cycles and subscription expiry calculations."
+msgstr "تتحكم هذه الإعدادات في دورات الفوترة وحسابات انتهاء الاشتراك."
+
+msgid "Rule ID"
+msgstr "معرّف القاعدة"
+
+msgid "System timezone"
+msgstr "المنطقة الزمنية للنظام"
+
+msgid "Default date format"
+msgstr "تنسيق التاريخ الافتراضي"
+
+msgid "Grace period days"
+msgstr "أيام فترة السماح"
+
+msgid "Standard billing cycle"
+msgstr "دورة الفوترة القياسية"
+
+msgid "Updated By"
+msgstr "تم التحديث بواسطة"
+
+msgid "Updated At"
+msgstr "تاريخ التحديث"
+
+msgid "Not updated yet"
+msgstr "لم يتم التحديث بعد"
+
+msgid "Invalid timezone. Use format like 'Asia/Riyadh' or 'UTC'."
+msgstr "منطقة زمنية غير صالحة. استخدم تنسيقًا مثل 'Asia/Riyadh' أو 'UTC'."
+
+msgid "Billing cycle must be at least 1 day."
+msgstr "يجب أن تكون دورة الفوترة يومًا واحدًا على الأقل."
+
+msgid "Grace period cannot be negative."
+msgstr "لا يمكن أن تكون فترة السماح سالبة."
+
+msgid "Set the accounting root currency for the platform"
+msgstr "تحديد العملة المحاسبية الأساسية للمنصة"
+
+msgid "This is the accounting root currency for all financial reports."
+msgstr "هذه هي العملة المحاسبية الأساسية لجميع التقارير المالية."
+
+msgid "Once financial transactions are recorded, this cannot be changed."
+msgstr "بمجرد تسجيل المعاملات المالية، لا يمكن تغيير ذلك."
+
+msgid "Current base currency:"
+msgstr "العملة الأساسية الحالية:"
+
+msgid "Not configured"
+msgstr "غير مهيأ"
+
+msgid "Base currency"
+msgstr "العملة الأساسية"
+
+msgid "Search by code or name..."
+msgstr "ابحث حسب الرمز أو الاسم..."
+
+msgid "Currency Code"
+msgstr "رمز العملة"
+
+msgid "Name"
+msgstr "الاسم"
+
+msgid "Rate"
+msgstr "السعر"
+
+msgid "Last Updated"
+msgstr "آخر تحديث"
+
+msgid "Toggle Active"
+msgstr "تبديل التفعيل"
+
+msgid "No exchange rates found"
+msgstr "لم يتم العثور على أسعار صرف"
+
+msgid "No exchange-rate records are available for the selected filters."
+msgstr "لا توجد سجلات أسعار صرف متاحة لعوامل التصفية المحددة."
+
+msgid "Currency field is disabled while editing an existing rate."
+msgstr "حقل العملة معطّل أثناء تعديل سعر موجود."
+
+msgid "Rate is relative to base currency"
+msgstr "السعر مرتبط بالعملة الأساسية"
+
+msgid "Reason for Change (optional)"
+msgstr "سبب التغيير (اختياري)"
+
+msgid "e.g. Update due to market movement"
+msgstr "مثال: تحديث بسبب حركة السوق"
+
+msgid "Exchange rate"
+msgstr "سعر الصرف"
+
+msgid "Exchange rate must be greater than 0."
+msgstr "يجب أن يكون سعر الصرف أكبر من 0."
+
+msgid "Read-only history of exchange-rate changes"
+msgstr "سجل للقراءة فقط لتغييرات أسعار الصرف"
+
+msgid "Back to Exchange Rates"
+msgstr "العودة إلى أسعار الصرف"
+
+msgid "Old Rate"
+msgstr "السعر السابق"
+
+msgid "New Rate"
+msgstr "السعر الجديد"
+
+msgid "Change±"
+msgstr "التغير±"
+
+msgid "Notes"
+msgstr "ملاحظات"
+
+msgid "Changed By"
+msgstr "تم التغيير بواسطة"
+
+msgid "Changed At"
+msgstr "تاريخ التغيير"
+
+msgid "No FX change log entries found"
+msgstr "لم يتم العثور على إدخالات في سجل تغييرات سعر الصرف"
+
+msgid "No entries match your current filters."
+msgstr "لا توجد إدخالات تطابق عوامل التصفية الحالية."
+
+msgid "Home Page CMS"
+msgstr "إدارة الصفحة الرئيسية"
+
+msgid "SEO & Meta"
+msgstr "السيو والبيانات الوصفية"
+
+msgid "Header"
+msgstr "الرأس"
+
+msgid "Hero"
+msgstr "البانر الرئيسي"
+
+msgid "Ticker"
+msgstr "الشريط المتحرك"
+
+msgid "About"
+msgstr "حول"
+
+msgid "Services Section"
+msgstr "قسم الخدمات"
+
+msgid "Why Choose"
+msgstr "لماذا تختارنا"
+
+msgid "Features"
+msgstr "المزايا"
+
+msgid "Business / Map"
+msgstr "الأعمال / الخريطة"
+
+msgid "Edit bilingual home page content."
+msgstr "تعديل محتوى الصفحة الرئيسية باللغتين."
+
+msgid "Please correct the errors below."
+msgstr "يرجى تصحيح الأخطاء أدناه."
+
+msgid "Feature block A"
+msgstr "كتلة الميزة A"
+
+msgid "Feature block B"
+msgstr "كتلة الميزة B"
+
+msgid "Feature block C"
+msgstr "كتلة الميزة C"
+
+msgid "Feature block D"
+msgstr "كتلة الميزة D"
+
+msgid "Save all changes"
+msgstr "حفظ جميع التغييرات"
+
+msgid "Service Cards"
+msgstr "بطاقات الخدمات"
+
+msgid "Add Service Card"
+msgstr "إضافة بطاقة خدمة"
+
+msgid "Edit Service Card"
+msgstr "تعديل بطاقة خدمة"
+
+msgid "Pricing Tiers"
+msgstr "شرائح التسعير"
+
+msgid "Add Pricing Tier"
+msgstr "إضافة شريحة تسعير"
+
+msgid "Edit Pricing Tier"
+msgstr "تعديل شريحة تسعير"
+
+msgid "Pricing Benefits"
+msgstr "مزايا التسعير"
+
+msgid "Add Pricing Benefit"
+msgstr "إضافة ميزة تسعير"
+
+msgid "Edit Pricing Benefit"
+msgstr "تعديل ميزة تسعير"
+
+msgid "Manage service cards shown on the home page."
+msgstr "إدارة بطاقات الخدمات المعروضة في الصفحة الرئيسية."
+
+msgid "Manage pricing tiers for the home page."
+msgstr "إدارة شرائح التسعير في الصفحة الرئيسية."
+
+msgid "Bullets under pricing tiers on home and pricing pages."
+msgstr "النقاط تحت شرائح التسعير في صفحات الرئيسية والتسعير."
+
+msgid "No service cards match your filters."
+msgstr "لا توجد بطاقات خدمة تطابق عوامل التصفية."
+
+msgid "No pricing tiers match your filters."
+msgstr "لا توجد شرائح تسعير تطابق عوامل التصفية."
+
+msgid "No pricing benefits match your filters."
+msgstr "لا توجد مزايا تسعير تطابق عوامل التصفية."
+
+msgid "Search by title or summary"
+msgstr "ابحث بالعنوان أو الملخص"
+
+msgid "Search by name, summary, or price"
+msgstr "ابحث بالاسم أو الملخص أو السعر"
+
+msgid "Search by text (EN or AR)"
+msgstr "ابحث بالنص (EN أو AR)"
+
+msgid "Order"
+msgstr "الترتيب"
+
+msgid "Title EN"
+msgstr "العنوان EN"
+
+msgid "Title AR"
+msgstr "العنوان AR"
+
+msgid "Name EN"
+msgstr "الاسم EN"
+
+msgid "Name AR"
+msgstr "الاسم AR"
+
+msgid "Text EN"
+msgstr "النص EN"
+
+msgid "Text AR"
+msgstr "النص AR"
+
+msgid "Price Display EN"
+msgstr "عرض السعر EN"
+
+msgid "Price Display AR"
+msgstr "عرض السعر AR"
+
+msgid "Bullet 1 EN"
+msgstr "النقطة 1 EN"
+
+msgid "Bullet 1 AR"
+msgstr "النقطة 1 AR"
+
+msgid "Bullet 2 EN"
+msgstr "النقطة 2 EN"
+
+msgid "Bullet 2 AR"
+msgstr "النقطة 2 AR"
+
+msgid "Bullet 3 EN"
+msgstr "النقطة 3 EN"
+
+msgid "Bullet 3 AR"
+msgstr "النقطة 3 AR"
+
+msgid "Bullet 4 EN"
+msgstr "النقطة 4 EN"
+
+msgid "Bullet 4 AR"
+msgstr "النقطة 4 AR"
+
+msgid "Detail URL"
+msgstr "رابط التفاصيل"
+
+msgid "CTA Label EN"
+msgstr "نص زر الدعوة EN"
+
+msgid "CTA Label AR"
+msgstr "نص زر الدعوة AR"
+
+msgid "CTA URL"
+msgstr "رابط زر الدعوة"
+
+msgid "Is Featured"
+msgstr "مميز"
+
+msgid "Text En"
+msgstr "النص En"
+
+msgid "Text Ar"
+msgstr "النص Ar"
+
+msgid "Pricing benefit created."
+msgstr "تم إنشاء ميزة التسعير."
+
+msgid "Pricing benefit updated."
+msgstr "تم تحديث ميزة التسعير."
+
+msgid "Pricing benefit deleted."
+msgstr "تم حذف ميزة التسعير."
+
+msgid "Pricing tier created."
+msgstr "تم إنشاء شريحة التسعير."
+
+msgid "Pricing tier updated."
+msgstr "تم تحديث شريحة التسعير."
+
+msgid "Service card created."
+msgstr "تم إنشاء بطاقة الخدمة."
+
+msgid "Service card updated."
+msgstr "تم تحديث بطاقة الخدمة."
+
+msgid "Home page content updated successfully."
+msgstr "تم تحديث محتوى الصفحة الرئيسية بنجاح."
+
+msgid "Manage home page testimonials."
+msgstr "إدارة شهادات الصفحة الرئيسية."
+
+msgid "Search by author, role, or quote"
+msgstr "ابحث باسم الكاتب أو الدور أو الاقتباس"
+
+msgid "No testimonials match your filters."
+msgstr "لا توجد شهادات تطابق عوامل التصفية."
+
+msgid "Manage map location cards on the home page."
+msgstr "إدارة بطاقات مواقع الخريطة في الصفحة الرئيسية."
+
+msgid "Search by title or subtitle"
+msgstr "ابحث بالعنوان أو العنوان الفرعي"
+
+msgid "No map locations match your filters."
+msgstr "لا توجد مواقع خريطة تطابق عوامل التصفية."
+
+msgid "No Data Found"
+msgstr "لا توجد بيانات"
+
+msgid "Author EN"
+msgstr "المؤلف EN"
+
+msgid "Author AR"
+msgstr "المؤلف AR"
+
+msgid "Subtitle EN"
+msgstr "العنوان الفرعي EN"
+
+msgid "Subtitle AR"
+msgstr "العنوان الفرعي AR"
+
+msgid "Quote EN"
+msgstr "الاقتباس EN"
+
+msgid "Quote AR"
+msgstr "الاقتباس AR"
+
+msgid "Author Name EN"
+msgstr "اسم المؤلف EN"
+
+msgid "Author Name AR"
+msgstr "اسم المؤلف AR"
+
+msgid "Author Role EN"
+msgstr "دور المؤلف EN"
+
+msgid "Author Role AR"
+msgstr "دور المؤلف AR"
+
+msgid "Author Avatar"
+msgstr "صورة المؤلف"
+
+msgid "Company Logo"
+msgstr "شعار الشركة"
+
+msgid "Card Image"
+msgstr "صورة البطاقة"

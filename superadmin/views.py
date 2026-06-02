@@ -99,6 +99,7 @@ def _read_tenant_user_password_reset_token(raw_token):
 
 
 from .billing_helpers import (
+    apply_due_scheduled_downgrades,
     calculate_addon_prorata,
     calculate_promo_discount,
     calculate_pro_rata_credit,
@@ -1825,6 +1826,10 @@ class DashboardView(LoginRequiredMixin, View):
         ).annotate(
             staff_count=Count('admin_users')
         ).values('role_name_en', 'role_name_ar', 'staff_count')
+        role_distribution_list = list(role_distribution)
+        role_labels_en = [item.get('role_name_en') or '' for item in role_distribution_list]
+        role_labels_ar = [item.get('role_name_ar') or item.get('role_name_en') or '' for item in role_distribution_list]
+        role_counts = [int(item.get('staff_count') or 0) for item in role_distribution_list]
 
         stale_cutoff = now - timedelta(days=30)
         stale_accounts = AdminUser.objects.filter(
@@ -1959,7 +1964,10 @@ class DashboardView(LoginRequiredMixin, View):
             'failed_transactions': failed_transactions,
             'suspended_tenants': suspended_tenants,
             # Staff
-            'role_distribution': list(role_distribution),
+            'role_distribution': role_distribution_list,
+            'role_labels_en': role_labels_en,
+            'role_labels_ar': role_labels_ar,
+            'role_counts': role_counts,
             'stale_accounts': stale_accounts,
             'suspended_admins': suspended_admins,
             'total_staff': total_staff,
@@ -7281,7 +7289,7 @@ class EventMappingListView(LoginRequiredMixin, View):
                     'row_id': base_id,
                     'row_type': 'mapped',
                     'mapping': mapping,
-                    'event_label': mapping.get_system_event_display(),
+                    'event_label': _(mapping.get_system_event_display()),
                     'primary_channel_value': mapping.primary_channel or '',
                     'primary_template_name': (
                         mapping.primary_template.template_name
@@ -7298,8 +7306,8 @@ class EventMappingListView(LoginRequiredMixin, View):
                 all_rows.append({
                     'row_id': base_id,
                     'row_type': 'unmapped',
-                    'event': {'code': code, 'label': label},
-                    'event_label': label,
+                    'event': {'code': code, 'label': _(label)},
+                    'event_label': _(label),
                     'primary_channel_value': '',
                     'primary_template_name': '',
                     'fallback_channel_value': '',
@@ -8019,6 +8027,11 @@ class TenantListView(LoginRequiredMixin, View):
     template_name = 'crm/tenants/tenant_list.html'
 
     def get(self, request):
+        try:
+            apply_due_scheduled_downgrades(as_of=date.today())
+        except Exception:
+            logger.exception('Failed applying due scheduled downgrades before tenant list.')
+
         # Annotate with a stable rank based on registration date
         qs = TenantProfile.objects.filter(is_deleted=False).annotate(
             default_rank=Window(

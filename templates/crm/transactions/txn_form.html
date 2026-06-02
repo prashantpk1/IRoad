@@ -45,7 +45,7 @@
           <div class="col-12 col-md-6">
             <label class="form-label">{% translate "Tenant" %}</label>
             <select name="tenant" class="form-select" required>
-              <option value="">---------</option>
+              <option value="">{% translate "Select" %}</option>
               {% for t in tenants %}
                 <option value="{{ t.tenant_id }}">{{ t.company_name }}</option>
               {% endfor %}
@@ -69,7 +69,13 @@
           </div>
           <div class="col-12 col-md-6">
             <label class="form-label">{% translate "Attachment" %}</label>
-            <input type="file" name="attachment" class="form-control">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+              <input type="file" name="attachment" id="id_attachment" class="d-none">
+              <label for="id_attachment" class="eal-btn eal-btn-outline mb-0">
+                {% translate "Choose File" %}
+              </label>
+              <span class="small text-muted" id="attachment-file-name">{% translate "No file chosen" %}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -93,4 +99,16 @@
     </div>
   </div>
 </form>
+<script>
+  (function () {
+    const fileInput = document.getElementById('id_attachment');
+    const fileName = document.getElementById('attachment-file-name');
+    if (!fileInput || !fileName) return;
+    const noFileText = "{% filter escapejs %}{% translate 'No file chosen' %}{% endfilter %}";
+    fileInput.addEventListener('change', function () {
+      const selected = fileInput.files && fileInput.files.length ? fileInput.files[0].name : '';
+      fileName.textContent = selected || noFileText;
+    });
+  })();
+</script>
 {% endblock %}

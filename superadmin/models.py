@@ -33,6 +33,7 @@ class Role(models.Model):
     role_name_en = models.CharField(max_length=50, unique=True)
     role_name_ar = models.CharField(max_length=50, unique=True)
     description = models.CharField(max_length=255, blank=True, null=True)
+    description_ar = models.CharField(max_length=255, blank=True, default='')
     is_system_default = models.BooleanField(default=False)
     status = models.CharField(
         max_length=20, choices=STATUS_CHOICES, default='Active'
@@ -54,6 +55,13 @@ class Role(models.Model):
 
     def __str__(self):
         return self.role_name_en
+
+    def get_localized_description(self):
+        from django.utils import translation
+
+        if translation.get_language() == 'ar' and self.description_ar:
+            return self.description_ar
+        return self.description or ''
 
     class Meta:
         verbose_name = 'Role'

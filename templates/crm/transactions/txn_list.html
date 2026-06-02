@@ -218,7 +218,7 @@
               {% endif %}
             </a>
           </th>
-          <th>{% translate "ACTIONS" %}</th>
+          <th>{% translate "Actions" %}</th>
         </tr>
       </thead>
       <tbody>
@@ -226,17 +226,31 @@
           <tr>
             <td>{{ t.list_rank }}</td>
             <td><span class="fw-bold">{{ t.tenant.company_name }}</span></td>
-            <td><span class="value-badge">{{ t.get_transaction_type_display }}</span></td>
+            <td>
+              <span class="value-badge">
+                {% if t.transaction_type == 'Order_Payment' %}
+                  {% translate "Order Payment" %}
+                {% elif t.transaction_type == 'Wallet_TopUp' %}
+                  {% translate "Wallet Top-Up" %}
+                {% elif t.transaction_type == 'Refund' %}
+                  {% translate "Refund" %}
+                {% else %}
+                  {{ t.get_transaction_type_display }}
+                {% endif %}
+              </span>
+            </td>
             <td><span class="text-muted small fw-bold">{{ t.currency_id }}</span></td>
             <td><span class="fw-semibold text-primary">{{ t.amount|floatformat:2 }}</span></td>
             <td class="small">{{ t.base_currency_equivalent_amount|floatformat:2 }}</td>
             <td>
               {% if t.status == 'Completed' %}
-                <span class="status-badge active">{{ t.get_status_display }}</span>
+                <span class="status-badge active">{% translate "Completed" %}</span>
               {% elif t.status == 'Pending' %}
-                <span class="status-badge warning">{{ t.get_status_display }}</span>
-              {% elif t.status == 'Rejected' or t.status == 'Failed' %}
-                <span class="status-badge danger">{{ t.get_status_display }}</span>
+                <span class="status-badge warning">{% translate "Pending" %}</span>
+              {% elif t.status == 'Rejected' %}
+                <span class="status-badge danger">{% translate "Rejected" %}</span>
+              {% elif t.status == 'Failed' %}
+                <span class="status-badge danger">{% translate "Failed" %}</span>
               {% else %}
                 <span class="status-badge neutral">{{ t.get_status_display }}</span>
               {% endif %}

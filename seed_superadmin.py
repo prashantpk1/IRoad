@@ -27,6 +27,7 @@ def seed_roles():
             "role_name_en": "Super Admin",
             "role_name_ar": "مدير النظام",
             "description": "Full access to all modules and configurations",
+            "description_ar": "صلاحية كاملة لجميع الوحدات والإعدادات",
             "is_system_default": True,
             "status": "Active",
         },
@@ -34,6 +35,7 @@ def seed_roles():
             "role_name_en": "Sales",
             "role_name_ar": "المبيعات",
             "description": "Manages tenant onboarding and subscription orders",
+            "description_ar": "يدير إعداد المستأجرين وطلبات الاشتراك",
             "is_system_default": True,
             "status": "Active",
         },
@@ -41,6 +43,7 @@ def seed_roles():
             "role_name_en": "Support",
             "role_name_ar": "الدعم الفني",
             "description": "Handles support tickets and tenant communication",
+            "description_ar": "يتولى تذاكر الدعم والتواصل مع المستأجرين",
             "is_system_default": True,
             "status": "Active",
         },
@@ -54,7 +57,17 @@ def seed_roles():
         if created:
             print(f"  ✅ Role created: {role.role_name_en}")
         else:
-            print(f"  ⏭️  Role already exists: {role.role_name_en}")
+            updated_fields = []
+            for field in ('role_name_ar', 'description', 'description_ar'):
+                new_value = role_data.get(field)
+                if new_value and getattr(role, field) != new_value:
+                    setattr(role, field, new_value)
+                    updated_fields.append(field)
+            if updated_fields:
+                role.save(update_fields=updated_fields)
+                print(f"  🔄 Role updated ({', '.join(updated_fields)}): {role.role_name_en}")
+            else:
+                print(f"  ⏭️  Role already exists: {role.role_name_en}")
 
 
 def seed_root_admin():
@@ -67,7 +80,7 @@ def seed_root_admin():
 
     try:
         admin, created = AdminUser.objects.get_or_create(
-            email="admin@iroad.com",
+            email="iroadadmin@yopmail.com",
             defaults={
                 "first_name": "Root",
                 "last_name": "Admin",

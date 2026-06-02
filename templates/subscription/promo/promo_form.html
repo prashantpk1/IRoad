@@ -21,11 +21,11 @@
   {% if is_edit and promo and promo.updated_at %}
   <div class="edit-info-bar">
     <i class="bi bi-clock-history"></i>
-    Last updated
+    {% translate "Last updated" %}
     {% if promo.updated_by %}
-      by <strong>{{ promo.updated_by.first_name }} {{ promo.updated_by.last_name }}</strong>
+      {% translate "by" %} <strong>{{ promo.updated_by.first_name }} {{ promo.updated_by.last_name }}</strong>
     {% endif %}
-    at <strong>{{ promo.updated_at|date:"d M Y, H:i" }}</strong>
+    {% translate "at" %} <strong>{{ promo.updated_at|date:"d M Y, H:i" }}</strong>
   </div>
   {% endif %}
 
@@ -36,7 +36,9 @@
       </div>
       <div class="form-card-header-text">
         <h3 class="form-card-title">{% translate "Promo Configuration" %}</h3>
-        <p class="form-card-desc">{% translate "Set discount rules, validity window, and applicable plans." %}</p>
+        <p class="form-card-desc">
+          {% translate "Set discount rules, validity window, and applicable plans." %}
+        </p>
       </div>
     </div>
     <div class="form-card-body">
@@ -91,23 +93,25 @@
           {% endfor %}
           <div class="col-12 col-md-6 col-lg-3 d-flex flex-column justify-content-end">
             <div class="form-label d-block mb-0">{% translate "Status" %}</div>
-            <div class="form-check form-switch mt-2">
-              {{ form.is_active }}
-              <label class="form-check-label ms-1" for="id_promo_is_active">
+            <div class="form-check form-switch mt-2 ps-0">
+              <label class="form-check-label" for="id_promo_is_active">
                 <span class="fw-medium">{% translate "Active" %}</span>
                 <span class="text-muted small d-block">{% translate "If off, the code cannot be used regardless of dates." %}</span>
               </label>
+              {{ form.is_active }}
             </div>
           </div>
         </div>
 
         <h3 class="form-card-title mb-3 mt-3">{% translate "Applicable Plans" %}</h3>
         <div class="field-group">
-          <p class="text-muted small mb-3">{% translate "Select one or more plans this promo code applies to. Leave empty to apply to ALL plans." %}</p>
+          <p class="text-muted small mb-3">
+            {% translate "Select one or more plans this promo code applies to. Leave empty to apply to ALL plans." %}
+          </p>
 
           {% for field in form %}
             {% if field.name == 'applicable_plans' %}
-              <div class="selectable-grid">
+              <div class="selectable-grid" style="max-height: 420px; overflow: auto; padding-inline-end: 4px;">
                 {% for choice in field %}
                   <label class="selectable-item">
                     {{ choice.tag }}
@@ -116,11 +120,14 @@
                         <i class="bi bi-check-lg" style="color: white; margin-bottom: 0; font-size: 10px;"></i>
                       </div>
                       <i class="bi bi-layers"></i>
-                      <span class="card-label">{{ choice.choice_label }}</span>
+                      <span class="card-label{% if LANGUAGE_CODE|slice:':2' == 'ar' %} arabic-text{% endif %}">{{ choice.choice_label }}</span>
                     </div>
                   </label>
                 {% endfor %}
               </div>
+              {% if not field|length %}
+                <span class="text-muted">{% translate "No active plans available." %}</span>
+              {% endif %}
             {% endif %}
           {% endfor %}
         </div>

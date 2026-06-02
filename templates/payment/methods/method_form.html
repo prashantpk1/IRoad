@@ -147,7 +147,7 @@
           <div class="col-12 col-md-6">
             <label class="form-label">{% translate "Current Logo" %}</label>
             <div class="d-flex align-items-center p-2 bg-light rounded-3 border" style="min-height: 56px;">
-              <img src="{{ method.logo.url }}" alt="Current Logo" style="height: 56px; width: 56px; object-fit: cover; border-radius: 8px; border: 1px solid #e5e7eb;" />
+              <img src="{{ method.logo.url }}" alt="{% translate 'Current Logo' %}" style="height: 56px; width: 56px; object-fit: cover; border-radius: 8px; border: 1px solid #e5e7eb;" />
             </div>
           </div>
           {% endif %}
@@ -191,6 +191,7 @@
 
   <script>
     (function () {
+      var removeText = "{% filter escapejs %}{% translate 'Remove' %}{% endfilter %}";
       var methodType = document.getElementById('id_method_type');
       var gatewayWrap = document.getElementById('gateway-wrapper');
       var bankWrap = document.getElementById('bank-wrapper');
@@ -245,7 +246,7 @@
           chip.style.padding = '8px 10px';
           chip.innerHTML =
             '<span>' + code + '</span>' +
-            '<button type="button" class="btn btn-sm p-0 border-0 bg-transparent" title="Remove" aria-label="Remove ' + code + '">' +
+            '<button type="button" class="btn btn-sm p-0 border-0 bg-transparent" title="' + removeText + '" aria-label="' + removeText + ' ' + code + '">' +
             '<i class="bi bi-x-lg"></i>' +
             '</button>';
           chip.querySelector('button').addEventListener('click', function () {

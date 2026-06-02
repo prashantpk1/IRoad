@@ -198,7 +198,7 @@
               {% endif %}
             </a>
           </th>
-          <th style="width: 100px">{% translate "ACTIONS" %}</th>
+          <th style="width: 100px">{% translate "Actions" %}</th>
         </tr>
       </thead>
       <tbody>
@@ -212,11 +212,11 @@
             <td>{{ inv.tax_amount|floatformat:2 }}</td>
             <td>
               {% if inv.status == 'Issued' %}
-                <span class="status-badge active">{{ inv.get_status_display }}</span>
+                <span class="status-badge active">{% translate "Issued" %}</span>
               {% elif inv.status == 'Paid' %}
-                <span class="status-badge success">{{ inv.get_status_display }}</span>
+                <span class="status-badge success">{% translate "Paid" %}</span>
               {% elif inv.status == 'Void' %}
-                <span class="status-badge inactive">{{ inv.get_status_display }}</span>
+                <span class="status-badge inactive">{% translate "Void" %}</span>
               {% else %}
                 <span class="status-badge warning">{{ inv.get_status_display }}</span>
               {% endif %}

@@ -93,7 +93,7 @@
       <div class="eal-toolbar-left db-filters-row">
         <div class="eal-search" style="flex: 1; min-width: 250px; margin-bottom: 0;">
           <i class="bi bi-search"></i>
-          <input type="text" name="q" value="{{ search_query }}" placeholder="Search recipient, trigger, client, error..." autocomplete="off" spellcheck="false" />
+          <input type="text" name="q" value="{{ search_query }}" placeholder="{% translate 'Search recipient, trigger, client, error...' %}" autocomplete="off" spellcheck="false" />
           <input type="hidden" name="channel" value="{{ channel_filter }}">
           <input type="hidden" name="status" value="{{ status_filter }}">
           <input type="hidden" name="sort" value="{{ current_sort }}">
@@ -122,7 +122,7 @@
           <input type="date" name="date_to" value="{{ date_to }}" style="width:145px">
         </div>
 
-        <div class="db-filter-select"><select class="eal-select" name="channel" onchange="this.form.submit()"><option value="All" {% if channel_filter == 'All' %}selected{% endif %}>All Channels</option><option value="Email" {% if channel_filter == 'Email' %}selected{% endif %}>Email</option><option value="SMS" {% if channel_filter == 'SMS' %}selected{% endif %}>SMS</option><option value="Push" {% if channel_filter == 'Push' %}selected{% endif %}>Push</option></select></div>
+        <div class="db-filter-select"><select class="eal-select" name="channel" onchange="this.form.submit()"><option value="All" {% if channel_filter == 'All' %}selected{% endif %}>{% translate "All Channels" %}</option><option value="Email" {% if channel_filter == 'Email' %}selected{% endif %}>{% translate "Email" %}</option><option value="SMS" {% if channel_filter == 'SMS' %}selected{% endif %}>{% translate "SMS" %}</option><option value="Push" {% if channel_filter == 'Push' %}selected{% endif %}>{% translate "Push" %}</option></select></div>
 
         {% if search_query or channel_filter != 'All' or status_filter != 'All' or date_from or date_to %}
           <a href="{% url 'comm_log_list' %}" class="eal-btn eal-btn-outline db-filter-clear" style="border-style: dashed; color: var(--text-muted); height: 32px; padding: 0 12px; font-size: 11px">
@@ -213,9 +213,9 @@
           <tr>
             <td>{{ row.list_rank }}</td>
             <td>{{ row.recipient }}</td>
-            <td>{% if row.channel_type == 'Email' %}<span class="value-badge">Email</span>{% elif row.channel_type == 'SMS' %}<span class="value-badge">SMS</span>{% else %}<span class="value-badge">Push</span>{% endif %}</td>
+            <td>{% if row.channel_type == 'Email' %}<span class="value-badge">{% translate "Email" %}</span>{% elif row.channel_type == 'SMS' %}<span class="value-badge">{% translate "SMS" %}</span>{% else %}<span class="value-badge">{% translate "Push" %}</span>{% endif %}</td>
             <td>{{ row.trigger_source }}</td>
-            <td>{% if row.delivery_status == 'Sent' %}<span class="status-badge success">Sent</span>{% elif row.delivery_status == 'Failed' %}<span class="status-badge inactive">Failed</span>{% else %}<span class="status-badge inactive">{{ row.delivery_status }}</span>{% endif %}</td>
+            <td>{% if row.delivery_status == 'Sent' %}<span class="status-badge success">{% translate "Sent" %}</span>{% elif row.delivery_status == 'Failed' %}<span class="status-badge inactive">{% translate "Failed" %}</span>{% else %}<span class="status-badge inactive">{{ row.delivery_status }}</span>{% endif %}</td>
 
             <td>{{ row.error_details|default:'-'|truncatechars:70 }}</td>
             <td>{{ row.dispatched_at|date:'Y-m-d H:i:s' }}</td>
@@ -226,7 +226,7 @@
               <div class="notification-empty">
                 <div class="empty-icon"><i class="bi bi-inbox"></i></div>
                 <h4 class="empty-title">{% translate "No Data Found" %}</h4>
-                <p class="empty-text">No communication logs found.</p>
+                <p class="empty-text">{% translate "No communication logs found." %}</p>
               </div>
             </td>
           </tr>

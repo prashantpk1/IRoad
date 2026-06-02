@@ -1,20 +1,20 @@
 {% extends 'base.html' %}
 {% load i18n %}
 
-{% block title %}{{ page_title }}{% endblock %}
+{% block title %}{% translate page_title %}{% endblock %}
 
 {% block breadcrumb_items %}
   <li class="breadcrumb-item">
     <a href="{% url 'home_pricing_tier_list' %}">{% translate "Pricing Tiers" %}</a>
   </li>
-  <li class="breadcrumb-item active" aria-current="page">{{ page_title }}</li>
+  <li class="breadcrumb-item active" aria-current="page">{% translate page_title %}</li>
 {% endblock %}
 
 {% block content %}
 <div class="page-header">
   <div class="page-header-row">
     <div class="page-header-left">
-      <h1 class="page-title">{{ page_title }}</h1>
+      <h1 class="page-title">{% translate page_title %}</h1>
     </div>
   </div>
 </div>
@@ -65,17 +65,23 @@
         <div class="col-md-6"><label class="form-label">{{ form.cta_label_en.label }}</label>{{ form.cta_label_en }}{{ form.cta_label_en.errors }}</div>
         <div class="col-md-6"><label class="form-label">{{ form.cta_label_ar.label }}</label>{{ form.cta_label_ar }}{{ form.cta_label_ar.errors }}</div>
         <div class="col-12"><label class="form-label">{{ form.cta_url.label }}</label>{{ form.cta_url }}{{ form.cta_url.errors }}</div>
-        <div class="col-12">
-          <div class="form-check">
+        <div class="col-12 col-md-6">
+          <div class="form-label d-block mb-0">{{ form.is_featured.label }}</div>
+          <div class="form-check form-switch mt-2">
             {{ form.is_featured }}
-            <label class="form-check-label" for="{{ form.is_featured.id_for_label }}">{{ form.is_featured.label }}</label>
+            <label class="form-check-label ms-1" for="{{ form.is_featured.id_for_label }}">
+              <span class="fw-medium">{{ form.is_featured.label }}</span>
+            </label>
           </div>
           {{ form.is_featured.errors }}
         </div>
-        <div class="col-12">
-          <div class="form-check">
+        <div class="col-12 col-md-6">
+          <div class="form-label d-block mb-0">{{ form.is_active.label }}</div>
+          <div class="form-check form-switch mt-2">
             {{ form.is_active }}
-            <label class="form-check-label" for="{{ form.is_active.id_for_label }}">{{ form.is_active.label }}</label>
+            <label class="form-check-label ms-1" for="{{ form.is_active.id_for_label }}">
+              <span class="fw-medium">{{ form.is_active.label }}</span>
+            </label>
           </div>
           {{ form.is_active.errors }}
         </div>
@@ -83,15 +89,25 @@
         <div class="col-12">
           <h6 class="mb-1">{% translate "Pricing benefit bullets" %}</h6>
           <p class="form-text text-muted mb-2">{% translate "Benefit icons and text are managed as a separate list (shared by home and pricing pages)." %}</p>
-          <a href="{% url 'home_pricing_benefit_list' %}" class="btn btn-outline-primary btn-sm">
+          <a href="{% url 'home_pricing_benefit_list' %}" class="eal-btn eal-btn-outline">
             {% translate "Manage pricing benefits" %} <i class="bi bi-arrow-right"></i>
           </a>
         </div>
       </div>
     </div>
-    <div class="form-card-footer d-flex flex-wrap gap-2 justify-content-end">
-      <a href="{% url 'home_pricing_tier_list' %}" class="btn btn-outline-secondary">{% translate "Cancel" %}</a>
-      <button type="submit" class="btn btn-primary">{% translate "Save" %}</button>
+  </div>
+  <div class="form-actions-bar">
+    <div class="form-actions-left">
+      <a href="{% url 'home_pricing_tier_list' %}" class="eal-btn eal-btn-outline">
+        <i class="bi bi-x-lg"></i>
+        <span>{% translate "Cancel" %}</span>
+      </a>
+    </div>
+    <div class="form-actions-right">
+      <button type="submit" class="eal-btn eal-btn-primary">
+        <i class="bi bi-send"></i>
+        <span>{% translate "Save" %}</span>
+      </button>
     </div>
   </div>
 </form>

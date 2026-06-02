@@ -1,0 +1,330 @@
+/* ============================================
+   iRoad Admin — RTL layout (Arabic)
+   Applied when <html dir="rtl"> is set
+   ============================================ */
+
+html[dir="rtl"],
+html[dir="rtl"] body,
+body.rtl-layout {
+  direction: rtl;
+  text-align: right;
+  font-family: "IBM Plex Sans Arabic", "Inter", sans-serif;
+}
+
+html[dir="rtl"] .arabic-text {
+  font-family: "IBM Plex Sans Arabic", "Inter", sans-serif;
+}
+
+html[dir="rtl"] .sidebar-logo.bidi-ltr {
+  direction: ltr !important;
+  unicode-bidi: isolate;
+  flex-direction: row !important;
+}
+
+html[dir="rtl"] .chart-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-direction: row-reverse;
+}
+
+/* ── Sidebar ── */
+html[dir="rtl"] .sidebar {
+  left: auto !important;
+  right: 0 !important;
+  border-right: none !important;
+  border-left: 1px solid var(--sidebar-border) !important;
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.02) !important;
+}
+
+html[dir="rtl"] .sidebar.collapsed:hover {
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.1) !important;
+}
+
+html[dir="rtl"] .nav-link i:first-child {
+  margin-right: 0 !important;
+  margin-left: 12px !important;
+}
+
+html[dir="rtl"] .nav-link:hover .nav-text {
+  transform: translateX(-2px);
+}
+
+html[dir="rtl"] .nav-link .arrow {
+  margin-left: 0 !important;
+  margin-right: auto !important;
+}
+
+html[dir="rtl"] .nav-item.open > .nav-link .arrow {
+  transform: rotate(-90deg);
+}
+
+html[dir="rtl"] .nav-item > .submenu {
+  border-left: none !important;
+  border-right: 2px solid var(--border-light) !important;
+  margin-left: 0 !important;
+  margin-right: 25px !important;
+  padding-left: 0 !important;
+  padding-right: 12px !important;
+}
+
+html[dir="rtl"] .submenu {
+  padding-left: 0 !important;
+  padding-right: calc(var(--sidebar-icon-box-size) / 2 + 12px) !important;
+}
+
+html[dir="rtl"] .submenu-link i {
+  margin-right: 0;
+  margin-left: 8px;
+}
+
+html[dir="rtl"] .sidebar.collapsed .nav-link i:first-child {
+  margin-left: 0 !important;
+}
+
+html[dir="rtl"] .sidebar.collapsed .nav-item > .submenu {
+  left: auto !important;
+  right: calc(var(--sidebar-collapsed-width) - 10px) !important;
+  transform: translateX(8px);
+}
+
+html[dir="rtl"] .sidebar.collapsed .nav-item.has-submenu:hover > .submenu {
+  transform: translateX(0);
+}
+
+html[dir="rtl"] .sidebar.collapsed .nav-item:not(.has-submenu) .nav-link::after {
+  left: auto !important;
+  right: calc(100% + 12px) !important;
+}
+
+/* ── Main content ── */
+html[dir="rtl"] .main-content {
+  margin-left: 0 !important;
+  margin-right: var(--sidebar-width) !important;
+}
+
+html[dir="rtl"] .sidebar.collapsed ~ .main-content {
+  margin-left: 0 !important;
+  margin-right: var(--sidebar-collapsed-width) !important;
+}
+
+html[dir="rtl"] .sidebar.collapsed ~ .main-content .form-actions-bar {
+  left: auto !important;
+  right: var(--sidebar-collapsed-width) !important;
+}
+
+/* ── Top header & search ── */
+html[dir="rtl"] .top-header {
+  flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .header-left {
+  flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .header-right {
+  flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .header-search input {
+  padding: 8px 40px 8px 14px !important;
+  text-align: right;
+}
+
+html[dir="rtl"] .header-search i {
+  left: auto !important;
+  right: 16px !important;
+}
+
+html[dir="rtl"] .header-toggle-btn {
+  margin-right: 0 !important;
+  margin-left: 12px !important;
+}
+
+html[dir="rtl"] .header-datetime {
+  align-items: flex-start;
+  text-align: right;
+}
+
+/* ── Page / dashboard layout ── */
+html[dir="rtl"] .page-header,
+html[dir="rtl"] .dashboard-toolbar,
+html[dir="rtl"] .page-header-row {
+  text-align: right;
+}
+
+html[dir="rtl"] .dashboard-toolbar {
+  flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .toolbar-left,
+html[dir="rtl"] .toolbar-right,
+html[dir="rtl"] .page-header-left,
+html[dir="rtl"] .page-header-right {
+  text-align: right;
+}
+
+html[dir="rtl"] .breadcrumb {
+  justify-content: flex-end;
+}
+
+html[dir="rtl"] .kpi-top {
+  flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .chart-card-header,
+html[dir="rtl"] .eal-toolbar,
+html[dir="rtl"] .eal-toolbar-left,
+html[dir="rtl"] .db-table-filters {
+  flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .eal-table thead th,
+html[dir="rtl"] .eal-table tbody td {
+  text-align: right;
+}
+
+/* ── Notification panel ── */
+html[dir="rtl"] .notification-panel {
+  right: auto !important;
+  left: 0 !important;
+  transform: translateX(-100%);
+  box-shadow: 4px 0 20px rgba(0, 0, 0, 0.1) !important;
+}
+
+html[dir="rtl"] .notification-panel.active {
+  transform: translateX(0);
+}
+
+html[dir="rtl"] .notification-header-actions {
+  margin-left: 0 !important;
+  margin-right: auto !important;
+}
+
+/* ── Detail slide-over panel ── */
+html[dir="rtl"] .detail-panel {
+  right: auto !important;
+  left: 0 !important;
+  transform: translateX(-100%);
+  box-shadow: 6px 0 30px rgba(0, 0, 0, 0.12) !important;
+}
+
+html[dir="rtl"] .detail-panel.active {
+  transform: translateX(0);
+}
+
+/* ── Tables & toolbars ── */
+html[dir="rtl"] .eal-table th.sortable i {
+  margin-left: 0 !important;
+  margin-right: 5px !important;
+}
+
+html[dir="rtl"] .toolbar-select {
+  padding: 0 12px 0 28px !important;
+  background-position: left 10px center !important;
+}
+
+html[dir="rtl"] .cashflow-bar-val {
+  margin-left: 0 !important;
+  margin-right: auto !important;
+}
+
+/* ── Pagination ── */
+html[dir="rtl"] .eal-pagination-info {
+  text-align: right;
+}
+
+html[dir="rtl"] .eal-pagination-controls {
+  direction: rtl;
+}
+
+html[dir="rtl"] .eal-page-prev .bi-chevron-left {
+  transform: scaleX(-1);
+}
+
+html[dir="rtl"] .eal-page-next .bi-chevron-right {
+  transform: scaleX(-1);
+}
+
+html[dir="rtl"] .ms-1,
+html[dir="rtl"] .ms-2,
+html[dir="rtl"] .ms-3 {
+  margin-left: 0 !important;
+}
+
+html[dir="rtl"] .ms-1 { margin-right: 0.25rem !important; }
+html[dir="rtl"] .ms-2 { margin-right: 0.5rem !important; }
+html[dir="rtl"] .ms-3 { margin-right: 1rem !important; }
+
+html[dir="rtl"] .me-1,
+html[dir="rtl"] .me-2,
+html[dir="rtl"] .me-3 {
+  margin-right: 0 !important;
+}
+
+html[dir="rtl"] .me-1 { margin-left: 0.25rem !important; }
+html[dir="rtl"] .me-2 { margin-left: 0.5rem !important; }
+html[dir="rtl"] .me-3 { margin-left: 1rem !important; }
+
+/* ── Form switches (RTL): label before input → text on the right, toggle on the left ── */
+html[dir="rtl"] .form-check.form-switch:not(.d-inline-flex) {
+  flex-direction: row;
+  justify-content: flex-start;
+  text-align: right;
+}
+
+html[dir="rtl"] .form-check.form-switch .form-check-input {
+  background-position: right center;
+}
+
+html[dir="rtl"] .form-check.form-switch .form-check-input:checked {
+  background-position: left center;
+}
+
+html[dir="rtl"] .form-check.form-switch .form-check-label {
+  text-align: right;
+}
+
+/* ── Selects: chevron on the left so it does not overlap value text ── */
+html[dir="rtl"] .form-select,
+html[dir="rtl"] .eal-select,
+html[dir="rtl"] select.form-select,
+html[dir="rtl"] select.eal-select {
+  direction: rtl;
+  text-align: right;
+  background-position: left 14px center !important;
+  padding-inline-start: 36px !important;
+  padding-inline-end: 14px !important;
+}
+
+html[dir="rtl"] .form-select-sm,
+html[dir="rtl"] select.form-select-sm {
+  background-position: left 10px center !important;
+  padding-inline-start: 28px !important;
+  padding-inline-end: 10px !important;
+}
+
+/* ── Mobile off-canvas sidebar ── */
+@media (max-width: 992px) {
+  html[dir="rtl"] .sidebar {
+    transform: translateX(100%) !important;
+  }
+
+  html[dir="rtl"] .sidebar.active {
+    transform: translateX(0) !important;
+  }
+
+  html[dir="rtl"] .main-content {
+    margin-right: 0 !important;
+  }
+
+  html[dir="rtl"] .form-actions-bar {
+    right: 0 !important;
+    left: auto !important;
+  }
+
+  html[dir="rtl"] .header-toggle-btn {
+    margin-left: 0 !important;
+    margin-right: 12px !important;
+  }
+}

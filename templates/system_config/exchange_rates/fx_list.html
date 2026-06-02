@@ -122,7 +122,7 @@
           <input
             type="text"
             name="q"
-            placeholder="Search by code or name..."
+            placeholder="{% translate 'Search by code or name...' %}"
             value="{{ search_query }}"
           />
           <input type="hidden" name="sort" value="{{ current_sort }}">
@@ -149,7 +149,7 @@
         {% if search_query or status_filter != 'All' %}
           <a href="{% url 'fx_rate_list' %}" class="eal-btn eal-btn-outline" style="border-style: dashed; color: var(--text-muted); height: 32px; padding: 0 12px; font-size: 11px">
             <i class="bi bi-x-circle"></i>
-            <span>Clear Filters</span>
+            <span>{% translate "Clear Filters" %}</span>
           </a>
         {% endif %}
       </div>
@@ -172,7 +172,7 @@
             </th>
             <th class="sortable" style="width: 140px">
               <a href="?q={{ search_query }}&status={{ status_filter }}&sort=code&dir={% if current_sort == 'code' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                <span>{% translate "CURRENCY CODE" %}</span>
+                <span>{% translate "Currency Code" %}</span>
                 {% if current_sort == 'code' %}
                   <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
                 {% else %}
@@ -182,7 +182,7 @@
             </th>
             <th class="sortable">
               <a href="?q={{ search_query }}&status={{ status_filter }}&sort=name&dir={% if current_sort == 'name' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                <span>{% translate "NAME" %}</span>
+                <span>{% translate "Name" %}</span>
                 {% if current_sort == 'name' %}
                   <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
                 {% else %}
@@ -192,7 +192,7 @@
             </th>
             <th class="sortable" style="width: 100px">
               <a href="?q={{ search_query }}&status={{ status_filter }}&sort=symbol&dir={% if current_sort == 'symbol' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                <span>{% translate "SYMBOL" %}</span>
+                <span>{% translate "Symbol" %}</span>
                 {% if current_sort == 'symbol' %}
                   <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
                 {% else %}
@@ -202,7 +202,7 @@
             </th>
             <th class="sortable" style="width: 160px">
               <a href="?q={{ search_query }}&status={{ status_filter }}&sort=rate&dir={% if current_sort == 'rate' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                <span>{% translate "RATE" %}</span>
+                <span>{% translate "Rate" %}</span>
                 {% if current_sort == 'rate' %}
                   <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
                 {% else %}
@@ -212,7 +212,7 @@
             </th>
             <th class="sortable" style="width: 120px">
               <a href="?q={{ search_query }}&status={{ status_filter }}&sort=status&dir={% if current_sort == 'status' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                <span>{% translate "STATUS" %}</span>
+                <span>{% translate "Status" %}</span>
                 {% if current_sort == 'status' %}
                   <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
                 {% else %}
@@ -222,7 +222,7 @@
             </th>
             <th class="sortable" style="width: 200px">
               <a href="?q={{ search_query }}&status={{ status_filter }}&sort=updated&dir={% if current_sort == 'updated' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                <span>{% translate "LAST UPDATED" %}</span>
+                <span>{% translate "Last Updated" %}</span>
                 {% if current_sort == 'updated' %}
                   <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
                 {% else %}
@@ -230,7 +230,7 @@
                 {% endif %}
               </a>
             </th>
-            <th style="width: 120px; text-align: left; padding-left: 16px;">{% translate "ACTIONS" %}</th>
+            <th style="width: 120px; text-align: left; padding-left: 16px;">{% translate "Actions" %}</th>
           </tr>
         </thead>
         <tbody>
@@ -238,27 +238,27 @@
             <tr>
               <td>{{ rate.default_rank }}</td>
               <td><span class="eal-entity-id">{{ rate.currency.currency_code }}</span></td>
-              <td>{{ rate.currency.name_en }}</td>
+              <td>{% if LANGUAGE_CODE|slice:':2' == 'ar' and rate.currency.name_ar %}{{ rate.currency.name_ar }}{% else %}{{ rate.currency.name_en }}{% endif %}</td>
               <td>{{ rate.currency.currency_symbol }}</td>
               <td>{{ rate.exchange_rate|floatformat:6 }}</td>
               <td>
                 {% if rate.is_active %}
-                  <span class="status-badge active">Active</span>
+                  <span class="status-badge active">{% translate "Active" %}</span>
                 {% else %}
-                  <span class="status-badge inactive">Inactive</span>
+                  <span class="status-badge inactive">{% translate "Inactive" %}</span>
                 {% endif %}
               </td>
               <td>{{ rate.updated_at }}</td>
               <td>
                 <div class="eal-actions-cell">
                   {% if request.user.is_root %}
-                    <a href="{% url 'fx_rate_edit' rate.fx_id %}" class="eal-row-btn" title="Edit">
+                    <a href="{% url 'fx_rate_edit' rate.fx_id %}" class="eal-row-btn" title="{% translate 'Edit' %}">
                       <i class="bi bi-pencil"></i>
                     </a>
                     <form method="post" action="{% url 'fx_rate_edit' rate.fx_id %}" style="display:inline">
                       {% csrf_token %}
                       <input type="hidden" name="action" value="toggle_status" />
-                      <button type="submit" class="eal-row-btn" title="Toggle Active">
+                      <button type="submit" class="eal-row-btn" title="{% translate 'Toggle Active' %}">
                         <i class="bi bi-arrow-repeat"></i>
                       </button>
                     </form>
@@ -275,8 +275,8 @@
       <div class="empty-icon">
         <i class="bi bi-currency-exchange"></i>
       </div>
-      <h4 class="empty-title">No exchange rates found</h4>
-      <p class="empty-text">No exchange-rate records are available for the selected filters.</p>
+      <h4 class="empty-title">{% translate "No exchange rates found" %}</h4>
+      <p class="empty-text">{% translate "No exchange-rate records are available for the selected filters." %}</p>
     </div>
   {% endif %}
 

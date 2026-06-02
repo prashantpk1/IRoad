@@ -169,6 +169,7 @@ TEMPLATES = [
         'OPTIONS': {
             'context_processors': [
                 'django.template.context_processors.request',
+                'django.template.context_processors.i18n',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'superadmin.context_processors.internal_alert_notifications',
@@ -181,6 +182,7 @@ TEMPLATES = [
             # of app templatetags packages fails (e.g. import/shadowing issues).
             'libraries': {
                 'cms_locale': 'iroad_frontend.templatetags.cms_locale',
+                'i18n_fields': 'superadmin.templatetags.i18n_fields',
             },
         },
     },

@@ -68,7 +68,7 @@
         {% if request.user.is_root %}
             <a href="{% url 'bank_account_create' %}" class="eal-btn eal-btn-primary">
               <i class="bi bi-plus-lg"></i>
-              <span>Add Account</span>
+              <span>{% translate "Add Account" %}</span>
             </a>
           {% endif %}
       </div>
@@ -94,7 +94,7 @@
             <input
               type="text"
               name="q"
-              placeholder="Search by bank name or IBAN"
+              placeholder="{% translate 'Search by bank name or IBAN' %}"
               value="{{ search_query }}"
             />
             <input type="hidden" name="currency" value="{{ currency_filter }}">
@@ -121,10 +121,10 @@
 
           <div style="width: 220px;">
             <select name="currency" class="eal-select" onchange="this.form.submit()">
-              <option value="">All currencies</option>
+              <option value="">{% translate "All currencies" %}</option>
               {% for cur in currencies %}
                 <option value="{{ cur.currency_code }}" {% if currency_filter == cur.currency_code %}selected{% endif %}>
-                  {{ cur.currency_code }} - {{ cur.name_en }}
+                  {{ cur.currency_code }} - {% if LANGUAGE_CODE|slice:':2' == 'ar' and cur.name_ar %}{{ cur.name_ar }}{% else %}{{ cur.name_en }}{% endif %}
                 </option>
               {% endfor %}
             </select>
@@ -156,7 +156,7 @@
               </th>
               <th class="sortable">
                 <a href="?q={{ search_query }}&currency={{ currency_filter }}&status={{ status_filter }}&sort=bank&dir={% if current_sort == 'bank' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                  <span>Bank Name</span>
+                  <span>{% translate "Bank Name" %}</span>
                   {% if current_sort == 'bank' %}
                     <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
                   {% else %}
@@ -166,7 +166,7 @@
               </th>
               <th class="sortable">
                 <a href="?q={{ search_query }}&currency={{ currency_filter }}&status={{ status_filter }}&sort=holder&dir={% if current_sort == 'holder' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                  <span>Account Holder</span>
+                  <span>{% translate "Account Holder" %}</span>
                   {% if current_sort == 'holder' %}
                     <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
                   {% else %}
@@ -176,7 +176,7 @@
               </th>
               <th class="sortable">
                 <a href="?q={{ search_query }}&currency={{ currency_filter }}&status={{ status_filter }}&sort=iban&dir={% if current_sort == 'iban' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                  <span>IBAN (masked ****1234)</span>
+                  <span>{% translate "IBAN (masked ****1234)" %}</span>
                   {% if current_sort == 'iban' %}
                     <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
                   {% else %}
@@ -186,7 +186,7 @@
               </th>
               <th class="sortable">
                 <a href="?q={{ search_query }}&currency={{ currency_filter }}&status={{ status_filter }}&sort=account_no&dir={% if current_sort == 'account_no' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                  <span>Account No</span>
+                  <span>{% translate "Account No" %}</span>
                   {% if current_sort == 'account_no' %}
                     <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
                   {% else %}
@@ -196,7 +196,7 @@
               </th>
               <th class="sortable">
                 <a href="?q={{ search_query }}&currency={{ currency_filter }}&status={{ status_filter }}&sort=currency&dir={% if current_sort == 'currency' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                  <span>Currency</span>
+                  <span>{% translate "Currency" %}</span>
                   {% if current_sort == 'currency' %}
                     <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
                   {% else %}
@@ -206,7 +206,7 @@
               </th>
               <th class="sortable">
                 <a href="?q={{ search_query }}&currency={{ currency_filter }}&status={{ status_filter }}&sort=swift&dir={% if current_sort == 'swift' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                  <span>SWIFT</span>
+                  <span>{% translate "SWIFT" %}</span>
                   {% if current_sort == 'swift' %}
                     <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
                   {% else %}
@@ -216,7 +216,7 @@
               </th>
               <th class="sortable" style="width: 120px">
                 <a href="?q={{ search_query }}&currency={{ currency_filter }}&status={{ status_filter }}&sort=status&dir={% if current_sort == 'status' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                  <span>Status</span>
+                  <span>{% translate "Status" %}</span>
                   {% if current_sort == 'status' %}
                     <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
                   {% else %}
@@ -224,7 +224,7 @@
                   {% endif %}
                 </a>
               </th>
-              <th style="width: 120px; text-align: left; padding-left: 16px;">ACTIONS</th>
+              <th style="width: 120px; text-align: left; padding-left: 16px;">{% translate "Actions" %}</th>
             </tr>
           </thead>
           <tbody>
@@ -239,25 +239,25 @@
                 <td>{{ account.swift_code|default:'-' }}</td>
                 <td>
                   {% if account.is_active %}
-                    <span class="status-badge active">Active</span>
+                    <span class="status-badge active">{% translate "Active" %}</span>
                   {% else %}
-                    <span class="status-badge inactive">Inactive</span>
+                    <span class="status-badge inactive">{% translate "Inactive" %}</span>
                   {% endif %}
                 </td>
                 <td>
                   {% if request.user.is_root %}
                     <div class="eal-actions-cell">
-                      <a href="{% url 'bank_account_edit' account.account_id %}" class="eal-row-btn icon-only-btn" title="Edit">
+                      <a href="{% url 'bank_account_edit' account.account_id %}" class="eal-row-btn icon-only-btn" title="{% translate 'Edit' %}">
 <i class="bi bi-pencil"></i>
 </a>
                       <form method="post" action="{% url 'bank_account_toggle' account.account_id %}" style="display:inline">
                         {% csrf_token %}
                         {% if account.is_active %}
-                          <button type="submit" class="eal-row-btn icon-only-btn" title="Deactivate">
+                          <button type="submit" class="eal-row-btn icon-only-btn" title="{% translate 'Deactivate' %}">
 <i class="bi bi-slash-circle"></i>
 </button>
                         {% else %}
-                          <button type="submit" class="eal-row-btn icon-only-btn" title="Activate">
+                          <button type="submit" class="eal-row-btn icon-only-btn" title="{% translate 'Activate' %}">
 <i class="bi bi-check-circle"></i>
 </button>
                         {% endif %}
@@ -275,8 +275,8 @@
     {% else %}
       <div class="notification-empty">
         <div class="empty-icon"><i class="bi bi-building"></i></div>
-        <h4 class="empty-title">No bank accounts found</h4>
-        <p class="empty-text">No bank account records match your current filters.</p>
+        <h4 class="empty-title">{% translate "No bank accounts found" %}</h4>
+        <p class="empty-text">{% translate "No bank account records match your current filters." %}</p>
       </div>
     {% endif %}
 

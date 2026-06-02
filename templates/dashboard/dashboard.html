@@ -119,9 +119,9 @@
         <div style="height: 220px; width: 100%;">
           <canvas id="ticketHealthChart"></canvas>
         </div>
-        <div class="mt-3 text-center small text-muted">
-          <span class="me-2"><i class="bi bi-circle-fill" style="color: #6366f1;"></i> {% translate "Open" %}</span>
-          <span><i class="bi bi-circle-fill" style="color: #f43f5e;"></i> {% translate "Overdue" %}</span>
+        <div class="mt-3 text-center small text-muted chart-legend">
+          <span class="chart-legend-item me-2"><i class="bi bi-circle-fill" style="color: #6366f1;"></i><span>{% translate "Open" %}</span></span>
+          <span class="chart-legend-item"><i class="bi bi-circle-fill" style="color: #f43f5e;"></i><span>{% translate "Overdue" %}</span></span>
         </div>
       </div>
     </div>
@@ -137,9 +137,9 @@
         <div style="height: 220px; width: 100%;">
           <canvas id="financeHubChart"></canvas>
         </div>
-        <div class="mt-3 text-center small text-muted">
-          <span class="me-2"><i class="bi bi-circle-fill" style="color: #10b981;"></i> {% translate "Orders" %}</span>
-          <span><i class="bi bi-circle-fill" style="color: #f59e0b;"></i> {% translate "Transfers" %}</span>
+        <div class="mt-3 text-center small text-muted chart-legend">
+          <span class="chart-legend-item me-2"><i class="bi bi-circle-fill" style="color: #10b981;"></i><span>{% translate "Orders" %}</span></span>
+          <span class="chart-legend-item"><i class="bi bi-circle-fill" style="color: #f59e0b;"></i><span>{% translate "Transfers" %}</span></span>
         </div>
       </div>
     </div>
@@ -476,10 +476,59 @@
 {% block extra_js %}
 {{ revenue_labels|json_script:"revenue-labels-data" }}
 {{ revenue_data|json_script:"revenue-data-data" }}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+{{ role_labels_en|json_script:"role-labels-en-data" }}
+{{ role_labels_ar|json_script:"role-labels-ar-data" }}
+{{ role_counts|json_script:"role-counts-data" }}
 <script>
-document.addEventListener("DOMContentLoaded", function() {
-    initEnhancedCharts();
+function loadChartJs() {
+    if (typeof Chart !== 'undefined') {
+        return Promise.resolve();
+    }
+
+    const sources = [
+        'https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js',
+        'https://unpkg.com/chart.js@3.9.1/dist/chart.min.js',
+        'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js'
+    ];
+
+    return new Promise((resolve) => {
+        const tryLoad = (idx) => {
+            if (idx >= sources.length) {
+                resolve(false);
+                return;
+            }
+
+            const script = document.createElement('script');
+            script.src = sources[idx];
+            script.async = true;
+            script.onload = () => resolve(true);
+            script.onerror = () => tryLoad(idx + 1);
+            document.head.appendChild(script);
+        };
+
+        tryLoad(0);
+    });
+}
+
+function showChartUnavailableFallback() {
+    ['revenueChart', 'ticketHealthChart', 'financeHubChart', 'roleDistributionChart'].forEach((id) => {
+        const canvas = document.getElementById(id);
+        if (!canvas || !canvas.parentElement) return;
+        canvas.style.display = 'none';
+        const fallback = document.createElement('div');
+        fallback.className = 'text-muted small d-flex align-items-center justify-content-center h-100';
+        fallback.textContent = 'Chart data unavailable';
+        canvas.parentElement.appendChild(fallback);
+    });
+}
+
+document.addEventListener("DOMContentLoaded", async function() {
+    const chartReady = await loadChartJs();
+    if (chartReady) {
+        initEnhancedCharts();
+    } else {
+        showChartUnavailableFallback();
+    }
     updateDateTime();
     setInterval(updateDateTime, 1000);
 
@@ -516,7 +565,9 @@ function initEnhancedCharts() {
     const revenueSeries = revenueDataEl ? JSON.parse(revenueDataEl.textContent) : [];
 
     // Common configurations
-    Chart.defaults.font.family = "'Inter', sans-serif";
+    Chart.defaults.font.family = isArabic
+        ? "'IBM Plex Sans Arabic', 'Inter', sans-serif"
+        : "'Inter', sans-serif";
     Chart.defaults.color = "#64748b";
     Chart.defaults.plugins.tooltip.backgroundColor = '#1e293b';
     Chart.defaults.plugins.tooltip.padding = 12;
@@ -622,6 +673,13 @@ function initEnhancedCharts() {
     if (roleCanvas) {
     const roleCtx = roleCanvas.getContext('2d');
     const roleColors = ['#5051f9', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4'];
+    const roleLabelsEnEl = document.getElementById('role-labels-en-data');
+    const roleLabelsArEl = document.getElementById('role-labels-ar-data');
+    const roleCountsEl = document.getElementById('role-counts-data');
+    const roleLabelsEn = roleLabelsEnEl ? JSON.parse(roleLabelsEnEl.textContent) : [];
+    const roleLabelsAr = roleLabelsArEl ? JSON.parse(roleLabelsArEl.textContent) : [];
+    const roleCounts = roleCountsEl ? JSON.parse(roleCountsEl.textContent) : [];
+    const roleLabels = isArabic ? roleLabelsAr : roleLabelsEn;
     
     document.querySelectorAll('.role-legend-dot').forEach((dot, idx) => {
         dot.style.backgroundColor = roleColors[idx % roleColors.length];
@@ -630,9 +688,9 @@ function initEnhancedCharts() {
     new Chart(roleCtx, {
         type: 'doughnut',
         data: {
-            labels: [{% for r in role_distribution %}isArabic ? '{{ r.role_name_ar }}' : '{{ r.role_name_en }}',{% endfor %}],
+            labels: roleLabels,
             datasets: [{
-                data: [{% for r in role_distribution %}{{ r.staff_count }},{% endfor %}],
+                data: doughnutDisplayValues(roleCounts),
                 backgroundColor: roleColors,
                 borderWidth: 4,
                 borderColor: '#ffffff',

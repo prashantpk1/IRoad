@@ -180,19 +180,19 @@
             <td>{{ role.default_rank }}</td>
             <td><span class="fw-bold">{{ role.role_name_en }}</span></td>
             <td class="arabic-text">{{ role.role_name_ar }}</td>
-            <td style="max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ role.description }}</td>
+            <td class="{% if LANGUAGE_CODE == 'ar' and role.description_ar %}arabic-text{% endif %}" style="max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{% if LANGUAGE_CODE|slice:':2' == 'ar' and role.description_ar %}{{ role.description_ar }}{% else %}{{ role.description|default:"" }}{% endif %}</td>
             <td>
               {% if role.is_system_default %}
-                <span class="status-badge active" style="background: rgba(100, 116, 139, 0.1); color: #64748b;">{% translate "Immutable" %}</span>
+                <span class="status-badge active bidi-ltr" style="background: rgba(100, 116, 139, 0.1); color: #64748b;" dir="ltr">Immutable</span>
               {% else %}
-                <span class="status-badge inactive">{% translate "Custom" %}</span>
+                <span class="status-badge inactive bidi-ltr" dir="ltr">Custom</span>
               {% endif %}
             </td>
             <td>
               {% if role.status == 'Active' %}
-                <span class="status-badge active">{% translate "Active" %}</span>
+                <span class="status-badge active bidi-ltr" dir="ltr">Active</span>
               {% else %}
-                <span class="status-badge inactive">{% translate "Inactive" %}</span>
+                <span class="status-badge inactive bidi-ltr" dir="ltr">Inactive</span>
               {% endif %}
             </td>
             <td>

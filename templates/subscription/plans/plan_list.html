@@ -82,7 +82,7 @@
       <div class="db-table-filters">
         <a href="?q={{ search_query }}&status=All&sort={{ current_sort }}&dir={{ current_dir }}" 
            class="filter-chip {% if status_filter == 'All' %}active{% endif %}">
-          All
+          {% translate "All" %}
         </a>
         <a href="?q={{ search_query }}&status=Active&sort={{ current_sort }}&dir={{ current_dir }}" 
            class="filter-chip {% if status_filter == 'Active' %}active{% endif %}">
@@ -99,7 +99,7 @@
       {% if search_query or status_filter != 'All' %}
         <a href="{% url 'plan_list' %}" class="eal-btn eal-btn-outline" style="border-style: dashed; color: var(--text-muted); height: 32px; padding: 0 12px; font-size: 11px">
           <i class="bi bi-x-circle"></i>
-          <span>Clear Filters</span>
+          <span>{% translate "Clear Filters" %}</span>
         </a>
       {% endif %}
     </div>
@@ -171,30 +171,30 @@
               {% endif %}
             </a>
           </th>
-          <th style="width: 120px;">{% translate "ACTIONS" %}</th>
+          <th style="width: 120px;">{% translate "Actions" %}</th>
         </tr>
       </thead>
       <tbody>
         {% for plan in plans %}
           <tr {% if not plan.is_active %}class="row-inactive"{% endif %}>
             <td>{{ plan.list_rank }}</td>
-            <td><span class="fw-bold">{{ plan.plan_name_en }}</span></td>
-            <td>{{ plan.plan_name_ar }}</td>
+            <td><span class="fw-bold bidi-ltr" dir="ltr">{{ plan.plan_name_en }}</span></td>
+            <td class="{% if plan.plan_name_ar %}arabic-text{% endif %}">{{ plan.plan_name_ar|default:"-" }}</td>
             <td>{{ plan.base_cycle_days }}</td>
             <td><span class="value-badge">{{ plan.pricing_rows_count }}</span></td>
             <td>
               {% if plan.has_driver_app %}
-                <span class="status-badge success">{% translate "Yes" %}</span>
+                <span class="status-badge success bidi-ltr" dir="ltr">Yes</span>
               {% else %}
-                <span class="status-badge inactive">{% translate "No" %}</span>
+                <span class="status-badge inactive bidi-ltr" dir="ltr">No</span>
               {% endif %}
             </td>
-            <td>{{ plan.backup_restore_level }}</td>
+            <td class="bidi-ltr" dir="ltr">{{ plan.backup_restore_level }}</td>
             <td>
               {% if plan.is_active %}
-                <span class="status-badge active">{% translate "Active" %}</span>
+                <span class="status-badge active bidi-ltr" dir="ltr">Active</span>
               {% else %}
-                <span class="status-badge inactive">{% translate "Inactive" %}</span>
+                <span class="status-badge inactive bidi-ltr" dir="ltr">Inactive</span>
               {% endif %}
             </td>
 
@@ -207,7 +207,7 @@
                     {% csrf_token %}
                     <button type="submit" class="eal-row-btn" title="{% translate 'Toggle Status' %}"><i class="bi bi-arrow-repeat"></i></button>
                   </form>
-                  <form method="post" action="{% url 'plan_delete' plan.plan_id %}" style="display:inline" onsubmit="return confirm('Remove this plan?');">
+                  <form method="post" action="{% url 'plan_delete' plan.plan_id %}" style="display:inline" onsubmit="return confirm('{% translate "Remove this plan?" %}');">
                     {% csrf_token %}
                     <button type="submit" class="eal-row-btn" title="{% translate 'Delete (Soft)' %}"><i class="bi bi-trash"></i></button>
                   </form>

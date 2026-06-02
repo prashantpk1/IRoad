@@ -68,7 +68,7 @@
         {% if request.user.is_root %}
             <a href="{% url 'gateway_create' %}" class="eal-btn eal-btn-primary">
               <i class="bi bi-plus-lg"></i>
-              <span>Add Gateway</span>
+              <span>{% translate "Add Gateway" %}</span>
             </a>
           {% endif %}
       </div>
@@ -94,7 +94,7 @@
             <input
               type="text"
               name="q"
-              placeholder="Search by gateway name"
+              placeholder="{% translate 'Search by gateway name' %}"
               value="{{ search_query }}"
             />
             <input type="hidden" name="environment" value="{{ environment_filter }}">
@@ -121,9 +121,9 @@
 
           <div style="width: 220px;">
             <select name="environment" class="eal-select" onchange="this.form.submit()">
-              <option value="All" {% if environment_filter == 'All' %}selected{% endif %}>All</option>
-              <option value="Test" {% if environment_filter == 'Test' %}selected{% endif %}>Test</option>
-              <option value="Live" {% if environment_filter == 'Live' %}selected{% endif %}>Live</option>
+              <option value="All" {% if environment_filter == 'All' %}selected{% endif %}>{% translate "All" %}</option>
+              <option value="Test" {% if environment_filter == 'Test' %}selected{% endif %}>{% translate "Test" %}</option>
+              <option value="Live" {% if environment_filter == 'Live' %}selected{% endif %}>{% translate "Live" %}</option>
             </select>
           </div>
 
@@ -153,7 +153,7 @@
               </th>
               <th class="sortable">
                 <a href="?q={{ search_query }}&environment={{ environment_filter }}&status={{ status_filter }}&sort=name&dir={% if current_sort == 'name' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                  <span>Gateway Name</span>
+                  <span>{% translate "Gateway Name" %}</span>
                   {% if current_sort == 'name' %}
                     <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
                   {% else %}
@@ -163,7 +163,7 @@
               </th>
               <th class="sortable" style="width: 140px">
                 <a href="?q={{ search_query }}&environment={{ environment_filter }}&status={{ status_filter }}&sort=environment&dir={% if current_sort == 'environment' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                  <span>Environment badge</span>
+                  <span>{% translate "Environment badge" %}</span>
                   {% if current_sort == 'environment' %}
                     <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
                   {% else %}
@@ -173,7 +173,7 @@
               </th>
               <th class="sortable" style="width: 120px">
                 <a href="?q={{ search_query }}&environment={{ environment_filter }}&status={{ status_filter }}&sort=status&dir={% if current_sort == 'status' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                  <span>Status</span>
+                  <span>{% translate "Status" %}</span>
                   {% if current_sort == 'status' %}
                     <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
                   {% else %}
@@ -183,7 +183,7 @@
               </th>
               <th class="sortable" style="width: 180px">
                 <a href="?q={{ search_query }}&environment={{ environment_filter }}&status={{ status_filter }}&sort=created_at&dir={% if current_sort == 'created_at' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                  <span>Created At</span>
+                  <span>{% translate "Created At" %}</span>
                   {% if current_sort == 'created_at' %}
                     <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
                   {% else %}
@@ -191,7 +191,7 @@
                   {% endif %}
                 </a>
               </th>
-              <th style="width: 120px; text-align: left; padding-left: 16px;">ACTIONS</th>
+              <th style="width: 120px; text-align: left; padding-left: 16px;">{% translate "Actions" %}</th>
             </tr>
           </thead>
           <tbody>
@@ -201,40 +201,40 @@
                 <td>{{ gateway.gateway_name }}</td>
                 <td>
                   {% if gateway.environment == 'Live' %}
-                    <span class="status-badge active">Live</span>
+                    <span class="status-badge active">{% translate "Live" %}</span>
                   {% else %}
-                    <span class="status-badge warning">Test</span>
+                    <span class="status-badge warning">{% translate "Test" %}</span>
                   {% endif %}
                 </td>
                 <td>
                   {% if gateway.is_active %}
-                    <span class="status-badge active">Active</span>
+                    <span class="status-badge active">{% translate "Active" %}</span>
                   {% else %}
-                    <span class="status-badge inactive">Inactive</span>
+                    <span class="status-badge inactive">{% translate "Inactive" %}</span>
                   {% endif %}
                 </td>
                 <td>{{ gateway.created_at|date:"Y-m-d H:i" }}</td>
                 <td>
                   {% if request.user.is_root %}
                     <div class="eal-actions-cell">
-                      <a href="{% url 'gateway_edit' gateway.gateway_id %}" class="eal-row-btn icon-only-btn" title="Edit">
+                      <a href="{% url 'gateway_edit' gateway.gateway_id %}" class="eal-row-btn icon-only-btn" title="{% translate 'Edit' %}">
 <i class="bi bi-pencil"></i>
 </a>
                       <form method="post" action="{% url 'gateway_toggle' gateway.gateway_id %}" style="display: inline">
                         {% csrf_token %}
                         {% if gateway.is_active %}
-                          <button type="submit" class="eal-row-btn icon-only-btn" title="Deactivate">
+                          <button type="submit" class="eal-row-btn icon-only-btn" title="{% translate 'Deactivate' %}">
 <i class="bi bi-slash-circle"></i>
 </button>
                         {% else %}
-                          <button type="submit" class="eal-row-btn icon-only-btn" title="Activate">
+                          <button type="submit" class="eal-row-btn icon-only-btn" title="{% translate 'Activate' %}">
 <i class="bi bi-check-circle"></i>
 </button>
                         {% endif %}
                       </form>
-                      <form method="post" action="{% url 'gateway_delete' gateway.gateway_id %}" style="display: inline" onsubmit="return confirm('Remove this gateway?');">
+                      <form method="post" action="{% url 'gateway_delete' gateway.gateway_id %}" style="display: inline" onsubmit="return confirm('{% translate 'Remove this gateway?' %}');">
                         {% csrf_token %}
-                        <button type="submit" class="eal-row-btn icon-only-btn" title="Delete (Soft)">
+                        <button type="submit" class="eal-row-btn icon-only-btn" title="{% translate 'Delete (Soft)' %}">
 <i class="bi bi-trash"></i>
 </button>
                       </form>
@@ -253,8 +253,8 @@
         <div class="empty-icon">
           <i class="bi bi-shield-lock"></i>
         </div>
-        <h4 class="empty-title">No gateways found</h4>
-        <p class="empty-text">No payment gateways records match your current filters.</p>
+        <h4 class="empty-title">{% translate "No gateways found" %}</h4>
+        <p class="empty-text">{% translate "No payment gateways records match your current filters." %}</p>
       </div>
     {% endif %}
 

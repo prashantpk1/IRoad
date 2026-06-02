@@ -51,7 +51,7 @@
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
-        <a href="{% url 'event_mapping_create' %}" class="eal-btn eal-btn-primary">Add Mapping</a>
+        <a href="{% url 'event_mapping_create' %}" class="eal-btn eal-btn-primary">{% translate "Add Mapping" %}</a>
       </div>
     </div>
   </div>
@@ -92,10 +92,10 @@
 
         <div style="width: 180px">
           <select name="channel" class="eal-select" onchange="this.form.submit()">
-            <option value="All" {% if channel_filter == 'All' %}selected{% endif %}>Channel: All</option>
-            <option value="Email" {% if channel_filter == 'Email' %}selected{% endif %}>Email</option>
-            <option value="SMS" {% if channel_filter == 'SMS' %}selected{% endif %}>SMS</option>
-            <option value="Not Configured" {% if channel_filter == 'Not Configured' %}selected{% endif %}>Not Configured</option>
+            <option value="All" {% if channel_filter == 'All' %}selected{% endif %}>{% translate "Channel: All" %}</option>
+            <option value="Email" {% if channel_filter == 'Email' %}selected{% endif %}>{% translate "Email" %}</option>
+            <option value="SMS" {% if channel_filter == 'SMS' %}selected{% endif %}>{% translate "SMS" %}</option>
+            <option value="Not Configured" {% if channel_filter == 'Not Configured' %}selected{% endif %}>{% translate "Not Configured" %}</option>
           </select>
         </div>
 
@@ -182,7 +182,7 @@
                 {% endif %}
               </a>
             </th>
-            <th>{% translate "ACTIONS" %}</th>
+            <th>{% translate "Actions" %}</th>
           </tr>
         </thead>
         <tbody>
@@ -190,12 +190,12 @@
             {% if row.row_type == 'mapped' %}
               <tr>
                 <td>{{ row.list_rank }}</td>
-                <td>{{ row.mapping.get_system_event_display }}</td>
-                <td>{{ row.mapping.primary_channel }}</td>
+                <td>{{ row.event_label }}</td>
+                <td>{% if row.mapping.primary_channel == 'Email' %}{% translate "Email" %}{% elif row.mapping.primary_channel == 'SMS' %}{% translate "SMS" %}{% else %}{{ row.mapping.primary_channel }}{% endif %}</td>
                 <td>{{ row.mapping.primary_template.template_name|default:'-' }}</td>
-                <td>{{ row.mapping.fallback_channel|default:'-' }}</td>
+                <td>{% if row.mapping.fallback_channel == 'Email' %}{% translate "Email" %}{% elif row.mapping.fallback_channel == 'SMS' %}{% translate "SMS" %}{% elif row.mapping.fallback_channel %}{{ row.mapping.fallback_channel }}{% else %}-{% endif %}</td>
                 <td>{{ row.mapping.fallback_template.template_name|default:'-' }}</td>
-                <td>{% if row.mapping.is_active %}<span class="status-badge active">Active</span>{% else %}<span class="status-badge inactive">Inactive</span>{% endif %}</td>
+                <td>{% if row.mapping.is_active %}<span class="status-badge active">{% translate "Active" %}</span>{% else %}<span class="status-badge inactive">{% translate "Inactive" %}</span>{% endif %}</td>
                 <td class="text-nowrap">
                   <div class="eal-actions-cell">
                     <a href="{% url 'event_mapping_edit' row.mapping.mapping_id %}" class="eal-row-btn"><i class="bi bi-pencil"></i></a>
@@ -211,10 +211,10 @@
                 <td>{{ row.list_rank }}</td>
                 <td>{{ row.event.label }}</td>
                 <td colspan="5">
-                  <span class="text-warning fw-semibold">⚠ Not Configured</span>
+                  <span class="text-warning fw-semibold">⚠ {% translate "Not Configured" %}</span>
                 </td>
                 <td>
-                  <a href="{% url 'event_mapping_create' %}?system_event={{ row.event.code }}" class="eal-row-btn" title="Configure">
+                  <a href="{% url 'event_mapping_create' %}?system_event={{ row.event.code }}" class="eal-row-btn" title="{% translate 'Configure' %}">
                     <i class="bi bi-plus-circle"></i>
                   </a>
                 </td>
@@ -227,7 +227,7 @@
                 <div class="notification-empty">
                   <div class="empty-icon"><i class="bi bi-inbox"></i></div>
                   <h4 class="empty-title">{% translate "No Data Found" %}</h4>
-                  <p class="empty-text">No events found.</p>
+                  <p class="empty-text">{% translate "No events found." %}</p>
                 </div>
               </td>
             </tr>

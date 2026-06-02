@@ -33,6 +33,31 @@ _TEXTAREA_ATTRS = {'class': 'form-control', 'rows': 3}
 _LEGAL_RICH_TEXTAREA_ATTRS = {'class': 'form-control', 'rows': 16}
 
 
+def _humanize_cms_label(field_name: str) -> str:
+    tokens = field_name.split('_')
+    normalized = []
+    for token in tokens:
+        low = token.lower()
+        if low in ('en', 'ar'):
+            normalized.append(low.upper())
+        elif low == 'cta':
+            normalized.append('CTA')
+        elif low == 'url':
+            normalized.append('URL')
+        elif low == 'seo':
+            normalized.append('SEO')
+        else:
+            normalized.append(token.capitalize())
+    return ' '.join(normalized)
+
+
+def _apply_translated_labels(form):
+    for name, field in form.fields.items():
+        if not field.label:
+            continue
+        field.label = _(_humanize_cms_label(name))
+
+
 def _apply_home_page_widgets(form):
     for name, field in form.fields.items():
         mf = HomePageContent._meta.get_field(name)
@@ -173,6 +198,7 @@ class HomePageContentForm(ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         _apply_home_page_widgets(self)
+        _apply_translated_labels(self)
 
 
 class HomeServiceCardForm(ModelForm):
@@ -183,6 +209,7 @@ class HomeServiceCardForm(ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         _apply_child_widgets(self, HomeServiceCard)
+        _apply_translated_labels(self)
 
 
 class HomePricingTierForm(ModelForm):
@@ -193,6 +220,7 @@ class HomePricingTierForm(ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         _apply_child_widgets(self, HomePricingTier)
+        _apply_translated_labels(self)
 
 
 class HomeTestimonialForm(ModelForm):
@@ -203,6 +231,7 @@ class HomeTestimonialForm(ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         _apply_child_widgets(self, HomeTestimonial)
+        _apply_translated_labels(self)
 
 
 class HomeMapLocationForm(ModelForm):
@@ -213,6 +242,7 @@ class HomeMapLocationForm(ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         _apply_child_widgets(self, HomeMapLocation)
+        _apply_translated_labels(self)
 
 
 class HomePricingBenefitForm(ModelForm):
@@ -223,6 +253,7 @@ class HomePricingBenefitForm(ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         _apply_child_widgets(self, HomePricingBenefit)
+        _apply_translated_labels(self)
 
 
 class AboutPageContentForm(ModelForm):

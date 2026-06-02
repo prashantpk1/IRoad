@@ -19,7 +19,7 @@
         {% if request.user.is_root %}
             <a href="{% url 'notif_template_create' %}" class="eal-btn eal-btn-primary">
               <i class="bi bi-plus-lg"></i>
-              <span>Add Template</span>
+              <span>{% translate "Add Template" %}</span>
             </a>
           {% endif %}
       </div>
@@ -33,7 +33,7 @@
         <div class="eal-toolbar-left" style="width: 100%; display:flex; gap: 16px; align-items:center; flex-wrap:wrap;">
           <div class="eal-search" style="flex: 1; min-width: 250px; margin-bottom: 0;">
             <i class="bi bi-search"></i>
-            <input type="text" name="q" value="{{ search_query }}" placeholder="Template name" />
+            <input type="text" name="q" value="{{ search_query }}" placeholder="{% translate 'Template name' %}" />
             <input type="hidden" name="sort" value="{{ current_sort }}">
             <input type="hidden" name="dir" value="{{ current_dir }}">
             <input type="hidden" name="status" value="{{ status_filter }}">
@@ -58,16 +58,16 @@
 
           <div style="width: 180px">
             <select name="channel" class="eal-select" onchange="this.form.submit()">
-              <option value="All" {% if channel_filter == 'All' %}selected{% endif %}>Channel: All</option>
-              <option value="Email" {% if channel_filter == 'Email' %}selected{% endif %}>Email</option>
-              <option value="SMS" {% if channel_filter == 'SMS' %}selected{% endif %}>SMS</option>
+              <option value="All" {% if channel_filter == 'All' %}selected{% endif %}>{% translate "Channel: All" %}</option>
+              <option value="Email" {% if channel_filter == 'Email' %}selected{% endif %}>{% translate "Email" %}</option>
+              <option value="SMS" {% if channel_filter == 'SMS' %}selected{% endif %}>{% translate "SMS" %}</option>
             </select>
           </div>
           <div style="width: 200px">
             <select name="category" class="eal-select" onchange="this.form.submit()">
-              <option value="All" {% if category_filter == 'All' %}selected{% endif %}>Category: All</option>
-              <option value="Transactional" {% if category_filter == 'Transactional' %}selected{% endif %}>Transactional</option>
-              <option value="Promotional" {% if category_filter == 'Promotional' %}selected{% endif %}>Promotional</option>
+              <option value="All" {% if category_filter == 'All' %}selected{% endif %}>{% translate "Category: All" %}</option>
+              <option value="Transactional" {% if category_filter == 'Transactional' %}selected{% endif %}>{% translate "Transactional" %}</option>
+              <option value="Promotional" {% if category_filter == 'Promotional' %}selected{% endif %}>{% translate "Promotional" %}</option>
             </select>
           </div>
 
@@ -147,7 +147,7 @@
                 </a>
               </th>
               {% if request.user.is_root %}
-              <th style="width: 120px; text-align: left; padding-left: 16px;">{% translate "ACTIONS" %}</th>
+              <th style="width: 120px; text-align: left; padding-left: 16px;">{% translate "Actions" %}</th>
               {% endif %}
             </tr>
           </thead>
@@ -158,24 +158,24 @@
                 <td><span class="fw-semibold text-dark">{{ t.template_name }}</span></td>
                 <td>
                   {% if t.channel_type == 'Email' %}
-                    <span class="eal-type-badge blue">Email</span>
+                    <span class="eal-type-badge blue">{% translate "Email" %}</span>
                   {% else %}
-                    <span class="eal-type-badge emerald">SMS</span>
+                    <span class="eal-type-badge emerald">{% translate "SMS" %}</span>
                   {% endif %}
                 </td>
                 <td>
                   {% if t.category == 'Transactional' %}
-                    <span class="eal-type-badge indigo">Transactional</span>
+                    <span class="eal-type-badge indigo">{% translate "Transactional" %}</span>
                   {% else %}
-                    <span class="eal-type-badge org">Promotional</span>
+                    <span class="eal-type-badge org">{% translate "Promotional" %}</span>
                   {% endif %}
                 </td>
                 <td><span class="text-muted small">{{ t.subject_en|default:'-'|truncatechars:40 }}</span></td>
                 <td>
                   {% if t.is_active %}
-                    <span class="status-badge active">Active</span>
+                    <span class="status-badge active">{% translate "Active" %}</span>
                   {% else %}
-                    <span class="status-badge inactive">Inactive</span>
+                    <span class="status-badge inactive">{% translate "Inactive" %}</span>
                   {% endif %}
                 </td>
                 {% if request.user.is_root %}
@@ -184,27 +184,27 @@
                     <button type="button" class="eal-row-btn preview-template-btn icon-only-btn" 
                             data-template-id="{{ t.template_id }}" 
                             data-template-name="{{ t.template_name }}"
-                            title="Preview Template">
+                            title="{% translate 'Preview Template' %}">
                       <i class="bi bi-eye"></i>
                     </button>
-                    <a href="{% url 'notif_template_edit' t.template_id %}" class="eal-row-btn icon-only-btn" title="Edit">
+                    <a href="{% url 'notif_template_edit' t.template_id %}" class="eal-row-btn icon-only-btn" title="{% translate 'Edit' %}">
                       <i class="bi bi-pencil"></i>
                     </a>
                     <form method="post" action="{% url 'notif_template_toggle' t.template_id %}" style="display:inline">
                       {% csrf_token %}
                       {% if t.is_active %}
-                        <button type="submit" class="eal-row-btn icon-only-btn" title="Deactivate">
+                        <button type="submit" class="eal-row-btn icon-only-btn" title="{% translate 'Deactivate' %}">
                           <i class="bi bi-slash-circle"></i>
                         </button>
                       {% else %}
-                        <button type="submit" class="eal-row-btn icon-only-btn" title="Activate">
+                        <button type="submit" class="eal-row-btn icon-only-btn" title="{% translate 'Activate' %}">
                           <i class="bi bi-check-circle"></i>
                         </button>
                       {% endif %}
                     </form>
-                    <form method="post" action="{% url 'notif_template_delete' t.template_id %}" style="display:inline" onsubmit="return confirm('Remove this template?');">
+                    <form method="post" action="{% url 'notif_template_delete' t.template_id %}" style="display:inline" onsubmit="return confirm('{% translate "Remove this template?" %}');">
                       {% csrf_token %}
-                      <button type="submit" class="eal-row-btn icon-only-btn" title="Delete (Soft)">
+                      <button type="submit" class="eal-row-btn icon-only-btn" title="{% translate 'Delete (Soft)' %}">
                         <i class="bi bi-trash"></i>
                       </button>
                     </form>
@@ -217,7 +217,7 @@
         </table>
       </div>
     {% else %}
-      <div class="notification-empty"><div class="empty-icon"><i class="bi bi-file-earmark-text"></i></div><h4 class="empty-title">No templates found.</h4><p class="empty-text">Try different filters or add a template.</p></div>
+      <div class="notification-empty"><div class="empty-icon"><i class="bi bi-file-earmark-text"></i></div><h4 class="empty-title">{% translate "No templates found." %}</h4><p class="empty-text">{% translate "Try different filters or add a template." %}</p></div>
     {% endif %}
     {% include 'partials/pagination.html' with page_obj=templates_page %}
   </div>
@@ -232,7 +232,7 @@
               <i class="bi bi-eye-fill fs-5"></i>
             </div>
             <div>
-              <h5 class="modal-title fw-bold mb-0" id="previewModalLabel">Template Preview</h5>
+              <h5 class="modal-title fw-bold mb-0" id="previewModalLabel">{% translate "Template Preview" %}</h5>
               <p class="small text-white text-opacity-75 mb-0" id="previewModalSubtitle"></p>
             </div>
           </div>
@@ -241,18 +241,18 @@
             <!-- Language Toggle -->
             <div class="btn-group btn-group-sm bg-white bg-opacity-10 p-1 rounded-pill">
               <input type="radio" class="btn-check lang-toggle" name="preview_lang" id="lang_en" value="en" checked>
-              <label class="btn btn-sm btn-outline-light border-0 rounded-pill px-3" for="lang_en">EN</label>
+              <label class="btn btn-sm btn-outline-light border-0 rounded-pill px-3" for="lang_en">{% translate "EN" %}</label>
               
               <input type="radio" class="btn-check lang-toggle" name="preview_lang" id="lang_ar" value="ar">
-              <label class="btn btn-sm btn-outline-light border-0 rounded-pill px-3" for="lang_ar">AR</label>
+              <label class="btn btn-sm btn-outline-light border-0 rounded-pill px-3" for="lang_ar">{% translate "AR" %}</label>
             </div>
             
             <!-- Device Toggle -->
             <div class="btn-group btn-group-sm bg-white bg-opacity-10 p-1 rounded-pill ms-2 d-none d-md-flex" style="gap: 2px;">
-              <button type="button" class="btn btn-sm btn-outline-light border-0 rounded-pill device-toggle active" data-device="desktop" title="Desktop View">
+              <button type="button" class="btn btn-sm btn-outline-light border-0 rounded-pill device-toggle active" data-device="desktop" title="{% translate 'Desktop View' %}">
                 <i class="bi bi-display"></i>
               </button>
-              <button type="button" class="btn btn-sm btn-outline-light border-0 rounded-pill device-toggle" data-device="mobile" title="Mobile View">
+              <button type="button" class="btn btn-sm btn-outline-light border-0 rounded-pill device-toggle" data-device="mobile" title="{% translate 'Mobile View' %}">
                 <i class="bi bi-smartphone"></i>
               </button>
             </div>
@@ -272,10 +272,10 @@
         </div>
         <div class="modal-footer bg-white border-0 px-4 py-3">
           <span class="text-muted small me-auto">
-            <i class="bi bi-info-circle me-1"></i> Previews may vary slightly depending on email clients.
+            <i class="bi bi-info-circle me-1"></i> {% translate "Previews may vary slightly depending on email clients." %}
           </span>
-          <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Close</button>
-          <a id="editTemplateBtn" href="#" class="btn btn-primary rounded-pill px-4">Edit Template</a>
+          <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">{% translate "Close" %}</button>
+          <a id="editTemplateBtn" href="#" class="btn btn-primary rounded-pill px-4">{% translate "Edit Template" %}</a>
         </div>
       </div>
     </div>
@@ -407,9 +407,9 @@
             <html>
               <body style="font-family: Inter, Arial, sans-serif; margin:0; background:#f8fafc; color:#0f172a;">
                 <div style="max-width:560px; margin:72px auto; padding:24px; background:#fff; border:1px solid #e2e8f0; border-radius:12px;">
-                  <h3 style="margin:0 0 8px; font-size:18px;">Preview unavailable</h3>
+                  <h3 style="margin:0 0 8px; font-size:18px;">{% filter escapejs %}{% translate "Preview unavailable" %}{% endfilter %}</h3>
                   <p style="margin:0; color:#475569; line-height:1.6;">
-                    We could not load this template preview right now. Please try again or open Edit Template to review content.
+                    {% filter escapejs %}{% translate "We could not load this template preview right now. Please try again or open Edit Template to review content." %}{% endfilter %}
                   </p>
                 </div>
               </body>

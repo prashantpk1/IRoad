@@ -40,7 +40,7 @@
             <div class="logo-preview-container" style="margin-bottom: 16px;">
               {% if obj.company_logo %}
                 <div class="d-flex align-items-center gap-3 p-3 bg-light rounded-3 border">
-                  <img src="{{ obj.company_logo.url }}" alt="Logo" style="height: 64px; object-fit: contain;">
+                  <img src="{{ obj.company_logo.url }}" alt="{% translate 'Logo' %}" style="height: 64px; object-fit: contain;">
                   <span class="small text-muted">{% translate "Current Logo" %}</span>
                 </div>
               {% else %}
@@ -117,12 +117,12 @@
 </form>
 
   <div style="margin-top: 14px; color: #64748b; font-weight: 600">
-    Last updated by:
+    {% translate "Last updated by:" %}
     {% if obj.updated_by %}
       {{ obj.updated_by.email }}
     {% else %}
-      Unknown
+      {% translate "Unknown" %}
     {% endif %}
-    at {{ obj.updated_at }}
+    {% translate "at" %} {{ obj.updated_at }}
   </div>
 {% endblock %}

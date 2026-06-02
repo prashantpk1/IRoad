@@ -25,15 +25,15 @@
   {% if is_edit and account and account.updated_at %}
   <div class="edit-info-bar">
     <i class="bi bi-clock-history"></i>
-    Last updated
+    {% translate "Last updated" %}
     {% if account.updated_by %}
-      by <strong>{{ account.updated_by.first_name }} {{ account.updated_by.last_name }}</strong>
+      {% translate "by" %} <strong>{{ account.updated_by.first_name }} {{ account.updated_by.last_name }}</strong>
     {% endif %}
-    at <strong>{{ account.updated_at|date:"d M Y, H:i" }}</strong>
+    {% translate "at" %} <strong>{{ account.updated_at|date:"d M Y, H:i" }}</strong>
   </div>
   {% endif %}
   <div class="alert alert-info mb-3">
-    <p class="mb-0 fw-semibold">IBAN stored uppercase, spaces removed.</p>
+    <p class="mb-0 fw-semibold">{% translate "IBAN stored uppercase, spaces removed." %}</p>
   </div>
 
   <div class="form-card">
@@ -50,8 +50,8 @@
           <i class="bi bi-bank"></i>
         </div>
         <div class="form-card-header-text">
-          <h3 class="form-card-title mb-0">Bank Details</h3>
-          <p class="form-card-desc mb-0">Enter the bank account information used for offline payments.</p>
+          <h3 class="form-card-title mb-0">{% translate "Bank Details" %}</h3>
+          <p class="form-card-desc mb-0">{% translate "Enter the bank account information used for offline payments." %}</p>
         </div>
       </div>
 
@@ -60,7 +60,7 @@
 
         <div class="fields-grid cols-2">
           <div class="field">
-            <label class="form-label">Bank Name</label>
+            <label class="form-label">{% translate "Bank Name" %}</label>
             {{ form.bank_name }}
             {% for error in form.bank_name.errors %}
               <div class="text-danger mt-1 fw-semibold">{{ error }}</div>
@@ -68,7 +68,7 @@
           </div>
 
           <div class="field">
-            <label class="form-label">Account Holder Name</label>
+            <label class="form-label">{% translate "Account Holder Name" %}</label>
             {{ form.account_holder_name }}
             {% for error in form.account_holder_name.errors %}
               <div class="text-danger mt-1 fw-semibold">{{ error }}</div>
@@ -76,7 +76,7 @@
           </div>
 
           <div class="field">
-            <label class="form-label">IBAN Number</label>
+            <label class="form-label">{% translate "IBAN Number" %}</label>
             {{ form.iban_number }}
             {% for error in form.iban_number.errors %}
               <div class="text-danger mt-1 fw-semibold">{{ error }}</div>
@@ -84,7 +84,7 @@
           </div>
 
           <div class="field">
-            <label class="form-label">Account Number</label>
+            <label class="form-label">{% translate "Account Number" %}</label>
             {{ form.account_number }}
             {% for error in form.account_number.errors %}
               <div class="text-danger mt-1 fw-semibold">{{ error }}</div>
@@ -92,7 +92,7 @@
           </div>
 
           <div class="field">
-            <label class="form-label">SWIFT Code</label>
+            <label class="form-label">{% translate "SWIFT Code" %}</label>
             {{ form.swift_code }}
             {% for error in form.swift_code.errors %}
               <div class="text-danger mt-1 fw-semibold">{{ error }}</div>
@@ -100,7 +100,7 @@
           </div>
 
           <div class="field">
-            <label class="form-label">Currency</label>
+            <label class="form-label">{% translate "Currency" %}</label>
             {{ form.currency }}
             {% for error in form.currency.errors %}
               <div class="text-danger mt-1 fw-semibold">{{ error }}</div>
@@ -108,15 +108,15 @@
           </div>
 
           <div class="field">
-            <div class="form-label d-block mb-0">Cross-currency payments</div>
+            <div class="form-label d-block mb-0">{% translate "Cross-currency payments" %}</div>
             <div class="form-check form-switch mt-2">
               {{ form.allow_cross_currency_payments }}
               <label class="form-check-label ms-1" for="{{ form.allow_cross_currency_payments.id_for_label }}">
-                <span class="fw-medium">Allow cross-currency payments</span>
+                <span class="fw-medium">{% translate "Allow cross-currency payments" %}</span>
               </label>
             </div>
             <small class="text-muted d-block mt-1">
-              When enabled, this account can receive transfers for invoices in other currencies using internal FX conversion.
+              {% translate "When enabled, this account can receive transfers for invoices in other currencies using internal FX conversion." %}
             </small>
             {% for error in form.allow_cross_currency_payments.errors %}
               <div class="text-danger mt-1 fw-semibold">{{ error }}</div>
@@ -124,11 +124,11 @@
           </div>
 
           <div class="field">
-            <div class="form-label d-block mb-0">Status</div>
+            <div class="form-label d-block mb-0">{% translate "Status" %}</div>
             <div class="form-check form-switch mt-2">
               {{ form.is_active }}
               <label class="form-check-label ms-1" for="{{ form.is_active.id_for_label }}">
-                <span class="fw-medium">Active account</span>
+                <span class="fw-medium">{% translate "Active account" %}</span>
               </label>
             </div>
             {% for error in form.is_active.errors %}

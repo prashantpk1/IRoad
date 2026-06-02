@@ -19,7 +19,7 @@
       <div class="eal-header-actions">
         <a href="{% url 'fx_rate_list' %}" class="eal-btn eal-btn-outline">
             <i class="bi bi-arrow-left"></i>
-            <span>Back</span>
+            <span>{% translate "Back" %}</span>
           </a>
       </div>
     </div>
@@ -28,13 +28,13 @@
 
   {% if is_edit %}
     <div class="alert alert-info" style="margin-bottom: 16px;">
-      Currency field is disabled while editing an existing rate.
+      {% translate "Currency field is disabled while editing an existing rate." %}
     </div>
   {% endif %}
 
   <div style="margin-bottom: 16px; padding: 12px 14px; border-radius: 10px; background:#eff6ff; border:1px solid #dbeafe">
     <p style="margin: 0; font-weight: 700; color:#1e3a8a">
-      Rate is relative to base currency
+      {% translate "Rate is relative to base currency" %}
       <span style="font-family: monospace">{{ base_currency_code|default:'SAR' }}</span>
     </p>
   </div>
@@ -62,21 +62,21 @@
         <div class="field-group">
           <div class="fields-grid cols-2">
             <div class="field">
-              <label class="form-label">Currency</label>
+              <label class="form-label">{% translate "Currency" %}</label>
               {{ form.currency }}
               {% for error in form.currency.errors %}
                 <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
               {% endfor %}
             </div>
             <div class="field">
-              <label class="form-label">Exchange Rate</label>
+              <label class="form-label">{% translate "Exchange Rate" %}</label>
               {{ form.exchange_rate }}
               {% for error in form.exchange_rate.errors %}
                 <div style="margin-top: 6px; color: #b91c1c; font-weight: 600">{{ error }}</div>
               {% endfor %}
             </div>
             <div class="field">
-              <label class="form-label">Status</label>
+              <label class="form-label">{% translate "Status" %}</label>
               <div style="display:flex; align-items:center; gap:10px">
                 {{ form.is_active }}
               </div>
@@ -85,12 +85,12 @@
               {% endfor %}
             </div>
             <div class="field">
-              <label class="form-label">Reason for Change (optional)</label>
+              <label class="form-label">{% translate "Reason for Change (optional)" %}</label>
               <input
                 type="text"
                 name="change_notes"
                 class="form-control"
-                placeholder="e.g. Update due to market movement"
+                placeholder="{% translate 'e.g. Update due to market movement' %}"
               />
             </div>
           </div>

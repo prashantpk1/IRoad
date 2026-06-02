@@ -29,11 +29,11 @@
   {% if is_edit and gateway and gateway.updated_at %}
   <div class="edit-info-bar">
     <i class="bi bi-clock-history"></i>
-    Last updated
+    {% translate "Last updated" %}
     {% if gateway.updated_by %}
-      by <strong>{{ gateway.updated_by.first_name }} {{ gateway.updated_by.last_name }}</strong>
+      {% translate "by" %} <strong>{{ gateway.updated_by.first_name }} {{ gateway.updated_by.last_name }}</strong>
     {% endif %}
-    at <strong>{{ gateway.updated_at|date:"d M Y, H:i" }}</strong>
+    {% translate "at" %} <strong>{{ gateway.updated_at|date:"d M Y, H:i" }}</strong>
   </div>
   {% endif %}
 
@@ -157,6 +157,13 @@
     var masked = '{{ masked_placeholder|default:""|escapejs }}';
     var keepExisting = false;
 
+    var keyLabelText = "{% filter escapejs %}{% translate 'Key' %}{% endfilter %}";
+    var valueLabelText = "{% filter escapejs %}{% translate 'Value' %}{% endfilter %}";
+    var keyPlaceholderText = "{% filter escapejs %}{% translate 'e.g. public_key' %}{% endfilter %}";
+    var valuePlaceholderText = "{% filter escapejs %}{% translate 'Enter value' %}{% endfilter %}";
+    var removeTitleText = "{% filter escapejs %}{% translate 'Remove' %}{% endfilter %}";
+    var keepExistingText = "{% filter escapejs %}{% translate 'Existing credentials will stay unchanged unless you edit rows.' %}{% endfilter %}";
+
     if (!textarea || !rowsWrap || !addBtn || !formEl) return;
 
     function rowTemplate(key, value) {
@@ -164,15 +171,15 @@
       row.className = 'row g-2 align-items-end';
       row.innerHTML =
         '<div class="col-12 col-md-5">' +
-        '  <label class="form-label mb-1">Key</label>' +
-        '  <input type="text" class="form-control cred-key" placeholder="e.g. public_key">' +
+        '  <label class="form-label mb-1">' + keyLabelText + '</label>' +
+        '  <input type="text" class="form-control cred-key" placeholder="' + keyPlaceholderText + '">' +
         '</div>' +
         '<div class="col-12 col-md-6">' +
-        '  <label class="form-label mb-1">Value</label>' +
-        '  <input type="text" class="form-control cred-value" placeholder="Enter value">' +
+        '  <label class="form-label mb-1">' + valueLabelText + '</label>' +
+        '  <input type="text" class="form-control cred-value" placeholder="' + valuePlaceholderText + '">' +
         '</div>' +
         '<div class="col-12 col-md-1 d-grid">' +
-        '  <button type="button" class="eal-btn eal-btn-outline cred-remove" title="Remove">' +
+        '  <button type="button" class="eal-btn eal-btn-outline cred-remove" title="' + removeTitleText + '">' +
         '    <i class="bi bi-trash"></i>' +
         '  </button>' +
         '</div>';
@@ -210,7 +217,7 @@
 
     function updateHint() {
       if (keepExisting) {
-        hintEl.textContent = 'Existing credentials will stay unchanged unless you edit rows.';
+        hintEl.textContent = keepExistingText;
       } else {
         hintEl.textContent = '';
       }

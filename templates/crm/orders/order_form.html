@@ -47,7 +47,7 @@
               <input type="hidden" name="tenant" id="id_tenant" value="{{ tenant_preselect }}">
             {% else %}
               <select name="tenant" class="form-select" required id="id_tenant">
-                <option value="">---------</option>
+                <option value="">{% translate "Select" %}</option>
                 {% for t in tenants %}
                   <option value="{{ t.tenant_id }}" {% if tenant_preselect == t.tenant_id|stringformat:"s" %}selected{% endif %}>{{ t.company_name }}</option>
                 {% endfor %}
@@ -58,7 +58,21 @@
             <label class="form-label">{% translate "Classification" %}</label>
             <select name="order_classification" class="form-select" required id="id_classification">
               {% for code, label in classification_choices %}
-                <option value="{{ code }}">{{ label }}</option>
+                <option value="{{ code }}">
+                  {% if code == 'New_Subscription' %}
+                    {% translate "New Subscription" %}
+                  {% elif code == 'Renewal' %}
+                    {% translate "Renewal" %}
+                  {% elif code == 'Upgrade' %}
+                    {% translate "Upgrade" %}
+                  {% elif code == 'Downgrade' %}
+                    {% translate "Downgrade" %}
+                  {% elif code == 'Add_ons' %}
+                    {% translate "Add-ons" %}
+                  {% else %}
+                    {{ label }}
+                  {% endif %}
+                </option>
               {% endfor %}
             </select>
           </div>
@@ -66,7 +80,7 @@
             <label class="form-label">{% translate "Currency" %}</label>
             <select name="currency" class="form-select" required id="id_currency">
               {% for c in currencies %}
-                <option value="{{ c.currency_code }}">{{ c.currency_code }} - {{ c.name_en }}</option>
+                <option value="{{ c.currency_code }}">{{ c.currency_code }} - {% if LANGUAGE_CODE|slice:':2' == 'ar' and c.name_ar %}{{ c.name_ar }}{% else %}{{ c.name_en }}{% endif %}</option>
               {% endfor %}
             </select>
           </div>
@@ -79,7 +93,7 @@
             <label class="form-label">{% translate "Payment method" %}</label>
             <select name="payment_method" class="form-select" required id="id_payment_method">
               {% for m in payment_methods %}
-                <option value="{{ m.method_id }}">{{ m.method_name_en }}</option>
+                <option value="{{ m.method_id }}">{% if LANGUAGE_CODE|slice:':2' == 'ar' and m.method_name_ar %}{{ m.method_name_ar }}{% else %}{{ m.method_name_en }}{% endif %}</option>
               {% endfor %}
             </select>
           </div>
@@ -104,9 +118,15 @@
           <div class="col-12 col-md-6">
             <label class="form-label">{% translate "Plan" %}</label>
             <select name="plan" class="form-select" id="id_plan">
-              <option value="">---------</option>
+              <option value="">{% translate "Select" %}</option>
               {% for p in plans %}
-                <option value="{{ p.plan_id }}">{{ p.plan_name_en }}</option>
+                <option value="{{ p.plan_id }}">
+                  {% if LANGUAGE_CODE|slice:':2' == 'ar' and p.plan_name_ar %}
+                    {{ p.plan_name_ar }}
+                  {% else %}
+                    {{ p.plan_name_en }}
+                  {% endif %}
+                </option>
               {% endfor %}
             </select>
           </div>
@@ -219,6 +239,16 @@
   data-hint-upgrade="{% translate 'Estimated credit for unused time on the current plan — in selected order currency (same as save).' %}"
   data-hint-upgrade-none="{% translate 'No credit calculated. Ensure the subscriber has a current plan and dates, and pricing exists for the selected currency.' %}"
   data-hint-select-tenant="{% translate 'Select a subscriber to load upgrade credit for the chosen currency.' %}"
+  data-hint-no-pricing-currency="{% translate 'No pricing for this currency. Choose another currency or add plan pricing.' %}"
+  data-hint-no-pricing-plan="{% translate 'No pricing for this plan. Add pricing cycles in Subscription Plans.' %}"
+  data-hint-promo-unavailable="{% translate 'Promo check is temporarily unavailable.' %}"
+  data-hint-promo-valid="{% translate 'Promo is valid. Select plan/add-ons to calculate discount.' %}"
+  data-hint-promo-applied="{% translate 'Promo applied. Discount:' %}"
+  data-hint-promo-invalid="{% translate 'Invalid or Expired Code.' %}"
+  data-hint-live-preview="{% translate 'Live preview warning:' %}"
+  data-hint-live-preview-fallback="{% translate 'Live preview is temporarily unavailable. Showing local estimate only.' %}"
+  data-alert-select-tenant="{% translate 'Select a subscriber before continuing with billing operations.' %}"
+  data-unlimited="{% translate 'Unlimited' %}"
 ></div>
 
 {{ pricing_data|json_script:"crm-order-pricing" }}
@@ -238,7 +268,7 @@
     <div class="field col-md-4">
       <label class="form-label small">{% translate "Add-on type" %}</label>
       <select name="addon_add_on_type" class="form-select form-select-sm addon-type">
-        <option value="">---------</option>
+        <option value="">{% translate "Select" %}</option>
         {% for code, label in addon_type_choices %}
           <option value="{{ code }}">{{ label }}</option>
         {% endfor %}
@@ -428,9 +458,13 @@
     if (!rows.length) {
       if (planPriceHintEl) {
         const anyCur = pricing.some(function (r) { return normUuid(r.plan_id) === pidN; });
-        planPriceHintEl.textContent = anyCur
-          ? ('No pricing for ' + cur + '. Choose another currency or add plan pricing.')
+        var noPricingCurrency = (uiStrings && uiStrings.dataset.hintNoPricingCurrency)
+          ? uiStrings.dataset.hintNoPricingCurrency
+          : 'No pricing for this currency. Choose another currency or add plan pricing.';
+        var noPricingPlan = (uiStrings && uiStrings.dataset.hintNoPricingPlan)
+          ? uiStrings.dataset.hintNoPricingPlan
           : 'No pricing for this plan. Add pricing cycles in Subscription Plans.';
+        planPriceHintEl.textContent = anyCur ? noPricingCurrency : noPricingPlan;
       }
       return null;
     }
@@ -504,7 +538,9 @@
       return;
     }
     if (!promoData) {
-      promoHintEl.textContent = 'Promo check is temporarily unavailable.';
+      promoHintEl.textContent = (uiStrings && uiStrings.dataset.hintPromoUnavailable)
+        ? uiStrings.dataset.hintPromoUnavailable
+        : 'Promo check is temporarily unavailable.';
       promoHintEl.classList.remove('text-success', 'text-danger');
       promoHintEl.classList.add('text-muted');
       return;
@@ -513,15 +549,23 @@
       var discount = parseFloat(promoData.discount_amount || 0) || 0;
       var sub = parseFloat((document.getElementById('pv_sub_input') || {}).value || '0') || 0;
       if (discount <= 0 && sub <= 0) {
-        promoHintEl.textContent = 'Promo is valid. Select plan/add-ons to calculate discount.';
+        promoHintEl.textContent = (uiStrings && uiStrings.dataset.hintPromoValid)
+          ? uiStrings.dataset.hintPromoValid
+          : 'Promo is valid. Select plan/add-ons to calculate discount.';
       } else {
-      promoHintEl.textContent = 'Promo applied. Discount: ' + discount.toFixed(2);
+      var promoAppliedPrefix = (uiStrings && uiStrings.dataset.hintPromoApplied)
+        ? uiStrings.dataset.hintPromoApplied
+        : 'Promo applied. Discount:';
+      promoHintEl.textContent = promoAppliedPrefix + ' ' + discount.toFixed(2);
       }
       promoHintEl.classList.remove('text-danger', 'text-muted');
       promoHintEl.classList.add('text-success');
       return;
     }
-    var msg = (promoData && promoData.error) ? promoData.error : 'Invalid or Expired Code.';
+    var fallbackInvalid = (uiStrings && uiStrings.dataset.hintPromoInvalid)
+      ? uiStrings.dataset.hintPromoInvalid
+      : 'Invalid or Expired Code.';
+    var msg = (promoData && promoData.error) ? promoData.error : fallbackInvalid;
     promoHintEl.textContent = msg;
     promoHintEl.classList.remove('text-success', 'text-muted');
     promoHintEl.classList.add('text-danger');
@@ -615,7 +659,11 @@
     function formatProjectedLimit(v, hasProjectedPlan) {
       if (v == null || v === '') return '';
       var n = parseInt(String(v), 10);
-      if (!Number.isNaN(n) && n === -1) return 'Unlimited';
+      if (!Number.isNaN(n) && n === -1) {
+        return (uiStrings && uiStrings.dataset.unlimited)
+          ? uiStrings.dataset.unlimited
+          : 'Unlimited';
+      }
       if (!Number.isNaN(n) && n === 0) return hasProjectedPlan ? '-' : '0';
       return String(v);
     }
@@ -678,10 +726,13 @@
         if (!resp.httpOk || !data || !data.ok) {
           refreshTotalsPreview();
           updatePromoHint(null);
-          setProjectedHint(
-            (data && data.error) ? ('Live preview warning: ' + data.error) : 'Live preview is temporarily unavailable. Showing local estimate only.',
-            true,
-          );
+          var previewWarnPrefix = (uiStrings && uiStrings.dataset.hintLivePreview)
+            ? uiStrings.dataset.hintLivePreview
+            : 'Live preview warning:';
+          var previewFallback = (uiStrings && uiStrings.dataset.hintLivePreviewFallback)
+            ? uiStrings.dataset.hintLivePreviewFallback
+            : 'Live preview is temporarily unavailable. Showing local estimate only.';
+          setProjectedHint((data && data.error) ? (previewWarnPrefix + ' ' + data.error) : previewFallback, true);
           return;
         }
         const totals = data.totals || {};
@@ -705,7 +756,12 @@
       .catch(function () {
         refreshTotalsPreview();
         updatePromoHint(null);
-        setProjectedHint('Live preview is temporarily unavailable. Showing local estimate only.', true);
+        setProjectedHint(
+          (uiStrings && uiStrings.dataset.hintLivePreviewFallback)
+            ? uiStrings.dataset.hintLivePreviewFallback
+            : 'Live preview is temporarily unavailable. Showing local estimate only.',
+          true
+        );
       });
   }
 
@@ -745,7 +801,11 @@
     orderFormEl.addEventListener('submit', function (ev) {
       if (!hasSelectedTenant()) {
         ev.preventDefault();
-        alert('Select a tenant before continuing with billing operations.');
+        alert(
+          (uiStrings && uiStrings.dataset.alertSelectTenant)
+            ? uiStrings.dataset.alertSelectTenant
+            : 'Select a subscriber before continuing with billing operations.'
+        );
       }
     });
   }

@@ -54,7 +54,7 @@
 
     <div class="col-12">
       <label class="form-label">{% translate "Description" %}</label>
-      <textarea class="form-control" rows="4" readonly aria-readonly="true" style="resize: none;">{% if role.description %}{{ role.description }}{% else %}—{% endif %}</textarea>
+      <textarea class="form-control {% if LANGUAGE_CODE == 'ar' %}arabic-text{% endif %}" rows="4" readonly aria-readonly="true" style="resize: none;">{% if role.get_localized_description %}{{ role.get_localized_description }}{% else %}—{% endif %}</textarea>
     </div>
 
     <div class="col-12 col-md-6">

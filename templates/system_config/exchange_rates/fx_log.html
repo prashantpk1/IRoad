@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load i18n %}
 
-{% block page_title %}FX Rate Change Log{% endblock %}
+{% block page_title %}{% translate "FX Rate Change Log" %}{% endblock %}
 
 {% block breadcrumb_items %}
   <li class="breadcrumb-item active" aria-current="page">{% translate "FX Rate Change Log" %}</li>
@@ -40,14 +40,14 @@
 <div class="page-header">
   <div class="page-header-row">
     <div class="page-header-left">
-      <h1 class="page-title">FX Rate Change Log</h1>
-      <p class="page-subtitle text-muted font-weight-normal">Read-only history of exchange-rate changes</p>
+      <h1 class="page-title">{% translate "FX Rate Change Log" %}</h1>
+      <p class="page-subtitle text-muted font-weight-normal">{% translate "Read-only history of exchange-rate changes" %}</p>
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
         <a href="{% url 'fx_rate_list' %}" class="eal-btn eal-btn-outline">
           <i class="bi bi-chevron-left"></i>
-          <span>Back to Exchange Rates</span>
+          <span>{% translate "Back to Exchange Rates" %}</span>
         </a>
       </div>
     </div>
@@ -70,13 +70,13 @@
         </div>
         <div style="width: 340px">
           <select name="currency" class="eal-select" onchange="this.form.submit()">
-            <option value="" {% if not selected_currency_code %}selected{% endif %}>All currencies</option>
+            <option value="" {% if not selected_currency_code %}selected{% endif %}>{% translate "All currencies" %}</option>
             {% for c in currencies %}
               <option
                 value="{{ c.currency_code }}"
                 {% if selected_currency_code == c.currency_code %}selected{% endif %}
               >
-                {{ c.currency_code }} - {{ c.name_en }}
+                {{ c.currency_code }} - {% if LANGUAGE_CODE|slice:':2' == 'ar' and c.name_ar %}{{ c.name_ar }}{% else %}{{ c.name_en }}{% endif %}
               </option>
             {% endfor %}
           </select>
@@ -85,7 +85,7 @@
         {% if selected_currency_code or search_query %}
           <a href="{% url 'fx_change_log' %}" class="eal-btn eal-btn-outline" style="border-style: dashed; color: var(--text-muted); height: 32px; padding: 0 12px; font-size: 11px">
             <i class="bi bi-x-circle"></i>
-            <span>Clear Filters</span>
+            <span>{% translate "Clear Filters" %}</span>
           </a>
         {% endif %}
       </div>
@@ -108,7 +108,7 @@
             </th>
             <th class="sortable" style="width: 140px">
               <a href="?q={{ search_query|urlencode }}&currency={{ selected_currency_code }}&sort=currency&dir={% if current_sort == 'currency' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                <span>Currency</span>
+                <span>{% translate "Currency" %}</span>
                 {% if current_sort == 'currency' %}
                   <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
                 {% else %}
@@ -118,7 +118,7 @@
             </th>
             <th class="sortable" style="width: 160px">
               <a href="?q={{ search_query|urlencode }}&currency={{ selected_currency_code }}&sort=old_rate&dir={% if current_sort == 'old_rate' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                <span>Old Rate</span>
+                <span>{% translate "Old Rate" %}</span>
                 {% if current_sort == 'old_rate' %}
                   <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
                 {% else %}
@@ -128,7 +128,7 @@
             </th>
             <th class="sortable" style="width: 160px">
               <a href="?q={{ search_query|urlencode }}&currency={{ selected_currency_code }}&sort=new_rate&dir={% if current_sort == 'new_rate' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                <span>New Rate</span>
+                <span>{% translate "New Rate" %}</span>
                 {% if current_sort == 'new_rate' %}
                   <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
                 {% else %}
@@ -138,7 +138,7 @@
             </th>
             <th class="sortable" style="width: 160px">
               <a href="?q={{ search_query|urlencode }}&currency={{ selected_currency_code }}&sort=change&dir={% if current_sort == 'change' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                <span>Change±</span>
+                <span>{% translate "Change±" %}</span>
                 {% if current_sort == 'change' %}
                   <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
                 {% else %}
@@ -148,7 +148,7 @@
             </th>
             <th class="sortable">
               <a href="?q={{ search_query|urlencode }}&currency={{ selected_currency_code }}&sort=notes&dir={% if current_sort == 'notes' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                <span>Notes</span>
+                <span>{% translate "Notes" %}</span>
                 {% if current_sort == 'notes' %}
                   <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
                 {% else %}
@@ -158,7 +158,7 @@
             </th>
             <th class="sortable" style="width: 160px">
               <a href="?q={{ search_query|urlencode }}&currency={{ selected_currency_code }}&sort=changed_by&dir={% if current_sort == 'changed_by' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                <span>Changed By</span>
+                <span>{% translate "Changed By" %}</span>
                 {% if current_sort == 'changed_by' %}
                   <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
                 {% else %}
@@ -168,7 +168,7 @@
             </th>
             <th class="sortable" style="width: 190px">
               <a href="?q={{ search_query|urlencode }}&currency={{ selected_currency_code }}&sort=changed_at&dir={% if current_sort == 'changed_at' and current_dir == 'asc' %}desc{% else %}asc{% endif %}">
-                <span>Changed At</span>
+                <span>{% translate "Changed At" %}</span>
                 {% if current_sort == 'changed_at' %}
                   <i class="bi bi-caret-{% if current_dir == 'asc' %}up{% else %}down{% endif %}-fill"></i>
                 {% else %}
@@ -213,8 +213,8 @@
       <div class="empty-icon">
         <i class="bi bi-list-check"></i>
       </div>
-      <h4 class="empty-title">No FX change log entries found</h4>
-      <p class="empty-text">No entries match your current filters.</p>
+      <h4 class="empty-title">{% translate "No FX change log entries found" %}</h4>
+      <p class="empty-text">{% translate "No entries match your current filters." %}</p>
     </div>
   {% endif %}
 </div>

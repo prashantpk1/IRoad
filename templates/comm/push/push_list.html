@@ -51,7 +51,7 @@
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
-        <a href="{% url 'push_notif_create' %}" class="eal-btn eal-btn-primary">Add Push Notification</a>
+        <a href="{% url 'push_notif_create' %}" class="eal-btn eal-btn-primary">{% translate "Add Push Notification" %}</a>
       </div>
     </div>
   </div>
@@ -97,9 +97,9 @@
 
         <div style="width:220px">
           <select class="eal-select" name="trigger_mode" onchange="this.form.submit()">
-            <option value="All" {% if trigger_mode_filter == 'All' %}selected{% endif %}>All Trigger Modes</option>
-            <option value="Manual_Broadcast" {% if trigger_mode_filter == 'Manual_Broadcast' %}selected{% endif %}>Manual</option>
-            <option value="System_Event" {% if trigger_mode_filter == 'System_Event' %}selected{% endif %}>System</option>
+            <option value="All" {% if trigger_mode_filter == 'All' %}selected{% endif %}>{% translate "All Trigger Modes" %}</option>
+            <option value="Manual_Broadcast" {% if trigger_mode_filter == 'Manual_Broadcast' %}selected{% endif %}>{% translate "Manual" %}</option>
+            <option value="System_Event" {% if trigger_mode_filter == 'System_Event' %}selected{% endif %}>{% translate "System" %}</option>
           </select>
         </div>
 
@@ -176,7 +176,7 @@
                 {% endif %}
               </a>
             </th>
-            <th>{% translate "ACTIONS" %}</th>
+            <th>{% translate "Actions" %}</th>
           </tr>
         </thead>
         <tbody>
@@ -186,9 +186,9 @@
               <td>{{ row.internal_name }}</td>
               <td>
                 {% if row.trigger_mode == 'Manual_Broadcast' %}
-                  <span class="status-badge active">Manual</span>
+                  <span class="status-badge active">{% translate "Manual" %}</span>
                 {% else %}
-                  <span class="status-badge warning">System</span>
+                  <span class="status-badge warning">{% translate "System" %}</span>
                 {% endif %}
               </td>
               <td>{% if row.trigger_mode == 'System_Event' %}{{ row.get_linked_event_display }}{% else %}{{ row.get_target_audience_display }}{% endif %}</td>
@@ -221,7 +221,7 @@
                 <div class="notification-empty">
                   <div class="empty-icon"><i class="bi bi-inbox"></i></div>
                   <h4 class="empty-title">{% translate "No Data Found" %}</h4>
-                  <p class="empty-text">No push notifications found.</p>
+                  <p class="empty-text">{% translate "No push notifications found." %}</p>
                 </div>
               </td>
             </tr>
