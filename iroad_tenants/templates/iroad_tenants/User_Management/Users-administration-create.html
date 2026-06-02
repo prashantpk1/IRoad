@@ -445,7 +445,16 @@
   </div>
 </div>
 
-<form id="userCreationForm" method="post" action="{% if is_edit_mode and editing_user %}{% url 'iroad_tenants:tenant_users_administration_edit' editing_user.user_id %}{% else %}{% url 'iroad_tenants:tenant_users_administration_create' %}{% endif %}" autocomplete="off">
+<div id="tenantFormBannerHost" class="page-content px-3 pt-2">
+  {% if form_errors %}
+  <div class="alert alert-danger alert-dismissible fade show mb-2" role="alert">
+    Please fix the highlighted errors.
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+  </div>
+  {% endif %}
+</div>
+
+<form id="userCreationForm" method="post" class="needs-validation" novalidate action="{% if is_edit_mode and editing_user %}{% url 'iroad_tenants:tenant_users_administration_edit' editing_user.user_id %}{% else %}{% url 'iroad_tenants:tenant_users_administration_create' %}{% endif %}" autocomplete="off">
   {% csrf_token %}
   <div class="form-card" data-section="1">
                     <div class="form-card-header">
@@ -616,7 +625,11 @@
                                         </ul>
                                     </div>
                                     {% if form_errors.roles %}<div class="invalid-feedback d-block">{{ form_errors.roles }}</div>{% endif %}
+                                    {% if role_options %}
                                     <span class="field-hint">Select one or more roles from the dropdown</span>
+                                    {% else %}
+                                    <span class="field-hint text-warning">No roles found. Create roles in Roles &amp; Permissions first.</span>
+                                    {% endif %}
                                 </div>
                             </div>
                         </div>
@@ -732,13 +745,16 @@
       const selected = Array.from(roleCheckboxes)
         .filter((cb) => cb.checked)
         .map((cb) => cb.nextElementSibling.textContent.trim());
+      const roleDropdown = document.getElementById("roleOptionsDropdown");
       if (selected.length === 0) {
         selectedRolesText.textContent = "Select Roles";
         selectedRolesText.classList.add("text-muted");
       } else if (selected.length <= 2) {
+        if (roleDropdown) roleDropdown.classList.remove("is-invalid");
         selectedRolesText.textContent = selected.join(", ");
         selectedRolesText.classList.remove("text-muted");
       } else {
+        if (roleDropdown) roleDropdown.classList.remove("is-invalid");
         selectedRolesText.textContent = selected.length + " Roles Selected";
         selectedRolesText.classList.remove("text-muted");
       }

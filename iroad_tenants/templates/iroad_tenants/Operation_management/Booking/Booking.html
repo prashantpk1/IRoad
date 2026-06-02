@@ -166,16 +166,16 @@
                 </div>
                 <div class="field">
                   <label for="podStatus" class="form-label">POD Status</label>
-                  <input
-                    type="text"
-                    class="form-control"
-                    id="podStatus"
-                    value="{% if booking_form_data.pod_status %}{{ booking_form_data.pod_status|title }}{% else %}Pending{% endif %}"
-                    readonly
-                    tabindex="-1"
-                    aria-readonly="true"
-                  />
-                  <span class="field-hint">Derived when POD is recorded (Phase 2). Not editable on booking.</span>
+                  <select class="form-select" id="podStatus" name="pod_status">
+                    <option value="" disabled>-Select POD status-</option>
+                    {% for pod_status in booking_pod_status_options %}
+                    <option value="{{ pod_status|lower }}" {% if booking_form_data.pod_status|default:'pending'|lower == pod_status|lower %}selected{% endif %}>{{ pod_status }}</option>
+                    {% empty %}
+                    <option value="pending" {% if booking_form_data.pod_status|default:'pending'|lower == 'pending' %}selected{% endif %}>Pending</option>
+                    <option value="received" {% if booking_form_data.pod_status|lower == 'received' %}selected{% endif %}>Received</option>
+                    <option value="verified" {% if booking_form_data.pod_status|lower == 'verified' %}selected{% endif %}>Verified</option>
+                    {% endfor %}
+                  </select>
                 </div>
               </div>
               <div style="display: none">

@@ -44,57 +44,69 @@
                   {% if lang == 'ar' %}{{ home.nav_contact_ar|default:home.nav_contact_en }}{% else %}{{ home.nav_contact_en }}{% endif %}
                 </a>
               </li>
+              <li class="nav-item nav-item-sign-in-mobile">
+                <a class="nav-link nav-link-sign-in-mobile" href="{{ home.header_sign_in_url }}">
+                  {% if lang == 'ar' %}{{ home.header_sign_in_ar|default:home.header_sign_in_en }}{% else %}{{ home.header_sign_in_en }}{% endif %}
+                </a>
+              </li>
             </ul>
           </div>
-
-          <!-- Header Contact Box Start -->
-          <div class="header-contact-box">
-            <!-- Header Contact Item Start -->
-            <div class="header-contact-item">
-              <div class="icon-box">
-                <img src="{% static 'landing/images/icon-phone-white.svg' %}" alt="" />
-              </div>
-              <div class="header-contact-item-content">
-                <p>
-                  {% if lang == 'ar' %}
-                    {{ home.header_cta_small_title_ar|default:home.header_cta_small_title_en }}
-                  {% else %}
-                    {{ home.header_cta_small_title_en }}
-                  {% endif %}
-                </p>
-                <h3>
-                  <a href="{{ home.header_cta_url }}">
-                    {% if lang == 'ar' %}{{ home.header_cta_title_ar|default:home.header_cta_title_en }}{% else %}{{ home.header_cta_title_en }}{% endif %}
-                  </a>
-                </h3>
-              </div>
-            </div>
-            <!-- Header Contact Item End -->
-
-            <div class="lang-toggle" role="group" aria-label="Language" dir="ltr">
-              <a
-                href="?lang=en"
-                class="lang-toggle__btn{% if lang != 'ar' %} is-active{% endif %}"
-                lang="en"
-              >EN</a>
-              <a
-                href="?lang=ar"
-                class="lang-toggle__btn{% if lang == 'ar' %} is-active{% endif %}"
-                lang="ar"
-              >عربي</a>
-            </div>
-
-            <!-- Header Btn Start -->
-            <div class="header-btn">
-              <a href="{{ home.header_sign_in_url }}" class="btn-default">
-                {% if lang == 'ar' %}{{ home.header_sign_in_ar|default:home.header_sign_in_en }}{% else %}{{ home.header_sign_in_en }}{% endif %}
-              </a>
-            </div>
-            <!-- Header Btn End -->
-          </div>
-          <!-- Hedaer Contact Box End -->
         </div>
         <!-- Main Menu End -->
+
+        <!-- Header Contact Box Start -->
+        <div class="header-contact-box">
+          <!-- Header Contact Item Start -->
+          <div class="header-contact-item">
+            <a
+              href="{{ home.header_cta_url }}"
+              class="icon-box"
+              aria-label="{% if lang == 'ar' %}{{ home.header_cta_title_ar|default:home.header_cta_title_en }}{% else %}{{ home.header_cta_title_en }}{% endif %}"
+            >
+              <img src="{% static 'landing/images/icon-phone-white.svg' %}" alt="" />
+            </a>
+            <div class="header-contact-item-content">
+              <p>
+                {% if lang == 'ar' %}
+                  {{ home.header_cta_small_title_ar|default:home.header_cta_small_title_en }}
+                {% else %}
+                  {{ home.header_cta_small_title_en }}
+                {% endif %}
+              </p>
+              <h3>
+                <a href="{{ home.header_cta_url }}">
+                  {% if lang == 'ar' %}{{ home.header_cta_title_ar|default:home.header_cta_title_en }}{% else %}{{ home.header_cta_title_en }}{% endif %}
+                </a>
+              </h3>
+            </div>
+          </div>
+          <!-- Header Contact Item End -->
+
+          <!-- Header Btn Start (before lang toggle so Sign In stays visible on narrow screens) -->
+          <div class="header-btn">
+            <a href="{{ home.header_sign_in_url }}" class="btn-default btn-header-sign-in">
+              <span class="btn-header-sign-in__label">
+                {% if lang == 'ar' %}{{ home.header_sign_in_ar|default:home.header_sign_in_en }}{% else %}{{ home.header_sign_in_en }}{% endif %}
+              </span>
+            </a>
+          </div>
+          <!-- Header Btn End -->
+
+          <div class="lang-toggle" role="group" aria-label="Language" dir="ltr">
+            <a
+              href="?lang=en"
+              class="lang-toggle__btn{% if lang != 'ar' %} is-active{% endif %}"
+              lang="en"
+            >EN</a>
+            <a
+              href="?lang=ar"
+              class="lang-toggle__btn{% if lang == 'ar' %} is-active{% endif %}"
+              lang="ar"
+            >عربي</a>
+          </div>
+        </div>
+        <!-- Header Contact Box End -->
+
         <div class="navbar-toggle"></div>
       </div>
     </nav>

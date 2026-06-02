@@ -1518,49 +1518,89 @@ function validateTimeRange() {
 /* ============================================
    Form Validation
    ============================================ */
-function initFormValidation() {
-  const form = document.getElementById("addressForm");
+var FORM_REQUIRED_FIELDS_MESSAGE = "Please fill in all required fields";
 
-  if (form) {
-    form.addEventListener("submit", function (e) {
-      // Validate time range (pages with working-time fields)
-      if (!validateTimeRange()) {
-        e.preventDefault();
-        showAlert("End time must be after start time", "error");
-        return;
-      }
+function validateRequiredFields(form) {
+  const requiredFields = form.querySelectorAll("[required]:not([disabled])");
+  let isValid = true;
 
-      // Client-side check for HTML5 [required] fields only — do not block POST otherwise
-      const requiredFields = form.querySelectorAll("[required]");
-      let isValid = true;
+  requiredFields.forEach(function (field) {
+    const value = (field.value || "").trim();
+    if (!value) {
+      field.classList.add("is-invalid");
+      isValid = false;
+    } else {
+      field.classList.remove("is-invalid");
+    }
+  });
 
-      requiredFields.forEach(function (field) {
-        if (!field.value.trim()) {
-          field.classList.add("is-invalid");
-          isValid = false;
-        } else {
-          field.classList.remove("is-invalid");
-        }
+  return isValid;
+}
+
+function validateUserRoleSelection(form) {
+  const roleBoxes = form.querySelectorAll(".role-checkbox:not(:disabled)");
+  const roleTrigger = form.querySelector("#roleOptionsDropdown");
+  if (!roleBoxes.length) {
+    if (roleTrigger) roleTrigger.classList.remove("is-invalid");
+    return true;
+  }
+
+  const anyChecked = Array.from(roleBoxes).some(function (cb) {
+    return cb.checked;
+  });
+  if (roleTrigger) {
+    roleTrigger.classList.toggle("is-invalid", !anyChecked);
+  }
+  return anyChecked;
+}
+
+function attachFormSubmitValidation(form, options) {
+  if (!form) return;
+  options = options || {};
+
+  form.addEventListener("submit", function (e) {
+    if (options.validateTimeRange && !validateTimeRange()) {
+      e.preventDefault();
+      showTenantFormBanner("End time must be after start time", "error");
+      return;
+    }
+
+    let isValid = validateRequiredFields(form);
+    if (options.validateRoles) {
+      isValid = validateUserRoleSelection(form) && isValid;
+    }
+
+    if (!isValid) {
+      e.preventDefault();
+      showTenantFormBanner(FORM_REQUIRED_FIELDS_MESSAGE, "error");
+      return;
+    }
+
+    // Allow native POST to Django (server validates & redirects)
+  });
+
+  form
+    .querySelectorAll(".form-control, .form-select")
+    .forEach(function (input) {
+      input.addEventListener("input", function () {
+        this.classList.remove("is-invalid");
       });
-
-      if (!isValid) {
-        e.preventDefault();
-        showAlert("Please fill in all required fields", "error");
-        return;
-      }
-
-      // Allow native POST to Django (Address Master CRUD — server validates & redirects)
     });
 
-    // Remove invalid class on input
-    form
-      .querySelectorAll(".form-control, .form-select")
-      .forEach(function (input) {
-        input.addEventListener("input", function () {
-          this.classList.remove("is-invalid");
-        });
-      });
-  }
+  form.querySelectorAll(".role-checkbox").forEach(function (cb) {
+    cb.addEventListener("change", function () {
+      validateUserRoleSelection(form);
+    });
+  });
+}
+
+function initFormValidation() {
+  attachFormSubmitValidation(document.getElementById("addressForm"), {
+    validateTimeRange: true,
+  });
+  attachFormSubmitValidation(document.getElementById("userCreationForm"), {
+    validateRoles: true,
+  });
 }
 
 /* ============================================
@@ -1594,84 +1634,68 @@ function formatPhoneNumber(input) {
 }
 
 /* ============================================
-   Alert/Notification Helper
+   Form feedback banner (Bootstrap, same as Django messages in base.html)
    ============================================ */
-function showAlert(message, type) {
-  // Remove existing alerts
-  const existingAlert = document.querySelector(".custom-alert");
-  if (existingAlert) {
-    existingAlert.remove();
+function ensureTenantFormBannerHost() {
+  var host = document.getElementById("tenantFormBannerHost");
+  if (host) return host;
+
+  host = document.createElement("div");
+  host.id = "tenantFormBannerHost";
+  host.className = "page-content px-3 pt-2";
+
+  var main = document.querySelector("main.main-content");
+  if (!main) return null;
+
+  var messageBlocks = main.querySelectorAll(".page-content.px-3.pt-2");
+  if (messageBlocks.length > 0) {
+    messageBlocks[messageBlocks.length - 1].insertAdjacentElement("afterend", host);
+  } else {
+    var header = main.querySelector(".top-header");
+    if (header) {
+      header.insertAdjacentElement("afterend", host);
+    } else {
+      main.prepend(host);
+    }
   }
+  return host;
+}
 
-  // Create alert element
-  const alert = document.createElement("div");
-  alert.className = `custom-alert alert-${type}`;
-  alert.innerHTML = `
-        <span>${message}</span>
-        <button type="button" class="alert-close">&times;</button>
-    `;
+function showTenantFormBanner(message, type) {
+  var host = ensureTenantFormBannerHost();
+  if (!host || !message) return;
 
-  // Add styles
-  alert.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        padding: 16px 20px;
-        border-radius: 8px;
-        background: ${type === "success" ? "#10b981" : "#ef4444"};
-        color: white;
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        z-index: 9999;
-        animation: slideIn 0.3s ease;
-    `;
+  var alertType = "danger";
+  if (type === "success") alertType = "success";
+  else if (type === "warning") alertType = "warning";
+  else if (type === "info") alertType = "info";
 
-  // Add animation keyframes if not present
-  if (!document.querySelector("#alertStyles")) {
-    const style = document.createElement("style");
-    style.id = "alertStyles";
-    style.textContent = `
-            @keyframes slideIn {
-                from { transform: translateX(100%); opacity: 0; }
-                to { transform: translateX(0); opacity: 1; }
-            }
-            @keyframes slideOut {
-                from { transform: translateX(0); opacity: 1; }
-                to { transform: translateX(100%); opacity: 0; }
-            }
-        `;
-    document.head.appendChild(style);
-  }
-
-  // Add to page
-  document.body.appendChild(alert);
-
-  // Close button functionality
-  const closeBtn = alert.querySelector(".alert-close");
-  closeBtn.style.cssText = `
-        background: none;
-        border: none;
-        color: white;
-        font-size: 20px;
-        cursor: pointer;
-        padding: 0;
-        line-height: 1;
-    `;
-
-  closeBtn.addEventListener("click", function () {
-    alert.style.animation = "slideOut 0.3s ease forwards";
-    setTimeout(() => alert.remove(), 300);
+  host.querySelectorAll(".alert").forEach(function (el) {
+    el.remove();
   });
 
-  // Auto remove after 5 seconds
-  setTimeout(function () {
-    if (alert.parentElement) {
-      alert.style.animation = "slideOut 0.3s ease forwards";
-      setTimeout(() => alert.remove(), 300);
-    }
-  }, 5000);
+  var alert = document.createElement("div");
+  alert.className = "alert alert-" + alertType + " alert-dismissible fade show mb-2";
+  alert.setAttribute("role", "alert");
+
+  var text = document.createElement("span");
+  text.textContent = message;
+  alert.appendChild(text);
+
+  var closeBtn = document.createElement("button");
+  closeBtn.type = "button";
+  closeBtn.className = "btn-close";
+  closeBtn.setAttribute("data-bs-dismiss", "alert");
+  closeBtn.setAttribute("aria-label", "Close");
+  alert.appendChild(closeBtn);
+
+  host.appendChild(alert);
+  host.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+/** @deprecated Use showTenantFormBanner — kept for older inline scripts */
+function showAlert(message, type) {
+  showTenantFormBanner(message, type);
 }
 
 /* ============================================

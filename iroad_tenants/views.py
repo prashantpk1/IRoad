@@ -6489,7 +6489,7 @@ class TenantOperationBookingCreateView(View):
                     sell_price=sell_price,
                     sourcing_mode=sourcing_mode,
                     pod_type=(request.POST.get('pod_type') or '').strip(),
-                    pod_status='',
+                    pod_status=(request.POST.get('pod_status') or 'pending').strip(),
                     **extra_payload,
                     created_by_label=(context.get('display_name') or '').strip(),
                 )
@@ -8035,7 +8035,7 @@ class TenantOperationDocumentHandoverListView(View):
                     | Q(status__icontains=search_q)
                 )
 
-            paginator = Paginator(handover_qs, 10)
+            paginator = Paginator(handover_qs, 25)
             page_obj = paginator.get_page(request.GET.get('page') or 1)
             all_handovers = TenantDocumentHandover.objects.all()
             context.update(
@@ -9283,7 +9283,7 @@ class TenantOperationActionsListView(View):
                     | Q(sequence_category__icontains=search_q)
                     | Q(status__icontains=search_q)
                 )
-            paginator = Paginator(action_qs, 10)
+            paginator = Paginator(action_qs, 25)
             page_obj = paginator.get_page(request.GET.get('page') or 1)
             context.update(
                 {
@@ -11224,7 +11224,7 @@ class TenantOperationSurchargeSalesListView(View):
                     | Q(client_account__display_name__icontains=search_q)
                 )
 
-            paginator = Paginator(surcharge_qs, 10)
+            paginator = Paginator(surcharge_qs, 25)
             page_obj = paginator.get_page(request.GET.get('page') or 1)
             surcharge_rows = []
             for surcharge in page_obj.object_list:
@@ -13721,7 +13721,7 @@ class TenantOperationBookingCreateView(View):
                     sell_price=sell_price,
                     sourcing_mode=sourcing_mode,
                     pod_type=(request.POST.get('pod_type') or '').strip(),
-                    pod_status='',
+                    pod_status=(request.POST.get('pod_status') or 'pending').strip(),
                     **extra_payload,
                     created_by_label=(context.get('display_name') or '').strip(),
                 )
@@ -13849,6 +13849,7 @@ class TenantOperationBookingEditView(View):
             booking.sell_price = validated['sell_price']
             booking.sourcing_mode = validated['sourcing_mode']
             booking.pod_type = (request.POST.get('pod_type') or '').strip()
+            booking.pod_status = (request.POST.get('pod_status') or 'pending').strip()
             for field_name, field_value in _tenant_booking_extra_payload(request).items():
                 setattr(booking, field_name, field_value)
             if request.FILES.get('booking_attachment'):
@@ -17839,7 +17840,7 @@ class TenantOperationDocumentHandoverListView(View):
                     | Q(status__icontains=search_q)
                 )
 
-            paginator = Paginator(handover_qs, 10)
+            paginator = Paginator(handover_qs, 25)
             page_obj = paginator.get_page(request.GET.get('page') or 1)
             all_handovers = TenantDocumentHandover.objects.all()
             context.update(
@@ -18281,7 +18282,7 @@ class TenantOperationTruckMovementLogListView(View):
                     | Q(status__icontains=search_q)
                 )
 
-            paginator = Paginator(movement_qs, 10)
+            paginator = Paginator(movement_qs, 25)
             page_obj = paginator.get_page(request.GET.get('page') or 1)
             all_movements = TenantTruckMovementLog.objects.all()
             context.update(
@@ -18695,7 +18696,7 @@ class TenantOperationActionsListView(View):
                     | Q(sequence_category__icontains=search_q)
                     | Q(status__icontains=search_q)
                 )
-            paginator = Paginator(action_qs, 10)
+            paginator = Paginator(action_qs, 25)
             page_obj = paginator.get_page(request.GET.get('page') or 1)
             context.update(
                 {
@@ -19112,7 +19113,7 @@ class TenantOperationSurchargeSalesListView(View):
                     | Q(client_account__display_name__icontains=search_q)
                 )
 
-            paginator = Paginator(surcharge_qs, 10)
+            paginator = Paginator(surcharge_qs, 25)
             page_obj = paginator.get_page(request.GET.get('page') or 1)
             surcharge_rows = []
             for surcharge in page_obj.object_list:
