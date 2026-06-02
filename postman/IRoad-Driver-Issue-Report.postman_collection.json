@@ -1,0 +1,1289 @@
+{
+  "info": {
+    "_postman_id": "324a7473-5856-45b0-b633-220d5422f7d9",
+    "name": "IRoad \u2014 Driver Issue Report (All Types)",
+    "description": "Report operational issues / delays for an active shipment.\n\n**Endpoint:** `POST /api/v1/mobile/driver/issues/report/`\n\n**Auth:** `Bearer {{access_token}}` + capability `mobile.driver.issues`\n\n### issue_type (all 8)\n`delay`, `vehicle_breakdown`, `customer_unavailable`, `payment_dispute`, `pod_issue`, `accident`, `route_blocked`, `other`\n\n### severity (all 4)\n`low`, `medium`, `high`, `critical`\n\n### Required fields\n- `client_issue_id` \u2014 idempotency key (unique per driver per tenant)\n- `shipment_id` \u2014 shipment UUID or `shipment_no`\n- `issue_type`, `severity`\n\n### Optional\n- `notes`, `latitude`, `longitude`, `media[]`\n\nImport `IRoad-Driver-Issue-Report.postman_environment.json` and run **00 Login** first.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (!pm.variables.get('request_id') || String(pm.variables.get('request_id')).indexOf('{{') >= 0) {",
+          "    pm.collectionVariables.set('request_id', 'postman-' + pm.variables.replaceIn('{{$guid}}'));",
+          "}",
+          "const token = pm.collectionVariables.get('access_token') || pm.environment.get('access_token') || '';",
+          "let tokenTenant = '';",
+          "let tokenUserId = '';",
+          "if (token && String(token).split('.').length >= 2) {",
+          "    try {",
+          "        const payload = JSON.parse(atob(String(token).split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));",
+          "        tokenTenant = String(payload.tenant_schema || '').trim();",
+          "        tokenUserId = String(payload.user_id || '').trim();",
+          "    } catch (e) {}",
+          "}",
+          "if (tokenTenant) { pm.collectionVariables.set('tenant_schema', tokenTenant); }",
+          "if (tokenUserId) { pm.collectionVariables.set('driver_id', tokenUserId); }",
+          "const tenant = pm.collectionVariables.get('tenant_schema') || 'tenant_schema';",
+          "const driver = pm.collectionVariables.get('driver_id') || 'driver_id';",
+          "const ship = pm.collectionVariables.get('shipment_id') || 'shipment_id';",
+          "pm.collectionVariables.set('issue_path_prefix', `mobile_driver_uploads/${tenant}/${driver}/${ship}/issues/`);"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8000/api/v1/mobile"
+    },
+    {
+      "key": "access_token",
+      "value": ""
+    },
+    {
+      "key": "email",
+      "value": "vuhuxyzon@yopmail.com"
+    },
+    {
+      "key": "password",
+      "value": "Test@1234"
+    },
+    {
+      "key": "shipment_id",
+      "value": ""
+    },
+    {
+      "key": "tenant_schema",
+      "value": "t_bb773f861f3048748c0a7f0ffbee0df6"
+    },
+    {
+      "key": "driver_id",
+      "value": ""
+    },
+    {
+      "key": "issue_latitude",
+      "value": "24.7136"
+    },
+    {
+      "key": "issue_longitude",
+      "value": "46.6753"
+    },
+    {
+      "key": "accept_language",
+      "value": "en"
+    },
+    {
+      "key": "request_id",
+      "value": ""
+    },
+    {
+      "key": "issue_path_prefix",
+      "value": ""
+    },
+    {
+      "key": "issue_replay_client_issue_id",
+      "value": ""
+    },
+    {
+      "key": "last_issue_id",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "00 \u2014 Setup (Login)",
+      "description": "Get `access_token` before reporting issues. Set `shipment_id` to an active job you own.",
+      "item": [
+        {
+          "name": "Login (Email)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var json = pm.response.json();",
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('status === 1', function () { pm.expect(json.status).to.eql(1); });",
+                  "if (json.status === 1 && json.data && json.data.access_token) {",
+                  "    pm.collectionVariables.set('access_token', json.data.access_token);",
+                  "    try { pm.environment.set('access_token', json.data.access_token); } catch (e) {}",
+                  "    try {",
+                  "        const payload = JSON.parse(atob(String(json.data.access_token).split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));",
+                  "        if (payload.tenant_schema) {",
+                  "            pm.collectionVariables.set('tenant_schema', String(payload.tenant_schema));",
+                  "        }",
+                  "        if (payload.user_id) {",
+                  "            pm.collectionVariables.set('driver_id', String(payload.user_id));",
+                  "        }",
+                  "    } catch (e) {}",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/driver/auth/login/"
+          }
+        }
+      ]
+    },
+    {
+      "name": "01 \u2014 Report Delay (all severities)",
+      "description": "Delay reports with each severity. `blocking_recommended` is true for medium, high, and critical.",
+      "item": [
+        {
+          "name": "Delay \u2014 severity low",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_issue_id\": \"{{issue_delay_client_issue_id}}\",\n  \"shipment_id\": \"{{shipment_id}}\",\n  \"issue_type\": \"delay\",\n  \"severity\": \"low\",\n  \"notes\": \"Minor delay \\u2014 15 minutes\",\n  \"latitude\": {{issue_latitude}},\n  \"longitude\": {{issue_longitude}},\n  \"media\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/driver/issues/report/",
+            "description": "`issue_type`: **delay** | `severity`: **low**\n\nPOST `/api/v1/mobile/driver/issues/report/`\nRequires `mobile.driver.issues` capability."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('issue_delay_client_issue_id', 'issue-delay-' + pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+                  "const body = pm.response.json();",
+                  "pm.test('status === 1', function () { pm.expect(body.status).to.eql(1); });",
+                  "const data = body.data || {};",
+                  "pm.test('issue object present', function () { pm.expect(data.issue).to.be.an('object'); });",
+                  "if (data.issue && data.issue.issue_id) {",
+                  "    pm.collectionVariables.set('last_issue_id', data.issue.issue_id);",
+                  "}",
+                  "if (data.issue && data.issue.client_issue_id) {",
+                  "    pm.collectionVariables.set('issue_replay_client_issue_id', data.issue.client_issue_id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delay \u2014 severity medium",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_issue_id\": \"{{issue_delay_client_issue_id}}\",\n  \"shipment_id\": \"{{shipment_id}}\",\n  \"issue_type\": \"delay\",\n  \"severity\": \"medium\",\n  \"notes\": \"Moderate delay \\u2014 traffic congestion\",\n  \"latitude\": {{issue_latitude}},\n  \"longitude\": {{issue_longitude}},\n  \"media\": [\n    {\n      \"media_type\": \"photo\",\n      \"file_ref\": \"{{issue_path_prefix}}delay-evidence.jpg\",\n      \"file_name\": \"delay-evidence.jpg\",\n      \"mime_type\": \"image/jpeg\",\n      \"sort_order\": 1\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/driver/issues/report/",
+            "description": "`issue_type`: **delay** | `severity`: **medium**\n\nPOST `/api/v1/mobile/driver/issues/report/`\nRequires `mobile.driver.issues` capability."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('issue_delay_client_issue_id', 'issue-delay-' + pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+                  "const body = pm.response.json();",
+                  "pm.test('status === 1', function () { pm.expect(body.status).to.eql(1); });",
+                  "const data = body.data || {};",
+                  "pm.test('issue object present', function () { pm.expect(data.issue).to.be.an('object'); });",
+                  "if (data.issue && data.issue.issue_id) {",
+                  "    pm.collectionVariables.set('last_issue_id', data.issue.issue_id);",
+                  "}",
+                  "if (data.issue && data.issue.client_issue_id) {",
+                  "    pm.collectionVariables.set('issue_replay_client_issue_id', data.issue.client_issue_id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delay \u2014 severity high",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_issue_id\": \"{{issue_delay_client_issue_id}}\",\n  \"shipment_id\": \"{{shipment_id}}\",\n  \"issue_type\": \"delay\",\n  \"severity\": \"high\",\n  \"notes\": \"Significant delay \\u2014 over 1 hour\",\n  \"latitude\": {{issue_latitude}},\n  \"longitude\": {{issue_longitude}},\n  \"media\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/driver/issues/report/",
+            "description": "`issue_type`: **delay** | `severity`: **high**\n\nPOST `/api/v1/mobile/driver/issues/report/`\nRequires `mobile.driver.issues` capability."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('issue_delay_client_issue_id', 'issue-delay-' + pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+                  "const body = pm.response.json();",
+                  "pm.test('status === 1', function () { pm.expect(body.status).to.eql(1); });",
+                  "const data = body.data || {};",
+                  "pm.test('issue object present', function () { pm.expect(data.issue).to.be.an('object'); });",
+                  "if (data.issue && data.issue.issue_id) {",
+                  "    pm.collectionVariables.set('last_issue_id', data.issue.issue_id);",
+                  "}",
+                  "if (data.issue && data.issue.client_issue_id) {",
+                  "    pm.collectionVariables.set('issue_replay_client_issue_id', data.issue.client_issue_id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delay \u2014 severity critical",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_issue_id\": \"{{issue_delay_client_issue_id}}\",\n  \"shipment_id\": \"{{shipment_id}}\",\n  \"issue_type\": \"delay\",\n  \"severity\": \"critical\",\n  \"notes\": \"Critical delay \\u2014 shipment at risk\",\n  \"latitude\": {{issue_latitude}},\n  \"longitude\": {{issue_longitude}},\n  \"media\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/driver/issues/report/",
+            "description": "`issue_type`: **delay** | `severity`: **critical**\n\nPOST `/api/v1/mobile/driver/issues/report/`\nRequires `mobile.driver.issues` capability."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('issue_delay_client_issue_id', 'issue-delay-' + pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+                  "const body = pm.response.json();",
+                  "pm.test('status === 1', function () { pm.expect(body.status).to.eql(1); });",
+                  "const data = body.data || {};",
+                  "pm.test('issue object present', function () { pm.expect(data.issue).to.be.an('object'); });",
+                  "if (data.issue && data.issue.issue_id) {",
+                  "    pm.collectionVariables.set('last_issue_id', data.issue.issue_id);",
+                  "}",
+                  "if (data.issue && data.issue.client_issue_id) {",
+                  "    pm.collectionVariables.set('issue_replay_client_issue_id', data.issue.client_issue_id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 \u2014 All issue types",
+      "description": "One request per `issue_type` with a typical severity.",
+      "item": [
+        {
+          "name": "Delay",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_issue_id\": \"{{issue_delay_client_issue_id}}\",\n  \"shipment_id\": \"{{shipment_id}}\",\n  \"issue_type\": \"delay\",\n  \"severity\": \"medium\",\n  \"notes\": \"Traffic delay \\u2014 ETA pushed back\",\n  \"latitude\": {{issue_latitude}},\n  \"longitude\": {{issue_longitude}},\n  \"media\": [\n    {\n      \"media_type\": \"photo\",\n      \"file_ref\": \"{{issue_path_prefix}}delay-evidence.jpg\",\n      \"file_name\": \"delay-evidence.jpg\",\n      \"mime_type\": \"image/jpeg\",\n      \"sort_order\": 1\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/driver/issues/report/",
+            "description": "`issue_type`: **delay** | `severity`: **medium**\n\nPOST `/api/v1/mobile/driver/issues/report/`\nRequires `mobile.driver.issues` capability."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('issue_delay_client_issue_id', 'issue-delay-' + pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+                  "const body = pm.response.json();",
+                  "pm.test('status === 1', function () { pm.expect(body.status).to.eql(1); });",
+                  "const data = body.data || {};",
+                  "pm.test('issue object present', function () { pm.expect(data.issue).to.be.an('object'); });",
+                  "if (data.issue && data.issue.issue_id) {",
+                  "    pm.collectionVariables.set('last_issue_id', data.issue.issue_id);",
+                  "}",
+                  "if (data.issue && data.issue.client_issue_id) {",
+                  "    pm.collectionVariables.set('issue_replay_client_issue_id', data.issue.client_issue_id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Vehicle Breakdown",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_issue_id\": \"{{issue_vehicle-breakdown_client_issue_id}}\",\n  \"shipment_id\": \"{{shipment_id}}\",\n  \"issue_type\": \"vehicle_breakdown\",\n  \"severity\": \"high\",\n  \"notes\": \"Vehicle breakdown \\u2014 roadside assistance requested\",\n  \"latitude\": {{issue_latitude}},\n  \"longitude\": {{issue_longitude}},\n  \"media\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/driver/issues/report/",
+            "description": "`issue_type`: **vehicle_breakdown** | `severity`: **high**\n\nPOST `/api/v1/mobile/driver/issues/report/`\nRequires `mobile.driver.issues` capability."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('issue_vehicle-breakdown_client_issue_id', 'issue-vehicle-breakdown-' + pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+                  "const body = pm.response.json();",
+                  "pm.test('status === 1', function () { pm.expect(body.status).to.eql(1); });",
+                  "const data = body.data || {};",
+                  "pm.test('issue object present', function () { pm.expect(data.issue).to.be.an('object'); });",
+                  "if (data.issue && data.issue.issue_id) {",
+                  "    pm.collectionVariables.set('last_issue_id', data.issue.issue_id);",
+                  "}",
+                  "if (data.issue && data.issue.client_issue_id) {",
+                  "    pm.collectionVariables.set('issue_replay_client_issue_id', data.issue.client_issue_id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Customer Unavailable",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_issue_id\": \"{{issue_customer-unavailable_client_issue_id}}\",\n  \"shipment_id\": \"{{shipment_id}}\",\n  \"issue_type\": \"customer_unavailable\",\n  \"severity\": \"medium\",\n  \"notes\": \"Customer not available at delivery location\",\n  \"latitude\": {{issue_latitude}},\n  \"longitude\": {{issue_longitude}},\n  \"media\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/driver/issues/report/",
+            "description": "`issue_type`: **customer_unavailable** | `severity`: **medium**\n\nPOST `/api/v1/mobile/driver/issues/report/`\nRequires `mobile.driver.issues` capability."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('issue_customer-unavailable_client_issue_id', 'issue-customer-unavailable-' + pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+                  "const body = pm.response.json();",
+                  "pm.test('status === 1', function () { pm.expect(body.status).to.eql(1); });",
+                  "const data = body.data || {};",
+                  "pm.test('issue object present', function () { pm.expect(data.issue).to.be.an('object'); });",
+                  "if (data.issue && data.issue.issue_id) {",
+                  "    pm.collectionVariables.set('last_issue_id', data.issue.issue_id);",
+                  "}",
+                  "if (data.issue && data.issue.client_issue_id) {",
+                  "    pm.collectionVariables.set('issue_replay_client_issue_id', data.issue.client_issue_id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Payment Dispute",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_issue_id\": \"{{issue_payment-dispute_client_issue_id}}\",\n  \"shipment_id\": \"{{shipment_id}}\",\n  \"issue_type\": \"payment_dispute\",\n  \"severity\": \"high\",\n  \"notes\": \"COD amount disputed by customer\",\n  \"latitude\": {{issue_latitude}},\n  \"longitude\": {{issue_longitude}},\n  \"media\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/driver/issues/report/",
+            "description": "`issue_type`: **payment_dispute** | `severity`: **high**\n\nPOST `/api/v1/mobile/driver/issues/report/`\nRequires `mobile.driver.issues` capability."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('issue_payment-dispute_client_issue_id', 'issue-payment-dispute-' + pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+                  "const body = pm.response.json();",
+                  "pm.test('status === 1', function () { pm.expect(body.status).to.eql(1); });",
+                  "const data = body.data || {};",
+                  "pm.test('issue object present', function () { pm.expect(data.issue).to.be.an('object'); });",
+                  "if (data.issue && data.issue.issue_id) {",
+                  "    pm.collectionVariables.set('last_issue_id', data.issue.issue_id);",
+                  "}",
+                  "if (data.issue && data.issue.client_issue_id) {",
+                  "    pm.collectionVariables.set('issue_replay_client_issue_id', data.issue.client_issue_id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pod Issue",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_issue_id\": \"{{issue_pod-issue_client_issue_id}}\",\n  \"shipment_id\": \"{{shipment_id}}\",\n  \"issue_type\": \"pod_issue\",\n  \"severity\": \"medium\",\n  \"notes\": \"POD document rejected \\u2014 rescan required\",\n  \"latitude\": {{issue_latitude}},\n  \"longitude\": {{issue_longitude}},\n  \"media\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/driver/issues/report/",
+            "description": "`issue_type`: **pod_issue** | `severity`: **medium**\n\nPOST `/api/v1/mobile/driver/issues/report/`\nRequires `mobile.driver.issues` capability."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('issue_pod-issue_client_issue_id', 'issue-pod-issue-' + pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+                  "const body = pm.response.json();",
+                  "pm.test('status === 1', function () { pm.expect(body.status).to.eql(1); });",
+                  "const data = body.data || {};",
+                  "pm.test('issue object present', function () { pm.expect(data.issue).to.be.an('object'); });",
+                  "if (data.issue && data.issue.issue_id) {",
+                  "    pm.collectionVariables.set('last_issue_id', data.issue.issue_id);",
+                  "}",
+                  "if (data.issue && data.issue.client_issue_id) {",
+                  "    pm.collectionVariables.set('issue_replay_client_issue_id', data.issue.client_issue_id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Accident",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_issue_id\": \"{{issue_accident_client_issue_id}}\",\n  \"shipment_id\": \"{{shipment_id}}\",\n  \"issue_type\": \"accident\",\n  \"severity\": \"critical\",\n  \"notes\": \"Minor accident \\u2014 vehicle damage reported\",\n  \"latitude\": {{issue_latitude}},\n  \"longitude\": {{issue_longitude}},\n  \"media\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/driver/issues/report/",
+            "description": "`issue_type`: **accident** | `severity`: **critical**\n\nPOST `/api/v1/mobile/driver/issues/report/`\nRequires `mobile.driver.issues` capability."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('issue_accident_client_issue_id', 'issue-accident-' + pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+                  "const body = pm.response.json();",
+                  "pm.test('status === 1', function () { pm.expect(body.status).to.eql(1); });",
+                  "const data = body.data || {};",
+                  "pm.test('issue object present', function () { pm.expect(data.issue).to.be.an('object'); });",
+                  "if (data.issue && data.issue.issue_id) {",
+                  "    pm.collectionVariables.set('last_issue_id', data.issue.issue_id);",
+                  "}",
+                  "if (data.issue && data.issue.client_issue_id) {",
+                  "    pm.collectionVariables.set('issue_replay_client_issue_id', data.issue.client_issue_id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Route Blocked",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_issue_id\": \"{{issue_route-blocked_client_issue_id}}\",\n  \"shipment_id\": \"{{shipment_id}}\",\n  \"issue_type\": \"route_blocked\",\n  \"severity\": \"critical\",\n  \"notes\": \"Route blocked \\u2014 police diversion in effect\",\n  \"latitude\": {{issue_latitude}},\n  \"longitude\": {{issue_longitude}},\n  \"media\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/driver/issues/report/",
+            "description": "`issue_type`: **route_blocked** | `severity`: **critical**\n\nPOST `/api/v1/mobile/driver/issues/report/`\nRequires `mobile.driver.issues` capability."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('issue_route-blocked_client_issue_id', 'issue-route-blocked-' + pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+                  "const body = pm.response.json();",
+                  "pm.test('status === 1', function () { pm.expect(body.status).to.eql(1); });",
+                  "const data = body.data || {};",
+                  "pm.test('issue object present', function () { pm.expect(data.issue).to.be.an('object'); });",
+                  "if (data.issue && data.issue.issue_id) {",
+                  "    pm.collectionVariables.set('last_issue_id', data.issue.issue_id);",
+                  "}",
+                  "if (data.issue && data.issue.client_issue_id) {",
+                  "    pm.collectionVariables.set('issue_replay_client_issue_id', data.issue.client_issue_id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Other",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_issue_id\": \"{{issue_other_client_issue_id}}\",\n  \"shipment_id\": \"{{shipment_id}}\",\n  \"issue_type\": \"other\",\n  \"severity\": \"low\",\n  \"notes\": \"Other operational issue \\u2014 see notes\",\n  \"latitude\": {{issue_latitude}},\n  \"longitude\": {{issue_longitude}},\n  \"media\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/driver/issues/report/",
+            "description": "`issue_type`: **other** | `severity`: **low**\n\nPOST `/api/v1/mobile/driver/issues/report/`\nRequires `mobile.driver.issues` capability."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('issue_other_client_issue_id', 'issue-other-' + pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+                  "const body = pm.response.json();",
+                  "pm.test('status === 1', function () { pm.expect(body.status).to.eql(1); });",
+                  "const data = body.data || {};",
+                  "pm.test('issue object present', function () { pm.expect(data.issue).to.be.an('object'); });",
+                  "if (data.issue && data.issue.issue_id) {",
+                  "    pm.collectionVariables.set('last_issue_id', data.issue.issue_id);",
+                  "}",
+                  "if (data.issue && data.issue.client_issue_id) {",
+                  "    pm.collectionVariables.set('issue_replay_client_issue_id', data.issue.client_issue_id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 \u2014 Media & multipart",
+      "item": [
+        {
+          "name": "Delay \u2014 with JSON media refs",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_issue_id\": \"{{issue_delay_client_issue_id}}\",\n  \"shipment_id\": \"{{shipment_id}}\",\n  \"issue_type\": \"delay\",\n  \"severity\": \"medium\",\n  \"notes\": \"Delay with pre-uploaded file_ref paths\",\n  \"latitude\": {{issue_latitude}},\n  \"longitude\": {{issue_longitude}},\n  \"media\": [\n    {\n      \"media_type\": \"photo\",\n      \"file_ref\": \"{{issue_path_prefix}}delay-evidence.jpg\",\n      \"file_name\": \"delay-evidence.jpg\",\n      \"mime_type\": \"image/jpeg\",\n      \"sort_order\": 1\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/driver/issues/report/",
+            "description": "`issue_type`: **delay** | `severity`: **medium**\n\nPOST `/api/v1/mobile/driver/issues/report/`\nRequires `mobile.driver.issues` capability."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('issue_delay_client_issue_id', 'issue-delay-' + pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+                  "const body = pm.response.json();",
+                  "pm.test('status === 1', function () { pm.expect(body.status).to.eql(1); });",
+                  "const data = body.data || {};",
+                  "pm.test('issue object present', function () { pm.expect(data.issue).to.be.an('object'); });",
+                  "if (data.issue && data.issue.issue_id) {",
+                  "    pm.collectionVariables.set('last_issue_id', data.issue.issue_id);",
+                  "}",
+                  "if (data.issue && data.issue.client_issue_id) {",
+                  "    pm.collectionVariables.set('issue_replay_client_issue_id', data.issue.client_issue_id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Report delay \u2014 multipart (file upload)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "client_issue_id",
+                  "value": "issue-multipart-{{$guid}}",
+                  "type": "text"
+                },
+                {
+                  "key": "shipment_id",
+                  "value": "{{shipment_id}}",
+                  "type": "text"
+                },
+                {
+                  "key": "issue_type",
+                  "value": "delay",
+                  "type": "text"
+                },
+                {
+                  "key": "severity",
+                  "value": "medium",
+                  "type": "text"
+                },
+                {
+                  "key": "notes",
+                  "value": "Delay with photo evidence (multipart)",
+                  "type": "text"
+                },
+                {
+                  "key": "latitude",
+                  "value": "{{issue_latitude}}",
+                  "type": "text"
+                },
+                {
+                  "key": "longitude",
+                  "value": "{{issue_longitude}}",
+                  "type": "text"
+                },
+                {
+                  "key": "media[0][media_type]",
+                  "value": "photo",
+                  "type": "text"
+                },
+                {
+                  "key": "media[0][file_name]",
+                  "value": "delay-traffic.jpg",
+                  "type": "text"
+                },
+                {
+                  "key": "media[0][mime_type]",
+                  "value": "image/jpeg",
+                  "type": "text"
+                },
+                {
+                  "key": "media[0][sort_order]",
+                  "value": "1",
+                  "type": "text"
+                },
+                {
+                  "key": "media[0][file_ref]",
+                  "type": "file",
+                  "src": [
+                    "postman/assets/delay-evidence.jpg"
+                  ]
+                }
+              ]
+            },
+            "url": "{{base_url}}/driver/issues/report/",
+            "description": "Multipart upload via `process_media_files`. Select a JPG/PNG file for `media[0][file_ref]`. Do not set Content-Type manually."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+                  "const body = pm.response.json();",
+                  "pm.test('status === 1', function () { pm.expect(body.status).to.eql(1); });",
+                  "const data = body.data || {};",
+                  "pm.test('issue object present', function () { pm.expect(data.issue).to.be.an('object'); });",
+                  "if (data.issue && data.issue.issue_id) {",
+                  "    pm.collectionVariables.set('last_issue_id', data.issue.issue_id);",
+                  "}",
+                  "if (data.issue && data.issue.client_issue_id) {",
+                  "    pm.collectionVariables.set('issue_replay_client_issue_id', data.issue.client_issue_id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 \u2014 Idempotency (replay)",
+      "item": [
+        {
+          "name": "Replay last delay report (same client_issue_id)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_issue_id\": \"{{issue_replay_client_issue_id}}\",\n  \"shipment_id\": \"{{shipment_id}}\",\n  \"issue_type\": \"delay\",\n  \"severity\": \"medium\",\n  \"notes\": \"Traffic delay \\u2014 replay test\",\n  \"latitude\": {{issue_latitude}},\n  \"longitude\": {{issue_longitude}},\n  \"media\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/driver/issues/report/",
+            "description": "Run after **Delay \u2014 severity medium** (or any request that sets `issue_replay_client_issue_id`). Expect HTTP **200** and `replayed: true`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200 replay', function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('status === 1', function () { pm.expect(body.status).to.eql(1); });",
+                  "pm.test('replayed true', function () {",
+                  "    pm.expect((body.data || {}).issue.replayed).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "05 \u2014 Verify on Job Detail",
+      "item": [
+        {
+          "name": "GET Job Detail (shipment)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipment/{{shipment_id}}/",
+            "description": "Check `operational_issues`, `unresolved_issue_count`, `blocking_recommendation`, timeline issue milestones."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "const data = (pm.response.json().data || {});",
+                  "pm.test('operational_issues key', function () {",
+                  "    pm.expect(data).to.have.property('operational_issues');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

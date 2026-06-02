@@ -6,8 +6,12 @@ Orchestrate delay/issue reporting (prep-only operational exceptions).
 from __future__ import annotations
 
 import hashlib
+import os
+import uuid
 from typing import Any, Mapping
 
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
 from django.utils.translation import gettext_lazy as _
 from django_tenants.utils import schema_context
 
@@ -163,6 +167,13 @@ class IssueReportingService:
             shipment_pk = str(
                 getattr(shipment, 'pk', '') or getattr(shipment, 'shipment_id', '')
             ).strip()
+
+            media_items = self._rehome_inline_issue_uploads(
+                media_items=media_items,
+                tenant_schema=schema,
+                driver_pk=driver_id,
+                shipment_pk=shipment_pk,
+            )
 
             self._validate_media_paths(
                 media_items=media_items,
@@ -340,6 +351,75 @@ class IssueReportingService:
         driver = (driver_pk or '').strip()
         shipment = (shipment_pk or '').strip()
         return f'mobile_driver_uploads/{tenant}/{driver}/{shipment}/issues/'
+
+    def _rehome_inline_issue_uploads(
+        self,
+        *,
+        media_items: list[dict[str, Any]],
+        tenant_schema: str,
+        driver_pk: str,
+        shipment_pk: str,
+    ) -> list[dict[str, Any]]:
+        """
+        Move multipart-uploaded files into the issue scoped prefix.
+
+        `process_media_files` stores uploads under `mobile/issue_evidence/...`.
+        This endpoint enforces the issue-specific secure scope, so we relocate
+        those files before validating file_ref paths.
+        """
+        if not media_items:
+            return media_items
+
+        prefix = self.issue_media_upload_prefix(
+            tenant_schema=tenant_schema,
+            driver_pk=driver_pk,
+            shipment_pk=shipment_pk,
+        )
+        migrated: list[dict[str, Any]] = []
+
+        for item in media_items:
+            row = dict(item or {})
+            file_ref = str(row.get('file_ref') or '').strip()
+            if not file_ref:
+                migrated.append(row)
+                continue
+
+            normalized = file_ref.replace('\\', '/').lstrip('/')
+            if normalized.startswith(prefix):
+                migrated.append(row)
+                continue
+
+            if not normalized.startswith('mobile/issue_evidence/'):
+                migrated.append(row)
+                continue
+
+            original_name = str(row.get('file_name') or '').strip()
+            base_name = (
+                os.path.basename(original_name)
+                or os.path.basename(normalized)
+                or f'{uuid.uuid4().hex}.bin'
+            )
+            target_ref = f'{prefix}{uuid.uuid4().hex}-{base_name}'
+
+            try:
+                if default_storage.exists(normalized):
+                    with default_storage.open(normalized, 'rb') as src:
+                        saved_ref = default_storage.save(
+                            target_ref,
+                            ContentFile(src.read()),
+                        )
+                    try:
+                        default_storage.delete(normalized)
+                    except Exception:
+                        pass
+                    row['file_ref'] = str(saved_ref).replace('\\', '/').lstrip('/')
+            except Exception:
+                # Keep original path; scope validation will reject invalid leftovers.
+                pass
+
+            migrated.append(row)
+
+        return migrated
 
     def _validate_media_paths(
         self,
