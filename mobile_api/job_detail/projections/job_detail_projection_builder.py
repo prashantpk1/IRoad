@@ -169,7 +169,12 @@ def enrich_timeline_with_operational_issues(
     *,
     request: Any | None = None,
 ) -> dict[str, Any]:
-    """Merge issue timeline milestones into Action Log timeline preview."""
+    """
+    Merge issue timeline milestones into Action Log timeline preview.
+
+    Not used by Job Detail main timeline (issues stay in alerts only).
+    Kept for reconciliation/unit tests and optional future overlays.
+    """
     bundle = dict(timeline_bundle or {})
     if context.job_type != 'shipment' or context.shipment is None:
         return bundle

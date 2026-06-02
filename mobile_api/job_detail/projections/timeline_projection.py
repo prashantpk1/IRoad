@@ -47,8 +47,7 @@ def build_timeline_section(
         preview_limit=preview_limit,
     )
     bundle['scope'] = context.job_type
-    from mobile_api.job_detail.projections.job_detail_projection_builder import (
-        enrich_timeline_with_operational_issues,
-    )
-
-    return enrich_timeline_with_operational_issues(bundle, context, request=request)
+    # Operational issues are surfaced via alerts / operational_issues blocks only.
+    # They are intentionally excluded from the action-log timeline preview.
+    bundle['includes_operational_issues'] = False
+    return bundle

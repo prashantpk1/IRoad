@@ -6,7 +6,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 from types import SimpleNamespace
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from mobile_api.tests.transaction_test_case import TransactionTestCase
 
@@ -24,6 +24,8 @@ from mobile_api.job_detail.projections.job_detail_projection_builder import (
     build_operational_issues_visibility,
     enrich_timeline_with_operational_issues,
 )
+from mobile_api.job_detail.projections.timeline_projection import build_timeline_section
+from mobile_api.job_detail.timeline.timeline_service import JobDetailTimelineService
 from mobile_api.job_detail.timeline.timeline_event_mapper import (
     ISSUE_TIMELINE_ESCALATED,
     ISSUE_TIMELINE_OPENED,
@@ -137,6 +139,32 @@ class OperationalIssuesIntegrationTests(TransactionTestCase):
         kinds = {row.get('issue_timeline_kind') for row in bundle['timeline_preview']}
         self.assertIn(ISSUE_TIMELINE_OPENED, kinds)
         self.assertIn(ISSUE_TIMELINE_ESCALATED, kinds)
+
+    @patch.object(JobDetailTimelineService, 'build_preview_bundle')
+    def test_timeline_section_excludes_operational_issues(self, mock_preview):
+        shipment_id = str(uuid.uuid4())
+        self._issue(shipment_id=shipment_id, state='escalated')
+        mock_preview.return_value = {
+            'preview_limit': 20,
+            'timeline_preview': [{'event_type': 'action', 'action_code': 'A5'}],
+            'timeline_cursor': '',
+            'has_more': False,
+        }
+        ctx = JobDetailContext(
+            driver=SimpleNamespace(pk='drv-1'),
+            tenant_schema='tenant_ops',
+            user_id='u1',
+            job_type='shipment',
+            job_id=shipment_id,
+            shipment=SimpleNamespace(pk=shipment_id, shipment_id=shipment_id),
+        )
+        section = build_timeline_section(ctx)
+        self.assertFalse(section.get('includes_operational_issues'))
+        self.assertEqual(len(section['timeline_preview']), 1)
+        self.assertEqual(section['timeline_preview'][0]['event_type'], 'action')
+        self.assertFalse(
+            any(row.get('event_type') == 'issue' for row in section['timeline_preview'])
+        )
 
     def test_unresolved_issue_warnings_on_execute(self):
         shipment_id = str(uuid.uuid4())
