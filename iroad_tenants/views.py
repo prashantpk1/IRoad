@@ -1020,7 +1020,6 @@ class TenantSupportTicketListView(View):
         ).select_related(
             'category',
             'assigned_to',
-            'assigned_to__role',
             'tenant',
         ).order_by('-created_at')
 
@@ -13077,6 +13076,37 @@ def _tenant_booking_derive_sell_price(price_list, service_item, trip_type, has_t
     return Decimal('0')
 
 
+def _tenant_booking_line_assignment_ids(booking, line_type):
+    """Truck and driver IDs assigned to an outbound/inbound booking line."""
+    if _tenant_booking_line_is_inbound(line_type):
+        return booking.booking_line_backload_truck_id, booking.booking_line_backload_driver_id
+    return booking.assigned_truck_id, booking.assigned_driver_id
+
+
+def _tenant_booking_blocks_scheduling_for_truck_driver(booking, truck, driver):
+    """
+    True when this truck+driver is on a booking line still Planned or In Execution.
+
+    Uses per-line operational status (doc §3.5.1), not stored booking_status or header Active.
+    """
+    if booking.booking_status != TenantBooking.Status.CONFIRMED:
+        return False
+    truck_id = truck.pk
+    driver_id = driver.pk
+    for line in _tenant_shipment_booking_line_rows(booking):
+        line_type = line['booking_item_type']
+        line_truck_id, line_driver_id = _tenant_booking_line_assignment_ids(
+            booking,
+            line_type,
+        )
+        if line_truck_id != truck_id or line_driver_id != driver_id:
+            continue
+        line_status = _tenant_booking_line_operational_status(booking, line_type)
+        if line_status in {'Planned', 'In Execution'}:
+            return True
+    return False
+
+
 def _tenant_booking_scheduling_conflict(
     *,
     booking_date,
@@ -13086,32 +13116,42 @@ def _tenant_booking_scheduling_conflict(
     backload_driver=None,
     exclude_booking_id=None,
 ):
-    """Same truck+driver already on an Active (Confirmed) booking for this planning date."""
+    """Same truck+driver on an open booking line (operational Planned/In Execution) for this date."""
     if booking_date is None:
         return False
 
     def _pair_conflict(assigned_truck, assigned_driver):
         if assigned_truck is None or assigned_driver is None:
             return False
-        qs = TenantBooking.objects.filter(
-            booking_status=TenantBooking.Status.CONFIRMED,
-            booking_date=booking_date,
-            assigned_truck=assigned_truck,
-            assigned_driver=assigned_driver,
+        qs = (
+            TenantBooking.objects.filter(
+                booking_status=TenantBooking.Status.CONFIRMED,
+                booking_date=booking_date,
+            )
+            .filter(
+                Q(assigned_truck=assigned_truck, assigned_driver=assigned_driver)
+                | Q(
+                    booking_line_backload_truck=assigned_truck,
+                    booking_line_backload_driver=assigned_driver,
+                )
+            )
+            .select_related(
+                'assigned_truck',
+                'assigned_driver',
+                'booking_line_backload_truck',
+                'booking_line_backload_driver',
+            )
         )
         if exclude_booking_id:
             qs = qs.exclude(pk=exclude_booking_id)
-        if qs.exists():
-            return True
-        qs = TenantBooking.objects.filter(
-            booking_status=TenantBooking.Status.CONFIRMED,
-            booking_date=booking_date,
-            booking_line_backload_truck=assigned_truck,
-            booking_line_backload_driver=assigned_driver,
-        )
-        if exclude_booking_id:
-            qs = qs.exclude(pk=exclude_booking_id)
-        return qs.exists()
+        for booking in qs:
+            if _tenant_booking_blocks_scheduling_for_truck_driver(
+                booking,
+                assigned_truck,
+                assigned_driver,
+            ):
+                return True
+        return False
 
     if _pair_conflict(truck, driver):
         return True
@@ -13333,7 +13373,8 @@ def _tenant_booking_validate_submission(request, *, booking_id=None, has_table=N
             exclude_booking_id=booking_id,
         ):
             errors.append(
-                'Another active booking already uses the same booking date, truck, and driver.'
+                'Another booking line is still in progress (operational status Planned or In Execution) '
+                'for the same booking date, truck, and driver.'
             )
 
     posted_sell_price = _decimal_from_request(request, 'sell_price')
@@ -24137,7 +24178,10 @@ class TruckMasterDetailView(View):
                 nm = (dd.english_name or dd.arabic_name or '').strip()
                 default_driver_display = f'{dd.driver_code} — {nm}' if nm else dd.driver_code
 
-            vendor_account_display = (truck.vendor_account_id or '').strip() or '—'
+            if truck.is_vendor_same_as_owner:
+                vendor_account_display = (truck.owner_id or '').strip() or '—'
+            else:
+                vendor_account_display = (truck.vendor_account_id or '').strip() or '—'
 
             context.update(
                 {

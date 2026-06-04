@@ -11,6 +11,7 @@ from __future__ import annotations
 from typing import Any
 
 from mobile_api.dashboard.selectors import pod_cod_policy as policy
+from mobile_api.helpers.cod_amount import build_cod_payment_display
 from mobile_api.job_detail.dto.job_detail_context import JobDetailContext
 from mobile_api.job_detail.services.job_detail_pod_cod_reconciler import (
     reconcile_job_detail_pod_cod,
@@ -61,6 +62,12 @@ def build_pod_cod_section(
         driver=context.driver,
     )
     display_flags['compliance_integrity'] = integrity
+    display_flags.update(
+        build_cod_payment_display(
+            shipment=context.shipment,
+            booking=context.booking,
+        ),
+    )
     return display_flags
 
 

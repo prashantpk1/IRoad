@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from mobile_api.helpers.cod_amount import build_cod_payment_display
 from tenant_workspace.models import TenantShipment
 
 
@@ -45,6 +46,19 @@ def _column_shipment_status(
     )
 
 
+def _enrich_collect_payment_hint(
+    hint: dict[str, Any],
+    *,
+    shipment: Any | None,
+    booking: Any | None = None,
+) -> dict[str, Any]:
+    if hint.get('screen') != 'collect_payment':
+        return hint
+    out = dict(hint)
+    out.update(build_cod_payment_display(shipment=shipment, booking=booking))
+    return out
+
+
 def build_next_action_hint(
     workflow: dict[str, Any] | None = None,
     pod_cod: dict[str, Any] | None = None,
@@ -52,6 +66,7 @@ def build_next_action_hint(
     order_type: str = 'Credit',
     *,
     shipment: Any | None = None,
+    booking: Any | None = None,
     allowed_actions: Any | None = None,
 ) -> dict[str, Any]:
     """
@@ -132,17 +147,21 @@ def build_next_action_hint(
 
     # A9 is next — COD payment collection
     if next_code == 'A9':
-        return {
-            'action': 'go_to_payment_collection',
-            'screen': 'collect_payment',
-            'action_code': 'A9',
-            'reason': (
-                'Collect cash payment from customer. '
-                'Enter exact amount received.'
-            ),
-            'job_closed': False,
-            'show_completion_screen': False,
-        }
+        return _enrich_collect_payment_hint(
+            {
+                'action': 'go_to_payment_collection',
+                'screen': 'collect_payment',
+                'action_code': 'A9',
+                'reason': (
+                    'Collect cash payment from customer. '
+                    'Enter exact amount received.'
+                ),
+                'job_closed': False,
+                'show_completion_screen': False,
+            },
+            shipment=shipment,
+            booking=booking,
+        )
 
     # A4 is next — needs camera for truck photos
     if next_code == 'A4':
@@ -213,14 +232,18 @@ def build_next_action_hint(
 
     # COD not collected yet
     if is_cod and not cod_collected and not cod_pending:
-        return {
-            'action': 'go_to_payment_collection',
-            'screen': 'collect_payment',
-            'action_code': 'A9',
-            'reason': 'COD payment not collected yet. Collect cash from customer.',
-            'job_closed': False,
-            'show_completion_screen': False,
-        }
+        return _enrich_collect_payment_hint(
+            {
+                'action': 'go_to_payment_collection',
+                'screen': 'collect_payment',
+                'action_code': 'A9',
+                'reason': 'COD payment not collected yet. Collect cash from customer.',
+                'job_closed': False,
+                'show_completion_screen': False,
+            },
+            shipment=shipment,
+            booking=booking,
+        )
 
     # Treasury processing
     if treasury_pending:
@@ -235,16 +258,20 @@ def build_next_action_hint(
     # POD compliant, A8 done, waiting for Delivered
     if pod_compliant and not is_job_closed:
         if is_cod and not cod_collected:
-            return {
-                'action': 'go_to_payment_collection',
-                'screen': 'collect_payment',
-                'action_code': 'A9',
-                'reason': (
-                    'POD verified. Collect COD payment to close job.'
-                ),
-                'job_closed': False,
-                'show_completion_screen': False,
-            }
+            return _enrich_collect_payment_hint(
+                {
+                    'action': 'go_to_payment_collection',
+                    'screen': 'collect_payment',
+                    'action_code': 'A9',
+                    'reason': (
+                        'POD verified. Collect COD payment to close job.'
+                    ),
+                    'job_closed': False,
+                    'show_completion_screen': False,
+                },
+                shipment=shipment,
+                booking=booking,
+            )
         return {
             'action': 'refresh_job_detail',
             'screen': 'job_detail',

@@ -3,6 +3,8 @@
 import os
 import sys
 
+import config.django_compat  # noqa: F401 — before Django loads template context
+
 
 def main():
     """Run administrative tasks."""

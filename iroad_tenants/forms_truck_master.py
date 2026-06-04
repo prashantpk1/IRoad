@@ -273,6 +273,9 @@ class TruckMasterForm(forms.ModelForm):
         else:
             cleaned['sourcing_mode'] = str(sm).strip()
 
+        if cleaned.get('is_vendor_same_as_owner'):
+            cleaned['vendor_account_id'] = (cleaned.get('owner_id') or '').strip()
+
         country = cleaned.get('registration_country')
         vendor_raw = cleaned.get('vendor_account_id')
 

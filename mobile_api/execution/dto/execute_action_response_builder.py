@@ -65,6 +65,8 @@ class ExecuteActionResponseBuilder:
             pod_cod=pod_cod,
             action_code=context.action_code,
             order_type=order_type,
+            shipment=getattr(context, 'shipment', None),
+            booking=getattr(context, 'booking', None),
         )
         execution['job_closed'] = next_hint.get('job_closed', False)
         execution['next_step'] = next_hint.get('action', 'refresh_job_detail')

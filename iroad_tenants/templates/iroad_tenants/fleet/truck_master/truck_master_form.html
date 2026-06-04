@@ -430,15 +430,30 @@
 
   var ownerToggle = document.getElementById("{{ form.is_vendor_same_as_owner.id_for_label }}");
   var ownerToggleLabel = form.querySelector(".js-tm-owner-toggle-label");
+  var ownerIdEl = document.getElementById("{{ form.owner_id.id_for_label }}");
+  var vendorEl = document.getElementById("{{ form.vendor_account_id.id_for_label }}");
 
-  function refreshOwnerToggleLabel() {
-    if (!ownerToggle || !ownerToggleLabel) return;
-    ownerToggleLabel.textContent = ownerToggle.checked ? "Yes" : "No";
+  function syncVendorFromOwner() {
+    if (!vendorEl || !ownerIdEl) return;
+    if (ownerToggle && ownerToggle.checked) {
+      vendorEl.value = (ownerIdEl.value || "").trim();
+    }
+    if (ownerToggleLabel) {
+      ownerToggleLabel.textContent = ownerToggle && ownerToggle.checked ? "Yes" : "No";
+    }
   }
 
-  if (ownerToggle) ownerToggle.addEventListener("change", refreshOwnerToggleLabel);
+  if (ownerToggle) ownerToggle.addEventListener("change", syncVendorFromOwner);
+  if (ownerIdEl) {
+    ownerIdEl.addEventListener("input", function () {
+      if (ownerToggle && ownerToggle.checked) syncVendorFromOwner();
+    });
+    ownerIdEl.addEventListener("change", function () {
+      if (ownerToggle && ownerToggle.checked) syncVendorFromOwner();
+    });
+  }
 
-  refreshOwnerToggleLabel();
+  syncVendorFromOwner();
 
   var firstError = form.querySelector(".text-danger.small");
   if (firstError) {

@@ -9,7 +9,7 @@ from django.utils.translation import gettext as _
 from iroad_tenants.models import TenantRegistry
 from tenant_workspace.models import TenantUser
 
-from .models import AdminUser
+from .models import AdminUser, Role
 
 
 def _admin_user_username_and_role(admin_user):
@@ -22,8 +22,15 @@ def _admin_user_username_and_role(admin_user):
     if getattr(admin_user, 'is_root', False):
         role = str(_('Super Admin'))
     else:
-        role_obj = getattr(admin_user, 'role', None)
-        role = (getattr(role_obj, 'role_name_en', None) or '').strip() if role_obj else ''
+        role = ''
+        role_id = getattr(admin_user, 'role_id', None)
+        if role_id:
+            role = (
+                Role.objects.filter(pk=role_id)
+                .values_list('role_name_en', flat=True)
+                .first()
+                or ''
+            ).strip()
     return username or '-', role or '-'
 
 
@@ -136,8 +143,8 @@ def support_ticket_created_by_display_map(tickets):
     admin_map = {}
     admin_ids = {raw for _, raw in need_admin}
     if admin_ids:
-        for a in AdminUser.objects.filter(pk__in=admin_ids).select_related('role').only(
-            'id', 'first_name', 'last_name', 'email', 'is_root', 'role__role_name_en',
+        for a in AdminUser.objects.filter(pk__in=admin_ids).only(
+            'id', 'first_name', 'last_name', 'email', 'is_root', 'role_id',
         ):
             username, role = _admin_user_username_and_role(a)
             admin_map[str(a.pk)] = {'username': username, 'role': role}

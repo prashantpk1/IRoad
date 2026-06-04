@@ -79,22 +79,22 @@ class Command(BaseCommand):
         '(Booking + Outbound Shipment + Backload Shipment) '
         'for a driver. '
         'Run: python manage.py seed_driver_job_round '
-        '--schema=t_bb773f861f3048748c0a7f0ffbee0df6 '
-        '--driver=DR-0002'
+        '--schema=t_d5d38bc1b3c44cd88a3d0d6eb61a7b12 '
+        '--driver=DR-0001'
     )
 
     def add_arguments(self, parser):
         parser.add_argument(
             '--schema',
             type=str,
-            default='t_bb773f861f3048748c0a7f0ffbee0df6',
+            default='t_d5d38bc1b3c44cd88a3d0d6eb61a7b12',
             help='Tenant schema name',
         )
         parser.add_argument(
             '--driver',
             type=str,
-            default='DR-0002',
-            help='Driver code (e.g. DR-0002)',
+            default='DR-0001',
+            help='Driver code (e.g. DR-0001)',
         )
         parser.add_argument(
             '--backload-driver',

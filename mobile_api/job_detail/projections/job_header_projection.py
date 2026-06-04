@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from mobile_api.helpers.cod_amount import build_cod_payment_display
 from mobile_api.helpers.job_booking_meta import (
     resolve_client_name,
     resolve_execution_date,
@@ -62,6 +63,12 @@ def build_job_header(
                 context.shipment,
                 booking=context.booking,
                 request=request,
+            ),
+        )
+        base.update(
+            build_cod_payment_display(
+                shipment=context.shipment,
+                booking=context.booking,
             ),
         )
         return base

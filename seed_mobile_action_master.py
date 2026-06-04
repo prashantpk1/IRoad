@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import argparse
 import os
-DEFAULT_SCHEMA = 't_bb773f861f3048748c0a7f0ffbee0df6'
+DEFAULT_SCHEMA = 't_d5d38bc1b3c44cd88a3d0d6eb61a7b12'
 
 def setup_django() -> None:
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')

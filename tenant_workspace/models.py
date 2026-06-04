@@ -1039,6 +1039,9 @@ class TruckMaster(models.Model):
         def add(field: str, message):
             errors.setdefault(field, []).append(message)
 
+        if self.is_vendor_same_as_owner:
+            self.vendor_account_id = (self.owner_id or '').strip()
+
         if self.sourcing_mode == self.SourcingMode.OUT_SOURCE:
             if not (self.vendor_account_id or '').strip():
                 add(

@@ -77,6 +77,7 @@ class JobDetailResponseBuilder:
             action_code=None,
             order_type=order_type,
             shipment=getattr(context, 'shipment', None),
+            booking=getattr(context, 'booking', None),
         )
 
         return JobDetailApiPayload(
