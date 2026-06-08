@@ -1240,6 +1240,13 @@ class TruckAttachment(models.Model):
         verbose_name=_('Status'),
         help_text=_('Current status of the attachment'),
     )
+    stats = models.CharField(
+        max_length=32,
+        choices=Status.choices,
+        default=Status.DOES_NOT_EXPIRE,
+        editable=False,
+        help_text=_('Derived expiry status persisted for reporting.'),
+    )
     attachment_file = models.FileField(upload_to=truck_attachment_upload_to, max_length=500)
     file_notes = models.TextField(
         help_text=_('Notes about this attachment document'),
@@ -1267,6 +1274,10 @@ class TruckAttachment(models.Model):
         if self.expiry_date is not None and self.expiry_date < today:
             return self.Status.EXPIRED
         return self.Status.VALID
+
+    def save(self, *args, **kwargs):
+        self.stats = self.status
+        super().save(*args, **kwargs)
 
     def clean(self):
         errors = {}

@@ -7,10 +7,54 @@
 
 {% block extra_css %}
 {% include 'iroad_tenants/partials/eal_list_live_search_css.html' %}
+<style>
+  .eal-stat-icon.blue {
+    background: rgba(59, 130, 246, 0.12);
+    color: #3b82f6;
+  }
+  .tt-type-table .eal-table thead th {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #7f8aa3;
+    font-weight: 600;
+  }
+  .tt-type-table .eal-table thead th:hover {
+    color: #7f8aa3;
+  }
+  .tt-type-table .eal-table td { vertical-align: middle; }
+  .tt-type-table .eal-actions-cell {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .eal-sort-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: inherit;
+    text-decoration: none;
+    font-weight: inherit;
+  }
+  .tt-type-table .eal-sort-link:hover { color: #5051f9; }
+  .eal-sort-caret {
+    opacity: 0.35;
+    font-size: 0.65em;
+    line-height: 1;
+  }
+  .eal-sort-caret.is-active {
+    opacity: 1;
+    color: #5051f9;
+  }
+  .tt-arabic-cell {
+    direction: rtl;
+    text-align: right;
+    font-family: "Segoe UI", sans-serif;
+  }
+</style>
 {% endblock %}
 
 {% block content %}
-{# Page header aligned with designer Truck-type-master breadcrumb trail + address-master action row pattern #}
 <div class="page-header">
   <nav aria-label="breadcrumb">
     <ol class="breadcrumb">
@@ -19,12 +63,12 @@
       </li>
       <li class="breadcrumb-item">{% translate "Operations" %}</li>
       <li class="breadcrumb-item">{% translate "Fleet Management" %}</li>
-      <li class="breadcrumb-item active" aria-current="page">{% translate "Truck Type Master List" %}</li>
+      <li class="breadcrumb-item active" aria-current="page">{% translate "Truck Type Master" %}</li>
     </ol>
   </nav>
   <div class="page-header-row">
     <div class="page-header-left">
-      <h1 class="page-title">{% translate "Truck Type Master List" %}</h1>
+      <h1 class="page-title">{% translate "Truck Type Master" %}</h1>
       <p class="page-subtitle">
         {% translate "Manage and view all truck types (code, labels, status)." %}
       </p>
@@ -35,10 +79,7 @@
           <i class="bi bi-download"></i>
           <span>{% translate "Export" %}</span>
         </button>
-        <a
-          href="{% url 'iroad_tenants:truck_type_master_create' %}"
-          class="eal-btn eal-btn-primary"
-        >
+        <a href="{% url 'iroad_tenants:truck_type_master_create' %}" class="eal-btn eal-btn-primary">
           <i class="bi bi-plus-lg"></i>
           <span>{% translate "Add Truck Type" %}</span>
         </a>
@@ -46,37 +87,6 @@
     </div>
   </div>
 </div>
-
-<style>
-  .eal-stat-icon.blue {
-    background: rgba(59, 130, 246, 0.12);
-    color: #3b82f6;
-  }
-  .tt-sort-indicator {
-    display: inline-flex;
-    flex-direction: column;
-    margin-left: 6px;
-    vertical-align: middle;
-    opacity: 0.45;
-    line-height: 0.75;
-  }
-  .tt-sort-link {
-    color: inherit;
-    text-decoration: none;
-    display: inline-flex;
-    align-items: center;
-  }
-  .tt-sort-link:hover {
-    color: inherit;
-    text-decoration: none;
-  }
-  .tt-sort-link.is-active .tt-sort-indicator {
-    opacity: 0.9;
-  }
-  .tt-sort-indicator i {
-    font-size: 9px;
-  }
-</style>
 
 <div class="eal-stats-row">
   <div class="eal-stat-card">
@@ -108,51 +118,40 @@
   </div>
 </div>
 
-<div
-  class="eal-table-card"
-  data-eal-filterable-table
-  data-eal-empty-colspan="6"
-  data-eal-empty-filter-message="{% translate 'No truck types match the selected search/filter criteria.' %}"
-  data-eal-global-search-columns="1,2,3,4"
->
-  <div class="eal-toolbar eal-toolbar--inline-filters">
+<div class="eal-table-card">
+  <form method="get" class="eal-toolbar">
     <div class="eal-toolbar-left w-100">
-      <div class="eal-toolbar-filters-row">
-        <div class="eal-search eal-search--toolbar-grow">
-          <i class="bi bi-search"></i>
-          <input
-            type="search"
-            id="truckTypeMasterSearch"
-            data-eal-global-search
-            value="{{ search_q|default:'' }}"
-            autocomplete="off"
-            placeholder="{% translate 'Search truck types...' %}"
-            aria-label="{% translate 'Search truck types' %}"
-          />
-          <button
-            type="button"
-            class="eal-search-clear-btn"
-            id="truckTypeMasterSearchClear"
-            title="{% translate 'Clear search' %}"
-            aria-label="{% translate 'Clear search' %}"
-            hidden
-          >
-            <i class="bi bi-x-lg"></i>
-          </button>
-        </div>
-        <div class="eal-toolbar-filter-pair">
-          <label class="form-label mb-0 small text-nowrap text-muted" for="ttListStatus">{% translate "Status" %}</label>
-          <select id="ttListStatus" data-query-param="status" class="form-select form-select-sm">
-            <option value="all" {% if filter_status == 'all' %}selected{% endif %}>{% translate "All" %}</option>
-            <option value="active" {% if filter_status == 'active' %}selected{% endif %}>{% translate "Active" %}</option>
-            <option value="inactive" {% if filter_status == 'inactive' %}selected{% endif %}>{% translate "Inactive" %}</option>
-          </select>
-        </div>
+      <input type="hidden" name="sort" value="{{ sort_key }}" />
+      <input type="hidden" name="dir" value="{{ sort_dir }}" />
+      {% if filter_status and filter_status != 'all' %}
+      <input type="hidden" name="status" value="{{ filter_status }}" />
+      {% endif %}
+      <div class="eal-search eal-search--toolbar-grow">
+        <i class="bi bi-search"></i>
+        <input
+          type="search"
+          name="q"
+          id="truckTypeMasterSearch"
+          value="{{ search_q|default:'' }}"
+          autocomplete="off"
+          placeholder="{% translate 'Search truck types...' %}"
+          aria-label="{% translate 'Search truck types' %}"
+        />
+        <button
+          type="button"
+          class="eal-search-clear-btn"
+          id="truckTypeMasterSearchClear"
+          title="{% translate 'Clear search' %}"
+          aria-label="{% translate 'Clear search' %}"
+          {% if not search_q %}hidden{% endif %}
+        >
+          <i class="bi bi-x-lg"></i>
+        </button>
       </div>
     </div>
-  </div>
+  </form>
 
-  <div class="eal-table-wrap">
+  <div class="eal-table-wrap tt-type-table">
     <table class="eal-table">
       <thead>
         <tr>
@@ -161,54 +160,42 @@
               type="checkbox"
               class="eal-custom-check"
               id="ttListSelectAll"
-              aria-label="Select all rows"
+              aria-label="{% translate 'Select all rows' %}"
             />
           </th>
           <th>
-            <a
-              href="{{ sort_url_truck_type_code }}"
-              class="tt-sort-link{% if sort_key == 'truck_type_code' %} is-active{% endif %}"
-            >
-              {% translate "Truck Type Code" %}
-              <span class="tt-sort-indicator">
-                <i class="bi bi-caret-up-fill"></i>
-                <i class="bi bi-caret-down-fill"></i>
+            <a href="{{ sort_urls.truck_type_code }}" class="eal-sort-link">
+              <span>{% translate "Truck Type Code" %}</span>
+              <span class="sort-indicator" role="presentation">
+                <i class="bi bi-caret-up-fill eal-sort-caret eal-sort-caret--up{% if sort_key == 'truck_type_code' and sort_dir == 'asc' %} is-active{% endif %}"></i>
+                <i class="bi bi-caret-down-fill eal-sort-caret eal-sort-caret--down{% if sort_key == 'truck_type_code' and sort_dir == 'desc' %} is-active{% endif %}"></i>
               </span>
             </a>
           </th>
           <th>
-            <a
-              href="{{ sort_url_english_label }}"
-              class="tt-sort-link{% if sort_key == 'english_label' %} is-active{% endif %}"
-            >
-              {% translate "English Label" %}
-              <span class="tt-sort-indicator">
-                <i class="bi bi-caret-up-fill"></i>
-                <i class="bi bi-caret-down-fill"></i>
+            <a href="{{ sort_urls.english_label }}" class="eal-sort-link">
+              <span>{% translate "English Label" %}</span>
+              <span class="sort-indicator" role="presentation">
+                <i class="bi bi-caret-up-fill eal-sort-caret eal-sort-caret--up{% if sort_key == 'english_label' and sort_dir == 'asc' %} is-active{% endif %}"></i>
+                <i class="bi bi-caret-down-fill eal-sort-caret eal-sort-caret--down{% if sort_key == 'english_label' and sort_dir == 'desc' %} is-active{% endif %}"></i>
               </span>
             </a>
           </th>
           <th>
-            <a
-              href="{{ sort_url_arabic_label }}"
-              class="tt-sort-link{% if sort_key == 'arabic_label' %} is-active{% endif %}"
-            >
-              {% translate "Arabic Label" %}
-              <span class="tt-sort-indicator">
-                <i class="bi bi-caret-up-fill"></i>
-                <i class="bi bi-caret-down-fill"></i>
+            <a href="{{ sort_urls.arabic_label }}" class="eal-sort-link">
+              <span>{% translate "Arabic Label" %}</span>
+              <span class="sort-indicator" role="presentation">
+                <i class="bi bi-caret-up-fill eal-sort-caret eal-sort-caret--up{% if sort_key == 'arabic_label' and sort_dir == 'asc' %} is-active{% endif %}"></i>
+                <i class="bi bi-caret-down-fill eal-sort-caret eal-sort-caret--down{% if sort_key == 'arabic_label' and sort_dir == 'desc' %} is-active{% endif %}"></i>
               </span>
             </a>
           </th>
           <th>
-            <a
-              href="{{ sort_url_status }}"
-              class="tt-sort-link{% if sort_key == 'status' %} is-active{% endif %}"
-            >
-              {% translate "Status" %}
-              <span class="tt-sort-indicator">
-                <i class="bi bi-caret-up-fill"></i>
-                <i class="bi bi-caret-down-fill"></i>
+            <a href="{{ sort_urls.status }}" class="eal-sort-link">
+              <span>{% translate "Status" %}</span>
+              <span class="sort-indicator" role="presentation">
+                <i class="bi bi-caret-up-fill eal-sort-caret eal-sort-caret--up{% if sort_key == 'status' and sort_dir == 'asc' %} is-active{% endif %}"></i>
+                <i class="bi bi-caret-down-fill eal-sort-caret eal-sort-caret--down{% if sort_key == 'status' and sort_dir == 'desc' %} is-active{% endif %}"></i>
               </span>
             </a>
           </th>
@@ -219,17 +206,20 @@
         {% for row in truck_types_page %}
         <tr>
           <td class="eal-col-check">
-            <input type="checkbox" class="eal-custom-check tt-row-check" aria-label="Select row" />
+            <input type="checkbox" class="eal-custom-check tt-row-check" aria-label="{% translate 'Select row' %}" />
           </td>
           <td>
-            <span class="eal-entity-id">{{ row.truck_type_code }}</span>
+            <a
+              href="{% url 'iroad_tenants:truck_type_master_edit' row.truck_type_id %}?mode=view"
+              class="eal-entity-id text-decoration-none"
+            >{{ row.truck_type_code }}</a>
           </td>
           <td>
             <div class="eal-name-cell">
-              <span class="eal-name-text">{{ row.english_label }}</span>
+              <span class="eal-name-text">{{ row.english_label|default:"—" }}</span>
             </div>
           </td>
-          <td class="eal-arabic" lang="ar" dir="rtl">{{ row.arabic_label }}</td>
+          <td class="tt-arabic-cell" lang="ar">{{ row.arabic_label|default:"—" }}</td>
           <td>
             {% if row.status == 'Active' %}
             <span class="status-badge active">{% translate "Active" %}</span>
@@ -238,60 +228,54 @@
             {% endif %}
           </td>
           <td>
-            <div class="dropdown eal-actions-cell">
-              <button
+            <div class="eal-actions-cell">
+              <a
                 class="eal-row-btn"
+                href="{% url 'iroad_tenants:truck_type_master_edit' row.truck_type_id %}?mode=view"
+                title="{% translate 'View' %}"
+              >
+                <i class="bi bi-eye"></i>
+              </a>
+              <a
+                class="eal-row-btn"
+                href="{% url 'iroad_tenants:truck_type_master_edit' row.truck_type_id %}"
+                title="{% translate 'Edit' %}"
+              >
+                <i class="bi bi-pencil"></i>
+              </a>
+              {% if row.status == 'Active' %}
+              <button
                 type="button"
-                data-bs-toggle="dropdown"
-                data-bs-boundary="viewport"
-                aria-expanded="false"
-                title="{% translate 'Actions' %}"
+                class="eal-row-btn danger tt-status-trigger"
+                title="{% translate 'Deactivate' %}"
+                data-truck-type-id="{{ row.truck_type_id }}"
+                data-new-status="Inactive"
               >
-                <i class="bi bi-three-dots-vertical"></i>
+                <i class="bi bi-trash3"></i>
               </button>
-              <ul
-                class="dropdown-menu dropdown-menu-end shadow-sm"
-                style="border-radius: 8px; border-color: #e2e8f0; min-width: 180px;"
+              {% else %}
+              <button
+                type="button"
+                class="eal-row-btn tt-status-trigger"
+                title="{% translate 'Activate' %}"
+                data-truck-type-id="{{ row.truck_type_id }}"
+                data-new-status="Active"
               >
-                <li>
-                  <a class="dropdown-item" href="{% url 'iroad_tenants:truck_type_master_edit' row.truck_type_id %}">
-                    <i class="bi bi-pencil text-primary me-2"></i>{% translate "Edit" %}
-                  </a>
-                </li>
-                <li>
-                  <a class="dropdown-item" href="{% url 'iroad_tenants:truck_type_master_edit' row.truck_type_id %}?mode=view">
-                    <i class="bi bi-eye text-info me-2"></i>{% translate "View" %}
-                  </a>
-                </li>
-                <li><hr class="dropdown-divider" /></li>
-                <li>
-                  {% if row.status == 'Active' %}
-                  <button
-                    type="button"
-                    class="dropdown-item text-danger tt-status-trigger"
-                    data-truck-type-id="{{ row.truck_type_id }}"
-                    data-new-status="Inactive"
-                  >
-                    <i class="bi bi-trash3 me-2"></i>{% translate "Deactivate" %}
-                  </button>
-                  {% else %}
-                  <button
-                    type="button"
-                    class="dropdown-item tt-status-trigger"
-                    data-truck-type-id="{{ row.truck_type_id }}"
-                    data-new-status="Active"
-                  >
-                    <i class="bi bi-arrow-counterclockwise me-2"></i>{% translate "Activate" %}
-                  </button>
-                  {% endif %}
-                </li>
-              </ul>
+                <i class="bi bi-arrow-counterclockwise"></i>
+              </button>
+              {% endif %}
             </div>
           </td>
         </tr>
         {% empty %}
         <tr>
-          <td colspan="6" class="text-center text-muted py-5">{% translate "No truck types found." %}</td>
+          <td colspan="6" class="text-center text-muted py-5">
+            {% if search_q %}
+            {% translate "No truck types match your search." %}
+            {% else %}
+            {% translate "No truck types found." %}
+            {% endif %}
+          </td>
         </tr>
         {% endfor %}
       </tbody>
@@ -369,10 +353,29 @@
 
 {% block extra_js %}
 {{ block.super }}
-{% url 'iroad_tenants:truck_type_master' as truck_type_list_url %}
-{% include 'iroad_tenants/partials/eal_list_live_search_js.html' with list_url=truck_type_list_url search_input_id='truckTypeMasterSearch' clear_btn_id='truckTypeMasterSearchClear' filter_select_ids='ttListStatus' %}
 <script>
 (function () {
+  var searchInput = document.getElementById("truckTypeMasterSearch");
+  var clearBtn = document.getElementById("truckTypeMasterSearchClear");
+  var searchForm = searchInput && searchInput.closest("form");
+
+  if (searchInput && searchForm) {
+    function syncClear() {
+      if (!clearBtn) return;
+      clearBtn.hidden = !((searchInput.value || "").trim());
+    }
+    searchInput.addEventListener("input", syncClear);
+    syncClear();
+
+    if (clearBtn) {
+      clearBtn.addEventListener("click", function () {
+        searchInput.value = "";
+        syncClear();
+        searchForm.submit();
+      });
+    }
+  }
+
   var selectAll = document.getElementById("ttListSelectAll");
   if (selectAll) {
     function syncSelectAll() {

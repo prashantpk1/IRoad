@@ -52,7 +52,11 @@ class TruckMasterForm(forms.ModelForm):
                 attrs={'class': 'form-control', 'placeholder': _('Owner or company name')}
             ),
             'plate_number': forms.TextInput(
-                attrs={'class': 'form-control', 'placeholder': _('Full plate as displayed')}
+                attrs={
+                    'class': 'form-control',
+                    'readonly': True,
+                    'placeholder': _('Auto-combined from plate fields'),
+                }
             ),
             'saudi_plate_number': forms.TextInput(
                 attrs={'class': 'form-control', 'placeholder': _('Numeric part')}
@@ -214,6 +218,11 @@ class TruckMasterForm(forms.ModelForm):
             self.fields['sourcing_mode'].initial = TruckMaster.SourcingMode.IN_SOURCE
 
         self.fields['vendor_account_id'].required = False
+        # Hidden vendor field: validate length in clean() so errors can be shown on Owner ID.
+        self.fields['vendor_account_id'] = forms.CharField(
+            required=False,
+            widget=forms.HiddenInput(),
+        )
 
         self.fields.pop('operational_status', None)
         self.fields['operational_status'] = forms.ChoiceField(
@@ -241,6 +250,14 @@ class TruckMasterForm(forms.ModelForm):
         self.fields['gross_weight_ton'].label = _('Gross Weight (Ton)')
         self.fields['volume_m3'].label = _('Volume (m³)')
 
+        self.fields['plate_number'].required = False
+        self.fields['plate_number'].label = _('Plate Number')
+
+        self.fields['saudi_plate_number'].label = _('Saudi Plate Number')
+        self.fields['saudi_english_letters'].label = _('Saudi English Letters')
+        self.fields['saudi_arabic_letters'].label = _('Saudi Arabic Letters')
+        self.fields['non_saudi_plate_number'].label = _('Non-Saudi Plate Number')
+
         for name in (
             'saudi_plate_number',
             'saudi_english_letters',
@@ -248,6 +265,17 @@ class TruckMasterForm(forms.ModelForm):
             'non_saudi_plate_number',
         ):
             self.fields[name].required = False
+
+    def add_model_validation_errors(self, error_dict):
+        """Map hidden-field model errors onto visible form fields."""
+        for field_name, errs in error_dict.items():
+            target = field_name
+            if field_name == 'vendor_account_id' and self.data.get(
+                'is_vendor_same_as_owner'
+            ):
+                target = 'owner_id'
+            for err in errs:
+                self.add_error(target, err)
 
     def _build_country_choices(self):
         with schema_context('public'):
@@ -274,10 +302,30 @@ class TruckMasterForm(forms.ModelForm):
             cleaned['sourcing_mode'] = str(sm).strip()
 
         if cleaned.get('is_vendor_same_as_owner'):
-            cleaned['vendor_account_id'] = (cleaned.get('owner_id') or '').strip()
+            owner_id = (cleaned.get('owner_id') or '').strip()
+            cleaned['vendor_account_id'] = owner_id
+            if len(owner_id) > 64:
+                raise ValidationError(
+                    {
+                        'owner_id': _(
+                            'Owner ID must be at most 64 characters when vendor is the same as owner.'
+                        )
+                    }
+                )
 
         country = cleaned.get('registration_country')
-        vendor_raw = cleaned.get('vendor_account_id')
+        vendor_raw = (cleaned.get('vendor_account_id') or '').strip()
+        cleaned['vendor_account_id'] = vendor_raw
+
+        if vendor_raw and len(vendor_raw) > 64:
+            field_name = (
+                'owner_id'
+                if cleaned.get('is_vendor_same_as_owner')
+                else 'vendor_account_id'
+            )
+            raise ValidationError(
+                {field_name: _('This value must be at most 64 characters.')}
+            )
 
         if (
             str(cleaned.get('sourcing_mode') or '')
@@ -298,7 +346,9 @@ class TruckMasterForm(forms.ModelForm):
                 raise ValidationError(
                     {'saudi_plate_number': _('Saudi plate number is required')}
                 )
-            if not (cleaned.get('saudi_english_letters') or '').strip():
+            english_letters = (cleaned.get('saudi_english_letters') or '').strip().upper()
+            cleaned['saudi_english_letters'] = english_letters
+            if not english_letters:
                 raise ValidationError(
                     {
                         'saudi_english_letters': _(
@@ -314,6 +364,8 @@ class TruckMasterForm(forms.ModelForm):
                         )
                     }
                 )
+            cleaned['plate_number'] = f'{sp} {english_letters}'.strip()
+            cleaned['non_saudi_plate_number'] = ''
 
         elif cc:
             nons = (cleaned.get('non_saudi_plate_number') or '').strip()
@@ -321,6 +373,7 @@ class TruckMasterForm(forms.ModelForm):
                 raise ValidationError(
                     {'non_saudi_plate_number': _('Plate number is required')}
                 )
+            cleaned['plate_number'] = nons
             cleaned['saudi_plate_number'] = ''
             cleaned['saudi_english_letters'] = ''
             cleaned['saudi_arabic_letters'] = ''

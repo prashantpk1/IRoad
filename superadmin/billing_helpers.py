@@ -602,6 +602,69 @@ def resolve_upgrade_credit_basis_price(plan, target_currency_code):
     return Decimal('0.00')
 
 
+def resolve_plan_cycle_price(plan, target_currency_code, number_of_cycles=1):
+    """
+    Total list price for ``number_of_cycles`` in ``target_currency_code``.
+
+    Uses exact PlanPricingCycle rows when available; otherwise derives per-cycle
+    price from any priced tier and converts via FX snapshots.
+    """
+    from .models import PlanPricingCycle
+
+    if not plan or not target_currency_code:
+        return Decimal('0.00')
+
+    try:
+        cycles = int(number_of_cycles)
+    except (TypeError, ValueError):
+        return Decimal('0.00')
+    if cycles <= 0:
+        return Decimal('0.00')
+
+    target_id = getattr(
+        target_currency_code, 'currency_code', str(target_currency_code))
+
+    qs = PlanPricingCycle.objects.filter(
+        plan=plan,
+        is_admin_only_cycle=False,
+    )
+
+    row = qs.filter(
+        currency_id=target_id,
+        number_of_cycles=cycles,
+    ).first()
+    if row:
+        return row.price
+
+    for r in qs.filter(currency_id=target_id).order_by('number_of_cycles'):
+        src_nc = int(r.number_of_cycles) if r.number_of_cycles else 1
+        if src_nc <= 0:
+            continue
+        per_cycle = r.price / Decimal(src_nc)
+        return (per_cycle * Decimal(cycles)).quantize(Decimal('0.01'))
+
+    for r in qs.filter(number_of_cycles=cycles).order_by('currency_id'):
+        conv = convert_amount_between_currencies(
+            r.price, r.currency_id, target_id)
+        if conv > 0:
+            return conv
+
+    for r in qs.order_by('number_of_cycles', 'currency_id'):
+        src_nc = int(r.number_of_cycles) if r.number_of_cycles else 0
+        if src_nc <= 0:
+            continue
+        per_cycle = r.price / Decimal(src_nc)
+        total = per_cycle * Decimal(cycles)
+        if r.currency_id == target_id:
+            return total.quantize(Decimal('0.01'))
+        conv = convert_amount_between_currencies(
+            total, r.currency_id, target_id)
+        if conv > 0:
+            return conv
+
+    return Decimal('0.00')
+
+
 def _is_routable_public_ip(ip_str):
     if not ip_str:
         return False

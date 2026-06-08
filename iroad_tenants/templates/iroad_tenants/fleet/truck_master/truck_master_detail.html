@@ -38,22 +38,31 @@
   <div class="ch-left">
     <div class="ch-title-row">
       <div class="ch-logo"><i class="bi bi-truck"></i></div>
-      <h2 class="ch-title mb-0">{{ truck.truck_code }}{% if truck.plate_number %} ({{ truck.plate_number }}){% endif %}</h2>
+      <h2 class="ch-title mb-0">{{ truck.truck_code }}{% if plate_number_display and plate_number_display != "—" %} ({{ plate_number_display }}){% endif %}</h2>
     </div>
     <div class="ch-badges">
-      <div class="ch-badge"><i class="bi bi-truck-flatbed"></i><span>{% if truck.truck_type %}{{ truck.truck_type.english_label }}{% else %}—{% endif %}</span></div>
-      <div class="ch-badge"><i class="bi bi-building"></i><span>{{ truck.owner_name|default:"—" }}</span></div>
-      {% if truck.sourcing_mode == 'In-Source' %}
-      <div class="ch-badge"><i class="bi bi-box-arrow-in-right"></i><span class="status-badge tm-source-in d-inline border-0">In-Source</span></div>
-      {% elif truck.sourcing_mode == 'Out-Source' %}
-      <div class="ch-badge"><i class="bi bi-box-arrow-up-right"></i><span class="status-badge tm-source-out d-inline border-0">Out-Source</span></div>
-      {% else %}
-      <div class="ch-badge"><i class="bi bi-key"></i><span>{{ truck.sourcing_mode|default:"—" }}</span></div>
-      {% endif %}
+      <div class="ch-badge">
+        <i class="bi bi-truck-flatbed"></i>
+        <span class="ch-badge-text">{% if truck.truck_type %}{{ truck.truck_type.english_label }}{% else %}—{% endif %}</span>
+      </div>
+      <div class="ch-badge">
+        <i class="bi bi-building"></i>
+        <span class="ch-badge-text">{{ truck.owner_name|default:"—" }}</span>
+      </div>
+      <div class="ch-badge">
+        {% if truck.sourcing_mode == 'In-Source' %}
+        <i class="bi bi-box-arrow-in-right"></i>
+        {% elif truck.sourcing_mode == 'Out-Source' %}
+        <i class="bi bi-box-arrow-up-right"></i>
+        {% else %}
+        <i class="bi bi-key"></i>
+        {% endif %}
+        <span class="ch-badge-text">{{ truck.sourcing_mode|default:"—" }}</span>
+      </div>
       {% if truck.status == 'Active' %}
-      <div class="ch-badge"><i class="bi bi-check2-circle"></i><span class="status-badge tm-status-active d-inline border-0">Active</span></div>
+      <div class="ch-badge"><i class="bi bi-check2-circle"></i><span class="tm-chip tm-chip--success">Active</span></div>
       {% else %}
-      <div class="ch-badge"><i class="bi bi-dash-circle"></i><span class="status-badge tm-status-inactive d-inline border-0">Inactive</span></div>
+      <div class="ch-badge"><i class="bi bi-dash-circle"></i><span class="tm-chip tm-chip--muted">Inactive</span></div>
       {% endif %}
     </div>
   </div>
@@ -120,9 +129,9 @@
               <span class="cd-field-label">Status</span>
               <span class="cd-field-value">
                 {% if truck.status == 'Active' %}
-                <span class="status-badge tm-status-active"><i class="bi bi-check2-circle"></i> Active</span>
+                <span class="tm-overview-badge tm-overview-badge--active">Active</span>
                 {% else %}
-                <span class="status-badge tm-status-inactive"><i class="bi bi-dash-circle"></i> Inactive</span>
+                <span class="tm-overview-badge tm-overview-badge--inactive">Inactive</span>
                 {% endif %}
               </span>
             </div>
@@ -147,26 +156,14 @@
               <span class="cd-field-value">{{ truck.owner_id|default:"—" }}</span>
             </div>
           </div>
-          <div class="cd-grid-row">
+          <div class="cd-grid-row cd-grid-row--last">
             <div class="cd-field">
               <span class="cd-field-label">Owner Name</span>
               <span class="cd-field-value">{{ truck.owner_name|default:"—" }}</span>
             </div>
             <div class="cd-field">
               <span class="cd-field-label">Is Vendor Same as Owner</span>
-              <span class="cd-field-value">
-                {% if truck.is_vendor_same_as_owner %}
-                <span class="badge rounded-pill bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25">Yes</span>
-                {% else %}
-                <span class="badge rounded-pill bg-secondary bg-opacity-10 text-secondary">No</span>
-                {% endif %}
-              </span>
-            </div>
-          </div>
-          <div class="cd-grid-row">
-            <div class="cd-field">
-              <span class="cd-field-label">Operational Status</span>
-              <span class="cd-field-value">{% if truck.operational_status %}{{ truck.get_operational_status_display }}{% else %}—{% endif %}</span>
+              <span class="cd-field-value">{% if truck.is_vendor_same_as_owner %}Yes{% else %}No{% endif %}</span>
             </div>
           </div>
         </div>
@@ -176,32 +173,62 @@
         <div class="cd-details-header">Plate &amp; Registration</div>
         <div class="cd-details-body">
           <div class="cd-grid-row">
-            <div class="cd-field"><span class="cd-field-label">Plate Number</span><span class="cd-field-value tm-plate-emphasis">{{ truck.plate_number|default:"—" }}</span></div>
-            <div class="cd-field"><span class="cd-field-label">Saudi Plate Number</span><span class="cd-field-value">{{ truck.saudi_plate_number|default:"—" }}</span></div>
-          </div>
-          <div class="cd-grid-row">
-            <div class="cd-field"><span class="cd-field-label">Saudi English Letters</span><span class="cd-field-value">{{ truck.saudi_english_letters|default:"—" }}</span></div>
-            <div class="cd-field"><span class="cd-field-label">Saudi Arabic Letters</span><span class="cd-field-value" dir="rtl" lang="ar">{{ truck.saudi_arabic_letters|default:"—" }}</span></div>
-          </div>
-          <div class="cd-grid-row">
-            <div class="cd-field"><span class="cd-field-label">Non-Saudi Plate Number</span><span class="cd-field-value">{{ truck.non_saudi_plate_number|default:"—" }}</span></div>
             <div class="cd-field">
-              {% if truck.plate_image %}
-              <span class="cd-field-label d-block mb-2">Plate Image</span>
-              <a href="{{ truck.plate_image.url }}" target="_blank" rel="noopener"><img src="{{ truck.plate_image.url }}" alt="" class="tm-doc-thumb rounded border" /></a>
-              {% else %}
-              <span class="cd-field-label">Plate Image</span><span class="cd-field-value">—</span>
-              {% endif %}
+              <span class="cd-field-label">Plate Number</span>
+              <span class="cd-field-value tm-plate-emphasis">{{ plate_number_display }}</span>
+            </div>
+            {% if is_saudi_registered %}
+            <div class="cd-field">
+              <span class="cd-field-label">Saudi Plate Number</span>
+              <span class="cd-field-value">{{ truck.saudi_plate_number|default:"—" }}</span>
+            </div>
+            {% else %}
+            <div class="cd-field">
+              <span class="cd-field-label">Non-Saudi Plate Number</span>
+              <span class="cd-field-value">{{ truck.non_saudi_plate_number|default:"—" }}</span>
+            </div>
+            {% endif %}
+          </div>
+          {% if is_saudi_registered %}
+          <div class="cd-grid-row">
+            <div class="cd-field">
+              <span class="cd-field-label">Saudi English Letters</span>
+              <span class="cd-field-value">{{ truck.saudi_english_letters|default:"—" }}</span>
+            </div>
+            <div class="cd-field">
+              <span class="cd-field-label">Saudi Arabic Letters</span>
+              <span class="cd-field-value" dir="rtl" lang="ar">{{ truck.saudi_arabic_letters|default:"—" }}</span>
             </div>
           </div>
-          <div class="cd-grid-row">
+          {% endif %}
+          <div class="cd-grid-row cd-grid-row--last">
             <div class="cd-field">
-              {% if truck.vehicle_registration_image %}
-              <span class="cd-field-label d-block mb-2">Vehicle Registration Image</span>
-              <a href="{{ truck.vehicle_registration_image.url }}" target="_blank" rel="noopener"><img src="{{ truck.vehicle_registration_image.url }}" alt="" class="tm-doc-thumb rounded border" /></a>
-              {% else %}
-              <span class="cd-field-label">Vehicle Registration Image</span><span class="cd-field-value">—</span>
-              {% endif %}
+              <span class="cd-field-label">Plate Image</span>
+              <div class="cd-field-value mt-2">
+                {% if truck.plate_image %}
+                <a href="{{ truck.plate_image.url }}" target="_blank" rel="noopener" class="tm-media-link">
+                  <img src="{{ truck.plate_image.url }}" alt="Plate image" class="tm-media-thumb" />
+                </a>
+                {% else %}
+                <div class="tm-media-placeholder tm-media-placeholder--image" title="No plate image">
+                  <i class="bi bi-image"></i>
+                </div>
+                {% endif %}
+              </div>
+            </div>
+            <div class="cd-field">
+              <span class="cd-field-label">Vehicle Registration Image</span>
+              <div class="cd-field-value mt-2">
+                {% if truck.vehicle_registration_image %}
+                <a href="{{ truck.vehicle_registration_image.url }}" target="_blank" rel="noopener" class="tm-media-link">
+                  <img src="{{ truck.vehicle_registration_image.url }}" alt="Vehicle registration" class="tm-media-thumb" />
+                </a>
+                {% else %}
+                <div class="tm-media-placeholder tm-media-placeholder--pdf" title="No registration image">
+                  <i class="bi bi-file-earmark-pdf"></i>
+                </div>
+                {% endif %}
+              </div>
             </div>
           </div>
         </div>
@@ -218,18 +245,22 @@
             <div class="cd-field"><span class="cd-field-label">Serial Number</span><span class="cd-field-value">{{ truck.serial_number|default:"—" }}</span></div>
             <div class="cd-field"><span class="cd-field-label">Color</span><span class="cd-field-value">{{ truck.color|default:"—" }}</span></div>
           </div>
-          <div class="cd-grid-row">
-            <div class="cd-field" style="grid-column: 1/-1;">
+          <div class="cd-grid-row cd-grid-row--last">
+            <div class="cd-field" style="grid-column: 1 / -1;">
               <span class="cd-field-label">Truck Images</span>
-              {% if truck_images %}
-              <div class="d-flex flex-wrap gap-2 mt-2">
-                {% for img in truck_images %}
-                <a href="{{ img.image.url }}" target="_blank" rel="noopener"><img src="{{ img.image.url }}" alt="" class="cd-thumb" /></a>
-                {% endfor %}
+              <div class="cd-field-value mt-2 d-flex flex-wrap gap-3">
+                {% if truck_images %}
+                  {% for img in truck_images %}
+                  <a href="{{ img.image.url }}" target="_blank" rel="noopener" class="tm-media-link">
+                    <img src="{{ img.image.url }}" alt="Truck image" class="tm-media-thumb tm-media-thumb--truck" />
+                  </a>
+                  {% endfor %}
+                {% else %}
+                <div class="tm-media-placeholder tm-media-placeholder--truck" title="No truck images">
+                  <i class="bi bi-truck"></i>
+                </div>
+                {% endif %}
               </div>
-              {% else %}
-              <span class="cd-field-value">—</span>
-              {% endif %}
             </div>
           </div>
         </div>
@@ -243,80 +274,116 @@
             <div class="cd-field"><span class="cd-field-label">Tires Count</span><span class="cd-field-value">{{ truck.tires_count|default:"—" }}</span></div>
           </div>
           <div class="cd-grid-row">
-            <div class="cd-field"><span class="cd-field-label">Tare Weight (Ton)</span><span class="cd-field-value">{{ truck.tare_weight_ton|default:"—" }}</span></div>
-            <div class="cd-field"><span class="cd-field-label">Gross Weight (Ton)</span><span class="cd-field-value">{{ truck.gross_weight_ton|default:"—" }}</span></div>
+            <div class="cd-field">
+              <span class="cd-field-label">Tare Weight (Ton)</span>
+              <span class="cd-field-value">{% if truck.tare_weight_ton is not None %}{{ truck.tare_weight_ton }} Ton{% else %}—{% endif %}</span>
+            </div>
+            <div class="cd-field">
+              <span class="cd-field-label">Gross Weight (Ton)</span>
+              <span class="cd-field-value">{% if truck.gross_weight_ton is not None %}{{ truck.gross_weight_ton }} Ton{% else %}—{% endif %}</span>
+            </div>
           </div>
           <div class="cd-grid-row">
-            <div class="cd-field"><span class="cd-field-label">Payload Capacity (Ton)</span><span class="cd-field-value">{{ truck.payload_capacity_ton|default:"—" }}</span></div>
-            <div class="cd-field"><span class="cd-field-label">Volume (m³)</span><span class="cd-field-value">{{ truck.volume_m3|default:"—" }}</span></div>
+            <div class="cd-field">
+              <span class="cd-field-label">Payload Capacity (Ton)</span>
+              <span class="cd-field-value">{% if truck.payload_capacity_ton is not None %}{{ truck.payload_capacity_ton }} Ton{% else %}—{% endif %}</span>
+            </div>
+            <div class="cd-field">
+              <span class="cd-field-label">Volume (m³)</span>
+              <span class="cd-field-value">{% if truck.volume_m3 is not None %}{{ truck.volume_m3 }} m³{% else %}—{% endif %}</span>
+            </div>
           </div>
-          <div class="cd-grid-row">
-            <div class="cd-field"><span class="cd-field-label">Default Driver</span><span class="cd-field-value">{{ default_driver_display }}</span></div>
+          <div class="cd-grid-row cd-grid-row--last">
+            <div class="cd-field">
+              <span class="cd-field-label">Default Driver</span>
+              <span class="cd-field-value">{{ default_driver_display }}</span>
+            </div>
           </div>
         </div>
       </div>
     </div>
 
     <div class="tab-pane fade" id="pane-documents" role="tabpanel" aria-labelledby="tab-documents">
-      <div class="cd-details-section mb-0">
+      <div class="cd-details-section cd-details-section--table mb-0">
         <div class="cd-details-header d-flex flex-wrap justify-content-between align-items-center gap-2">
-          <span>Truck Documents <span class="badge bg-secondary ms-1">{{ document_attachment_count }} files</span></span>
-          <a href="{% url 'iroad_tenants:truck_attachment_create' truck.truck_id %}" class="btn btn-primary btn-sm">
+          <span>Truck Documents</span>
+          <a href="{% url 'iroad_tenants:truck_attachment_create' truck.truck_id %}" class="btn btn-primary btn-sm tm-doc-upload-btn">
             <i class="bi bi-upload"></i> Upload Document
           </a>
         </div>
         <div class="cd-details-body p-0">
           {% if document_attachments %}
-          <div class="eal-table-wrap" style="box-shadow:none;border-radius:0;">
-            <table class="eal-table mb-0">
+          <div class="tm-detail-table-scroll tm-doc-table-scroll" tabindex="0" aria-label="Truck documents — scroll horizontally to view all columns">
+            <div class="eal-table-wrap tm-doc-table">
+            <table class="eal-table mb-0 tm-doc-table-grid">
               <thead>
                 <tr>
-                  <th>#</th>
-                  <th>Document Name</th>
-                  <th>Attached Date</th>
-                  <th>Expiry Applicable</th>
+                  <th>SN</th>
+                  <th>Arabic Label</th>
+                  <th>English Label</th>
+                  <th>Ref Num</th>
                   <th>Expiry Date</th>
+                  <th>File Attached</th>
                   <th>Status</th>
                   <th class="text-end">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {% for a in document_attachments %}
+                {% for row in document_attachments %}
+                {% with a=row.obj %}
                 <tr>
                   <td>{{ forloop.counter }}</td>
                   <td>
-                    <i class="bi bi-file-earmark me-1 text-secondary"></i>
-                    {{ a.english_label|default:a.arabic_label|default:a.attachment_no|default:"—" }}
-                  </td>
-                  <td>{{ a.attachment_date|date:"d M Y" }}</td>
-                  <td>{% if a.is_expiry_applicable %}Yes{% else %}No{% endif %}</td>
-                  <td>
-                    {% if a.is_expiry_applicable and a.expiry_date %}
-                      {% if a.status == 'Expired' %}<span class="text-danger fw-bold">{{ a.expiry_date|date:"d M Y" }}</span>
-                      {% else %}<span class="text-success fw-bold">{{ a.expiry_date|date:"d M Y" }}</span>{% endif %}
-                    {% else %}<span class="text-muted">—</span>{% endif %}
-                  </td>
-                  <td>
-                    {% if a.status == 'Valid' %}
-                    <span class="status-badge tm-doc-valid">Active</span>
-                    {% elif a.status == 'Expired' %}
-                    <span class="status-badge tm-doc-expired">Expired</span>
+                    {% if a.arabic_label %}
+                    <span class="tm-doc-arabic" dir="rtl" lang="ar" title="{{ a.arabic_label }}">{{ a.arabic_label }}</span>
                     {% else %}
-                    <span class="status-badge tm-doc-none">Does Not Expire</span>
+                    <span class="text-muted">—</span>
                     {% endif %}
+                  </td>
+                  <td>{{ a.english_label|default:"—" }}</td>
+                  <td>{{ a.doc_ref_number|default:"—" }}</td>
+                  <td>
+                    {% if row.expiry_tone %}
+                    <span class="tm-doc-expiry tm-doc-expiry--{{ row.expiry_tone }}">{{ a.expiry_date|date:"j M Y" }}</span>
+                    {% else %}
+                    <span class="text-muted">—</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if row.file_name %}
+                    <span class="tm-doc-file" title="{{ row.file_name }}">
+                      <i class="bi {{ row.file_icon_class }} me-1 flex-shrink-0"></i><span class="tm-doc-file-name">{{ row.file_name }}</span>
+                    </span>
+                    {% else %}
+                    <span class="text-muted">—</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <span class="status-badge {{ row.status_badge }}">{{ row.display_status }}</span>
                   </td>
                   <td class="text-end">
                     <div class="eal-actions-cell justify-content-end pt-0 pb-0 w-100">
-                      {% if a.attachment_file %}
-                      <a class="eal-row-btn" href="{{ a.attachment_file.url }}" target="_blank" rel="noopener" title="Download"><i class="bi bi-download"></i></a>
+                      {% if row.has_file %}
+                      <a class="eal-row-btn" href="{{ a.attachment_file.url }}" target="_blank" rel="noopener" download title="Download">
+                        <i class="bi bi-download"></i>
+                      </a>
                       {% endif %}
-                      <a class="eal-row-btn" href="{% url 'iroad_tenants:truck_attachment_detail' truck_id=truck.truck_id attachment_id=a.attachment_id %}" title="View"><i class="bi bi-eye"></i></a>
+                      <button
+                        type="button"
+                        class="eal-row-btn tm-doc-delete-btn tm-detail-doc-delete"
+                        title="Delete"
+                        data-delete-url="{% url 'iroad_tenants:truck_attachment_delete' truck.truck_id a.attachment_id %}"
+                      >
+                        <i class="bi bi-trash"></i>
+                      </button>
                     </div>
                   </td>
                 </tr>
+                {% endwith %}
                 {% endfor %}
               </tbody>
             </table>
+            </div>
           </div>
           {% else %}
           <div class="p-4 text-muted cd-empty border-0">No truck documents uploaded yet.</div>
@@ -326,11 +393,12 @@
     </div>
 
     <div class="tab-pane fade" id="pane-assigned-drivers" role="tabpanel" aria-labelledby="tab-assigned-drivers">
-      <div class="cd-details-section">
+      <div class="cd-details-section cd-details-section--table">
         <div class="cd-details-header">Driver Assignment History</div>
         <div class="cd-details-body p-0">
           {% if assigned_drivers_rows %}
-          <div class="eal-table-wrap" style="box-shadow:none;border-radius:0;">
+          <div class="tm-detail-table-scroll">
+          <div class="eal-table-wrap">
             <table class="eal-table mb-0">
               <thead>
                 <tr>
@@ -368,6 +436,7 @@
               </tbody>
             </table>
           </div>
+          </div>
           {% else %}
           <div class="cd-empty m-3"><strong>No driver is assigned.</strong></div>
           {% endif %}
@@ -376,11 +445,12 @@
     </div>
 
     <div class="tab-pane fade" id="pane-shipments" role="tabpanel" aria-labelledby="tab-shipments">
-      <div class="cd-details-section mb-0">
+      <div class="cd-details-section cd-details-section--table mb-0">
         <div class="cd-details-header">Truck Shipments History</div>
         <div class="cd-details-body p-0">
           {% if truck_shipment_rows %}
-          <div class="eal-table-wrap" style="box-shadow:none;border-radius:0;">
+          <div class="tm-detail-table-scroll">
+          <div class="eal-table-wrap">
             <table class="eal-table mb-0">
               <thead>
                 <tr>
@@ -401,8 +471,8 @@
                   <td><span class="eal-entity-id">{{ s.shipment_no }}</span></td>
                   <td>{{ s.shipment_date|date:"d M Y" }}</td>
                   <td>{{ row.route }}</td>
-                  <td>{{ s.client_account_ref|default:"—" }}</td>
-                  <td>{{ s.driver_ref|default:"—" }}</td>
+                  <td>{{ row.client_display|default:"—" }}</td>
+                  <td>{{ row.driver_display|default:"—" }}</td>
                   <td>{{ s.booking_item_type|default:"—" }}</td>
                   <td>
                     {% if s.shipment_status == 'In Transit' %}
@@ -430,6 +500,7 @@
               </tbody>
             </table>
           </div>
+          </div>
           {% else %}
           <div class="cd-empty m-3"><strong>No shipments recorded for this truck.</strong></div>
           {% endif %}
@@ -438,11 +509,12 @@
     </div>
 
     <div class="tab-pane fade" id="pane-movements" role="tabpanel" aria-labelledby="tab-movements">
-      <div class="cd-details-section mb-0">
+      <div class="cd-details-section cd-details-section--table mb-0">
         <div class="cd-details-header">Truck Movements Log</div>
         <div class="cd-details-body p-0">
           {% if movement_log_rows %}
-          <div class="eal-table-wrap" style="box-shadow:none;border-radius:0;">
+          <div class="tm-detail-table-scroll">
+          <div class="eal-table-wrap">
             <table class="eal-table mb-0">
               <thead>
                 <tr>
@@ -457,46 +529,45 @@
                 </tr>
               </thead>
               <tbody>
-                {% for m in movement_log_rows %}
+                {% for row in movement_log_rows %}
+                {% with m=row.obj %}
                 <tr>
                   <td><span class="eal-entity-id">{{ m.movement_no }}</span></td>
-                  <td>{{ m.movement_date|date:"d M Y" }}</td>
-                  <td>{% if m.from_location_point %}{{ m.from_location_point.display_label }}{% else %}—{% endif %}</td>
-                  <td>{% if m.to_location_point %}{{ m.to_location_point.display_label }}{% else %}—{% endif %}</td>
-                  <td style="font-weight:600">{% if m.distance_km %}{{ m.distance_km|floatformat:0 }}&nbsp;km{% else %}—{% endif %}</td>
                   <td>
-                    {% if m.shipment_id %}
-                    <span class="status-badge tm-mov-loaded">Loaded trip</span>
-                    {% elif m.empty_move_reason %}
-                    <span class="status-badge tm-mov-empty">{{ m.empty_move_reason }}</span>
-                    {% elif m.movement_source %}
-                    <span class="status-badge tm-mov-source">{{ m.movement_source }}</span>
+                    {% if row.use_start_time %}
+                    {{ m.start_time|date:"d M Y" }}
                     {% else %}
-                    <span class="text-muted">—</span>
+                    {{ m.movement_date|date:"d M Y" }}
+                    {% endif %}
+                  </td>
+                  <td><span class="tm-mov-loc" title="{{ row.from_location }}">{{ row.from_location }}</span></td>
+                  <td><span class="tm-mov-loc" title="{{ row.to_location }}">{{ row.to_location }}</span></td>
+                  <td style="font-weight:600">{% if row.has_distance %}{{ m.distance_km|floatformat:0 }}&nbsp;km{% else %}—{% endif %}</td>
+                  <td>
+                    {% if row.movement_type_badge == 'loaded' %}
+                    <span class="status-badge tm-mov-loaded">{{ row.movement_type }}</span>
+                    {% elif row.movement_type_badge == 'empty' %}
+                    <span class="status-badge tm-mov-empty">{{ row.movement_type }}</span>
+                    {% elif row.movement_type_badge == 'source' %}
+                    <span class="status-badge tm-mov-source">{{ row.movement_type }}</span>
+                    {% else %}
+                    <span class="text-muted">{{ row.movement_type }}</span>
                     {% endif %}
                   </td>
                   <td>
-                    {% if m.status == 'In Progress' %}
-                    <span class="status-badge tm-mov-inprog">In Progress</span>
-                    {% elif m.status == 'Completed' %}
-                    <span class="status-badge tm-mov-done">Completed</span>
-                    {% elif m.status == 'Scheduled' %}
-                    <span class="status-badge tm-mov-sched">Scheduled</span>
-                    {% elif m.status == 'Cancelled' %}
-                    <span class="status-badge tm-mov-cancel">Cancelled</span>
-                    {% else %}
-                    <span class="status-badge tm-ship-default">{{ m.status }}</span>
-                    {% endif %}
+                    <span class="status-badge tm-mov-{{ row.status_badge }}">{{ row.status_label }}</span>
                   </td>
                   <td class="text-end">
                     <div class="eal-actions-cell justify-content-end pt-0 pb-0 w-100">
-                      <a class="eal-row-btn" href="{% url 'iroad_tenants:tenant_operation_truck_movement_log_list' %}" title="Open movement log"><i class="bi bi-eye"></i></a>
+                      <a class="eal-row-btn" href="{% url 'iroad_tenants:tenant_operation_truck_movement_log_detail' m.movement_id %}" title="View movement"><i class="bi bi-eye"></i></a>
                     </div>
                   </td>
                 </tr>
+                {% endwith %}
                 {% endfor %}
               </tbody>
             </table>
+          </div>
           </div>
           {% else %}
           <div class="cd-empty m-3"><strong>No movement log entries for this truck yet.</strong> Entries appear when a movement log row truck reference matches this truck code or id.</div>
@@ -506,6 +577,27 @@
     </div>
   </div>
 </div>
+</div>
+
+<div class="modal fade" id="truckDetailDocDeleteModal" tabindex="-1" aria-labelledby="truckDetailDocDeleteTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post" action="" id="truckDetailDocDeleteForm">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title" id="truckDetailDocDeleteTitle">Delete document</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-0">Delete this attachment permanently? This cannot be undone.</p>
+        </div>
+        <div class="modal-footer gap-2">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-danger px-4">Delete</button>
+        </div>
+      </form>
+    </div>
+  </div>
 </div>
 
 <div class="modal fade" id="truckDetailStatusModal" tabindex="-1" aria-labelledby="truckDetailStatusTitle" aria-hidden="true">
@@ -559,7 +651,33 @@
     display: flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 20px;
     border: 1px solid rgba(0, 0, 0, 0.08); font-size: 0.85rem; font-weight: 500; color: #4a4a4a; background: #fff;
   }
-  .ch-badge i { color: #6b6b6b; }
+  .ch-badge i { color: #6b6b6b; flex-shrink: 0; }
+  .ch-badge-text {
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .tm-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2rem 0.65rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    line-height: 1.2;
+    white-space: nowrap;
+  }
+  .tm-chip--success {
+    background: #e6f8ef;
+    color: #0d894f;
+    border: 1px solid rgba(13, 137, 79, 0.2);
+  }
+  .tm-chip--muted {
+    background: #f1f5f9;
+    color: #64748b;
+    border: 1px solid #e2e8f0;
+  }
   .ch-right { display: flex; flex-direction: column; gap: 10px; min-width: 250px; }
   .ch-contact-item {
     display: flex; align-items: stretch; background: #f4f5f9; border-radius: 6px; overflow: hidden;
@@ -582,8 +700,17 @@
     color: #64748b;
     border-color: #e2e8f0;
   }
+  .container-fluid.pb-4 {
+    max-width: 100%;
+    min-width: 0;
+  }
   .cd-main-card {
-    background: #fff; border-radius: 12px; border: 1px solid rgba(0, 0, 0, 0.08); padding: 20px;
+    background: #fff;
+    border-radius: 12px;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    padding: 20px;
+    max-width: 100%;
+    min-width: 0;
   }
   .cd-tabs-container { background: #f4f5fc; border-radius: 8px; padding: 6px; margin-bottom: 24px; }
   .cd-tabs-list { display: flex; gap: 6px; flex-wrap: nowrap; overflow-x: auto; padding: 0; margin: 0; list-style: none; }
@@ -595,6 +722,8 @@
   .cd-tab.active { background: #5051f9; color: #fff; box-shadow: 0 2px 4px rgba(80, 81, 249, 0.2); }
   .cd-tab:hover:not(.active) { color: #1a1a1a; }
   .cd-details-section { border: 1px solid rgba(0, 0, 0, 0.08); border-radius: 8px; overflow: hidden; margin-bottom: 1rem; }
+  .cd-details-section--table { overflow: visible; }
+  .cd-details-section--table .cd-details-body { overflow: hidden; border-radius: 0 0 8px 8px; }
   .cd-details-header {
     background: #f4f5fc; padding: 16px 20px; font-weight: 600; font-size: 0.9rem;
     color: #1a1a1a; border-bottom: 1px solid rgba(0, 0, 0, 0.05);
@@ -604,10 +733,73 @@
     display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
     padding-bottom: 20px; margin-bottom: 20px; border-bottom: 1px dashed rgba(0, 0, 0, 0.1);
   }
-  .cd-grid-row:last-child { padding-bottom: 0; margin-bottom: 0; border-bottom: none; }
+  .cd-grid-row:last-child,
+  .cd-grid-row.cd-grid-row--last { padding-bottom: 0; margin-bottom: 0; border-bottom: none; }
   .cd-field { display: flex; flex-direction: column; gap: 6px; }
   .cd-field-label { font-size: 0.8rem; color: #6b6b6b; }
   .cd-field-value { font-size: 1rem; font-weight: 700; color: #1a1a1a; }
+  .tm-overview-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.75rem;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+  .tm-overview-badge--active {
+    background: #e9f8ef;
+    color: #0f8a43;
+    border: 1px solid #c7efd5;
+  }
+  .tm-overview-badge--inactive {
+    background: #f2f4f8;
+    color: #6f7b90;
+    border: 1px solid #dde2ea;
+  }
+  .tm-media-link { display: inline-block; text-decoration: none; }
+  .tm-media-thumb {
+    width: 120px;
+    height: 80px;
+    object-fit: cover;
+    border: 1px solid #d7dcef;
+    border-radius: 8px;
+    display: block;
+  }
+  .tm-media-thumb--truck {
+    width: 140px;
+    height: 100px;
+  }
+  .tm-media-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    border-style: dashed;
+  }
+  .tm-media-placeholder--image {
+    width: 120px;
+    height: 80px;
+    background: #f4f5fc;
+    border-color: #c2c4fa;
+    color: #5051f9;
+    font-size: 1.5rem;
+  }
+  .tm-media-placeholder--pdf {
+    width: 120px;
+    height: 80px;
+    background: #fef2f2;
+    border-color: #fca5a5;
+    color: #ef4444;
+    font-size: 1.5rem;
+  }
+  .tm-media-placeholder--truck {
+    width: 140px;
+    height: 100px;
+    background: #f4f5fc;
+    border-color: #c2c4fa;
+    color: #5051f9;
+    font-size: 2rem;
+  }
   .cd-empty {
     border: 1px dashed rgba(0, 0, 0, 0.2); border-radius: 14px; padding: 18px; background: rgba(0, 0, 0, 0.02);
   }
@@ -618,9 +810,151 @@
   .status-badge.tm-source-out { background: #fd7e14; color: #fff; border: 0; }
   .status-badge.tm-status-active { background: #198754; color: #fff; border: 0; }
   .status-badge.tm-status-inactive { background: #94a3b8; color: #fff; border: 0; }
-  .status-badge.tm-doc-valid { background: #198754; color: #fff; border: 0; }
-  .status-badge.tm-doc-expired { background: #dc3545; color: #fff; border: 0; }
-  .status-badge.tm-doc-none { background: #64748b; color: #fff; border: 0; }
+  .tm-detail-table-scroll {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+    scrollbar-width: thin;
+    scrollbar-color: #94a3b8 #f1f5f9;
+  }
+  .tm-detail-table-scroll::-webkit-scrollbar {
+    height: 8px;
+  }
+  .tm-detail-table-scroll::-webkit-scrollbar-track {
+    background: #f1f5f9;
+  }
+  .tm-detail-table-scroll::-webkit-scrollbar-thumb {
+    background: #94a3b8;
+    border-radius: 4px;
+  }
+  .tm-detail-table-scroll .eal-table-wrap {
+    box-shadow: none;
+    border-radius: 0;
+    overflow: visible;
+  }
+  .tm-detail-table-scroll .eal-table {
+    min-width: 720px;
+  }
+  .tm-doc-table-grid {
+    min-width: 960px;
+  }
+  .tm-doc-table .eal-table thead th {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #7f8aa3;
+    font-weight: 600;
+  }
+  .tm-doc-table .eal-table td { vertical-align: middle; }
+  .tm-doc-table .eal-table th:first-child,
+  .tm-doc-table .eal-table td:first-child {
+    width: 48px;
+    min-width: 48px;
+    text-align: center;
+  }
+  .tm-doc-table .eal-table th:nth-child(2),
+  .tm-doc-table .eal-table td:nth-child(2) {
+    min-width: 120px;
+    max-width: 180px;
+  }
+  .tm-doc-table .eal-table th:nth-child(3),
+  .tm-doc-table .eal-table td:nth-child(3) {
+    min-width: 120px;
+  }
+  .tm-doc-table .eal-table th:nth-child(5),
+  .tm-doc-table .eal-table td:nth-child(5) {
+    min-width: 110px;
+  }
+  .tm-doc-table .eal-table th:nth-child(6),
+  .tm-doc-table .eal-table td:nth-child(6) {
+    min-width: 150px;
+    max-width: 200px;
+  }
+  .tm-doc-table .eal-table th:nth-child(7),
+  .tm-doc-table .eal-table td:nth-child(7) {
+    min-width: 90px;
+  }
+  .tm-doc-table .eal-table th:last-child,
+  .tm-doc-table .eal-table td:last-child {
+    position: sticky;
+    right: 0;
+    z-index: 2;
+    min-width: 100px;
+    background: #fff;
+    box-shadow: -6px 0 10px rgba(15, 23, 42, 0.06);
+  }
+  .tm-doc-table .eal-table thead th:last-child {
+    background: #fafbfd;
+    z-index: 3;
+  }
+  .tm-doc-table .eal-table tbody tr:hover td:last-child {
+    background: #f6f6ff;
+  }
+  .tm-doc-arabic {
+    display: inline-block;
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: bottom;
+  }
+  .tm-doc-file {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    max-width: 180px;
+    min-width: 0;
+  }
+  .tm-doc-file-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+  }
+  .tm-doc-expiry { font-weight: 700; }
+  .tm-doc-expiry--danger { color: #ef4444; }
+  .tm-doc-expiry--success { color: #0d894f; }
+  .tm-doc-table .status-badge {
+    display: inline-flex;
+    align-items: center;
+    width: auto;
+    max-width: max-content;
+    white-space: nowrap;
+    box-shadow: none;
+  }
+  .tm-doc-table .status-badge.active {
+    background: #e6f8ef;
+    color: #0d894f;
+    border: 1px solid rgba(13, 137, 79, 0.25);
+  }
+  .tm-doc-table .status-badge.inactive {
+    background: #fef2f2;
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.25);
+  }
+  .tm-doc-delete-btn {
+    color: #ef4444 !important;
+    border-color: #fca5a5 !important;
+    background: #fef2f2 !important;
+  }
+  .tm-doc-delete-btn:hover {
+    color: #dc2626 !important;
+    background: #fee2e2 !important;
+  }
+  .tm-mov-loc {
+    display: inline-block;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: bottom;
+  }
+  .status-badge.tm-mov-default {
+    background: #f4f4f5;
+    color: #52525b;
+    border: 1px solid #e4e4e7;
+  }
   .status-badge.asg-status-current { background:#e8f8ee; color:#0f8a4b; border:1px solid #bfe7cf; }
   .status-badge.asg-status-ended { background:#eef1f5; color:#6b7280; border:1px solid #dde2ea; }
   .tm-plate-emphasis { font-weight: 600; font-size: 1.1rem; }
@@ -637,9 +971,75 @@
   .status-badge.tm-mov-done { background:#f0fdf4; color:#166534; border:1px solid #bbf7d0; }
   .status-badge.tm-mov-sched { background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; }
   .status-badge.tm-mov-cancel { background:#fafafa; color:#737373; border:1px solid #e5e5e5; }
+  @media (max-width: 992px) {
+    .cd-main-card { padding: 16px; }
+    .cd-tab { padding: 8px 14px; font-size: 0.8rem; }
+    .cd-details-header { padding: 14px 16px; }
+  }
   @media (max-width: 768px) {
+    .page-header-row {
+      flex-direction: column;
+      align-items: flex-start !important;
+      gap: 12px;
+    }
+    .page-header-right,
+    .eal-header-actions {
+      width: 100%;
+    }
+    .eal-header-actions {
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .eal-header-actions .eal-btn {
+      flex: 1 1 auto;
+      justify-content: center;
+    }
     .ch-header-card { flex-direction: column; }
+    .ch-right {
+      min-width: 0;
+      width: 100%;
+    }
+    .ch-actions { gap: 8px; }
+    .ch-action-btn {
+      flex: 1 1 calc(50% - 4px);
+      justify-content: center;
+      font-size: 0.82rem;
+      padding: 8px 10px;
+    }
     .cd-grid-row { grid-template-columns: 1fr; }
+    .cd-details-header.tm-doc-upload-header,
+    .cd-details-header:has(.tm-doc-upload-btn) {
+      align-items: stretch !important;
+    }
+    .tm-doc-upload-btn {
+      width: 100%;
+      justify-content: center;
+    }
+    .tm-doc-table-grid { min-width: 880px; }
+    .tm-detail-table-scroll .eal-table { min-width: 640px; }
+  }
+  @media (max-width: 576px) {
+    .container-fluid.pb-4 {
+      padding-left: 12px !important;
+      padding-right: 12px !important;
+    }
+    .cd-main-card {
+      padding: 12px;
+      border-radius: 10px;
+    }
+    .cd-tabs-container {
+      margin-bottom: 16px;
+      padding: 4px;
+    }
+    .cd-tab {
+      padding: 7px 12px;
+      font-size: 0.78rem;
+    }
+    .ch-title { font-size: 1.15rem; }
+    .ch-action-btn {
+      flex: 1 1 100%;
+    }
+    .tm-doc-table-grid { min-width: 820px; }
   }
 </style>
 {% endblock %}
@@ -653,24 +1053,43 @@
     modalEl && typeof bootstrap !== "undefined"
       ? bootstrap.Modal.getOrCreateInstance(modalEl)
       : null;
-  if (!modal) return;
 
-  document.querySelectorAll(".tm-detail-status-trigger").forEach(function (btn) {
-    btn.addEventListener("click", function () {
-      var newStatus = btn.getAttribute("data-new-status") || "";
-      var id = btn.getAttribute("data-truck-id") || "";
-      document.getElementById("tmDetailConfirmId").value = id;
-      document.getElementById("tmDetailConfirmStatus").value = newStatus;
-      var deact = newStatus === "Inactive";
-      document.getElementById("tmDetailMsgDeact").classList.toggle("d-none", !deact);
-      document.getElementById("tmDetailMsgAct").classList.toggle("d-none", deact);
-      document.getElementById("truckDetailStatusTitle").textContent = deact ? "Suspend truck" : "Activate truck";
-      var sub = document.getElementById("tmDetailConfirmSubmit");
-      sub.textContent = deact ? "Suspend" : "Activate";
-      sub.className = "btn px-4 " + (deact ? "btn-danger" : "btn-success");
-      modal.show();
+  if (modal) {
+    document.querySelectorAll(".tm-detail-status-trigger").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var newStatus = btn.getAttribute("data-new-status") || "";
+        var id = btn.getAttribute("data-truck-id") || "";
+        document.getElementById("tmDetailConfirmId").value = id;
+        document.getElementById("tmDetailConfirmStatus").value = newStatus;
+        var deact = newStatus === "Inactive";
+        document.getElementById("tmDetailMsgDeact").classList.toggle("d-none", !deact);
+        document.getElementById("tmDetailMsgAct").classList.toggle("d-none", deact);
+        document.getElementById("truckDetailStatusTitle").textContent = deact ? "Suspend truck" : "Activate truck";
+        var sub = document.getElementById("tmDetailConfirmSubmit");
+        sub.textContent = deact ? "Suspend" : "Activate";
+        sub.className = "btn px-4 " + (deact ? "btn-danger" : "btn-success");
+        modal.show();
+      });
     });
-  });
+  }
+
+  var docDeleteModalEl = document.getElementById("truckDetailDocDeleteModal");
+  var docDeleteForm = document.getElementById("truckDetailDocDeleteForm");
+  var docDeleteModal =
+    docDeleteModalEl && typeof bootstrap !== "undefined"
+      ? bootstrap.Modal.getOrCreateInstance(docDeleteModalEl)
+      : null;
+
+  if (docDeleteModal && docDeleteForm) {
+    document.querySelectorAll(".tm-detail-doc-delete").forEach(function (btn) {
+      btn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        var url = btn.getAttribute("data-delete-url") || "";
+        docDeleteForm.setAttribute("action", url);
+        docDeleteModal.show();
+      });
+    });
+  }
 })();
 </script>
 {% endblock %}

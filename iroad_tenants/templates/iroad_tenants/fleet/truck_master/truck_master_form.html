@@ -33,7 +33,6 @@
   {{ form.sourcing_mode }}
   {{ form.vendor_account_id }}
   {% if form.sourcing_mode.errors %}<div class="text-danger small">{{ form.sourcing_mode.errors }}</div>{% endif %}
-  {% if form.vendor_account_id.errors %}<div class="text-danger small">{{ form.vendor_account_id.errors }}</div>{% endif %}
 
   {% if form.non_field_errors %}
   <div class="alert alert-danger" role="alert">{{ form.non_field_errors }}</div>
@@ -114,6 +113,11 @@
             <label class="form-label" for="{{ form.owner_id.id_for_label }}">{{ form.owner_id.label }}</label>
             {{ form.owner_id }}
             {% if form.owner_id.errors %}<div class="text-danger small">{{ form.owner_id.errors }}</div>{% endif %}
+            {% if form.vendor_account_id.errors and form.is_vendor_same_as_owner.value %}
+            <div class="text-danger small">{{ form.vendor_account_id.errors }}</div>
+            {% elif form.vendor_account_id.errors %}
+            <div class="text-danger small">{{ form.vendor_account_id.label }}: {{ form.vendor_account_id.errors }}</div>
+            {% endif %}
           </div>
           <div class="field">
             <label class="form-label" for="{{ form.owner_name.id_for_label }}">{{ form.owner_name.label }}</label>
@@ -162,31 +166,48 @@
               {{ form.plate_number.label }} <span class="required">*</span>
             </label>
             {{ form.plate_number }}
+            <span class="field-hint">Combined automatically from the plate fields below</span>
             {% if form.plate_number.errors %}<div class="text-danger small">{{ form.plate_number.errors }}</div>{% endif %}
           </div>
-          <div class="field">
-            <label class="form-label" for="{{ form.saudi_plate_number.id_for_label }}">{{ form.saudi_plate_number.label }}</label>
-            {{ form.saudi_plate_number }}
-            {% if form.saudi_plate_number.errors %}<div class="text-danger small">{{ form.saudi_plate_number.errors }}</div>{% endif %}
+        </div>
+        <div class="js-tm-saudi-plate-fields">
+          <div class="fields-grid cols-2">
+            <div class="field">
+              <label class="form-label" for="{{ form.saudi_plate_number.id_for_label }}">
+                {{ form.saudi_plate_number.label }}
+                <span class="required js-tm-saudi-required">*</span>
+              </label>
+              {{ form.saudi_plate_number }}
+              {% if form.saudi_plate_number.errors %}<div class="text-danger small">{{ form.saudi_plate_number.errors }}</div>{% endif %}
+            </div>
+          </div>
+          <div class="fields-grid cols-2">
+            <div class="field">
+              <label class="form-label" for="{{ form.saudi_english_letters.id_for_label }}">
+                {{ form.saudi_english_letters.label }}
+                <span class="required js-tm-saudi-required">*</span>
+              </label>
+              {{ form.saudi_english_letters }}
+              <small class="text-muted d-block mt-1">e.g. ABC</small>
+              {% if form.saudi_english_letters.errors %}<div class="text-danger small">{{ form.saudi_english_letters.errors }}</div>{% endif %}
+            </div>
+            <div class="field">
+              <label class="form-label" for="{{ form.saudi_arabic_letters.id_for_label }}">
+                {{ form.saudi_arabic_letters.label }}
+                <span class="required js-tm-saudi-required">*</span>
+              </label>
+              {{ form.saudi_arabic_letters }}
+              <small class="text-muted d-block mt-1">e.g. أ ب ج</small>
+              {% if form.saudi_arabic_letters.errors %}<div class="text-danger small">{{ form.saudi_arabic_letters.errors }}</div>{% endif %}
+            </div>
           </div>
         </div>
-        <div class="fields-grid cols-2">
+        <div class="fields-grid cols-1 js-tm-non-saudi-plate-fields">
           <div class="field">
-            <label class="form-label" for="{{ form.saudi_english_letters.id_for_label }}">{{ form.saudi_english_letters.label }}</label>
-            {{ form.saudi_english_letters }}
-            <small class="text-muted d-block mt-1">e.g. ABC</small>
-            {% if form.saudi_english_letters.errors %}<div class="text-danger small">{{ form.saudi_english_letters.errors }}</div>{% endif %}
-          </div>
-          <div class="field">
-            <label class="form-label" for="{{ form.saudi_arabic_letters.id_for_label }}">{{ form.saudi_arabic_letters.label }}</label>
-            {{ form.saudi_arabic_letters }}
-            <small class="text-muted d-block mt-1">e.g. أ ب ج</small>
-            {% if form.saudi_arabic_letters.errors %}<div class="text-danger small">{{ form.saudi_arabic_letters.errors }}</div>{% endif %}
-          </div>
-        </div>
-        <div class="fields-grid cols-1">
-          <div class="field">
-            <label class="form-label" for="{{ form.non_saudi_plate_number.id_for_label }}">{{ form.non_saudi_plate_number.label }}</label>
+            <label class="form-label" for="{{ form.non_saudi_plate_number.id_for_label }}">
+              {{ form.non_saudi_plate_number.label }}
+              <span class="required js-tm-non-saudi-required">*</span>
+            </label>
             {{ form.non_saudi_plate_number }}
             {% if form.non_saudi_plate_number.errors %}<div class="text-danger small">{{ form.non_saudi_plate_number.errors }}</div>{% endif %}
           </div>
@@ -455,13 +476,121 @@
 
   syncVendorFromOwner();
 
-  var firstError = form.querySelector(".text-danger.small");
-  if (firstError) {
-    var field = firstError.previousElementSibling;
-    if (field && typeof field.focus === "function") {
-      field.focus({ preventScroll: true });
+  var countryEl = document.getElementById("{{ form.registration_country.id_for_label }}");
+  var plateEl = document.getElementById("{{ form.plate_number.id_for_label }}");
+  var saudiPlateEl = document.getElementById("{{ form.saudi_plate_number.id_for_label }}");
+  var saudiEngEl = document.getElementById("{{ form.saudi_english_letters.id_for_label }}");
+  var saudiArEl = document.getElementById("{{ form.saudi_arabic_letters.id_for_label }}");
+  var nonSaudiEl = document.getElementById("{{ form.non_saudi_plate_number.id_for_label }}");
+  var saudiBlock = form.querySelector(".js-tm-saudi-plate-fields");
+  var nonSaudiBlock = form.querySelector(".js-tm-non-saudi-plate-fields");
+
+  function isSaudiCountry() {
+    return (countryEl && countryEl.value || "").trim().toUpperCase() === "SA";
+  }
+
+  function hasRegistrationCountry() {
+    return !!(countryEl && (countryEl.value || "").trim());
+  }
+
+  function combineSaudiPlate() {
+    var num = (saudiPlateEl && saudiPlateEl.value || "").trim();
+    var eng = (saudiEngEl && saudiEngEl.value || "").trim().toUpperCase();
+    if (num && eng) return num + " " + eng;
+    return num || eng || "";
+  }
+
+  function syncCombinedPlateNumber() {
+    if (!plateEl) return;
+    if (isSaudiCountry()) {
+      plateEl.value = combineSaudiPlate();
+    } else if (hasRegistrationCountry()) {
+      plateEl.value = (nonSaudiEl && nonSaudiEl.value || "").trim();
+    } else {
+      plateEl.value = "";
     }
-    firstError.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  function clearSaudiPlateFields() {
+    if (saudiPlateEl) saudiPlateEl.value = "";
+    if (saudiEngEl) saudiEngEl.value = "";
+    if (saudiArEl) saudiArEl.value = "";
+  }
+
+  function clearNonSaudiPlateField() {
+    if (nonSaudiEl) nonSaudiEl.value = "";
+  }
+
+  function updatePlateFieldVisibility() {
+    var saudi = isSaudiCountry();
+    var hasCountry = hasRegistrationCountry();
+
+    if (saudiBlock) {
+      saudiBlock.classList.toggle("d-none", !saudi);
+    }
+    if (nonSaudiBlock) {
+      nonSaudiBlock.classList.toggle("d-none", !hasCountry || saudi);
+    }
+
+    form.querySelectorAll(".js-tm-saudi-required").forEach(function (el) {
+      el.classList.toggle("d-none", !saudi);
+    });
+    form.querySelectorAll(".js-tm-non-saudi-required").forEach(function (el) {
+      el.classList.toggle("d-none", !hasCountry || saudi);
+    });
+
+    syncCombinedPlateNumber();
+  }
+
+  if (countryEl) {
+    countryEl.addEventListener("change", function () {
+      if (isSaudiCountry()) {
+        clearNonSaudiPlateField();
+      } else if (hasRegistrationCountry()) {
+        clearSaudiPlateFields();
+      }
+      updatePlateFieldVisibility();
+    });
+  }
+
+  [saudiPlateEl, saudiEngEl, nonSaudiEl].forEach(function (el) {
+    if (!el) return;
+    el.addEventListener("input", syncCombinedPlateNumber);
+    el.addEventListener("change", syncCombinedPlateNumber);
+  });
+
+  if (saudiEngEl) {
+    saudiEngEl.addEventListener("input", function () {
+      saudiEngEl.value = saudiEngEl.value.toUpperCase();
+    });
+  }
+
+  form.addEventListener("reset", function () {
+    window.setTimeout(updatePlateFieldVisibility, 0);
+  });
+
+  updatePlateFieldVisibility();
+
+  function highlightInvalidFields() {
+    form.querySelectorAll(".field .text-danger.small").forEach(function (errEl) {
+      var fieldWrap = errEl.closest(".field");
+      if (!fieldWrap) return;
+      fieldWrap.querySelectorAll(".form-control, .form-select").forEach(function (input) {
+        input.classList.add("is-invalid");
+      });
+    });
+  }
+
+  highlightInvalidFields();
+
+  var firstError = form.querySelector(".field .text-danger.small");
+  if (firstError) {
+    var fieldWrap = firstError.closest(".field");
+    var focusEl = fieldWrap && fieldWrap.querySelector(".form-control, .form-select");
+    if (focusEl && typeof focusEl.focus === "function") {
+      focusEl.focus({ preventScroll: true });
+    }
+    (fieldWrap || firstError).scrollIntoView({ behavior: "smooth", block: "center" });
   }
 })();
 </script>

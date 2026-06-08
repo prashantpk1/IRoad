@@ -152,9 +152,10 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    # Before tenant gate middleware (uses messages.warning on subscription redirect).
+    'django.contrib.messages.middleware.MessageMiddleware',
     'iroad_tenants.middleware.TenantPortalSchemaMiddleware',
     'iroad_tenants.middleware.TenantSubscriptionGateMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
     # After Auth (and Message) so flash messages on timeout redirect persist.
     'superadmin.middleware.SessionTimeoutMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',

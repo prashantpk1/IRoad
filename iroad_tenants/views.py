@@ -40,6 +40,7 @@ from superadmin.billing_helpers import (
     get_fx_snapshot,
     get_tax_code_for_tenant,
     refresh_order_projected_fields,
+    resolve_plan_cycle_price,
     resolve_upgrade_credit_basis_price,
     sync_or_create_order_payment_transaction,
     validate_downgrade_order,
@@ -1028,6 +1029,58 @@ def _activate_tenant_workspace_schema(request, *, _debug_label=''):
     print(f'{_dbg} OK: schema_name={registry.schema_name!r}')
     connection.set_tenant(registry)
     return registry
+
+
+def _organization_base_currency(request):
+    """Tenant workspace organization profile preferred/base currency (e.g. SAR)."""
+    registry = _activate_tenant_workspace_schema(request)
+    if registry is None:
+        return ''
+    try:
+        org = OrganizationProfile.objects.order_by('-updated_at').first()
+        return (getattr(org, 'base_currency_code', '') or '').strip().upper()
+    finally:
+        restore_public_schema(request)
+
+
+def _resolve_tenant_display_currency(tenant, request):
+    """
+    Currency shown on tenant subscription pages: organization preferred currency,
+    then last order currency, then first active currency.
+    """
+    org_code = _organization_base_currency(request)
+    if org_code and Currency.objects.filter(
+        currency_code=org_code,
+        is_active=True,
+    ).exists():
+        return org_code
+
+    order_code = (
+        SubscriptionOrder.objects.filter(tenant=tenant)
+        .order_by('-created_at')
+        .values_list('currency_id', flat=True)
+        .first()
+    )
+    if order_code and Currency.objects.filter(
+        currency_code=order_code,
+        is_active=True,
+    ).exists():
+        return order_code
+
+    return (
+        Currency.objects.filter(is_active=True)
+        .order_by('currency_code')
+        .values_list('currency_code', flat=True)
+        .first()
+        or 'SAR'
+    )
+
+
+class _PlanDisplayPrice:
+    """Lightweight price holder for subscription plan cards."""
+
+    def __init__(self, price):
+        self.price = price
 
 
 def _current_tenant_actor_id(request) -> str:
@@ -2409,31 +2462,9 @@ class TenantSubscriptionPlanView(View):
         # is not listed on that method (e.g. USD plan, SAR-only Wallet gateway).
         return online_methods.first()
 
-    def _load_plan_context(self, tenant):
+    def _load_plan_context(self, tenant, request):
         current_plan = tenant.current_plan
-        selected_currency = (
-            SubscriptionOrder.objects.filter(tenant=tenant)
-            .select_related('currency')
-            .order_by('-created_at')
-            .values_list('currency__currency_code', flat=True)
-            .first()
-        )
-        if not selected_currency:
-            selected_currency = (
-                PlanPricingCycle.objects.select_related('currency')
-                .filter(is_admin_only_cycle=False)
-                .order_by('currency__currency_code')
-                .values_list('currency__currency_code', flat=True)
-                .first()
-            )
-        if not selected_currency:
-            selected_currency = (
-                Currency.objects.filter(is_active=True)
-                .order_by('currency_code')
-                .values_list('currency_code', flat=True)
-                .first()
-                or ''
-            )
+        selected_currency = _resolve_tenant_display_currency(tenant, request)
 
         eligible_plan_ids = PlanPricingCycle.objects.filter(
             is_admin_only_cycle=False,
@@ -2450,50 +2481,35 @@ class TenantSubscriptionPlanView(View):
             )
             .order_by('plan_name_en')
         )
-        pricing_rows = (
-            PlanPricingCycle.objects.select_related('currency')
-            .filter(plan__in=plans, number_of_cycles__in=[1, 12], is_admin_only_cycle=False)
-            .order_by('plan__plan_name_en', 'number_of_cycles', 'currency__currency_code')
-        )
-        pricing_map = {}
-        currencies_by_plan: dict[str, list[str]] = {}
-        for row in pricing_rows:
-            plan_key = str(row.plan_id)
-            cur = row.currency_id
-            key = (plan_key, cur)
-            pricing_map.setdefault(key, {})[int(row.number_of_cycles)] = row
-            currencies_by_plan.setdefault(plan_key, [])
-            if cur not in currencies_by_plan[plan_key]:
-                currencies_by_plan[plan_key].append(cur)
-
-        def _resolve_plan_pricing(plan_id):
-            """Prefer tenant billing currency; fall back to any priced currency."""
-            plan_key = str(plan_id)
-            lookup_order = []
-            if selected_currency:
-                lookup_order.append(selected_currency)
-            for cur in currencies_by_plan.get(plan_key, []):
-                if cur not in lookup_order:
-                    lookup_order.append(cur)
-            for cur in lookup_order:
-                cycles = pricing_map.get((plan_key, cur), {})
-                monthly_row = cycles.get(1)
-                yearly_row = cycles.get(12)
-                if monthly_row or yearly_row:
-                    return monthly_row, yearly_row, cur
-            return None, None, selected_currency or ''
 
         current_monthly_price = None
         if current_plan and selected_currency:
-            current_monthly = pricing_map.get(
-                (str(current_plan.plan_id), selected_currency), {}
-            ).get(1)
-            if current_monthly:
-                current_monthly_price = current_monthly.price
+            current_monthly_price = resolve_plan_cycle_price(
+                current_plan,
+                selected_currency,
+                number_of_cycles=1,
+            )
+            if current_monthly_price <= 0:
+                current_monthly_price = None
 
         plan_cards = []
         for plan in plans:
-            monthly_row, yearly_row, card_currency = _resolve_plan_pricing(plan.plan_id)
+            monthly_price = resolve_plan_cycle_price(
+                plan,
+                selected_currency,
+                number_of_cycles=1,
+            )
+            yearly_price = resolve_plan_cycle_price(
+                plan,
+                selected_currency,
+                number_of_cycles=12,
+            )
+            monthly_row = (
+                _PlanDisplayPrice(monthly_price) if monthly_price > 0 else None
+            )
+            yearly_row = (
+                _PlanDisplayPrice(yearly_price) if yearly_price > 0 else None
+            )
             if not monthly_row and not yearly_row:
                 continue
 
@@ -2515,7 +2531,6 @@ class TenantSubscriptionPlanView(View):
                 current_plan
                 and current_monthly_price is not None
                 and monthly_row
-                and card_currency == selected_currency
             ):
                 if monthly_row.price >= current_monthly_price:
                     action_type = 'Upgrade'
@@ -2531,7 +2546,7 @@ class TenantSubscriptionPlanView(View):
                     'yearly_row': yearly_row,
                     'default_cycle': default_cycle,
                     'default_price': default_row.price if default_row else Decimal('0.00'),
-                    'currency_code': card_currency,
+                    'currency_code': selected_currency,
                     'is_current': is_current,
                     'action_type': action_type,
                     'action_label': action_label,
@@ -2566,7 +2581,7 @@ class TenantSubscriptionPlanView(View):
         if apply_due_scheduled_downgrade_for_tenant(tenant):
             tenant.refresh_from_db()
             context['tenant'] = tenant
-        context.update(self._load_plan_context(tenant))
+        context.update(self._load_plan_context(tenant, request))
         return render(request, 'iroad_tenants/Subscription_Manage/Subscription-plan.html', context)
 
     def post(self, request):
@@ -2580,10 +2595,15 @@ class TenantSubscriptionPlanView(View):
         action_type = (request.POST.get('action_type') or '').strip()
         plan_id = (request.POST.get('plan_id') or '').strip()
         selected_cycle_raw = (request.POST.get('selected_cycle') or '1').strip()
-        selected_currency = (request.POST.get('currency_code') or '').strip()
+        selected_currency = (
+            (request.POST.get('currency_code') or '').strip()
+            or _resolve_tenant_display_currency(tenant, request)
+        )
         try:
             selected_cycle = int(selected_cycle_raw)
         except ValueError:
+            selected_cycle = 1
+        if selected_cycle not in (1, 12):
             selected_cycle = 1
 
         if action_type not in self._PLAN_ACTIONS:
@@ -2616,16 +2636,15 @@ class TenantSubscriptionPlanView(View):
             messages.error(request, 'No active currency is configured.', extra_tags='tenant')
             return _tenant_redirect(request, 'iroad_tenants:tenant_subscription_plan')
 
-        pricing_row = PlanPricingCycle.objects.filter(
-            plan=plan,
-            currency=currency,
+        plan_price = resolve_plan_cycle_price(
+            plan,
+            currency.currency_code,
             number_of_cycles=selected_cycle,
-            is_admin_only_cycle=False,
-        ).first()
-        if not pricing_row:
+        )
+        if plan_price <= 0:
             messages.error(
                 request,
-                'Pricing is not configured for this cycle/currency.',
+                'Pricing is not configured for this plan.',
                 extra_tags='tenant',
             )
             return _tenant_redirect(request, 'iroad_tenants:tenant_subscription_plan')
@@ -2691,7 +2710,6 @@ class TenantSubscriptionPlanView(View):
             return _tenant_redirect(request, 'iroad_tenants:tenant_subscription_billing')
 
         tax_rate = tax.rate_percent or Decimal('0.00')
-        plan_price = pricing_row.price
         pro_rata = Decimal('0.00')
         if action_type == 'Upgrade' and tenant.current_plan:
             old_price = resolve_upgrade_credit_basis_price(
@@ -2764,19 +2782,6 @@ class TenantSubscriptionBillingView(View):
     """Tenant subscription billing page with live data."""
 
     @staticmethod
-    def _organization_base_currency(request):
-        """Tenant workspace organization profile base currency (e.g. SAR)."""
-        registry = _activate_tenant_workspace_schema(request)
-        if registry is None:
-            return 'SAR'
-        try:
-            org = OrganizationProfile.objects.order_by('-updated_at').first()
-            code = (getattr(org, 'base_currency_code', '') or '').strip().upper()
-            return code or 'SAR'
-        finally:
-            restore_public_schema(request)
-
-    @staticmethod
     def _parse_expiry(expiry_value):
         raw = (expiry_value or '').strip()
         if '/' not in raw:
@@ -2819,7 +2824,7 @@ class TenantSubscriptionBillingView(View):
             .first()
         ) or 'SAR'
 
-        base_currency = self._organization_base_currency(request)
+        base_currency = _organization_base_currency(request) or 'SAR'
 
         current_price = Decimal('0.00')
         if current_plan:
@@ -23379,7 +23384,7 @@ class TruckTypeMasterListView(View):
                 | Q(arabic_label__icontains=sq)
             )
 
-        sort_key_raw = (request.GET.get('sort') or 'english_label').strip().lower()
+        sort_key_raw = (request.GET.get('sort') or 'truck_type_code').strip().lower()
         sort_dir_raw = (request.GET.get('dir') or 'asc').strip().lower()
         sort_map = {
             'truck_type_code': 'truck_type_code',
@@ -23387,7 +23392,7 @@ class TruckTypeMasterListView(View):
             'arabic_label': 'arabic_label',
             'status': 'status',
         }
-        sort_key = sort_map.get(sort_key_raw, 'english_label')
+        sort_key = sort_map.get(sort_key_raw, 'truck_type_code')
         sort_dir = 'desc' if sort_dir_raw == 'desc' else 'asc'
         order_expr = f'-{sort_key}' if sort_dir == 'desc' else sort_key
 
@@ -23456,10 +23461,12 @@ class TruckTypeMasterListView(View):
                 'pagination_total': total_count,
                 'sort_key': sort_key,
                 'sort_dir': sort_dir,
-                'sort_url_truck_type_code': _sort_url('truck_type_code'),
-                'sort_url_english_label': _sort_url('english_label'),
-                'sort_url_arabic_label': _sort_url('arabic_label'),
-                'sort_url_status': _sort_url('status'),
+                'sort_urls': {
+                    'truck_type_code': _sort_url('truck_type_code'),
+                    'english_label': _sort_url('english_label'),
+                    'arabic_label': _sort_url('arabic_label'),
+                    'status': _sort_url('status'),
+                },
                 'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
             }
         )
@@ -24233,9 +24240,7 @@ class TruckMasterCreateView(View):
                     prefix='TR',
                 )
                 if getattr(ve, 'error_dict', None):
-                    for field_name, errs in ve.error_dict.items():
-                        for err in errs:
-                            form.add_error(field_name, err)
+                    form.add_model_validation_errors(ve.error_dict)
                 else:
                     for msg in getattr(ve, 'messages', []) or [str(ve)]:
                         form.add_error(None, msg)
@@ -24443,9 +24448,7 @@ class TruckMasterEditView(View):
                 return render(request, self.template_name, context)
             except ValidationError as ve:
                 if getattr(ve, 'error_dict', None):
-                    for field_name, errs in ve.error_dict.items():
-                        for err in errs:
-                            form.add_error(field_name, err)
+                    form.add_model_validation_errors(ve.error_dict)
                 else:
                     for msg in getattr(ve, 'messages', []) or [str(ve)]:
                         form.add_error(None, msg)
@@ -24471,6 +24474,196 @@ class TruckMasterEditView(View):
             restore_public_schema(request)
 
         return redirect_resp
+
+
+def _truck_is_saudi_registered(truck):
+    country_code = (
+        getattr(truck, 'registration_country_id', None) or ''
+    ).strip().upper()
+    return country_code == 'SA'
+
+
+def _truck_plate_number_display(truck):
+    """TR-001 plate label: SA = Saudi number + English letters; else non-Saudi plate."""
+    if _truck_is_saudi_registered(truck):
+        saudi_number = (truck.saudi_plate_number or '').strip()
+        english_letters = (truck.saudi_english_letters or '').strip()
+        if saudi_number and english_letters:
+            return f'{saudi_number} {english_letters}'
+        stored = (truck.plate_number or '').strip()
+        return stored or '—'
+    non_saudi_plate = (truck.non_saudi_plate_number or '').strip()
+    if non_saudi_plate:
+        return non_saudi_plate
+    stored = (truck.plate_number or '').strip()
+    return stored or '—'
+
+
+def _truck_movement_location_display(movement):
+    """Best-effort location label from a movement log row."""
+    from_label = _truck_movement_location_point_label(movement.from_location_point)
+    if not from_label:
+        from_label = _truck_movement_shipment_endpoint_label(movement, 'from')
+    to_label = _truck_movement_location_point_label(movement.to_location_point)
+    if not to_label:
+        to_label = _truck_movement_shipment_endpoint_label(movement, 'to')
+    from_label = from_label.strip()
+    to_label = to_label.strip()
+    status = (movement.status or '').strip()
+    if status == TenantTruckMovementLog.Status.IN_PROGRESS:
+        if from_label and to_label:
+            return f'{from_label} → {to_label}'
+        return to_label or from_label
+    if status in {
+        TenantTruckMovementLog.Status.SCHEDULED,
+        TenantTruckMovementLog.Status.COMPLETED,
+    }:
+        return to_label or from_label
+    return to_label or from_label
+
+
+def _truck_location_display(movement_log_rows, shipments):
+    """Current truck location from movements, then active/recent shipments."""
+    priority_statuses = (
+        TenantTruckMovementLog.Status.IN_PROGRESS,
+        TenantTruckMovementLog.Status.SCHEDULED,
+        TenantTruckMovementLog.Status.COMPLETED,
+    )
+    for status in priority_statuses:
+        for movement in movement_log_rows:
+            if movement.status != status:
+                continue
+            label = _truck_movement_location_display(movement)
+            if label:
+                return label
+
+    for movement in movement_log_rows:
+        label = _truck_movement_location_display(movement)
+        if label:
+            return label
+
+    active_statuses = {
+        TenantShipment.ShipmentStatus.LOADED,
+        TenantShipment.ShipmentStatus.IN_TRANSIT,
+        TenantShipment.ShipmentStatus.AT_DELIVERY,
+        TenantShipment.ShipmentStatus.POD_SUBMITTED,
+    }
+    for shipment in shipments:
+        if shipment.shipment_status not in active_statuses:
+            continue
+        from_label, to_label = shipment_route_endpoints(shipment)
+        if from_label and to_label:
+            return f'{from_label} → {to_label}'
+        if to_label:
+            return to_label
+        if from_label:
+            return from_label
+        route = (shipment.route_display or '').strip()
+        if route:
+            return route
+
+    for shipment in shipments:
+        from_label, to_label = shipment_route_endpoints(shipment)
+        if from_label and to_label:
+            return f'{from_label} → {to_label}'
+        route = (shipment.route_display or '').strip()
+        if route:
+            return route
+        if to_label:
+            return to_label
+        if from_label:
+            return from_label
+
+    return '—'
+
+
+def _truck_shipment_client_display(shipment):
+    client = shipment.client_account
+    if client is None and shipment.booking_id and shipment.booking:
+        client = shipment.booking.client_account
+    return client_account_label(client) or '—'
+
+
+def _truck_shipment_driver_display(shipment):
+    return driver_label(shipment.driver) or '—'
+
+
+def _truck_movement_location_point_label(location):
+    """Human-readable location for movement log tables."""
+    if location is None:
+        return ''
+    english = (getattr(location, 'location_name_english', None) or '').strip()
+    code = (getattr(location, 'location_code', None) or '').strip()
+    display = (getattr(location, 'display_label', None) or '').strip()
+    arabic = (getattr(location, 'location_name_arabic', None) or '').strip()
+    if english:
+        return f'{code} — {english}' if code else english
+    if display:
+        return display
+    if arabic:
+        return arabic
+    return code
+
+
+def _truck_movement_shipment_endpoint_label(movement, endpoint):
+    shipment = getattr(movement, 'shipment', None)
+    if shipment is None:
+        return ''
+    from_label, to_label = shipment_route_endpoints(shipment)
+    return from_label if endpoint == 'from' else to_label
+
+
+def _truck_movement_type_display(movement):
+    if movement.shipment_id:
+        return 'Loaded trip', 'loaded'
+    reason = (movement.empty_move_reason or '').strip()
+    if reason:
+        return reason, 'empty'
+    source = (movement.movement_source or '').strip()
+    if source:
+        return source, 'source'
+    return '—', ''
+
+
+def _truck_movement_status_display(movement):
+    status = (movement.status or '').strip()
+    badge_map = {
+        TenantTruckMovementLog.Status.IN_PROGRESS: ('In Progress', 'inprog'),
+        TenantTruckMovementLog.Status.COMPLETED: ('Completed', 'done'),
+        TenantTruckMovementLog.Status.SCHEDULED: ('Scheduled', 'sched'),
+        TenantTruckMovementLog.Status.CANCELLED: ('Cancelled', 'cancel'),
+    }
+    return badge_map.get(status, (status or '—', 'default'))
+
+
+def _truck_movement_detail_row(movement):
+    from_label = _truck_movement_location_point_label(movement.from_location_point)
+    if not from_label:
+        from_label = _truck_movement_shipment_endpoint_label(movement, 'from')
+    to_label = _truck_movement_location_point_label(movement.to_location_point)
+    if not to_label:
+        to_label = _truck_movement_shipment_endpoint_label(movement, 'to')
+
+    movement_type, movement_type_badge = _truck_movement_type_display(movement)
+    status_label, status_badge = _truck_movement_status_display(movement)
+    distance = movement.distance_km
+    try:
+        has_distance = distance is not None and float(distance) > 0
+    except (TypeError, ValueError):
+        has_distance = False
+
+    return {
+        'obj': movement,
+        'from_location': from_label or '—',
+        'to_location': to_label or '—',
+        'movement_type': movement_type,
+        'movement_type_badge': movement_type_badge,
+        'status_label': status_label,
+        'status_badge': status_badge,
+        'has_distance': has_distance,
+        'driver_display': driver_label(movement.driver) or '—',
+        'use_start_time': bool(movement.start_time),
+    }
 
 
 class TruckMasterDetailView(View):
@@ -24499,9 +24692,13 @@ class TruckMasterDetailView(View):
                 messages.error(request, 'Truck not found.', extra_tags='tenant')
                 return _tenant_redirect(request, 'iroad_tenants:truck_master')
 
-            doc_att_qs = truck.attachments.filter(is_deleted=False).order_by('-attachment_date', '-created_at')
+            doc_att_qs = truck.attachments.filter(is_deleted=False).order_by(
+                '-attachment_date', '-created_at',
+            )
             document_attachment_count = doc_att_qs.count()
-            document_attachments = list(doc_att_qs[:200])
+            document_attachments = [
+                _truck_attachment_detail_row(a) for a in doc_att_qs[:200]
+            ]
             assignments_qs = truck.driver_assignments.select_related('driver').order_by(
                 '-assigned_from', '-created_at'
             )
@@ -24520,51 +24717,52 @@ class TruckMasterDetailView(View):
                 with schema_context('public'):
                     cobj = Country.objects.filter(country_code=rc).first()
                     if cobj:
-                        reg_country_display = f'{cobj.country_code} — {cobj.name_en}'
+                        reg_country_display = cobj.name_en
 
-            movement_log_rows = list(
-                TenantTruckMovementLog.objects.filter(truck=truck)
+            movement_log_models = list(
+                TenantTruckMovementLog.objects.filter(
+                    Q(truck=truck) | Q(shipment__truck=truck),
+                )
                 .select_related(
                     'truck',
                     'driver',
                     'shipment',
+                    'shipment__loading_address',
+                    'shipment__delivery_address',
                     'booking',
+                    'booking__loading_address',
+                    'booking__delivery_address',
                     'from_location_point',
                     'to_location_point',
                 )
-                .order_by('-movement_date', '-created_at')[:100]
+                .order_by('-movement_date', '-created_at')
+                .distinct()[:100]
+            )
+            movement_log_rows = [
+                _truck_movement_detail_row(m) for m in movement_log_models
+            ]
+
+            truck_shipments = list(
+                TenantShipment.objects.filter(truck=truck)
+                .select_related(
+                    'loading_address',
+                    'delivery_address',
+                    'client_account',
+                    'driver',
+                    'booking',
+                    'booking__client_account',
+                    'booking__loading_address',
+                    'booking__delivery_address',
+                )
+                .order_by('-shipment_date', '-created_at')[:100]
+            )
+            truck_location_display = _truck_location_display(
+                movement_log_models,
+                truck_shipments,
             )
 
-            truck_location_display = '—'
-            for m in movement_log_rows:
-                if m.status == TenantTruckMovementLog.Status.IN_PROGRESS:
-                    a = location_label(m.from_location_point).strip()
-                    b = location_label(m.to_location_point).strip()
-                    if a and b:
-                        truck_location_display = f'{a} → {b}'
-                    elif b:
-                        truck_location_display = b
-                    elif a:
-                        truck_location_display = a
-                    break
-            if truck_location_display == '—':
-                for m in movement_log_rows:
-                    if m.status == TenantTruckMovementLog.Status.COMPLETED:
-                        loc = (
-                            location_label(m.to_location_point)
-                            or location_label(m.from_location_point)
-                        ).strip()
-                        if loc:
-                            truck_location_display = loc
-                            break
-
             truck_shipment_rows = []
-            for s in TenantShipment.objects.select_related(
-                'loading_address',
-                'delivery_address',
-            ).filter(truck=truck).order_by(
-                '-shipment_date', '-created_at'
-            )[:100]:
+            for s in truck_shipments:
                 route = (s.route_display or '').strip()
                 if not route:
                     fl, tl = shipment_route_endpoints(s)
@@ -24574,7 +24772,14 @@ class TruckMasterDetailView(View):
                         route = fl or tl
                     else:
                         route = '—'
-                truck_shipment_rows.append({'shipment': s, 'route': route})
+                truck_shipment_rows.append(
+                    {
+                        'shipment': s,
+                        'route': route,
+                        'client_display': _truck_shipment_client_display(s),
+                        'driver_display': _truck_shipment_driver_display(s),
+                    }
+                )
 
             default_driver_display = '—'
             dd = truck.default_driver_id
@@ -24600,6 +24805,8 @@ class TruckMasterDetailView(View):
                     'truck_location_display': truck_location_display,
                     'default_driver_display': default_driver_display,
                     'vendor_account_display': vendor_account_display,
+                    'is_saudi_registered': _truck_is_saudi_registered(truck),
+                    'plate_number_display': _truck_plate_number_display(truck),
                     'page_title': truck.truck_code,
                     'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
                 }
@@ -27030,6 +27237,62 @@ class TruckSettingsView(View):
             restore_public_schema(request)
 
 
+def _truck_attachment_default_form_data():
+    return {
+        'doc_ref_number': '',
+        'arabic_label': '',
+        'english_label': '',
+        'attachment_date': timezone.localdate().isoformat(),
+        'is_expiry_applicable': False,
+        'expiry_date': '',
+        'record_status': '',
+        'file_notes': '',
+    }
+
+
+def _truck_attachment_form_data_from_post(request):
+    is_expiry = request.POST.get('is_expiry_applicable') in ('on', 'true', '1')
+    return {
+        'doc_ref_number': (request.POST.get('doc_ref_number') or '').strip(),
+        'arabic_label': (request.POST.get('arabic_label') or '').strip(),
+        'english_label': (request.POST.get('english_label') or '').strip(),
+        'attachment_date': (request.POST.get('attachment_date') or '').strip(),
+        'is_expiry_applicable': is_expiry,
+        'expiry_date': (request.POST.get('expiry_date') or '').strip() if is_expiry else '',
+        'record_status': (request.POST.get('record_status') or '').strip(),
+        'file_notes': (request.POST.get('file_notes') or '').strip(),
+    }
+
+
+def _truck_attachment_form_data_from_attachment(attachment):
+    return {
+        'doc_ref_number': attachment.doc_ref_number or '',
+        'arabic_label': attachment.arabic_label or '',
+        'english_label': attachment.english_label or '',
+        'attachment_date': (
+            attachment.attachment_date.isoformat()
+            if attachment.attachment_date
+            else ''
+        ),
+        'is_expiry_applicable': bool(attachment.is_expiry_applicable),
+        'expiry_date': (
+            attachment.expiry_date.isoformat()
+            if attachment.expiry_date
+            else ''
+        ),
+        'record_status': attachment.record_status or '',
+        'file_notes': attachment.file_notes or '',
+    }
+
+
+def _truck_attachment_form_errors_from_form(form):
+    errors = {}
+    for field, msgs in form.errors.items():
+        if field != '__all__' and msgs:
+            errors[field] = msgs[0]
+    return errors
+
+
 class TruckAttachmentListView(View):
     """TR-ATT-001 list for one truck; status filter uses derived ``TruckAttachment.status``."""
 
@@ -27059,7 +27322,9 @@ class TruckAttachmentCreateView(View):
             show_truck_selector = not bool(truck_id)
             trucks_for_select = []
             if truck_id:
-                truck = TruckMaster.objects.filter(pk=truck_id).first()
+                truck = TruckMaster.objects.select_related('truck_type').filter(
+                    pk=truck_id
+                ).first()
                 if not truck:
                     messages.error(request, 'Truck not found.', extra_tags='tenant')
                     return _tenant_redirect(request, 'iroad_tenants:truck_master')
@@ -27067,15 +27332,16 @@ class TruckAttachmentCreateView(View):
                 trucks_for_select = list(
                     TruckMaster.objects.filter(
                         status=TruckMaster.Status.ACTIVE
-                    ).order_by('truck_code')
+                    ).select_related('truck_type').order_by('truck_code')
                 )
 
-            form = TruckAttachmentForm(initial={'record_status': ''})
             context.update(
                 {
-                    'form': form,
+                    'form_data': _truck_attachment_default_form_data(),
+                    'form_errors': {},
+                    'record_status_choices': TruckAttachment.RecordStatus.choices,
                     'truck': truck,
-                    'page_title': 'Add Attachment',
+                    'page_title': 'Truck Attachments',
                     'attachment_no_preview': _preview_next_auto_number_for_form(
                         form_code='truck-attachment',
                         form_label='Truck Attachments',
@@ -27110,7 +27376,9 @@ class TruckAttachmentCreateView(View):
             selected_truck_id = ''
             truck_error = ''
             if truck_id:
-                truck = TruckMaster.objects.filter(pk=truck_id).first()
+                truck = TruckMaster.objects.select_related('truck_type').filter(
+                    pk=truck_id
+                ).first()
                 if not truck:
                     messages.error(request, 'Truck not found.', extra_tags='tenant')
                     return _tenant_redirect(request, 'iroad_tenants:truck_master')
@@ -27119,10 +27387,10 @@ class TruckAttachmentCreateView(View):
                 trucks_for_select = list(
                     TruckMaster.objects.filter(
                         status=TruckMaster.Status.ACTIVE
-                    ).order_by('truck_code')
+                    ).select_related('truck_type').order_by('truck_code')
                 )
                 if selected_truck_id:
-                    truck = TruckMaster.objects.filter(
+                    truck = TruckMaster.objects.select_related('truck_type').filter(
                         pk=selected_truck_id,
                         status=TruckMaster.Status.ACTIVE,
                     ).first()
@@ -27133,9 +27401,12 @@ class TruckAttachmentCreateView(View):
             if truck_error or not form.is_valid():
                 context.update(
                     {
-                        'form': form,
+                        'form_data': _truck_attachment_form_data_from_post(request),
+                        'form_errors': _truck_attachment_form_errors_from_form(form),
+                        'form_non_field_errors': form.non_field_errors,
+                        'record_status_choices': TruckAttachment.RecordStatus.choices,
                         'truck': truck,
-                        'page_title': 'Add Attachment',
+                        'page_title': 'Truck Attachments',
                         'attachment_no_preview': _preview_next_auto_number_for_form(
                             form_code='truck-attachment',
                             form_label='Truck Attachments',
@@ -27185,7 +27456,9 @@ class TruckAttachmentEditView(View):
             return response
 
         try:
-            truck = TruckMaster.objects.filter(pk=truck_id).first()
+            truck = TruckMaster.objects.select_related('truck_type').filter(
+                pk=truck_id
+            ).first()
             if not truck:
                 messages.error(request, 'Truck not found.', extra_tags='tenant')
                 return _tenant_redirect(request, 'iroad_tenants:truck_master')
@@ -27199,13 +27472,14 @@ class TruckAttachmentEditView(View):
                 messages.error(request, 'Attachment not found.', extra_tags='tenant')
                 return redirect('iroad_tenants:truck_attachment_all_list')
 
-            form = TruckAttachmentForm(instance=attachment)
             context.update(
                 {
-                    'form': form,
+                    'form_data': _truck_attachment_form_data_from_attachment(attachment),
+                    'form_errors': {},
+                    'record_status_choices': TruckAttachment.RecordStatus.choices,
                     'truck': truck,
                     'attachment': attachment,
-                    'page_title': 'Edit Attachment',
+                    'page_title': 'Truck Attachments',
                     'is_edit': True,
                     'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
                 }
@@ -27227,7 +27501,9 @@ class TruckAttachmentEditView(View):
             return response
 
         try:
-            truck = TruckMaster.objects.filter(pk=truck_id).first()
+            truck = TruckMaster.objects.select_related('truck_type').filter(
+                pk=truck_id
+            ).first()
             if not truck:
                 messages.error(request, 'Truck not found.', extra_tags='tenant')
                 return _tenant_redirect(request, 'iroad_tenants:truck_master')
@@ -27255,10 +27531,13 @@ class TruckAttachmentEditView(View):
             if not form.is_valid():
                 context.update(
                     {
-                        'form': form,
+                        'form_data': _truck_attachment_form_data_from_post(request),
+                        'form_errors': _truck_attachment_form_errors_from_form(form),
+                        'form_non_field_errors': form.non_field_errors,
+                        'record_status_choices': TruckAttachment.RecordStatus.choices,
                         'truck': truck,
                         'attachment': attachment,
-                        'page_title': 'Edit Attachment',
+                        'page_title': 'Truck Attachments',
                         'is_edit': True,
                         'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
                     }
@@ -27440,15 +27719,83 @@ def _truck_attachment_truck_label(truck):
     return code or name or '—'
 
 
+def _truck_attachment_file_icon_class(file_name):
+    ext = os.path.splitext(file_name or '')[1].lower()
+    if ext == '.pdf':
+        return 'bi-file-earmark-pdf text-danger'
+    if ext in {'.jpg', '.jpeg', '.png'}:
+        return 'bi-file-earmark-image text-primary'
+    if ext in {'.doc', '.docx'}:
+        return 'bi-file-earmark-word text-primary'
+    return 'bi-file-earmark text-secondary'
+
+
+def _truck_attachment_file_display_name(att):
+    """Basename of the stored attachment file, or empty string."""
+    file_field = getattr(att, 'attachment_file', None)
+    stored_name = (getattr(file_field, 'name', None) or '').strip()
+    return os.path.basename(stored_name) if stored_name else ''
+
+
+def _truck_attachment_expiry_status(att):
+    """Derived expiry status (Valid / Expired / Does Not Expire)."""
+    stats = (getattr(att, 'stats', None) or '').strip()
+    valid_stats = {choice for choice, _label in TruckAttachment.Status.choices}
+    if stats in valid_stats:
+        return stats
+    return att.status
+
+
 def _truck_attachment_list_display_status(att):
     """UI status label + badge class for truck attachment list rows."""
-    if att.record_status == TruckAttachment.RecordStatus.INACTIVE:
+    record_status = (getattr(att, 'record_status', None) or '').strip()
+    if record_status == TruckAttachment.RecordStatus.INACTIVE:
         return 'Inactive', 'inactive'
-    if att.record_status == TruckAttachment.RecordStatus.PENDING:
+    if record_status == TruckAttachment.RecordStatus.PENDING:
         return 'Pending Review', 'pending'
-    if att.status == TruckAttachment.Status.EXPIRED:
-        return 'Expired', 'inactive'
+    if _truck_attachment_expiry_status(att) == TruckAttachment.Status.EXPIRED:
+        return 'Expired', 'expired'
     return 'Active', 'active'
+
+
+def _truck_attachment_enrich_for_list(att):
+    file_name = _truck_attachment_file_display_name(att)
+    att.list_file_name = file_name
+    att.list_file_icon_class = (
+        _truck_attachment_file_icon_class(file_name)
+        if file_name
+        else 'bi-file-earmark text-secondary'
+    )
+    att.list_display_status, att.list_status_badge = (
+        _truck_attachment_list_display_status(att)
+    )
+    return att
+
+
+def _truck_attachment_detail_row(att):
+    """Display-ready row dict for truck detail Documents tab."""
+    file_name = _truck_attachment_file_display_name(att)
+    display_status, status_badge = _truck_attachment_list_display_status(att)
+    expiry_tone = ''
+    if att.is_expiry_applicable and att.expiry_date:
+        expiry_tone = (
+            'danger'
+            if _truck_attachment_expiry_status(att) == TruckAttachment.Status.EXPIRED
+            else 'success'
+        )
+    return {
+        'obj': att,
+        'file_name': file_name,
+        'file_icon_class': (
+            _truck_attachment_file_icon_class(file_name)
+            if file_name
+            else 'bi-file-earmark text-secondary'
+        ),
+        'display_status': display_status,
+        'status_badge': status_badge,
+        'expiry_tone': expiry_tone,
+        'has_file': bool(file_name),
+    }
 
 
 def _truck_attachment_display_status_rank(att):
@@ -27459,6 +27806,52 @@ def _truck_attachment_display_status_rank(att):
         'Pending Review': 2,
         'Active': 3,
     }.get(label, 4)
+
+
+def _truck_attachment_stats_counts(attachments):
+    """Summary cards for the truck attachments list page."""
+    today = timezone.localdate()
+    soon_cutoff = today + timezone.timedelta(days=30)
+    not_expired_count = 0
+    expiring_soon_count = 0
+    expired_count = 0
+    for att in attachments:
+        expiry_st = _truck_attachment_expiry_status(att)
+        if expiry_st == TruckAttachment.Status.EXPIRED:
+            expired_count += 1
+        elif not att.is_expiry_applicable or expiry_st == TruckAttachment.Status.DOES_NOT_EXPIRE:
+            not_expired_count += 1
+        elif att.expiry_date and today <= att.expiry_date <= soon_cutoff:
+            expiring_soon_count += 1
+        else:
+            not_expired_count += 1
+    return {
+        'total': len(attachments),
+        'not_expired_count': not_expired_count,
+        'expiring_soon_count': expiring_soon_count,
+        'expired_count': expired_count,
+    }
+
+
+def _truck_attachment_all_list_row(att):
+    """Display-ready row for truck attachments list."""
+    _truck_attachment_enrich_for_list(att)
+    truck = getattr(att, 'truck', None)
+    return {
+        'obj': att,
+        'attachment_id': att.attachment_id,
+        'attachment_no': (att.attachment_no or '').strip() or '—',
+        'attachment_date': att.attachment_date,
+        'truck_id': getattr(truck, 'truck_id', None),
+        'truck_label': _truck_attachment_truck_label(truck),
+        'doc_ref_number': (att.doc_ref_number or '').strip() or '—',
+        'arabic_label': (att.arabic_label or '').strip(),
+        'english_label': (att.english_label or '').strip() or '—',
+        'file_name': att.list_file_name,
+        'display_status': att.list_display_status,
+        'status_badge': att.list_status_badge,
+        'has_truck': truck is not None,
+    }
 
 
 class TruckAttachmentAllListView(View):
@@ -27498,10 +27891,10 @@ class TruckAttachmentAllListView(View):
         if raw_dir not in ('asc', 'desc'):
             raw_dir = ''
         if not raw_sort and not raw_dir:
-            sort_field = 'attachment_date'
+            sort_field = 'attachment_no'
             sort_dir = 'desc'
         else:
-            sort_field = raw_sort if raw_sort in allowed_sort else 'attachment_date'
+            sort_field = raw_sort if raw_sort in allowed_sort else 'attachment_no'
             sort_dir = raw_dir if raw_dir in ('asc', 'desc') else 'desc'
         sort_reverse = sort_dir == 'desc'
 
@@ -27516,40 +27909,20 @@ class TruckAttachmentAllListView(View):
                     | Q(doc_ref_number__icontains=sq)
                     | Q(arabic_label__icontains=sq)
                     | Q(english_label__icontains=sq)
+                    | Q(file_notes__icontains=sq)
                     | Q(truck__truck_code__icontains=sq)
                     | Q(truck__plate_number__icontains=sq)
-                    | Q(truck__truck_type__english_label__icontains=sq),
+                    | Q(truck__truck_type__english_label__icontains=sq)
+                    | Q(attachment_file__icontains=sq),
                 )
 
             all_attachments = list(qs)
-            today = timezone.localdate()
-            soon_cutoff = today + timezone.timedelta(days=30)
-            not_expired_count = 0
-            expiring_soon_count = 0
-            expired_count = 0
-            for a in all_attachments:
-                st = a.status
-                if st == ta.Status.EXPIRED:
-                    expired_count += 1
-                elif not a.is_expiry_applicable:
-                    not_expired_count += 1
-                elif st == ta.Status.VALID:
-                    ed = a.expiry_date
-                    if ed is not None and today <= ed <= soon_cutoff:
-                        expiring_soon_count += 1
-            stats = {
-                'total': len(all_attachments),
-                'not_expired_count': not_expired_count,
-                'expiring_soon_count': expiring_soon_count,
-                'expired_count': expired_count,
-            }
+            stats = _truck_attachment_stats_counts(all_attachments)
 
             filtered = all_attachments
 
             def _sort_file_key(att):
-                if att.attachment_file and att.attachment_file.name:
-                    return os.path.basename(att.attachment_file.name).lower()
-                return ''
+                return _truck_attachment_file_display_name(att).lower()
 
             if sort_field == 'attachment_no':
                 filtered = sorted(
@@ -27605,7 +27978,10 @@ class TruckAttachmentAllListView(View):
             else:
                 filtered = sorted(
                     filtered,
-                    key=lambda a: a.attachment_date,
+                    key=lambda a: (
+                        not bool((a.attachment_no or '').strip()),
+                        (a.attachment_no or '').lower(),
+                    ),
                     reverse=True,
                 )
 
@@ -27616,15 +27992,9 @@ class TruckAttachmentAllListView(View):
                 page_no = 1
             page = paginator.get_page(page_no)
 
-            for att in page.object_list:
-                if att.attachment_file:
-                    att.list_file_name = os.path.basename(att.attachment_file.name)
-                else:
-                    att.list_file_name = ''
-                att.list_truck_label = _truck_attachment_truck_label(att.truck)
-                att.list_display_status, att.list_status_badge = (
-                    _truck_attachment_list_display_status(att)
-                )
+            attachment_rows = [
+                _truck_attachment_all_list_row(att) for att in page.object_list
+            ]
 
             total_count = paginator.count
             if total_count == 0:
@@ -27665,6 +28035,7 @@ class TruckAttachmentAllListView(View):
             context.update(
                 {
                     'attachments_page': page,
+                    'attachment_rows': attachment_rows,
                     'stats': stats,
                     'search_q': sq,
                     'pagination_page_links': pagination_page_links,

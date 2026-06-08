@@ -1,158 +1,164 @@
-{% extends 'iroad_tenants/base.html' %}
-{% load static %}
-
-{% block title %}Truck Settings | iRoad{% endblock %}
-{% block breadcrumb %}{% endblock %}
-
-{% block content %}
-<div class="page-header">
-  <nav aria-label="breadcrumb">
-    <ol class="breadcrumb">
-      <li class="breadcrumb-item"><a href="{% url 'iroad_tenants:tenant_dashboard' %}">Dashboard</a></li>
-      <li class="breadcrumb-item">Operations</li>
-      <li class="breadcrumb-item">Fleet Management</li>
-      <li class="breadcrumb-item active" aria-current="page">Truck Settings</li>
-    </ol>
-  </nav>
-  <div class="page-header-row">
-    <div class="page-header-left">
-      <h1 class="page-title">Truck Settings</h1>
-      <p class="page-subtitle">Configure defaults, tracking, and alert parameters for your fleet.</p>
-    </div>
-  </div>
-</div>
-
-<form id="truckSettingsForm" method="post" class="needs-validation" novalidate>
-  {% csrf_token %}
-  {% if form.non_field_errors %}
-  <div class="alert alert-danger" role="alert">{{ form.non_field_errors }}</div>
-  {% endif %}
-
-  <div class="form-card mb-3">
-    <div class="form-card-header">
-      <div class="form-card-icon blue"><i class="bi bi-gear"></i></div>
-      <div class="form-card-header-text">
-        <h2 class="form-card-title">Default Values</h2>
-        <p class="form-card-desc">Set default values automatically applied for new trucks.</p>
-      </div>
-    </div>
-    <div class="form-card-body">
-      <div class="field-group">
-        <h3 class="field-group-title"><i class="bi bi-truck"></i> Truck Defaults</h3>
-        <div class="fields-grid cols-2">
-          <div class="field">
-            <label class="form-label" for="{{ form.default_truck_status.id_for_label }}">Default Truck Status</label>
-            {{ form.default_truck_status }}
-            <span class="field-hint">Status assigned to newly created truck records.</span>
-            {% if form.default_truck_status.errors %}<div class="text-danger small mt-1">{{ form.default_truck_status.errors }}</div>{% endif %}
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="form-card mb-3">
-    <div class="form-card-header">
-      <div class="form-card-icon amber"><i class="bi bi-bell"></i></div>
-      <div class="form-card-header-text">
-        <h2 class="form-card-title">Alert Settings</h2>
-        <p class="form-card-desc">Configure reminder notifications. Set to 0 to disable.</p>
-      </div>
-    </div>
-    <div class="form-card-body">
-      <div class="field-group">
-        <h3 class="field-group-title"><i class="bi bi-calendar-event"></i> Reminders</h3>
-        <div class="fields-grid cols-3">
-          <div class="field">
-            <label class="form-label" for="{{ form.maintenance_reminder_days.id_for_label }}">Maintenance Reminder Days</label>
-            <div class="input-icon-wrapper"><i class="bi bi-tools"></i>{{ form.maintenance_reminder_days }}</div>
-            {% if form.maintenance_reminder_days.errors %}<div class="text-danger small mt-1">{{ form.maintenance_reminder_days.errors }}</div>{% endif %}
-          </div>
-          <div class="field">
-            <label class="form-label" for="{{ form.insurance_expiry_alert_days.id_for_label }}">Insurance Expiry Alert Days</label>
-            <div class="input-icon-wrapper"><i class="bi bi-shield-check"></i>{{ form.insurance_expiry_alert_days }}</div>
-            {% if form.insurance_expiry_alert_days.errors %}<div class="text-danger small mt-1">{{ form.insurance_expiry_alert_days.errors }}</div>{% endif %}
-          </div>
-          <div class="field">
-            <label class="form-label" for="{{ form.registration_expiry_alert_days.id_for_label }}">Registration Expiry Alert Days</label>
-            <div class="input-icon-wrapper"><i class="bi bi-card-checklist"></i>{{ form.registration_expiry_alert_days }}</div>
-            {% if form.registration_expiry_alert_days.errors %}<div class="text-danger small mt-1">{{ form.registration_expiry_alert_days.errors }}</div>{% endif %}
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="form-card mb-3">
-    <div class="form-card-header">
-      <div class="form-card-icon green"><i class="bi bi-check-circle"></i></div>
-      <div class="form-card-header-text">
-        <h2 class="form-card-title">Tracking &amp; Compliance</h2>
-        <p class="form-card-desc">Enable tracking features and operational compliance rules.</p>
-      </div>
-    </div>
-    <div class="form-card-body">
-      <div class="field-group mb-0">
-        <h3 class="field-group-title"><i class="bi bi-speedometer2"></i> Operational Tracking</h3>
-        <div class="setting-row">
-          <div class="setting-row-info">
-            <span class="form-label d-block">Fuel Consumption Tracking Enabled</span>
-            <span class="field-hint">Enables fuel usage monitoring for the fleet.</span>
-          </div>
-          <label class="setting-toggle">
-            {{ form.fuel_consumption_tracking_enabled }}
-            <span class="toggle-track"></span>
-            <span class="toggle-label js-ts-toggle">OFF</span>
-          </label>
-        </div>
-        {% if form.fuel_consumption_tracking_enabled.errors %}<div class="text-danger small">{{ form.fuel_consumption_tracking_enabled.errors }}</div>{% endif %}
-        <div class="setting-row">
-          <div class="setting-row-info">
-            <span class="form-label d-block">Driver Assignment Required</span>
-            <span class="field-hint">Ensures truck cannot be dispatched without assigned driver.</span>
-          </div>
-          <label class="setting-toggle">
-            {{ form.driver_assignment_required }}
-            <span class="toggle-track"></span>
-            <span class="toggle-label js-ts-toggle">OFF</span>
-          </label>
-        </div>
-        {% if form.driver_assignment_required.errors %}<div class="text-danger small">{{ form.driver_assignment_required.errors }}</div>{% endif %}
-      </div>
-    </div>
-  </div>
-
-  <div class="form-actions-bar mb-3">
-    <div class="form-actions-left">
-      <a href="{% url 'iroad_tenants:truck_settings' %}" class="btn btn-outline-secondary">
-        <i class="bi bi-arrow-counterclockwise"></i> Reset Form
-      </a>
-    </div>
-    <div class="form-actions-right">
-      <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle"></i> Save Settings</button>
-    </div>
-  </div>
-</form>
-{% endblock %}
-
-{% block extra_js %}
-{{ block.super }}
-<script>
-(function () {
-  var root = document.getElementById("truckSettingsForm");
-  if (!root) return;
-  root.querySelectorAll(".setting-toggle").forEach(function (wrap) {
-    var input = wrap.querySelector('input[type="checkbox"]');
-    var label = wrap.querySelector(".toggle-label");
-    function updateLabel() {
-      if (!label || !input) return;
-      label.textContent = input.checked ? "Enabled" : "Disabled";
-    }
-    if (input) {
-      updateLabel();
-      input.addEventListener("change", updateLabel);
-    }
-  });
-})();
-</script>
-{% endblock %}
+{% extends 'iroad_tenants/base.html' %}
+{% load static %}
+
+{% block title %}Truck Settings | iRoad{% endblock %}
+{% block breadcrumb %}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{% url 'iroad_tenants:tenant_dashboard' %}">Dashboard</a></li>
+      <li class="breadcrumb-item">Operations</li>
+      <li class="breadcrumb-item">Fleet Management</li>
+      <li class="breadcrumb-item active" aria-current="page">Truck Settings</li>
+    </ol>
+  </nav>
+  <div class="page-header-row">
+    <div class="page-header-left">
+      <h1 class="page-title">Truck Settings</h1>
+      <p class="page-subtitle">Configure defaults, tracking, and alert parameters for your fleet.</p>
+    </div>
+  </div>
+</div>
+
+<form id="truckSettingsForm" method="post" class="needs-validation" novalidate>
+  {% csrf_token %}
+  {% if form.non_field_errors %}
+  <div class="alert alert-danger" role="alert">{{ form.non_field_errors }}</div>
+  {% endif %}
+
+  <div class="form-card mb-3" data-section="1">
+    <div class="form-card-header">
+      <div class="form-card-icon blue"><i class="bi bi-gear"></i></div>
+      <div class="form-card-header-text">
+        <h2 class="form-card-title">Default Values</h2>
+        <p class="form-card-desc">
+          Set default values that are automatically applied when creating new trucks.
+        </p>
+      </div>
+    </div>
+    <div class="form-card-body">
+      <div class="field-group mb-0">
+        <h3 class="field-group-title"><i class="bi bi-truck"></i> Truck Defaults</h3>
+        <div class="fields-grid cols-2">
+          <div class="field">
+            <label class="form-label" for="{{ form.default_truck_status.id_for_label }}">Default Truck Status</label>
+            {{ form.default_truck_status }}
+            <span class="field-hint">Default status for newly created truck records.</span>
+            {% if form.default_truck_status.errors %}<div class="text-danger small mt-1">{{ form.default_truck_status.errors }}</div>{% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-card mb-3" data-section="2">
+    <div class="form-card-header">
+      <div class="form-card-icon amber"><i class="bi bi-bell"></i></div>
+      <div class="form-card-header-text">
+        <h2 class="form-card-title">Alert Settings</h2>
+        <p class="form-card-desc">
+          Configure reminder notifications for maintenance and expiries. Set to 0 to disable.
+        </p>
+      </div>
+    </div>
+    <div class="form-card-body">
+      <div class="field-group mb-0">
+        <h3 class="field-group-title"><i class="bi bi-calendar-event"></i> Reminders</h3>
+        <div class="fields-grid cols-2">
+          <div class="field">
+            <label class="form-label" for="{{ form.maintenance_reminder_days.id_for_label }}">
+              Period (Months) for Inspection Alert
+            </label>
+            <div class="input-icon-wrapper">
+              <i class="bi bi-tools"></i>
+              {{ form.maintenance_reminder_days }}
+            </div>
+            <span class="field-hint">Days before inspection expiry to send alert.</span>
+            {% if form.maintenance_reminder_days.errors %}<div class="text-danger small mt-1">{{ form.maintenance_reminder_days.errors }}</div>{% endif %}
+          </div>
+          <div class="field">
+            <label class="form-label" for="{{ form.insurance_expiry_alert_days.id_for_label }}">
+              Document Expiry Alert (Days)
+            </label>
+            <div class="input-icon-wrapper">
+              <i class="bi bi-shield-check"></i>
+              {{ form.insurance_expiry_alert_days }}
+            </div>
+            <span class="field-hint">Days before document expiry to send alert.</span>
+            {% if form.insurance_expiry_alert_days.errors %}<div class="text-danger small mt-1">{{ form.insurance_expiry_alert_days.errors }}</div>{% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-card mb-3" data-section="3">
+    <div class="form-card-header">
+      <div class="form-card-icon green"><i class="bi bi-check-circle"></i></div>
+      <div class="form-card-header-text">
+        <h2 class="form-card-title">Tracking &amp; Compliance</h2>
+        <p class="form-card-desc">Enable tracking features and operational compliance rules.</p>
+      </div>
+    </div>
+    <div class="form-card-body">
+      <div class="field-group mb-0">
+        <h3 class="field-group-title"><i class="bi bi-speedometer2"></i> Operational Tracking</h3>
+        <div class="setting-row">
+          <div class="setting-row-info">
+            <label class="form-label" for="{{ form.fuel_consumption_tracking_enabled.id_for_label }}">
+              Enable Location Tracking
+            </label>
+            <span class="field-hint">Enable real-time location tracking for all active trucks.</span>
+          </div>
+          <label class="setting-toggle">
+            {{ form.fuel_consumption_tracking_enabled }}
+            <span class="toggle-track"></span>
+            <span class="toggle-label js-ts-toggle">Disabled</span>
+          </label>
+        </div>
+        {% if form.fuel_consumption_tracking_enabled.errors %}<div class="text-danger small">{{ form.fuel_consumption_tracking_enabled.errors }}</div>{% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="form-actions-bar mb-3">
+    <div class="form-actions-left">
+      <button type="reset" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-counterclockwise"></i>
+        Reset Form
+      </button>
+    </div>
+    <div class="form-actions-right">
+      <button type="submit" class="btn btn-primary">
+        <i class="bi bi-check-circle"></i>
+        Save Settings
+      </button>
+    </div>
+  </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+(function () {
+  var root = document.getElementById("truckSettingsForm");
+  if (!root) return;
+  root.querySelectorAll(".setting-toggle").forEach(function (wrap) {
+    var input = wrap.querySelector('input[type="checkbox"]');
+    var label = wrap.querySelector(".toggle-label");
+    function updateLabel() {
+      if (!label || !input) return;
+      label.textContent = input.checked ? "Enabled" : "Disabled";
+    }
+    if (input) {
+      updateLabel();
+      input.addEventListener("change", updateLabel);
+    }
+  });
+})();
+</script>
+{% endblock %}
+

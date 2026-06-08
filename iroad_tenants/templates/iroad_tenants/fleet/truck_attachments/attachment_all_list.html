@@ -53,7 +53,6 @@
     <div>
       <div class="eal-stat-value">{{ stats.not_expired_count }}</div>
       <div class="eal-stat-label">Not Expired</div>
-      <div class="eal-stat-sub">Documents without an expiry date</div>
     </div>
   </div>
   <div class="eal-stat-card">
@@ -95,7 +94,7 @@
     </div>
   </form>
 
-  <div class="eal-table-wrap">
+  <div class="eal-table-wrap ta-att-table">
     <table class="eal-table">
       <thead>
         <tr>
@@ -178,67 +177,94 @@
         </tr>
       </thead>
       <tbody>
-        {% for row in attachments_page %}
+        {% for row in attachment_rows %}
         <tr>
           <td class="eal-col-check">
             <input type="checkbox" class="eal-custom-check ta-row-check" aria-label="Select row" />
           </td>
           <td>
+            {% if row.has_truck %}
             <a
-              href="{% url 'iroad_tenants:truck_attachment_detail' truck_id=row.truck.truck_id attachment_id=row.attachment_id %}"
+              href="{% url 'iroad_tenants:truck_attachment_detail' truck_id=row.truck_id attachment_id=row.attachment_id %}"
               class="eal-entity-id text-decoration-none"
-            >{{ row.attachment_no|default:"—" }}</a>
+            >{{ row.attachment_no }}</a>
+            {% else %}
+            <span class="eal-entity-id">{{ row.attachment_no }}</span>
+            {% endif %}
           </td>
           <td>{{ row.attachment_date|date:"j M Y" }}</td>
           <td>
             <div class="eal-name-cell">
-              <span class="eal-name-text">{{ row.list_truck_label }}</span>
+              <span class="eal-name-text">{{ row.truck_label }}</span>
             </div>
           </td>
-          <td>{{ row.doc_ref_number|default:"—" }}</td>
+          <td>{{ row.doc_ref_number }}</td>
           <td>
             {% if row.arabic_label %}
-            <span class="arabic-text d-inline-block" dir="rtl" lang="ar">{{ row.arabic_label }}</span>
+            <span class="ta-att-arabic" dir="rtl" lang="ar">{{ row.arabic_label }}</span>
             {% else %}
             &mdash;
             {% endif %}
           </td>
-          <td>{{ row.english_label|default:"—" }}</td>
+          <td>{{ row.english_label }}</td>
           <td>
-            {% if row.list_file_name %}
-            <span class="text-break">{{ row.list_file_name }}</span>
+            {% if row.file_name %}
+            <span class="ta-att-file" title="{{ row.file_name }}">{{ row.file_name }}</span>
             {% else %}
             &mdash;
             {% endif %}
           </td>
           <td>
-            <span class="status-badge {{ row.list_status_badge }}">{{ row.list_display_status }}</span>
+            <span class="status-badge {{ row.status_badge }}">{{ row.display_status }}</span>
           </td>
           <td>
-            <div class="eal-actions-cell">
-              <a
-                href="{% url 'iroad_tenants:truck_attachment_detail' truck_id=row.truck.truck_id attachment_id=row.attachment_id %}"
-                class="eal-row-btn"
-                title="View"
-              >
-                <i class="bi bi-eye"></i>
-              </a>
-              <a
-                href="{% url 'iroad_tenants:truck_attachment_edit' truck_id=row.truck.truck_id attachment_id=row.attachment_id %}"
-                class="eal-row-btn"
-                title="Edit"
-              >
-                <i class="bi bi-pencil"></i>
-              </a>
+            {% if row.has_truck %}
+            <div class="dropdown eal-actions-cell">
               <button
+                class="eal-row-btn"
                 type="button"
-                class="eal-row-btn danger ta-delete-trigger"
-                title="Delete"
-                data-delete-url="{% url 'iroad_tenants:truck_attachment_delete' row.truck.truck_id row.attachment_id %}"
+                data-bs-toggle="dropdown"
+                data-bs-boundary="viewport"
+                aria-expanded="false"
+                title="Actions"
               >
-                <i class="bi bi-trash3"></i>
+                <i class="bi bi-three-dots-vertical"></i>
               </button>
+              <ul
+                class="dropdown-menu dropdown-menu-end shadow-sm"
+                style="border-radius: 8px; border-color: #e2e8f0; min-width: 180px;"
+              >
+                <li>
+                  <a
+                    class="dropdown-item"
+                    href="{% url 'iroad_tenants:truck_attachment_detail' truck_id=row.truck_id attachment_id=row.attachment_id %}"
+                  >
+                    <i class="bi bi-eye text-info me-2"></i>View
+                  </a>
+                </li>
+                <li>
+                  <a
+                    class="dropdown-item"
+                    href="{% url 'iroad_tenants:truck_attachment_edit' truck_id=row.truck_id attachment_id=row.attachment_id %}"
+                  >
+                    <i class="bi bi-pencil text-primary me-2"></i>Edit
+                  </a>
+                </li>
+                <li><hr class="dropdown-divider" /></li>
+                <li>
+                  <button
+                    type="button"
+                    class="dropdown-item text-danger ta-delete-trigger"
+                    data-delete-url="{% url 'iroad_tenants:truck_attachment_delete' row.truck_id row.attachment_id %}"
+                  >
+                    <i class="bi bi-trash3 me-2"></i>Delete
+                  </button>
+                </li>
+              </ul>
             </div>
+            {% else %}
+            <span class="text-muted small">—</span>
+            {% endif %}
           </td>
         </tr>
         {% empty %}
@@ -307,19 +333,60 @@
 
 <style>
   .page-subtitle { max-width: 720px; }
-  .eal-stat-sub {
-    font-size: 11px;
-    color: #8b8fa3;
-    margin-top: 2px;
-    line-height: 1.3;
-  }
-  .eal-table thead th {
+  .ta-att-table .eal-table thead th {
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.03em;
     color: #7f8aa3;
+    font-weight: 600;
+    cursor: default;
   }
-  .eal-table td { vertical-align: middle; }
+  .ta-att-table .eal-table thead th:hover {
+    color: #7f8aa3;
+  }
+  .ta-att-table .eal-table td { vertical-align: middle; }
+  .ta-att-arabic {
+    display: inline-block;
+    max-width: 180px;
+    direction: rtl;
+    font-family: "Segoe UI", sans-serif;
+  }
+  .ta-att-file {
+    display: inline-block;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: bottom;
+  }
+  .ta-att-table .status-badge {
+    display: inline-flex;
+    align-items: center;
+    width: auto;
+    max-width: max-content;
+    white-space: nowrap;
+    box-shadow: none;
+  }
+  .ta-att-table .status-badge.active {
+    background: #e6f8ef;
+    color: #0d894f;
+    border: 1px solid rgba(13, 137, 79, 0.25);
+  }
+  .ta-att-table .status-badge.pending {
+    background: #fff7ed;
+    color: #ea580c;
+    border: 1px solid rgba(234, 88, 12, 0.25);
+  }
+  .ta-att-table .status-badge.expired {
+    background: #fef2f2;
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.25);
+  }
+  .ta-att-table .status-badge.inactive {
+    background: #fce7f3;
+    color: #be185d;
+    border: 1px solid rgba(190, 24, 93, 0.2);
+  }
   .eal-actions-cell {
     display: flex;
     align-items: center;
@@ -333,7 +400,7 @@
     text-decoration: none;
     font-weight: inherit;
   }
-  .eal-sort-link:hover { color: #5051f9; }
+  .ta-att-table .eal-sort-link:hover { color: #5051f9; }
   .eal-sort-caret {
     opacity: 0.35;
     font-size: 0.65em;

@@ -11,9 +11,7 @@ class TruckSettingsForm(forms.ModelForm):
             'default_truck_status',
             'maintenance_reminder_days',
             'insurance_expiry_alert_days',
-            'registration_expiry_alert_days',
             'fuel_consumption_tracking_enabled',
-            'driver_assignment_required',
         ]
         widgets = {
             'default_truck_status': forms.Select(attrs={'class': 'form-select'}),
@@ -23,11 +21,7 @@ class TruckSettingsForm(forms.ModelForm):
             'insurance_expiry_alert_days': forms.NumberInput(
                 attrs={'class': 'form-control has-icon', 'min': 0, 'max': 180}
             ),
-            'registration_expiry_alert_days': forms.NumberInput(
-                attrs={'class': 'form-control has-icon', 'min': 0, 'max': 180}
-            ),
             'fuel_consumption_tracking_enabled': forms.CheckboxInput(),
-            'driver_assignment_required': forms.CheckboxInput(),
         }
 
     def clean_maintenance_reminder_days(self):
@@ -38,12 +32,6 @@ class TruckSettingsForm(forms.ModelForm):
 
     def clean_insurance_expiry_alert_days(self):
         val = self.cleaned_data.get('insurance_expiry_alert_days')
-        if val is not None and not (0 <= val <= 180):
-            raise ValidationError('Must be between 0 and 180')
-        return val
-
-    def clean_registration_expiry_alert_days(self):
-        val = self.cleaned_data.get('registration_expiry_alert_days')
         if val is not None and not (0 <= val <= 180):
             raise ValidationError('Must be between 0 and 180')
         return val
