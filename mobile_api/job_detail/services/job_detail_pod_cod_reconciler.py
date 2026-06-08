@@ -57,7 +57,11 @@ def reconcile_job_detail_pod_cod(context: JobDetailContext) -> dict[str, Any]:
     logs = _logs_for_shipment(context)
     evidence = _log_evidence_flags(logs)
     column_flags = dict(
-        pod_cod_policy.derive_pod_cod_flags(shipment, driver=context.driver)
+        pod_cod_policy.derive_pod_cod_flags(
+            shipment,
+            driver=context.driver,
+            log_evidence=evidence,
+        )
     )
     log_count = len(logs)
 

@@ -12,6 +12,9 @@ from typing import Any
 
 from mobile_api.dashboard.selectors import pod_cod_policy as policy
 from mobile_api.helpers.cod_amount import build_cod_payment_display
+from mobile_api.pod_capture.services.pod_section_metadata import (
+    build_hard_copy_confirmation_block,
+)
 from mobile_api.job_detail.dto.job_detail_context import JobDetailContext
 from mobile_api.job_detail.services.job_detail_pod_cod_reconciler import (
     reconcile_job_detail_pod_cod,
@@ -68,6 +71,11 @@ def build_pod_cod_section(
             booking=context.booking,
         ),
     )
+    display_flags['hard_copy_confirmation'] = build_hard_copy_confirmation_block(
+        context.shipment,
+        driver=context.driver,
+        tenant_schema=(context.tenant_schema or '').strip(),
+    )
     return display_flags
 
 
@@ -101,17 +109,13 @@ def _resolve_display_flags(
         if evidence.get('pod_uploaded'):
             flags['pod_pending'] = False
             if hard_pod_type:
-                flags['hard_pod_pending'] = (
-                    not pod_complete and hard_pod_type and not hard_pod_log
-                )
-                flags['pod_compliant'] = pod_complete or hard_pod_log
+                flags['hard_pod_pending'] = not hard_pod_log
+                flags['pod_compliant'] = hard_pod_log or pod_complete
             else:
                 flags['pod_compliant'] = True
                 flags['hard_pod_pending'] = False
-
-    if pod_complete and hard_pod_type:
-        flags['hard_pod_pending'] = False
-        flags['pod_compliant'] = True
+    elif hard_pod_type and not hard_pod_log:
+        flags['hard_pod_pending'] = True
 
     if log_primary or evidence.get('cod_collected_log'):
         if evidence.get('cod_collected_log') and policy.is_cod_shipment(shipment):

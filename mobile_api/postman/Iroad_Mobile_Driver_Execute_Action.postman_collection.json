@@ -141,6 +141,26 @@
     {
       "key": "hard_pod_photo_file_ref",
       "value": "tenant-uploads/hard-pod/scan-001.jpg"
+    },
+    {
+      "key": "hard_pod_client_submission_id",
+      "value": ""
+    },
+    {
+      "key": "hard_pod_custody_submission_id",
+      "value": ""
+    },
+    {
+      "key": "hard_pod_receiver_name",
+      "value": "Receiver Name"
+    },
+    {
+      "key": "hard_pod_receiver_contact",
+      "value": "0500000000"
+    },
+    {
+      "key": "hard_pod_handoff_notes",
+      "value": "Hard POD handoff via Postman"
     }
   ],
   "item": [
@@ -497,6 +517,75 @@
           ]
         },
         {
+          "name": "5a. Hard POD Submit (get custody_submission_id)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept-Language",
+                "value": "{{accept_language}}"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{request_id}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenant_schema}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/hard-pod/submit/",
+            "description": "Run before Hard POD Execute. Stores `hard_pod_custody_submission_id` required by A7H execute.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_submission_id\": \"{{hard_pod_client_submission_id}}\",\n  \"shipment_id\": \"{{shipment_id}}\",\n  \"receiver_name\": \"{{hard_pod_receiver_name}}\",\n  \"receiver_contact\": \"{{hard_pod_receiver_contact}}\",\n  \"handoff_notes\": \"{{hard_pod_handoff_notes}}\",\n  \"latitude\": {{execute_latitude}},\n  \"longitude\": {{execute_longitude}},\n  \"media\": [\n    {\n      \"media_type\": \"photo\",\n      \"file_ref\": \"{{hard_pod_photo_file_ref}}\",\n      \"file_name\": \"hard-pod.jpg\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('hard_pod_client_submission_id') || String(pm.variables.get('hard_pod_client_submission_id')).indexOf('{{') >= 0) {",
+                  "    pm.variables.set('hard_pod_client_submission_id', 'hard-pod-' + pm.variables.replaceIn('{{$guid}}'));",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201 or 200', function () { pm.expect([200, 201]).to.include(pm.response.code); });",
+                  "const json = pm.response.json();",
+                  "pm.test('status=1', function () { pm.expect(json.status).to.eql(1); });",
+                  "const custody = (json.data || {}).custody_submission || {};",
+                  "pm.test('submission id present', function () { pm.expect(custody.submission_id).to.be.a('string'); });",
+                  "if (custody.submission_id) {",
+                  "    pm.environment.set('hard_pod_custody_submission_id', custody.submission_id);",
+                  "    pm.collectionVariables.set('hard_pod_custody_submission_id', custody.submission_id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "5. Hard POD Execute",
           "request": {
             "method": "POST",
@@ -523,10 +612,10 @@
               }
             ],
             "url": "{{base_url}}/driver/jobs/shipment/{{shipment_id}}/actions/{{execute_hard_pod_action_code}}/execute/",
-            "description": "Set execute_hard_pod_action_code when pod_cod.hard_pod_pending.",
+            "description": "Set execute_hard_pod_action_code when pod_cod.hard_pod_pending. Requires `hard_pod_custody_submission_id` from request 5a.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"client_action_id\": \"{{execute_client_action_id}}\",\n  \"workflow_version\": \"{{execute_workflow_version}}\",\n  \"content_hash\": \"{{execute_content_hash}}\",\n  \"latitude\": {{execute_latitude}},\n  \"longitude\": {{execute_longitude}},\n  \"notes\": \"Hard POD \u2014 Postman\",\n  \"media\": [\n    {\n      \"media_type\": \"photo\",\n      \"file_ref\": \"{{hard_pod_photo_file_ref}}\",\n      \"file_name\": \"hard-pod.jpg\"\n    }\n  ]\n}",
+              "raw": "{\n  \"client_action_id\": \"{{execute_client_action_id}}\",\n  \"workflow_version\": \"{{execute_workflow_version}}\",\n  \"content_hash\": \"{{execute_content_hash}}\",\n  \"latitude\": {{execute_latitude}},\n  \"longitude\": {{execute_longitude}},\n  \"notes\": \"Hard POD \u2014 Postman\",\n  \"custody_submission_id\": \"{{hard_pod_custody_submission_id}}\",\n  \"media\": [\n    {\n      \"media_type\": \"photo\",\n      \"file_ref\": \"{{hard_pod_photo_file_ref}}\",\n      \"file_name\": \"hard-pod.jpg\"\n    }\n  ]\n}",
               "options": {
                 "raw": {
                   "language": "json"

@@ -3864,7 +3864,8 @@ textarea.form-control {
 /* ============================================
    Client Account New — Conditional Business Section
    ============================================ */
-.client-account-business-section.hidden {
+.client-account-business-section.hidden,
+.client-account-individual-section.hidden {
   display: none !important;
 }
 

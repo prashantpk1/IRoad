@@ -21,9 +21,13 @@ from mobile_api.pod_capture.serializers.pod_capture_serializer import (
     PodCaptureRequestSerializer,
 )
 from mobile_api.pod_capture.services.pod_capture_orchestrator import PodCaptureOrchestrator
+from mobile_api.pod_capture.services.pod_capture_screen_routing import (
+    build_pod_capture_get_routing,
+)
+from mobile_api.pod_capture.services.pod_section_metadata import build_pod_section_metadata
 from mobile_api.rbac import get_mobile_jwt_payload
 from mobile_api.throttling import MobileUserThrottle
-from mobile_api.utils.file_upload_handler import process_media_files
+from mobile_api.utils.file_upload_handler import merge_multipart_media_with_json_hints
 from mobile_api.views.base import MobileAPIView
 
 logger = logging.getLogger('mobile_api.pod_capture')
@@ -100,6 +104,16 @@ class PodCaptureAPIView(MobileAPIView):
         shipment = resolved.shipment
         updated = getattr(shipment, 'updated_at', None)
         hash_value = updated.isoformat() if hasattr(updated, 'isoformat') else ''
+        pod_section = build_pod_section_metadata(
+            shipment,
+            driver=driver,
+            tenant_schema=tenant_schema,
+        )
+        requested_step = str(
+            request.query_params.get('step')
+            or request.query_params.get('capture_step')
+            or ''
+        ).strip()
         data = {
             'shipment_id': str(getattr(shipment, 'pk', None) or shipment_id),
             'content_hash': hash_value,
@@ -108,6 +122,11 @@ class PodCaptureAPIView(MobileAPIView):
                 'shipment': hash_value,
             },
             'generated_at': hash_value,
+            'pod_section': pod_section,
+            **build_pod_capture_get_routing(
+                pod_section,
+                requested_step=requested_step,
+            ),
         }
         return self.success(
             message=_('mobile.pod_capture.success'),
@@ -117,17 +136,14 @@ class PodCaptureAPIView(MobileAPIView):
         )
 
     def post(self, request, shipment_id: str):
-        serializer_data = request.data
-        if any(str(k).startswith('media[') for k in request.FILES.keys()):
-            processed = process_media_files(
-                request.FILES,
-                request.data,
-                subfolder='pod_evidence',
-            )
-            if processed:
-                merged_data = {k: request.data.get(k) for k in request.data.keys()}
-                merged_data['media'] = processed
-                serializer_data = merged_data
+        serializer_data = {key: request.data.get(key) for key in request.data.keys()}
+        processed_media = merge_multipart_media_with_json_hints(
+            request,
+            prefix='media',
+            subfolder='pod_evidence',
+        )
+        if processed_media:
+            serializer_data['media'] = processed_media
 
         serializer = PodCaptureRequestSerializer(data=serializer_data)
         if not serializer.is_valid():

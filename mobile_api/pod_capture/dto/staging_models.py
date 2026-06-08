@@ -150,6 +150,7 @@ class PODCaptureMediaItemInput:
     captured_at: datetime | None = None
     checksum: str = ''
     line_no: int = 0
+    duration_seconds: float | None = None
     upload: Any | None = field(default=None, repr=False)
 
 

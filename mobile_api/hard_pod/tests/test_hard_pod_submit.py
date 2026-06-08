@@ -153,6 +153,15 @@ class HardPodSubmitServiceTests(TransactionTestCase):
         self.driver = _driver(self.driver_id)
         self.shipment = _hard_shipment(self.shipment_id, self.driver_id)
 
+    _CONFIRMED_PAGES = [
+        {
+            'page_id': 'page-1',
+            'document_id': 'doc-1',
+            'line_no': 1,
+            'confirmed': True,
+        }
+    ]
+
     def _payload(self, **kwargs) -> dict:
         base = {
             'client_submission_id': self.client_submission_id,
@@ -163,6 +172,7 @@ class HardPodSubmitServiceTests(TransactionTestCase):
             'latitude': 24.7136,
             'longitude': 46.6753,
             'media': [],
+            'confirmed_pages': list(self._CONFIRMED_PAGES),
         }
         base.update(kwargs)
         return base
@@ -184,22 +194,41 @@ class HardPodSubmitServiceTests(TransactionTestCase):
                 str(payload.get('latitude') or '').strip(),
                 str(payload.get('longitude') or '').strip(),
                 ','.join(sorted(r for r in file_refs if r)),
+                ','.join(
+                    sorted(
+                        f"{p.get('document_id','')}:{p.get('page_id','')}:{p.get('line_no','')}"
+                        for p in (payload.get('confirmed_pages') or self._CONFIRMED_PAGES)
+                    )
+                ),
             ]
         )
         return hashlib.sha256(text.encode('utf-8')).hexdigest()
 
+    @patch(
+        'mobile_api.hard_pod.services.hard_pod_submit_service.validate_confirmed_pages',
+        return_value=[
+            {
+                'page_id': 'page-1',
+                'document_id': 'doc-1',
+                'line_no': 1,
+                'physical_page_no': 1,
+                'label': 'DN-1020-P1',
+            }
+        ],
+    )
     @patch('mobile_api.hard_pod.services.hard_pod_submit_service.schema_context')
     @patch.object(HardPodSecurityGuard, 'resolve_and_assert_shipment')
     @patch.object(HardPodSecurityGuard, 'assert_media_paths')
     def test_successful_submit_creates_custody(
         self,
-        mock_media,
         mock_resolve,
+        mock_media,
         mock_schema,
+        _mock_validate_pages,
     ):
         mock_schema.return_value.__enter__ = MagicMock(return_value=None)
         mock_schema.return_value.__exit__ = MagicMock(return_value=False)
-        mock_resolve.return_value = self.shipment
+        mock_media.return_value = self.shipment
 
         service = HardPodSubmitService()
         result = service.submit_custody(
@@ -209,6 +238,7 @@ class HardPodSubmitServiceTests(TransactionTestCase):
         )
 
         self.assertFalse(result['custody_submission']['replayed'])
+        self.assertEqual(result['custody_submission']['confirmed_page_count'], 1)
         self.assertTrue(result['next_step']['requires_execute_action'])
         self.assertEqual(result['custody_submission']['receiver_name'], 'Jane Receiver')
         self.assertGreaterEqual(len(result['timeline_preview']), 1)
@@ -220,12 +250,16 @@ class HardPodSubmitServiceTests(TransactionTestCase):
         # collected, handoff, received, verified
         self.assertEqual(submission.custody_events.count(), 4)
 
+    @patch(
+        'mobile_api.hard_pod.services.hard_pod_submit_service.validate_confirmed_pages',
+        return_value=[{'page_id': 'page-1', 'document_id': 'doc-1', 'line_no': 1}],
+    )
     @patch('mobile_api.hard_pod.services.hard_pod_submit_service.schema_context')
     @patch.object(HardPodSecurityGuard, 'resolve_and_assert_shipment')
-    def test_wrong_shipment_rejected(self, mock_resolve, mock_schema):
+    def test_wrong_shipment_rejected(self, mock_media, mock_schema, _mock_validate_pages):
         mock_schema.return_value.__enter__ = MagicMock(return_value=None)
         mock_schema.return_value.__exit__ = MagicMock(return_value=False)
-        mock_resolve.side_effect = HardPodError(
+        mock_media.side_effect = HardPodError(
             'not found',
             code='job_not_found',
             http_status=404,
@@ -240,12 +274,16 @@ class HardPodSubmitServiceTests(TransactionTestCase):
             )
         self.assertEqual(exc.exception.code, 'job_not_found')
 
+    @patch(
+        'mobile_api.hard_pod.services.hard_pod_submit_service.validate_confirmed_pages',
+        return_value=[{'page_id': 'page-1', 'document_id': 'doc-1', 'line_no': 1}],
+    )
     @patch('mobile_api.hard_pod.services.hard_pod_submit_service.schema_context')
     @patch.object(HardPodSecurityGuard, 'resolve_and_assert_shipment')
-    def test_wrong_driver_rejected(self, mock_resolve, mock_schema):
+    def test_wrong_driver_rejected(self, mock_media, mock_schema, _mock_validate_pages):
         mock_schema.return_value.__enter__ = MagicMock(return_value=None)
         mock_schema.return_value.__exit__ = MagicMock(return_value=False)
-        mock_resolve.side_effect = HardPodError(
+        mock_media.side_effect = HardPodError(
             'forbidden',
             code='forbidden',
             http_status=403,
@@ -260,18 +298,23 @@ class HardPodSubmitServiceTests(TransactionTestCase):
             )
         self.assertEqual(exc.exception.code, 'forbidden')
 
+    @patch(
+        'mobile_api.hard_pod.services.hard_pod_submit_service.validate_confirmed_pages',
+        return_value=[{'page_id': 'page-1', 'document_id': 'doc-1', 'line_no': 1}],
+    )
     @patch('mobile_api.hard_pod.services.hard_pod_submit_service.schema_context')
     @patch.object(HardPodSecurityGuard, 'resolve_and_assert_shipment')
     @patch.object(HardPodSecurityGuard, 'assert_media_paths')
     def test_replay_submit_returns_same_submission(
         self,
-        mock_media,
         mock_resolve,
+        mock_media,
         mock_schema,
+        _mock_validate_pages,
     ):
         mock_schema.return_value.__enter__ = MagicMock(return_value=None)
         mock_schema.return_value.__exit__ = MagicMock(return_value=False)
-        mock_resolve.return_value = self.shipment
+        mock_media.return_value = self.shipment
 
         service = HardPodSubmitService()
         first = service.submit_custody(
@@ -298,18 +341,23 @@ class HardPodSubmitServiceTests(TransactionTestCase):
             1,
         )
 
+    @patch(
+        'mobile_api.hard_pod.services.hard_pod_submit_service.validate_confirmed_pages',
+        return_value=[{'page_id': 'page-1', 'document_id': 'doc-1', 'line_no': 1}],
+    )
     @patch('mobile_api.hard_pod.services.hard_pod_submit_service.schema_context')
     @patch.object(HardPodSecurityGuard, 'resolve_and_assert_shipment')
     @patch.object(HardPodSecurityGuard, 'assert_media_paths')
     def test_duplicate_race_returns_replay(
         self,
-        mock_media,
         mock_resolve,
+        mock_media,
         mock_schema,
+        _mock_validate_pages,
     ):
         mock_schema.return_value.__enter__ = MagicMock(return_value=None)
         mock_schema.return_value.__exit__ = MagicMock(return_value=False)
-        mock_resolve.return_value = self.shipment
+        mock_media.return_value = self.shipment
 
         payload = self._payload()
         HardPODCustodySubmission.objects.create(
@@ -330,18 +378,23 @@ class HardPodSubmitServiceTests(TransactionTestCase):
 
         self.assertTrue(result['custody_submission']['replayed'])
 
+    @patch(
+        'mobile_api.hard_pod.services.hard_pod_submit_service.validate_confirmed_pages',
+        return_value=[{'page_id': 'page-1', 'document_id': 'doc-1', 'line_no': 1}],
+    )
     @patch('mobile_api.hard_pod.services.hard_pod_submit_service.schema_context')
     @patch.object(HardPodSecurityGuard, 'resolve_and_assert_shipment')
     @patch.object(HardPodSecurityGuard, 'assert_media_paths')
     def test_immutable_media_persisted(
         self,
-        mock_media,
         mock_resolve,
+        mock_media,
         mock_schema,
+        _mock_validate_pages,
     ):
         mock_schema.return_value.__enter__ = MagicMock(return_value=None)
         mock_schema.return_value.__exit__ = MagicMock(return_value=False)
-        mock_resolve.return_value = self.shipment
+        mock_media.return_value = self.shipment
 
         prefix = build_hard_pod_upload_prefix(
             tenant_schema=self.tenant_schema,

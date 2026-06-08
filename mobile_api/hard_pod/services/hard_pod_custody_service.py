@@ -11,6 +11,7 @@ from typing import Any
 from django.utils import timezone
 
 from mobile_api.hard_pod.models import (
+    HardPODConfirmedPage,
     HardPODCustodySubmission,
     HardPODCustodySubmissionEvent,
     HardPODCustodySubmissionMedia,
@@ -53,6 +54,28 @@ class HardPodCustodyService:
             longitude=(longitude or '').strip() or submission.longitude,
             occurred_at=occurred_at or timezone.now(),
         )
+
+    def persist_confirmed_pages(
+        self,
+        submission: HardPODCustodySubmission,
+        confirmed_pages: list[dict[str, Any]],
+    ) -> list[HardPODConfirmedPage]:
+        rows: list[HardPODConfirmedPage] = []
+        for page in confirmed_pages:
+            rows.append(
+                HardPODConfirmedPage.objects.create(
+                    submission=submission,
+                    tenant_schema=submission.tenant_schema,
+                    shipment_id=submission.shipment_id,
+                    driver_id=submission.driver_id,
+                    document_id=(page.get('document_id') or '').strip(),
+                    page_id=(page.get('page_id') or '').strip(),
+                    line_no=int(page.get('line_no') or 1),
+                    physical_page_no=int(page.get('physical_page_no') or 1),
+                    label=(page.get('label') or '').strip(),
+                )
+            )
+        return rows
 
     def persist_media_rows(
         self,
@@ -208,6 +231,7 @@ class HardPodCustodyService:
         media_rows = media_rows if media_rows is not None else list(
             submission.media_rows.order_by('line_no')
         )
+        confirmed_pages = list(submission.confirmed_pages.order_by('line_no', 'created_at'))
         events = list(submission.custody_events.order_by('occurred_at', 'created_at'))
         return {
             'submission_id': str(submission.id),
@@ -225,6 +249,17 @@ class HardPodCustodyService:
                 str(submission.capture_bundle_id) if submission.capture_bundle_id else None
             ),
             'replayed': replayed,
+            'confirmed_page_count': len(confirmed_pages),
+            'confirmed_pages': [
+                {
+                    'page_id': (p.page_id or '').strip(),
+                    'document_id': (p.document_id or '').strip(),
+                    'line_no': p.line_no,
+                    'physical_page_no': p.physical_page_no,
+                    'label': (p.label or '').strip(),
+                }
+                for p in confirmed_pages
+            ],
             'media_count': len(media_rows),
             'media': [
                 {

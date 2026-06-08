@@ -3364,7 +3364,15 @@ class AdminUserToggleStatusView(LoginRequiredMixin, View):
             _revoke_user_sessions(target_user)
             messages.success(request, 'Admin user suspended successfully.')
         else:
+            from superadmin.email_uniqueness import admin_activation_email_blocked
+
             target_user.status = 'Active'
+            activation_error = admin_activation_email_blocked(target_user)
+            if activation_error:
+                target_user.status = 'Suspended'
+                messages.error(request, activation_error)
+                return redirect(reverse('admin_user_list'))
+
             target_user.two_factor_enabled = True
             target_user.updated_by = request.user
             target_user.save(update_fields=['status', 'two_factor_enabled', 'updated_by'])

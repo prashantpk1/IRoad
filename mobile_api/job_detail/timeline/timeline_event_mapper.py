@@ -10,6 +10,9 @@ from __future__ import annotations
 from typing import Any
 
 from iroad_tenants.operation_runtime.impacts import operation_action_matches
+from mobile_api.helpers.action_navigation_metadata import (
+    enrich_timeline_event_navigation,
+)
 from mobile_api.pod_capture.policy.canonical_pod_action_registry import (
     TIMELINE_EVENT_ACTION,
     TIMELINE_EVENT_COD,
@@ -67,6 +70,8 @@ def map_log_to_timeline_event(
     log_row: Any,
     *,
     request: Any | None = None,
+    shipment: Any | None = None,
+    tenant_schema: str = '',
 ) -> dict[str, Any]:
     """Map one Action Log ORM row to a timeline event DTO (append-only derived)."""
     action = getattr(log_row, 'operation_action', None)
@@ -82,7 +87,7 @@ def map_log_to_timeline_event(
     log_date = getattr(log_row, 'log_date', None)
     created_at = getattr(log_row, 'created_at', None)
 
-    return {
+    event = {
         'log_id': log_id,
         'log_no': str(getattr(log_row, 'log_no', '') or ''),
         'log_date': log_date.isoformat() if hasattr(log_date, 'isoformat') else '',
@@ -116,21 +121,39 @@ def map_log_to_timeline_event(
         'append_only': True,
         'authority': 'action_log',
     }
+    return enrich_timeline_event_navigation(
+        event,
+        action,
+        shipment=shipment,
+        tenant_schema=tenant_schema,
+    )
 
 
 def map_logs_to_timeline_events(
     logs: list[Any],
     *,
     request: Any | None = None,
+    shipment: Any | None = None,
+    tenant_schema: str = '',
 ) -> list[dict[str, Any]]:
     """Map log rows preserving input order (caller must supply stable sort)."""
-    return [map_log_to_timeline_event(row, request=request) for row in logs]
+    return [
+        map_log_to_timeline_event(
+            row,
+            request=request,
+            shipment=shipment,
+            tenant_schema=tenant_schema,
+        )
+        for row in logs
+    ]
 
 
 def map_action_to_pending_timeline_event(
     action: Any,
     *,
     request: Any | None = None,
+    shipment: Any | None = None,
+    tenant_schema: str = '',
 ) -> dict[str, Any]:
     """Map one configured workflow action to an unperformed timeline step."""
     event_type = classify_event_type(action)
@@ -142,7 +165,7 @@ def map_action_to_pending_timeline_event(
             or ''
         ).strip()
 
-    return {
+    event = {
         'log_id': '',
         'log_no': '',
         'log_date': '',
@@ -174,6 +197,12 @@ def map_action_to_pending_timeline_event(
         'is_performed': False,
         'sequence_number': int(getattr(action, 'sequence_number', 0) or 0),
     }
+    return enrich_timeline_event_navigation(
+        event,
+        action,
+        shipment=shipment,
+        tenant_schema=tenant_schema,
+    )
 
 
 def merge_actions_with_timeline_logs(
@@ -181,6 +210,8 @@ def merge_actions_with_timeline_logs(
     logs: list[Any],
     *,
     request: Any | None = None,
+    shipment: Any | None = None,
+    tenant_schema: str = '',
 ) -> list[dict[str, Any]]:
     """
     Build a workflow progression timeline.
@@ -206,9 +237,21 @@ def merge_actions_with_timeline_logs(
         action_id = str(getattr(action, 'action_id', '') or '')
         log = latest_log_by_action_id.get(action_id)
         if log is None:
-            out.append(map_action_to_pending_timeline_event(action, request=request))
+            out.append(
+                map_action_to_pending_timeline_event(
+                    action,
+                    request=request,
+                    shipment=shipment,
+                    tenant_schema=tenant_schema,
+                ),
+            )
             continue
-        event = map_log_to_timeline_event(log, request=request)
+        event = map_log_to_timeline_event(
+            log,
+            request=request,
+            shipment=shipment,
+            tenant_schema=tenant_schema,
+        )
         event['timeline_state'] = 'performed'
         event['is_performed'] = True
         event['sequence_number'] = int(getattr(action, 'sequence_number', 0) or 0)

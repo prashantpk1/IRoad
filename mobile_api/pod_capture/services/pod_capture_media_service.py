@@ -16,6 +16,7 @@ from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
 from mobile_api.execution.evidence.execution_media_security import ExecutionMediaSecurityService
+from mobile_api.utils.file_upload_handler import infer_media_type
 from mobile_api.pod_capture.dto.pod_capture_context import PodCaptureContext
 from mobile_api.pod_capture.dto.staging_models import PODCaptureMedia, PODCaptureMediaItemInput
 from mobile_api.pod_capture.exceptions import PodCaptureError
@@ -75,15 +76,30 @@ class PodCaptureMediaService:
                         captured_at,
                         timezone.get_current_timezone(),
                     )
+            file_ref = str(row.get('file_ref') or '').strip()
+            file_name = str(row.get('file_name') or '').strip()
+            media_type = infer_media_type(
+                explicit=str(row.get('media_type') or ''),
+                file_ref=file_ref,
+                file_name=file_name,
+            )
+            duration_raw = row.get('duration_seconds')
+            duration_seconds = None
+            if duration_raw is not None and str(duration_raw).strip() != '':
+                try:
+                    duration_seconds = float(duration_raw)
+                except (TypeError, ValueError):
+                    duration_seconds = None
             normalized.append(
                 PODCaptureMediaItemInput(
-                    media_type=str(row.get('media_type') or '').strip().casefold(),
-                    file_ref=str(row.get('file_ref') or '').strip(),
-                    file_name=str(row.get('file_name') or '').strip(),
+                    media_type=media_type,
+                    file_ref=file_ref,
+                    file_name=file_name,
                     description=str(row.get('description') or '').strip(),
                     captured_at=captured_at,
                     checksum=str(row.get('checksum') or row.get('content_hash') or '').strip(),
                     line_no=int(row.get('sort_order') or row.get('line_no') or (idx + 1)),
+                    duration_seconds=duration_seconds,
                     upload=row.get('file'),
                 )
             )

@@ -40,8 +40,15 @@
         </div>
       </div>
 
+      {% if form_errors %}
+      <div class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
+        Please fix the highlighted errors.
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+      {% endif %}
+
       {% if is_ticket_edit %}
-      <form method="post" action="{% url 'iroad_tenants:tenant_support_ticket_edit' ticket.ticket_id %}">
+      <form method="post" action="{% url 'iroad_tenants:tenant_support_ticket_edit' ticket.ticket_id %}" novalidate>
         {% csrf_token %}
         <div class="form-card">
           <div class="form-card-header">
@@ -63,22 +70,23 @@
                 <label for="subject" class="form-label">Subject <span class="required">*</span></label>
                 <input
                   type="text"
-                  class="form-control"
+                  class="form-control{% if form_errors.subject %} is-invalid{% endif %}"
                   id="subject"
                   name="subject"
-                  value="{{ ticket.subject }}"
-                  required
+                  value="{{ form_data.subject|default:ticket.subject }}"
                 />
+                {% if form_errors.subject %}<div class="invalid-feedback d-block">{{ form_errors.subject }}</div>{% endif %}
               </div>
               <div class="field">
                 <label for="category_id" class="form-label">Category <span class="required">*</span></label>
-                <select class="form-select" id="category_id" name="category_id" required>
+                <select class="form-select{% if form_errors.category_id %} is-invalid{% endif %}" id="category_id" name="category_id">
                   {% for category in categories %}
-                  <option value="{{ category.category_id }}" {% if category.category_id == ticket.category_id %}selected{% endif %}>
+                  <option value="{{ category.category_id }}" {% if form_data.category_id %}{% if form_data.category_id == category.category_id|stringformat:'s' %}selected{% endif %}{% elif category.category_id == ticket.category_id %}selected{% endif %}>
                     {{ category.name_en }}
                   </option>
                   {% endfor %}
                 </select>
+                {% if form_errors.category_id %}<div class="invalid-feedback d-block">{{ form_errors.category_id }}</div>{% endif %}
               </div>
             </div>
           </div>
@@ -140,7 +148,7 @@
       </div>
 
       {% if not is_view_only and ticket.status != 'Closed' %}
-      <form id="supportTicketForm" method="post" enctype="multipart/form-data">
+      <form id="supportTicketForm" method="post" enctype="multipart/form-data" novalidate>
         {% csrf_token %}
         <div class="form-card" id="reply-section" data-section="2">
           <div class="form-card-header">
@@ -156,23 +164,24 @@
             <div class="field">
               <label for="message_body" class="form-label">Reply <span class="required">*</span></label>
               <textarea
-                class="form-control"
+                class="form-control{% if form_errors.message_body %} is-invalid{% endif %}"
                 id="message_body"
                 name="message_body"
                 rows="6"
                 placeholder="Enter your reply message..."
-                required
-              ></textarea>
+              >{{ form_data.message_body|default:'' }}</textarea>
+              {% if form_errors.message_body %}<div class="invalid-feedback d-block">{{ form_errors.message_body }}</div>{% endif %}
             </div>
             <div class="field mt-3">
               <label for="attachment" class="form-label">Attachment</label>
               <input
                 type="file"
-                class="form-control"
+                class="form-control{% if form_errors.attachment %} is-invalid{% endif %}"
                 id="attachment"
                 name="attachment"
                 accept="image/*,.pdf,.log"
               />
+              {% if form_errors.attachment %}<div class="invalid-feedback d-block">{{ form_errors.attachment }}</div>{% endif %}
               <span class="field-hint">Image, PDF or log file</span>
             </div>
           </div>
@@ -203,7 +212,7 @@
 
       {% else %}
       <!-- Create Support Ticket -->
-      <form id="supportTicketForm" method="post" enctype="multipart/form-data">
+      <form id="supportTicketForm" method="post" enctype="multipart/form-data" novalidate>
         {% csrf_token %}
         <div class="form-card" data-section="1">
           <div class="form-card-header">
@@ -233,21 +242,23 @@
                 <label for="subject" class="form-label">Subject <span class="required">*</span></label>
                 <input
                   type="text"
-                  class="form-control"
+                  class="form-control{% if form_errors.subject %} is-invalid{% endif %}"
                   id="subject"
                   name="subject"
                   placeholder="Enter subject"
-                  required
+                  value="{{ form_data.subject|default:'' }}"
                 />
+                {% if form_errors.subject %}<div class="invalid-feedback d-block">{{ form_errors.subject }}</div>{% endif %}
               </div>
               <div class="field">
                 <label for="category_id" class="form-label">Category <span class="required">*</span></label>
-                <select class="form-select" id="category_id" name="category_id" required>
-                  <option value="" selected disabled>-Select category-</option>
+                <select class="form-select{% if form_errors.category_id %} is-invalid{% endif %}" id="category_id" name="category_id">
+                  <option value="" disabled {% if not form_data.category_id %}selected{% endif %}>-Select category-</option>
                   {% for category in categories %}
-                  <option value="{{ category.category_id }}">{{ category.name_en }}</option>
+                  <option value="{{ category.category_id }}" {% if form_data.category_id == category.category_id|stringformat:'s' %}selected{% endif %}>{{ category.name_en }}</option>
                   {% endfor %}
                 </select>
+                {% if form_errors.category_id %}<div class="invalid-feedback d-block">{{ form_errors.category_id }}</div>{% endif %}
               </div>
             </div>
           </div>
@@ -267,23 +278,24 @@
             <div class="field">
               <label for="message_body" class="form-label">Message <span class="required">*</span></label>
               <textarea
-                class="form-control"
+                class="form-control{% if form_errors.message_body %} is-invalid{% endif %}"
                 id="message_body"
                 name="message_body"
                 rows="6"
                 placeholder="Describe your issue..."
-                required
-              ></textarea>
+              >{{ form_data.message_body|default:'' }}</textarea>
+              {% if form_errors.message_body %}<div class="invalid-feedback d-block">{{ form_errors.message_body }}</div>{% endif %}
             </div>
             <div class="field mt-3">
               <label for="attachment" class="form-label">Attachment</label>
               <input
                 type="file"
-                class="form-control"
+                class="form-control{% if form_errors.attachment %} is-invalid{% endif %}"
                 id="attachment"
                 name="attachment"
                 accept="image/*,.pdf,.log"
               />
+              {% if form_errors.attachment %}<div class="invalid-feedback d-block">{{ form_errors.attachment }}</div>{% endif %}
             </div>
           </div>
         </div>

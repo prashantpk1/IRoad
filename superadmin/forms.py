@@ -281,6 +281,18 @@ class AdminUserForm(forms.ModelForm):
             raise ValidationError('Email must be unique.')
         return value
 
+    def clean(self):
+        cleaned_data = super().clean()
+        email = (cleaned_data.get('email') or '').strip().lower()
+        if email and cleaned_data.get('status') == 'Active':
+            from superadmin.email_uniqueness import active_tenant_email_conflict
+
+            if active_tenant_email_conflict(email):
+                raise ValidationError(
+                    'This email is already used by an active tenant admin.'
+                )
+        return cleaned_data
+
 
 class MyAccountForm(forms.ModelForm):
     new_password = forms.CharField(
@@ -317,6 +329,13 @@ class MyAccountForm(forms.ModelForm):
             qs = qs.exclude(pk=self.instance.pk)
         if qs.exists():
             raise ValidationError('Email must be unique.')
+        if getattr(self.instance, 'status', '') == 'Active':
+            from superadmin.email_uniqueness import active_tenant_email_conflict
+
+            if active_tenant_email_conflict(value):
+                raise ValidationError(
+                    'This email is already used by an active tenant admin.'
+                )
         return value
 
     def clean(self):
@@ -1777,6 +1796,12 @@ class TenantProfileCreateForm(forms.ModelForm):
             raise ValidationError(
                 _('Primary email must be unique across tenants.')
             )
+        from superadmin.email_uniqueness import active_admin_email_conflict
+
+        if active_admin_email_conflict(value):
+            raise ValidationError(
+                _('This email is already used by an active super admin.')
+            )
         return value
 
 
@@ -1850,6 +1875,12 @@ class TenantProfileUpdateForm(forms.ModelForm):
         if qs.exists():
             raise ValidationError(
                 _('Primary email must be unique across tenants.')
+            )
+        from superadmin.email_uniqueness import active_admin_email_conflict
+
+        if active_admin_email_conflict(value):
+            raise ValidationError(
+                _('This email is already used by an active super admin.')
             )
         return value
 

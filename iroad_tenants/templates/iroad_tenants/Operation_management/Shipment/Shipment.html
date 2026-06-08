@@ -25,13 +25,6 @@
         </div>
       </div>
 
-      {% if not shipment_is_edit %}
-      <div class="alert alert-light border shadow-sm mb-3" role="note">
-        <strong>Two ways to create a shipment:</strong>
-        (1) this form — manual office create linked to a confirmed booking line; or
-        (2) driver / Action Log — when the action has <strong>Auto Shipment Post</strong> enabled in Action Master.
-      </div>
-      {% endif %}
       <!-- Shipment Form -->
       <form id="shipmentForm" method="post">
         {% csrf_token %}
@@ -69,8 +62,13 @@
                 <span class="field-hint">Updated by Operation Action Log impacts</span>
               </div>
               <div class="field">
-                <label class="form-label">Order Type (Credit / COD)</label>
-                <input type="text" class="form-control" value="{{ shipment_form_data.order_type|default:'—' }}" readonly />
+                <label for="headerOrderType" class="form-label">Order Type</label>
+                <select class="form-select" id="headerOrderType" disabled aria-readonly="true">
+                  <option value="" {% if not shipment_form_data.order_type %}selected{% endif %} disabled>-Select order type-</option>
+                  {% for order_type in operation_order_type_options %}
+                  <option value="{{ order_type }}" {% if shipment_form_data.order_type == order_type %}selected{% endif %}>{{ order_type }}</option>
+                  {% endfor %}
+                </select>
               </div>
               {% endif %}
               <div class="field">
@@ -87,6 +85,36 @@
                 />
                 <span class="field-hint">Execution date (defaults to today)</span>
                 {% if form_errors.shipment_date %}<div class="invalid-feedback d-block">{{ form_errors.shipment_date }}</div>{% endif %}
+              </div>
+            </div>
+            <div class="fields-grid cols-2 mt-3">
+              <div class="field">
+                <label for="salesReportLookup" class="form-label">Sales Report</label>
+                <select
+                  class="form-select"
+                  id="salesReportLookup"
+                  name="sales_report_no"
+                  disabled
+                  aria-readonly="true"
+                >
+                  <option value="" selected disabled>-Select sales report-</option>
+                </select>
+                <span class="field-hint">Lookup filtered by booking number; auto-linked when included in a Sales Invoice Report.</span>
+              </div>
+              <div class="field">
+                <label for="salesReportStatus" class="form-label">Sales Report Status</label>
+                <select
+                  class="form-select"
+                  id="salesReportStatus"
+                  name="sales_report_status"
+                  disabled
+                  aria-readonly="true"
+                >
+                  <option value="" {% if not shipment_form_data.sales_report_status %}selected{% endif %} disabled>-Select sales report status-</option>
+                  {% for status in operation_sales_report_status_options %}
+                  <option value="{{ status }}" {% if shipment_form_data.sales_report_status == status %}selected{% endif %}>{{ status }}</option>
+                  {% endfor %}
+                </select>
               </div>
             </div>
           </div>
@@ -131,6 +159,9 @@
                     value="{{ booking.booking_id }}"
                     data-booking-no="{{ booking.booking_no }}"
                     data-client-account-id="{{ booking.client_account_id }}"
+                    data-sales-report-id="{{ booking.sales_report_id|default:'' }}"
+                    data-sales-report-no="{{ booking.sales_report_no|default:'' }}"
+                    data-sales-report-status="{{ booking.sales_report_status|default:'' }}"
                     {% if shipment_form_data.booking_id == booking.booking_id|stringformat:"s" or shipment_form_data.booking_no == booking.booking_no %}selected{% endif %}
                   >
                     {{ booking.booking_no }}
@@ -141,17 +172,19 @@
                 <span class="field-hint">Confirmed bookings only; one shipment per line</span>
               </div>
               <div class="field">
-                <label for="bookingOrderType" class="form-label"
-                  >Order Type</label
-                >
-                <input
-                  type="text"
-                  class="form-control"
+                <label for="bookingOrderType" class="form-label">Order Type</label>
+                <select
+                  class="form-select"
                   id="bookingOrderType"
-                  name="booking_order_type"
-                  value="{{ shipment_form_data.order_type|default:'' }}"
-                  readonly
-                />
+                  disabled
+                  aria-readonly="true"
+                >
+                  <option value="" {% if not shipment_form_data.order_type %}selected{% endif %} disabled>-Select order type-</option>
+                  {% for order_type in operation_order_type_options %}
+                  <option value="{{ order_type }}" {% if shipment_form_data.order_type == order_type %}selected{% endif %}>{{ order_type }}</option>
+                  {% endfor %}
+                </select>
+                <input type="hidden" id="bookingOrderTypeValue" name="booking_order_type" value="{{ shipment_form_data.order_type|default:'' }}" />
               </div>
             </div>
             <div class="fields-grid cols-3">
@@ -257,9 +290,9 @@
                 <label for="podType" class="form-label">POD Type (list)</label>
                 <select class="form-select" id="podType" name="pod_type">
                   <option value="" {% if not shipment_form_data.pod_type %}selected{% endif %} disabled>-Select POD type-</option>
-                  <option value="Soft" {% if shipment_form_data.pod_type == 'Soft' %}selected{% endif %}>Soft</option>
-                  <option value="Hard" {% if shipment_form_data.pod_type == 'Hard' %}selected{% endif %}>Hard</option>
-                  <option value="Digital" {% if shipment_form_data.pod_type == 'Digital' %}selected{% endif %}>Digital</option>
+                  {% for pod_type in operation_pod_type_options %}
+                  <option value="{{ pod_type }}" {% if shipment_form_data.pod_type == pod_type %}selected{% endif %}>{{ pod_type }}</option>
+                  {% endfor %}
                 </select>
               </div>
               <div class="field">
@@ -279,14 +312,19 @@
               </div>
               <div class="field">
                 <label for="podStatus" class="form-label">POD Status</label>
-                <input
-                  type="text"
-                  class="form-control"
+                <select
+                  class="form-select"
                   id="podStatus"
                   name="pod_status"
-                  value="{{ shipment_form_data.pod_status|default:'' }}"
-                  readonly
-                />
+                  disabled
+                  aria-readonly="true"
+                >
+                  <option value="" {% if not shipment_form_data.pod_status %}selected{% endif %} disabled>-Select POD status-</option>
+                  {% for pod_status in operation_pod_status_options %}
+                  <option value="{{ pod_status }}" {% if shipment_form_data.pod_status == pod_status %}selected{% endif %}>{{ pod_status }}</option>
+                  {% endfor %}
+                </select>
+                <input type="hidden" id="podStatusValue" name="pod_status" value="{{ shipment_form_data.pod_status|default:'' }}" />
               </div>
             </div>
             <div class="fields-grid cols-3">
@@ -597,8 +635,19 @@
 {% endblock %}
 
 {% block extra_js %}
+<script id="operationSalesReportLookupData" type="application/json">{{ operation_sales_report_lookup_json|default:'{}'|safe }}</script>
 <script>
       (function () {
+        var salesReportLookup = {};
+        try {
+          var lookupNode = document.getElementById("operationSalesReportLookupData");
+          salesReportLookup = lookupNode && lookupNode.textContent
+            ? JSON.parse(lookupNode.textContent)
+            : {};
+        } catch (lookupError) {
+          salesReportLookup = {};
+        }
+
         // Set default shipment date to today if empty
         var shipmentDate = document.getElementById("shipmentDate");
         if (shipmentDate && !shipmentDate.value) {
@@ -630,13 +679,17 @@
         var bookingItemSelect = document.getElementById("bookingItem");
         var bookingItemTypeSelect = document.getElementById("bookingItemType");
         var bookingItemRouteSelect = document.getElementById("bookingItemRoute");
-        var bookingOrderTypeInput = document.getElementById("bookingOrderType");
-        var orderTypeInput = document.getElementById("orderType");
+        var bookingOrderTypeSelect = document.getElementById("bookingOrderType");
+        var bookingOrderTypeValue = document.getElementById("bookingOrderTypeValue");
+        var headerOrderTypeSelect = document.getElementById("headerOrderType");
         var sourcingModeInput = document.getElementById("sourcingMode");
         var podTypeSelect = document.getElementById("podType");
         var shipmentForm = document.getElementById("shipmentForm");
         var podDocCountInput = document.getElementById("podDocCount");
-        var podStatusInput = document.getElementById("podStatus");
+        var podStatusSelect = document.getElementById("podStatus");
+        var podStatusValue = document.getElementById("podStatusValue");
+        var salesReportLookupSelect = document.getElementById("salesReportLookup");
+        var salesReportStatusSelect = document.getElementById("salesReportStatus");
         var codAmountInput = document.getElementById("codAmount");
         var shipmentTruckDisplay = document.getElementById("shipmentTruckDisplay");
         var shipmentDriverDisplay = document.getElementById("shipmentDriverDisplay");
@@ -691,6 +744,61 @@
             return !opt.hidden && opt.value === value;
           });
           if (!found) resetSelectToPlaceholder(selectEl);
+        }
+
+        function syncReadonlySelectValue(selectEl, hiddenEl, value) {
+          setSelectValueIfExists(selectEl, value || "");
+          if (hiddenEl) hiddenEl.value = value || "";
+        }
+
+        function getBookingOrderTypeValue() {
+          if (bookingOrderTypeValue && bookingOrderTypeValue.value) {
+            return bookingOrderTypeValue.value;
+          }
+          if (bookingOrderTypeSelect && bookingOrderTypeSelect.value) {
+            return bookingOrderTypeSelect.value;
+          }
+          return "";
+        }
+
+        function rebuildSalesReportLookupOptions(bookingId, preferredReportNo, preferredStatus) {
+          if (!salesReportLookupSelect) return;
+          var placeholder = salesReportLookupSelect.options[0];
+          while (salesReportLookupSelect.options.length > 1) {
+            salesReportLookupSelect.remove(1);
+          }
+          var reports = (salesReportLookup && bookingId && salesReportLookup[bookingId]) || [];
+          reports.forEach(function (report) {
+            var opt = document.createElement("option");
+            opt.value = report.report_no;
+            opt.textContent = report.report_no;
+            opt.setAttribute("data-report-id", report.report_id || "");
+            opt.setAttribute("data-report-status", report.status || "");
+            salesReportLookupSelect.appendChild(opt);
+          });
+          if (preferredReportNo) {
+            setSelectValueIfExists(salesReportLookupSelect, preferredReportNo);
+          } else if (reports.length === 1) {
+            salesReportLookupSelect.value = reports[0].report_no;
+          } else {
+            resetSelectToPlaceholder(salesReportLookupSelect);
+          }
+          var selectedReport = getSelectedOption(salesReportLookupSelect);
+          var statusValue = preferredStatus
+            || (selectedReport ? selectedReport.getAttribute("data-report-status") : "")
+            || "";
+          setSelectValueIfExists(salesReportStatusSelect, statusValue);
+        }
+
+        function syncSalesReportFromBookingOption(bookingOpt) {
+          if (!bookingOpt) {
+            rebuildSalesReportLookupOptions("", "", "");
+            return;
+          }
+          var bookingId = bookingOpt.value || "";
+          var reportNo = bookingOpt.getAttribute("data-sales-report-no") || "";
+          var reportStatus = bookingOpt.getAttribute("data-sales-report-status") || "";
+          rebuildSalesReportLookupOptions(bookingId, reportNo, reportStatus);
         }
 
         function getVisibleOptions(selectEl) {
@@ -782,11 +890,13 @@
             resetSelectToPlaceholder(selectEl);
             selectEl.disabled = true;
           });
-          if (bookingOrderTypeInput) bookingOrderTypeInput.value = "";
+          syncReadonlySelectValue(bookingOrderTypeSelect, bookingOrderTypeValue, "");
+          syncReadonlySelectValue(headerOrderTypeSelect, null, "");
           if (sourcingModeInput) sourcingModeInput.value = "In-Source";
           if (podTypeSelect) resetSelectToPlaceholder(podTypeSelect);
           if (podDocCountInput) podDocCountInput.value = "";
-          if (podStatusInput) podStatusInput.value = "";
+          syncReadonlySelectValue(podStatusSelect, podStatusValue, "");
+          syncSalesReportFromBookingOption(null);
           if (codAmountInput) codAmountInput.value = "";
           if (shipmentTruckDisplay) shipmentTruckDisplay.value = "";
           if (shipmentDriverDisplay) shipmentDriverDisplay.value = "";
@@ -870,12 +980,18 @@
           selectMatchingOption(bookingItemRouteSelect, function (opt) {
             return !opt.hidden && opt.value === routeDisplay;
           });
-          if (bookingOrderTypeInput) bookingOrderTypeInput.value = orderType;
+          syncReadonlySelectValue(bookingOrderTypeSelect, bookingOrderTypeValue, orderType);
+          syncReadonlySelectValue(headerOrderTypeSelect, null, orderType);
           if (sourcingModeInput) sourcingModeInput.value = sourcingMode;
           setSelectValueIfExists(podTypeSelect, lineOpt.getAttribute("data-pod-type") || "");
           syncCodAmountField();
           if (podDocCountInput) podDocCountInput.value = lineOpt.getAttribute("data-pod-doc-count") || "";
-          if (podStatusInput) podStatusInput.value = lineOpt.getAttribute("data-pod-status") || "";
+          syncReadonlySelectValue(
+            podStatusSelect,
+            podStatusValue,
+            lineOpt.getAttribute("data-pod-status") || ""
+          );
+          syncSalesReportFromBookingOption(getSelectedOption(bookingNoSelect));
           if (codAmountInput) codAmountInput.value = lineOpt.getAttribute("data-cod-amount") || "";
           if (shipmentTruckDisplay) shipmentTruckDisplay.value = lineOpt.getAttribute("data-truck-code") || "";
           if (shipmentDriverDisplay) shipmentDriverDisplay.value = lineOpt.getAttribute("data-driver-display") || "";
@@ -959,11 +1075,13 @@
             bookingItemSelect.addEventListener("change", populateBookingInfo);
           }
           applyClientBookingFilter();
+        } else if (bookingNoSelect && bookingNoSelect.value) {
+          syncSalesReportFromBookingOption(getSelectedOption(bookingNoSelect));
         }
 
         function syncCodAmountField() {
-          if (!codAmountInput || !bookingOrderTypeInput) return;
-          var isCod = (bookingOrderTypeInput.value || "").toUpperCase() === "COD";
+          if (!codAmountInput) return;
+          var isCod = getBookingOrderTypeValue().toUpperCase() === "COD";
           codAmountInput.readOnly = !isCod;
           if (!isCod) {
             codAmountInput.removeAttribute("required");
@@ -999,7 +1117,7 @@
           if (cargoQtyInput && Number(cargoQtyInput.value || "0") <= 0) {
             errors.push("Cargo quantity must be greater than zero.");
           }
-          if (bookingOrderTypeInput && (bookingOrderTypeInput.value || "").toUpperCase() === "COD") {
+          if (getBookingOrderTypeValue().toUpperCase() === "COD") {
             if (!codAmountInput || Number(codAmountInput.value || "0") <= 0) {
               errors.push("COD amount is required for COD orders.");
             }

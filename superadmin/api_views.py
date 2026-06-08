@@ -452,6 +452,13 @@ def tenant_profile_sync(request):
                 {'error': 'primary_email already used by another tenant'},
                 status=400,
             )
+        from superadmin.email_uniqueness import active_admin_email_conflict
+
+        if active_admin_email_conflict(email):
+            return JsonResponse(
+                {'error': 'primary_email already used by an active super admin'},
+                status=400,
+            )
         tenant.primary_email = email
 
     if 'primary_phone' in updates:

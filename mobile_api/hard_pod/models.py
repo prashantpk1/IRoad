@@ -74,6 +74,46 @@ class HardPODCustodySubmission(models.Model):
         super().save(*args, **kwargs)
 
 
+class HardPODConfirmedPage(models.Model):
+    """Immutable per-page physical custody confirmation for one submit session."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    submission = models.ForeignKey(
+        HardPODCustodySubmission,
+        on_delete=models.CASCADE,
+        related_name='confirmed_pages',
+    )
+    tenant_schema = models.CharField(max_length=100, db_index=True)
+    shipment_id = models.CharField(max_length=64, db_index=True)
+    driver_id = models.CharField(max_length=64, db_index=True)
+    document_id = models.CharField(max_length=64, blank=True, default='')
+    page_id = models.CharField(max_length=64, blank=True, default='')
+    line_no = models.PositiveIntegerField(default=1)
+    physical_page_no = models.PositiveIntegerField(default=1)
+    label = models.CharField(max_length=255, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'mobile_hard_pod_confirmed_page'
+        ordering = ['line_no', 'created_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['submission', 'document_id', 'line_no'],
+                name='hard_pod_confirmed_page_uq',
+            ),
+        ]
+
+    def save(self, *args, **kwargs) -> None:
+        if self.pk and HardPODConfirmedPage.objects.filter(pk=self.pk).exists():
+            raise ValueError('Hard POD confirmed pages are immutable and cannot be updated.')
+        if self.submission_id:
+            sub = self.submission
+            self.tenant_schema = sub.tenant_schema
+            self.shipment_id = sub.shipment_id
+            self.driver_id = sub.driver_id
+        super().save(*args, **kwargs)
+
+
 class HardPODCustodySubmissionMedia(models.Model):
     """Immutable media evidence linked to a custody submission."""
 

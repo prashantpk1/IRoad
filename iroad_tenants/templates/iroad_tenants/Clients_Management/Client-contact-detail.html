@@ -146,7 +146,7 @@
             <label class="form-label">Mobile Number</label>
             <div class="view-field-box">
               <p class="view-value {% if not contact.mobile_number %}empty{% endif %}">
-                {{ contact.mobile_number|default:"—" }}
+                {{ contact_mobile_display|default:contact.mobile_number|default:"—" }}
               </p>
             </div>
           </div>
@@ -154,7 +154,7 @@
             <label class="form-label">Telephone Number</label>
             <div class="view-field-box">
               <p class="view-value {% if not contact.telephone_number %}empty{% endif %}">
-                {{ contact.telephone_number|default:"—" }}
+                {{ contact_telephone_display|default:contact.telephone_number|default:"—" }}
               </p>
             </div>
           </div>
@@ -162,7 +162,7 @@
             <label class="form-label">Extension</label>
             <div class="view-field-box">
               <p class="view-value {% if not contact.extension %}empty{% endif %}">
-                {{ contact_extension_label|default:contact.extension|default:"—" }}
+                {{ contact.extension|default:"—" }}
               </p>
             </div>
           </div>

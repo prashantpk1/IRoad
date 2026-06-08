@@ -288,7 +288,6 @@ class Command(BaseCommand):
                 trip_type='Round',
                 order_type='Credit',
                 shipment_status='Created',
-                pod_type='Soft',
                 shipment_date=today,
                 driver=driver,
                 truck=truck,
@@ -301,7 +300,6 @@ class Command(BaseCommand):
                 f'Outbound shipment created: {outbound_shipment.shipment_no} '
                 f'({outbound_shipment.shipment_id})',
             )
-
             backload_shipment = TenantShipment.objects.create(
                 shipment_no=backload_shipment_no,
                 booking=booking,
@@ -312,7 +310,6 @@ class Command(BaseCommand):
                 trip_type='Round',
                 order_type='Credit',
                 shipment_status='Created',
-                pod_type='Soft',
                 shipment_date=today,
                 driver=backload_driver,
                 truck=backload_truck,
@@ -325,7 +322,6 @@ class Command(BaseCommand):
                 f'Backload shipment created: {backload_shipment.shipment_no} '
                 f'({backload_shipment.shipment_id})',
             )
-
         self.stdout.write('')
         self.stdout.write('=== ROUND TRIP CREDIT JOB READY ===')
         self.stdout.write(f'Booking ID:           {booking.booking_id}')
@@ -348,8 +344,7 @@ class Command(BaseCommand):
         self.stdout.write('')
         self.stdout.write('ROUND TRIP FLOW:')
         self.stdout.write(
-            'OUTBOUND: A1 A2 A3 A4 A5 A6 '
-            'POD-Capture A7 A8 A10',
+            'OUTBOUND: A1 A2 A3 A4 A5 A6 POD-Capture A7 A8 A10',
         )
         self.stdout.write(
             'BACKLOAD: Login again (or same session) -> '

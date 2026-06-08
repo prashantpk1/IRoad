@@ -259,6 +259,7 @@
         label: "{{ ti.service_code|escapejs }} - {{ ti.english_name|escapejs }}",
         origin: "{% if ti.route and ti.route.origin_point %}{{ ti.route.origin_point.display_label|escapejs }}{% endif %}",
         destination: "{% if ti.route and ti.route.destination_point %}{{ ti.route.destination_point.display_label|escapejs }}{% endif %}",
+        sellPrice: "{{ ti.sell_price }}",
         outboundSellPrice: "{% if ti.outbound_sell_price is not None %}{{ ti.outbound_sell_price }}{% endif %}",
         inboundSellPrice: "{% if ti.inbound_sell_price is not None %}{{ ti.inbound_sell_price }}{% endif %}"
       },
@@ -346,9 +347,9 @@
       const catalogItem = findServiceItemCatalog(typeSel.value, serviceItemId);
       if (!catalogItem) return;
       if (typeSel.value === "Trip") {
+        if (sell) sell.value = formatPriceValue(catalogItem.sellPrice);
         if (outSell) outSell.value = formatPriceValue(catalogItem.outboundSellPrice);
         if (inSell) inSell.value = formatPriceValue(catalogItem.inboundSellPrice);
-        syncTripSellPrice(row);
         return;
       }
       if (sell) sell.value = formatPriceValue(catalogItem.sellPrice);
@@ -409,7 +410,6 @@
       if (typeSel) typeSel.addEventListener("change", function () {
         populateServiceItems(row, false);
         applyTripVisibility(row);
-        syncTripSellPrice(row);
         updateTripRouteFromService(row);
         updateTotals();
       });
@@ -417,10 +417,6 @@
         updateTripRouteFromService(row);
         applySellPriceFromServiceItem(row);
       });
-      const outSell = row.querySelector(".pl-out-sell");
-      const inSell = row.querySelector(".pl-in-sell");
-      if (outSell) outSell.addEventListener("input", function () { syncTripSellPrice(row); });
-      if (inSell) inSell.addEventListener("input", function () { syncTripSellPrice(row); });
       if (delBtn) delBtn.addEventListener("click", function () { row.remove(); renumber(); updateTotals(); });
       if (dupBtn) dupBtn.addEventListener("click", function () {
         const clone = row.cloneNode(true);
@@ -448,9 +444,7 @@
       if (svcSel && sid) svcSel.value = sid;
       if (sell) {
         const lineSell = line && line.sell_price != null && String(line.sell_price) !== "" ? String(line.sell_price) : "";
-        const outboundSell = line && line.outbound_sell_price != null && String(line.outbound_sell_price) !== "" ? String(line.outbound_sell_price) : "";
-        const inboundSell = line && line.inbound_sell_price != null && String(line.inbound_sell_price) !== "" ? String(line.inbound_sell_price) : "";
-        sell.value = lt === "Trip" ? (lineSell || outboundSell || inboundSell || "") : lineSell;
+        sell.value = lineSell;
       }
       if (outSell) outSell.value = line && line.outbound_sell_price != null && String(line.outbound_sell_price) !== "" ? String(line.outbound_sell_price) : "";
       if (inSell) inSell.value = line && line.inbound_sell_price != null && String(line.inbound_sell_price) !== "" ? String(line.inbound_sell_price) : "";
@@ -601,9 +595,7 @@
           const serviceItemId = svcSel ? (svcSel.value || "") : "";
           const hasAnyValue = serviceItemId || (sell && sell.value) || (outSell && outSell.value) || (inSell && inSell.value);
           if (!hasAnyValue) return;
-          const sellValue = lineType === "Trip"
-            ? ((outSell && outSell.value) || (inSell && inSell.value) || "")
-            : (sell ? (sell.value || "") : "");
+          const sellValue = sell ? (sell.value || "") : "";
           payload.push({
             line_type: lineType,
             service_item_id: serviceItemId,

@@ -40,8 +40,15 @@
         </div>
       </div>
 
+      {% if form_errors %}
+      <div class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
+        {% if form_errors.non_field_errors %}{{ form_errors.non_field_errors }}{% else %}Please fix the highlighted errors.{% endif %}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+      {% endif %}
+
       <!-- Client Contacts Form -->
-      <form id="clientContactForm" method="post" action="{{ contact_form_action }}">
+      <form id="clientContactForm" method="post" action="{{ contact_form_action }}" novalidate>
         {% csrf_token %}        <!-- Section 1: Contact Details -->
         <div class="form-card" data-section="1">
           <div class="form-card-header">
@@ -64,7 +71,7 @@
                     >Client Account
                     <span class="required">*</span>
                   </label>
-                  <select class="form-select {% if form_errors.client_account %}is-invalid{% endif %}" id="contactClientAccount" name="client_account" required>
+                  <select class="form-select {% if form_errors.client_account %}is-invalid{% endif %}" id="contactClientAccount" name="client_account">
                     <option value="" {% if not form_data.client_account %}selected{% endif %} disabled>
                       -Select client account-
                     </option>
@@ -88,7 +95,6 @@
                     name="name"
                     placeholder="Enter full name"
                     value="{{ form_data.name|default:'' }}"
-                    required
                   />
                   {% if form_errors.name %}<div class="invalid-feedback d-block">{{ form_errors.name }}</div>{% endif %}
                 </div>
@@ -120,28 +126,56 @@
                   <label for="contactMobile" class="form-label"
                     >Mobile Number</label
                   >
-                  <input
-                    type="text"
-                    class="form-control {% if form_errors.mobile_number %}is-invalid{% endif %}"
-                    id="contactMobile"
-                    name="mobile_number"
-                    placeholder="Enter mobile number"
-                    value="{{ form_data.mobile_number|default:'' }}"
-                  />
+                  <div class="phone-input-group">
+                    <select
+                      class="form-select country-code {% if form_errors.mobile_country_code %}is-invalid{% endif %}"
+                      id="contactMobileCountryCode"
+                      name="mobile_country_code"
+                    >
+                      {% for dial_val, dial_label in contact_dial_prefix_options %}
+                      {% if dial_val %}
+                      <option value="{{ dial_val }}" {% if form_data.mobile_country_code|default:'+966' == dial_val %}selected{% endif %}>{{ dial_val }}</option>
+                      {% endif %}
+                      {% endfor %}
+                    </select>
+                    <input
+                      type="text"
+                      class="form-control phone-number {% if form_errors.mobile_number %}is-invalid{% endif %}"
+                      id="contactMobile"
+                      name="mobile_number"
+                      placeholder="Enter phone number"
+                      value="{{ form_data.mobile_number|default:'' }}"
+                    />
+                  </div>
+                  {% if form_errors.mobile_country_code %}<div class="invalid-feedback d-block">{{ form_errors.mobile_country_code }}</div>{% endif %}
                   {% if form_errors.mobile_number %}<div class="invalid-feedback d-block">{{ form_errors.mobile_number }}</div>{% endif %}
                 </div>
                 <div class="field">
                   <label for="contactTelephone" class="form-label"
                     >Telephone Number</label
                   >
-                  <input
-                    type="text"
-                    class="form-control {% if form_errors.telephone_number %}is-invalid{% endif %}"
-                    id="contactTelephone"
-                    name="telephone_number"
-                    placeholder="Enter telephone number"
-                    value="{{ form_data.telephone_number|default:'' }}"
-                  />
+                  <div class="phone-input-group">
+                    <select
+                      class="form-select country-code {% if form_errors.telephone_country_code %}is-invalid{% endif %}"
+                      id="contactTelephoneCountryCode"
+                      name="telephone_country_code"
+                    >
+                      {% for dial_val, dial_label in contact_telephone_dial_prefix_options %}
+                      {% if dial_val %}
+                      <option value="{{ dial_val }}" {% if form_data.telephone_country_code|default:'+966' == dial_val %}selected{% endif %}>{{ dial_val }}</option>
+                      {% endif %}
+                      {% endfor %}
+                    </select>
+                    <input
+                      type="text"
+                      class="form-control phone-number {% if form_errors.telephone_number %}is-invalid{% endif %}"
+                      id="contactTelephone"
+                      name="telephone_number"
+                      placeholder="Enter phone number"
+                      value="{{ form_data.telephone_number|default:'' }}"
+                    />
+                  </div>
+                  {% if form_errors.telephone_country_code %}<div class="invalid-feedback d-block">{{ form_errors.telephone_country_code }}</div>{% endif %}
                   {% if form_errors.telephone_number %}<div class="invalid-feedback d-block">{{ form_errors.telephone_number }}</div>{% endif %}
                 </div>
               </div>
@@ -150,15 +184,14 @@
                   <label for="contactExtension" class="form-label"
                     >Extension</label
                   >
-                  <select
-                    class="form-select {% if form_errors.extension %}is-invalid{% endif %}"
+                  <input
+                    type="text"
+                    class="form-control {% if form_errors.extension %}is-invalid{% endif %}"
                     id="contactExtension"
                     name="extension"
-                  >
-                    {% for ext_val, ext_label in contact_extension_options %}
-                    <option value="{{ ext_val }}" {% if form_data.extension == ext_val %}selected{% endif %}>{{ ext_label }}</option>
-                    {% endfor %}
-                  </select>
+                    placeholder="e.g. 104"
+                    value="{{ form_data.extension|default:'' }}"
+                  />
                   {% if form_errors.extension %}<div class="invalid-feedback d-block">{{ form_errors.extension }}</div>{% endif %}
                 </div>
                 <div class="field">

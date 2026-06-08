@@ -4,6 +4,7 @@ Timeline engine tests — preview, pagination, cursor, ordering, dedupe.
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
@@ -20,13 +21,16 @@ from mobile_api.job_detail.timeline.timeline_cursor_service import (
 from mobile_api.job_detail.timeline.timeline_event_mapper import (
     EVENT_COD,
     EVENT_DELAY,
+    EVENT_HARD_POD,
     EVENT_MOVEMENT,
     EVENT_POD,
     classify_event_type,
     dedupe_timeline_events,
+    map_action_to_pending_timeline_event,
     map_log_to_timeline_event,
     sort_logs_newest_first,
 )
+from tenant_workspace.models import TenantShipment
 from mobile_api.job_detail.timeline.timeline_service import JobDetailTimelineService
 from iroad_tenants.operation_runtime.timeline_cursor import TimelineCursor
 
@@ -103,6 +107,40 @@ class TimelineEventMapperTests(SimpleTestCase):
         event = map_log_to_timeline_event(_log(action=_action()))
         self.assertEqual(event['authority'], 'action_log')
         self.assertTrue(event['append_only'])
+
+    def test_classify_hard_pod_event_type(self):
+        self.assertEqual(
+            classify_event_type(
+                _action(code='A7H', label='Hard POD Collection', hard_copy_collection=True),
+            ),
+            EVENT_HARD_POD,
+        )
+
+    @patch(
+        'mobile_api.helpers.action_navigation_metadata.build_hard_copy_confirmation_block',
+        return_value={
+            'required': True,
+            'pending': True,
+            'action_code': 'A7H',
+            'pages': [{'label': 'DN-1', 'page_id': '1'}],
+            'submit_endpoint': '/api/v1/mobile/driver/hard-pod/submit/',
+            'execute_action_code': 'A7H',
+        },
+    )
+    def test_pending_hard_pod_timeline_includes_navigation(self, _mock_block):
+        action = _action(code='A7H', label='Hard POD Collection', hard_copy_collection=True)
+        shipment = SimpleNamespace(
+            pk=uuid4(),
+            pod_type=TenantShipment.PodType.HARD,
+            pod_doc_count=1,
+        )
+        event = map_action_to_pending_timeline_event(
+            action,
+            shipment=shipment,
+            tenant_schema='tenant_test',
+        )
+        self.assertEqual(event['screen'], 'hard_copy_confirmation')
+        self.assertEqual(event['timeline_state'], 'pending')
 
 
 class TimelineCursorServiceTests(SimpleTestCase):

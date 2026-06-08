@@ -153,6 +153,7 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'iroad_tenants.middleware.TenantPortalSchemaMiddleware',
+    'iroad_tenants.middleware.TenantSubscriptionGateMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     # After Auth (and Message) so flash messages on timeout redirect persist.
     'superadmin.middleware.SessionTimeoutMiddleware',

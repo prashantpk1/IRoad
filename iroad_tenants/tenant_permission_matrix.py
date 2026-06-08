@@ -31,7 +31,7 @@ TENANT_PERMISSION_MATRIX = [
     {'module_name': 'Operations', 'form_name': 'Shipment'},
     {'module_name': 'Operations', 'form_name': 'Shipment Documents'},
     {'module_name': 'Operations', 'form_name': 'Surcharge Sales Transaction'},
-    {'module_name': 'Operations', 'form_name': 'Shipment POD Analysis'},
+    {'module_name': 'Operations', 'form_name': 'Shipment PODs'},
     {'module_name': 'Operations', 'form_name': 'Document Handover'},
     {'module_name': 'Operations', 'form_name': 'Truck Movement Log'},
     {'module_name': 'Operations', 'form_name': 'Operation Actions'},

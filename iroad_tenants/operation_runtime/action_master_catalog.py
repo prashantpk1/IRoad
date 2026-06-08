@@ -123,6 +123,15 @@ PRODUCTION_ACTION_MASTER: tuple[ActionMasterSpec, ...] = (
         prerequisite_action_codes=('A6',),
     ),
     ActionMasterSpec(
+        action_code='A7H',
+        english_label='Hard POD Collection',
+        arabic_label='Hard POD Collection',
+        sequence_number=72,
+        hard_copy_collection=True,
+        mobile_visible=True,
+        prerequisite_action_codes=('A7',),
+    ),
+    ActionMasterSpec(
         action_code='A8',
         english_label='Unloading Completed',
         arabic_label='Unloading Completed',

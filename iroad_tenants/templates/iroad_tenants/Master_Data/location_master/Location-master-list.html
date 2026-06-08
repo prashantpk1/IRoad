@@ -142,21 +142,43 @@
                       <i class="bi bi-three-dots-vertical"></i>
                     </button>
               <ul class="dropdown-menu dropdown-menu-end shadow-sm" style="border-radius: 8px; border-color: #e2e8f0">
-                <li><a class="dropdown-item" href="{% url 'iroad_tenants:tenant_location_master_edit' loc.location_id %}"><i class="bi bi-pencil text-primary me-2"></i> Edit</a></li>
-                <li><a class="dropdown-item" href="{% url 'iroad_tenants:tenant_location_master_detail' loc.location_id %}"><i class="bi bi-eye text-info me-2"></i> View</a></li>
-                      <li><hr class="dropdown-divider" /></li>
-                      <li>
+                <li>
+                  <a class="dropdown-item" href="{% url 'iroad_tenants:tenant_location_master_edit' loc.location_id %}">
+                    <i class="bi bi-pencil text-primary me-2"></i>{% translate "Edit" %}
+                  </a>
+                </li>
+                <li>
+                  <a class="dropdown-item" href="{% url 'iroad_tenants:tenant_location_master_detail' loc.location_id %}">
+                    <i class="bi bi-eye text-info me-2"></i>{% translate "View" %}
+                  </a>
+                </li>
+                <li>
                   <form
                     method="post"
                     action="{% url 'iroad_tenants:tenant_location_master_delete' loc.location_id %}"
-                    onsubmit="return confirm('Delete {{ loc.location_code|escapejs }}? This cannot be undone.');"
+                    onsubmit="return confirm('{% blocktranslate with code=loc.location_code %}Delete {{ code }}? This cannot be undone.{% endblocktranslate %}');"
                   >
                     {% csrf_token %}
-                    
-                    <button type="submit" class="dropdown-item text-danger"><i class="bi bi-trash3 me-2"></i> Delete</button>
+                    <button type="submit" class="dropdown-item text-danger">
+                      <i class="bi bi-trash3 me-2"></i>{% translate "Delete" %}
+                    </button>
                   </form>
-                      </li>
-                    </ul>
+                </li>
+                <li>
+                  <form method="post" action="{% url 'iroad_tenants:tenant_location_master_toggle_status' loc.location_id %}">
+                    {% csrf_token %}
+                    {% if loc.status == 'Active' %}
+                    <button type="submit" class="dropdown-item">
+                      <i class="bi bi-person-slash text-secondary me-2"></i>{% translate "Deactivated" %}
+                    </button>
+                    {% else %}
+                    <button type="submit" class="dropdown-item text-success">
+                      <i class="bi bi-arrow-counterclockwise me-2"></i>{% translate "Active" %}
+                    </button>
+                    {% endif %}
+                  </form>
+                </li>
+              </ul>
                   </div>
                 </td>
               </tr>

@@ -290,7 +290,10 @@ class EvidenceValidationService:
                 error_code='photo_limit_exceeded',
                 message=str(_('mobile.jobs.execute.photo_limit_exceeded')),
             )
-        if video_count > EXECUTION_MEDIA_MAX_VIDEOS:
+        video_max = int(requirements.get('video_max_count') or 0)
+        if video_max <= 0:
+            video_max = EXECUTION_MEDIA_MAX_VIDEOS
+        if video_count > video_max:
             raise self._evidence_error(
                 error_code='video_limit_exceeded',
                 message=str(_('mobile.jobs.execute.video_limit_exceeded')),

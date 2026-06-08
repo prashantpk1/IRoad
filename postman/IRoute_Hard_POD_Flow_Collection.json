@@ -1,0 +1,2031 @@
+{
+  "info": {
+    "_postman_id": "f1e2d3c4-b5a6-7890-abcd-hardpodflow01",
+    "name": "IRoute — Hard POD Flow (A7 → A7H)",
+    "description": "Complete driver mobile job flow from login to job closed.\nFollows A1 through A10 as defined in IRoute document.\nUse {{base_url}} variable = http://127.0.0.1:8000/api/v1/mobile\nUse {{access_token}} variable = filled automatically after login.\nUse {{job_id}} variable = filled after dashboard call.\nUse {{shipment_id}} variable = filled after A4 executes.\nUse {{capture_bundle_id}} variable = filled after POD capture.\n\nFLOW ORDER:\n01 Login\n02 Dashboard\n03 Job Detail\n04 Execute A1\n05 Execute A2\n06 Execute A3\n07 Execute A4\n08 Execute A5\n09 Execute A6\n10a POD Capture Sync (GET hash)\n10 POD Capture (POST with photo)\n11 Execute A7\n12 Execute A8\n13 Payment Collection (COD only)\n14 Execute A10\n15 Report Issue\n\nHOW TO READ next_action_hint IN EVERY RESPONSE:\n\nnext_action_hint.action values:\n  execute_action         = fire the action_code shown\n  execute_action_with_media = fire action, use camera\n  go_to_pod_capture      = open POD capture screen first\n  go_to_payment_collection = open payment screen (COD)\n  go_to_hard_pod         = open hard POD submit screen\n  go_to_dashboard        = job done, go home\n  wait_for_ops           = ops must verify, wait\n  refresh_job_detail     = pull to refresh, try again\n\nnext_action_hint.job_closed values:\n  true  = call Dashboard API, job done\n  false = stay on job flow\n\nCREDIT ORDER FLOW:\n  A1 → A2 → A3 → A4 → A5 → A6\n  → POD Capture Screen → A7\n  → A8 → refresh → A10 → Dashboard\n\nCOD ORDER FLOW:\n  A1 → A2 → A3 → A4 → A5 → A6\n  → POD Capture Screen → A7\n  → A8 → Payment Screen → A9\n  → A10 → Dashboard\n\nVIDEO + HARD POD (updated Jun 2026):\n  10 POD Capture — photo + signature + optional video (max 15s, duration_seconds)\n  11 Execute A7\n  11b GET .../pod/capture/?step=hard_copy_confirmation — DN checklist\n  11b-alt GET .../hard-pod/documents/ — dedicated Shipment Documents API\n  11c POST .../hard-pod/submit/ — confirmed_pages[] required (all DN pages)\n  11d POST .../actions/A7H/execute/ — custody_submission_id from 11c\n  12 Execute A8 → ...\nSkip 11b–11d for digital/soft POD shipments.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8000/api/v1/mobile"
+    },
+    {
+      "key": "driver_email",
+      "value": ""
+    },
+    {
+      "key": "driver_password",
+      "value": ""
+    },
+    {
+      "key": "driver_extension",
+      "value": ""
+    },
+    {
+      "key": "driver_phone",
+      "value": ""
+    },
+    {
+      "key": "tenant_id",
+      "value": ""
+    },
+    {
+      "key": "access_token",
+      "value": ""
+    },
+    {
+      "key": "refresh_token",
+      "value": ""
+    },
+    {
+      "key": "job_id",
+      "value": "79da24b3-b15d-42f1-a87e-11c0143a2ff4"
+    },
+    {
+      "key": "job_type",
+      "value": "shipment"
+    },
+    {
+      "key": "shipment_id",
+      "value": ""
+    },
+    {
+      "key": "capture_bundle_id",
+      "value": ""
+    },
+    {
+      "key": "content_hash",
+      "value": ""
+    },
+    {
+      "key": "workflow_version",
+      "value": ""
+    },
+    {
+      "key": "pod_content_hash",
+      "value": ""
+    },
+    {
+      "key": "pod_workflow_version",
+      "value": ""
+    },
+    {
+      "key": "shipment_no",
+      "value": "SH-COD-29789621"
+    },
+    {
+      "key": "a10_action_id",
+      "value": "5fe74069-ba05-411d-af68-37e239cc38c6"
+    },
+    {
+      "key": "hard_pod_custody_submission_id",
+      "value": ""
+    },
+    {
+      "key": "hard_pod_client_submission_id",
+      "value": ""
+    },
+    {
+      "key": "hard_pod_receiver_name",
+      "value": "Receiver Name"
+    },
+    {
+      "key": "hard_pod_receiver_contact",
+      "value": "0500000000"
+    },
+    {
+      "key": "hard_pod_handoff_notes",
+      "value": "Hard copy DN collected from receiver"
+    },
+    {
+      "key": "hard_pod_page_count",
+      "value": ""
+    },
+    {
+      "key": "hard_pod_confirmed_pages_json",
+      "value": "[]"
+    },
+    {
+      "key": "hard_pod_document_id",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "01 — Login (Get Access Token)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{driver_email}}\",\n  \"password\": \"{{driver_password}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": "{{base_url}}/driver/auth/login/",
+        "description": "EMAIL LOGIN — tenant_id optional.\nSend email + password only; tenant resolves from driver record.\nAdd tenant_id only if the same email exists on multiple subscribers."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var resp = pm.response.json();",
+              "if (resp.status === 1 && resp.data && resp.data.access_token) {",
+              "    pm.collectionVariables.set(\"access_token\", resp.data.access_token);",
+              "    pm.collectionVariables.set(\"refresh_token\", resp.data.refresh_token);",
+              "    pm.environment.set(\"access_token\", resp.data.access_token);",
+              "    pm.environment.set(\"refresh_token\", resp.data.refresh_token);",
+              "    console.log(\"access_token saved (length=\" + resp.data.access_token.length + \")\");",
+              "    pm.test(\"Login successful, token saved\", function() { pm.expect(resp.status).to.eql(1); });",
+              "} else {",
+              "    pm.test(\"Login failed — check email and password\", function() { pm.expect(resp.status).to.eql(1); });",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "01b — Login via Phone Number (Alternative)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"extension\": \"{{driver_extension}}\",\n  \"phone\": \"{{driver_phone}}\",\n  \"password\": \"{{driver_password}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": "{{base_url}}/driver/auth/login/",
+        "description": "ALTERNATIVE LOGIN — USE PHONE NUMBER INSTEAD OF EMAIL.\n\nUse this request if the driver does not have an email\nor prefers to login with phone number.\n\nRequired fields:\n  extension = country code e.g. +966 or +91\n  phone = phone number without extension e.g. 987456321\n  password = driver password\n\ntenant_id is OPTIONAL (multi-subscriber disambiguation only).\n\nSet driver_extension and driver_phone in\ncollection variables before running.\n\nSame response as email login.\naccess_token is auto-saved after success.\n\nOnly run ONE login request (01 or 01b).\nBoth save the same access_token variable."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var resp = pm.response.json();",
+              "if (resp.status === 1 && resp.data &&",
+              "    resp.data.access_token) {",
+              "    pm.collectionVariables.set(",
+              "        \"access_token\", resp.data.access_token",
+              "    );",
+              "    pm.collectionVariables.set(",
+              "        \"refresh_token\", resp.data.refresh_token",
+              "    );",
+              "    pm.environment.set(\"access_token\", resp.data.access_token);",
+              "    pm.environment.set(\"refresh_token\", resp.data.refresh_token);",
+              "    console.log(\"access_token saved (length=\" + resp.data.access_token.length + \")\");",
+              "    pm.test(\"Login successful, token saved\",",
+              "        function() {",
+              "            pm.expect(resp.status).to.eql(1);",
+              "        }",
+              "    );",
+              "} else {",
+              "    pm.test(\"Login FAILED — check credentials\",",
+              "        function() {",
+              "            pm.expect(resp.status).to.eql(1);",
+              "        }",
+              "    );",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 — Dashboard (Get Active Job)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/driver/dashboard/",
+        "description": "STEP 2 — CALL AFTER LOGIN.\nReturns active job assigned to driver.\njob_id and job_type are auto-saved from response.\njob_type will be 'shipment' for normal delivery jobs.\nIf no active_job in response then no job is assigned yet.\nCheck data.active_job.job_id and data.active_job.job_type.\nThese variables are used in all job detail and action calls."
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var token = pm.variables.get('access_token');",
+              "if (!token || String(token).trim() === '' || String(token).indexOf('{{') >= 0) {",
+              "    throw new Error('access_token is missing. Run 01 \\u2014 Login first. Set driver_email and driver_password in the active environment.');",
+              "}"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var resp = pm.response.json();",
+              "if (resp.data && resp.data.active_job) {",
+              "    pm.collectionVariables.set(\"job_id\", resp.data.active_job.job_id);",
+              "    pm.collectionVariables.set(\"job_type\", resp.data.active_job.job_type || \"shipment\");",
+              "    pm.test(\"Active job found, job_id saved\", function() { pm.expect(resp.data.active_job.job_id).to.exist; });",
+              "} else {",
+              "    pm.test(\"No active job assigned to driver\", function() { pm.expect(resp.data.active_job).to.exist; });",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 — Job Detail (See Current State)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
+        ],
+        "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/",
+        "description": "STEP 3 — CALL TO SEE FULL JOB STATE BEFORE ANY ACTION.\nURL uses job_type and job_id from dashboard response.\njob_type is usually 'shipment'.\nResponse shows current state, next allowed action, cargo, addresses.\nCheck data.next_action to know which action to fire next.\nCheck data.shipment_id — will be null until A4 fires.\nThis API can be called anytime to refresh job state.\n\nIMPORTANT: Call Job Detail before the FIRST execute only.\nAfter each execute fires, sync_metadata is automatically\nupdated from the execute response.\nYou do NOT need to re-call Job Detail between actions\nas long as you run them in order.\nOnly call Job Detail again if you skip a step or\nif you get a 409 stale_content_hash error."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var resp = pm.response.json();",
+              "if (resp.data && resp.data.sync_metadata) {",
+              "    pm.collectionVariables.set(",
+              "        \"content_hash\",",
+              "        resp.data.sync_metadata.content_hash",
+              "    );",
+              "    pm.collectionVariables.set(",
+              "        \"workflow_version\",",
+              "        resp.data.sync_metadata.workflow_version",
+              "    );",
+              "    pm.environment.set(\"content_hash\", resp.data.sync_metadata.content_hash);",
+              "    pm.environment.set(\"workflow_version\", resp.data.sync_metadata.workflow_version);",
+              "    console.log(\"sync saved — hash: \" + String(resp.data.sync_metadata.content_hash).substring(0, 16) + \"...\");",
+              "    pm.test(",
+              "        \"Sync metadata saved for execute\",",
+              "        function() {",
+              "            pm.expect(resp.data.sync_metadata.content_hash).to.exist;",
+              "        }",
+              "    );",
+              "}",
+              "var hint = resp.data && resp.data.next_action_hint;",
+              "if (hint) {",
+              "    pm.test(",
+              "        \"Next hint: \" + hint.action + \" — \" + hint.reason,",
+              "        function() {",
+              "            pm.expect(hint.action).to.exist;",
+              "        }",
+              "    );",
+              "    console.log(\"=== NEXT ACTION HINT ===\");",
+              "    console.log(\"Action: \" + hint.action);",
+              "    console.log(\"Screen: \" + hint.screen);",
+              "    console.log(\"Reason: \" + hint.reason);",
+              "    if (hint.job_closed) {",
+              "        console.log(\"*** JOB CLOSED — GO TO DASHBOARD ***\");",
+              "    }",
+              "    if (hint.action_code) {",
+              "        console.log(\"Next action code: \" + hint.action_code);",
+              "    }",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 — Execute A1 — Start Job",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"client_action_id\": \"a1-{{$guid}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": 24.7136,\n  \"longitude\": 46.6753,\n  \"notes\": \"Starting job\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A1/execute/",
+        "description": "PREREQUISITE: Run requests in order 04 → 05 → 06 etc.\ncontent_hash and workflow_version auto-update after\neach successful execute.\nIf you get 409 stale_content_hash:\n  1. Re-run Request 03 Job Detail to refresh hash\n  2. Then retry this request\nDo NOT skip any action in the sequence."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var resp = pm.response.json();",
+              "if (resp.status === 1 && resp.data && resp.data.sync_metadata) {",
+              "    pm.collectionVariables.set(",
+              "        \"content_hash\",",
+              "        resp.data.sync_metadata.content_hash",
+              "    );",
+              "    pm.collectionVariables.set(",
+              "        \"workflow_version\",",
+              "        resp.data.sync_metadata.workflow_version",
+              "    );",
+              "    pm.environment.set(\"content_hash\", resp.data.sync_metadata.content_hash);",
+              "    pm.environment.set(\"workflow_version\", resp.data.sync_metadata.workflow_version);",
+              "    console.log(\"sync saved — hash: \" + String(resp.data.sync_metadata.content_hash).substring(0, 16) + \"...\");",
+              "    pm.test(",
+              "        \"Sync hash updated from execute response\",",
+              "        function() {",
+              "            pm.expect(",
+              "                resp.data.sync_metadata.content_hash",
+              "            ).to.exist;",
+              "        }",
+              "    );",
+              "}",
+              "var hint = resp.data && resp.data.next_action_hint;",
+              "if (hint) {",
+              "    pm.test(",
+              "        \"Next hint: \" + hint.action + \" — \" + hint.reason,",
+              "        function() {",
+              "            pm.expect(hint.action).to.exist;",
+              "        }",
+              "    );",
+              "    console.log(\"=== NEXT ACTION HINT ===\");",
+              "    console.log(\"Action: \" + hint.action);",
+              "    console.log(\"Screen: \" + hint.screen);",
+              "    console.log(\"Reason: \" + hint.reason);",
+              "    if (hint.job_closed) {",
+              "        console.log(\"*** JOB CLOSED — GO TO DASHBOARD ***\");",
+              "    }",
+              "    if (hint.action_code) {",
+              "        console.log(\"Next action code: \" + hint.action_code);",
+              "    }",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 — Execute A2 — Pickup Arrival",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"client_action_id\": \"a2-{{$guid}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": 24.7136,\n  \"longitude\": 46.6753,\n  \"notes\": \"Arrived at pickup site\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A2/execute/",
+        "description": "PREREQUISITE: Run requests in order 04 → 05 → 06 etc.\ncontent_hash and workflow_version auto-update after\neach successful execute.\nIf you get 409 stale_content_hash:\n  1. Re-run Request 03 Job Detail to refresh hash\n  2. Then retry this request\nDo NOT skip any action in the sequence."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var resp = pm.response.json();",
+              "if (resp.status === 1 && resp.data && resp.data.sync_metadata) {",
+              "    pm.collectionVariables.set(",
+              "        \"content_hash\",",
+              "        resp.data.sync_metadata.content_hash",
+              "    );",
+              "    pm.collectionVariables.set(",
+              "        \"workflow_version\",",
+              "        resp.data.sync_metadata.workflow_version",
+              "    );",
+              "    pm.environment.set(\"content_hash\", resp.data.sync_metadata.content_hash);",
+              "    pm.environment.set(\"workflow_version\", resp.data.sync_metadata.workflow_version);",
+              "    console.log(\"sync saved — hash: \" + String(resp.data.sync_metadata.content_hash).substring(0, 16) + \"...\");",
+              "    pm.test(",
+              "        \"Sync hash updated from execute response\",",
+              "        function() {",
+              "            pm.expect(",
+              "                resp.data.sync_metadata.content_hash",
+              "            ).to.exist;",
+              "        }",
+              "    );",
+              "}",
+              "var hint = resp.data && resp.data.next_action_hint;",
+              "if (hint) {",
+              "    pm.test(",
+              "        \"Next hint: \" + hint.action + \" — \" + hint.reason,",
+              "        function() {",
+              "            pm.expect(hint.action).to.exist;",
+              "        }",
+              "    );",
+              "    console.log(\"=== NEXT ACTION HINT ===\");",
+              "    console.log(\"Action: \" + hint.action);",
+              "    console.log(\"Screen: \" + hint.screen);",
+              "    console.log(\"Reason: \" + hint.reason);",
+              "    if (hint.job_closed) {",
+              "        console.log(\"*** JOB CLOSED — GO TO DASHBOARD ***\");",
+              "    }",
+              "    if (hint.action_code) {",
+              "        console.log(\"Next action code: \" + hint.action_code);",
+              "    }",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 — Execute A3 — Start Loading",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"client_action_id\": \"a3-{{$guid}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": 24.7136,\n  \"longitude\": 46.6753,\n  \"notes\": \"Loading started\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A3/execute/",
+        "description": "PREREQUISITE: Run requests in order 04 → 05 → 06 etc.\ncontent_hash and workflow_version auto-update after\neach successful execute.\nIf you get 409 stale_content_hash:\n  1. Re-run Request 03 Job Detail to refresh hash\n  2. Then retry this request\nDo NOT skip any action in the sequence."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var resp = pm.response.json();",
+              "if (resp.status === 1 && resp.data && resp.data.sync_metadata) {",
+              "    pm.collectionVariables.set(",
+              "        \"content_hash\",",
+              "        resp.data.sync_metadata.content_hash",
+              "    );",
+              "    pm.collectionVariables.set(",
+              "        \"workflow_version\",",
+              "        resp.data.sync_metadata.workflow_version",
+              "    );",
+              "    pm.environment.set(\"content_hash\", resp.data.sync_metadata.content_hash);",
+              "    pm.environment.set(\"workflow_version\", resp.data.sync_metadata.workflow_version);",
+              "    console.log(\"sync saved — hash: \" + String(resp.data.sync_metadata.content_hash).substring(0, 16) + \"...\");",
+              "    pm.test(",
+              "        \"Sync hash updated from execute response\",",
+              "        function() {",
+              "            pm.expect(",
+              "                resp.data.sync_metadata.content_hash",
+              "            ).to.exist;",
+              "        }",
+              "    );",
+              "}",
+              "var hint = resp.data && resp.data.next_action_hint;",
+              "if (hint) {",
+              "    pm.test(",
+              "        \"Next hint: \" + hint.action + \" — \" + hint.reason,",
+              "        function() {",
+              "            pm.expect(hint.action).to.exist;",
+              "        }",
+              "    );",
+              "    console.log(\"=== NEXT ACTION HINT ===\");",
+              "    console.log(\"Action: \" + hint.action);",
+              "    console.log(\"Screen: \" + hint.screen);",
+              "    console.log(\"Reason: \" + hint.reason);",
+              "    if (hint.job_closed) {",
+              "        console.log(\"*** JOB CLOSED — GO TO DASHBOARD ***\");",
+              "    }",
+              "    if (hint.action_code) {",
+              "        console.log(\"Next action code: \" + hint.action_code);",
+              "    }",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "07 — Execute A4 — Confirm Loaded (POINT OF NO RETURN)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "client_action_id",
+              "value": "a4-{{$guid}}",
+              "type": "text"
+            },
+            {
+              "key": "workflow_version",
+              "value": "{{workflow_version}}",
+              "type": "text"
+            },
+            {
+              "key": "content_hash",
+              "value": "{{content_hash}}",
+              "type": "text"
+            },
+            {
+              "key": "latitude",
+              "value": "24.7136",
+              "type": "text"
+            },
+            {
+              "key": "longitude",
+              "value": "46.6753",
+              "type": "text"
+            },
+            {
+              "key": "notes",
+              "value": "Cargo loaded and confirmed",
+              "type": "text"
+            },
+            {
+              "key": "media[0][media_type]",
+              "value": "photo",
+              "type": "text"
+            },
+            {
+              "key": "media[0][file_name]",
+              "value": "loaded_truck_1.jpg",
+              "type": "text"
+            },
+            {
+              "key": "media[0][description]",
+              "value": "Front view of loaded truck",
+              "type": "text"
+            },
+            {
+              "key": "media[0][sort_order]",
+              "value": "1",
+              "type": "text"
+            },
+            {
+              "key": "media[0][file_ref]",
+              "value": "",
+              "type": "file"
+            },
+            {
+              "key": "media[1][media_type]",
+              "value": "photo",
+              "type": "text"
+            },
+            {
+              "key": "media[1][file_name]",
+              "value": "loaded_truck_2.jpg",
+              "type": "text"
+            },
+            {
+              "key": "media[1][description]",
+              "value": "Side view of loaded truck",
+              "type": "text"
+            },
+            {
+              "key": "media[1][sort_order]",
+              "value": "2",
+              "type": "text"
+            },
+            {
+              "key": "media[1][file_ref]",
+              "value": "",
+              "type": "file"
+            }
+          ]
+        },
+        "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A4/execute/",
+        "description": "PREREQUISITE: Run requests in order 04 → 05 → 06 etc.\ncontent_hash and workflow_version auto-update after\neach successful execute.\nIf you get 409 stale_content_hash:\n  1. Re-run Request 03 Job Detail to refresh hash\n  2. Then retry this request\nDo NOT skip any action in the sequence.\n\nFILE UPLOAD INSTRUCTIONS:\nFor any field with type FILE:\n  Click the file icon in Postman next to that field.\n  Select any JPG, PNG, or MP4 file from your device.\nAllowed file types: image/jpeg, image/png,\n  image/webp, video/mp4\nMax file size: 50MB per file\nContent-Type is set automatically by Postman.\nDo NOT set Content-Type header manually."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var resp = pm.response.json();",
+              "if (resp.data && resp.data.shipment_id) {",
+              "    pm.collectionVariables.set(\"shipment_id\", resp.data.shipment_id);",
+              "    pm.test(\"Shipment created, shipment_id saved\", function() { pm.expect(resp.data.shipment_id).to.exist; });",
+              "}",
+              "var hint = resp.data && resp.data.next_action_hint;",
+              "if (hint) {",
+              "    pm.test(",
+              "        \"Next hint: \" + hint.action + \" — \" + hint.reason,",
+              "        function() {",
+              "            pm.expect(hint.action).to.exist;",
+              "        }",
+              "    );",
+              "    console.log(\"=== NEXT ACTION HINT ===\");",
+              "    console.log(\"Action: \" + hint.action);",
+              "    console.log(\"Screen: \" + hint.screen);",
+              "    console.log(\"Reason: \" + hint.reason);",
+              "    if (hint.job_closed) {",
+              "        console.log(\"*** JOB CLOSED — GO TO DASHBOARD ***\");",
+              "    }",
+              "    if (hint.action_code) {",
+              "        console.log(\"Next action code: \" + hint.action_code);",
+              "    }",
+              "}"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var resp = pm.response.json();",
+              "if (resp.status === 1 && resp.data && resp.data.sync_metadata) {",
+              "    pm.collectionVariables.set(",
+              "        \"content_hash\",",
+              "        resp.data.sync_metadata.content_hash",
+              "    );",
+              "    pm.collectionVariables.set(",
+              "        \"workflow_version\",",
+              "        resp.data.sync_metadata.workflow_version",
+              "    );",
+              "    pm.environment.set(\"content_hash\", resp.data.sync_metadata.content_hash);",
+              "    pm.environment.set(\"workflow_version\", resp.data.sync_metadata.workflow_version);",
+              "    console.log(\"sync saved — hash: \" + String(resp.data.sync_metadata.content_hash).substring(0, 16) + \"...\");",
+              "    pm.test(",
+              "        \"Sync hash updated from execute response\",",
+              "        function() {",
+              "            pm.expect(",
+              "                resp.data.sync_metadata.content_hash",
+              "            ).to.exist;",
+              "        }",
+              "    );",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "08 — Execute A5 — Depart In Transit",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"client_action_id\": \"a5-{{$guid}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": 24.7136,\n  \"longitude\": 46.6753,\n  \"notes\": \"Departed from pickup location\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A5/execute/",
+        "description": "PREREQUISITE: Run requests in order 04 → 05 → 06 etc.\ncontent_hash and workflow_version auto-update after\neach successful execute.\nIf you get 409 stale_content_hash:\n  1. Re-run Request 03 Job Detail to refresh hash\n  2. Then retry this request\nDo NOT skip any action in the sequence."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var resp = pm.response.json();",
+              "if (resp.status === 1 && resp.data && resp.data.sync_metadata) {",
+              "    pm.collectionVariables.set(",
+              "        \"content_hash\",",
+              "        resp.data.sync_metadata.content_hash",
+              "    );",
+              "    pm.collectionVariables.set(",
+              "        \"workflow_version\",",
+              "        resp.data.sync_metadata.workflow_version",
+              "    );",
+              "    pm.environment.set(\"content_hash\", resp.data.sync_metadata.content_hash);",
+              "    pm.environment.set(\"workflow_version\", resp.data.sync_metadata.workflow_version);",
+              "    console.log(\"sync saved — hash: \" + String(resp.data.sync_metadata.content_hash).substring(0, 16) + \"...\");",
+              "    pm.test(",
+              "        \"Sync hash updated from execute response\",",
+              "        function() {",
+              "            pm.expect(",
+              "                resp.data.sync_metadata.content_hash",
+              "            ).to.exist;",
+              "        }",
+              "    );",
+              "}",
+              "var hint = resp.data && resp.data.next_action_hint;",
+              "if (hint) {",
+              "    pm.test(",
+              "        \"Next hint: \" + hint.action + \" — \" + hint.reason,",
+              "        function() {",
+              "            pm.expect(hint.action).to.exist;",
+              "        }",
+              "    );",
+              "    console.log(\"=== NEXT ACTION HINT ===\");",
+              "    console.log(\"Action: \" + hint.action);",
+              "    console.log(\"Screen: \" + hint.screen);",
+              "    console.log(\"Reason: \" + hint.reason);",
+              "    if (hint.job_closed) {",
+              "        console.log(\"*** JOB CLOSED — GO TO DASHBOARD ***\");",
+              "    }",
+              "    if (hint.action_code) {",
+              "        console.log(\"Next action code: \" + hint.action_code);",
+              "    }",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "09 — Execute A6 — Delivery Arrival",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"client_action_id\": \"a6-{{$guid}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": 21.3891,\n  \"longitude\": 39.8579,\n  \"notes\": \"Arrived at delivery location\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A6/execute/",
+        "description": "PREREQUISITE: Run requests in order 04 → 05 → 06 etc.\ncontent_hash and workflow_version auto-update after\neach successful execute.\nIf you get 409 stale_content_hash:\n  1. Re-run Request 03 Job Detail to refresh hash\n  2. Then retry this request\nDo NOT skip any action in the sequence."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var resp = pm.response.json();",
+              "if (resp.status === 1 && resp.data && resp.data.sync_metadata) {",
+              "    pm.collectionVariables.set(",
+              "        \"content_hash\",",
+              "        resp.data.sync_metadata.content_hash",
+              "    );",
+              "    pm.collectionVariables.set(",
+              "        \"workflow_version\",",
+              "        resp.data.sync_metadata.workflow_version",
+              "    );",
+              "    pm.environment.set(\"content_hash\", resp.data.sync_metadata.content_hash);",
+              "    pm.environment.set(\"workflow_version\", resp.data.sync_metadata.workflow_version);",
+              "    console.log(\"sync saved — hash: \" + String(resp.data.sync_metadata.content_hash).substring(0, 16) + \"...\");",
+              "    pm.test(",
+              "        \"Sync hash updated from execute response\",",
+              "        function() {",
+              "            pm.expect(",
+              "                resp.data.sync_metadata.content_hash",
+              "            ).to.exist;",
+              "        }",
+              "    );",
+              "}",
+              "var hint = resp.data && resp.data.next_action_hint;",
+              "if (hint) {",
+              "    pm.test(",
+              "        \"Next hint: \" + hint.action + \" — \" + hint.reason,",
+              "        function() {",
+              "            pm.expect(hint.action).to.exist;",
+              "        }",
+              "    );",
+              "    console.log(\"=== NEXT ACTION HINT ===\");",
+              "    console.log(\"Action: \" + hint.action);",
+              "    console.log(\"Screen: \" + hint.screen);",
+              "    console.log(\"Reason: \" + hint.reason);",
+              "    if (hint.job_closed) {",
+              "        console.log(\"*** JOB CLOSED — GO TO DASHBOARD ***\");",
+              "    }",
+              "    if (hint.action_code) {",
+              "        console.log(\"Next action code: \" + hint.action_code);",
+              "    }",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "10a — POD Capture Sync (Get Hash Before Upload)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
+        ],
+        "url": "{{base_url}}/driver/jobs/shipments/{{shipment_id}}/pod/capture/",
+        "description": "STEP 10a — MUST CALL THIS BEFORE REQUEST 10.\nReturns content_hash and workflow_version\nspecifically for POD Capture API.\nThese are DIFFERENT from Job Detail hash.\nPOD Capture hash = shipment.updated_at ISO string.\nJob Detail hash = full fingerprint digest.\nDo NOT mix them up.\npod_content_hash and pod_workflow_version are\nsaved automatically for use in Request 10."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var resp = pm.response.json();",
+              "if (resp.status === 1 && resp.data) {",
+              "    pm.collectionVariables.set(",
+              "        \"pod_content_hash\",",
+              "        resp.data.content_hash",
+              "    );",
+              "    pm.collectionVariables.set(",
+              "        \"pod_workflow_version\",",
+              "        resp.data.workflow_version",
+              "    );",
+              "    pm.test(",
+              "        \"POD sync hash saved\",",
+              "        function() {",
+              "            pm.expect(resp.data.content_hash).to.exist;",
+              "        }",
+              "    );",
+              "}",
+              "var hint = resp.data && resp.data.next_action_hint;",
+              "if (hint) {",
+              "    pm.test(",
+              "        \"Next hint: \" + hint.action + \" — \" + hint.reason,",
+              "        function() {",
+              "            pm.expect(hint.action).to.exist;",
+              "        }",
+              "    );",
+              "    console.log(\"=== NEXT ACTION HINT ===\");",
+              "    console.log(\"Action: \" + hint.action);",
+              "    console.log(\"Screen: \" + hint.screen);",
+              "    console.log(\"Reason: \" + hint.reason);",
+              "    if (hint.job_closed) {",
+              "        console.log(\"*** JOB CLOSED — GO TO DASHBOARD ***\");",
+              "    }",
+              "    if (hint.action_code) {",
+              "        console.log(\"Next action code: \" + hint.action_code);",
+              "    }",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "10 — POD Capture (Upload Evidence Before A7)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "client_capture_id",
+              "value": "pod-cap-{{$guid}}",
+              "type": "text"
+            },
+            {
+              "key": "content_hash",
+              "value": "{{pod_content_hash}}",
+              "type": "text"
+            },
+            {
+              "key": "workflow_version",
+              "value": "{{pod_workflow_version}}",
+              "type": "text"
+            },
+            {
+              "key": "pod_type",
+              "value": "soft",
+              "type": "text"
+            },
+            {
+              "key": "target_action_code",
+              "value": "A7",
+              "type": "text"
+            },
+            {
+              "key": "latitude",
+              "value": "21.3891",
+              "type": "text"
+            },
+            {
+              "key": "longitude",
+              "value": "39.8579",
+              "type": "text"
+            },
+            {
+              "key": "notes",
+              "value": "Delivery note signed by receiver",
+              "type": "text"
+            },
+            {
+              "key": "media[0][media_type]",
+              "value": "photo",
+              "type": "text"
+            },
+            {
+              "key": "media[0][file_name]",
+              "value": "delivery_note_p1.jpg",
+              "type": "text"
+            },
+            {
+              "key": "media[0][description]",
+              "value": "Page 1 of signed delivery note",
+              "type": "text"
+            },
+            {
+              "key": "media[0][sort_order]",
+              "value": "1",
+              "type": "text"
+            },
+            {
+              "key": "media[0][file_ref]",
+              "value": "",
+              "type": "file"
+            },
+            {
+              "key": "media[1][media_type]",
+              "value": "signature",
+              "type": "text"
+            },
+            {
+              "key": "media[1][file_name]",
+              "value": "signature.jpg",
+              "type": "text"
+            },
+            {
+              "key": "media[1][description]",
+              "value": "Customer signature",
+              "type": "text"
+            },
+            {
+              "key": "media[1][sort_order]",
+              "value": "2",
+              "type": "text"
+            },
+            {
+              "key": "media[1][file_ref]",
+              "value": "",
+              "type": "file"
+            },
+            {
+              "key": "pod_type",
+              "value": "digital",
+              "type": "text"
+            },
+            {
+              "key": "media[2][media_type]",
+              "value": "video",
+              "type": "text"
+            },
+            {
+              "key": "media[2][file_name]",
+              "value": "signed_paper.mp4",
+              "type": "text"
+            },
+            {
+              "key": "media[2][description]",
+              "value": "Optional delivery video evidence (max 15s)",
+              "type": "text"
+            },
+            {
+              "key": "media[2][duration_seconds]",
+              "value": "8",
+              "type": "text"
+            },
+            {
+              "key": "media[2][sort_order]",
+              "value": "3",
+              "type": "text"
+            },
+            {
+              "key": "media[2][file_ref]",
+              "value": "",
+              "type": "file"
+            }
+          ]
+        },
+        "url": "{{base_url}}/driver/jobs/shipments/{{shipment_id}}/pod/capture/",
+        "description": "STEP 10 — STAGE POD EVIDENCE (digital + optional video).\nPREREQUISITE: Run 10a first.\n\nFILES:\n  media[0] photo — delivery note scan (required)\n  media[1] signature — customer signature (required)\n  media[2] video — optional, max 15s (set duration_seconds)\n\npod_type=digital. Saves capture_bundle_id for A7."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var resp = pm.response.json();",
+              "if (resp.data && resp.data.capture_bundle_id) {",
+              "    pm.collectionVariables.set(\"capture_bundle_id\", resp.data.capture_bundle_id);",
+              "    pm.test(\"POD bundle staged, capture_bundle_id saved\", function() { pm.expect(resp.data.capture_bundle_id).to.exist; });",
+              "}",
+              "var hint = resp.data && resp.data.next_action_hint;",
+              "if (hint) {",
+              "    pm.test(",
+              "        \"Next hint: \" + hint.action + \" — \" + hint.reason,",
+              "        function() {",
+              "            pm.expect(hint.action).to.exist;",
+              "        }",
+              "    );",
+              "    console.log(\"=== NEXT ACTION HINT ===\");",
+              "    console.log(\"Action: \" + hint.action);",
+              "    console.log(\"Screen: \" + hint.screen);",
+              "    console.log(\"Reason: \" + hint.reason);",
+              "    if (hint.job_closed) {",
+              "        console.log(\"*** JOB CLOSED — GO TO DASHBOARD ***\");",
+              "    }",
+              "    if (hint.action_code) {",
+              "        console.log(\"Next action code: \" + hint.action_code);",
+              "    }",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "11 — Execute A7 — Upload POD (Creates POD Record)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"client_action_id\": \"a7-{{$guid}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": 21.3891,\n  \"longitude\": 39.8579,\n  \"capture_bundle_id\": \"{{capture_bundle_id}}\",\n  \"notes\": \"POD submitted with signed delivery note\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A7/execute/",
+        "description": "PREREQUISITE: Run requests in order 04 → 05 → 06 etc.\ncontent_hash and workflow_version auto-update after\neach successful execute.\nIf you get 409 stale_content_hash:\n  1. Re-run Request 03 Job Detail to refresh hash\n  2. Then retry this request\nDo NOT skip any action in the sequence."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var resp = pm.response.json();",
+              "if (resp.status === 1 && resp.data && resp.data.sync_metadata) {",
+              "    pm.collectionVariables.set(",
+              "        \"content_hash\",",
+              "        resp.data.sync_metadata.content_hash",
+              "    );",
+              "    pm.collectionVariables.set(",
+              "        \"workflow_version\",",
+              "        resp.data.sync_metadata.workflow_version",
+              "    );",
+              "    pm.environment.set(\"content_hash\", resp.data.sync_metadata.content_hash);",
+              "    pm.environment.set(\"workflow_version\", resp.data.sync_metadata.workflow_version);",
+              "    console.log(\"sync saved — hash: \" + String(resp.data.sync_metadata.content_hash).substring(0, 16) + \"...\");",
+              "    pm.test(",
+              "        \"Sync hash updated from execute response\",",
+              "        function() {",
+              "            pm.expect(",
+              "                resp.data.sync_metadata.content_hash",
+              "            ).to.exist;",
+              "        }",
+              "    );",
+              "}",
+              "var hint = resp.data && resp.data.next_action_hint;",
+              "if (hint) {",
+              "    pm.test(",
+              "        \"Next hint: \" + hint.action + \" — \" + hint.reason,",
+              "        function() {",
+              "            pm.expect(hint.action).to.exist;",
+              "        }",
+              "    );",
+              "    console.log(\"=== NEXT ACTION HINT ===\");",
+              "    console.log(\"Action: \" + hint.action);",
+              "    console.log(\"Screen: \" + hint.screen);",
+              "    console.log(\"Reason: \" + hint.reason);",
+              "    if (hint.job_closed) {",
+              "        console.log(\"*** JOB CLOSED — GO TO DASHBOARD ***\");",
+              "    }",
+              "    if (hint.action_code) {",
+              "        console.log(\"Next action code: \" + hint.action_code);",
+              "    }",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "11b — Fetch DN Checklist (pod/capture GET)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
+        ],
+        "url": "{{base_url}}/driver/jobs/shipments/{{shipment_id}}/pod/capture/?step=hard_copy_confirmation",
+        "description": "Hard POD checklist via POD capture GET.\nReads pod_section.hard_copy_confirmation.documents[] + pages[].\nAuto-builds hard_pod_confirmed_pages_json for 11c."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "function buildConfirmedPages(pages) {",
+              "    return (pages || []).map(function (p) {",
+              "        return {",
+              "            page_id: p.page_id || \"\",",
+              "            document_id: p.document_id || \"\",",
+              "            line_no: p.line_no || 1,",
+              "            confirmed: true",
+              "        };",
+              "    });",
+              "}",
+              "var resp = pm.response.json();",
+              "pm.test(\"HTTP 200\", function() { pm.response.to.have.status(200); });",
+              "pm.test(\"status success\", function() { pm.expect(resp.status).to.eql(1); });",
+              "if (resp.data) {",
+              "    var section = resp.data.pod_section || {};",
+              "    var block = section.hard_copy_confirmation || {};",
+              "    var pages = block.pages || resp.data.pages || [];",
+              "    var documents = block.documents || resp.data.documents || [];",
+              "    pm.test(\"shipment document pages returned\", function() {",
+              "        pm.expect(pages.length).to.be.at.least(1);",
+              "    });",
+              "    if (documents.length) {",
+              "        pm.test(\"shipment document header present\", function() {",
+              "            pm.expect(documents[0].document_ref_no || documents[0].record_no).to.exist;",
+              "        });",
+              "    }",
+              "    if (pages.length) {",
+              "        pm.collectionVariables.set(\"hard_pod_page_count\", String(pages.length));",
+              "        pm.collectionVariables.set(\"hard_pod_confirmed_pages_json\", JSON.stringify(buildConfirmedPages(pages)));",
+              "    }",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "11b-alt — Fetch Shipment Documents (hard-pod/documents GET)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
+        ],
+        "url": "{{base_url}}/driver/jobs/shipments/{{shipment_id}}/hard-pod/documents/",
+        "description": "Dedicated Hard POD documents API.\nReturns documents[] (TenantShipmentDocument DN headers) and pages[]."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "function buildConfirmedPages(pages) {",
+              "    return (pages || []).map(function (p) {",
+              "        return {",
+              "            page_id: p.page_id || \"\",",
+              "            document_id: p.document_id || \"\",",
+              "            line_no: p.line_no || 1,",
+              "            confirmed: true",
+              "        };",
+              "    });",
+              "}",
+              "var resp = pm.response.json();",
+              "pm.test(\"HTTP 200\", function() { pm.response.to.have.status(200); });",
+              "pm.test(\"status success\", function() { pm.expect(resp.status).to.eql(1); });",
+              "if (resp.data) {",
+              "    pm.test(\"action_code is A7H\", function() {",
+              "        pm.expect(resp.data.action_code).to.eql(\"A7H\");",
+              "    });",
+              "    var pages = resp.data.pages || [];",
+              "    var documents = resp.data.documents || [];",
+              "    pm.test(\"pages returned\", function() { pm.expect(pages.length).to.be.at.least(1); });",
+              "    if (pages.length) {",
+              "        pm.collectionVariables.set(\"hard_pod_page_count\", String(pages.length));",
+              "        pm.collectionVariables.set(\"hard_pod_confirmed_pages_json\", JSON.stringify(buildConfirmedPages(pages)));",
+              "    }",
+              "    if (documents.length) {",
+              "        pm.collectionVariables.set(\"hard_pod_document_id\", documents[0].document_id || \"\");",
+              "    }",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "11c — Confirm Physical Custody (hard-pod/submit POST)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/driver/hard-pod/submit/",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"client_submission_id\": \"{{hard_pod_client_submission_id}}\",\n  \"shipment_id\": \"{{shipment_id}}\",\n  \"receiver_name\": \"{{hard_pod_receiver_name}}\",\n  \"receiver_contact\": \"{{hard_pod_receiver_contact}}\",\n  \"handoff_notes\": \"{{hard_pod_handoff_notes}}\",\n  \"latitude\": 21.3891,\n  \"longitude\": 39.8579,\n  \"confirmed_pages\": {{hard_pod_confirmed_pages_json}},\n  \"media\": []\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "description": "Requires confirmed_pages[] for every DN page from 11b/11b-alt.\nSaves custody_submission.submission_id for 11d."
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (!pm.variables.get('hard_pod_client_submission_id') || String(pm.variables.get('hard_pod_client_submission_id')).indexOf('{{') >= 0) {",
+              "    pm.collectionVariables.set('hard_pod_client_submission_id', 'hard-pod-' + pm.variables.replaceIn('{{$guid}}'));",
+              "}",
+              "var pagesJson = pm.collectionVariables.get('hard_pod_confirmed_pages_json');",
+              "if (!pagesJson || String(pagesJson).indexOf('{{') >= 0) {",
+              "    pm.collectionVariables.set('hard_pod_confirmed_pages_json', JSON.stringify([{page_id:'', document_id:'', line_no:1, confirmed:true}]));",
+              "}"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 201 or 200\", function() { pm.expect([200, 201]).to.include(pm.response.code); });",
+              "var json = pm.response.json();",
+              "pm.test(\"status=1\", function() { pm.expect(json.status).to.eql(1); });",
+              "var custody = (json.data || {}).custody_submission || {};",
+              "var sid = custody.submission_id;",
+              "pm.test(\"custody_submission_id saved\", function() { pm.expect(sid).to.be.a(\"string\"); });",
+              "pm.test(\"confirmed pages persisted\", function() {",
+              "    pm.expect(custody.confirmed_page_count || 0).to.be.at.least(1);",
+              "});",
+              "if (sid) {",
+              "    pm.collectionVariables.set(\"hard_pod_custody_submission_id\", sid);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "11d — Execute A7H — Hard POD Confirmation",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A7H/execute/",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"client_action_id\": \"a7h-{{$guid}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": 21.3891,\n  \"longitude\": 39.8579,\n  \"custody_submission_id\": \"{{hard_pod_custody_submission_id}}\",\n  \"notes\": \"Hard POD collection confirmed — signed DN received\",\n  \"media\": []\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "description": "Execute A7H with custody_submission_id from 11c.\nThen continue to 12 (A8)."
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const sid = pm.collectionVariables.get(\"hard_pod_custody_submission_id\");",
+              "if (!sid || String(sid).indexOf(\"{{\") >= 0) {",
+              "    throw new Error(\"Run request 11c first — hard_pod_custody_submission_id missing\");",
+              "}"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var resp = pm.response.json();",
+              "pm.test(\"HTTP 201 or 200\", function() { pm.expect([200, 201]).to.include(pm.response.code); });",
+              "if (resp.status === 1 && resp.data && resp.data.sync_metadata) {",
+              "    pm.collectionVariables.set(\"content_hash\", resp.data.sync_metadata.content_hash);",
+              "    pm.collectionVariables.set(\"workflow_version\", resp.data.sync_metadata.workflow_version);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "12 — Execute A8 — Unloading Completed",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"client_action_id\": \"a8-{{$guid}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": 21.3891,\n  \"longitude\": 39.8579,\n  \"notes\": \"Unloading completed\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A8/execute/",
+        "description": "PREREQUISITE: Run requests in order 04 → 05 → 06 etc.\ncontent_hash and workflow_version auto-update after\neach successful execute.\nIf you get 409 stale_content_hash:\n  1. Re-run Request 03 Job Detail to refresh hash\n  2. Then retry this request\nDo NOT skip any action in the sequence."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var resp = pm.response.json();",
+              "if (resp.status === 1 && resp.data && resp.data.sync_metadata) {",
+              "    pm.collectionVariables.set(",
+              "        \"content_hash\",",
+              "        resp.data.sync_metadata.content_hash",
+              "    );",
+              "    pm.collectionVariables.set(",
+              "        \"workflow_version\",",
+              "        resp.data.sync_metadata.workflow_version",
+              "    );",
+              "    pm.environment.set(\"content_hash\", resp.data.sync_metadata.content_hash);",
+              "    pm.environment.set(\"workflow_version\", resp.data.sync_metadata.workflow_version);",
+              "    console.log(\"sync saved — hash: \" + String(resp.data.sync_metadata.content_hash).substring(0, 16) + \"...\");",
+              "    pm.test(",
+              "        \"Sync hash updated from execute response\",",
+              "        function() {",
+              "            pm.expect(",
+              "                resp.data.sync_metadata.content_hash",
+              "            ).to.exist;",
+              "        }",
+              "    );",
+              "}",
+              "var hint = resp.data && resp.data.next_action_hint;",
+              "if (hint) {",
+              "    pm.test(",
+              "        \"Next hint: \" + hint.action + \" — \" + hint.reason,",
+              "        function() {",
+              "            pm.expect(hint.action).to.exist;",
+              "        }",
+              "    );",
+              "    console.log(\"=== NEXT ACTION HINT ===\");",
+              "    console.log(\"Action: \" + hint.action);",
+              "    console.log(\"Screen: \" + hint.screen);",
+              "    console.log(\"Reason: \" + hint.reason);",
+              "    if (hint.job_closed) {",
+              "        console.log(\"*** JOB CLOSED — GO TO DASHBOARD ***\");",
+              "    }",
+              "    if (hint.action_code) {",
+              "        console.log(\"Next action code: \" + hint.action_code);",
+              "    }",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "13 — Execute A9 — Collect Payment COD Only",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"client_action_id\": \"a9-{{$guid}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"mobile_cod_amount\": 1500.00,\n  \"notes\": \"Cash collected from customer — 1500.00 SAR\",\n  \"latitude\": 21.3891,\n  \"longitude\": 39.8579\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A9/execute/",
+        "description": "STEP 13 — COD PAYMENT COLLECTION (COD ORDERS ONLY).\nSKIP THIS STEP FOR CREDIT ORDERS.\n\nTHIS USES EXECUTE ACTION API — same as all other actions.\nNOT the /payments/collect/ staging API.\n\nREQUIRED FIELDS:\n  mobile_cod_amount = actual cash collected from customer\n  notes = required (note says what amount was collected)\n  workflow_version and content_hash from Job Detail\n\nWHAT HAPPENS WHEN A9 FIRES:\n  - Driver Treasury Transaction created (Debit, Client Pay)\n  - Driver wallet balance increases by collected amount\n  - Shipment COD Payment Status = Collected\n  - If amount differs from expected: variance flagged for Ops\n  - Driver is NEVER blocked due to variance\n\nVARIANCE HANDLING:\n  Change mobile_cod_amount to actual amount received.\n  If different from 1500.00 that is fine.\n  System records variance and Ops follows up.\n  Driver proceeds normally to A10.\n\nIMPORTANT: Always run 03 Job Detail before this request\nto refresh content_hash and workflow_version.\n\nNext action after A9: A10 Job Closed."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var resp = pm.response.json();",
+              "if (resp.status === 1 && resp.data && resp.data.sync_metadata) {",
+              "    pm.collectionVariables.set(",
+              "        \"content_hash\",",
+              "        resp.data.sync_metadata.content_hash",
+              "    );",
+              "    pm.collectionVariables.set(",
+              "        \"workflow_version\",",
+              "        resp.data.sync_metadata.workflow_version",
+              "    );",
+              "    pm.environment.set(\"content_hash\", resp.data.sync_metadata.content_hash);",
+              "    pm.environment.set(\"workflow_version\", resp.data.sync_metadata.workflow_version);",
+              "    console.log(\"sync saved — hash: \" + String(resp.data.sync_metadata.content_hash).substring(0, 16) + \"...\");",
+              "    pm.test(",
+              "        \"A9 COD payment collected\",",
+              "        function() { pm.expect(resp.status).to.eql(1); }",
+              "    );",
+              "    var hint = resp.data && resp.data.next_action_hint;",
+              "    if (hint) {",
+              "        console.log(\"Next: \" + hint.action + \" — \" + hint.reason);",
+              "        if (hint.job_closed) {",
+              "            console.log(\"*** JOB CLOSED — GO TO DASHBOARD ***\");",
+              "        }",
+              "    }",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "13B — Payment Staging API (Optional Reference Only)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"client_payment_id\": \"pay-{{$guid}}\",\n  \"shipment_id\": \"{{shipment_id}}\",\n  \"amount\": 1500.00,\n  \"notes\": \"COD collection staging\",\n  \"payment_mode\": \"cash\",\n  \"proof_media\": []\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": "{{base_url}}/driver/payments/collect/",
+        "description": "REFERENCE ONLY — NOT REQUIRED FOR COD FLOW.\n\nThis is a staging API for pre-registering payment intent.\nIt does NOT fire A9.\nIt does NOT collect the payment.\nIt does NOT create a Treasury Transaction.\n\nUSE THIS ONLY IF:\n  Your app needs to stage payment metadata\n  before the driver physically collects cash.\n\nFOR NORMAL COD FLOW: Use Request 13 Execute A9 instead.\n\nWARNING: This API validates file paths strictly.\nDo NOT attach files unless paths follow this pattern:\n  mobile_driver_uploads/{tenant}/{driver}/{shipment}/\n  payment_collection/filename.jpg\nSend proof_media as empty array [] for testing."
+      }
+    },
+    {
+      "name": "14 — Execute A10 — Job Closed (Terminal Action)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"client_action_id\": \"a10-{{$guid}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": 21.3891,\n  \"longitude\": 39.8579,\n  \"notes\": \"Job completed and closed\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A10/execute/",
+        "description": "PREREQUISITE: Run requests in order 04 → 05 → 06 etc.\ncontent_hash and workflow_version auto-update after\neach successful execute.\nIf you get 409 stale_content_hash:\n  1. Re-run Request 03 Job Detail to refresh hash\n  2. Then retry this request\nDo NOT skip any action in the sequence."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var resp = pm.response.json();",
+              "if (resp.status === 1 && resp.data && resp.data.sync_metadata) {",
+              "    pm.collectionVariables.set(",
+              "        \"content_hash\",",
+              "        resp.data.sync_metadata.content_hash",
+              "    );",
+              "    pm.collectionVariables.set(",
+              "        \"workflow_version\",",
+              "        resp.data.sync_metadata.workflow_version",
+              "    );",
+              "    pm.environment.set(\"content_hash\", resp.data.sync_metadata.content_hash);",
+              "    pm.environment.set(\"workflow_version\", resp.data.sync_metadata.workflow_version);",
+              "    console.log(\"sync saved — hash: \" + String(resp.data.sync_metadata.content_hash).substring(0, 16) + \"...\");",
+              "    pm.test(",
+              "        \"Sync hash updated from execute response\",",
+              "        function() {",
+              "            pm.expect(",
+              "                resp.data.sync_metadata.content_hash",
+              "            ).to.exist;",
+              "        }",
+              "    );",
+              "}",
+              "var hint = resp.data && resp.data.next_action_hint;",
+              "if (hint) {",
+              "    pm.test(",
+              "        \"Next hint: \" + hint.action + \" — \" + hint.reason,",
+              "        function() {",
+              "            pm.expect(hint.action).to.exist;",
+              "        }",
+              "    );",
+              "    console.log(\"=== NEXT ACTION HINT ===\");",
+              "    console.log(\"Action: \" + hint.action);",
+              "    console.log(\"Screen: \" + hint.screen);",
+              "    console.log(\"Reason: \" + hint.reason);",
+              "    if (hint.job_closed) {",
+              "        console.log(\"*** JOB CLOSED — GO TO DASHBOARD ***\");",
+              "    }",
+              "    if (hint.action_code) {",
+              "        console.log(\"Next action code: \" + hint.action_code);",
+              "    }",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "15 — Report Issue (Optional — Any Time)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "client_issue_id",
+              "value": "issue-{{$guid}}",
+              "type": "text"
+            },
+            {
+              "key": "shipment_id",
+              "value": "{{shipment_id}}",
+              "type": "text"
+            },
+            {
+              "key": "issue_type",
+              "value": "delay",
+              "type": "text"
+            },
+            {
+              "key": "severity",
+              "value": "medium",
+              "type": "text"
+            },
+            {
+              "key": "notes",
+              "value": "Traffic delay on main route",
+              "type": "text"
+            },
+            {
+              "key": "latitude",
+              "value": "24.7136",
+              "type": "text"
+            },
+            {
+              "key": "longitude",
+              "value": "46.6753",
+              "type": "text"
+            },
+            {
+              "key": "media[0][media_type]",
+              "value": "photo",
+              "type": "text"
+            },
+            {
+              "key": "media[0][file_name]",
+              "value": "issue_photo.jpg",
+              "type": "text"
+            },
+            {
+              "key": "media[0][description]",
+              "value": "Issue evidence photo",
+              "type": "text"
+            },
+            {
+              "key": "media[0][sort_order]",
+              "value": "1",
+              "type": "text"
+            },
+            {
+              "key": "media[0][file_ref]",
+              "value": "",
+              "type": "file"
+            }
+          ]
+        },
+        "url": "{{base_url}}/driver/issues/report/",
+        "description": "OPTIONAL — CAN BE CALLED AT ANY POINT DURING THE JOB.\nissue_type values: delay, vehicle_breakdown, customer_unavailable,\n  payment_dispute, pod_issue, accident, route_blocked, other\nseverity values: low, medium, high, critical\nThis does NOT stop the job flow.\nIssue is sent to Ops supervisor for acknowledgement.\nDriver continues normal action flow alongside.\n\nFILE UPLOAD INSTRUCTIONS:\nFor any field with type FILE:\n  Click the file icon in Postman next to that field.\n  Select any JPG, PNG, or MP4 file from your device.\nAllowed file types: image/jpeg, image/png,\n  image/webp, video/mp4\nMax file size: 50MB per file\nContent-Type is set automatically by Postman.\nDo NOT set Content-Type header manually."
+      }
+    },
+    {
+      "name": "COD Fix Verification — SH-COD-29789621",
+      "description": "Verifies all 5 COD fix patches for SH-COD-29789621.\nRun 01-Login first to get access_token.\nNote: shipment is already Closed in DB.\nPre-fix checks verify fix logic is live.\nExecute A10 request will return 400 (already closed) which is expected.\nTo fully re-test, reset shipment to Delivered state first.",
+      "item": [
+        {
+          "name": "Job Detail — Pre-Fix Check",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/",
+            "description": "Pre-fix job detail checks: Delivered, A10 allowed, hard_pod_pending false, A_POD_VERIFY in timeline."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Response has data envelope\", () => {",
+                  "    pm.expect(pm.response.json()).to.have.property(\"data\");",
+                  "});",
+                  "pm.test(\"authoritative_status is Delivered or Closed\", () => {",
+                  "    const d = pm.response.json().data;",
+                  "    const s = d.workflow.reconciliation.authoritative_status;",
+                  "    pm.expect(s).to.be.oneOf([\"Delivered\", \"Closed\"]);",
+                  "});",
+                  "pm.test(\"hard_pod_pending is false\", () => {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(d.pod_cod.hard_pod_pending).to.eql(false);",
+                  "});",
+                  "pm.test(\"hint is not go_to_hard_pod\", () => {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(d.next_action_hint.action).to.not.eql(\"go_to_hard_pod\");",
+                  "});",
+                  "pm.test(\"A_POD_VERIFY in timeline\", () => {",
+                  "    const d = pm.response.json().data;",
+                  "    const events = d.timeline?.timeline_preview || [];",
+                  "    const codes = events.map(e => e.action_code);",
+                  "    pm.expect(codes).to.include(\"A_POD_VERIFY\");",
+                  "});",
+                  "pm.test(\"A_POD_VERIFY is_system_auto true\", () => {",
+                  "    const d = pm.response.json().data;",
+                  "    const events = d.timeline?.timeline_preview || [];",
+                  "    const ev = events.find(e => e.action_code === \"A_POD_VERIFY\");",
+                  "    pm.expect(ev, \"A_POD_VERIFY event not found\").to.exist;",
+                  "    pm.expect(ev.is_system_auto).to.eql(true);",
+                  "});",
+                  "const d = pm.response.json().data;",
+                  "if (d && d.workflow) {",
+                  "    const wv = d.workflow.workflow_version",
+                  "        || d.workflow.sync_metadata?.workflow_version",
+                  "        || d.workflow.workflow_metadata?.workflow_version",
+                  "        || \"1\";",
+                  "    const ch = d.workflow.content_hash",
+                  "        || d.workflow.sync_metadata?.content_hash",
+                  "        || \"\";",
+                  "    pm.collectionVariables.set(\"workflow_version\", wv);",
+                  "    pm.collectionVariables.set(\"content_hash\", ch);",
+                  "    console.log(\"workflow_version saved:\", wv);",
+                  "    console.log(\"content_hash saved:\", ch);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Timeline — A_POD_VERIFY Present",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/timeline/?limit=20"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"timeline_preview exists\", () => {",
+                  "    const d = pm.response.json().data || pm.response.json();",
+                  "    pm.expect(d).to.have.property(\"timeline_preview\")",
+                  "        .or.have.property(\"events\");",
+                  "});",
+                  "pm.test(\"A_POD_VERIFY present in timeline\", () => {",
+                  "    const d = pm.response.json().data || pm.response.json();",
+                  "    const events = d.timeline_preview || d.events || [];",
+                  "    const codes = events.map(e => e.action_code);",
+                  "    pm.expect(codes).to.include(\"A_POD_VERIFY\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Hard POD Pending — Pre-Execute",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/hard-pod/pending/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"SH-COD-29789621 not in pending list\", () => {",
+                  "    const d = pm.response.json().data || pm.response.json();",
+                  "    const results = d.results || d.items || d || [];",
+                  "    if (!Array.isArray(results)) return;",
+                  "    const nos = results.map(r => r.shipment_no || r.shipment);",
+                  "    pm.expect(nos).to.not.include(\"SH-COD-29789621\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Execute A10 — Job Closed",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A10/execute/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_action_id\": \"a10-{{$guid}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": 21.3891,\n  \"longitude\": 39.8579,\n  \"notes\": \"Job completed and closed\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Terminal A10. Requires content_hash and workflow_version from Pre-Fix Job Detail test script."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200 or 201 or 400\", () => {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 400]);",
+                  "});",
+                  "const body = pm.response.json();",
+                  "if (pm.response.code === 400) {",
+                  "    pm.test(\"400 means already closed — acceptable\", () => {",
+                  "        const msg = JSON.stringify(body).toLowerCase();",
+                  "        pm.expect(msg).to.satisfy(m =>",
+                  "            m.includes(\"already\") ||",
+                  "            m.includes(\"closed\") ||",
+                  "            m.includes(\"not allowed\") ||",
+                  "            m.includes(\"invalid\")",
+                  "        );",
+                  "    });",
+                  "    console.log(\"Shipment already closed — A10 not re-executable. Expected.\");",
+                  "} else {",
+                  "    pm.test(\"No error field on success\", () => {",
+                  "        pm.expect(body.status).to.not.eql(0);",
+                  "        pm.expect(body).to.not.have.property(\"error\");",
+                  "    });",
+                  "    pm.test(\"Shipment moving to Closed\", () => {",
+                  "        const d = body.data || body;",
+                  "        const status = d.shipment_status",
+                  "            || d.workflow?.reconciliation?.authoritative_status",
+                  "            || d.status;",
+                  "        pm.expect(status).to.be.oneOf([\"Closed\", \"Delivered\"]);",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Job Detail — Post A10 Closed",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"authoritative_status is Closed\", () => {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(d.workflow.reconciliation.authoritative_status).to.eql(\"Closed\");",
+                  "});",
+                  "pm.test(\"allowed_actions is empty\", () => {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(d.workflow.allowed_actions).to.have.lengthOf(0);",
+                  "});",
+                  "pm.test(\"hint is go_to_dashboard\", () => {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(d.next_action_hint.action).to.eql(\"go_to_dashboard\");",
+                  "});",
+                  "pm.test(\"job_closed is true\", () => {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(d.next_action_hint.job_closed).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Hard POD Pending — Post-Execute",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": "{{base_url}}/driver/hard-pod/pending/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"SH-COD-29789621 still not in pending list\", () => {",
+                  "    const d = pm.response.json().data || pm.response.json();",
+                  "    const results = d.results || d.items || d || [];",
+                  "    if (!Array.isArray(results)) return;",
+                  "    const nos = results.map(r => r.shipment_no || r.shipment);",
+                  "    pm.expect(nos).to.not.include(\"SH-COD-29789621\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

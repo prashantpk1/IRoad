@@ -24,6 +24,14 @@ from mobile_api.dashboard.selectors import pod_cod_policy as policy
 from tenant_workspace.models import TenantShipment
 
 
+def _mock_no_promoted_submission(mock_submission) -> None:
+    qs = MagicMock()
+    qs.exclude.return_value = qs
+    qs.filter.return_value = qs
+    qs.first.return_value = None
+    mock_submission.objects.filter.return_value = qs
+
+
 def _shipment(
     *,
     order_type='Standard',
@@ -40,6 +48,8 @@ def _shipment(
     s.collection_status = collection_status
     s.shipment_status = shipment_status
     s.driver = MagicMock()
+    s.driver.pk = uuid4()
+    s.driver_id = ''
     s.cod_amount = Decimal('100.00')
     return s
 
@@ -68,16 +78,65 @@ class PodCodPolicyTests(SimpleTestCase):
             mock_authority.return_value.resolve_authority.return_value = {
                 'custody_authority': '',
             }
-            mock_submission.objects.filter.return_value.exclude.return_value.first.return_value = None
+            _mock_no_promoted_submission(mock_submission)
             self.assertTrue(policy.derive_hard_pod_pending(shipment))
 
-    def test_hard_pod_not_pending_when_compliant(self):
+    def test_hard_pod_still_pending_when_hard_copy_received_without_a7h(self):
+        """Digital A7 may have set HARD_COPY_RECEIVED before A7H — keep pending."""
         shipment = _shipment(
             pod_type=TenantShipment.PodType.HARD,
             pod_status=TenantShipment.PodStatus.HARD_COPY_RECEIVED,
         )
-        self.assertFalse(policy.derive_hard_pod_pending(shipment))
+        with patch(
+            'mobile_api.dashboard.selectors.pod_cod_policy.HardPodCustodyAuthorityService',
+        ) as mock_authority, patch(
+            'mobile_api.dashboard.selectors.pod_cod_policy.HardPODCustodySubmission',
+        ) as mock_submission:
+            mock_authority.return_value.resolve_authority.return_value = {
+                'custody_authority': '',
+            }
+            _mock_no_promoted_submission(mock_submission)
+            self.assertTrue(policy.derive_hard_pod_pending(shipment))
         self.assertTrue(policy.derive_pod_compliant(shipment))
+
+    def test_hard_pod_not_pending_when_a7h_log_present(self):
+        shipment = _shipment(
+            pod_type=TenantShipment.PodType.HARD,
+            pod_status=TenantShipment.PodStatus.HARD_COPY_RECEIVED,
+        )
+        self.assertFalse(
+            policy.derive_hard_pod_pending(
+                shipment,
+                log_evidence={'hard_pod_log': True},
+            )
+        )
+
+    def test_hard_pod_still_pending_when_compliant_without_a7h_log(self):
+        shipment = _shipment(
+            pod_type=TenantShipment.PodType.HARD,
+            pod_status=TenantShipment.PodStatus.COMPLIANT,
+        )
+        with patch(
+            'mobile_api.dashboard.selectors.pod_cod_policy.HardPodCustodyAuthorityService',
+        ) as mock_authority, patch(
+            'mobile_api.dashboard.selectors.pod_cod_policy.HardPODCustodySubmission',
+        ) as mock_submission:
+            mock_authority.return_value.resolve_authority.return_value = {
+                'custody_authority': '',
+            }
+            _mock_no_promoted_submission(mock_submission)
+            self.assertTrue(
+                policy.derive_hard_pod_pending(
+                    shipment,
+                    log_evidence={'hard_pod_log': False, 'pod_uploaded': True},
+                )
+            )
+            self.assertFalse(
+                policy.derive_hard_pod_pending(
+                    shipment,
+                    log_evidence={'hard_pod_log': True, 'pod_uploaded': True},
+                )
+            )
 
     def test_cod_pending_and_collected(self):
         pending = _shipment(

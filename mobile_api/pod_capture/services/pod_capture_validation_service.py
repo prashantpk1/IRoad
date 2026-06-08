@@ -11,7 +11,11 @@ from __future__ import annotations
 from django.utils.translation import gettext_lazy as _
 from django_tenants.utils import schema_context
 
-from mobile_api.execution.evidence.constants import EXECUTION_MEDIA_MAX_DOCUMENTS
+from mobile_api.execution.evidence.constants import (
+    EXECUTION_MEDIA_MAX_DOCUMENTS,
+    POD_CAPTURE_VIDEO_MAX_DURATION_SECONDS,
+    VIDEO_MEDIA_TYPES,
+)
 from mobile_api.execution.evidence.evidence_validation_service import EvidenceValidationService
 from mobile_api.pod_capture.dto.pod_capture_context import PodCaptureContext
 from mobile_api.pod_capture.dto.staging_models import PODCaptureMediaItemInput
@@ -124,6 +128,7 @@ class PodCaptureValidationService:
             raise
 
         self._validate_document_minimum(context.media_items, requirements)
+        self._validate_video_duration(context.media_items, requirements)
         self._assert_no_duplicate_media(context.media_items)
         self._assert_media_integrity(context.media_items)
 
@@ -196,6 +201,32 @@ class PodCaptureValidationService:
                 'gps_incomplete',
                 str(_('mobile.pod_capture.gps_incomplete')),
             )
+
+    @staticmethod
+    def _validate_video_duration(
+        items: list[PODCaptureMediaItemInput],
+        requirements: dict,
+    ) -> None:
+        max_duration = int(
+            requirements.get('video_max_duration_seconds')
+            or POD_CAPTURE_VIDEO_MAX_DURATION_SECONDS
+        )
+        for item in items:
+            media_type = (item.media_type or '').strip().casefold()
+            if media_type not in VIDEO_MEDIA_TYPES:
+                continue
+            duration = item.duration_seconds
+            if duration is None:
+                continue
+            if float(duration) > float(max_duration):
+                raise PodCaptureValidationService._validation_error(
+                    'video_duration_exceeded',
+                    str(
+                        _(
+                            'mobile.pod_capture.video_duration_exceeded',
+                        )
+                    ),
+                )
 
     @staticmethod
     def _assert_no_duplicate_media(items: list[PODCaptureMediaItemInput]) -> None:

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from mobile_api.execution.evidence.constants import POD_CAPTURE_VIDEO_MAX_DURATION_SECONDS
 from mobile_api.helpers.action_execution_metadata import build_execution_requirements
 from mobile_api.pod_capture.policy.canonical_pod_action_registry import (
     is_hard_pod_action,
@@ -42,6 +43,7 @@ def merge_execution_requirements(
         'gps',
         'photo',
         'video',
+        'video_optional',
         'note',
         'note_required',
         'signature',
@@ -53,6 +55,16 @@ def merge_execution_requirements(
 
     for key in ('photo_min_count', 'video_min_count', 'document_min_count'):
         merged[key] = max(int(merged.get(key) or 0), int(overlay.get(key) or 0))
+
+    for key in ('video_max_count',):
+        base_val = int(merged.get(key) or 0)
+        overlay_val = int(overlay.get(key) or 0)
+        if overlay_val <= 0:
+            continue
+        if base_val <= 0:
+            merged[key] = overlay_val
+        else:
+            merged[key] = min(base_val, overlay_val)
 
     return merged
 
@@ -79,9 +91,20 @@ def derive_pod_type_overlay(
             token = 'hard'
         elif is_pod_upload_action(operation_action):
             token = 'digital'
+            if shipment is not None:
+                shipment_pod = (
+                    getattr(shipment, 'pod_type', None) or ''
+                ).strip().casefold()
+                if shipment_pod == 'hard':
+                    token = 'hard'
 
     if token == 'digital':
+        overlay['photo'] = True
         overlay['photo_min_count'] = max(int(overlay.get('photo_min_count') or 0), 1)
+        # IRoute §14.5.1 — digital evidence may include one optional video clip (max 15s).
+        overlay['video_optional'] = True
+        overlay['video_max_count'] = max(int(overlay.get('video_max_count') or 0), 1)
+        overlay['video_max_duration_seconds'] = POD_CAPTURE_VIDEO_MAX_DURATION_SECONDS
     elif token == 'soft':
         overlay['photo'] = True
         overlay['photo_min_count'] = max(int(overlay.get('photo_min_count') or 0), 1)
@@ -128,4 +151,6 @@ def build_pod_capture_requirements(
         merged['photo_min_count'] = max(int(merged.get('photo_min_count') or 0), 1)
 
     merged['pod_capture_type'] = (pod_capture_type or '').strip().casefold()
+    if not int(merged.get('video_max_duration_seconds') or 0):
+        merged['video_max_duration_seconds'] = POD_CAPTURE_VIDEO_MAX_DURATION_SECONDS
     return merged

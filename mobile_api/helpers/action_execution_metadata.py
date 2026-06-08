@@ -13,6 +13,14 @@ from typing import Any
 from iroad_tenants.operation_execution import action_matches
 from mobile_api.helpers.i18n import get_localized_value
 
+
+def _is_hard_copy_action(action) -> bool:
+    if action is None:
+        return False
+    if getattr(action, 'hard_copy_collection', False):
+        return True
+    return (getattr(action, 'action_code', '') or '').strip().upper() == 'A7H'
+
 # IRoute Ch.2 forward-action evidence conventions (UI metadata only).
 _GPS_ACTION_NEEDLES = (
     'start job',
@@ -79,19 +87,34 @@ def infer_requires_gps(action) -> bool:
     return bool((action.movement_status_impact or '').strip())
 
 
+def _tenant_evidence_flag(action, field_name: str) -> bool | None:
+    """Explicit tenant Action Master flag when present (future portal toggles)."""
+    if action is None or not hasattr(action, field_name):
+        return None
+    return bool(getattr(action, field_name, False))
+
+
 def infer_requires_photo(action) -> bool:
     if action is None:
         return False
+    explicit = _tenant_evidence_flag(action, 'requires_photo')
+    if explicit is True:
+        return True
     if getattr(action, 'auto_pod_post', False):
         return True
-    if getattr(action, 'hard_copy_collection', False):
-        return True
+    if _is_hard_copy_action(action):
+        return False
     return action_matches(action, *_PHOTO_ACTION_NEEDLES)
 
 
 def infer_requires_video(action) -> bool:
     if action is None:
         return False
+    if _is_hard_copy_action(action):
+        return False
+    explicit = _tenant_evidence_flag(action, 'requires_video')
+    if explicit is True:
+        return True
     return action_matches(action, *_VIDEO_ACTION_NEEDLES)
 
 
@@ -105,24 +128,70 @@ def infer_requires_note(action) -> bool:
 
 def build_execution_requirements(action) -> dict[str, Any]:
     """Structured capture requirements for mobile execute-action UI."""
+    if _is_hard_copy_action(action):
+        return {
+            'gps': False,
+            'photo': False,
+            'photo_min_count': 0,
+            'video': False,
+            'video_min_count': 0,
+            'video_max_count': 0,
+            'video_optional': False,
+            'note': False,
+            'note_required': False,
+            'signature': False,
+            'auto_movement_post': bool(getattr(action, 'auto_movement_post', False)),
+            'auto_pod_post': bool(getattr(action, 'auto_pod_post', False)),
+            'auto_shipment_post': bool(getattr(action, 'auto_shipment_post', False)),
+            'auto_treasury_post': bool(getattr(action, 'auto_treasury_post', False)),
+            'hard_copy_collection': True,
+            'custody_submission_required': True,
+            'capture_mode': 'hard_copy_confirmation',
+            'shipment_status_impact': (action.shipment_status_impact or '').strip()
+            if action
+            else '',
+            'movement_status_impact': (action.movement_status_impact or '').strip()
+            if action
+            else '',
+        }
+
     requires_gps = infer_requires_gps(action)
     requires_photo = infer_requires_photo(action)
     requires_video = infer_requires_video(action)
     requires_note = infer_requires_note(action)
-    photo_min = 1 if requires_photo and action_matches(
-        action,
-        'confirm loaded',
-        'a4',
-        'action 4',
-    ) else (1 if requires_photo else 0)
-    if requires_photo and action_matches(action, 'upload pod', 'a7', 'action 7'):
-        photo_min = max(photo_min, 1)
+    photo_min = int(getattr(action, 'photo_min_count', None) or 0) if action else 0
+    video_min = int(getattr(action, 'video_min_count', None) or 0) if action else 0
+    if photo_min <= 0:
+        photo_min = 1 if requires_photo and action_matches(
+            action,
+            'confirm loaded',
+            'a4',
+            'action 4',
+        ) else (1 if requires_photo else 0)
+        if requires_photo and action_matches(
+            action,
+            'upload pod',
+            'a7',
+            'action 7',
+            'hard pod',
+            'a7h',
+        ):
+            photo_min = max(photo_min, 1)
+        if requires_photo and getattr(action, 'auto_pod_post', False):
+            photo_min = max(photo_min, 1)
+    video_max = int(getattr(action, 'video_max_count', None) or 0) if action else 0
+    if video_min <= 0 and requires_video:
+        video_min = 1 if action_matches(action, 'video', 'record') else 0
+    if video_max <= 0 and requires_video:
+        video_max = 1
     return {
         'gps': requires_gps,
         'photo': requires_photo,
         'photo_min_count': photo_min,
         'video': requires_video,
-        'video_min_count': 1 if requires_video else 0,
+        'video_min_count': video_min,
+        'video_max_count': video_max,
+        'video_optional': bool(getattr(action, 'auto_pod_post', False)),
         'note': requires_note,
         'note_required': requires_note and action_matches(
             action,
@@ -165,13 +234,15 @@ def project_allowed_action_row(
     request=None,
     current_stage: str = '',
     sort_index: int = 0,
+    shipment=None,
+    tenant_schema: str = '',
 ) -> dict[str, Any]:
     """
     Mobile allowed-action DTO for one ``TenantOperationAction`` row.
     """
     name = _localized_action_name(action, request)
     requirements = build_execution_requirements(action)
-    return {
+    row = {
         'action_id': str(action.action_id),
         'action_code': action.action_code or '',
         'action_name': name,
@@ -186,6 +257,22 @@ def project_allowed_action_row(
         'current_stage': current_stage,
         'execution_requirements': requirements,
     }
+    if getattr(action, 'auto_pod_post', False) and not _is_hard_copy_action(action):
+        row['screen'] = 'pod_capture'
+        row['action'] = 'go_to_pod_capture'
+
+    if _is_hard_copy_action(action):
+        from mobile_api.helpers.action_navigation_metadata import (
+            apply_hard_copy_navigation_to_action_row,
+        )
+
+        return apply_hard_copy_navigation_to_action_row(
+            row,
+            action,
+            shipment=shipment,
+            tenant_schema=tenant_schema,
+        )
+    return row
 
 
 def project_allowed_actions_payload(
@@ -197,17 +284,33 @@ def project_allowed_actions_payload(
     job_type: str = '',
     job_id: str = '',
     job_no: str = '',
+    shipment=None,
+    tenant_schema: str = '',
 ) -> dict[str, Any]:
     """Full allowed-actions response from engine queryset (already filtered)."""
-    rows = [
-        project_allowed_action_row(
-            action,
-            request=request,
-            current_stage=current_stage,
-            sort_index=idx,
+    schema = (tenant_schema or '').strip()
+    if not schema and request is not None:
+        try:
+            from mobile_api.job_detail.services.job_detail_driver_resolver import (
+                tenant_schema_for_request,
+            )
+
+            schema = tenant_schema_for_request(request)
+        except Exception:
+            schema = ''
+
+    rows = []
+    for action in actions:
+        rows.append(
+            project_allowed_action_row(
+                action,
+                request=request,
+                current_stage=current_stage,
+                sort_index=len(rows),
+                shipment=shipment,
+                tenant_schema=schema,
+            )
         )
-        for idx, action in enumerate(actions)
-    ]
     primary = rows[0] if rows else None
     return {
         'job_type': job_type,

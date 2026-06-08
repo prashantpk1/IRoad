@@ -73,24 +73,37 @@ def derive_pod_compliant(shipment: Any | None) -> bool:
     return pod_status_is_complete(getattr(shipment, 'pod_status', None))
 
 
-def derive_hard_pod_pending(shipment: Any | None) -> bool:
-    """Hard-copy POD type with delivery-note compliance still outstanding."""
+def derive_hard_pod_pending(
+    shipment: Any | None,
+    *,
+    log_evidence: dict[str, bool] | None = None,
+    tenant_schema: str = '',
+) -> bool:
+    """
+    Hard-copy POD custody still outstanding for this shipment.
+
+    Digital POD / DN verification (e.g. ``COMPLIANT``) do **not** clear hard-copy
+    pending — only an A7H Action Log or promoted Hard POD custody submission.
+    """
     if shipment is None:
         return False
     pod_type = (getattr(shipment, 'pod_type', None) or '').strip().casefold()
     if pod_type != TenantShipment.PodType.HARD.casefold():
         return False
-    if pod_status_is_complete(getattr(shipment, 'pod_status', None)):
+
+    evidence = log_evidence or {}
+    if evidence.get('hard_pod_log'):
         return False
 
     shipment_id = str(getattr(shipment, 'pk', None) or getattr(shipment, 'shipment_id', '') or '').strip()
     driver = getattr(shipment, 'driver', None)
     driver_id = str(getattr(driver, 'pk', None) or getattr(shipment, 'driver_id', '') or '').strip()
+    schema = (tenant_schema or getattr(shipment, 'tenant_schema', '') or '').strip()
     if not shipment_id:
         return True
 
     authority = HardPodCustodyAuthorityService().resolve_authority(
-        tenant_schema=str(getattr(shipment, 'tenant_schema', '') or '').strip(),
+        tenant_schema=schema,
         shipment_id=shipment_id,
         driver_id=driver_id,
     )
@@ -100,14 +113,15 @@ def derive_hard_pod_pending(shipment: Any | None) -> bool:
     }:
         return False
 
-    promoted_submission = HardPODCustodySubmission.objects.filter(
+    promoted_qs = HardPODCustodySubmission.objects.filter(
         shipment_id=shipment_id,
-        driver_id=driver_id,
         promoted_at__isnull=False,
-    ).exclude(
-        promotion_action_log_id=''
-    ).first()
-    if promoted_submission is not None:
+    ).exclude(promotion_action_log_id='')
+    if schema:
+        promoted_qs = promoted_qs.filter(tenant_schema=schema)
+    if driver_id:
+        promoted_qs = promoted_qs.filter(driver_id=driver_id)
+    if promoted_qs.first() is not None:
         return False
     return True
 
@@ -186,12 +200,18 @@ def derive_pod_cod_flags(
     shipment: Any | None,
     *,
     driver: Any | None = None,
+    log_evidence: dict[str, bool] | None = None,
+    tenant_schema: str = '',
 ) -> dict[str, bool]:
     """All dashboard POD/COD booleans for one shipment."""
     return {
         'pod_pending': derive_pod_pending(shipment),
         'pod_compliant': derive_pod_compliant(shipment),
-        'hard_pod_pending': derive_hard_pod_pending(shipment),
+        'hard_pod_pending': derive_hard_pod_pending(
+            shipment,
+            log_evidence=log_evidence,
+            tenant_schema=tenant_schema,
+        ),
         'cod_pending': derive_cod_pending(shipment),
         'cod_collected': derive_cod_collected(shipment),
         'treasury_pending': derive_treasury_pending(shipment, driver=driver),

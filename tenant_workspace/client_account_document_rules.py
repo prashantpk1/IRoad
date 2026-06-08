@@ -6,12 +6,8 @@ _CLIENT_TYPE_BUSINESS = 'Business'
 MSG_NATIONAL_ID = (
     'National ID is required for individual clients under your Client Account Settings.'
 )
-MSG_COMMERCIAL_REG = (
-    'Commercial Registration is required for business clients under your Client Account Settings.'
-)
-MSG_TAX_VAT = (
-    'Tax/VAT registration is required for business clients under your Client Account Settings.'
-)
+MSG_COMMERCIAL_REG = 'Commercial Registration No. is required for business clients.'
+MSG_TAX_VAT = 'Tax Registration No. is required for business clients.'
 
 
 def collect_client_account_document_rule_errors(
@@ -31,10 +27,8 @@ def collect_client_account_document_rule_errors(
         if require_national_id_individual and not (national_id or '').strip():
             errors['national_id'] = MSG_NATIONAL_ID
     elif ct == _CLIENT_TYPE_BUSINESS:
-        if require_commercial_registration_business and not (
-            (commercial_registration_no or '').strip()
-        ):
+        if not (commercial_registration_no or '').strip():
             errors['commercial_registration_no'] = MSG_COMMERCIAL_REG
-        if require_tax_vat_registration_business and not ((tax_registration_no or '').strip()):
+        if not (tax_registration_no or '').strip():
             errors['tax_registration_no'] = MSG_TAX_VAT
     return errors

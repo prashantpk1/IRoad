@@ -18,6 +18,7 @@ from iroad_tenants.operation_runtime.impacts import (
 )
 from iroad_tenants.operation_runtime.latest_state import (
     apply_hard_copy_pod_type_if_needed,
+    apply_hard_copy_received_if_needed,
     apply_shipment_status_impact,
 )
 from iroad_tenants.operation_runtime.movement_ops import birth_movement_for_shipment
@@ -448,3 +449,4 @@ def apply_execution_side_effects(action_log, *, created_by_label='') -> None:
 
     if shipment is not None:
         apply_hard_copy_pod_type_if_needed(shipment=shipment, action=action)
+        apply_hard_copy_received_if_needed(shipment=shipment, action=action)

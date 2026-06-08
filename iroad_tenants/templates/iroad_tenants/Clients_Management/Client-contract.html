@@ -50,12 +50,20 @@
         </div>
       </div>
 
+      {% if form_errors %}
+      <div class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
+        Please fix the highlighted errors.
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+      {% endif %}
+
       <!-- Client Contract Form -->
       <form
         id="clientContractForm"
         method="post"
         enctype="multipart/form-data"
         action="{{ contract_form_action }}"
+        novalidate
       >
         {% csrf_token %}        {% if contract_settings.pre_expiry_notification_days %}
         <div class="alert alert-info d-flex align-items-start gap-2 py-2 px-3 mb-3" role="status" style="font-size: 0.9rem; border-radius: 8px;">
@@ -125,7 +133,7 @@
                   </select>
                   <span class="field-hint">Client account cannot be changed after the contract is created.</span>
                   {% else %}
-                  <select class="form-select {% if form_errors.client_account %}is-invalid{% endif %}" id="clientAccount" name="client_account" required>
+                  <select class="form-select {% if form_errors.client_account %}is-invalid{% endif %}" id="clientAccount" name="client_account">
                     <option value="" {% if not form_data.client_account %}selected{% endif %} disabled>
                       -Select client account-
                     </option>
@@ -174,7 +182,6 @@
                       id="startDate"
                       name="start_date"
                       value="{{ form_data.start_date|default:'' }}"
-                      required
                     />
                   </div>
                   {% if form_errors.start_date %}<div class="invalid-feedback d-block">{{ form_errors.start_date }}</div>{% endif %}
@@ -192,7 +199,6 @@
                       id="endDate"
                       name="end_date"
                       value="{{ form_data.end_date|default:'' }}"
-                      required
                     />
                   </div>
                   {% if form_errors.end_date %}<div class="invalid-feedback d-block">{{ form_errors.end_date }}</div>{% endif %}
@@ -257,7 +263,6 @@
                     id="contractAttachment"
                     name="contract_attachment"
                     accept=".pdf,.doc,.docx,image/*"
-                    {% if not is_edit_mode %}required{% endif %}
                   />
                   {% if form_errors.contract_attachment %}<div class="invalid-feedback d-block">{{ form_errors.contract_attachment }}</div>{% endif %}
                   <span class="field-hint">

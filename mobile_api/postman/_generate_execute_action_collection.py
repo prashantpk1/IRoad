@@ -101,6 +101,24 @@ HARD_POD_BODY = """{
   "latitude": {{execute_latitude}},
   "longitude": {{execute_longitude}},
   "notes": "Hard POD — Postman",
+  "custody_submission_id": "{{hard_pod_custody_submission_id}}",
+  "media": [
+    {
+      "media_type": "photo",
+      "file_ref": "{{hard_pod_photo_file_ref}}",
+      "file_name": "hard-pod.jpg"
+    }
+  ]
+}"""
+
+HARD_POD_SUBMIT_BODY = """{
+  "client_submission_id": "{{hard_pod_client_submission_id}}",
+  "shipment_id": "{{shipment_id}}",
+  "receiver_name": "{{hard_pod_receiver_name}}",
+  "receiver_contact": "{{hard_pod_receiver_contact}}",
+  "handoff_notes": "{{hard_pod_handoff_notes}}",
+  "latitude": {{execute_latitude}},
+  "longitude": {{execute_longitude}},
   "media": [
     {
       "media_type": "photo",
@@ -225,6 +243,7 @@ def main() -> None:
         f'{base}/driver/jobs/shipment/{{{{shipment_id}}}}/actions/'
         f'{{{{execute_hard_pod_action_code}}}}/execute/'
     )
+    hard_pod_submit = f'{base}/driver/hard-pod/submit/'
     foreign_execute = (
         f'{base}/driver/jobs/shipment/{{{{foreign_shipment_id}}}}/actions/'
         f'{{{{execute_action_code}}}}/execute/'
@@ -305,6 +324,11 @@ def main() -> None:
             {'key': 'pod_photo_file_ref', 'value': 'tenant-uploads/pod/photo-001.jpg'},
             {'key': 'pod_signature_file_ref', 'value': 'tenant-uploads/pod/signature-001.png'},
             {'key': 'hard_pod_photo_file_ref', 'value': 'tenant-uploads/hard-pod/scan-001.jpg'},
+            {'key': 'hard_pod_client_submission_id', 'value': ''},
+            {'key': 'hard_pod_custody_submission_id', 'value': ''},
+            {'key': 'hard_pod_receiver_name', 'value': 'Receiver Name'},
+            {'key': 'hard_pod_receiver_contact', 'value': '0500000000'},
+            {'key': 'hard_pod_handoff_notes', 'value': 'Hard POD handoff via Postman'},
         ],
         'item': [
             {
@@ -348,12 +372,40 @@ def main() -> None:
                         description='Set execute_cod_action_code when pod_cod.cod_pending.',
                     ),
                     _req(
+                        '5a. Hard POD Submit (get custody_submission_id)',
+                        url=hard_pod_submit,
+                        body=HARD_POD_SUBMIT_BODY,
+                        prerequest=[
+                            "if (!pm.variables.get('hard_pod_client_submission_id') || String(pm.variables.get('hard_pod_client_submission_id')).indexOf('{{') >= 0) {",
+                            "    pm.variables.set('hard_pod_client_submission_id', 'hard-pod-' + pm.variables.replaceIn('{{$guid}}'));",
+                            "}",
+                        ],
+                        tests=[
+                            "pm.test('HTTP 201 or 200', function () { pm.expect([200, 201]).to.include(pm.response.code); });",
+                            "const json = pm.response.json();",
+                            "pm.test('status=1', function () { pm.expect(json.status).to.eql(1); });",
+                            "const custody = (json.data || {}).custody_submission || {};",
+                            "pm.test('submission id present', function () { pm.expect(custody.submission_id).to.be.a('string'); });",
+                            "if (custody.submission_id) {",
+                            "    pm.environment.set('hard_pod_custody_submission_id', custody.submission_id);",
+                            "    pm.collectionVariables.set('hard_pod_custody_submission_id', custody.submission_id);",
+                            "}",
+                        ],
+                        description=(
+                            'Run before Hard POD Execute. Stores `hard_pod_custody_submission_id` '
+                            'required by A7H execute.'
+                        ),
+                    ),
+                    _req(
                         '5. Hard POD Execute',
                         url=hard_pod_execute,
                         body=HARD_POD_BODY,
                         prerequest=PREREQUEST_NEW_ID,
                         tests=EXEC_SUCCESS_TEST,
-                        description='Set execute_hard_pod_action_code when pod_cod.hard_pod_pending.',
+                        description=(
+                            'Set execute_hard_pod_action_code when pod_cod.hard_pod_pending. '
+                            'Requires `hard_pod_custody_submission_id` from request 5a.'
+                        ),
                     ),
                     _req(
                         '6. Idempotent Replay (retry)',

@@ -1,0 +1,483 @@
+{
+  "info": {
+    "_postman_id": "a1b2c3d4-e5f6-7890-abcd-videohardpod",
+    "name": "IRoute — Video + Hard POD APIs",
+    "description": "Focused Postman collection for digital POD video evidence and Hard POD Shipment Document confirmation.\n\nPrerequisites: login (or set access_token), shipment_id, job_id, job_type, content_hash, workflow_version from job detail.\n\nFlow:\n  1. GET pod/capture sync (video requirements)\n  2. POST pod/capture (photo + optional video)\n  3. POST execute A7\n  4. GET hard-pod/documents OR pod/capture?step=hard_copy_confirmation\n  5. POST hard-pod/submit with confirmed_pages[]\n  6. POST execute A7H with custody_submission_id",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8000/api/v1/mobile"
+    },
+    {
+      "key": "access_token",
+      "value": ""
+    },
+    {
+      "key": "shipment_id",
+      "value": ""
+    },
+    {
+      "key": "job_id",
+      "value": ""
+    },
+    {
+      "key": "job_type",
+      "value": "shipment"
+    },
+    {
+      "key": "capture_bundle_id",
+      "value": ""
+    },
+    {
+      "key": "content_hash",
+      "value": ""
+    },
+    {
+      "key": "workflow_version",
+      "value": ""
+    },
+    {
+      "key": "pod_content_hash",
+      "value": ""
+    },
+    {
+      "key": "pod_workflow_version",
+      "value": ""
+    },
+    {
+      "key": "hard_pod_custody_submission_id",
+      "value": ""
+    },
+    {
+      "key": "hard_pod_client_submission_id",
+      "value": ""
+    },
+    {
+      "key": "hard_pod_confirmed_pages_json",
+      "value": "[]"
+    },
+    {
+      "key": "hard_pod_receiver_name",
+      "value": "Receiver Name"
+    },
+    {
+      "key": "hard_pod_receiver_contact",
+      "value": "0500000000"
+    },
+    {
+      "key": "hard_pod_handoff_notes",
+      "value": "Hard copy DN collected"
+    }
+  ],
+  "item": [
+    {
+      "name": "01 — POD Capture Sync (video requirements)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
+        ],
+        "url": "{{base_url}}/driver/jobs/shipments/{{shipment_id}}/pod/capture/"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var resp = pm.response.json();",
+              "pm.test(\"HTTP 200\", function() { pm.response.to.have.status(200); });",
+              "if (resp.data) {",
+              "    var digital = (resp.data.pod_section || {}).digital_evidence || {};",
+              "    var reqs = digital.requirements || {};",
+              "    pm.test(\"video_optional exposed\", function() { pm.expect(reqs.video_optional).to.eql(true); });",
+              "    pm.test(\"video max duration 15s\", function() { pm.expect(reqs.video_max_duration_seconds).to.eql(15); });",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 — POD Capture POST (photo + optional video)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
+        ],
+        "url": "{{base_url}}/driver/jobs/shipments/{{shipment_id}}/pod/capture/",
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "client_capture_id",
+              "value": "pod-cap-{{$guid}}",
+              "type": "text"
+            },
+            {
+              "key": "content_hash",
+              "value": "{{pod_content_hash}}",
+              "type": "text"
+            },
+            {
+              "key": "workflow_version",
+              "value": "{{pod_workflow_version}}",
+              "type": "text"
+            },
+            {
+              "key": "pod_type",
+              "value": "digital",
+              "type": "text"
+            },
+            {
+              "key": "latitude",
+              "value": "21.3891",
+              "type": "text"
+            },
+            {
+              "key": "longitude",
+              "value": "39.8579",
+              "type": "text"
+            },
+            {
+              "key": "notes",
+              "value": "Digital POD with optional video",
+              "type": "text"
+            },
+            {
+              "key": "media[0][media_type]",
+              "value": "photo",
+              "type": "text"
+            },
+            {
+              "key": "media[0][file_name]",
+              "value": "delivery_note.jpg",
+              "type": "text"
+            },
+            {
+              "key": "media[0][sort_order]",
+              "value": "1",
+              "type": "text"
+            },
+            {
+              "key": "media[0][file_ref]",
+              "value": "",
+              "type": "file"
+            },
+            {
+              "key": "media[1][media_type]",
+              "value": "video",
+              "type": "text"
+            },
+            {
+              "key": "media[1][file_name]",
+              "value": "signed_paper.mp4",
+              "type": "text"
+            },
+            {
+              "key": "media[1][duration_seconds]",
+              "value": "8",
+              "type": "text"
+            },
+            {
+              "key": "media[1][sort_order]",
+              "value": "2",
+              "type": "text"
+            },
+            {
+              "key": "media[1][file_ref]",
+              "value": "",
+              "type": "file"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var resp = pm.response.json();",
+              "if (resp.data && resp.data.capture_bundle) {",
+              "    pm.collectionVariables.set(\"capture_bundle_id\", resp.data.capture_bundle.capture_bundle_id);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 — Execute A7 (Upload POD)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A7/execute/",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"client_action_id\": \"a7-{{$guid}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": 21.3891,\n  \"longitude\": 39.8579,\n  \"capture_bundle_id\": \"{{capture_bundle_id}}\",\n  \"notes\": \"POD with video evidence\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "11b — Fetch DN Checklist (pod/capture GET)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
+        ],
+        "url": "{{base_url}}/driver/jobs/shipments/{{shipment_id}}/pod/capture/?step=hard_copy_confirmation",
+        "description": "Hard POD checklist via POD capture GET.\nReads pod_section.hard_copy_confirmation.documents[] + pages[].\nAuto-builds hard_pod_confirmed_pages_json for 11c."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "function buildConfirmedPages(pages) {",
+              "    return (pages || []).map(function (p) {",
+              "        return {",
+              "            page_id: p.page_id || \"\",",
+              "            document_id: p.document_id || \"\",",
+              "            line_no: p.line_no || 1,",
+              "            confirmed: true",
+              "        };",
+              "    });",
+              "}",
+              "var resp = pm.response.json();",
+              "pm.test(\"HTTP 200\", function() { pm.response.to.have.status(200); });",
+              "pm.test(\"status success\", function() { pm.expect(resp.status).to.eql(1); });",
+              "if (resp.data) {",
+              "    var section = resp.data.pod_section || {};",
+              "    var block = section.hard_copy_confirmation || {};",
+              "    var pages = block.pages || resp.data.pages || [];",
+              "    var documents = block.documents || resp.data.documents || [];",
+              "    pm.test(\"shipment document pages returned\", function() {",
+              "        pm.expect(pages.length).to.be.at.least(1);",
+              "    });",
+              "    if (documents.length) {",
+              "        pm.test(\"shipment document header present\", function() {",
+              "            pm.expect(documents[0].document_ref_no || documents[0].record_no).to.exist;",
+              "        });",
+              "    }",
+              "    if (pages.length) {",
+              "        pm.collectionVariables.set(\"hard_pod_page_count\", String(pages.length));",
+              "        pm.collectionVariables.set(\"hard_pod_confirmed_pages_json\", JSON.stringify(buildConfirmedPages(pages)));",
+              "    }",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "11b-alt — Fetch Shipment Documents (hard-pod/documents GET)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
+        ],
+        "url": "{{base_url}}/driver/jobs/shipments/{{shipment_id}}/hard-pod/documents/",
+        "description": "Dedicated Hard POD documents API.\nReturns documents[] (TenantShipmentDocument DN headers) and pages[]."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "function buildConfirmedPages(pages) {",
+              "    return (pages || []).map(function (p) {",
+              "        return {",
+              "            page_id: p.page_id || \"\",",
+              "            document_id: p.document_id || \"\",",
+              "            line_no: p.line_no || 1,",
+              "            confirmed: true",
+              "        };",
+              "    });",
+              "}",
+              "var resp = pm.response.json();",
+              "pm.test(\"HTTP 200\", function() { pm.response.to.have.status(200); });",
+              "pm.test(\"status success\", function() { pm.expect(resp.status).to.eql(1); });",
+              "if (resp.data) {",
+              "    pm.test(\"action_code is A7H\", function() {",
+              "        pm.expect(resp.data.action_code).to.eql(\"A7H\");",
+              "    });",
+              "    var pages = resp.data.pages || [];",
+              "    var documents = resp.data.documents || [];",
+              "    pm.test(\"pages returned\", function() { pm.expect(pages.length).to.be.at.least(1); });",
+              "    if (pages.length) {",
+              "        pm.collectionVariables.set(\"hard_pod_page_count\", String(pages.length));",
+              "        pm.collectionVariables.set(\"hard_pod_confirmed_pages_json\", JSON.stringify(buildConfirmedPages(pages)));",
+              "    }",
+              "    if (documents.length) {",
+              "        pm.collectionVariables.set(\"hard_pod_document_id\", documents[0].document_id || \"\");",
+              "    }",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "11c — Confirm Physical Custody (hard-pod/submit POST)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/driver/hard-pod/submit/",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"client_submission_id\": \"{{hard_pod_client_submission_id}}\",\n  \"shipment_id\": \"{{shipment_id}}\",\n  \"receiver_name\": \"{{hard_pod_receiver_name}}\",\n  \"receiver_contact\": \"{{hard_pod_receiver_contact}}\",\n  \"handoff_notes\": \"{{hard_pod_handoff_notes}}\",\n  \"latitude\": 21.3891,\n  \"longitude\": 39.8579,\n  \"confirmed_pages\": {{hard_pod_confirmed_pages_json}},\n  \"media\": []\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "description": "Requires confirmed_pages[] for every DN page from 11b/11b-alt.\nSaves custody_submission.submission_id for 11d."
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (!pm.variables.get('hard_pod_client_submission_id') || String(pm.variables.get('hard_pod_client_submission_id')).indexOf('{{') >= 0) {",
+              "    pm.collectionVariables.set('hard_pod_client_submission_id', 'hard-pod-' + pm.variables.replaceIn('{{$guid}}'));",
+              "}",
+              "var pagesJson = pm.collectionVariables.get('hard_pod_confirmed_pages_json');",
+              "if (!pagesJson || String(pagesJson).indexOf('{{') >= 0) {",
+              "    pm.collectionVariables.set('hard_pod_confirmed_pages_json', JSON.stringify([{page_id:'', document_id:'', line_no:1, confirmed:true}]));",
+              "}"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 201 or 200\", function() { pm.expect([200, 201]).to.include(pm.response.code); });",
+              "var json = pm.response.json();",
+              "pm.test(\"status=1\", function() { pm.expect(json.status).to.eql(1); });",
+              "var custody = (json.data || {}).custody_submission || {};",
+              "var sid = custody.submission_id;",
+              "pm.test(\"custody_submission_id saved\", function() { pm.expect(sid).to.be.a(\"string\"); });",
+              "pm.test(\"confirmed pages persisted\", function() {",
+              "    pm.expect(custody.confirmed_page_count || 0).to.be.at.least(1);",
+              "});",
+              "if (sid) {",
+              "    pm.collectionVariables.set(\"hard_pod_custody_submission_id\", sid);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "11d — Execute A7H — Hard POD Confirmation",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A7H/execute/",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"client_action_id\": \"a7h-{{$guid}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"latitude\": 21.3891,\n  \"longitude\": 39.8579,\n  \"custody_submission_id\": \"{{hard_pod_custody_submission_id}}\",\n  \"notes\": \"Hard POD collection confirmed — signed DN received\",\n  \"media\": []\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "description": "Execute A7H with custody_submission_id from 11c.\nThen continue to 12 (A8)."
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const sid = pm.collectionVariables.get(\"hard_pod_custody_submission_id\");",
+              "if (!sid || String(sid).indexOf(\"{{\") >= 0) {",
+              "    throw new Error(\"Run request 11c first — hard_pod_custody_submission_id missing\");",
+              "}"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var resp = pm.response.json();",
+              "pm.test(\"HTTP 201 or 200\", function() { pm.expect([200, 201]).to.include(pm.response.code); });",
+              "if (resp.status === 1 && resp.data && resp.data.sync_metadata) {",
+              "    pm.collectionVariables.set(\"content_hash\", resp.data.sync_metadata.content_hash);",
+              "    pm.collectionVariables.set(\"workflow_version\", resp.data.sync_metadata.workflow_version);",
+              "}"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

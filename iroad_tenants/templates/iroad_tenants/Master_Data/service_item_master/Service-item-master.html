@@ -31,8 +31,15 @@
         </div>
       </div>
 
+      {% if field_errors %}
+      <div class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
+        Please fix the highlighted errors.
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+      {% endif %}
+
       <!-- Service Item Master Form -->
-      <form id="serviceItemMasterForm" method="post" action="{{ form_action_url|default:'' }}">
+      <form id="serviceItemMasterForm" method="post" action="{{ form_action_url|default:'' }}" novalidate>
         {% csrf_token %}
         <!-- Section 1: Basic Information -->
         <div class="form-card" data-section="1">
@@ -81,12 +88,12 @@
                     >Service Type
                     <span class="required">*</span>
                   </label>
-                  <select class="form-select" id="serviceType" name="service_type" required {% if is_view_mode or is_edit_mode %}disabled{% endif %}>
-                    <option value="" selected disabled>-Select type-</option>
+                  <select class="form-select{% if field_errors.service_type %} is-invalid{% endif %}" id="serviceType" name="service_type" {% if is_view_mode or is_edit_mode %}disabled{% endif %}>
+                    <option value="" {% if not form_data.service_type %}selected{% endif %} disabled>-Select type-</option>
                     <option value="Service" {% if form_data.service_type == 'Service' %}selected{% endif %}>Service</option>
                     <option value="Trip" {% if form_data.service_type == 'Trip' %}selected{% endif %}>Trip</option>
                   </select>
-                  {% if field_errors.service_type %}<span class="text-danger small">{{ field_errors.service_type }}</span>{% endif %}
+                  {% if field_errors.service_type %}<div class="invalid-feedback d-block">{{ field_errors.service_type }}</div>{% endif %}
                   <span class="field-hint"
                     >Service or Trip. Cannot be changed after save.</span
                   >
@@ -96,11 +103,11 @@
                     >Status
                     <span class="required">*</span>
                   </label>
-                  <select class="form-select" id="status" name="status" {% if is_view_mode %}disabled{% endif %}>
+                  <select class="form-select{% if field_errors.status %} is-invalid{% endif %}" id="status" name="status" {% if is_view_mode %}disabled{% endif %}>
                     <option value="Active" {% if form_data.status|default:'Active' == 'Active' %}selected{% endif %}>Active</option>
                     <option value="Inactive" {% if form_data.status == 'Inactive' %}selected{% endif %}>Inactive</option>
                   </select>
-                  {% if field_errors.status %}<span class="text-danger small">{{ field_errors.status }}</span>{% endif %}
+                  {% if field_errors.status %}<div class="invalid-feedback d-block">{{ field_errors.status }}</div>{% endif %}
                   <span class="field-hint"
                     >Inactive blocks new selection in transactions.</span
                   >
@@ -122,15 +129,15 @@
                   </label>
                   <input
                     type="text"
-                    class="form-control"
+                    class="form-control{% if field_errors.english_name %} is-invalid{% endif %}"
                     id="englishName"
                     name="english_name"
                     value="{{ form_data.english_name|default:'' }}"
                     placeholder="Enter English name"
                     maxlength="200"
-                    required {% if is_view_mode %}readonly{% endif %}
+                    {% if is_view_mode %}readonly{% endif %}
                   />
-                  {% if field_errors.english_name %}<span class="text-danger small">{{ field_errors.english_name }}</span>{% endif %}
+                  {% if field_errors.english_name %}<div class="invalid-feedback d-block">{{ field_errors.english_name }}</div>{% endif %}
                   <span class="field-hint">Shown in lists and reports.</span>
                 </div>
                 <div class="field">
@@ -190,15 +197,15 @@
                     >Route
                     <span class="required">*</span>
                   </label>
-                  <select class="form-select" id="route" name="route_id" {% if is_view_mode %}disabled{% endif %}>
-                    <option value="" selected disabled>-Select route-</option>
+                  <select class="form-select{% if field_errors.route_id %} is-invalid{% endif %}" id="route" name="route_id" {% if is_view_mode %}disabled{% endif %}>
+                    <option value="" {% if not form_data.route_id %}selected{% endif %} disabled>-Select route-</option>
                     {% for route in route_options %}
                     <option value="{{ route.route_id }}" {% if form_data.route_id == route.route_id|stringformat:'s' %}selected{% endif %}>
                       {{ route.route_code }} — {{ route.route_label }}
                     </option>
                     {% endfor %}
                   </select>
-                  {% if field_errors.route_id %}<span class="text-danger small">{{ field_errors.route_id }}</span>{% endif %}
+                  {% if field_errors.route_id %}<div class="invalid-feedback d-block">{{ field_errors.route_id }}</div>{% endif %}
                   <span class="field-hint"
                     >Required for Trip. Must be active. Names may auto-fill from
                     route.</span
@@ -223,17 +230,17 @@
                     <i class="bi bi-currency-dollar"></i>
                     <input
                       type="number"
-                      class="form-control has-icon"
+                      class="form-control has-icon{% if field_errors.sell_price %} is-invalid{% endif %}"
                       id="sellPrice"
                       name="sell_price"
                       value="{{ form_data.sell_price|default:'' }}"
                       placeholder="0.00"
                       min="0"
                       step="0.01"
-                      required {% if is_view_mode %}readonly{% endif %}
+                      {% if is_view_mode %}readonly{% endif %}
                     />
                   </div>
-                  {% if field_errors.sell_price %}<span class="text-danger small">{{ field_errors.sell_price }}</span>{% endif %}
+                  {% if field_errors.sell_price %}<div class="invalid-feedback d-block">{{ field_errors.sell_price }}</div>{% endif %}
                   <span class="field-hint"
                     >Must be ≥ 0.</span
                   >
@@ -252,7 +259,7 @@
                       <i class="bi bi-currency-dollar"></i>
                       <input
                         type="number"
-                        class="form-control has-icon"
+                        class="form-control has-icon{% if field_errors.outbound_sell_price %} is-invalid{% endif %}"
                         id="outboundSellPrice"
                         name="outbound_sell_price"
                         value="{{ form_data.outbound_sell_price|default:'' }}"
@@ -261,7 +268,7 @@
                         step="0.01"
                       {% if is_view_mode %}readonly{% endif %} />
                     </div>
-                    {% if field_errors.outbound_sell_price %}<span class="text-danger small">{{ field_errors.outbound_sell_price }}</span>{% endif %}
+                    {% if field_errors.outbound_sell_price %}<div class="invalid-feedback d-block">{{ field_errors.outbound_sell_price }}</div>{% endif %}
                     <span class="field-hint"
                       >Outbound sell price. Required for Trip.</span
                     >
@@ -275,7 +282,7 @@
                       <i class="bi bi-currency-dollar"></i>
                       <input
                         type="number"
-                        class="form-control has-icon"
+                        class="form-control has-icon{% if field_errors.inbound_sell_price %} is-invalid{% endif %}"
                         id="roundSellPrice"
                         name="inbound_sell_price"
                         value="{{ form_data.inbound_sell_price|default:'' }}"
@@ -284,7 +291,7 @@
                         step="0.01"
                       {% if is_view_mode %}readonly{% endif %} />
                     </div>
-                    {% if field_errors.inbound_sell_price %}<span class="text-danger small">{{ field_errors.inbound_sell_price }}</span>{% endif %}
+                    {% if field_errors.inbound_sell_price %}<div class="invalid-feedback d-block">{{ field_errors.inbound_sell_price }}</div>{% endif %}
                     <span class="field-hint"
                       >Inbound sell price (was Round Trip Price).</span
                     >
@@ -350,9 +357,6 @@
             roundTripPricesRow.style.display = isTrip ? "" : "none";
           // Sell Price / Buy Price are common fields for both Service & Trip
           // (only outbound/inbound specific fields are controlled here).
-          if (outboundSellPriceInput) outboundSellPriceInput.required = isTrip;
-          if (roundSellPriceInput) roundSellPriceInput.required = isTrip;
-
           if (routeSelect && !isTrip) routeSelect.value = "";
 
           if (!isTrip) {

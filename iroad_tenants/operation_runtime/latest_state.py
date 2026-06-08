@@ -108,9 +108,37 @@ def apply_hard_copy_pod_type_if_needed(*, shipment, action) -> None:
         'upload pod',
         'a7',
         'action 7',
+        'hard pod',
+        'a7h',
+        'hard copy',
+        'hard-copy',
+        'hardcopy',
+        'delivery note',
         'confirm loaded',
         'a4',
     ):
         return
     shipment.pod_type = TenantShipment.PodType.HARD
     shipment.save(update_fields=['pod_type', 'updated_at'])
+
+
+def apply_hard_copy_received_if_needed(*, shipment, action) -> None:
+    """Mark physical hard-copy receipt after A7H — not on digital A7 posting."""
+    if shipment is None or action is None:
+        return
+    if not action.hard_copy_collection:
+        return
+    if not operation_action_matches(
+        action,
+        'hard pod',
+        'a7h',
+        'hard copy',
+        'hard-copy',
+        'hardcopy',
+        'hard pod collection',
+    ):
+        return
+    if (getattr(shipment, 'pod_type', None) or '').strip() != TenantShipment.PodType.HARD:
+        return
+    shipment.pod_status = TenantShipment.PodStatus.HARD_COPY_RECEIVED
+    shipment.save(update_fields=['pod_status', 'updated_at'])

@@ -1,8 +1,8 @@
 {
   "info": {
     "_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-    "name": "IRoute \u2014 Driver Job Flow",
-    "description": "Complete driver mobile job flow from login to job closed.\nFollows A1 through A10 as defined in IRoute document.\nUse {{base_url}} variable = http://127.0.0.1:8000/api/v1/mobile\nUse {{access_token}} variable = filled automatically after login.\nUse {{job_id}} variable = filled after dashboard call.\nUse {{shipment_id}} variable = filled after A4 executes.\nUse {{capture_bundle_id}} variable = filled after POD capture.\n\nFLOW ORDER:\n01 Login\n02 Dashboard\n03 Job Detail\n04 Execute A1\n05 Execute A2\n06 Execute A3\n07 Execute A4\n08 Execute A5\n09 Execute A6\n10a POD Capture Sync (GET hash)\n10 POD Capture (POST with photo)\n11 Execute A7\n12 Execute A8\n13 Payment Collection (COD only)\n14 Execute A10\n15 Report Issue\n\nHOW TO READ next_action_hint IN EVERY RESPONSE:\n\nnext_action_hint.action values:\n  execute_action         = fire the action_code shown\n  execute_action_with_media = fire action, use camera\n  go_to_pod_capture      = open POD capture screen first\n  go_to_payment_collection = open payment screen (COD)\n  go_to_hard_pod         = open hard POD submit screen\n  go_to_dashboard        = job done, go home\n  wait_for_ops           = ops must verify, wait\n  refresh_job_detail     = pull to refresh, try again\n\nnext_action_hint.job_closed values:\n  true  = call Dashboard API, job done\n  false = stay on job flow\n\nCREDIT ORDER FLOW:\n  A1 \u2192 A2 \u2192 A3 \u2192 A4 \u2192 A5 \u2192 A6\n  \u2192 POD Capture Screen \u2192 A7\n  \u2192 A8 \u2192 refresh \u2192 A10 \u2192 Dashboard\n\nCOD ORDER FLOW:\n  A1 \u2192 A2 \u2192 A3 \u2192 A4 \u2192 A5 \u2192 A6\n  \u2192 POD Capture Screen \u2192 A7\n  \u2192 A8 \u2192 Payment Screen \u2192 A9\n  \u2192 A10 \u2192 Dashboard",
+    "name": "IRoute — Driver Job Flow",
+    "description": "Complete driver mobile job flow from login to job closed.\nFollows A1 through A10 as defined in IRoute document.\nUse {{base_url}} variable = http://127.0.0.1:8000/api/v1/mobile\nUse {{access_token}} variable = filled automatically after login.\nUse {{job_id}} variable = filled after dashboard call.\nUse {{shipment_id}} variable = filled after A4 executes.\nUse {{capture_bundle_id}} variable = filled after POD capture.\n\nFLOW ORDER:\n01 Login\n02 Dashboard\n03 Job Detail\n04 Execute A1\n05 Execute A2\n06 Execute A3\n07 Execute A4\n08 Execute A5\n09 Execute A6\n10a POD Capture Sync (GET hash)\n10 POD Capture (POST with photo)\n11 Execute A7\n12 Execute A8\n13 Payment Collection (COD only)\n14 Execute A10\n15 Report Issue\n\nHOW TO READ next_action_hint IN EVERY RESPONSE:\n\nnext_action_hint.action values:\n  execute_action         = fire the action_code shown\n  execute_action_with_media = fire action, use camera\n  go_to_pod_capture      = open POD capture screen first\n  go_to_payment_collection = open payment screen (COD)\n  go_to_hard_pod         = open hard POD submit screen\n  go_to_dashboard        = job done, go home\n  wait_for_ops           = ops must verify, wait\n  refresh_job_detail     = pull to refresh, try again\n\nnext_action_hint.job_closed values:\n  true  = call Dashboard API, job done\n  false = stay on job flow\n\nCREDIT ORDER FLOW:\n  A1 → A2 → A3 → A4 → A5 → A6\n  → POD Capture Screen → A7\n  → A8 → refresh → A10 → Dashboard\n\nCOD ORDER FLOW:\n  A1 → A2 → A3 → A4 → A5 → A6\n  → POD Capture Screen → A7\n  → A8 → Payment Screen → A9\n  → A10 → Dashboard",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -81,7 +81,7 @@
   ],
   "item": [
     {
-      "name": "01 \u2014 Login (Get Access Token)",
+      "name": "01 — Login (Get Access Token)",
       "request": {
         "method": "POST",
         "header": [
@@ -92,7 +92,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"email\": \"{{driver_email}}\",\n  \"password\": \"{{driver_password}}\",\n  \"tenant_id\": \"{{tenant_id}}\"\n}",
+          "raw": "{\n  \"email\": \"{{driver_email}}\",\n  \"password\": \"{{driver_password}}\"\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -100,7 +100,7 @@
           }
         },
         "url": "{{base_url}}/driver/auth/login/",
-        "description": "EMAIL LOGIN \u2014 Use this OR Request 01b for phone login.\nOnly run one login request per session.\n\nSTEP 1 \u2014 FIRST API TO CALL.\nSend driver email, password, tenant_id in body.\nAfter success, access_token is auto-saved to collection variable.\nAll subsequent requests use Authorization: Bearer {{access_token}}.\nResponse key is data.access_token (not 'access', not 'token').\nIf login fails check: email format, password, tenant_id is correct.\nSet driver_email in collection variables before running.\n\nAlternative body (phone login \u2014 use Request 01b instead):\n{\n  \"extension\": \"{{driver_extension}}\",\n  \"phone\": \"{{driver_phone}}\",\n  \"password\": \"{{driver_password}}\",\n  \"tenant_id\": \"{{tenant_id}}\"\n}"
+        "description": "EMAIL LOGIN — Use this OR Request 01b for phone login.\nOnly run one login request per session.\n\nSTEP 1 — FIRST API TO CALL.\nSend driver email and password in body.\ntenant_id is OPTIONAL (only when the same email exists on multiple subscribers).\nAfter success, access_token is auto-saved to collection variable.\nAll subsequent requests use Authorization: Bearer {{access_token}}.\nResponse key is data.access_token (not 'access', not 'token').\nIf login fails check: email format and password.\nSet driver_email and driver_password in collection variables before running.\n\nExample:\n{\n  \"email\": \"melamid@yopmail.com\",\n  \"password\": \"Asdasd@123\"\n}\n\nOptional tenant disambiguation:\n{ \"email\": \"...\", \"password\": \"...\", \"tenant_id\": \"{{tenant_id}}\" }\n\nPhone login — use Request 01b instead."
       },
       "event": [
         {
@@ -112,9 +112,12 @@
               "if (resp.status === 1 && resp.data && resp.data.access_token) {",
               "    pm.collectionVariables.set(\"access_token\", resp.data.access_token);",
               "    pm.collectionVariables.set(\"refresh_token\", resp.data.refresh_token);",
+              "    pm.environment.set(\"access_token\", resp.data.access_token);",
+              "    pm.environment.set(\"refresh_token\", resp.data.refresh_token);",
+              "    console.log(\"access_token saved (length=\" + resp.data.access_token.length + \")\");",
               "    pm.test(\"Login successful, token saved\", function() { pm.expect(resp.status).to.eql(1); });",
               "} else {",
-              "    pm.test(\"Login failed \u2014 check phone, password, tenant_id\", function() { pm.expect(resp.status).to.eql(1); });",
+              "    pm.test(\"Login failed — check email and password\", function() { pm.expect(resp.status).to.eql(1); });",
               "}"
             ]
           }
@@ -122,7 +125,7 @@
       ]
     },
     {
-      "name": "01b \u2014 Login via Phone Number (Alternative)",
+      "name": "01b — Login via Phone Number (Alternative)",
       "request": {
         "method": "POST",
         "header": [
@@ -133,7 +136,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"extension\": \"{{driver_extension}}\",\n  \"phone\": \"{{driver_phone}}\",\n  \"password\": \"{{driver_password}}\",\n  \"tenant_id\": \"{{tenant_id}}\"\n}",
+          "raw": "{\n  \"extension\": \"{{driver_extension}}\",\n  \"phone\": \"{{driver_phone}}\",\n  \"password\": \"{{driver_password}}\"\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -141,7 +144,7 @@
           }
         },
         "url": "{{base_url}}/driver/auth/login/",
-        "description": "ALTERNATIVE LOGIN \u2014 USE PHONE NUMBER INSTEAD OF EMAIL.\n\nUse this request if the driver does not have an email\nor prefers to login with phone number.\n\nRequired fields:\n  extension = country code e.g. +966 or +91\n  phone = phone number without extension e.g. 987456321\n  password = driver password\n\nSet driver_extension and driver_phone in\ncollection variables before running.\n\nSame response as email login.\naccess_token is auto-saved after success.\n\nOnly run ONE login request (01 or 01b).\nBoth save the same access_token variable."
+        "description": "ALTERNATIVE LOGIN — USE PHONE NUMBER INSTEAD OF EMAIL.\n\nUse this request if the driver does not have an email\nor prefers to login with phone number.\n\nRequired fields:\n  extension = country code e.g. +966 or +91\n  phone = phone number without extension e.g. 987456321\n  password = driver password\n\ntenant_id is OPTIONAL (multi-subscriber disambiguation only).\n\nSet driver_extension and driver_phone in\ncollection variables before running.\n\nSame response as email login.\naccess_token is auto-saved after success.\n\nOnly run ONE login request (01 or 01b).\nBoth save the same access_token variable."
       },
       "event": [
         {
@@ -158,13 +161,16 @@
               "    pm.collectionVariables.set(",
               "        \"refresh_token\", resp.data.refresh_token",
               "    );",
+              "    pm.environment.set(\"access_token\", resp.data.access_token);",
+              "    pm.environment.set(\"refresh_token\", resp.data.refresh_token);",
+              "    console.log(\"access_token saved (length=\" + resp.data.access_token.length + \")\");",
               "    pm.test(\"Login successful, token saved\",",
               "        function() {",
               "            pm.expect(resp.status).to.eql(1);",
               "        }",
               "    );",
               "} else {",
-              "    pm.test(\"Login FAILED \u2014 check credentials\",",
+              "    pm.test(\"Login FAILED — check credentials\",",
               "        function() {",
               "            pm.expect(resp.status).to.eql(1);",
               "        }",
@@ -176,7 +182,7 @@
       ]
     },
     {
-      "name": "02 \u2014 Dashboard (Get Active Job)",
+      "name": "02 — Dashboard (Get Active Job)",
       "request": {
         "method": "GET",
         "header": [
@@ -190,9 +196,21 @@
           }
         ],
         "url": "{{base_url}}/driver/dashboard/",
-        "description": "STEP 2 \u2014 CALL AFTER LOGIN.\nReturns active job assigned to driver.\njob_id and job_type are auto-saved from response.\njob_type will be 'shipment' for normal delivery jobs.\nIf no active_job in response then no job is assigned yet.\nCheck data.active_job.job_id and data.active_job.job_type.\nThese variables are used in all job detail and action calls."
+        "description": "STEP 2 — CALL AFTER LOGIN.\nReturns active job assigned to driver.\njob_id and job_type are auto-saved from response.\njob_type will be 'shipment' for normal delivery jobs.\nIf no active_job in response then no job is assigned yet.\nCheck data.active_job.job_id and data.active_job.job_type.\nThese variables are used in all job detail and action calls."
       },
       "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var token = pm.variables.get('access_token');",
+              "if (!token || String(token).trim() === '' || String(token).indexOf('{{') >= 0) {",
+              "    throw new Error('access_token is missing. Run 01 \\u2014 Login first. Set driver_email and driver_password in the active environment.');",
+              "}"
+            ]
+          }
+        },
         {
           "listen": "test",
           "script": {
@@ -212,7 +230,7 @@
       ]
     },
     {
-      "name": "03 \u2014 Job Detail (See Current State)",
+      "name": "03 — Job Detail (See Current State)",
       "request": {
         "method": "GET",
         "header": [
@@ -222,7 +240,7 @@
           }
         ],
         "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/",
-        "description": "STEP 3 \u2014 CALL TO SEE FULL JOB STATE BEFORE ANY ACTION.\nURL uses job_type and job_id from dashboard response.\njob_type is usually 'shipment'.\nResponse shows current state, next allowed action, cargo, addresses.\nCheck data.next_action to know which action to fire next.\nCheck data.shipment_id \u2014 will be null until A4 fires.\nThis API can be called anytime to refresh job state.\n\nIMPORTANT: Call Job Detail before the FIRST execute only.\nAfter each execute fires, sync_metadata is automatically\nupdated from the execute response.\nYou do NOT need to re-call Job Detail between actions\nas long as you run them in order.\nOnly call Job Detail again if you skip a step or\nif you get a 409 stale_content_hash error."
+        "description": "STEP 3 — CALL TO SEE FULL JOB STATE BEFORE ANY ACTION.\nURL uses job_type and job_id from dashboard response.\njob_type is usually 'shipment'.\nResponse shows current state, next allowed action, cargo, addresses.\nCheck data.next_action to know which action to fire next.\nCheck data.shipment_id — will be null until A4 fires.\nThis API can be called anytime to refresh job state.\n\nIMPORTANT: Call Job Detail before the FIRST execute only.\nAfter each execute fires, sync_metadata is automatically\nupdated from the execute response.\nYou do NOT need to re-call Job Detail between actions\nas long as you run them in order.\nOnly call Job Detail again if you skip a step or\nif you get a 409 stale_content_hash error."
       },
       "event": [
         {
@@ -240,6 +258,9 @@
               "        \"workflow_version\",",
               "        resp.data.sync_metadata.workflow_version",
               "    );",
+              "    pm.environment.set(\"content_hash\", resp.data.sync_metadata.content_hash);",
+              "    pm.environment.set(\"workflow_version\", resp.data.sync_metadata.workflow_version);",
+              "    console.log(\"sync saved — hash: \" + String(resp.data.sync_metadata.content_hash).substring(0, 16) + \"...\");",
               "    pm.test(",
               "        \"Sync metadata saved for execute\",",
               "        function() {",
@@ -250,7 +271,7 @@
               "var hint = resp.data && resp.data.next_action_hint;",
               "if (hint) {",
               "    pm.test(",
-              "        \"Next hint: \" + hint.action + \" \u2014 \" + hint.reason,",
+              "        \"Next hint: \" + hint.action + \" — \" + hint.reason,",
               "        function() {",
               "            pm.expect(hint.action).to.exist;",
               "        }",
@@ -260,7 +281,7 @@
               "    console.log(\"Screen: \" + hint.screen);",
               "    console.log(\"Reason: \" + hint.reason);",
               "    if (hint.job_closed) {",
-              "        console.log(\"*** JOB CLOSED \u2014 GO TO DASHBOARD ***\");",
+              "        console.log(\"*** JOB CLOSED — GO TO DASHBOARD ***\");",
               "    }",
               "    if (hint.action_code) {",
               "        console.log(\"Next action code: \" + hint.action_code);",
@@ -272,7 +293,7 @@
       ]
     },
     {
-      "name": "04 \u2014 Execute A1 \u2014 Start Job",
+      "name": "04 — Execute A1 — Start Job",
       "request": {
         "method": "POST",
         "header": [
@@ -295,7 +316,7 @@
           }
         },
         "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A1/execute/",
-        "description": "PREREQUISITE: Run requests in order 04 \u2192 05 \u2192 06 etc.\ncontent_hash and workflow_version auto-update after\neach successful execute.\nIf you get 409 stale_content_hash:\n  1. Re-run Request 03 Job Detail to refresh hash\n  2. Then retry this request\nDo NOT skip any action in the sequence."
+        "description": "PREREQUISITE: Run requests in order 04 → 05 → 06 etc.\ncontent_hash and workflow_version auto-update after\neach successful execute.\nIf you get 409 stale_content_hash:\n  1. Re-run Request 03 Job Detail to refresh hash\n  2. Then retry this request\nDo NOT skip any action in the sequence."
       },
       "event": [
         {
@@ -313,6 +334,9 @@
               "        \"workflow_version\",",
               "        resp.data.sync_metadata.workflow_version",
               "    );",
+              "    pm.environment.set(\"content_hash\", resp.data.sync_metadata.content_hash);",
+              "    pm.environment.set(\"workflow_version\", resp.data.sync_metadata.workflow_version);",
+              "    console.log(\"sync saved — hash: \" + String(resp.data.sync_metadata.content_hash).substring(0, 16) + \"...\");",
               "    pm.test(",
               "        \"Sync hash updated from execute response\",",
               "        function() {",
@@ -325,7 +349,7 @@
               "var hint = resp.data && resp.data.next_action_hint;",
               "if (hint) {",
               "    pm.test(",
-              "        \"Next hint: \" + hint.action + \" \u2014 \" + hint.reason,",
+              "        \"Next hint: \" + hint.action + \" — \" + hint.reason,",
               "        function() {",
               "            pm.expect(hint.action).to.exist;",
               "        }",
@@ -335,7 +359,7 @@
               "    console.log(\"Screen: \" + hint.screen);",
               "    console.log(\"Reason: \" + hint.reason);",
               "    if (hint.job_closed) {",
-              "        console.log(\"*** JOB CLOSED \u2014 GO TO DASHBOARD ***\");",
+              "        console.log(\"*** JOB CLOSED — GO TO DASHBOARD ***\");",
               "    }",
               "    if (hint.action_code) {",
               "        console.log(\"Next action code: \" + hint.action_code);",
@@ -347,7 +371,7 @@
       ]
     },
     {
-      "name": "05 \u2014 Execute A2 \u2014 Pickup Arrival",
+      "name": "05 — Execute A2 — Pickup Arrival",
       "request": {
         "method": "POST",
         "header": [
@@ -370,7 +394,7 @@
           }
         },
         "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A2/execute/",
-        "description": "PREREQUISITE: Run requests in order 04 \u2192 05 \u2192 06 etc.\ncontent_hash and workflow_version auto-update after\neach successful execute.\nIf you get 409 stale_content_hash:\n  1. Re-run Request 03 Job Detail to refresh hash\n  2. Then retry this request\nDo NOT skip any action in the sequence."
+        "description": "PREREQUISITE: Run requests in order 04 → 05 → 06 etc.\ncontent_hash and workflow_version auto-update after\neach successful execute.\nIf you get 409 stale_content_hash:\n  1. Re-run Request 03 Job Detail to refresh hash\n  2. Then retry this request\nDo NOT skip any action in the sequence."
       },
       "event": [
         {
@@ -388,6 +412,9 @@
               "        \"workflow_version\",",
               "        resp.data.sync_metadata.workflow_version",
               "    );",
+              "    pm.environment.set(\"content_hash\", resp.data.sync_metadata.content_hash);",
+              "    pm.environment.set(\"workflow_version\", resp.data.sync_metadata.workflow_version);",
+              "    console.log(\"sync saved — hash: \" + String(resp.data.sync_metadata.content_hash).substring(0, 16) + \"...\");",
               "    pm.test(",
               "        \"Sync hash updated from execute response\",",
               "        function() {",
@@ -400,7 +427,7 @@
               "var hint = resp.data && resp.data.next_action_hint;",
               "if (hint) {",
               "    pm.test(",
-              "        \"Next hint: \" + hint.action + \" \u2014 \" + hint.reason,",
+              "        \"Next hint: \" + hint.action + \" — \" + hint.reason,",
               "        function() {",
               "            pm.expect(hint.action).to.exist;",
               "        }",
@@ -410,7 +437,7 @@
               "    console.log(\"Screen: \" + hint.screen);",
               "    console.log(\"Reason: \" + hint.reason);",
               "    if (hint.job_closed) {",
-              "        console.log(\"*** JOB CLOSED \u2014 GO TO DASHBOARD ***\");",
+              "        console.log(\"*** JOB CLOSED — GO TO DASHBOARD ***\");",
               "    }",
               "    if (hint.action_code) {",
               "        console.log(\"Next action code: \" + hint.action_code);",
@@ -422,7 +449,7 @@
       ]
     },
     {
-      "name": "06 \u2014 Execute A3 \u2014 Start Loading",
+      "name": "06 — Execute A3 — Start Loading",
       "request": {
         "method": "POST",
         "header": [
@@ -445,7 +472,7 @@
           }
         },
         "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A3/execute/",
-        "description": "PREREQUISITE: Run requests in order 04 \u2192 05 \u2192 06 etc.\ncontent_hash and workflow_version auto-update after\neach successful execute.\nIf you get 409 stale_content_hash:\n  1. Re-run Request 03 Job Detail to refresh hash\n  2. Then retry this request\nDo NOT skip any action in the sequence."
+        "description": "PREREQUISITE: Run requests in order 04 → 05 → 06 etc.\ncontent_hash and workflow_version auto-update after\neach successful execute.\nIf you get 409 stale_content_hash:\n  1. Re-run Request 03 Job Detail to refresh hash\n  2. Then retry this request\nDo NOT skip any action in the sequence."
       },
       "event": [
         {
@@ -463,6 +490,9 @@
               "        \"workflow_version\",",
               "        resp.data.sync_metadata.workflow_version",
               "    );",
+              "    pm.environment.set(\"content_hash\", resp.data.sync_metadata.content_hash);",
+              "    pm.environment.set(\"workflow_version\", resp.data.sync_metadata.workflow_version);",
+              "    console.log(\"sync saved — hash: \" + String(resp.data.sync_metadata.content_hash).substring(0, 16) + \"...\");",
               "    pm.test(",
               "        \"Sync hash updated from execute response\",",
               "        function() {",
@@ -475,7 +505,7 @@
               "var hint = resp.data && resp.data.next_action_hint;",
               "if (hint) {",
               "    pm.test(",
-              "        \"Next hint: \" + hint.action + \" \u2014 \" + hint.reason,",
+              "        \"Next hint: \" + hint.action + \" — \" + hint.reason,",
               "        function() {",
               "            pm.expect(hint.action).to.exist;",
               "        }",
@@ -485,7 +515,7 @@
               "    console.log(\"Screen: \" + hint.screen);",
               "    console.log(\"Reason: \" + hint.reason);",
               "    if (hint.job_closed) {",
-              "        console.log(\"*** JOB CLOSED \u2014 GO TO DASHBOARD ***\");",
+              "        console.log(\"*** JOB CLOSED — GO TO DASHBOARD ***\");",
               "    }",
               "    if (hint.action_code) {",
               "        console.log(\"Next action code: \" + hint.action_code);",
@@ -497,7 +527,7 @@
       ]
     },
     {
-      "name": "07 \u2014 Execute A4 \u2014 Confirm Loaded (POINT OF NO RETURN)",
+      "name": "07 — Execute A4 — Confirm Loaded (POINT OF NO RETURN)",
       "request": {
         "method": "POST",
         "header": [
@@ -592,7 +622,7 @@
           ]
         },
         "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A4/execute/",
-        "description": "PREREQUISITE: Run requests in order 04 \u2192 05 \u2192 06 etc.\ncontent_hash and workflow_version auto-update after\neach successful execute.\nIf you get 409 stale_content_hash:\n  1. Re-run Request 03 Job Detail to refresh hash\n  2. Then retry this request\nDo NOT skip any action in the sequence.\n\nFILE UPLOAD INSTRUCTIONS:\nFor any field with type FILE:\n  Click the file icon in Postman next to that field.\n  Select any JPG, PNG, or MP4 file from your device.\nAllowed file types: image/jpeg, image/png,\n  image/webp, video/mp4\nMax file size: 50MB per file\nContent-Type is set automatically by Postman.\nDo NOT set Content-Type header manually."
+        "description": "PREREQUISITE: Run requests in order 04 → 05 → 06 etc.\ncontent_hash and workflow_version auto-update after\neach successful execute.\nIf you get 409 stale_content_hash:\n  1. Re-run Request 03 Job Detail to refresh hash\n  2. Then retry this request\nDo NOT skip any action in the sequence.\n\nFILE UPLOAD INSTRUCTIONS:\nFor any field with type FILE:\n  Click the file icon in Postman next to that field.\n  Select any JPG, PNG, or MP4 file from your device.\nAllowed file types: image/jpeg, image/png,\n  image/webp, video/mp4\nMax file size: 50MB per file\nContent-Type is set automatically by Postman.\nDo NOT set Content-Type header manually."
       },
       "event": [
         {
@@ -608,7 +638,7 @@
               "var hint = resp.data && resp.data.next_action_hint;",
               "if (hint) {",
               "    pm.test(",
-              "        \"Next hint: \" + hint.action + \" \u2014 \" + hint.reason,",
+              "        \"Next hint: \" + hint.action + \" — \" + hint.reason,",
               "        function() {",
               "            pm.expect(hint.action).to.exist;",
               "        }",
@@ -618,7 +648,7 @@
               "    console.log(\"Screen: \" + hint.screen);",
               "    console.log(\"Reason: \" + hint.reason);",
               "    if (hint.job_closed) {",
-              "        console.log(\"*** JOB CLOSED \u2014 GO TO DASHBOARD ***\");",
+              "        console.log(\"*** JOB CLOSED — GO TO DASHBOARD ***\");",
               "    }",
               "    if (hint.action_code) {",
               "        console.log(\"Next action code: \" + hint.action_code);",
@@ -642,6 +672,9 @@
               "        \"workflow_version\",",
               "        resp.data.sync_metadata.workflow_version",
               "    );",
+              "    pm.environment.set(\"content_hash\", resp.data.sync_metadata.content_hash);",
+              "    pm.environment.set(\"workflow_version\", resp.data.sync_metadata.workflow_version);",
+              "    console.log(\"sync saved — hash: \" + String(resp.data.sync_metadata.content_hash).substring(0, 16) + \"...\");",
               "    pm.test(",
               "        \"Sync hash updated from execute response\",",
               "        function() {",
@@ -657,7 +690,7 @@
       ]
     },
     {
-      "name": "08 \u2014 Execute A5 \u2014 Depart In Transit",
+      "name": "08 — Execute A5 — Depart In Transit",
       "request": {
         "method": "POST",
         "header": [
@@ -680,7 +713,7 @@
           }
         },
         "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A5/execute/",
-        "description": "PREREQUISITE: Run requests in order 04 \u2192 05 \u2192 06 etc.\ncontent_hash and workflow_version auto-update after\neach successful execute.\nIf you get 409 stale_content_hash:\n  1. Re-run Request 03 Job Detail to refresh hash\n  2. Then retry this request\nDo NOT skip any action in the sequence."
+        "description": "PREREQUISITE: Run requests in order 04 → 05 → 06 etc.\ncontent_hash and workflow_version auto-update after\neach successful execute.\nIf you get 409 stale_content_hash:\n  1. Re-run Request 03 Job Detail to refresh hash\n  2. Then retry this request\nDo NOT skip any action in the sequence."
       },
       "event": [
         {
@@ -698,6 +731,9 @@
               "        \"workflow_version\",",
               "        resp.data.sync_metadata.workflow_version",
               "    );",
+              "    pm.environment.set(\"content_hash\", resp.data.sync_metadata.content_hash);",
+              "    pm.environment.set(\"workflow_version\", resp.data.sync_metadata.workflow_version);",
+              "    console.log(\"sync saved — hash: \" + String(resp.data.sync_metadata.content_hash).substring(0, 16) + \"...\");",
               "    pm.test(",
               "        \"Sync hash updated from execute response\",",
               "        function() {",
@@ -710,7 +746,7 @@
               "var hint = resp.data && resp.data.next_action_hint;",
               "if (hint) {",
               "    pm.test(",
-              "        \"Next hint: \" + hint.action + \" \u2014 \" + hint.reason,",
+              "        \"Next hint: \" + hint.action + \" — \" + hint.reason,",
               "        function() {",
               "            pm.expect(hint.action).to.exist;",
               "        }",
@@ -720,7 +756,7 @@
               "    console.log(\"Screen: \" + hint.screen);",
               "    console.log(\"Reason: \" + hint.reason);",
               "    if (hint.job_closed) {",
-              "        console.log(\"*** JOB CLOSED \u2014 GO TO DASHBOARD ***\");",
+              "        console.log(\"*** JOB CLOSED — GO TO DASHBOARD ***\");",
               "    }",
               "    if (hint.action_code) {",
               "        console.log(\"Next action code: \" + hint.action_code);",
@@ -732,7 +768,7 @@
       ]
     },
     {
-      "name": "09 \u2014 Execute A6 \u2014 Delivery Arrival",
+      "name": "09 — Execute A6 — Delivery Arrival",
       "request": {
         "method": "POST",
         "header": [
@@ -755,7 +791,7 @@
           }
         },
         "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A6/execute/",
-        "description": "PREREQUISITE: Run requests in order 04 \u2192 05 \u2192 06 etc.\ncontent_hash and workflow_version auto-update after\neach successful execute.\nIf you get 409 stale_content_hash:\n  1. Re-run Request 03 Job Detail to refresh hash\n  2. Then retry this request\nDo NOT skip any action in the sequence."
+        "description": "PREREQUISITE: Run requests in order 04 → 05 → 06 etc.\ncontent_hash and workflow_version auto-update after\neach successful execute.\nIf you get 409 stale_content_hash:\n  1. Re-run Request 03 Job Detail to refresh hash\n  2. Then retry this request\nDo NOT skip any action in the sequence."
       },
       "event": [
         {
@@ -773,6 +809,9 @@
               "        \"workflow_version\",",
               "        resp.data.sync_metadata.workflow_version",
               "    );",
+              "    pm.environment.set(\"content_hash\", resp.data.sync_metadata.content_hash);",
+              "    pm.environment.set(\"workflow_version\", resp.data.sync_metadata.workflow_version);",
+              "    console.log(\"sync saved — hash: \" + String(resp.data.sync_metadata.content_hash).substring(0, 16) + \"...\");",
               "    pm.test(",
               "        \"Sync hash updated from execute response\",",
               "        function() {",
@@ -785,7 +824,7 @@
               "var hint = resp.data && resp.data.next_action_hint;",
               "if (hint) {",
               "    pm.test(",
-              "        \"Next hint: \" + hint.action + \" \u2014 \" + hint.reason,",
+              "        \"Next hint: \" + hint.action + \" — \" + hint.reason,",
               "        function() {",
               "            pm.expect(hint.action).to.exist;",
               "        }",
@@ -795,7 +834,7 @@
               "    console.log(\"Screen: \" + hint.screen);",
               "    console.log(\"Reason: \" + hint.reason);",
               "    if (hint.job_closed) {",
-              "        console.log(\"*** JOB CLOSED \u2014 GO TO DASHBOARD ***\");",
+              "        console.log(\"*** JOB CLOSED — GO TO DASHBOARD ***\");",
               "    }",
               "    if (hint.action_code) {",
               "        console.log(\"Next action code: \" + hint.action_code);",
@@ -807,7 +846,7 @@
       ]
     },
     {
-      "name": "10a \u2014 POD Capture Sync (Get Hash Before Upload)",
+      "name": "10a — POD Capture Sync (Get Hash Before Upload)",
       "request": {
         "method": "GET",
         "header": [
@@ -817,7 +856,7 @@
           }
         ],
         "url": "{{base_url}}/driver/jobs/shipments/{{shipment_id}}/pod/capture/",
-        "description": "STEP 10a \u2014 MUST CALL THIS BEFORE REQUEST 10.\nReturns content_hash and workflow_version\nspecifically for POD Capture API.\nThese are DIFFERENT from Job Detail hash.\nPOD Capture hash = shipment.updated_at ISO string.\nJob Detail hash = full fingerprint digest.\nDo NOT mix them up.\npod_content_hash and pod_workflow_version are\nsaved automatically for use in Request 10."
+        "description": "STEP 10a — MUST CALL THIS BEFORE REQUEST 10.\nReturns content_hash and workflow_version\nspecifically for POD Capture API.\nThese are DIFFERENT from Job Detail hash.\nPOD Capture hash = shipment.updated_at ISO string.\nJob Detail hash = full fingerprint digest.\nDo NOT mix them up.\npod_content_hash and pod_workflow_version are\nsaved automatically for use in Request 10."
       },
       "event": [
         {
@@ -845,7 +884,7 @@
               "var hint = resp.data && resp.data.next_action_hint;",
               "if (hint) {",
               "    pm.test(",
-              "        \"Next hint: \" + hint.action + \" \u2014 \" + hint.reason,",
+              "        \"Next hint: \" + hint.action + \" — \" + hint.reason,",
               "        function() {",
               "            pm.expect(hint.action).to.exist;",
               "        }",
@@ -855,7 +894,7 @@
               "    console.log(\"Screen: \" + hint.screen);",
               "    console.log(\"Reason: \" + hint.reason);",
               "    if (hint.job_closed) {",
-              "        console.log(\"*** JOB CLOSED \u2014 GO TO DASHBOARD ***\");",
+              "        console.log(\"*** JOB CLOSED — GO TO DASHBOARD ***\");",
               "    }",
               "    if (hint.action_code) {",
               "        console.log(\"Next action code: \" + hint.action_code);",
@@ -867,7 +906,7 @@
       ]
     },
     {
-      "name": "10 \u2014 POD Capture (Upload Evidence Before A7)",
+      "name": "10 — POD Capture (Upload Evidence Before A7)",
       "request": {
         "method": "POST",
         "header": [
@@ -972,7 +1011,7 @@
           ]
         },
         "url": "{{base_url}}/driver/jobs/shipments/{{shipment_id}}/pod/capture/",
-        "description": "STEP 10 \u2014 STAGE POD EVIDENCE.\nPREREQUISITE: Run Request 10a first to get\npod_content_hash and pod_workflow_version.\nThese are auto-filled from 10a response.\n\nTWO files required for POD Capture:\nFILE 1: media[0][file_ref]\n  media_type = photo\n  Select any JPG or PNG delivery note scan.\nFILE 2: media[1][file_ref]\n  media_type = signature\n  Select any JPG or PNG signature image.\nBoth file rows must have a real file selected.\nClick the file icon on each row in Postman.\n\nValid pod_type values: photo, video, document,\n  signature, soft, digital, multi_page\nValid media_type values: photo, video, \n  document, signature\n\nOn success capture_bundle_id is auto-saved\nfor use in Request 11 Execute A7."
+        "description": "STEP 10 — STAGE POD EVIDENCE.\nPREREQUISITE: Run Request 10a first to get\npod_content_hash and pod_workflow_version.\nThese are auto-filled from 10a response.\n\nTWO files required for POD Capture:\nFILE 1: media[0][file_ref]\n  media_type = photo\n  Select any JPG or PNG delivery note scan.\nFILE 2: media[1][file_ref]\n  media_type = signature\n  Select any JPG or PNG signature image.\nBoth file rows must have a real file selected.\nClick the file icon on each row in Postman.\n\nValid pod_type values: photo, video, document,\n  signature, soft, digital, multi_page\nValid media_type values: photo, video, \n  document, signature\n\nOn success capture_bundle_id is auto-saved\nfor use in Request 11 Execute A7."
       },
       "event": [
         {
@@ -988,7 +1027,7 @@
               "var hint = resp.data && resp.data.next_action_hint;",
               "if (hint) {",
               "    pm.test(",
-              "        \"Next hint: \" + hint.action + \" \u2014 \" + hint.reason,",
+              "        \"Next hint: \" + hint.action + \" — \" + hint.reason,",
               "        function() {",
               "            pm.expect(hint.action).to.exist;",
               "        }",
@@ -998,7 +1037,7 @@
               "    console.log(\"Screen: \" + hint.screen);",
               "    console.log(\"Reason: \" + hint.reason);",
               "    if (hint.job_closed) {",
-              "        console.log(\"*** JOB CLOSED \u2014 GO TO DASHBOARD ***\");",
+              "        console.log(\"*** JOB CLOSED — GO TO DASHBOARD ***\");",
               "    }",
               "    if (hint.action_code) {",
               "        console.log(\"Next action code: \" + hint.action_code);",
@@ -1010,7 +1049,7 @@
       ]
     },
     {
-      "name": "11 \u2014 Execute A7 \u2014 Upload POD (Creates POD Record)",
+      "name": "11 — Execute A7 — Upload POD (Creates POD Record)",
       "request": {
         "method": "POST",
         "header": [
@@ -1033,7 +1072,7 @@
           }
         },
         "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A7/execute/",
-        "description": "PREREQUISITE: Run requests in order 04 \u2192 05 \u2192 06 etc.\ncontent_hash and workflow_version auto-update after\neach successful execute.\nIf you get 409 stale_content_hash:\n  1. Re-run Request 03 Job Detail to refresh hash\n  2. Then retry this request\nDo NOT skip any action in the sequence."
+        "description": "PREREQUISITE: Run requests in order 04 → 05 → 06 etc.\ncontent_hash and workflow_version auto-update after\neach successful execute.\nIf you get 409 stale_content_hash:\n  1. Re-run Request 03 Job Detail to refresh hash\n  2. Then retry this request\nDo NOT skip any action in the sequence."
       },
       "event": [
         {
@@ -1051,6 +1090,9 @@
               "        \"workflow_version\",",
               "        resp.data.sync_metadata.workflow_version",
               "    );",
+              "    pm.environment.set(\"content_hash\", resp.data.sync_metadata.content_hash);",
+              "    pm.environment.set(\"workflow_version\", resp.data.sync_metadata.workflow_version);",
+              "    console.log(\"sync saved — hash: \" + String(resp.data.sync_metadata.content_hash).substring(0, 16) + \"...\");",
               "    pm.test(",
               "        \"Sync hash updated from execute response\",",
               "        function() {",
@@ -1063,7 +1105,7 @@
               "var hint = resp.data && resp.data.next_action_hint;",
               "if (hint) {",
               "    pm.test(",
-              "        \"Next hint: \" + hint.action + \" \u2014 \" + hint.reason,",
+              "        \"Next hint: \" + hint.action + \" — \" + hint.reason,",
               "        function() {",
               "            pm.expect(hint.action).to.exist;",
               "        }",
@@ -1073,7 +1115,7 @@
               "    console.log(\"Screen: \" + hint.screen);",
               "    console.log(\"Reason: \" + hint.reason);",
               "    if (hint.job_closed) {",
-              "        console.log(\"*** JOB CLOSED \u2014 GO TO DASHBOARD ***\");",
+              "        console.log(\"*** JOB CLOSED — GO TO DASHBOARD ***\");",
               "    }",
               "    if (hint.action_code) {",
               "        console.log(\"Next action code: \" + hint.action_code);",
@@ -1085,7 +1127,7 @@
       ]
     },
     {
-      "name": "12 \u2014 Execute A8 \u2014 Unloading Completed",
+      "name": "12 — Execute A8 — Unloading Completed",
       "request": {
         "method": "POST",
         "header": [
@@ -1108,7 +1150,7 @@
           }
         },
         "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A8/execute/",
-        "description": "PREREQUISITE: Run requests in order 04 \u2192 05 \u2192 06 etc.\ncontent_hash and workflow_version auto-update after\neach successful execute.\nIf you get 409 stale_content_hash:\n  1. Re-run Request 03 Job Detail to refresh hash\n  2. Then retry this request\nDo NOT skip any action in the sequence."
+        "description": "PREREQUISITE: Run requests in order 04 → 05 → 06 etc.\ncontent_hash and workflow_version auto-update after\neach successful execute.\nIf you get 409 stale_content_hash:\n  1. Re-run Request 03 Job Detail to refresh hash\n  2. Then retry this request\nDo NOT skip any action in the sequence."
       },
       "event": [
         {
@@ -1126,6 +1168,9 @@
               "        \"workflow_version\",",
               "        resp.data.sync_metadata.workflow_version",
               "    );",
+              "    pm.environment.set(\"content_hash\", resp.data.sync_metadata.content_hash);",
+              "    pm.environment.set(\"workflow_version\", resp.data.sync_metadata.workflow_version);",
+              "    console.log(\"sync saved — hash: \" + String(resp.data.sync_metadata.content_hash).substring(0, 16) + \"...\");",
               "    pm.test(",
               "        \"Sync hash updated from execute response\",",
               "        function() {",
@@ -1138,7 +1183,7 @@
               "var hint = resp.data && resp.data.next_action_hint;",
               "if (hint) {",
               "    pm.test(",
-              "        \"Next hint: \" + hint.action + \" \u2014 \" + hint.reason,",
+              "        \"Next hint: \" + hint.action + \" — \" + hint.reason,",
               "        function() {",
               "            pm.expect(hint.action).to.exist;",
               "        }",
@@ -1148,7 +1193,7 @@
               "    console.log(\"Screen: \" + hint.screen);",
               "    console.log(\"Reason: \" + hint.reason);",
               "    if (hint.job_closed) {",
-              "        console.log(\"*** JOB CLOSED \u2014 GO TO DASHBOARD ***\");",
+              "        console.log(\"*** JOB CLOSED — GO TO DASHBOARD ***\");",
               "    }",
               "    if (hint.action_code) {",
               "        console.log(\"Next action code: \" + hint.action_code);",
@@ -1160,7 +1205,7 @@
       ]
     },
     {
-      "name": "13 \u2014 Execute A9 \u2014 Collect Payment COD Only",
+      "name": "13 — Execute A9 — Collect Payment COD Only",
       "request": {
         "method": "POST",
         "header": [
@@ -1175,7 +1220,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"client_action_id\": \"a9-{{$guid}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"mobile_cod_amount\": 1500.00,\n  \"notes\": \"Cash collected from customer \u2014 1500.00 SAR\",\n  \"latitude\": 21.3891,\n  \"longitude\": 39.8579\n}",
+          "raw": "{\n  \"client_action_id\": \"a9-{{$guid}}\",\n  \"workflow_version\": \"{{workflow_version}}\",\n  \"content_hash\": \"{{content_hash}}\",\n  \"mobile_cod_amount\": 1500.00,\n  \"notes\": \"Cash collected from customer — 1500.00 SAR\",\n  \"latitude\": 21.3891,\n  \"longitude\": 39.8579\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -1183,7 +1228,7 @@
           }
         },
         "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A9/execute/",
-        "description": "STEP 13 \u2014 COD PAYMENT COLLECTION (COD ORDERS ONLY).\nSKIP THIS STEP FOR CREDIT ORDERS.\n\nTHIS USES EXECUTE ACTION API \u2014 same as all other actions.\nNOT the /payments/collect/ staging API.\n\nREQUIRED FIELDS:\n  mobile_cod_amount = actual cash collected from customer\n  notes = required (note says what amount was collected)\n  workflow_version and content_hash from Job Detail\n\nWHAT HAPPENS WHEN A9 FIRES:\n  - Driver Treasury Transaction created (Debit, Client Pay)\n  - Driver wallet balance increases by collected amount\n  - Shipment COD Payment Status = Collected\n  - If amount differs from expected: variance flagged for Ops\n  - Driver is NEVER blocked due to variance\n\nVARIANCE HANDLING:\n  Change mobile_cod_amount to actual amount received.\n  If different from 1500.00 that is fine.\n  System records variance and Ops follows up.\n  Driver proceeds normally to A10.\n\nIMPORTANT: Always run 03 Job Detail before this request\nto refresh content_hash and workflow_version.\n\nNext action after A9: A10 Job Closed."
+        "description": "STEP 13 — COD PAYMENT COLLECTION (COD ORDERS ONLY).\nSKIP THIS STEP FOR CREDIT ORDERS.\n\nTHIS USES EXECUTE ACTION API — same as all other actions.\nNOT the /payments/collect/ staging API.\n\nREQUIRED FIELDS:\n  mobile_cod_amount = actual cash collected from customer\n  notes = required (note says what amount was collected)\n  workflow_version and content_hash from Job Detail\n\nWHAT HAPPENS WHEN A9 FIRES:\n  - Driver Treasury Transaction created (Debit, Client Pay)\n  - Driver wallet balance increases by collected amount\n  - Shipment COD Payment Status = Collected\n  - If amount differs from expected: variance flagged for Ops\n  - Driver is NEVER blocked due to variance\n\nVARIANCE HANDLING:\n  Change mobile_cod_amount to actual amount received.\n  If different from 1500.00 that is fine.\n  System records variance and Ops follows up.\n  Driver proceeds normally to A10.\n\nIMPORTANT: Always run 03 Job Detail before this request\nto refresh content_hash and workflow_version.\n\nNext action after A9: A10 Job Closed."
       },
       "event": [
         {
@@ -1201,15 +1246,18 @@
               "        \"workflow_version\",",
               "        resp.data.sync_metadata.workflow_version",
               "    );",
+              "    pm.environment.set(\"content_hash\", resp.data.sync_metadata.content_hash);",
+              "    pm.environment.set(\"workflow_version\", resp.data.sync_metadata.workflow_version);",
+              "    console.log(\"sync saved — hash: \" + String(resp.data.sync_metadata.content_hash).substring(0, 16) + \"...\");",
               "    pm.test(",
               "        \"A9 COD payment collected\",",
               "        function() { pm.expect(resp.status).to.eql(1); }",
               "    );",
               "    var hint = resp.data && resp.data.next_action_hint;",
               "    if (hint) {",
-              "        console.log(\"Next: \" + hint.action + \" \u2014 \" + hint.reason);",
+              "        console.log(\"Next: \" + hint.action + \" — \" + hint.reason);",
               "        if (hint.job_closed) {",
-              "            console.log(\"*** JOB CLOSED \u2014 GO TO DASHBOARD ***\");",
+              "            console.log(\"*** JOB CLOSED — GO TO DASHBOARD ***\");",
               "        }",
               "    }",
               "}"
@@ -1219,7 +1267,7 @@
       ]
     },
     {
-      "name": "13B \u2014 Payment Staging API (Optional Reference Only)",
+      "name": "13B — Payment Staging API (Optional Reference Only)",
       "request": {
         "method": "POST",
         "header": [
@@ -1242,11 +1290,11 @@
           }
         },
         "url": "{{base_url}}/driver/payments/collect/",
-        "description": "REFERENCE ONLY \u2014 NOT REQUIRED FOR COD FLOW.\n\nThis is a staging API for pre-registering payment intent.\nIt does NOT fire A9.\nIt does NOT collect the payment.\nIt does NOT create a Treasury Transaction.\n\nUSE THIS ONLY IF:\n  Your app needs to stage payment metadata\n  before the driver physically collects cash.\n\nFOR NORMAL COD FLOW: Use Request 13 Execute A9 instead.\n\nWARNING: This API validates file paths strictly.\nDo NOT attach files unless paths follow this pattern:\n  mobile_driver_uploads/{tenant}/{driver}/{shipment}/\n  payment_collection/filename.jpg\nSend proof_media as empty array [] for testing."
+        "description": "REFERENCE ONLY — NOT REQUIRED FOR COD FLOW.\n\nThis is a staging API for pre-registering payment intent.\nIt does NOT fire A9.\nIt does NOT collect the payment.\nIt does NOT create a Treasury Transaction.\n\nUSE THIS ONLY IF:\n  Your app needs to stage payment metadata\n  before the driver physically collects cash.\n\nFOR NORMAL COD FLOW: Use Request 13 Execute A9 instead.\n\nWARNING: This API validates file paths strictly.\nDo NOT attach files unless paths follow this pattern:\n  mobile_driver_uploads/{tenant}/{driver}/{shipment}/\n  payment_collection/filename.jpg\nSend proof_media as empty array [] for testing."
       }
     },
     {
-      "name": "14 \u2014 Execute A10 \u2014 Job Closed (Terminal Action)",
+      "name": "14 — Execute A10 — Job Closed (Terminal Action)",
       "request": {
         "method": "POST",
         "header": [
@@ -1269,7 +1317,7 @@
           }
         },
         "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A10/execute/",
-        "description": "PREREQUISITE: Run requests in order 04 \u2192 05 \u2192 06 etc.\ncontent_hash and workflow_version auto-update after\neach successful execute.\nIf you get 409 stale_content_hash:\n  1. Re-run Request 03 Job Detail to refresh hash\n  2. Then retry this request\nDo NOT skip any action in the sequence."
+        "description": "PREREQUISITE: Run requests in order 04 → 05 → 06 etc.\ncontent_hash and workflow_version auto-update after\neach successful execute.\nIf you get 409 stale_content_hash:\n  1. Re-run Request 03 Job Detail to refresh hash\n  2. Then retry this request\nDo NOT skip any action in the sequence."
       },
       "event": [
         {
@@ -1287,6 +1335,9 @@
               "        \"workflow_version\",",
               "        resp.data.sync_metadata.workflow_version",
               "    );",
+              "    pm.environment.set(\"content_hash\", resp.data.sync_metadata.content_hash);",
+              "    pm.environment.set(\"workflow_version\", resp.data.sync_metadata.workflow_version);",
+              "    console.log(\"sync saved — hash: \" + String(resp.data.sync_metadata.content_hash).substring(0, 16) + \"...\");",
               "    pm.test(",
               "        \"Sync hash updated from execute response\",",
               "        function() {",
@@ -1299,7 +1350,7 @@
               "var hint = resp.data && resp.data.next_action_hint;",
               "if (hint) {",
               "    pm.test(",
-              "        \"Next hint: \" + hint.action + \" \u2014 \" + hint.reason,",
+              "        \"Next hint: \" + hint.action + \" — \" + hint.reason,",
               "        function() {",
               "            pm.expect(hint.action).to.exist;",
               "        }",
@@ -1309,7 +1360,7 @@
               "    console.log(\"Screen: \" + hint.screen);",
               "    console.log(\"Reason: \" + hint.reason);",
               "    if (hint.job_closed) {",
-              "        console.log(\"*** JOB CLOSED \u2014 GO TO DASHBOARD ***\");",
+              "        console.log(\"*** JOB CLOSED — GO TO DASHBOARD ***\");",
               "    }",
               "    if (hint.action_code) {",
               "        console.log(\"Next action code: \" + hint.action_code);",
@@ -1321,7 +1372,7 @@
       ]
     },
     {
-      "name": "15 \u2014 Report Issue (Optional \u2014 Any Time)",
+      "name": "15 — Report Issue (Optional — Any Time)",
       "request": {
         "method": "POST",
         "header": [
@@ -1396,15 +1447,15 @@
           ]
         },
         "url": "{{base_url}}/driver/issues/report/",
-        "description": "OPTIONAL \u2014 CAN BE CALLED AT ANY POINT DURING THE JOB.\nissue_type values: delay, vehicle_breakdown, customer_unavailable,\n  payment_dispute, pod_issue, accident, route_blocked, other\nseverity values: low, medium, high, critical\nThis does NOT stop the job flow.\nIssue is sent to Ops supervisor for acknowledgement.\nDriver continues normal action flow alongside.\n\nFILE UPLOAD INSTRUCTIONS:\nFor any field with type FILE:\n  Click the file icon in Postman next to that field.\n  Select any JPG, PNG, or MP4 file from your device.\nAllowed file types: image/jpeg, image/png,\n  image/webp, video/mp4\nMax file size: 50MB per file\nContent-Type is set automatically by Postman.\nDo NOT set Content-Type header manually."
+        "description": "OPTIONAL — CAN BE CALLED AT ANY POINT DURING THE JOB.\nissue_type values: delay, vehicle_breakdown, customer_unavailable,\n  payment_dispute, pod_issue, accident, route_blocked, other\nseverity values: low, medium, high, critical\nThis does NOT stop the job flow.\nIssue is sent to Ops supervisor for acknowledgement.\nDriver continues normal action flow alongside.\n\nFILE UPLOAD INSTRUCTIONS:\nFor any field with type FILE:\n  Click the file icon in Postman next to that field.\n  Select any JPG, PNG, or MP4 file from your device.\nAllowed file types: image/jpeg, image/png,\n  image/webp, video/mp4\nMax file size: 50MB per file\nContent-Type is set automatically by Postman.\nDo NOT set Content-Type header manually."
       }
     },
     {
-      "name": "COD Fix Verification \u2014 SH-COD-29789621",
+      "name": "COD Fix Verification — SH-COD-29789621",
       "description": "Verifies all 5 COD fix patches for SH-COD-29789621.\nRun 01-Login first to get access_token.\nNote: shipment is already Closed in DB.\nPre-fix checks verify fix logic is live.\nExecute A10 request will return 400 (already closed) which is expected.\nTo fully re-test, reset shipment to Delivered state first.",
       "item": [
         {
-          "name": "Job Detail \u2014 Pre-Fix Check",
+          "name": "Job Detail — Pre-Fix Check",
           "request": {
             "method": "GET",
             "header": [
@@ -1472,7 +1523,7 @@
           ]
         },
         {
-          "name": "Timeline \u2014 A_POD_VERIFY Present",
+          "name": "Timeline — A_POD_VERIFY Present",
           "request": {
             "method": "GET",
             "header": [
@@ -1507,7 +1558,7 @@
           ]
         },
         {
-          "name": "Hard POD Pending \u2014 Pre-Execute",
+          "name": "Hard POD Pending — Pre-Execute",
           "request": {
             "method": "GET",
             "header": [
@@ -1538,7 +1589,7 @@
           ]
         },
         {
-          "name": "Execute A10 \u2014 Job Closed",
+          "name": "Execute A10 — Job Closed",
           "request": {
             "method": "POST",
             "header": [
@@ -1574,7 +1625,7 @@
                   "});",
                   "const body = pm.response.json();",
                   "if (pm.response.code === 400) {",
-                  "    pm.test(\"400 means already closed \u2014 acceptable\", () => {",
+                  "    pm.test(\"400 means already closed — acceptable\", () => {",
                   "        const msg = JSON.stringify(body).toLowerCase();",
                   "        pm.expect(msg).to.satisfy(m =>",
                   "            m.includes(\"already\") ||",
@@ -1583,7 +1634,7 @@
                   "            m.includes(\"invalid\")",
                   "        );",
                   "    });",
-                  "    console.log(\"Shipment already closed \u2014 A10 not re-executable. Expected.\");",
+                  "    console.log(\"Shipment already closed — A10 not re-executable. Expected.\");",
                   "} else {",
                   "    pm.test(\"No error field on success\", () => {",
                   "        pm.expect(body.status).to.not.eql(0);",
@@ -1603,7 +1654,7 @@
           ]
         },
         {
-          "name": "Job Detail \u2014 Post A10 Closed",
+          "name": "Job Detail — Post A10 Closed",
           "request": {
             "method": "GET",
             "header": [
@@ -1643,7 +1694,7 @@
           ]
         },
         {
-          "name": "Hard POD Pending \u2014 Post-Execute",
+          "name": "Hard POD Pending — Post-Execute",
           "request": {
             "method": "GET",
             "header": [

@@ -11,6 +11,13 @@ from rest_framework import serializers
 from mobile_api.execution.evidence.constants import EXECUTION_MEDIA_MAX_ITEMS
 
 
+class HardPodConfirmedPageSerializer(serializers.Serializer):
+    page_id = serializers.CharField(required=False, allow_blank=True, max_length=64)
+    document_id = serializers.CharField(required=False, allow_blank=True, max_length=64)
+    line_no = serializers.IntegerField(required=False, min_value=1)
+    confirmed = serializers.BooleanField(required=False, default=True)
+
+
 class HardPodSubmitMediaItemSerializer(serializers.Serializer):
     media_type = serializers.ChoiceField(
         choices=['photo', 'video', 'document', 'signature'],
@@ -34,6 +41,7 @@ class HardPodSubmitRequestSerializer(serializers.Serializer):
     latitude = serializers.FloatField(required=False, allow_null=True)
     longitude = serializers.FloatField(required=False, allow_null=True)
     media = HardPodSubmitMediaItemSerializer(many=True, required=False, default=list)
+    confirmed_pages = HardPodConfirmedPageSerializer(many=True, required=True)
 
     def validate_client_submission_id(self, value: str) -> str:
         token = (value or '').strip()

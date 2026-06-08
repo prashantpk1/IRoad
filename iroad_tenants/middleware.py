@@ -3,7 +3,20 @@ Middleware for the tenant web portal (``/tenant/`` URLs).
 """
 from __future__ import annotations
 
+from django.contrib import messages
+from django.shortcuts import redirect
+from django.urls import reverse
+
+from iroad_tenants.subscription_access import (
+    SUBSCRIPTION_SETUP_URL_NAMES,
+    subscription_setup_url_name,
+    tenant_has_active_subscription,
+    tenant_portal_is_owner_admin,
+)
 from iroad_tenants.tenant_schema import lock_portal_tenant_schema, unlock_portal_tenant_schema
+from superadmin.models import TenantProfile
+from superadmin.redis_helpers import get_tenant_session
+from superadmin.tenant_portal_auth import get_tenant_portal_cookie_payload
 
 
 class TenantPortalSchemaMiddleware:
@@ -37,3 +50,48 @@ class TenantPortalSchemaMiddleware:
         finally:
             if locked:
                 unlock_portal_tenant_schema(request)
+
+
+class TenantSubscriptionGateMiddleware:
+    """
+    Tenant owners without an active subscription may only open subscription
+    setup pages until they purchase a plan.
+    """
+
+    PREFIX = '/tenant/'
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        if not request.path.startswith(self.PREFIX):
+            return self.get_response(request)
+
+        url_name = subscription_setup_url_name(request)
+        if url_name in SUBSCRIPTION_SETUP_URL_NAMES:
+            return self.get_response(request)
+
+        auth_payload = get_tenant_portal_cookie_payload(request) or {}
+        tenant_id = auth_payload.get('tenant_id')
+        tenant_jti = auth_payload.get('jti')
+        if not tenant_id or not tenant_jti:
+            return self.get_response(request)
+
+        tenant = TenantProfile.objects.filter(pk=tenant_id).first()
+        if tenant is None or tenant.account_status != 'Active':
+            return self.get_response(request)
+
+        session_data = get_tenant_session(str(tenant.tenant_id), str(tenant_jti)) or {}
+        if not tenant_portal_is_owner_admin(session_data, tenant):
+            return self.get_response(request)
+
+        if tenant_has_active_subscription(tenant):
+            return self.get_response(request)
+
+        messages.warning(
+            request,
+            'Choose a subscription plan to access this area. '
+            'Add a payment method on Subscription Billing before purchasing.',
+            extra_tags='tenant',
+        )
+        return redirect(reverse('iroad_tenants:tenant_subscription_plan'))

@@ -1,324 +1,293 @@
-{% extends 'iroad_tenants/base.html' %}
-{% load static %}
-
-{% block title %}Support Ticket Master List | iRoad Admin{% endblock %}
-
-{% block content %}
-
-      <!-- Page Header -->
-      <div class="page-header">
-        <nav aria-label="breadcrumb">
-          <ol class="breadcrumb">
-            <li class="breadcrumb-item">
-              <a href="{% url 'iroad_tenants:tenant_dashboard' %}">Dashboard</a>
-            </li>
-            <li class="breadcrumb-item">Administration</li>
-            <li class="breadcrumb-item">Support Management</li>
-            <li class="breadcrumb-item active" aria-current="page">
-              Support Ticket Master
-            </li>
-          </ol>
-        </nav>
-
-        <div class="page-header-row">
-          <div class="page-header-left">
-            <h1 class="page-title">Support Ticket Master</h1>
-            <p class="page-subtitle">Manage and view all support tickets.</p>
-          </div>
-          <div class="page-header-right">
-            <div class="eal-header-actions">
-              <button class="eal-btn eal-btn-outline" type="button">
-                <i class="bi bi-download"></i>
-                <span>Export</span>
-              </button>
-              <a
-                href="{% url 'iroad_tenants:tenant_support_ticket_create' %}"
-                class="eal-btn eal-btn-primary"
-              >
-                <i class="bi bi-plus-lg"></i>
-                <span>Add Support Ticket</span>
-              </a>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Stats Row -->
-      <div class="eal-stats-row">
-        <div class="eal-stat-card">
-          <div class="eal-stat-icon purple">
-            <i class="bi bi-ticket-detailed"></i>
-          </div>
-          <div>
-            <div class="eal-stat-value">{{ total_count }}</div>
-            <div class="eal-stat-label">Total Tickets</div>
-          </div>
-        </div>
-        <div class="eal-stat-card">
-          <div class="eal-stat-icon green">
-            <i class="bi bi-circle"></i>
-          </div>
-          <div>
-            <div class="eal-stat-value">{{ open_count }}</div>
-            <div class="eal-stat-label">Open</div>
-          </div>
-        </div>
-        <div class="eal-stat-card">
-          <div class="eal-stat-icon amber">
-            <i class="bi bi-hourglass-split"></i>
-          </div>
-          <div>
-            <div class="eal-stat-value">{{ in_progress_count }}</div>
-            <div class="eal-stat-label">In Progress</div>
-          </div>
-        </div>
-        <div class="eal-stat-card">
-          <div class="eal-stat-icon blue">
-            <i class="bi bi-check-circle"></i>
-          </div>
-          <div>
-            <div class="eal-stat-value">{{ closed_count }}</div>
-            <div class="eal-stat-label">Resolved / Closed</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Table Card -->
-      <div
-        class="eal-table-card"
-        data-eal-filterable-table
-        data-eal-empty-colspan="10"
-        data-eal-empty-filter-message="No support tickets match the selected search or column filters."
-        data-eal-global-search-columns="1,2,3,4,5,6,7,8"
-      >
-        <div class="eal-toolbar">
-          <div class="eal-toolbar-left">
-            <div class="eal-search">
-              <i class="bi bi-search"></i>
-              <input
-                type="search"
-                id="supportTicketSearch"
-                data-eal-global-search
-                value="{{ search_q|default:'' }}"
-                autocomplete="off"
-                placeholder="Search support tickets&hellip;"
-                aria-label="Search support tickets"
-              />
-              <button
-                type="button"
-                class="eal-search-clear-btn"
-                id="supportTicketSearchClear"
-                title="Clear search"
-                aria-label="Clear search"
-                hidden
-              >
-                <i class="bi bi-x-lg"></i>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div class="eal-table-wrap">
-          <table class="eal-table">
-            <thead>
-              <tr>
-                <th class="eal-col-check">
-                  <input
-                    type="checkbox"
-                    class="eal-custom-check"
-                    id="ealSelectAll"
-                  />
-                </th>
-                {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=1 title="Ticket No." filter_placeholder="Filter by ticket no." %}
-                {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=2 title="Tenant" filter_placeholder="Filter by tenant" %}
-                {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=3 title="Subject" filter_placeholder="Filter by subject" %}
-                {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=4 title="Category" filter_placeholder="Filter by category" %}
-                {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=5 title="Priority" filter_placeholder="Filter by priority" %}
-                {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=6 title="Assigned To" filter_placeholder="Filter by assignee" %}
-                {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=7 title="Created By" filter_placeholder="Filter by creator" %}
-                {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=8 title="Status" filter_placeholder="Filter by status" %}
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for ticket in tickets %}
-              <tr>
-                <td class="eal-col-check">
-                  <input type="checkbox" class="eal-custom-check" />
-                </td>
-                <td>
-                  <a
-                    href="{% url 'iroad_tenants:tenant_support_ticket_detail' ticket.ticket_id %}?mode=view"
-                    class="eal-entity-id"
-                  >{{ ticket.ticket_no }}</a>
-                </td>
-                <td>{{ ticket.tenant.company_name|default:"-" }}</td>
-                <td>{{ ticket.subject }}</td>
-                <td>{{ ticket.category.name_en }}</td>
-                <td>
-                  {% if ticket.priority == 'Critical' %}
-                    <span class="status-badge suspended">{{ ticket.priority }}</span>
-                  {% elif ticket.priority == 'High' %}
-                    <span class="status-badge pending">{{ ticket.priority }}</span>
-                  {% elif ticket.priority == 'Medium' %}
-                    <span class="status-badge active">{{ ticket.priority }}</span>
-                  {% else %}
-                    <span class="status-badge inactive">{{ ticket.priority }}</span>
-                  {% endif %}
-                </td>
-                <td>
-                  <div class="eal-name-cell">
-                    <span class="eal-name-text">{{ ticket.assigned_to_username|default:"-" }}</span>
-                    {% if ticket.assigned_to_role and ticket.assigned_to_role != "-" %}
-                    <span class="eal-name-sub text-muted" style="font-size: 12px;">{{ ticket.assigned_to_role }}</span>
-                    {% endif %}
-                  </div>
-                </td>
-                <td>
-                  <div class="eal-name-cell">
-                    <span class="eal-name-text">{{ ticket.created_by_username|default:"-" }}</span>
-                    {% if ticket.created_by_role and ticket.created_by_role != "-" %}
-                    <span class="eal-name-sub text-muted" style="font-size: 12px;">{{ ticket.created_by_role }}</span>
-                    {% endif %}
-                  </div>
-                </td>
-                <td>
-                  <span class="status-badge {% if ticket.status == 'Closed' %}inactive{% elif ticket.status == 'In_Progress' %}pending{% else %}active{% endif %}">{{ ticket.get_status_display }}</span>
-                </td>
-                <td>
-                  <div class="dropdown eal-actions-cell">
-                    <button
-                      class="eal-row-btn"
-                      type="button"
-                      data-bs-toggle="dropdown"
-                      data-bs-boundary="viewport"
-                      aria-expanded="false"
-                      title="Actions"
-                    >
-                      <i class="bi bi-three-dots-vertical"></i>
-                    </button>
-                    <ul
-                      class="dropdown-menu dropdown-menu-end shadow-sm"
-                      style="border-radius: 8px; border-color: #e2e8f0; min-width: 180px;"
-                    >
-                      {% if ticket.status != 'Closed' %}
-                      <li>
-                        <a
-                          class="dropdown-item"
-                          href="{% url 'iroad_tenants:tenant_support_ticket_edit' ticket.ticket_id %}"
-                        >
-                          <i class="bi bi-pencil text-primary me-2"></i>Edit
-                        </a>
-                      </li>
-                      {% endif %}
-                      <li>
-                        <a
-                          class="dropdown-item"
-                          href="{% url 'iroad_tenants:tenant_support_ticket_detail' ticket.ticket_id %}?mode=view"
-                        >
-                          <i class="bi bi-eye text-info me-2"></i>View
-                        </a>
-                      </li>
-                      {% if ticket.status != 'Closed' %}
-                      <li>
-                        <a
-                          class="dropdown-item"
-                          href="{% url 'iroad_tenants:tenant_support_ticket_detail' ticket.ticket_id %}#reply-section"
-                        >
-                          <i class="bi bi-reply text-info me-2"></i>Reply
-                        </a>
-                      </li>
-                      <li><hr class="dropdown-divider" /></li>
-                      <li>
-                        <form
-                          method="post"
-                          action="{% url 'iroad_tenants:tenant_support_ticket_delete' ticket.ticket_id %}"
-                          onsubmit="return confirm('Delete support ticket {{ ticket.ticket_no }}? This cannot be undone.');"
-                        >
-                          {% csrf_token %}
-                          <button type="submit" class="dropdown-item text-danger">
-                            <i class="bi bi-trash3 me-2"></i>Delete
-                          </button>
-                        </form>
-                      </li>
-                      {% endif %}
-                    </ul>
-                  </div>
-                </td>
-              </tr>
-              {% empty %}
-              <tr data-eal-empty-row>
-                <td colspan="10" class="text-center py-4">No support tickets found.</td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-
-        <div class="eal-pagination">
-          <div class="eal-pagination-info" data-eal-pagination-info>
-            Showing
-            <strong>{% if tickets %}1&ndash;{{ tickets|length }}{% else %}0{% endif %}</strong>
-            of
-            <strong>{{ tickets|length }}</strong>
-            support tickets
-          </div>
-          <div class="eal-pagination-controls">
-            <button class="eal-page-btn" type="button" title="Previous" disabled>
-              <i class="bi bi-chevron-left"></i>
-            </button>
-            <button class="eal-page-btn active" type="button">1</button>
-            <button class="eal-page-btn" type="button" title="Next" disabled>
-              <i class="bi bi-chevron-right"></i>
-            </button>
-          </div>
-        </div>
-      </div>
-
-{% endblock %}
-
-{% block extra_js %}
-<script>
-(function () {
-  var inp = document.getElementById("supportTicketSearch");
-  var btn = document.getElementById("supportTicketSearchClear");
-  var listUrl = "{% url 'iroad_tenants:tenant_support_ticket_list' %}";
-  if (!inp) return;
-
-  function hasServerQ() {
-    try {
-      return new URLSearchParams(window.location.search).has("q");
-    } catch (e) {
-      return false;
-    }
-  }
-
-  function syncClear() {
-    if (!btn) return;
-    var v = (inp.value || "").trim();
-    btn.hidden = !(v || hasServerQ());
-  }
-
-  inp.addEventListener("input", syncClear);
-  syncClear();
-
-  if ((inp.value || "").trim()) {
-    inp.dispatchEvent(new Event("input", { bubbles: true }));
-  }
-
-  if (btn) {
-    btn.addEventListener("click", function () {
-      if (hasServerQ()) {
-        window.location.href = listUrl;
-        return;
-      }
-      inp.value = "";
-      inp.dispatchEvent(new Event("input", { bubbles: true }));
-      syncClear();
-      inp.focus();
-    });
-  }
-})();
-</script>
-{% endblock %}
-
+{% extends 'iroad_tenants/base.html' %}
+{% load static %}
+
+{% block title %}Support Ticket Master List | iRoad Admin{% endblock %}
+
+{% block content %}
+
+      <!-- Page Header -->
+      <div class="page-header">
+        <nav aria-label="breadcrumb">
+          <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+              <a href="{% url 'iroad_tenants:tenant_dashboard' %}">Dashboard</a>
+            </li>
+            <li class="breadcrumb-item">Administration</li>
+            <li class="breadcrumb-item">Support Management</li>
+            <li class="breadcrumb-item active" aria-current="page">
+              Support Ticket Master
+            </li>
+          </ol>
+        </nav>
+
+        <div class="page-header-row">
+          <div class="page-header-left">
+            <h1 class="page-title">Support Ticket Master</h1>
+            <p class="page-subtitle">Manage and view all support tickets.</p>
+          </div>
+          <div class="page-header-right">
+            <div class="eal-header-actions">
+              <button class="eal-btn eal-btn-outline" type="button">
+                <i class="bi bi-download"></i>
+                <span>Export</span>
+              </button>
+              <a
+                href="{% url 'iroad_tenants:tenant_support_ticket_create' %}"
+                class="eal-btn eal-btn-primary"
+              >
+                <i class="bi bi-plus-lg"></i>
+                <span>Add Support Ticket</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stats Row -->
+      <div class="eal-stats-row">
+        <div class="eal-stat-card">
+          <div class="eal-stat-icon purple">
+            <i class="bi bi-ticket-detailed"></i>
+          </div>
+          <div>
+            <div class="eal-stat-value">{{ total_count }}</div>
+            <div class="eal-stat-label">Total Tickets</div>
+          </div>
+        </div>
+        <div class="eal-stat-card">
+          <div class="eal-stat-icon green">
+            <i class="bi bi-circle"></i>
+          </div>
+          <div>
+            <div class="eal-stat-value">{{ open_count }}</div>
+            <div class="eal-stat-label">Open</div>
+          </div>
+        </div>
+        <div class="eal-stat-card">
+          <div class="eal-stat-icon amber">
+            <i class="bi bi-hourglass-split"></i>
+          </div>
+          <div>
+            <div class="eal-stat-value">{{ in_progress_count }}</div>
+            <div class="eal-stat-label">In Progress</div>
+          </div>
+        </div>
+        <div class="eal-stat-card">
+          <div class="eal-stat-icon blue">
+            <i class="bi bi-check-circle"></i>
+          </div>
+          <div>
+            <div class="eal-stat-value">{{ closed_count }}</div>
+            <div class="eal-stat-label">Resolved / Closed</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Table Card -->
+      <div
+        class="eal-table-card"
+        data-eal-filterable-table
+        data-eal-empty-colspan="10"
+        data-eal-empty-filter-message="No support tickets match the selected search or column filters."
+        data-eal-global-search-columns="1,2,3,4,5,6,7,8"
+      >
+        <div class="eal-toolbar">
+          <div class="eal-toolbar-left">
+            <div class="eal-search">
+              <i class="bi bi-search"></i>
+              <input
+                type="search"
+                id="supportTicketSearch"
+                data-eal-global-search
+                value="{{ search_q|default:'' }}"
+                autocomplete="off"
+                placeholder="Search support tickets&hellip;"
+                aria-label="Search support tickets"
+              />
+              <button
+                type="button"
+                class="eal-search-clear-btn"
+                id="supportTicketSearchClear"
+                title="Clear search"
+                aria-label="Clear search"
+                hidden
+              >
+                <i class="bi bi-x-lg"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="eal-table-wrap">
+          <table class="eal-table">
+            <thead>
+              <tr>
+                <th class="eal-col-check">
+                  <input
+                    type="checkbox"
+                    class="eal-custom-check"
+                    id="ealSelectAll"
+                  />
+                </th>
+                {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=1 title="Ticket No." filter_placeholder="Filter by ticket no." %}
+                {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=2 title="Tenant" filter_placeholder="Filter by tenant" %}
+                {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=3 title="Subject" filter_placeholder="Filter by subject" %}
+                {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=4 title="Category" filter_placeholder="Filter by category" %}
+                {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=5 title="Priority" filter_placeholder="Filter by priority" %}
+                {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=6 title="Assigned To" filter_placeholder="Filter by assignee" %}
+                {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=7 title="Created By" filter_placeholder="Filter by creator" %}
+                {% include 'iroad_tenants/partials/eal_column_filter_th.html' with col_index=8 title="Status" filter_placeholder="Filter by status" %}
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for ticket in tickets %}
+              <tr>
+                <td class="eal-col-check">
+                  <input type="checkbox" class="eal-custom-check" />
+                </td>
+                <td>
+                  <a
+                    href="{% url 'iroad_tenants:tenant_support_ticket_detail' ticket.ticket_id %}?mode=view"
+                    class="eal-entity-id"
+                  >{{ ticket.ticket_no }}</a>
+                </td>
+                <td>{{ ticket.tenant.company_name|default:"-" }}</td>
+                <td>{{ ticket.subject }}</td>
+                <td>{{ ticket.category.name_en }}</td>
+                <td>
+                  {% if ticket.priority == 'Critical' %}
+                    <span class="status-badge suspended">{{ ticket.priority }}</span>
+                  {% elif ticket.priority == 'High' %}
+                    <span class="status-badge pending">{{ ticket.priority }}</span>
+                  {% elif ticket.priority == 'Medium' %}
+                    <span class="status-badge active">{{ ticket.priority }}</span>
+                  {% else %}
+                    <span class="status-badge inactive">{{ ticket.priority }}</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <div class="eal-name-cell">
+                    <span class="eal-name-text">{{ ticket.assigned_to_username|default:"-" }}</span>
+                    {% if ticket.assigned_to_role and ticket.assigned_to_role != "-" %}
+                    <span class="eal-name-sub text-muted" style="font-size: 12px;">{{ ticket.assigned_to_role }}</span>
+                    {% endif %}
+                  </div>
+                </td>
+                <td>
+                  <div class="eal-name-cell">
+                    <span class="eal-name-text">{{ ticket.created_by_username|default:"-" }}</span>
+                    {% if ticket.created_by_role and ticket.created_by_role != "-" %}
+                    <span class="eal-name-sub text-muted" style="font-size: 12px;">{{ ticket.created_by_role }}</span>
+                    {% endif %}
+                  </div>
+                </td>
+                <td>
+                  <span class="status-badge {% if ticket.status == 'Closed' %}inactive{% elif ticket.status == 'In_Progress' %}pending{% else %}active{% endif %}">{{ ticket.get_status_display }}</span>
+                </td>
+                <td>
+                  <div class="dropdown eal-actions-cell">
+                    <button
+                      class="eal-row-btn"
+                      type="button"
+                      data-bs-toggle="dropdown"
+                      data-bs-boundary="viewport"
+                      aria-expanded="false"
+                      title="Actions"
+                    >
+                      <i class="bi bi-three-dots-vertical"></i>
+                    </button>
+                    <ul
+                      class="dropdown-menu dropdown-menu-end shadow-sm"
+                      style="border-radius: 8px; border-color: #e2e8f0; min-width: 180px;"
+                    >
+                      {% if ticket.status != 'Closed' %}
+                      <li>
+                        <a
+                          class="dropdown-item"
+                          href="{% url 'iroad_tenants:tenant_support_ticket_detail' ticket.ticket_id %}#reply-section"
+                        >
+                          <i class="bi bi-reply text-info me-2"></i>Reply
+                        </a>
+                      </li>
+                      {% endif %}
+                    </ul>
+                  </div>
+                </td>
+              </tr>
+              {% empty %}
+              <tr data-eal-empty-row>
+                <td colspan="10" class="text-center py-4">No support tickets found.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="eal-pagination">
+          <div class="eal-pagination-info" data-eal-pagination-info>
+            Showing
+            <strong>{% if tickets %}1&ndash;{{ tickets|length }}{% else %}0{% endif %}</strong>
+            of
+            <strong>{{ tickets|length }}</strong>
+            support tickets
+          </div>
+          <div class="eal-pagination-controls">
+            <button class="eal-page-btn" type="button" title="Previous" disabled>
+              <i class="bi bi-chevron-left"></i>
+            </button>
+            <button class="eal-page-btn active" type="button">1</button>
+            <button class="eal-page-btn" type="button" title="Next" disabled>
+              <i class="bi bi-chevron-right"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  var inp = document.getElementById("supportTicketSearch");
+  var btn = document.getElementById("supportTicketSearchClear");
+  var listUrl = "{% url 'iroad_tenants:tenant_support_ticket_list' %}";
+  if (!inp) return;
+
+  function hasServerQ() {
+    try {
+      return new URLSearchParams(window.location.search).has("q");
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function syncClear() {
+    if (!btn) return;
+    var v = (inp.value || "").trim();
+    btn.hidden = !(v || hasServerQ());
+  }
+
+  inp.addEventListener("input", syncClear);
+  syncClear();
+
+  if ((inp.value || "").trim()) {
+    inp.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+
+  if (btn) {
+    btn.addEventListener("click", function () {
+      if (hasServerQ()) {
+        window.location.href = listUrl;
+        return;
+      }
+      inp.value = "";
+      inp.dispatchEvent(new Event("input", { bubbles: true }));
+      syncClear();
+      inp.focus();
+    });
+  }
+})();
+</script>
+{% endblock %}
+

@@ -354,7 +354,14 @@ class JobDetailTimelineService:
         actions = self._filter_workflow_actions_for_context(actions, context=context)
         if not actions:
             return []
-        events = merge_actions_with_timeline_logs(actions, logs, request=request)
+        shipment = context.shipment if context.job_type == 'shipment' else None
+        events = merge_actions_with_timeline_logs(
+            actions,
+            logs,
+            request=request,
+            shipment=shipment,
+            tenant_schema=(context.tenant_schema or ''),
+        )
         return self._append_system_auto_events(events, logs, request=request)
 
     def _bundle_from_workflow_events(

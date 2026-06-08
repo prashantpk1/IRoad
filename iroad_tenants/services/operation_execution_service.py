@@ -125,6 +125,7 @@ class OperationExecutionService:
             job_type=job_type,
             job_id=job_id,
             job_no=job_no,
+            shipment=shipment,
         )
 
     validate_driver_action_execution = validate_operation_action_allowed

@@ -23,6 +23,12 @@ class PodCaptureMediaItemSerializer(serializers.Serializer):
     captured_at = serializers.DateTimeField(required=False, allow_null=True)
     checksum = serializers.CharField(required=False, allow_blank=True, max_length=128)
     sort_order = serializers.IntegerField(required=False, default=0)
+    duration_seconds = serializers.FloatField(
+        required=False,
+        allow_null=True,
+        min_value=0,
+        help_text='Video clip length in seconds (max 15 for POD capture).',
+    )
 
 
 class PodCaptureRequestSerializer(serializers.Serializer):
@@ -37,12 +43,12 @@ class PodCaptureRequestSerializer(serializers.Serializer):
     content_hash = serializers.CharField(max_length=128)
     workflow_version = serializers.CharField(max_length=256)
     pod_type = serializers.ChoiceField(
-        choices=['digital', 'soft', 'signature', 'multi_page', 'video'],
+        choices=['digital', 'soft', 'hard', 'signature', 'multi_page', 'video'],
         required=False,
         allow_blank=True,
     )
     pod_capture_type = serializers.ChoiceField(
-        choices=['digital', 'soft', 'signature', 'multi_page', 'video'],
+        choices=['digital', 'soft', 'hard', 'signature', 'multi_page', 'video'],
         required=False,
         allow_blank=True,
         help_text='Deprecated alias for ``pod_type``.',

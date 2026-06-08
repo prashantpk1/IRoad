@@ -107,6 +107,7 @@ from .views import (
     TenantLocationMasterDeleteView,
     TenantLocationMasterEditView,
     TenantLocationMasterListView,
+    TenantLocationMasterToggleStatusView,
     TenantInvoiceDownloadView,
     TenantInvoiceExportAllView,
     TenantLogoutView,
@@ -285,6 +286,11 @@ urlpatterns = [
         name='tenant_users_administration_export',
     ),
     path(
+        'administration/roles/export/',
+        TenantRolesPermissionsExportView.as_view(),
+        name='tenant_roles_permissions_export',
+    ),
+    path(
         'administration/roles/',
         TenantRolesPermissionsView.as_view(),
         name='tenant_roles_permissions',
@@ -308,11 +314,6 @@ urlpatterns = [
         'administration/roles/<uuid:role_id>/delete/',
         TenantRolesPermissionsDeleteView.as_view(),
         name='tenant_roles_permissions_delete',
-    ),
-    path(
-        'administration/roles/export/',
-        TenantRolesPermissionsExportView.as_view(),
-        name='tenant_roles_permissions_export',
     ),
     path(
         'administration/subscription-plan/',
@@ -768,6 +769,11 @@ urlpatterns = [
         'master-data/route-management/locations/<uuid:location_id>/delete/',
         TenantLocationMasterDeleteView.as_view(),
         name='tenant_location_master_delete',
+    ),
+    path(
+        'master-data/route-management/locations/<uuid:location_id>/toggle-status/',
+        TenantLocationMasterToggleStatusView.as_view(),
+        name='tenant_location_master_toggle_status',
     ),
     path(
         'master-data/route-management/locations/<uuid:location_id>/',

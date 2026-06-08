@@ -103,8 +103,6 @@ class DashboardSummaryService:
             _add('delivery_blocked', 'error')
         if pod.get('pod_pending'):
             _add('pod_pending')
-        if pod.get('hard_pod_pending'):
-            _add('hard_pod_pending')
         if pod.get('cod_pending'):
             _add('cod_pending')
         if pod.get('treasury_pending'):

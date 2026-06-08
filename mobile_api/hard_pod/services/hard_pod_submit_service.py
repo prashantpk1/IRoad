@@ -19,6 +19,9 @@ from django_tenants.utils import schema_context
 
 from mobile_api.hard_pod.guards.hard_pod_replay_guard import HardPodReplayGuard
 from mobile_api.hard_pod.guards.hard_pod_security_guard import HardPodSecurityGuard
+from mobile_api.hard_pod.services.hard_pod_confirmation_validator import (
+    validate_confirmed_pages,
+)
 from mobile_api.hard_pod.services.hard_pod_custody_service import HardPodCustodyService
 from mobile_api.hard_pod.services.hard_pod_idempotency_service import HardPodIdempotencyService
 from mobile_api.job_detail.guards.ownership import driver_pk
@@ -71,6 +74,7 @@ class HardPodSubmitService:
         shipment_ref = (payload.get('shipment_id') or '').strip()
         driver_id = str(driver_pk(driver) or '').strip()
         media_items = list(payload.get('media') or [])
+        confirmed_pages_raw = list(payload.get('confirmed_pages') or [])
         receiver_name = str(payload.get('receiver_name') or '').strip()
         receiver_contact = str(payload.get('receiver_contact') or '').strip()
         handoff_notes = str(payload.get('handoff_notes') or '').strip()
@@ -94,6 +98,11 @@ class HardPodSubmitService:
                 driver_pk=driver_id,
                 shipment_pk=shipment_pk,
             )
+            confirmed_pages = validate_confirmed_pages(
+                shipment,
+                confirmed_pages_raw,
+                tenant_schema=schema,
+            )
 
             file_refs = [
                 str(m.get('file_ref') or '').replace('\\', '/').lstrip('/')
@@ -112,6 +121,12 @@ class HardPodSubmitService:
                         latitude,
                         longitude,
                         ','.join(sorted(r for r in file_refs if r)),
+                        ','.join(
+                            sorted(
+                                f"{p.get('document_id','')}:{p.get('page_id','')}:{p.get('line_no','')}"
+                                for p in confirmed_pages
+                            )
+                        ),
                     ]
                 )
             )
@@ -184,6 +199,7 @@ class HardPodSubmitService:
                     submission,
                     actor_label=receiver_actor_label,
                 )
+                self._custody.persist_confirmed_pages(submission, confirmed_pages)
                 if media_items:
                     self._custody.persist_media_rows(submission, media_items)
 

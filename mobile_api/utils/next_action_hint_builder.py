@@ -131,15 +131,39 @@ def build_next_action_hint(
             'show_completion_screen': False,
         }
 
-    # A7 is next — must do POD capture first
+    # A7 is next — must do POD capture first (hard copy step is inside POD section)
     if next_code == 'A7':
-        return {
+        hint = {
             'action': 'go_to_pod_capture',
             'screen': 'pod_capture',
             'action_code': 'A7',
             'reason': (
                 'Upload proof of delivery. '
-                'Take photo of signed delivery note then submit POD.'
+                'Take photo evidence (video optional), then submit POD.'
+            ),
+            'job_closed': False,
+            'show_completion_screen': False,
+        }
+        if hard_pod_pending:
+            hint['reason'] = (
+                'Upload proof of delivery in the POD section. '
+                'Complete digital evidence, then hard-copy confirmation.'
+            )
+            hint['pod_capture_steps'] = [
+                'digital_evidence',
+                'hard_copy_confirmation',
+            ]
+        return hint
+
+    # A7H is next — hard-copy checklist (not generic evidence capture)
+    if next_code == 'A7H':
+        return {
+            'action': 'go_to_hard_copy_confirmation',
+            'screen': 'hard_copy_confirmation',
+            'action_code': 'A7H',
+            'reason': (
+                'Confirm each signed delivery note page you collected, '
+                'then submit hard POD custody.'
             ),
             'job_closed': False,
             'show_completion_screen': False,
@@ -199,23 +223,6 @@ def build_next_action_hint(
         }
 
     # No allowed actions — check why
-
-    # Hard POD pending
-    if hard_pod_pending:
-        if shipment_status not in {
-            TenantShipment.ShipmentStatus.CLOSED,
-            TenantShipment.ShipmentStatus.DELIVERED,
-        }:
-            return {
-                'action': 'go_to_hard_pod',
-                'screen': 'hard_pod',
-                'reason': (
-                    'Physical documents required. '
-                    'Submit hard copy delivery note.'
-                ),
-                'job_closed': False,
-                'show_completion_screen': False,
-            }
 
     # Delivery blocked by POD not compliant
     if delivery_blocked and not pod_compliant:

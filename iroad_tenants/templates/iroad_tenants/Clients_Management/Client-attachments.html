@@ -40,12 +40,20 @@
         </div>
       </div>
 
+      {% if form_errors %}
+      <div class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
+        Please fix the highlighted errors.
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+      {% endif %}
+
       <!-- Client Attachment Form -->
       <form
         id="clientAttachmentForm"
         method="post"
         enctype="multipart/form-data"
         action="{{ attachment_form_action }}"
+        novalidate
       >
         {% csrf_token %}        <!-- Section 1: Attachment Details -->
         <div class="form-card" data-section="1">
@@ -70,7 +78,7 @@
                     >Client Account
                     <span class="required">*</span>
                   </label>
-                  <select class="form-select {% if form_errors.client_account %}is-invalid{% endif %}" id="clientAccount" name="client_account" required>
+                  <select class="form-select {% if form_errors.client_account %}is-invalid{% endif %}" id="clientAccount" name="client_account">
                     <option value="" disabled {% if not form_data.client_account %}selected{% endif %}>
                       -Select client account-
                     </option>
@@ -98,7 +106,6 @@
                       id="attachmentDate"
                       name="attachment_date"
                       value="{{ form_data.attachment_date|default:'' }}"
-                      required
                     />
                   </div>
                   {% if form_errors.attachment_date %}<div class="invalid-feedback d-block">{{ form_errors.attachment_date }}</div>{% endif %}
@@ -120,11 +127,12 @@
                   <label for="isExpiryApplicable" class="form-label"
                     >Is Expiry Applicable</label
                   >
-                  <select class="form-select" id="isExpiryApplicable" name="is_expiry_applicable" required>
+                  <select class="form-select{% if form_errors.is_expiry_applicable %} is-invalid{% endif %}" id="isExpiryApplicable" name="is_expiry_applicable">
                     <option value="" disabled>-Select-</option>
                     <option value="true" {% if form_data.is_expiry_applicable == 'true' %}selected{% endif %}>Yes</option>
                     <option value="false" {% if form_data.is_expiry_applicable|default:'false' == 'false' %}selected{% endif %}>No</option>
                   </select>
+                  {% if form_errors.is_expiry_applicable %}<div class="invalid-feedback d-block">{{ form_errors.is_expiry_applicable }}</div>{% endif %}
                   <span class="field-hint"
                     >Indicate if this attachment has an expiry date</span
                   >
@@ -195,7 +203,6 @@
                     id="attachmentFile"
                     name="attachment_file"
                     accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif"
-                    {% if not is_edit_mode %}required{% endif %}
                   />
                   {% if form_errors.attachment_file %}<div class="invalid-feedback d-block">{{ form_errors.attachment_file }}</div>{% endif %}
                   <span class="field-hint"
@@ -260,7 +267,6 @@
     function syncExpiryDateState() {
       var isEnabled = expiryApplicable.value === "true";
       expiryDate.disabled = !isEnabled;
-      expiryDate.required = isEnabled;
       if (!isEnabled) {
         expiryDate.value = "";
       }

@@ -462,18 +462,28 @@
               </div>
               <div class="fields-grid cols-3">
                 <div class="field">
-                  <label for="physicalLocation" class="form-label"
-                    >Physical Location</label
-                  >
-                  <input
-                    type="text"
-                    class="form-control"
+                  <label for="physicalLocation" class="form-label">Physical Location</label>
+                  <select
+                    class="form-select {% if shipment_document_form_errors.physical_location %}is-invalid{% endif %}"
                     id="physicalLocation"
                     name="physical_location"
-                    value="{{ shipment_document_form_data.physical_location|default:'' }}"
-                    placeholder="e.g. Warehouse A — Shelf 12"
-                  />
-                  <span class="field-hint">Header-level storage note (optional)</span>
+                  >
+                    <option value="" {% if not shipment_document_form_data.physical_location %}selected{% endif %} disabled>
+                      -Select physical location-
+                    </option>
+                    {% for location in shipment_document_physical_location_options %}
+                    <option
+                      value="{{ location }}"
+                      {% if shipment_document_form_data.physical_location == location %}selected{% endif %}
+                    >
+                      {{ location }}
+                    </option>
+                    {% endfor %}
+                  </select>
+                  {% if shipment_document_form_errors.physical_location %}
+                  <div class="invalid-feedback d-block">{{ shipment_document_form_errors.physical_location }}</div>
+                  {% endif %}
+                  <span class="field-hint">Header custody location; changing this updates all page lines below.</span>
                 </div>
               </div>
             </div>
@@ -604,6 +614,7 @@
       </form>
 
       {{ shipment_document_line_rows|json_script:"shipment-document-line-rows" }}
+      {{ shipment_document_physical_location_options|json_script:"shipment-document-physical-locations" }}
       <script>
         (function () {
           var shipmentSelect = document.getElementById("shipmentRef");

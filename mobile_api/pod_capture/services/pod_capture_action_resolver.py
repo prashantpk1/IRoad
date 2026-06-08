@@ -32,7 +32,7 @@ def resolve_default_pod_action(tenant_schema: str) -> Any | None:
             TenantOperationAction.objects.exclude(
                 status=TenantOperationAction.Status.INACTIVE,
             )
-            .order_by('line_no', 'action_code')
+            .order_by('sequence_number', 'action_code')
         )
         for action in candidates:
             if is_pod_upload_action(action):

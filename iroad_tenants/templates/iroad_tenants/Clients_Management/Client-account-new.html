@@ -107,6 +107,7 @@
                     name="national_id"
                     placeholder="Enter national ID"
                     value="{{ form_data.national_id|default:'' }}"
+                    {% if settings_data.require_national_id_individual and form_data.client_type|default:'Individual' != 'Business' %}required{% endif %}
                   />
                   {% if form_errors.national_id %}<div class="invalid-feedback d-block">{{ form_errors.national_id }}</div>{% endif %}
                 </div>
@@ -350,6 +351,7 @@
               </div>
             </div>
 
+            {% if is_edit_mode %}
             <div class="field-group mt-4">
               <h3 class="field-group-title">
                 <i class="bi bi-sliders"></i>
@@ -423,6 +425,7 @@
                 </div>
               </div>
             </div>
+            {% endif %}
           </div>
         </div>
 
@@ -450,7 +453,7 @@
               <div class="fields-grid cols-2">
                 <div class="field">
                   <label for="commercialRegistrationNo" class="form-label"
-                    >Commercial Registration No.{% if settings_data.require_commercial_registration_business %} <span class="required">*</span>{% endif %}</label
+                    >Commercial Registration No. <span class="required">*</span></label
                   >
                   <input
                     type="text"
@@ -459,12 +462,13 @@
                     name="commercial_registration_no"
                     placeholder="Enter CR number"
                     value="{{ form_data.commercial_registration_no|default:'' }}"
+                    {% if form_data.client_type == 'Business' %}required{% endif %}
                   />
                   {% if form_errors.commercial_registration_no %}<div class="invalid-feedback d-block">{{ form_errors.commercial_registration_no }}</div>{% endif %}
                 </div>
                 <div class="field">
                   <label for="taxRegistrationNo" class="form-label"
-                    >Tax Registration No.{% if settings_data.require_tax_vat_registration_business %} <span class="required">*</span>{% endif %}</label
+                    >Tax Registration No. <span class="required">*</span></label
                   >
                   <input
                     type="text"
@@ -473,6 +477,7 @@
                     name="tax_registration_no"
                     placeholder="Enter tax registration number"
                     value="{{ form_data.tax_registration_no|default:'' }}"
+                    {% if form_data.client_type == 'Business' %}required{% endif %}
                   />
                   {% if form_errors.tax_registration_no %}<div class="invalid-feedback d-block">{{ form_errors.tax_registration_no }}</div>{% endif %}
                 </div>
@@ -505,6 +510,10 @@
         var businessSection = document.getElementById("clientAccountBusinessSection");
         var individualSection = document.getElementById("clientAccountIndividualSection");
         var clientType = document.getElementById("clientType");
+        var nationalId = document.getElementById("nationalId");
+        var commercialRegistrationNo = document.getElementById("commercialRegistrationNo");
+        var taxRegistrationNo = document.getElementById("taxRegistrationNo");
+        var requireNationalId = {{ settings_data.require_national_id_individual|yesno:"true,false" }};
         if (clientType) {
           function toggleTypeSections() {
             var isBusiness = clientType.value === "Business";
@@ -513,6 +522,18 @@
             }
             if (individualSection) {
               individualSection.classList.toggle("hidden", isBusiness);
+            }
+            if (nationalId) {
+              nationalId.required = !isBusiness && requireNationalId;
+              nationalId.disabled = isBusiness;
+            }
+            if (commercialRegistrationNo) {
+              commercialRegistrationNo.required = isBusiness;
+              commercialRegistrationNo.disabled = !isBusiness;
+            }
+            if (taxRegistrationNo) {
+              taxRegistrationNo.required = isBusiness;
+              taxRegistrationNo.disabled = !isBusiness;
             }
           }
           toggleTypeSections();

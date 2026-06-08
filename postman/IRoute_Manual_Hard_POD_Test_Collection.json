@@ -1,0 +1,450 @@
+{
+  "info": {
+    "_postman_id": "8a35b8a6-a52e-4f8d-b7ad-2ff26fa3e7d1",
+    "name": "IRoute — Manual Hard POD Test (A7 -> A7H)",
+    "description": "Test Hard POD when Booking, Shipment, and Shipment Document (Is Delivery Note = Yes) are already created manually in portal.\n\n## Import first\n1. Import this collection\n2. Import `IRoute-Manual-Hard-POD-Test.postman_environment.json`\n3. Select environment **IRoute Manual Hard POD Test — Local**\n4. Set `driver_email` and `driver_password` in environment\n5. Set `shipment_id` (UUID) OR run Setup 02+03 to auto-fill from dashboard\n\n## Run order\n**Setup**\n- 01 Login (email) — saves `access_token`\n- 02 Dashboard — saves `job_id` (optional if you set IDs manually)\n- 03 Job Detail — saves `shipment_id`, sync hash (optional)\n\n**Hard POD flow**\n- 04 POD Capture Sync\n- 05 POD Capture POST (digital)\n- 06 Execute A7\n- 07 Hard POD Documents GET\n- 08 Hard POD Submit POST\n- 09 Execute A7H\n- 10 POD Capture Sync (verify hard_pod_pending=false)\n\n## Notes\n- `base_url` default is `http://127.0.0.1:8001/api/v1/mobile` (match your runserver port)\n- For shipment jobs, `job_id` and `shipment_id` are usually the same UUID\n- A7 digital POD does not override manual DN rows (`is_delivery_note=Yes`)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://127.0.0.1:8001/api/v1/mobile" },
+    { "key": "driver_email", "value": "" },
+    { "key": "driver_password", "value": "" },
+    { "key": "driver_extension", "value": "+966" },
+    { "key": "driver_phone", "value": "" },
+    { "key": "access_token", "value": "" },
+    { "key": "refresh_token", "value": "" },
+    { "key": "shipment_id", "value": "" },
+    { "key": "shipment_no", "value": "" },
+    { "key": "job_id", "value": "" },
+    { "key": "job_type", "value": "shipment" },
+    { "key": "content_hash", "value": "" },
+    { "key": "workflow_version", "value": "" },
+    { "key": "capture_bundle_id", "value": "" },
+    { "key": "pod_content_hash", "value": "" },
+    { "key": "pod_workflow_version", "value": "" },
+    { "key": "hard_pod_confirmed_pages_json", "value": "[]" },
+    { "key": "hard_pod_custody_submission_id", "value": "" },
+    { "key": "hard_pod_client_submission_id", "value": "" },
+    { "key": "hard_pod_receiver_name", "value": "Receiver Name" },
+    { "key": "hard_pod_receiver_contact", "value": "0500000000" },
+    { "key": "hard_pod_handoff_notes", "value": "Collected original delivery note pages" }
+  ],
+  "item": [
+    {
+      "name": "00 — Setup",
+      "item": [
+        {
+          "name": "01 — Login (Email)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{driver_email}}\",\n  \"password\": \"{{driver_password}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/driver/auth/login/",
+            "description": "Email login. Saves access_token to environment + collection variables.\nSet driver_email and driver_password in the active environment before running."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var resp = pm.response.json();",
+                  "if (resp.status === 1 && resp.data && resp.data.access_token) {",
+                  "    pm.collectionVariables.set('access_token', resp.data.access_token);",
+                  "    pm.collectionVariables.set('refresh_token', resp.data.refresh_token);",
+                  "    pm.environment.set('access_token', resp.data.access_token);",
+                  "    pm.environment.set('refresh_token', resp.data.refresh_token);",
+                  "    console.log('access_token saved (length=' + resp.data.access_token.length + ')');",
+                  "    pm.test('Login successful, token saved', function () { pm.expect(resp.status).to.eql(1); });",
+                  "} else {",
+                  "    pm.test('Login failed — check driver_email and driver_password', function () { pm.expect(resp.status).to.eql(1); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "01b — Login (Phone — optional)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"extension\": \"{{driver_extension}}\",\n  \"phone\": \"{{driver_phone}}\",\n  \"password\": \"{{driver_password}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/driver/auth/login/",
+            "description": "Alternative login via phone. Run either 01 or 01b, not both."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var resp = pm.response.json();",
+                  "if (resp.status === 1 && resp.data && resp.data.access_token) {",
+                  "    pm.collectionVariables.set('access_token', resp.data.access_token);",
+                  "    pm.collectionVariables.set('refresh_token', resp.data.refresh_token);",
+                  "    pm.environment.set('access_token', resp.data.access_token);",
+                  "    pm.environment.set('refresh_token', resp.data.refresh_token);",
+                  "    pm.test('Login successful, token saved', function () { pm.expect(resp.status).to.eql(1); });",
+                  "} else {",
+                  "    pm.test('Login failed — check phone credentials', function () { pm.expect(resp.status).to.eql(1); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 — Dashboard (auto job_id)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": "{{base_url}}/driver/dashboard/",
+            "description": "Optional. Saves active_job.job_id and job_type.\nSkip if you already set shipment_id/job_id manually in environment."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var token = pm.variables.get('access_token');",
+                  "if (!token || String(token).trim() === '' || String(token).indexOf('{{') >= 0) {",
+                  "    throw new Error('access_token missing. Run 01 Login first.');",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var resp = pm.response.json();",
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "if (resp.data && resp.data.active_job) {",
+                  "    var job = resp.data.active_job;",
+                  "    pm.collectionVariables.set('job_id', job.job_id);",
+                  "    pm.collectionVariables.set('job_type', job.job_type || 'shipment');",
+                  "    pm.environment.set('job_id', job.job_id);",
+                  "    pm.environment.set('job_type', job.job_type || 'shipment');",
+                  "    if (!pm.environment.get('shipment_id')) {",
+                  "        pm.collectionVariables.set('shipment_id', job.job_id);",
+                  "        pm.environment.set('shipment_id', job.job_id);",
+                  "    }",
+                  "    pm.test('Active job found', function () { pm.expect(job.job_id).to.exist; });",
+                  "} else {",
+                  "    console.log('No active_job — set shipment_id and job_id manually in environment');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 — Job Detail (auto shipment_id + sync)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/",
+            "description": "Optional. Confirms job state and saves sync metadata.\nFor shipment jobs, shipment_id is usually same as job_id."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var token = pm.variables.get('access_token');",
+                  "if (!token || String(token).trim() === '' || String(token).indexOf('{{') >= 0) {",
+                  "    throw new Error('access_token missing. Run 01 Login first.');",
+                  "}",
+                  "var jobId = pm.variables.get('job_id');",
+                  "if (!jobId || String(jobId).trim() === '' || String(jobId).indexOf('{{') >= 0) {",
+                  "    throw new Error('job_id missing. Run 02 Dashboard or set job_id in environment.');",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var resp = pm.response.json();",
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "var data = (resp && resp.data) || {};",
+                  "var sid = data.shipment_id || (data.job && data.job.shipment_id) || pm.variables.get('job_id');",
+                  "if (sid) {",
+                  "    pm.collectionVariables.set('shipment_id', sid);",
+                  "    pm.environment.set('shipment_id', sid);",
+                  "}",
+                  "if (data.sync_metadata) {",
+                  "    pm.collectionVariables.set('content_hash', data.sync_metadata.content_hash || '');",
+                  "    pm.collectionVariables.set('workflow_version', data.sync_metadata.workflow_version || '');",
+                  "    pm.environment.set('content_hash', data.sync_metadata.content_hash || '');",
+                  "    pm.environment.set('workflow_version', data.sync_metadata.workflow_version || '');",
+                  "}",
+                  "var pod = data.pod_cod || {};",
+                  "console.log('pod_type(from job)=', (data.shipment && data.shipment.pod_type) || '');",
+                  "console.log('hard_pod_pending=', pod.hard_pod_pending);",
+                  "console.log('hard_required=', ((pod.hard_copy_confirmation || {}).required));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "01 — Hard POD Flow",
+      "item": [
+        {
+          "name": "04 — POD Capture Sync",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipments/{{shipment_id}}/pod/capture/"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var sid = pm.variables.get('shipment_id');",
+                  "if (!sid || String(sid).trim() === '' || String(sid).indexOf('{{') >= 0) {",
+                  "    throw new Error('shipment_id missing. Set in environment or run Setup 02/03.');",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "var r = pm.response.json();",
+                  "var data = (r && r.data) || {};",
+                  "pm.collectionVariables.set('pod_content_hash', data.content_hash || '');",
+                  "pm.collectionVariables.set('pod_workflow_version', data.workflow_version || '');",
+                  "pm.environment.set('pod_content_hash', data.content_hash || '');",
+                  "pm.environment.set('pod_workflow_version', data.workflow_version || '');",
+                  "var section = data.pod_section || {};",
+                  "var hard = section.hard_copy_confirmation || {};",
+                  "console.log('pod_type=', section.pod_type);",
+                  "console.log('hard_pod_pending=', section.hard_pod_pending);",
+                  "console.log('hard_required=', hard.required);",
+                  "console.log('hard_pages=', (hard.pages || []).length);",
+                  "pm.test('Has pod_section', function () { pm.expect(section).to.be.an('object'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 — POD Capture POST (digital)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipments/{{shipment_id}}/pod/capture/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_capture_id\": \"pod-cap-{{$timestamp}}\",\n  \"content_hash\": \"{{pod_content_hash}}\",\n  \"workflow_version\": \"{{pod_workflow_version}}\",\n  \"pod_type\": \"digital\",\n  \"target_action_code\": \"A7\",\n  \"latitude\": 22.294,\n  \"longitude\": 73.137,\n  \"notes\": \"Digital POD evidence\",\n  \"media\": [\n    {\n      \"media_type\": \"photo\",\n      \"file_ref\": \"mobile_uploads/pod_evidence/sample-photo.jpg\",\n      \"file_name\": \"sample-photo.jpg\",\n      \"checksum\": \"\",\n      \"sort_order\": 1\n    },\n    {\n      \"media_type\": \"video\",\n      \"file_ref\": \"mobile_uploads/pod_evidence/sample-video.mp4\",\n      \"file_name\": \"sample-video.mp4\",\n      \"duration_seconds\": 8,\n      \"checksum\": \"\",\n      \"sort_order\": 2\n    }\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200/201', function () { pm.expect([200, 201]).to.include(pm.response.code); });",
+                  "var r = pm.response.json();",
+                  "var data = (r && r.data) || {};",
+                  "var b = data.capture_bundle || {};",
+                  "pm.collectionVariables.set('capture_bundle_id', b.capture_bundle_id || '');",
+                  "pm.environment.set('capture_bundle_id', b.capture_bundle_id || '');",
+                  "pm.test('capture_bundle_id present', function () { pm.expect(b.capture_bundle_id).to.be.a('string').and.not.empty; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "06 — Execute A7",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A7/execute/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_action_id\": \"exec-a7-{{$timestamp}}\",\n  \"capture_bundle_id\": \"{{capture_bundle_id}}\",\n  \"latitude\": 22.294,\n  \"longitude\": 73.137,\n  \"notes\": \"Execute digital POD\",\n  \"media\": []\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200/201', function () { pm.expect([200, 201]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "07 — Hard POD Documents GET",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipments/{{shipment_id}}/hard-pod/documents/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "var r = pm.response.json();",
+                  "var data = (r && r.data) || {};",
+                  "var pages = data.pages || [];",
+                  "console.log('required=', data.required, 'pending=', data.pending, 'pages=', pages.length);",
+                  "pm.test('Has hard POD pages', function () { pm.expect(pages.length).to.be.greaterThan(0); });",
+                  "var confirmed = pages.map(function (p) {",
+                  "  return {",
+                  "    page_id: p.page_id || '',",
+                  "    document_id: p.document_id || '',",
+                  "    line_no: p.line_no || 1,",
+                  "    confirmed: true",
+                  "  };",
+                  "});",
+                  "var json = JSON.stringify(confirmed);",
+                  "pm.collectionVariables.set('hard_pod_confirmed_pages_json', json);",
+                  "pm.environment.set('hard_pod_confirmed_pages_json', json);",
+                  "var clientId = 'hard-sub-' + Date.now();",
+                  "pm.collectionVariables.set('hard_pod_client_submission_id', clientId);",
+                  "pm.environment.set('hard_pod_client_submission_id', clientId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "08 — Hard POD Submit POST",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{base_url}}/driver/hard-pod/submit/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_submission_id\": \"{{hard_pod_client_submission_id}}\",\n  \"shipment_id\": \"{{shipment_id}}\",\n  \"receiver_name\": \"{{hard_pod_receiver_name}}\",\n  \"receiver_contact\": \"{{hard_pod_receiver_contact}}\",\n  \"handoff_notes\": \"{{hard_pod_handoff_notes}}\",\n  \"latitude\": 22.294,\n  \"longitude\": 73.137,\n  \"confirmed_pages\": {{hard_pod_confirmed_pages_json}},\n  \"media\": [\n    {\n      \"media_type\": \"photo\",\n      \"file_ref\": \"mobile_uploads/hard_pod/hard-copy-proof.jpg\",\n      \"file_name\": \"hard-copy-proof.jpg\",\n      \"sort_order\": 1\n    }\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200/201', function () { pm.expect([200, 201]).to.include(pm.response.code); });",
+                  "var r = pm.response.json();",
+                  "var data = (r && r.data) || {};",
+                  "var sub = data.custody_submission || {};",
+                  "pm.collectionVariables.set('hard_pod_custody_submission_id', sub.submission_id || '');",
+                  "pm.environment.set('hard_pod_custody_submission_id', sub.submission_id || '');",
+                  "pm.test('custody submission id present', function () { pm.expect(sub.submission_id).to.be.a('string').and.not.empty; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "09 — Execute A7H",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{base_url}}/driver/jobs/{{job_type}}/{{job_id}}/actions/A7H/execute/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_action_id\": \"exec-a7h-{{$timestamp}}\",\n  \"custody_submission_id\": \"{{hard_pod_custody_submission_id}}\",\n  \"notes\": \"Execute hard POD custody confirmation\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200/201', function () { pm.expect([200, 201]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "10 — POD Capture Sync (verify hard pending false)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": "{{base_url}}/driver/jobs/shipments/{{shipment_id}}/pod/capture/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "var r = pm.response.json();",
+                  "var s = ((r || {}).data || {}).pod_section || {};",
+                  "console.log('After A7H -> hard_pod_pending=', s.hard_pod_pending);",
+                  "pm.test('Hard POD pending should be false', function () {",
+                  "  pm.expect(Boolean(s.hard_pod_pending)).to.eql(false);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

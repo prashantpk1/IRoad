@@ -570,9 +570,74 @@ function initShipmentDocumentLines() {
   const pageCountInput = document.getElementById("pageCount");
   const isDeliveryNoteInput = document.getElementById("isDeliveryNote");
   const documentTypeInput = document.getElementById("documentType");
+  const physicalLocationSelect = document.getElementById("physicalLocation");
 
   // Only run on Shipment-documents.html (or pages with same markup)
   if (!tbody || !addBtn) return;
+
+  const DEFAULT_PHYSICAL_LOCATIONS = [
+    "Not Collected",
+    "With Driver",
+    "In Company",
+    "Submitted to Receiver",
+    "Submitted to Client",
+  ];
+
+  function readPhysicalLocationOptions() {
+    const optionsEl = document.getElementById("shipment-document-physical-locations");
+    if (!optionsEl || !optionsEl.textContent) return DEFAULT_PHYSICAL_LOCATIONS.slice();
+    try {
+      const parsed = JSON.parse(optionsEl.textContent);
+      return Array.isArray(parsed) && parsed.length ? parsed : DEFAULT_PHYSICAL_LOCATIONS.slice();
+    } catch (e) {
+      return DEFAULT_PHYSICAL_LOCATIONS.slice();
+    }
+  }
+
+  const physicalLocationOptions = readPhysicalLocationOptions();
+
+  function normalizePhysicalLocation(value) {
+    const safeValue = String(value || "").trim();
+    if (safeValue === "With Client") return "Submitted to Client";
+    return safeValue;
+  }
+
+  function buildPhysicalLocationSelectMarkup(selectedValue) {
+    const normalized = normalizePhysicalLocation(selectedValue);
+    let html =
+      '<option value="" disabled' +
+      (normalized ? "" : " selected") +
+      '>-Select custody-</option>';
+    physicalLocationOptions.forEach(function (optionValue) {
+      html +=
+        '<option value="' +
+        optionValue +
+        '"' +
+        (normalized === optionValue ? " selected" : "") +
+        ">" +
+        optionValue +
+        "</option>";
+    });
+    if (normalized && physicalLocationOptions.indexOf(normalized) === -1) {
+      html +=
+        '<option value="' +
+        normalized +
+        '" selected>' +
+        normalized +
+        "</option>";
+    }
+    return html;
+  }
+
+  function syncLinePhysicalLocations(value) {
+    const normalized = normalizePhysicalLocation(value);
+    if (!normalized) return;
+    getRows().forEach(function (tr) {
+      const field = tr.querySelector('[data-field="physicalLocation"]');
+      if (!field) return;
+      setFieldValue(tr, '[name="line_physical_location[]"]', normalized);
+    });
+  }
 
   function getRows() {
     return Array.from(tbody.querySelectorAll("tr[data-sd-line]"));
@@ -665,6 +730,13 @@ function initShipmentDocumentLines() {
 
   function createLineRow(lineData) {
     const data = lineData || {};
+    if (
+      !data.physical_location &&
+      physicalLocationSelect &&
+      physicalLocationSelect.value
+    ) {
+      data.physical_location = physicalLocationSelect.value;
+    }
     const tr = document.createElement("tr");
     tr.setAttribute("data-sd-line", "true");
     tr.innerHTML = `
@@ -686,12 +758,7 @@ function initShipmentDocumentLines() {
       </td>
       <td data-label="Physical Location">
         <select class="form-select form-select-sm" name="line_physical_location[]" data-field="physicalLocation" required>
-          <option value="" selected disabled>-Select custody-</option>
-          <option value="Not Collected">Not Collected</option>
-          <option value="With Driver">With Driver</option>
-          <option value="Submitted to Receiver">Submitted to Receiver</option>
-          <option value="In Company">In Company</option>
-          <option value="With Client">With Client</option>
+          ${buildPhysicalLocationSelectMarkup(data.physical_location)}
         </select>
       </td>
       <td data-label="Attachment">
@@ -715,7 +782,11 @@ function initShipmentDocumentLines() {
       pageNoInput.setAttribute("data-auto-page", data.page_no ? "false" : "true");
     }
     setFieldValue(tr, '[name="line_status[]"]', data.status || "Not Completed");
-    setFieldValue(tr, '[name="line_physical_location[]"]', data.physical_location);
+    setFieldValue(
+      tr,
+      '[name="line_physical_location[]"]',
+      normalizePhysicalLocation(data.physical_location)
+    );
     setFieldValue(
       tr,
       '[name="line_existing_attachment_label[]"]',
@@ -815,6 +886,12 @@ function initShipmentDocumentLines() {
     isDeliveryNoteInput.addEventListener("change", syncDerivedFields);
   }
 
+  if (physicalLocationSelect) {
+    physicalLocationSelect.addEventListener("change", function () {
+      syncLinePhysicalLocations(physicalLocationSelect.value);
+    });
+  }
+
   if (documentTypeInput && isDeliveryNoteInput) {
     if (documentTypeInput.value === "Delivery Note") {
       isDeliveryNoteInput.checked = true;
@@ -828,6 +905,9 @@ function initShipmentDocumentLines() {
   }
 
   syncDerivedFields();
+  if (physicalLocationSelect && physicalLocationSelect.value) {
+    syncLinePhysicalLocations(physicalLocationSelect.value);
+  }
 }
 
 /* ============================================

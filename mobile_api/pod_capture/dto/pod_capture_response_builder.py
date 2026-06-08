@@ -7,8 +7,10 @@ from __future__ import annotations
 
 from typing import Any
 
+from mobile_api.execution.evidence.constants import POD_CAPTURE_VIDEO_MAX_DURATION_SECONDS
 from mobile_api.pod_capture.dto.pod_capture_context import PodCaptureContext
 from mobile_api.pod_capture.dto.staging_models import PODCaptureBundle, PODCaptureMedia
+from mobile_api.pod_capture.services.pod_section_metadata import build_pod_section_metadata
 
 
 class PodCaptureResponseBuilder:
@@ -17,11 +19,17 @@ class PodCaptureResponseBuilder:
     def build(self, context: PodCaptureContext) -> dict[str, Any]:
         bundle = context.bundle
         if bundle is None:
+            shipment = getattr(context, 'shipment', None)
             return {
                 'capture_bundle': {},
                 'compliance': {},
                 'sync_metadata': dict(context.sync_metadata or {}),
                 'next_step': {'requires_execute_action': False},
+                'pod_section': build_pod_section_metadata(
+                    shipment,
+                    driver=getattr(context, 'driver', None),
+                    tenant_schema=(getattr(context, 'tenant_schema', None) or ''),
+                ),
             }
 
         staged_media = [self._build_media_row(row) for row in context.staged_media]
@@ -29,11 +37,17 @@ class PodCaptureResponseBuilder:
         compliance = self._build_compliance(context, staged_media)
         next_step = self._build_next_step(bundle, context)
 
+        shipment = getattr(context, 'shipment', None)
         return {
             'capture_bundle': capture_bundle,
             'compliance': compliance,
             'sync_metadata': dict(context.sync_metadata or {}),
             'next_step': next_step,
+            'pod_section': build_pod_section_metadata(
+                shipment,
+                driver=getattr(context, 'driver', None),
+                tenant_schema=(getattr(context, 'tenant_schema', None) or ''),
+            ),
         }
 
     def _build_capture_bundle(
@@ -104,7 +118,13 @@ class PodCaptureResponseBuilder:
                 'photo': bool(requirements.get('photo')),
                 'photo_min_count': int(requirements.get('photo_min_count') or 0),
                 'video': bool(requirements.get('video')),
+                'video_optional': bool(requirements.get('video_optional')),
                 'video_min_count': int(requirements.get('video_min_count') or 0),
+                'video_max_count': int(requirements.get('video_max_count') or 0),
+                'video_max_duration_seconds': int(
+                    requirements.get('video_max_duration_seconds')
+                    or POD_CAPTURE_VIDEO_MAX_DURATION_SECONDS
+                ),
                 'signature': bool(requirements.get('signature')),
                 'note': bool(requirements.get('note')),
                 'note_required': bool(requirements.get('note_required')),
