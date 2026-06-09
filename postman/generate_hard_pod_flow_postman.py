@@ -147,14 +147,18 @@ POD_CAPTURE_10A_TESTS = [
     'if (resp.data) {',
     '    var digital = (resp.data.pod_section || {}).digital_evidence || {};',
     '    var reqs = digital.requirements || {};',
-    '    pm.test("video_optional exposed", function() { pm.expect(reqs.video_optional).to.eql(true); });',
+    '    pm.test("video required for digital POD", function() { pm.expect(reqs.video).to.eql(true); pm.expect(reqs.video_min_count).to.eql(1); });',
     '    pm.test("video max duration 15s", function() { pm.expect(reqs.video_max_duration_seconds).to.eql(15); });',
+    '    pm.test("media_steps include video", function() {',
+    '        var types = ((digital.media_steps || []).map(function (r) { return r.media_type; }));',
+    '        pm.expect(types).to.include("video");',
+    '    });',
     '}',
 ]
 
 HARD_POD_EXTRA = (
     '\n\nVIDEO + HARD POD (updated Jun 2026):\n'
-    '  10 POD Capture — photo + signature + optional video (max 15s, duration_seconds)\n'
+    '  10 POD Capture — photo + signature + video (1 clip, max 15s, duration_seconds)\n'
     '  11 Execute A7\n'
     '  11b GET .../pod/capture/?step=hard_copy_confirmation — DN checklist\n'
     '  11b-alt GET .../hard-pod/documents/ — dedicated Shipment Documents API\n'

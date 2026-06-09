@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from iroad_tenants.operation_execution import _is_hard_copy_collection_action
 from iroad_tenants.operation_runtime.execution_stage_deriver import (
     derive_job_execution_stage,
 )
@@ -117,11 +118,12 @@ def _build_shipment_workflow(
         job_id=str(shipment_id) if shipment_id is not None else context.job_id,
         job_no=str(getattr(shipment, 'shipment_no', '') or ''),
     )
-    return _map_engine_payload(
+    workflow = _map_engine_payload(
         engine_payload,
         stage_block=stage_block,
         entity_type='shipment',
     )
+    return _strip_hard_copy_from_driver_workflow(workflow)
 
 
 def _build_movement_workflow(
@@ -197,6 +199,32 @@ def _map_engine_payload(
             'allowed_action_count': int(engine_payload.get('count') or 0),
         }
     return workflow
+
+
+def _strip_hard_copy_from_driver_workflow(workflow: dict[str, Any]) -> dict[str, Any]:
+    """Hard POD (A7H) is completed inside Upload POD — not a separate workflow row."""
+    out = dict(workflow or {})
+    actions = [
+        row
+        for row in (out.get('allowed_actions') or [])
+        if not _is_hard_copy_collection_action_row(row)
+    ]
+    out['allowed_actions'] = actions
+    for key in ('next_action', 'primary_action'):
+        row = dict(out.get(key) or {})
+        if _is_hard_copy_collection_action_row(row):
+            out[key] = dict(actions[0]) if actions else {}
+    return out
+
+
+def _is_hard_copy_collection_action_row(row: Any) -> bool:
+    if not isinstance(row, dict):
+        return False
+    code = str(row.get('action_code') or '').strip()
+    if code.upper() == 'A7H':
+        return True
+    requirements = row.get('execution_requirements') or {}
+    return bool(requirements.get('hard_copy_collection'))
 
 
 def _reconciliation_api_slice(block: dict[str, Any]) -> dict[str, Any]:

@@ -134,6 +134,59 @@ class ActionLogMediaImmutabilityTests(SimpleTestCase):
         action_log.media_rows.filter.assert_not_called()
 
 
+class AutoAttachPodBundleTests(SimpleTestCase):
+    def test_auto_attach_staged_bundle_when_a7_has_no_inline_media(self) -> None:
+        ctx = ExecuteActionContext(
+            driver=_driver(),
+            tenant_schema='tenant_a',
+            user_id='u1',
+            job_type='shipment',
+            job_id='ship-1',
+            action_code='A7',
+            payload={
+                'latitude': '25.0',
+                'longitude': '55.0',
+                'notes': 'delivered',
+            },
+        )
+        ctx.shipment = _shipment()
+        ctx.operation_action = SimpleNamespace(
+            action_code='A7',
+            auto_pod_post=True,
+            english_label='Upload POD',
+        )
+        service = EvidenceValidationService()
+        with patch.object(
+            service,
+            '_find_latest_ready_pod_bundle_id',
+            return_value='bundle-ready-1',
+        ):
+            bundle_id = service._auto_attach_staged_pod_bundle(ctx)
+        self.assertEqual(bundle_id, 'bundle-ready-1')
+        self.assertEqual(ctx.payload['capture_bundle_id'], 'bundle-ready-1')
+
+    def test_does_not_override_explicit_capture_bundle_id(self) -> None:
+        ctx = ExecuteActionContext(
+            driver=_driver(),
+            tenant_schema='tenant_a',
+            user_id='u1',
+            job_type='shipment',
+            job_id='ship-1',
+            action_code='A7',
+            payload={'capture_bundle_id': 'explicit-bundle'},
+        )
+        ctx.operation_action = SimpleNamespace(action_code='A7', auto_pod_post=True)
+        service = EvidenceValidationService()
+        with patch.object(
+            service,
+            '_find_latest_ready_pod_bundle_id',
+            return_value='other-bundle',
+        ) as mock_find:
+            bundle_id = service._auto_attach_staged_pod_bundle(ctx)
+        mock_find.assert_not_called()
+        self.assertEqual(bundle_id, 'explicit-bundle')
+
+
 class EvidencePodBundleValidationTests(SimpleTestCase):
     def setUp(self) -> None:
         self.store = _InMemoryStagingStore()

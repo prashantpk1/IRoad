@@ -629,15 +629,26 @@ function initShipmentDocumentLines() {
     return html;
   }
 
+  function getHeaderPhysicalLocation() {
+    if (!physicalLocationSelect) return "";
+    const selectedValue = String(physicalLocationSelect.value || "").trim();
+    if (selectedValue) return selectedValue;
+    const selectedOption =
+      physicalLocationSelect.options[physicalLocationSelect.selectedIndex];
+    return selectedOption ? String(selectedOption.value || "").trim() : "";
+  }
+
   function syncLinePhysicalLocations(value) {
-    const normalized = normalizePhysicalLocation(value);
+    const normalized = normalizePhysicalLocation(
+      value !== undefined ? value : getHeaderPhysicalLocation()
+    );
     if (!normalized) return;
     getRows().forEach(function (tr) {
-      const field = tr.querySelector('[data-field="physicalLocation"]');
-      if (!field) return;
       setFieldValue(tr, '[name="line_physical_location[]"]', normalized);
     });
   }
+
+  window.syncShipmentDocumentLinePhysicalLocations = syncLinePhysicalLocations;
 
   function getRows() {
     return Array.from(tbody.querySelectorAll("tr[data-sd-line]"));
@@ -730,12 +741,11 @@ function initShipmentDocumentLines() {
 
   function createLineRow(lineData) {
     const data = lineData || {};
-    if (
-      !data.physical_location &&
-      physicalLocationSelect &&
-      physicalLocationSelect.value
-    ) {
-      data.physical_location = physicalLocationSelect.value;
+    if (!data.physical_location) {
+      const headerLocation = getHeaderPhysicalLocation();
+      if (headerLocation) {
+        data.physical_location = headerLocation;
+      }
     }
     const tr = document.createElement("tr");
     tr.setAttribute("data-sd-line", "true");
@@ -852,6 +862,7 @@ function initShipmentDocumentLines() {
     for (let i = 0; i < target; i += 1) {
       createLineRow();
     }
+    syncLinePhysicalLocations();
   }
 
   function syncPageCountFromShipment() {
@@ -888,7 +899,7 @@ function initShipmentDocumentLines() {
 
   if (physicalLocationSelect) {
     physicalLocationSelect.addEventListener("change", function () {
-      syncLinePhysicalLocations(physicalLocationSelect.value);
+      syncLinePhysicalLocations();
     });
   }
 
@@ -905,9 +916,7 @@ function initShipmentDocumentLines() {
   }
 
   syncDerivedFields();
-  if (physicalLocationSelect && physicalLocationSelect.value) {
-    syncLinePhysicalLocations(physicalLocationSelect.value);
-  }
+  syncLinePhysicalLocations();
 }
 
 /* ============================================

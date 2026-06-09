@@ -88,6 +88,7 @@ class PodCodProjectionTests(TestCase):
         shipment = _shipment(
             pod_type=TenantShipment.PodType.HARD,
             pod_status=TenantShipment.PodStatus.PENDING,
+            status=TenantShipment.ShipmentStatus.AT_DELIVERY,
         )
         self.assertTrue(pod_cod_policy.derive_hard_pod_pending(shipment))
 

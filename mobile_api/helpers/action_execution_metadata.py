@@ -126,7 +126,7 @@ def infer_requires_note(action) -> bool:
     return bool((action.booking_status_impact or '').strip())
 
 
-def build_execution_requirements(action) -> dict[str, Any]:
+def build_execution_requirements(action, *, shipment=None) -> dict[str, Any]:
     """Structured capture requirements for mobile execute-action UI."""
     if _is_hard_copy_action(action):
         return {
@@ -241,7 +241,33 @@ def project_allowed_action_row(
     Mobile allowed-action DTO for one ``TenantOperationAction`` row.
     """
     name = _localized_action_name(action, request)
-    requirements = build_execution_requirements(action)
+    if getattr(action, 'auto_pod_post', False) and not _is_hard_copy_action(action):
+        from mobile_api.execution.evidence.constants import (
+            POD_CAPTURE_VIDEO_MAX_DURATION_SECONDS,
+        )
+        from mobile_api.pod_capture.policy.pod_capture_policy import (
+            build_pod_capture_requirements,
+        )
+        from mobile_api.pod_capture.services.pod_section_metadata import (
+            build_digital_capture_ui,
+        )
+
+        requirements = build_pod_capture_requirements(
+            action,
+            pod_capture_type='digital',
+            shipment=shipment,
+        )
+        requirements['video_optional'] = False
+        requirements['capture_mode'] = 'digital_evidence'
+        requirements['screen'] = 'pod_capture'
+        requirements['screen_title'] = 'Capturing Action Evidences'
+        requirements['video_max_duration_seconds'] = int(
+            requirements.get('video_max_duration_seconds')
+            or POD_CAPTURE_VIDEO_MAX_DURATION_SECONDS
+        )
+        requirements['capture_ui'] = build_digital_capture_ui(requirements)
+    else:
+        requirements = build_execution_requirements(action, shipment=shipment)
     row = {
         'action_id': str(action.action_id),
         'action_code': action.action_code or '',
@@ -260,6 +286,10 @@ def project_allowed_action_row(
     if getattr(action, 'auto_pod_post', False) and not _is_hard_copy_action(action):
         row['screen'] = 'pod_capture'
         row['action'] = 'go_to_pod_capture'
+        row['capture_mode'] = requirements.get('capture_mode') or 'digital_evidence'
+        row['screen_title'] = requirements.get('screen_title') or 'Capturing Action Evidences'
+        if requirements.get('capture_ui'):
+            row['capture_ui'] = requirements['capture_ui']
 
     if _is_hard_copy_action(action):
         from mobile_api.helpers.action_navigation_metadata import (
@@ -272,6 +302,33 @@ def project_allowed_action_row(
             shipment=shipment,
             tenant_schema=tenant_schema,
         )
+
+    code = (getattr(action, 'action_code', '') or '').strip().upper()
+    if code == 'A8':
+        row['screen'] = 'job_detail'
+        row['action'] = 'execute_action'
+        row.pop('capture_mode', None)
+        row.pop('capture_ui', None)
+        row.pop('screen_title', None)
+        requirements = dict(row.get('execution_requirements') or {})
+        requirements.update(
+            {
+                'photo': False,
+                'photo_min_count': 0,
+                'video': False,
+                'video_min_count': 0,
+                'video_max_count': 0,
+                'video_optional': False,
+                'note': False,
+                'note_required': False,
+                'signature': False,
+                'capture_mode': '',
+            },
+        )
+        row['execution_requirements'] = requirements
+        row['requires_photo'] = False
+        row['requires_video'] = False
+        row['requires_note'] = False
     return row
 
 

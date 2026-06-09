@@ -8,9 +8,11 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import Any
 
+from mobile_api.dashboard.selectors import pod_cod_policy
 from mobile_api.hard_pod.models import HardPODCustodySubmission, HardPODCustodySubmissionEvent
 from mobile_api.hard_pod.services.custody_authority_service import HardPodCustodyAuthorityService
 from mobile_api.issues.models.operational_issue import OperationalIssue, OperationalIssueEscalationEvent
+from tenant_workspace.models import TenantShipment
 from mobile_api.job_detail.timeline.timeline_event_mapper import map_escalation_events_to_timeline
 from mobile_api.payment_collection.services.payment_reconciliation_service import PaymentReconciliationService
 
@@ -106,7 +108,7 @@ class OperationalReconciliationService:
         issues: dict[str, Any],
     ) -> list[dict[str, Any]]:
         alerts: list[dict[str, Any]] = []
-        if not authority.get('reconciled'):
+        if self._should_surface_custody_unreconciled_alert(context, authority):
             alerts.append(
                 {
                     'code': 'custody_unreconciled',
@@ -132,6 +134,34 @@ class OperationalReconciliationService:
                 }
             )
         return alerts
+
+    def _should_surface_custody_unreconciled_alert(
+        self,
+        context: Any,
+        authority: dict[str, Any],
+    ) -> bool:
+        """
+        Hard-copy custody warnings belong on the POD step — not pickup/in transit.
+
+        ``reconciled=False`` is normal before A7; only warn when hard POD is
+        actually outstanding during delivery/POD stages.
+        """
+        if authority.get('reconciled'):
+            return False
+        shipment = getattr(context, 'shipment', None)
+        if shipment is None:
+            return False
+        pod_type = (getattr(shipment, 'pod_type', None) or '').strip().casefold()
+        if pod_type != TenantShipment.PodType.HARD.casefold():
+            return False
+        pod_bundle = dict((getattr(context, 'reconciliation', None) or {}).get('pod_cod') or {})
+        evidence = dict(pod_bundle.get('log_evidence') or {})
+        tenant_schema = (getattr(context, 'tenant_schema', None) or '').strip()
+        return pod_cod_policy.derive_hard_pod_pending(
+            shipment,
+            log_evidence=evidence,
+            tenant_schema=tenant_schema,
+        )
 
     def _issue_events(self, *, tenant_schema: str, shipment_id: str, request: Any | None = None) -> list[dict[str, Any]]:
         if not (tenant_schema and shipment_id):

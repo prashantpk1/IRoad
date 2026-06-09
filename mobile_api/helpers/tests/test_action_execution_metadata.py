@@ -4,11 +4,15 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest import TestCase
 
-from mobile_api.helpers.action_execution_metadata import build_execution_requirements
+from mobile_api.helpers.action_execution_metadata import (
+    build_execution_requirements,
+    project_allowed_action_row,
+)
 
 
 def _action(**kwargs):
     base = {
+        'action_id': '00000000-0000-0000-0000-000000000001',
         'action_code': 'A7',
         'english_label': 'Upload POD',
         'auto_pod_post': False,
@@ -16,6 +20,9 @@ def _action(**kwargs):
         'movement_status_impact': '',
         'booking_status_impact': '',
         'shipment_status_impact': '',
+        'sequence_number': 7,
+        'action_scope': 'job',
+        'sequence_category': '',
     }
     base.update(kwargs)
     return SimpleNamespace(**base)
@@ -46,3 +53,17 @@ class ActionExecutionMetadataTests(TestCase):
         self.assertTrue(req['hard_copy_collection'])
         self.assertTrue(req['custody_submission_required'])
         self.assertEqual(req['capture_mode'], 'hard_copy_confirmation')
+
+    def test_a8_row_never_routes_to_pod_capture(self):
+        row = project_allowed_action_row(
+            _action(
+                action_code='A8',
+                english_label='Unloading Completed',
+                movement_status_impact='Completed',
+            ),
+        )
+        self.assertEqual(row['action'], 'execute_action')
+        self.assertEqual(row['screen'], 'job_detail')
+        self.assertFalse(row['requires_photo'])
+        self.assertNotIn('capture_ui', row)
+        self.assertEqual(row['execution_requirements']['photo'], False)

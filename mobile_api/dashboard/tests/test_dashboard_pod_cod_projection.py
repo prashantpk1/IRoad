@@ -65,6 +65,22 @@ class PodCodPolicyTests(SimpleTestCase):
         self.assertTrue(policy.derive_pod_compliant(shipment))
         self.assertFalse(policy.derive_pod_pending(shipment))
 
+    def test_hard_pod_not_pending_during_pickup_or_transit(self):
+        for status in (
+            TenantShipment.ShipmentStatus.LOADED,
+            TenantShipment.ShipmentStatus.IN_TRANSIT,
+            TenantShipment.ShipmentStatus.CREATED,
+        ):
+            shipment = _shipment(
+                pod_type=TenantShipment.PodType.HARD,
+                pod_status=TenantShipment.PodStatus.NOT_COMPLIANT,
+                shipment_status=status,
+            )
+            self.assertFalse(
+                policy.derive_hard_pod_pending(shipment),
+                msg=f'expected False for {status}',
+            )
+
     def test_hard_pod_pending(self):
         shipment = _shipment(
             pod_type=TenantShipment.PodType.HARD,

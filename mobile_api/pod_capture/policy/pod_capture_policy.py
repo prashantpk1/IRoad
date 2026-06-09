@@ -13,7 +13,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from mobile_api.execution.evidence.constants import POD_CAPTURE_VIDEO_MAX_DURATION_SECONDS
+from mobile_api.execution.evidence.constants import (
+    POD_CAPTURE_VIDEO_MAX_COUNT,
+    POD_CAPTURE_VIDEO_MAX_DURATION_SECONDS,
+    POD_CAPTURE_VIDEO_MIN_COUNT,
+)
 from mobile_api.helpers.action_execution_metadata import build_execution_requirements
 from mobile_api.pod_capture.policy.canonical_pod_action_registry import (
     is_hard_pod_action,
@@ -101,9 +105,17 @@ def derive_pod_type_overlay(
     if token == 'digital':
         overlay['photo'] = True
         overlay['photo_min_count'] = max(int(overlay.get('photo_min_count') or 0), 1)
-        # IRoute §14.5.1 — digital evidence may include one optional video clip (max 15s).
-        overlay['video_optional'] = True
-        overlay['video_max_count'] = max(int(overlay.get('video_max_count') or 0), 1)
+        # IRoute §14.5.1 — digital POD: photo + signature + one video clip (max 15s).
+        overlay['video'] = True
+        overlay['video_min_count'] = max(
+            int(overlay.get('video_min_count') or 0),
+            POD_CAPTURE_VIDEO_MIN_COUNT,
+        )
+        overlay['video_max_count'] = max(
+            int(overlay.get('video_max_count') or 0),
+            POD_CAPTURE_VIDEO_MAX_COUNT,
+        )
+        overlay['video_optional'] = False
         overlay['video_max_duration_seconds'] = POD_CAPTURE_VIDEO_MAX_DURATION_SECONDS
     elif token == 'soft':
         overlay['photo'] = True
@@ -153,4 +165,6 @@ def build_pod_capture_requirements(
     merged['pod_capture_type'] = (pod_capture_type or '').strip().casefold()
     if not int(merged.get('video_max_duration_seconds') or 0):
         merged['video_max_duration_seconds'] = POD_CAPTURE_VIDEO_MAX_DURATION_SECONDS
+    if int(merged.get('video_min_count') or 0) > 0 and bool(merged.get('video')):
+        merged['video_optional'] = False
     return merged

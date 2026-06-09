@@ -35,19 +35,20 @@ class PodCaptureResponseBuilder:
         staged_media = [self._build_media_row(row) for row in context.staged_media]
         capture_bundle = self._build_capture_bundle(bundle, context, staged_media)
         compliance = self._build_compliance(context, staged_media)
-        next_step = self._build_next_step(bundle, context)
-
         shipment = getattr(context, 'shipment', None)
+        pod_section = build_pod_section_metadata(
+            shipment,
+            driver=getattr(context, 'driver', None),
+            tenant_schema=(getattr(context, 'tenant_schema', None) or ''),
+        )
+        next_step = self._build_next_step(bundle, context, pod_section=pod_section)
+
         return {
             'capture_bundle': capture_bundle,
             'compliance': compliance,
             'sync_metadata': dict(context.sync_metadata or {}),
             'next_step': next_step,
-            'pod_section': build_pod_section_metadata(
-                shipment,
-                driver=getattr(context, 'driver', None),
-                tenant_schema=(getattr(context, 'tenant_schema', None) or ''),
-            ),
+            'pod_section': pod_section,
         }
 
     def _build_capture_bundle(
@@ -147,15 +148,42 @@ class PodCaptureResponseBuilder:
         self,
         bundle: PODCaptureBundle,
         context: PodCaptureContext,
+        *,
+        pod_section: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         requires_execute = bundle.is_promotable() and not bundle.is_promoted()
-        return {
+        hard_block = dict((pod_section or {}).get('hard_copy_confirmation') or {})
+        has_hard_copy_step = bool(hard_block.get('applicable') or hard_block.get('required'))
+        shipment_pk = getattr(context, 'shipment_id', '') or ''
+        base_capture = f'/api/v1/mobile/driver/jobs/shipments/{shipment_pk}/pod/capture/'
+
+        step: dict[str, Any] = {
             'requires_execute_action': requires_execute,
             'bundle_id': bundle.bundle_id,
             'capture_bundle_id': bundle.bundle_id,
-            'target_action_code': (context.target_action_code or '').strip() or None,
+            'execute_payload_hint': {
+                'capture_bundle_id': bundle.bundle_id,
+                'latitude': 'from device GPS',
+                'longitude': 'from device GPS',
+            },
+            'target_action_code': (context.target_action_code or '').strip() or 'A7',
+            'execute_action_code': 'A7',
             'execute_ready': bundle.is_promotable(),
         }
+        if has_hard_copy_step:
+            step.update(
+                {
+                    'wizard_next_step': 'hard_copy_confirmation',
+                    'wizard_next_get_endpoint': f'{base_capture}?step=hard_copy_confirmation',
+                    'documents_endpoint': hard_block.get('documents_endpoint') or '',
+                    'custody_submit_endpoint': hard_block.get('submit_endpoint') or '',
+                    'after_custody_execute_action_code': 'A7H',
+                    'complete_upload_after_execute': False,
+                },
+            )
+        else:
+            step['complete_upload_after_execute'] = True
+        return step
 
     @staticmethod
     def _build_media_row(row: PODCaptureMedia) -> dict[str, Any]:

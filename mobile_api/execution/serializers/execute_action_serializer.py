@@ -44,6 +44,18 @@ class ExecuteActionRequestSerializer(serializers.Serializer):
     longitude = serializers.FloatField(required=False, allow_null=True)
     notes = serializers.CharField(required=False, allow_blank=True, default='')
     media = ExecuteActionMediaItemSerializer(many=True, required=False, default=list)
+    custody_submission_id = serializers.CharField(
+        max_length=64,
+        required=False,
+        allow_blank=True,
+        help_text='Hard POD custody submission to promote when executing A7H.',
+    )
+    client_submission_id = serializers.CharField(
+        max_length=128,
+        required=False,
+        allow_blank=True,
+        help_text='Client idempotency key from POST /hard-pod/submit/ (A7H fallback).',
+    )
     capture_bundle_id = serializers.CharField(
         max_length=64,
         required=False,

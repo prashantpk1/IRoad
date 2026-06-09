@@ -288,12 +288,13 @@
             <div class="fields-grid cols-3">
               <div class="field">
                 <label for="podType" class="form-label">POD Type (list)</label>
-                <select class="form-select" id="podType" name="pod_type">
+                <select class="form-select {% if form_errors.pod_type %}is-invalid{% endif %}" id="podType" name="pod_type" required>
                   <option value="" {% if not shipment_form_data.pod_type %}selected{% endif %} disabled>-Select POD type-</option>
                   {% for pod_type in operation_pod_type_options %}
                   <option value="{{ pod_type }}" {% if shipment_form_data.pod_type == pod_type %}selected{% endif %}>{{ pod_type }}</option>
                   {% endfor %}
                 </select>
+                {% if form_errors.pod_type %}<div class="invalid-feedback d-block">{{ form_errors.pod_type }}</div>{% endif %}
               </div>
               <div class="field">
                 <label for="podDocCount" class="form-label"
@@ -313,18 +314,20 @@
               <div class="field">
                 <label for="podStatus" class="form-label">POD Status</label>
                 <select
-                  class="form-select"
+                  class="form-select {% if form_errors.pod_status %}is-invalid{% endif %}"
                   id="podStatus"
                   name="pod_status"
-                  disabled
-                  aria-readonly="true"
+                  {% if not shipment_is_edit %}disabled aria-readonly="true"{% endif %}
                 >
                   <option value="" {% if not shipment_form_data.pod_status %}selected{% endif %} disabled>-Select POD status-</option>
                   {% for pod_status in operation_pod_status_options %}
                   <option value="{{ pod_status }}" {% if shipment_form_data.pod_status == pod_status %}selected{% endif %}>{{ pod_status }}</option>
                   {% endfor %}
                 </select>
+                {% if not shipment_is_edit %}
                 <input type="hidden" id="podStatusValue" name="pod_status" value="{{ shipment_form_data.pod_status|default:'' }}" />
+                {% endif %}
+                {% if form_errors.pod_status %}<div class="invalid-feedback d-block">{{ form_errors.pod_status }}</div>{% endif %}
               </div>
             </div>
             <div class="fields-grid cols-3">
@@ -654,6 +657,7 @@
           shipmentDate.value = new Date().toISOString().slice(0, 10);
         }
 
+        var shipmentIsEdit = {% if shipment_is_edit %}true{% else %}false{% endif %};
         var clientAccountSelect = document.getElementById("clientAccount");
         var bookingNoSelect = document.getElementById("bookingNo");
 
@@ -893,9 +897,11 @@
           syncReadonlySelectValue(bookingOrderTypeSelect, bookingOrderTypeValue, "");
           syncReadonlySelectValue(headerOrderTypeSelect, null, "");
           if (sourcingModeInput) sourcingModeInput.value = "In-Source";
-          if (podTypeSelect) resetSelectToPlaceholder(podTypeSelect);
-          if (podDocCountInput) podDocCountInput.value = "";
-          syncReadonlySelectValue(podStatusSelect, podStatusValue, "");
+          if (!shipmentIsEdit) {
+            if (podTypeSelect) resetSelectToPlaceholder(podTypeSelect);
+            if (podDocCountInput) podDocCountInput.value = "";
+            syncReadonlySelectValue(podStatusSelect, podStatusValue, "");
+          }
           syncSalesReportFromBookingOption(null);
           if (codAmountInput) codAmountInput.value = "";
           if (shipmentTruckDisplay) shipmentTruckDisplay.value = "";
@@ -983,14 +989,16 @@
           syncReadonlySelectValue(bookingOrderTypeSelect, bookingOrderTypeValue, orderType);
           syncReadonlySelectValue(headerOrderTypeSelect, null, orderType);
           if (sourcingModeInput) sourcingModeInput.value = sourcingMode;
-          setSelectValueIfExists(podTypeSelect, lineOpt.getAttribute("data-pod-type") || "");
-          syncCodAmountField();
-          if (podDocCountInput) podDocCountInput.value = lineOpt.getAttribute("data-pod-doc-count") || "";
-          syncReadonlySelectValue(
-            podStatusSelect,
-            podStatusValue,
-            lineOpt.getAttribute("data-pod-status") || ""
-          );
+          if (!shipmentIsEdit) {
+            setSelectValueIfExists(podTypeSelect, lineOpt.getAttribute("data-pod-type") || "");
+            syncCodAmountField();
+            if (podDocCountInput) podDocCountInput.value = lineOpt.getAttribute("data-pod-doc-count") || "";
+            syncReadonlySelectValue(
+              podStatusSelect,
+              podStatusValue,
+              lineOpt.getAttribute("data-pod-status") || ""
+            );
+          }
           syncSalesReportFromBookingOption(getSelectedOption(bookingNoSelect));
           if (codAmountInput) codAmountInput.value = lineOpt.getAttribute("data-cod-amount") || "";
           if (shipmentTruckDisplay) shipmentTruckDisplay.value = lineOpt.getAttribute("data-truck-code") || "";

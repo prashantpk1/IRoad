@@ -9,6 +9,9 @@ from dataclasses import dataclass
 from typing import Any, TypedDict
 
 from mobile_api.execution.dto.execute_action_context import ExecuteActionContext
+from mobile_api.job_detail.services.hard_pod_workflow_overlay import (
+    apply_hard_pod_workflow_overlay,
+)
 from mobile_api.utils.next_action_hint_builder import build_next_action_hint
 
 _EMPTY_TIMELINE_PREVIEW: dict[str, Any] = {
@@ -48,6 +51,7 @@ class ExecuteActionResponseBuilder:
     def build(self, context: ExecuteActionContext) -> ExecuteActionApiPayload:
         workflow = self._build_workflow(context)
         pod_cod = self._build_pod_cod(context)
+        workflow = apply_hard_pod_workflow_overlay(workflow, pod_cod)
         execution = self._build_execution(context)
 
         order_type = ''

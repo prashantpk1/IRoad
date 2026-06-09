@@ -12,6 +12,9 @@ from mobile_api.execution.dto.execute_action_response_builder import (
     ExecuteActionResponseBuilder,
 )
 from mobile_api.execution.exceptions import ExecuteActionError
+from mobile_api.execution.serializers.execute_action_serializer import (
+    ExecuteActionRequestSerializer,
+)
 from mobile_api.execution.services.execute_action_orchestrator import (
     ExecuteActionOrchestrator,
 )
@@ -78,3 +81,23 @@ class ExecuteActionFoundationTests(SimpleTestCase):
         with self.assertRaises(ExecuteActionError) as exc:
             ExecutionIdempotencyGuard().assert_idempotency_key_present(ctx)
         self.assertEqual(exc.exception.code, 'idempotency_key_required')
+
+    def test_execute_serializer_preserves_hard_pod_submission_refs(self):
+        serializer = ExecuteActionRequestSerializer(
+            data={
+                'client_action_id': 'a7h-test-1',
+                'workflow_version': 'wf-v1',
+                'content_hash': 'hash-v1',
+                'custody_submission_id': '37888b58-d871-4f98-8f0e-c2216c5ba394',
+                'client_submission_id': 'hard-sh0012-1780995362541',
+            }
+        )
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        self.assertEqual(
+            serializer.validated_data['custody_submission_id'],
+            '37888b58-d871-4f98-8f0e-c2216c5ba394',
+        )
+        self.assertEqual(
+            serializer.validated_data['client_submission_id'],
+            'hard-sh0012-1780995362541',
+        )

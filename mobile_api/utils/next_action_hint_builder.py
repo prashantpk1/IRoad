@@ -46,6 +46,39 @@ def _column_shipment_status(
     )
 
 
+def _hard_copy_confirmation_hint(*, reason: str = '') -> dict[str, Any]:
+    return {
+        'action': 'go_to_pod_capture',
+        'screen': 'pod_capture',
+        'action_code': 'A7H',
+        'capture_mode': 'hard_copy_confirmation',
+        'active_step': 'hard_copy_confirmation',
+        'ui_mode': 'hard_pod_collection_confirmation',
+        'screen_title': 'Hard POD Collection Confirmation',
+        'pod_capture_steps': ['hard_copy_confirmation'],
+        'reason': reason
+        or (
+            'Digital POD is uploaded. Confirm hard-copy delivery note pages '
+            'inside Upload POD, then continue.'
+        ),
+        'job_closed': False,
+        'show_completion_screen': False,
+    }
+
+
+def _hard_copy_applicable(pod_cod: dict[str, Any]) -> bool:
+    block = dict(pod_cod.get('hard_copy_confirmation') or {})
+    return bool(block.get('applicable') or block.get('required'))
+
+
+def _hard_copy_step_required(pod_cod: dict[str, Any]) -> bool:
+    if pod_cod.get('pod_pending'):
+        return False
+    if not pod_cod.get('hard_pod_pending'):
+        return False
+    return _hard_copy_applicable(pod_cod)
+
+
 def _enrich_collect_payment_hint(
     hint: dict[str, Any],
     *,
@@ -98,7 +131,15 @@ def build_next_action_hint(
         next_code = str(first.get('action_code') or '').strip()
 
     shipment_status = _column_shipment_status(workflow, shipment)
-    is_job_closed = shipment_status == TenantShipment.ShipmentStatus.CLOSED
+    if shipment is not None:
+        shipment_status = (
+            (getattr(shipment, 'shipment_status', None) or '').strip()
+            or shipment_status
+        )
+    is_job_closed = shipment_status in {
+        TenantShipment.ShipmentStatus.CLOSED,
+        TenantShipment.ShipmentStatus.CANCELLED,
+    }
 
     pod_pending = pod_cod.get('pod_pending', True)
     pod_compliant = pod_cod.get('pod_compliant', False)
@@ -131,40 +172,57 @@ def build_next_action_hint(
             'show_completion_screen': False,
         }
 
-    # A7 is next — must do POD capture first (hard copy step is inside POD section)
+    # A7 is next — open digital evidence capture (hard copy is a later A7H step)
     if next_code == 'A7':
+        hard_copy_applicable = _hard_copy_applicable(pod_cod)
         hint = {
             'action': 'go_to_pod_capture',
             'screen': 'pod_capture',
             'action_code': 'A7',
+            'capture_mode': 'digital_evidence',
+            'ui_mode': 'digital_evidence',
+            'active_step': 'digital_evidence',
+            'screen_title': 'Capturing Action Evidences',
             'reason': (
-                'Upload proof of delivery. '
-                'Take photo evidence (video optional), then submit POD.'
+                'Upload proof of delivery. Capture photos and video evidence, '
+                'then tap Next.'
             ),
+            'pod_capture_steps': ['digital_evidence'],
             'job_closed': False,
             'show_completion_screen': False,
         }
-        if hard_pod_pending:
-            hint['reason'] = (
-                'Upload proof of delivery in the POD section. '
-                'Complete digital evidence, then hard-copy confirmation.'
-            )
+        if hard_copy_applicable:
             hint['pod_capture_steps'] = [
                 'digital_evidence',
                 'hard_copy_confirmation',
             ]
+            block = dict(pod_cod.get('hard_copy_confirmation') or {})
+            hint['documents_endpoint'] = block.get('documents_endpoint') or ''
+            hint['custody_submit_endpoint'] = block.get('submit_endpoint') or ''
         return hint
 
-    # A7H is next — hard-copy checklist (not generic evidence capture)
-    if next_code == 'A7H':
+    # Just finished digital A7 — open hard-copy step 2 before any forward action
+    if (action_code or '').strip().upper() == 'A7' and _hard_copy_step_required(pod_cod):
+        return _hard_copy_confirmation_hint()
+
+    # Hard POD step 2 blocks A8/A9/A10 until custody confirmed
+    if _hard_copy_step_required(pod_cod) and next_code in {
+        'A7',
+        'A7H',
+        'A8',
+        'A9',
+        'A10',
+        '',
+    }:
+        return _hard_copy_confirmation_hint()
+
+    # A8 — unloading is GPS-only (only after hard copy complete on Hard POD)
+    if next_code == 'A8':
         return {
-            'action': 'go_to_hard_copy_confirmation',
-            'screen': 'hard_copy_confirmation',
-            'action_code': 'A7H',
-            'reason': (
-                'Confirm each signed delivery note page you collected, '
-                'then submit hard POD custody.'
-            ),
+            'action': 'execute_action',
+            'screen': 'job_detail',
+            'action_code': 'A8',
+            'reason': 'Confirm unloading complete.',
             'job_closed': False,
             'show_completion_screen': False,
         }
@@ -222,9 +280,26 @@ def build_next_action_hint(
             'show_completion_screen': False,
         }
 
-    # No allowed actions — check why
+    # No allowed actions — job finished
+    if is_job_closed:
+        return {
+            'action': 'go_to_dashboard',
+            'screen': 'dashboard',
+            'reason': 'Job is complete. No more actions required.',
+            'job_closed': True,
+            'show_completion_screen': True,
+        }
 
-    # Delivery blocked by POD not compliant
+    # Hard copy still due with no forward action left (e.g. after A9 without A7H)
+    if _hard_copy_step_required(pod_cod) and not pod_compliant:
+        return _hard_copy_confirmation_hint(
+            reason=(
+                'Complete hard-copy POD confirmation inside Upload POD, '
+                'then close the job.'
+            ),
+        )
+
+    # Delivery blocked by POD not compliant (portal / column validation)
     if delivery_blocked and not pod_compliant:
         return {
             'action': 'wait_for_ops',
@@ -258,6 +333,22 @@ def build_next_action_hint(
             'action': 'refresh_job_detail',
             'screen': 'job_detail',
             'reason': 'Payment processing. Pull to refresh in a moment.',
+            'job_closed': False,
+            'show_completion_screen': False,
+        }
+
+    # POD + COD complete — close job (A10)
+    if (
+        pod_compliant
+        and not is_job_closed
+        and (not is_cod or cod_collected)
+        and next_code == 'A10'
+    ):
+        return {
+            'action': 'execute_action',
+            'screen': 'job_detail',
+            'action_code': 'A10',
+            'reason': 'All steps complete. Tap to close the job.',
             'job_closed': False,
             'show_completion_screen': False,
         }

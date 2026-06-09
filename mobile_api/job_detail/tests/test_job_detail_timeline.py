@@ -139,8 +139,35 @@ class TimelineEventMapperTests(SimpleTestCase):
             shipment=shipment,
             tenant_schema='tenant_test',
         )
-        self.assertEqual(event['screen'], 'hard_copy_confirmation')
+        self.assertEqual(event['screen'], 'pod_capture')
+        self.assertEqual(event['capture_mode'], 'hard_copy_confirmation')
         self.assertEqual(event['timeline_state'], 'pending')
+
+    def test_pending_a8_routes_to_execute_not_pod_capture(self):
+        action = _action(code='A8', label='Unloading Completed')
+        event = map_action_to_pending_timeline_event(action, tenant_schema='tenant_test')
+        self.assertEqual(event['screen'], 'job_detail')
+        self.assertEqual(event['action'], 'execute_action')
+        self.assertNotIn('capture_mode', event)
+
+    def test_pending_a7_hard_shipment_includes_pod_capture_steps(self):
+        action = _action(code='A7', label='Upload POD')
+        shipment = SimpleNamespace(
+            pk=uuid4(),
+            pod_type=TenantShipment.PodType.HARD,
+            pod_doc_count=2,
+        )
+        event = map_action_to_pending_timeline_event(
+            action,
+            shipment=shipment,
+            tenant_schema='tenant_test',
+        )
+        self.assertEqual(event['screen'], 'pod_capture')
+        self.assertEqual(
+            event['pod_capture_steps'],
+            ['digital_evidence', 'hard_copy_confirmation'],
+        )
+        self.assertTrue(event['includes_hard_copy'])
 
 
 class TimelineCursorServiceTests(SimpleTestCase):
@@ -278,6 +305,26 @@ class TimelineServiceTests(SimpleTestCase):
             [a.action_code for a in filtered_shipment],
             ['A2'],
         )
+
+    def test_filter_always_hides_hard_pod_from_timeline(self):
+        act_a7 = _action(code='A7', label='Upload POD')
+        act_a7h = _action(code='A7H', label='Hard POD Collection')
+        act_a7h.hard_copy_collection = True
+        shipment = MagicMock()
+        shipment.order_type = 'COD'
+        ctx = JobDetailContext(
+            driver=_driver(),
+            tenant_schema='t',
+            user_id='u',
+            job_type='shipment',
+            job_id=str(uuid4()),
+            shipment=shipment,
+        )
+        filtered = JobDetailTimelineService()._filter_workflow_actions_for_context(
+            [act_a7, act_a7h],
+            context=ctx,
+        )
+        self.assertEqual([a.action_code for a in filtered], ['A7'])
 
 
 class TimelineProjectionTests(TestCase):

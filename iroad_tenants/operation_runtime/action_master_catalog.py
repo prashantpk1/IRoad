@@ -128,7 +128,8 @@ PRODUCTION_ACTION_MASTER: tuple[ActionMasterSpec, ...] = (
         arabic_label='Hard POD Collection',
         sequence_number=72,
         hard_copy_collection=True,
-        mobile_visible=True,
+        # Hard copy is a sub-step inside Upload POD (A7), not a separate timeline row.
+        mobile_visible=False,
         prerequisite_action_codes=('A7',),
     ),
     ActionMasterSpec(

@@ -75,6 +75,14 @@
       </div>
       <div class="fields-grid cols-3 mt-3">
         <div class="field">
+          <label for="podType" class="form-label">POD Type</label>
+          <select class="form-select" id="podType" name="pod_type">
+            {% for pod_type in operation_pod_type_options %}
+            <option value="{{ pod_type }}" {% if shipment.pod_type == pod_type %}selected{% endif %}>{{ pod_type }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field">
           <label for="podDocCount" class="form-label">POD Doc Count</label>
           <input type="number" class="form-control" id="podDocCount" name="pod_doc_count" min="0" value="{{ shipment.pod_doc_count|default:0 }}" />
         </div>

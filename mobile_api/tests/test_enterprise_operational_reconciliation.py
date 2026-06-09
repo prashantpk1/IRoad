@@ -264,3 +264,31 @@ class PaymentReplayMappingTests(TransactionTestCase):
 
         self.assertEqual(exc.exception.code, 'payment_replay_integrity_mismatch')
         self.assertEqual(exc.exception.http_status, 409)
+
+
+class OperationalReconciliationAlertTests(TransactionTestCase):
+    def test_no_custody_alert_during_in_transit(self) -> None:
+        shipment = SimpleNamespace(
+            pk='ship-1',
+            shipment_id='ship-1',
+            pod_type='Hard',
+            shipment_status='In Transit',
+            driver_id='drv-1',
+            driver=SimpleNamespace(pk='drv-1'),
+        )
+        context = SimpleNamespace(
+            shipment=shipment,
+            tenant_schema='tenant_a',
+            reconciliation={
+                'pod_cod': {
+                    'log_evidence': {},
+                },
+            },
+        )
+        service = OperationalReconciliationService()
+        alerts = service._build_alerts(
+            context,
+            authority={'reconciled': False},
+            issues={'unresolved_issue_count': 0, 'blocking_recommendation': False},
+        )
+        self.assertFalse(any(row.get('code') == 'custody_unreconciled' for row in alerts))

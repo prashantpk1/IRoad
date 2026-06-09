@@ -95,6 +95,46 @@ def _pod_status_is_complete(shipment) -> bool:
     }
 
 
+def _mobile_log_evidence_for_shipment(shipment) -> dict[str, bool]:
+    from mobile_api.pod_capture.policy.compliance_log_evidence import (
+        log_evidence_flags,
+    )
+
+    logs = list(
+        TenantOperationActionLog.objects.filter(shipment_id=shipment.pk)
+        .select_related('operation_action')
+        .order_by('-log_date', '-created_at')[:100],
+    )
+    return log_evidence_flags(logs)
+
+
+def _mobile_pod_compliance_satisfied(shipment) -> bool:
+    """Action Log + column — Hard POD needs A7H (hard_pod_log), not digital A7 alone."""
+    if _pod_status_is_complete(shipment):
+        return True
+    evidence = _mobile_log_evidence_for_shipment(shipment)
+    pod_type = (getattr(shipment, 'pod_type', None) or '').strip().casefold()
+    if pod_type == TenantShipment.PodType.HARD.casefold():
+        return bool(evidence.get('hard_pod_log'))
+    return bool(evidence.get('pod_uploaded'))
+
+
+def _sync_pod_status_from_mobile_logs(shipment) -> None:
+    """Align pod_status column with mobile Action Log evidence before Delivered gates."""
+    if shipment is None or _pod_status_is_complete(shipment):
+        return
+    evidence = _mobile_log_evidence_for_shipment(shipment)
+    pod_type = (getattr(shipment, 'pod_type', None) or '').strip().casefold()
+    if pod_type == TenantShipment.PodType.HARD.casefold():
+        if evidence.get('hard_pod_log'):
+            shipment.pod_status = TenantShipment.PodStatus.HARD_COPY_RECEIVED
+            shipment.save(update_fields=['pod_status', 'updated_at'])
+        return
+    if evidence.get('pod_uploaded'):
+        shipment.pod_status = TenantShipment.PodStatus.COMPLIANT
+        shipment.save(update_fields=['pod_status', 'updated_at'])
+
+
 def _should_auto_mark_delivered_for_cod(action, shipment) -> bool:
     """After A9 on COD: advance to Delivered when POD is complete and cash collected."""
     if shipment is None or not _is_collect_payment_action(action):
@@ -106,7 +146,8 @@ def _should_auto_mark_delivered_for_cod(action, shipment) -> bool:
         != TenantShipment.CollectionStatus.COLLECTED
     ):
         return False
-    if not _pod_status_is_complete(shipment):
+    _sync_pod_status_from_mobile_logs(shipment)
+    if not _mobile_pod_compliance_satisfied(shipment):
         return False
     current = (shipment.shipment_status or '').strip()
     return current in {

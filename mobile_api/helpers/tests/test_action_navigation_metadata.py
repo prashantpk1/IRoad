@@ -42,8 +42,9 @@ class ActionNavigationMetadataTests(TestCase):
             shipment=shipment,
             tenant_schema='tenant_a',
         )
-        self.assertEqual(event['screen'], 'hard_copy_confirmation')
-        self.assertEqual(event['action'], 'go_to_hard_copy_confirmation')
+        self.assertEqual(event['screen'], 'pod_capture')
+        self.assertEqual(event['action'], 'go_to_pod_capture')
+        self.assertEqual(event['capture_mode'], 'hard_copy_confirmation')
         self.assertTrue(event['hard_copy_confirmation']['required'])
         self.assertEqual(len(event['hard_copy_confirmation']['pages']), 1)
 

@@ -30,6 +30,7 @@ from mobile_api.job_detail.timeline.timeline_event_mapper import (
     map_logs_to_timeline_events,
     sort_logs_newest_first,
 )
+from iroad_tenants.operation_execution import _is_hard_copy_collection_action
 from iroad_tenants.services.timeline_service import TimelineService
 from iroad_tenants.operation_runtime.impacts import operation_action_matches
 from tenant_workspace.models import TenantOperationAction
@@ -269,6 +270,8 @@ class JobDetailTimelineService:
                     'cod',
                 ):
                     continue
+                if _is_hard_copy_collection_action(action):
+                    continue
                 filtered.append(action)
             return filtered
 
@@ -287,6 +290,8 @@ class JobDetailTimelineService:
                 'action 9',
                 'cod',
             ):
+                continue
+            if _is_hard_copy_collection_action(action):
                 continue
             filtered.append(action)
         return filtered

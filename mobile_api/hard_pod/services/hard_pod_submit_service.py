@@ -239,6 +239,8 @@ class HardPodSubmitService:
             'timeline_preview': timeline,
             'next_step': {
                 'requires_execute_action': True,
+                'execute_action_code': 'A7H',
+                'complete_upload_after_execute': True,
                 'reason': 'hard_pod_workflow_progression',
             },
         }

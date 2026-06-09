@@ -6995,18 +6995,12 @@ class TenantOperationShipmentCreateView(View):
             if normalized_order_type != 'COD':
                 cod_amount = Decimal('0')
 
-            pod_doc_count = _int_from_request(request, 'pod_doc_count', default=0)
-            if matched_line:
-                pod_doc_count = int(matched_line.get('pod_doc_count') or pod_doc_count or 0)
-            pod_type = _normalize_shipment_pod_type(
-                (matched_line or {}).get('pod_type') or shipment_form_data['pod_type'],
-                default=TenantShipment.PodType.SOFT,
+            pod_type, pod_status, pod_doc_count = _resolve_shipment_pod_fields_for_save(
+                shipment_form_data=shipment_form_data,
+                matched_line=matched_line,
+                request=request,
+                is_edit=False,
             )
-            pod_status = (
-                (matched_line or {}).get('pod_status') or shipment_form_data['pod_status']
-            )
-            if pod_status not in {choice[0] for choice in TenantShipment.PodStatus.choices}:
-                pod_status = TenantShipment.PodStatus.NOT_COMPLIANT
 
             if form_errors:
                 context.update(
@@ -12766,8 +12760,11 @@ def _tenant_shipment_pod_birth_from_action_log(action_log, *, created_by_label='
         )
 
     if _tenant_operation_action_matches(action_log.operation_action, 'upload pod', 'a7', 'action 7'):
-        shipment.pod_type = TenantShipment.PodType.DIGITAL
-        shipment.save(update_fields=['pod_type', 'updated_at'])
+        from iroad_tenants.operation_runtime.pod_action import (
+            apply_a7_shipment_pod_type_classification,
+        )
+
+        apply_a7_shipment_pod_type_classification(shipment)
 
     return document
 
@@ -12790,6 +12787,33 @@ def _tenant_shipment_document_guard_mutable(document, *, new_status=None):
         }:
             errors['status'] = 'Document status cannot be changed after it has left Draft.'
     return errors
+
+
+def _tenant_shipment_document_dependent_pod_documents(document):
+    """POD shipment documents that reference this row as delivery-note source."""
+    if document is None:
+        return TenantShipmentDocument.objects.none()
+    return TenantShipmentDocument.objects.filter(source_document_id=document.pk)
+
+
+def _tenant_shipment_document_delete_chain(document):
+    """Dependents first, then the requested document (safe order for PROTECT FK)."""
+    if document is None:
+        return []
+    chain = []
+    seen = set()
+
+    def walk(doc):
+        doc_pk = doc.pk
+        if doc_pk in seen:
+            return
+        seen.add(doc_pk)
+        for child in _tenant_shipment_document_dependent_pod_documents(doc):
+            walk(child)
+        chain.append(doc)
+
+    walk(document)
+    return chain
 
 
 def _tenant_surcharge_sales_guard_status(existing_surcharge, new_status, form_errors, request):
@@ -12920,13 +12944,16 @@ def _tenant_operation_action_log_apply_side_effects(action_log, *, created_by_la
             pod_document is not None
             and _tenant_operation_action_matches(action, 'upload pod', 'a7', 'action 7')
         ):
-            _tenant_shipment_pod_apply_posting_effects(
-                document=pod_document,
-                source_document=pod_document.source_document,
-                shipment=shipment,
-                header_physical_location='with_driver',
+            from iroad_tenants.operation_runtime.pod_action import (
+                apply_pod_posting_from_action_log,
             )
-            pod_document.save(update_fields=['status', 'physical_location', 'updated_at'])
+
+            apply_pod_posting_from_action_log(
+                action_log=action_log,
+                pod_document=pod_document,
+                shipment=shipment,
+                created_by_label=created_by_label,
+            )
 
     if shipment is not None and (action.shipment_status_impact or '').strip():
         new_status = _tenant_resolve_shipment_status_impact(action.shipment_status_impact)
@@ -14842,6 +14869,46 @@ def _normalize_shipment_pod_type(value, default=''):
     return normalize_operation_pod_type(value, default=default)
 
 
+def _resolve_shipment_pod_fields_for_save(
+    *,
+    shipment_form_data: dict,
+    matched_line: dict | None,
+    request,
+    is_edit: bool = False,
+    existing_shipment=None,
+) -> tuple[str, str, int]:
+    """
+    Resolve POD fields for shipment create/edit.
+
+    Posted form values win over booking-line defaults so portal edits persist
+  alongside mobile-driven ``pod_status`` updates.
+    """
+    posted_pod_type = (shipment_form_data.get('pod_type') or '').strip()
+    posted_pod_status = (shipment_form_data.get('pod_status') or '').strip()
+    line_pod_type = (matched_line or {}).get('pod_type') or ''
+    line_pod_status = (matched_line or {}).get('pod_status') or ''
+
+    if is_edit and existing_shipment is not None:
+        pod_type_source = posted_pod_type or getattr(existing_shipment, 'pod_type', '')
+        pod_status_source = posted_pod_status or getattr(existing_shipment, 'pod_status', '')
+        pod_doc_count = int(getattr(existing_shipment, 'pod_doc_count', None) or 0)
+    else:
+        pod_type_source = posted_pod_type or line_pod_type
+        pod_status_source = posted_pod_status or line_pod_status
+        pod_doc_count = _int_from_request(request, 'pod_doc_count', default=0)
+        if matched_line and not (shipment_form_data.get('pod_doc_count') or '').strip():
+            pod_doc_count = int(matched_line.get('pod_doc_count') or pod_doc_count or 0)
+
+    pod_type = _normalize_shipment_pod_type(
+        pod_type_source,
+        default=TenantShipment.PodType.DIGITAL if is_edit else TenantShipment.PodType.SOFT,
+    )
+    pod_status = normalize_operation_pod_status(pod_status_source)
+    if pod_status not in {choice[0] for choice in TenantShipment.PodStatus.choices}:
+        pod_status = TenantShipment.PodStatus.NOT_COMPLIANT
+    return pod_type, pod_status, pod_doc_count
+
+
 def _tenant_driver_ref(driver):
     if driver is None:
         return ''
@@ -15206,6 +15273,19 @@ def _tenant_shipment_validate_submission(
     if driver is not None and driver.driver_status != DriverMaster.Status.ACTIVE:
         form_errors['booking_no'] = 'Driver must be Active.'
 
+    posted_pod_type = (shipment_form_data.get('pod_type') or '').strip()
+    if posted_pod_type:
+        normalized_pod_type = _normalize_shipment_pod_type(posted_pod_type, default='')
+        if not normalized_pod_type:
+            form_errors['pod_type'] = 'Select a valid POD type.'
+        else:
+            shipment_form_data['pod_type'] = normalized_pod_type
+    posted_pod_status = (shipment_form_data.get('pod_status') or '').strip()
+    if posted_pod_status:
+        normalized_pod_status = normalize_operation_pod_status(posted_pod_status, default='')
+        if normalized_pod_status not in {choice[0] for choice in TenantShipment.PodStatus.choices}:
+            form_errors['pod_status'] = 'Select a valid POD status.'
+
     return form_errors, order_type
 
 
@@ -15431,18 +15511,12 @@ class TenantOperationShipmentCreateView(View):
             if normalized_order_type != 'COD':
                 cod_amount = Decimal('0')
 
-            pod_doc_count = _int_from_request(request, 'pod_doc_count', default=0)
-            if matched_line:
-                pod_doc_count = int(matched_line.get('pod_doc_count') or pod_doc_count or 0)
-            pod_type = _normalize_shipment_pod_type(
-                (matched_line or {}).get('pod_type') or shipment_form_data['pod_type'],
-                default=TenantShipment.PodType.SOFT,
+            pod_type, pod_status, pod_doc_count = _resolve_shipment_pod_fields_for_save(
+                shipment_form_data=shipment_form_data,
+                matched_line=matched_line,
+                request=request,
+                is_edit=False,
             )
-            pod_status = (
-                (matched_line or {}).get('pod_status') or shipment_form_data['pod_status']
-            )
-            if pod_status not in {choice[0] for choice in TenantShipment.PodStatus.choices}:
-                pod_status = TenantShipment.PodStatus.NOT_COMPLIANT
 
             if form_errors:
                 context.update(
@@ -15863,18 +15937,13 @@ class TenantOperationShipmentEditView(View):
             if normalized_order_type != 'COD':
                 cod_amount = Decimal('0')
 
-            pod_doc_count = _int_from_request(request, 'pod_doc_count', default=0)
-            if matched_line:
-                pod_doc_count = int(matched_line.get('pod_doc_count') or pod_doc_count or 0)
-            pod_type = _normalize_shipment_pod_type(
-                (matched_line or {}).get('pod_type') or shipment_form_data['pod_type'],
-                default=TenantShipment.PodType.SOFT,
+            pod_type, pod_status, pod_doc_count = _resolve_shipment_pod_fields_for_save(
+                shipment_form_data=shipment_form_data,
+                matched_line=matched_line,
+                request=request,
+                is_edit=True,
+                existing_shipment=shipment,
             )
-            pod_status = (
-                (matched_line or {}).get('pod_status') or shipment_form_data['pod_status']
-            )
-            if pod_status not in {choice[0] for choice in TenantShipment.PodStatus.choices}:
-                pod_status = TenantShipment.PodStatus.NOT_COMPLIANT
 
             if form_errors:
                 context.update(
@@ -15998,6 +16067,7 @@ class TenantOperationShipmentUpdateView(View):
                     'collection_status_choices': TenantShipment.CollectionStatus.choices,
                     'pod_status_choices': TenantShipment.PodStatus.choices,
                     'tenant_schema_name': tenant_registry.schema_name,
+                    **operation_field_options_context(booking=shipment.booking),
                 }
             )
             return render(request, self.template_name, context)
@@ -16029,6 +16099,10 @@ class TenantOperationShipmentUpdateView(View):
                 request.POST.get('collection_status') or shipment.collection_status
             ).strip()
             posted_pod_status = (request.POST.get('pod_status') or shipment.pod_status).strip()
+            posted_pod_type = _normalize_shipment_pod_type(
+                (request.POST.get('pod_type') or shipment.pod_type or '').strip(),
+                default=shipment.pod_type or TenantShipment.PodType.DIGITAL,
+            )
             posted_pod_doc_count = _int_from_request(
                 request,
                 'pod_doc_count',
@@ -16052,6 +16126,7 @@ class TenantOperationShipmentUpdateView(View):
             shipment.shipment_status = posted_status
             shipment.collection_status = posted_collection
             shipment.pod_status = posted_pod_status
+            shipment.pod_type = posted_pod_type
             shipment.pod_doc_count = posted_pod_doc_count
             try:
                 with db_transaction.atomic():
@@ -16108,6 +16183,7 @@ class TenantOperationShipmentUpdateView(View):
                     # Re-apply admin form values after sync/side effects so manual edits persist.
                     shipment.collection_status = posted_collection
                     shipment.pod_status = posted_pod_status
+                    shipment.pod_type = posted_pod_type
                     shipment.pod_doc_count = posted_pod_doc_count
                     if status_changed:
                         shipment.shipment_status = posted_status
@@ -16526,8 +16602,6 @@ def _tenant_shipment_pod_apply_posting_effects(*, document, source_document, shi
     if not document.record_date:
         document.record_date = timezone.localdate()
     if shipment is not None:
-        shipment.pod_type = TenantShipment.PodType.HARD
-        shipment.save(update_fields=['pod_type', 'updated_at'])
         _tenant_shipment_document_refresh_shipment_pod(shipment)
 
 
@@ -17573,17 +17647,32 @@ class TenantOperationShipmentDocumentsDeleteView(View):
             if document is None:
                 messages.error(request, 'Shipment document not found.', extra_tags='tenant')
                 return _tenant_redirect(request, 'iroad_tenants:tenant_operation_shipment_documents_list')
-            guard_errors = _tenant_shipment_document_guard_mutable(document)
-            if guard_errors:
+            delete_chain = _tenant_shipment_document_delete_chain(document)
+            for chain_document in delete_chain:
+                chain_errors = _tenant_shipment_document_guard_mutable(chain_document)
+                if chain_errors:
+                    messages.error(
+                        request,
+                        (
+                            f'Cannot delete {chain_document.record_no}: '
+                            f'{chain_errors.get("status", "This document cannot be deleted.")}'
+                        ),
+                        extra_tags='tenant',
+                    )
+                    return _tenant_redirect(request, 'iroad_tenants:tenant_operation_shipment_documents_list')
+            record_no = document.record_no
+            shipment = document.shipment
+            try:
+                with db_transaction.atomic():
+                    for chain_document in delete_chain:
+                        chain_document.delete()
+            except ProtectedError:
                 messages.error(
                     request,
-                    guard_errors.get('status', 'This document cannot be deleted.'),
+                    'Cannot delete this document because other records reference it.',
                     extra_tags='tenant',
                 )
                 return _tenant_redirect(request, 'iroad_tenants:tenant_operation_shipment_documents_list')
-            record_no = document.record_no
-            shipment = document.shipment
-            document.delete()
             if shipment:
                 _tenant_shipment_document_refresh_shipment_pod(shipment)
             messages.success(request, f'Shipment document {record_no} deleted successfully.', extra_tags='tenant')
@@ -28534,7 +28623,7 @@ class TenantOrganizationProfileView(View):
             context.update({
                 'org': profile,
                 'owner_label': owner_label,
-                'org_status_label': _organization_status_from_tenant(context['tenant']),
+                # 'org_status_label': _organization_status_from_tenant(context['tenant']),
                 'logo_display_name': _logo_display_name(profile),
                 'tenant_schema_name': tenant_registry.schema_name,
             })

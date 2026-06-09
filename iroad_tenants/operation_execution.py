@@ -186,6 +186,127 @@ def _executed_action_ids(*, booking=None, shipment=None, movement=None, exclude_
     return set(qs.values_list('operation_action_id', flat=True))
 
 
+def _executed_action_codes(*, booking=None, shipment=None, movement=None, exclude_log_id=None):
+    """Uppercase action_code tokens already logged on the current context."""
+    qs = TenantOperationActionLog.objects.exclude(operation_action__isnull=True)
+    if exclude_log_id:
+        qs = qs.exclude(log_id=exclude_log_id)
+    if shipment is not None:
+        qs = qs.filter(shipment_id=shipment.pk)
+    elif movement is not None:
+        from iroad_tenants.operation_runtime.movement_execution_engine import (
+            movement_executed_action_ids,
+        )
+
+        movement_ids = movement_executed_action_ids(
+            movement,
+            exclude_log_id=exclude_log_id,
+        )
+        if not movement_ids:
+            return set()
+        return {
+            (code or '').strip().upper()
+            for code in TenantOperationAction.objects.filter(
+                action_id__in=movement_ids,
+            ).values_list('action_code', flat=True)
+            if (code or '').strip()
+        }
+    elif booking is not None:
+        qs = qs.filter(booking_id=booking.booking_id, shipment__isnull=True)
+    else:
+        return set()
+    return {
+        (code or '').strip().upper()
+        for code in qs.values_list('operation_action__action_code', flat=True)
+        if (code or '').strip()
+    }
+
+
+def _is_hard_copy_collection_action(action) -> bool:
+    if action is None:
+        return False
+    if getattr(action, 'hard_copy_collection', False):
+        return True
+    return action_matches(
+        action,
+        'hard pod',
+        'a7h',
+        'hard copy',
+        'hard-copy',
+        'hardcopy',
+    )
+
+
+def _pending_hard_pod_custody_exists(shipment) -> bool:
+    """Unpromoted custody from POST /hard-pod/submit/ (mobile step 15)."""
+    shipment_id = str(
+        getattr(shipment, 'pk', None) or getattr(shipment, 'shipment_id', '') or ''
+    ).strip()
+    if not shipment_id:
+        return False
+    try:
+        from mobile_api.hard_pod.models import HardPODCustodySubmission
+    except ImportError:
+        return False
+    return HardPODCustodySubmission.objects.filter(
+        shipment_id=shipment_id,
+        promoted_at__isnull=True,
+    ).exists()
+
+
+def _hard_pod_blocks_forward_action(shipment, action_code: str) -> bool:
+    """
+    Hard POD: digital A7 alone is not enough — block A8/A9/A10 until A7H custody.
+    """
+    code = (action_code or '').strip().upper()
+    if code not in {'A8', 'A9', 'A10'}:
+        return False
+    if shipment is None:
+        return False
+    pod_type = (getattr(shipment, 'pod_type', None) or '').strip()
+    if pod_type != TenantShipment.PodType.HARD:
+        return False
+    try:
+        from mobile_api.dashboard.selectors import pod_cod_policy as policy
+
+        if not policy.derive_hard_pod_pending(shipment):
+            return False
+        return not policy.derive_pod_pending(shipment)
+    except Exception:
+        return False
+
+
+def _hard_copy_collection_shipment_allowed(
+    shipment,
+    *,
+    exclude_log_id=None,
+) -> bool:
+    """
+    A7H on Hard POD shipments at delivery/POD-submitted.
+
+    Allowed after digital A7 **or** after Hard POD custody submit (step 15) when
+    execute will promote the custody submission.
+    """
+    if shipment is None:
+        return False
+    pod_type = (getattr(shipment, 'pod_type', None) or '').strip()
+    if pod_type != TenantShipment.PodType.HARD:
+        return False
+    current = (shipment.shipment_status or '').strip()
+    if current not in {
+        TenantShipment.ShipmentStatus.AT_DELIVERY,
+        TenantShipment.ShipmentStatus.POD_SUBMITTED,
+    }:
+        return False
+    executed_codes = _executed_action_codes(
+        shipment=shipment,
+        exclude_log_id=exclude_log_id,
+    )
+    if 'A7' in executed_codes:
+        return True
+    return _pending_hard_pod_custody_exists(shipment)
+
+
 def _booking_start_job_done(booking, *, exclude_log_id=None):
     if booking is None:
         return False
@@ -284,6 +405,9 @@ def _action_is_allowed(
         if requires_existing_movement and not has_active_movement:
             return False
 
+        if _hard_pod_blocks_forward_action(shipment, action_code):
+            return False
+
         if action_matches(action, 'collect payment', 'a9', 'action 9'):
             if (shipment.order_type or '').upper() != 'COD':
                 return False
@@ -293,6 +417,12 @@ def _action_is_allowed(
                 TenantShipment.ShipmentStatus.POD_SUBMITTED,
                 TenantShipment.ShipmentStatus.DELIVERED,
             }
+
+        if _is_hard_copy_collection_action(action):
+            return _hard_copy_collection_shipment_allowed(
+                shipment,
+                exclude_log_id=exclude_log_id,
+            )
 
         if action_matches(action, 'start job', 'action 1') or action_code == 'A1':
             return False

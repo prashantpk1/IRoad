@@ -15,8 +15,55 @@ from tenant_workspace.models import (
     resolve_operation_action_log_for_pod,
     TenantShipment,
     TenantShipmentDocument,
+    TenantShipmentDocumentPage,
     TenantShipmentPodPage,
 )
+
+
+def _shipment_requires_hard_pod_mode(shipment) -> bool:
+    """Hard POD compliance must survive A7 digital evidence posting."""
+    if shipment is None:
+        return False
+    current = (getattr(shipment, 'pod_type', None) or '').strip()
+    if current == TenantShipment.PodType.HARD:
+        return True
+    booking = getattr(shipment, 'booking', None)
+    if booking is None and getattr(shipment, 'booking_id', None):
+        from tenant_workspace.models import TenantBooking
+
+        booking = TenantBooking.objects.filter(pk=shipment.booking_id).only('pod_type').first()
+    if booking is not None:
+        booking_pod = (getattr(booking, 'pod_type', None) or '').strip()
+        if booking_pod == TenantShipment.PodType.HARD:
+            return True
+    from iroad_tenants.operation_execution import _pending_hard_pod_custody_exists
+
+    if _pending_hard_pod_custody_exists(shipment):
+        return True
+    return False
+
+
+def apply_a7_shipment_pod_type_classification(shipment) -> None:
+    """
+    A7 records digital evidence; it must not downgrade Hard shipments to Digital.
+
+    Hard POD mobile flow: digital capture (A7) then physical confirmation (A7H)
+    while ``pod_type`` stays Hard for gating and custody submit.
+    """
+    if shipment is None:
+        return
+    if getattr(shipment, 'pk', None):
+        shipment.refresh_from_db(fields=['pod_type', 'booking_id', 'updated_at'])
+    if _shipment_requires_hard_pod_mode(shipment):
+        if (getattr(shipment, 'pod_type', None) or '').strip() != TenantShipment.PodType.HARD:
+            shipment.pod_type = TenantShipment.PodType.HARD
+            shipment.save(update_fields=['pod_type', 'updated_at'])
+        return
+    current = (getattr(shipment, 'pod_type', None) or '').strip()
+    if current == TenantShipment.PodType.HARD:
+        return
+    shipment.pod_type = TenantShipment.PodType.DIGITAL
+    shipment.save(update_fields=['pod_type', 'updated_at'])
 
 
 def birth_pod_from_action_log(action_log, *, created_by_label=''):
@@ -124,8 +171,7 @@ def birth_pod_from_action_log(action_log, *, created_by_label=''):
         )
 
     if is_upload_pod_action:
-        shipment.pod_type = TenantShipment.PodType.DIGITAL
-        shipment.save(update_fields=['pod_type', 'updated_at'])
+        apply_a7_shipment_pod_type_classification(shipment)
 
     return document
 
@@ -172,6 +218,50 @@ def _auto_create_delivery_note_for_a7(action_log, *, shipment, created_by_label=
     return source_document
 
 
+def _apply_a7_hard_pod_digital_posting(
+    *,
+    action_log,
+    pod_document,
+    source_document,
+    shipment,
+) -> None:
+    """
+    Hard POD A7: digital evidence on POD child; update manual DN page completion.
+
+    Does not relocate the delivery-note header to In Company — physical custody
+    is confirmed later via A7H.
+    """
+    from iroad_tenants.views import _tenant_shipment_document_refresh_shipment_pod
+
+    now = timezone.now()
+
+    pod_document.physical_location = 'With Driver'
+    pod_document.status = TenantShipmentDocument.Status.VERIFIED
+    if not pod_document.record_date:
+        pod_document.record_date = timezone.localdate()
+    pod_document.save(
+        update_fields=['physical_location', 'status', 'record_date', 'updated_at'],
+    )
+
+    action_log_obj = action_log if getattr(action_log, 'pk', None) else None
+    for page in TenantShipmentPodPage.objects.filter(document=pod_document).order_by('line_no'):
+        page.digital_evidence_status = 'Collected'
+        if action_log_obj is not None and page.action_log_id is None:
+            page.action_log = action_log_obj
+        page.save(update_fields=['digital_evidence_status', 'action_log', 'updated_at'])
+
+    if source_document is not None:
+        TenantShipmentDocumentPage.objects.filter(document=source_document).update(
+            completion_status=TenantShipmentDocumentPage.CompletionStatus.COMPLETED,
+            updated_at=now,
+        )
+        source_document.refresh_from_db()
+        source_document.sync_pod_pages_from_document_pages()
+
+    if shipment is not None:
+        _tenant_shipment_document_refresh_shipment_pod(shipment)
+
+
 def apply_pod_posting_from_action_log(
     *,
     action_log,
@@ -187,10 +277,20 @@ def apply_pod_posting_from_action_log(
         return
     if not operation_action_matches(action, 'upload pod', 'a7', 'action 7'):
         return
-    _tenant_shipment_pod_apply_posting_effects(
-        document=pod_document,
-        source_document=pod_document.source_document,
-        shipment=shipment,
-        header_physical_location='with_driver',
-    )
-    pod_document.save(update_fields=['status', 'physical_location', 'updated_at'])
+    source_document = pod_document.source_document
+    if _shipment_requires_hard_pod_mode(shipment):
+        _apply_a7_hard_pod_digital_posting(
+            action_log=action_log,
+            pod_document=pod_document,
+            source_document=source_document,
+            shipment=shipment,
+        )
+    else:
+        _tenant_shipment_pod_apply_posting_effects(
+            document=pod_document,
+            source_document=source_document,
+            shipment=shipment,
+            header_physical_location='with_driver',
+        )
+        pod_document.save(update_fields=['status', 'physical_location', 'updated_at'])
+    apply_a7_shipment_pod_type_classification(shipment)

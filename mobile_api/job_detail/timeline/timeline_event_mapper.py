@@ -165,13 +165,14 @@ def map_action_to_pending_timeline_event(
             or ''
         ).strip()
 
+    action_code = str(getattr(action, 'action_code', '') or '')
     event = {
         'log_id': '',
         'log_no': '',
         'log_date': '',
         'created_at': '',
         'event_type': event_type,
-        'action_code': str(getattr(action, 'action_code', '') or ''),
+        'action_code': action_code,
         'action_label': _action_label_from_action(action, request=request),
         'source': '',
         'source_channel': '',
@@ -197,12 +198,27 @@ def map_action_to_pending_timeline_event(
         'is_performed': False,
         'sequence_number': int(getattr(action, 'sequence_number', 0) or 0),
     }
-    return enrich_timeline_event_navigation(
+    event = enrich_timeline_event_navigation(
         event,
         action,
         shipment=shipment,
         tenant_schema=tenant_schema,
     )
+    if (
+        shipment is not None
+        and action_code.upper() == 'A7'
+        and (getattr(shipment, 'pod_type', None) or '').strip().casefold() == 'hard'
+    ):
+        event['screen'] = 'pod_capture'
+        event['capture_mode'] = 'digital_evidence'
+        event['pod_capture_steps'] = ['digital_evidence', 'hard_copy_confirmation']
+        event['includes_hard_copy'] = True
+    elif action_code.upper() == 'A8':
+        event['screen'] = 'job_detail'
+        event['action'] = 'execute_action'
+        event.pop('capture_mode', None)
+        event.pop('pod_capture_steps', None)
+    return event
 
 
 def merge_actions_with_timeline_logs(

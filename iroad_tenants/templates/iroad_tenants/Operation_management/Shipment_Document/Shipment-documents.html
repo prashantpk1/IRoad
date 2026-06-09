@@ -467,6 +467,7 @@
                     class="form-select {% if shipment_document_form_errors.physical_location %}is-invalid{% endif %}"
                     id="physicalLocation"
                     name="physical_location"
+                    onchange="window.syncShipmentDocumentLinePhysicalLocations && window.syncShipmentDocumentLinePhysicalLocations(this.value)"
                   >
                     <option value="" {% if not shipment_document_form_data.physical_location %}selected{% endif %} disabled>
                       -Select physical location-

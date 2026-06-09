@@ -45,6 +45,31 @@ _TERMINAL_SHIPMENT_STATUSES = frozenset(
         TenantShipment.ShipmentStatus.CANCELLED,
     }
 )
+_HARD_POD_ACTIONABLE_STATUSES = frozenset(
+    {
+        TenantShipment.ShipmentStatus.AT_DELIVERY,
+        TenantShipment.ShipmentStatus.POD_SUBMITTED,
+    }
+)
+
+
+def hard_pod_stage_reached(
+    shipment: Any | None,
+    *,
+    log_evidence: dict[str, bool] | None = None,
+) -> bool:
+    """
+    Hard POD warnings/checklists only apply during delivery/POD — not pickup or in transit.
+    """
+    if shipment is None:
+        return False
+    status = (getattr(shipment, 'shipment_status', None) or '').strip()
+    if status in _TERMINAL_SHIPMENT_STATUSES:
+        return False
+    if status in _HARD_POD_ACTIONABLE_STATUSES:
+        return True
+    evidence = log_evidence or {}
+    return bool(evidence.get('pod_uploaded'))
 
 
 def pod_status_is_complete(pod_status: str | None) -> bool:
@@ -92,6 +117,9 @@ def derive_hard_pod_pending(
         return False
 
     evidence = log_evidence or {}
+    if not hard_pod_stage_reached(shipment, log_evidence=evidence):
+        return False
+
     if evidence.get('hard_pod_log'):
         return False
 

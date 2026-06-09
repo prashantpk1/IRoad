@@ -189,7 +189,35 @@ class ExecutionValidationService:
         if not code:
             return False
         normalized = {c.casefold() for c in allowed_codes if c}
-        return code.casefold() in normalized
+        if code.casefold() in normalized:
+            return True
+        return self._hard_copy_execute_allowed(context, operation_action)
+
+    def _hard_copy_execute_allowed(
+        self,
+        context: ExecuteActionContext,
+        operation_action: Any,
+    ) -> bool:
+        """A7H runs inside Upload POD — allowed when policy permits, not in workflow list."""
+        from iroad_tenants.operation_execution import (
+            _hard_copy_collection_shipment_allowed,
+            _is_hard_copy_collection_action,
+        )
+
+        if not _is_hard_copy_collection_action(operation_action):
+            return False
+        if context.shipment is None:
+            return False
+        if not _hard_copy_collection_shipment_allowed(context.shipment):
+            return False
+        policy_error = OperationExecutionService.validate_operation_action_allowed(
+            operation_action,
+            booking=context.booking,
+            shipment=context.shipment,
+            movement=context.movement,
+            booking_item_type=self._booking_item_type(context),
+        )
+        return policy_error is None
 
     def _allowed_action_codes(
         self,

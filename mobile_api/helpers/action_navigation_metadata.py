@@ -9,6 +9,8 @@ from __future__ import annotations
 from typing import Any
 
 from mobile_api.pod_capture.services.pod_section_metadata import (
+    HARD_COPY_SCREEN_TITLE,
+    UI_MODE_HARD_POD_CONFIRMATION,
     build_hard_copy_confirmation_block,
 )
 
@@ -38,9 +40,15 @@ def build_hard_copy_navigation_payload(
     if not block.get('required'):
         return {}
     return {
-        'screen': HARD_COPY_CONFIRMATION_SCREEN,
-        'action': 'go_to_hard_copy_confirmation',
+        'screen': POD_CAPTURE_SCREEN,
+        'action': 'go_to_pod_capture',
+        'capture_mode': HARD_COPY_CONFIRMATION_SCREEN,
+        'active_step': 'hard_copy_confirmation',
+        'ui_mode': UI_MODE_HARD_POD_CONFIRMATION,
+        'screen_title': HARD_COPY_SCREEN_TITLE,
+        'pod_capture_steps': ['hard_copy_confirmation'],
         'hard_copy_confirmation': block,
+        'confirmation_ui': dict(block.get('confirmation_ui') or {}),
     }
 
 
@@ -109,5 +117,8 @@ def enrich_timeline_event_navigation(
         return event
     out = dict(event)
     out.update(navigation)
+    out['screen'] = POD_CAPTURE_SCREEN
+    out['action'] = 'go_to_pod_capture'
     out['capture_mode'] = HARD_COPY_CONFIRMATION_SCREEN
+    out['active_step'] = 'hard_copy_confirmation'
     return out

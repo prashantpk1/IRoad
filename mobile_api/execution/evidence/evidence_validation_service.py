@@ -27,6 +27,9 @@ from mobile_api.execution.evidence.execution_media_security import (
 )
 from mobile_api.execution.exceptions import ExecuteActionError
 from mobile_api.helpers.action_execution_metadata import build_execution_requirements
+from mobile_api.pod_capture.policy.canonical_pod_action_registry import (
+    is_pod_upload_action,
+)
 
 
 def extract_capture_bundle_id(payload: dict[str, Any] | None) -> str:
@@ -70,7 +73,7 @@ class EvidenceValidationService:
             return
 
         payload = context.payload or {}
-        bundle_id = extract_capture_bundle_id(payload)
+        bundle_id = self._auto_attach_staged_pod_bundle(context)
         if bundle_id:
             self.validate_pod_capture_bundle(context, bundle_id)
             requirements = dict(context.resolver_meta.get('pod_capture_compliance') or {})
@@ -137,6 +140,8 @@ class EvidenceValidationService:
             raise self._map_pod_capture_error(exc) from exc
 
         pod_type = str((context.payload or {}).get('pod_type') or '').strip()
+        if not pod_type and self._is_digital_pod_execute(context.operation_action):
+            pod_type = 'digital'
         requirements = build_pod_capture_requirements(
             context.operation_action,
             pod_capture_type=pod_type,
@@ -147,6 +152,67 @@ class EvidenceValidationService:
         context.resolver_meta['pod_capture_bundle'] = bundle
         context.resolver_meta['pod_capture_bundle_media'] = list(bundle_media or [])
         context.resolver_meta['pod_capture_compliance'] = requirements
+
+    def _auto_attach_staged_pod_bundle(self, context: ExecuteActionContext) -> str:
+        """
+        Mobile often POSTs pod/capture then Execute A7 without ``capture_bundle_id``.
+
+        Attach the latest ready staged bundle for this driver+shipment so evidence
+        (photo / signature / video) is validated from staging, not an empty body.
+        """
+        existing = extract_capture_bundle_id(context.payload)
+        if existing:
+            return existing
+        if not self._is_digital_pod_execute(context.operation_action):
+            return ''
+        if context.job_type != 'shipment':
+            return ''
+        inline_media = normalize_media_items(list((context.payload or {}).get('media') or []))
+        if inline_media:
+            return ''
+        bundle_id = self._find_latest_ready_pod_bundle_id(context)
+        if not bundle_id:
+            return ''
+        context.payload = dict(context.payload or {})
+        context.payload['capture_bundle_id'] = bundle_id
+        return bundle_id
+
+    @staticmethod
+    def _is_digital_pod_execute(operation_action: Any | None) -> bool:
+        if operation_action is None:
+            return False
+        code = (getattr(operation_action, 'action_code', '') or '').strip().upper()
+        if code == 'A7':
+            return True
+        if bool(getattr(operation_action, 'auto_pod_post', False)):
+            return True
+        return is_pod_upload_action(operation_action)
+
+    @staticmethod
+    def _find_latest_ready_pod_bundle_id(context: ExecuteActionContext) -> str:
+        from django.utils import timezone
+
+        from mobile_api.pod_capture.models import PODCaptureBundle
+
+        tenant = (context.tenant_schema or '').strip()
+        driver_pk = EvidenceValidationService._driver_pk(context.driver)
+        shipment_pk = EvidenceValidationService._shipment_key(context)
+        if not (tenant and driver_pk and shipment_pk):
+            return ''
+        bundle = (
+            PODCaptureBundle.objects.filter(
+                tenant_schema=tenant,
+                shipment_id=shipment_pk,
+                driver_id=driver_pk,
+                bundle_status=PODCaptureBundle.BundleStatus.READY,
+                expires_at__gt=timezone.now(),
+            )
+            .order_by('-created_at')
+            .first()
+        )
+        if bundle is None:
+            return ''
+        return str(bundle.pk)
 
     @staticmethod
     def _driver_pk(driver: Any) -> str:

@@ -75,6 +75,7 @@ def build_pod_cod_section(
         context.shipment,
         driver=context.driver,
         tenant_schema=(context.tenant_schema or '').strip(),
+        log_evidence=evidence,
     )
     return display_flags
 
@@ -115,7 +116,10 @@ def _resolve_display_flags(
                 flags['pod_compliant'] = True
                 flags['hard_pod_pending'] = False
     elif hard_pod_type and not hard_pod_log:
-        flags['hard_pod_pending'] = True
+        flags['hard_pod_pending'] = policy.derive_hard_pod_pending(
+            shipment,
+            log_evidence=evidence,
+        )
 
     if log_primary or evidence.get('cod_collected_log'):
         if evidence.get('cod_collected_log') and policy.is_cod_shipment(shipment):
@@ -127,4 +131,8 @@ def _resolve_display_flags(
         driver=driver,
     )
     flags['delivery_blocked'] = policy.derive_delivery_blocked(shipment)
+    if flags.get('pod_compliant') and (
+        not policy.is_cod_shipment(shipment) or flags.get('cod_collected')
+    ):
+        flags['delivery_blocked'] = False
     return flags

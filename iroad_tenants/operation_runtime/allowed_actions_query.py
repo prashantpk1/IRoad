@@ -54,6 +54,7 @@ from iroad_tenants.operation_runtime.movement_action_validator import (
 from iroad_tenants.operation_runtime.shipment_execution_stage import (
     STAGE_COD,
     STAGE_COMPLETION,
+    STAGE_DELIVERY,
     STAGE_PICKUP,
     STAGE_LOADING,
     STAGE_PRE_TRANSIT,
@@ -124,10 +125,16 @@ def _forward_impact_tokens_for_status(current_status: str) -> list[str]:
 
 
 def _apply_mobile_scope_filter(qs: QuerySet) -> QuerySet:
+    """
+    Mobile driver scope — includes hidden hard-copy rows (A7H) for execute policy.
+
+    Job Detail workflow/timeline strip hard-copy actions for display; execute still
+    validates A7H when digital POD + custody submit are complete.
+    """
     return (
         qs.filter(action_scope__in=_MOBILE_JOB_ACTION_SCOPES)
-        .filter(mobile_visible=True)
         .exclude(admin_only=True)
+        .filter(Q(mobile_visible=True) | Q(hard_copy_collection=True))
     )
 
 
@@ -230,6 +237,12 @@ def _prefilter_shipment_candidates(
     }:
         clauses |= Q(auto_movement_post=True) | Q(auto_pod_post=True)
 
+    if current in {
+        TenantShipment.ShipmentStatus.AT_DELIVERY,
+        TenantShipment.ShipmentStatus.POD_SUBMITTED,
+    } or stage in {STAGE_DELIVERY, STAGE_POD}:
+        clauses |= Q(hard_copy_collection=True) | Q(action_code__iexact='A7H')
+
     if stage == STAGE_POD:
         clauses |= Q(movement_status_impact__in=('Completed', 'completed'))
 
@@ -248,7 +261,8 @@ def _prefilter_shipment_candidates(
         & Q(shipment_status_impact='')
         & Q(movement_status_impact='')
         & Q(auto_movement_post=False)
-        & Q(auto_pod_post=False),
+        & Q(auto_pod_post=False)
+        & Q(hard_copy_collection=False),
     )
     return qs
 

@@ -19,9 +19,13 @@ from mobile_api.job_detail.services.job_detail_driver_resolver import tenant_sch
 from mobile_api.job_detail.services.shipment_job_resolver import resolve_shipment_job
 from mobile_api.permissions import HasViewMobileCapability, IsDriver, IsMobileAuthenticated
 from mobile_api.pod_capture.services.pod_section_metadata import (
+    HARD_COPY_SCREEN_TITLE,
     HARD_POD_ACTION_CODE,
+    UI_MODE_HARD_POD_CONFIRMATION,
     build_hard_copy_confirmation_block,
+    build_hard_copy_confirmation_ui,
 )
+from mobile_api.pod_capture.services.shipment_log_evidence import resolve_shipment_log_evidence
 from mobile_api.rbac import get_mobile_jwt_payload
 from mobile_api.throttling import MobileUserThrottle
 from mobile_api.views.base import MobileAPIView
@@ -83,27 +87,52 @@ class HardPodDocumentsAPIView(MobileAPIView):
             )
 
         shipment = resolved.shipment
+        log_evidence = resolve_shipment_log_evidence(
+            shipment,
+            driver=driver,
+            tenant_schema=tenant_schema,
+        )
         hard_block = build_hard_copy_confirmation_block(
             shipment,
             driver=driver,
             tenant_schema=tenant_schema,
+            log_evidence=log_evidence,
         )
         confirmation = build_hard_pod_confirmation_context(
             shipment,
             tenant_schema=tenant_schema,
         )
 
+        pages = list(confirmation.get('pages') or hard_block.get('pages') or [])
+        applicable = bool(hard_block.get('applicable')) or bool(pages)
+        confirmation_ui = dict(hard_block.get('confirmation_ui') or {})
+        if not confirmation_ui and pages:
+            confirmation_ui = build_hard_copy_confirmation_ui(pages)
         data = {
             'shipment_id': str(getattr(shipment, 'pk', None) or shipment_id),
-            'required': bool(hard_block.get('required')),
+            'applicable': applicable,
+            'required': applicable,
+            'actionable': bool(hard_block.get('actionable')),
+            'submit_allowed': bool(hard_block.get('submit_allowed')),
             'pending': bool(hard_block.get('pending')),
+            'documents_source': 'shipment_document',
             'action_code': (hard_block.get('action_code') or HARD_POD_ACTION_CODE).strip(),
             'submit_endpoint': hard_block.get('submit_endpoint') or '/api/v1/mobile/driver/hard-pod/submit/',
             'execute_action_code': (
                 hard_block.get('execute_action_code') or HARD_POD_ACTION_CODE
             ).strip(),
+            'screen_title': HARD_COPY_SCREEN_TITLE,
+            'ui_mode': UI_MODE_HARD_POD_CONFIRMATION,
+            'screen_contract': 'confirmation_ui',
+            'capture_ui': {},
+            'confirmation_ui': confirmation_ui,
             'documents': list(confirmation.get('documents') or []),
-            'pages': list(confirmation.get('pages') or []),
+            'pages': pages,
+            'workflow': {
+                'fetch': 'GET hard-pod/documents (shipment document pages)',
+                'confirm': 'POST hard-pod/submit (confirmed_pages)',
+                'execute': 'POST execute-action A7H',
+            },
         }
         logger.info(
             'hard_pod_documents tenant=%s shipment=%s pages=%s',
