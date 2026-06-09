@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.urls import path
 from django.views.generic import TemplateView
 
@@ -19,6 +20,7 @@ from .views import (
     DriverAttachmentCreateView,
     DriverAttachmentEditView,
     DriverAttachmentDetailView,
+    DriverAttachmentFileView,
     DriverAttachmentDeleteView,
     DriverAttachmentDriverSelectView,
     DriverSettingsView,
@@ -690,6 +692,11 @@ urlpatterns = [
         name='driver_attachment_detail',
     ),
     path(
+        'fleet/drivers/<uuid:driver_id>/attachments/<uuid:attachment_id>/file/',
+        DriverAttachmentFileView.as_view(),
+        name='driver_attachment_file',
+    ),
+    path(
         'fleet/drivers/<uuid:driver_id>/attachments/<uuid:attachment_id>/edit/',
         DriverAttachmentEditView.as_view(),
         name='driver_attachment_edit',
@@ -1161,3 +1168,14 @@ urlpatterns = [
     path('my-account/', TenantMyAccountView.as_view(), name='tenant_my_account'),
     path('logout/', TenantLogoutView.as_view(), name='tenant_logout'),
 ]
+
+if settings.DEBUG:
+    from iroad_frontend.error_views import error_preview
+
+    urlpatterns += [
+        path(
+            '__preview__/error/<int:code>/',
+            error_preview,
+            name='tenant_error_preview',
+        ),
+    ]

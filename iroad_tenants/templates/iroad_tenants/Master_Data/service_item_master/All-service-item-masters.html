@@ -142,6 +142,7 @@
       <div
         class="eal-table-card"
         data-eal-filterable-table
+        data-eal-server-paginated="1"
         data-eal-empty-colspan="9"
         data-eal-empty-filter-message="No service items match the selected search or filters."
         data-eal-global-search-columns="1,2,3,5,6,7"
@@ -154,6 +155,7 @@
                 type="search"
                 id="serviceItemMasterSearch"
                 data-eal-global-search
+                value="{{ search_q|default:'' }}"
                 autocomplete="off"
                 placeholder="Search service items..."
                 aria-label="Search service items"
@@ -1040,25 +1042,7 @@
           </table>
         </div>
 
-        <!-- Pagination -->
-        <div class="eal-pagination">
-          <div class="eal-pagination-info">
-            Showing
-            <strong>{% if service_items %}1-{{ service_items|length }}{% else %}0-0{% endif %}</strong>
-            of
-            <strong>{{ service_items|length }}</strong>
-            service items
-          </div>
-          <div class="eal-pagination-controls">
-            <button class="eal-page-btn" title="Previous">
-              <i class="bi bi-chevron-left"></i>
-            </button>
-            <button class="eal-page-btn active">1</button>
-            <button class="eal-page-btn" title="Next">
-              <i class="bi bi-chevron-right"></i>
-            </button>
-          </div>
-        </div>
+        {% include 'iroad_tenants/partials/eal_list_pagination.html' with page_obj=service_items_page pagination_label='service items' %}
       </div>
       <!-- ========== END NEW TABLE UI DESIGN ========== -->
 

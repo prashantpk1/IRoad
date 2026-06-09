@@ -43,6 +43,7 @@
 <div
   class="eal-table-card"
   data-eal-filterable-table
+  data-eal-server-paginated="1"
   data-eal-empty-colspan="11"
   data-eal-empty-filter-message="{% translate 'No locations match the selected search/filter criteria.' %}"
   data-eal-global-search-columns="1,2,3,4,5,6,7,8,9"
@@ -189,19 +190,7 @@
           </table>
         </div>
 
-  {% if locations_page.paginator.num_pages > 1 %}
-        <div class="eal-pagination">
-    <div class="eal-pagination-info">{% translate "Page" %} {{ locations_page.number }} / {{ locations_page.paginator.num_pages }}</div>
-          <div class="eal-pagination-controls">
-      {% if locations_page.has_previous %}
-      <a class="eal-page-btn" href="?page={{ locations_page.previous_page_number }}{% if search_q %}&q={{ search_q|urlencode }}{% endif %}&status={{ filter_status|urlencode }}&serviceable={{ filter_serviceable|urlencode }}"><i class="bi bi-chevron-left"></i></a>
-      {% endif %}
-      {% if locations_page.has_next %}
-      <a class="eal-page-btn" href="?page={{ locations_page.next_page_number }}{% if search_q %}&q={{ search_q|urlencode }}{% endif %}&status={{ filter_status|urlencode }}&serviceable={{ filter_serviceable|urlencode }}"><i class="bi bi-chevron-right"></i></a>
-      {% endif %}
-          </div>
-        </div>
-  {% endif %}
+  {% include 'iroad_tenants/partials/eal_list_pagination.html' with page_obj=locations_page pagination_label='locations' %}
       </div>
 
     <div class="detail-panel-overlay" id="locationDetailOverlay"></div>

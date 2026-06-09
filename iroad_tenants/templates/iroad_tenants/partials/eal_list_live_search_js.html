@@ -10,6 +10,8 @@
   var listUrl = "{{ list_url|escapejs }}";
   var useServerQ = {% if debounce_server_q == False %}false{% else %}true{% endif %};
   if (!inp) return;
+  var serverTable = inp.closest("[data-eal-server-paginated='1']");
+  if (serverTable) return;
 
   var filterEls = [];
   {% if filter_select_ids %}

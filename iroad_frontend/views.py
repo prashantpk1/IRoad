@@ -28,10 +28,11 @@ def get_lang_context(request) -> dict:
     Returns dict with lang and dir keys.
     """
     lang = (request.GET.get('lang') or '').strip().lower()
+    session = getattr(request, 'session', None)
     if lang not in ('en', 'ar'):
-        lang = request.session.get('frontend_lang', 'en')
-    else:
-        request.session['frontend_lang'] = lang
+        lang = session.get('frontend_lang', 'en') if session is not None else 'en'
+    elif session is not None:
+        session['frontend_lang'] = lang
     if lang not in ('en', 'ar'):
         lang = 'en'
     return {
@@ -275,18 +276,4 @@ class ContactFormSubmitView(View):
         return redirect('/contact/?success=1')
 
 
-def page_not_found(request, exception=None):
-    """
-    Custom 404 (handler404 in root URLconf).
-    Uses the same chrome as the public site: base layout, header/footer,
-    and CMS-driven nav/footer via HomePageContent singleton.
-    """
-    home = HomePageContent.get_singleton()
-    ctx = {'home': home}
-    ctx.update(get_lang_context(request))
-    return render(
-        request,
-        'iroad_frontend/errors/404.html',
-        ctx,
-        status=404,
-    )
+# Custom error handlers live in iroad_frontend.error_views (wired in config/urls.py).

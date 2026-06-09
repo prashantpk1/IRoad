@@ -43,6 +43,7 @@
       <div
         class="eal-table-card"
         data-eal-filterable-table
+        data-eal-server-paginated="1"
         data-eal-empty-colspan="10"
         data-eal-empty-filter-message="No routes match the selected search or filters."
         data-eal-global-search-columns="1,2,3,4,5,6,7,8"
@@ -122,18 +123,7 @@
             </tbody>
           </table>
         </div>
-        <div class="eal-pagination">
-    <div class="eal-pagination-info">Showing <strong>{{ routes_page.start_index|default:0 }}-{{ routes_page.end_index|default:0 }}</strong> of <strong>{{ routes_page.paginator.count|default:0 }}</strong> routes</div>
-    <div class="eal-pagination-controls">
-      {% if routes_page.has_previous %}
-      <a class="eal-page-btn" href="{% url 'iroad_tenants:tenant_route_master_list' %}?page={{ routes_page.previous_page_number }}{% if route_scope %}&scope={{ route_scope|urlencode }}{% endif %}{% if search_q %}&q={{ search_q|urlencode }}{% endif %}"><i class="bi bi-chevron-left"></i></a>
-      {% endif %}
-      <span class="eal-page-btn active">{{ routes_page.number|default:1 }}</span>
-      {% if routes_page.has_next %}
-      <a class="eal-page-btn" href="{% url 'iroad_tenants:tenant_route_master_list' %}?page={{ routes_page.next_page_number }}{% if route_scope %}&scope={{ route_scope|urlencode }}{% endif %}{% if search_q %}&q={{ search_q|urlencode }}{% endif %}"><i class="bi bi-chevron-right"></i></a>
-      {% endif %}
-    </div>
-          </div>
+        {% include 'iroad_tenants/partials/eal_list_pagination.html' with page_obj=routes_page pagination_label='routes' %}
           </div>
 
     <div class="detail-panel-overlay" id="routeDetailOverlay"></div>

@@ -1,7 +1,7 @@
 {% extends 'iroad_tenants/base.html' %}
 {% load static %}
 
-{% block title %}Driver Master | iRoad{% endblock %}
+{% block title %}Driver Master List | iRoad{% endblock %}
 {% block breadcrumb %}{% endblock %}
 
 {% block content %}
@@ -13,12 +13,12 @@
       </li>
       <li class="breadcrumb-item">Operations</li>
       <li class="breadcrumb-item">Drivers Management</li>
-      <li class="breadcrumb-item active" aria-current="page">Driver Master</li>
+      <li class="breadcrumb-item active" aria-current="page">Driver Master List</li>
     </ol>
   </nav>
   <div class="page-header-row">
     <div class="page-header-left">
-      <h1 class="page-title">Driver Master</h1>
+      <h1 class="page-title">Driver Master List</h1>
       <p class="page-subtitle">Manage and view all registered drivers.</p>
     </div>
     <div class="page-header-right">
@@ -29,7 +29,7 @@
         </button>
         <a href="{% url 'iroad_tenants:driver_master_create' %}" class="eal-btn eal-btn-primary">
           <i class="bi bi-plus-lg"></i>
-          <span>Add New Driver</span>
+          <span>Add Driver</span>
         </a>
       </div>
     </div>
@@ -76,13 +76,11 @@
 </div>
 
 <div class="eal-table-card">
-  <form method="get" class="eal-toolbar eal-toolbar--inline-filters">
+  <form method="get" class="eal-toolbar">
     <div class="eal-toolbar-left w-100">
-      <div class="eal-toolbar-filters-row">
-        <div class="eal-search eal-search--toolbar-grow">
-          <i class="bi bi-search"></i>
-          <input type="text" name="q" value="{{ search_q }}" placeholder="Search driver code, names, mobile…" />
-        </div>
+      <div class="eal-search">
+        <i class="bi bi-search"></i>
+        <input type="text" name="q" value="{{ search_q }}" placeholder="Search drivers..." aria-label="Search drivers" />
       </div>
     </div>
   </form>
@@ -94,63 +92,76 @@
           <th class="eal-col-check">
             <input type="checkbox" class="eal-custom-check" id="dmListSelectAll" aria-label="Select all" />
           </th>
-          <th>#</th>
           <th>
             <a href="{{ sort_url_driver_code }}" class="tm-sort-link{% if sort_key == 'driver_code' %} is-active{% endif %}">
               Driver Code
-              <span class="tm-sort-indicator">
+              <span class="sort-indicator">
                 <i class="bi bi-caret-up-fill{% if sort_key == 'driver_code' and sort_dir == 'asc' %} active{% endif %}"></i>
                 <i class="bi bi-caret-down-fill{% if sort_key == 'driver_code' and sort_dir == 'desc' %} active{% endif %}"></i>
               </span>
             </a>
           </th>
           <th>
-            <a href="{{ sort_url_arabic_name }}" class="tm-sort-link{% if sort_key == 'arabic_name' %} is-active{% endif %}">
-              Arabic Name
-              <span class="tm-sort-indicator">
-                <i class="bi bi-caret-up-fill{% if sort_key == 'arabic_name' and sort_dir == 'asc' %} active{% endif %}"></i>
-                <i class="bi bi-caret-down-fill{% if sort_key == 'arabic_name' and sort_dir == 'desc' %} active{% endif %}"></i>
-              </span>
-            </a>
-          </th>
-          <th>
-            <a href="{{ sort_url_english_name }}" class="tm-sort-link{% if sort_key == 'english_name' %} is-active{% endif %}">
-              English Name
-              <span class="tm-sort-indicator">
-                <i class="bi bi-caret-up-fill{% if sort_key == 'english_name' and sort_dir == 'asc' %} active{% endif %}"></i>
-                <i class="bi bi-caret-down-fill{% if sort_key == 'english_name' and sort_dir == 'desc' %} active{% endif %}"></i>
-              </span>
-            </a>
-          </th>
-          <th>
-            <a href="{{ sort_url_mobile_number }}" class="tm-sort-link{% if sort_key == 'mobile_number' %} is-active{% endif %}">
-              Mobile
-              <span class="tm-sort-indicator">
-                <i class="bi bi-caret-up-fill{% if sort_key == 'mobile_number' and sort_dir == 'asc' %} active{% endif %}"></i>
-                <i class="bi bi-caret-down-fill{% if sort_key == 'mobile_number' and sort_dir == 'desc' %} active{% endif %}"></i>
-              </span>
-            </a>
-          </th>
-          <th>
-            <a href="{{ sort_url_driver_source }}" class="tm-sort-link{% if sort_key == 'driver_source' %} is-active{% endif %}">
-              Source
-              <span class="tm-sort-indicator">
-                <i class="bi bi-caret-up-fill{% if sort_key == 'driver_source' and sort_dir == 'asc' %} active{% endif %}"></i>
-                <i class="bi bi-caret-down-fill{% if sort_key == 'driver_source' and sort_dir == 'desc' %} active{% endif %}"></i>
+            <a href="{{ sort_url_driver_name }}" class="tm-sort-link{% if sort_key == 'driver_name' or sort_key == 'english_name' %} is-active{% endif %}">
+              Driver Name
+              <span class="sort-indicator">
+                <i class="bi bi-caret-up-fill{% if sort_key == 'driver_name' or sort_key == 'english_name' %}{% if sort_dir == 'asc' %} active{% endif %}{% endif %}"></i>
+                <i class="bi bi-caret-down-fill{% if sort_key == 'driver_name' or sort_key == 'english_name' %}{% if sort_dir == 'desc' %} active{% endif %}{% endif %}"></i>
               </span>
             </a>
           </th>
           <th>
             <a href="{{ sort_url_driver_status }}" class="tm-sort-link{% if sort_key == 'driver_status' %} is-active{% endif %}">
               Status
-              <span class="tm-sort-indicator">
+              <span class="sort-indicator">
                 <i class="bi bi-caret-up-fill{% if sort_key == 'driver_status' and sort_dir == 'asc' %} active{% endif %}"></i>
                 <i class="bi bi-caret-down-fill{% if sort_key == 'driver_status' and sort_dir == 'desc' %} active{% endif %}"></i>
               </span>
             </a>
           </th>
-          <th>ID Status</th>
-          <th>DL Status</th>
+          <th>
+            <a href="{{ sort_url_mobile_number }}" class="tm-sort-link{% if sort_key == 'mobile_number' %} is-active{% endif %}">
+              Mobile
+              <span class="sort-indicator">
+                <i class="bi bi-caret-up-fill{% if sort_key == 'mobile_number' and sort_dir == 'asc' %} active{% endif %}"></i>
+                <i class="bi bi-caret-down-fill{% if sort_key == 'mobile_number' and sort_dir == 'desc' %} active{% endif %}"></i>
+              </span>
+            </a>
+          </th>
+          <th>
+            <a href="{{ sort_url_nationality }}" class="tm-sort-link{% if sort_key == 'nationality' %} is-active{% endif %}">
+              Nationality
+              <span class="sort-indicator">
+                <i class="bi bi-caret-up-fill{% if sort_key == 'nationality' and sort_dir == 'asc' %} active{% endif %}"></i>
+                <i class="bi bi-caret-down-fill{% if sort_key == 'nationality' and sort_dir == 'desc' %} active{% endif %}"></i>
+              </span>
+            </a>
+          </th>
+          <th>
+            <a href="{{ sort_url_dl_number }}" class="tm-sort-link{% if sort_key == 'dl_number' %} is-active{% endif %}">
+              License No.
+              <span class="sort-indicator">
+                <i class="bi bi-caret-up-fill{% if sort_key == 'dl_number' and sort_dir == 'asc' %} active{% endif %}"></i>
+                <i class="bi bi-caret-down-fill{% if sort_key == 'dl_number' and sort_dir == 'desc' %} active{% endif %}"></i>
+              </span>
+            </a>
+          </th>
+          <th>
+            <a href="{{ sort_url_dl_expiry_date }}" class="tm-sort-link{% if sort_key == 'dl_expiry_date' %} is-active{% endif %}">
+              License Expiry
+              <span class="sort-indicator">
+                <i class="bi bi-caret-up-fill{% if sort_key == 'dl_expiry_date' and sort_dir == 'asc' %} active{% endif %}"></i>
+                <i class="bi bi-caret-down-fill{% if sort_key == 'dl_expiry_date' and sort_dir == 'desc' %} active{% endif %}"></i>
+              </span>
+            </a>
+          </th>
+          <th>
+            Assigned Truck
+            <span class="sort-indicator">
+              <i class="bi bi-caret-up-fill"></i>
+              <i class="bi bi-caret-down-fill"></i>
+            </span>
+          </th>
           <th>Actions</th>
         </tr>
       </thead>
@@ -158,44 +169,31 @@
         {% for row in drivers_page %}
         <tr>
           <td class="eal-col-check"><input type="checkbox" class="eal-custom-check dm-row-check" /></td>
-          <td>{{ drivers_page.start_index|add:forloop.counter0 }}</td>
           <td><span class="eal-entity-id">{{ row.driver_code }}</span></td>
-          <td><span dir="rtl">{{ row.arabic_name }}</span></td>
-          <td>{{ row.english_name|default:"—" }}</td>
-          <td>{{ row.mobile_number }}</td>
           <td>
-            {% if row.driver_source == 'In-Source' %}
-            <span class="status-badge dm-source-in"><i class="bi bi-box-arrow-in-right"></i> In-Source</span>
-            {% elif row.driver_source == 'Out-Source' %}
-            <span class="status-badge dm-source-out"><i class="bi bi-box-arrow-up-right"></i> Out-Source</span>
-            {% else %}
-            <span class="status-badge">{{ row.driver_source }}</span>
-            {% endif %}
+            <div class="eal-name-cell">
+              <span class="eal-name-text">{{ row.english_name|default:row.arabic_name }}</span>
+            </div>
           </td>
           <td>
             {% if row.driver_status == 'Active' %}
-            <span class="status-badge dm-driver-active"><i class="bi bi-check2-circle"></i> Active</span>
+            <span class="status-badge active">Active</span>
             {% else %}
-            <span class="status-badge dm-driver-inactive"><i class="bi bi-dash-circle"></i> Inactive</span>
+            <span class="status-badge inactive">Inactive</span>
             {% endif %}
           </td>
+          <td>{{ row.mobile_number }}</td>
+          <td>{% if row.nationality_country %}{{ row.nationality_country.name_en }}{% else %}—{% endif %}</td>
+          <td>{{ row.dl_number|default:"—" }}</td>
+          <td>{% if row.dl_expiry_date %}{{ row.dl_expiry_date|date:"d M Y" }}{% else %}—{% endif %}</td>
           <td>
-            {% if row.id_status == 'Valid' %}
-            <span class="status-badge dm-doc-valid">Valid</span>
-            {% elif row.id_status == 'Expired' %}
-            <span class="status-badge dm-doc-expired">Expired</span>
+            {% with truck=row.trucks_as_default_driver.all|first %}
+            {% if truck %}
+            {{ truck.truck_code }}{% if truck.truck_type %} ({{ truck.truck_type.english_label }}){% endif %}
             {% else %}
-            <span class="status-badge dm-doc-none">Not Provided</span>
+            —
             {% endif %}
-          </td>
-          <td>
-            {% if row.dl_status == 'Valid' %}
-            <span class="status-badge dm-doc-valid">Valid</span>
-            {% elif row.dl_status == 'Expired' %}
-            <span class="status-badge dm-doc-expired">Expired</span>
-            {% else %}
-            <span class="status-badge dm-doc-none">Not Provided</span>
-            {% endif %}
+            {% endwith %}
           </td>
           <td>
             <div class="dropdown eal-actions-cell">
@@ -251,7 +249,7 @@
         </tr>
         {% empty %}
         <tr>
-          <td colspan="11" class="text-center text-muted py-5">
+          <td colspan="10" class="text-center text-muted py-5">
             <div class="eal-empty py-4">
               <p class="mb-1 fw-medium">No drivers found.</p>
               <p class="small mb-3">Adjust search or filters, or add your first driver.</p>
@@ -320,42 +318,6 @@
   .eal-stats-row {
     margin-bottom: 1rem;
   }
-  .eal-stat-icon.slate { background: #64748b; color: #fff; }
-  .status-badge.dm-source-in {
-    background: #0d6efd;
-    color: #fff;
-    border: 0;
-  }
-  .status-badge.dm-source-out {
-    background: #fd7e14;
-    color: #fff;
-    border: 0;
-  }
-  .status-badge.dm-driver-active {
-    background: #198754;
-    color: #fff;
-    border: 0;
-  }
-  .status-badge.dm-driver-inactive {
-    background: #94a3b8;
-    color: #fff;
-    border: 0;
-  }
-  .status-badge.dm-doc-valid {
-    background: #198754;
-    color: #fff;
-    border: 0;
-  }
-  .status-badge.dm-doc-expired {
-    background: #dc3545;
-    color: #fff;
-    border: 0;
-  }
-  .status-badge.dm-doc-none {
-    background: #64748b;
-    color: #fff;
-    border: 0;
-  }
   .tm-sort-link {
     color: inherit;
     text-decoration: none;
@@ -366,23 +328,14 @@
     color: inherit;
     text-decoration: none;
   }
-  .tm-sort-link.is-active .tm-sort-indicator {
-    opacity: 0.9;
-  }
-  .tm-sort-indicator {
-    display: inline-flex;
-    flex-direction: column;
-    margin-left: 6px;
-    vertical-align: middle;
-    opacity: 0.45;
-    line-height: 0.75;
-  }
-  .tm-sort-indicator i {
-    font-size: 9px;
-    opacity: 0.35;
-  }
-  .tm-sort-indicator i.active {
+  .tm-sort-link.is-active .sort-indicator {
     opacity: 1;
+  }
+  .sort-indicator i.active {
+    opacity: 1;
+  }
+  .sort-indicator i:not(.active) {
+    opacity: 0.35;
   }
 </style>
 {% endblock %}

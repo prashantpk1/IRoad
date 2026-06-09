@@ -1,5 +1,7 @@
+from django.conf import settings
 from django.urls import path
 
+from iroad_frontend.error_views import error_preview
 from iroad_frontend.views import (
     AboutPageView,
     ContactFormSubmitView,
@@ -39,3 +41,17 @@ urlpatterns = [
     ),
     path('', HomePageView.as_view(), name='home'),
 ]
+
+if settings.DEBUG:
+    urlpatterns += [
+        path(
+            '__preview__/error/<int:code>/',
+            error_preview,
+            name='error_preview',
+        ),
+        path(
+            '__preview__/portal-error/<int:code>/',
+            error_preview,
+            name='portal_error_preview',
+        ),
+    ]

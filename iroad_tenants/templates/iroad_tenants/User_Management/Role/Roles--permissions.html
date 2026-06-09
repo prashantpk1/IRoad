@@ -44,6 +44,7 @@
 <div
   class="eal-table-card"
   data-eal-filterable-table
+  data-eal-server-paginated="1"
   data-eal-empty-colspan="7"
   data-eal-empty-filter-message="No roles match the selected search/filter criteria."
   data-eal-global-search-columns="1,2,3,4,5"
@@ -56,6 +57,7 @@
           type="search"
           id="rolesPermissionsSearch"
           data-eal-global-search
+          value="{{ search_q|default:'' }}"
           autocomplete="off"
           placeholder="Search roles&hellip;"
           aria-label="Search roles"
@@ -146,14 +148,7 @@
     </table>
   </div>
 
-  <div class="eal-pagination">
-    <div class="eal-pagination-info">Showing <strong>1-{{ tenant_roles|length }}</strong> of <strong>{{ tenant_roles|length }}</strong> roles</div>
-    <div class="eal-pagination-controls">
-      <button class="eal-page-btn" title="Previous"><i class="bi bi-chevron-left"></i></button>
-      <button class="eal-page-btn active">1</button>
-      <button class="eal-page-btn" title="Next"><i class="bi bi-chevron-right"></i></button>
-    </div>
-  </div>
+  {% include 'iroad_tenants/partials/eal_list_pagination.html' with page_obj=tenant_roles_page pagination_label='roles' %}
 </div>
 {% endblock %}
 

@@ -10,7 +10,7 @@ import logging
 import io
 from django.apps import apps
 from django.conf import settings
-from django.http import HttpResponse, JsonResponse
+from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.template.loader import render_to_string
 from django.urls import NoReverseMatch, resolve, reverse
@@ -29,8 +29,17 @@ from django.db.models import Prefetch, Q, Sum
 from django.utils.dateparse import parse_date, parse_datetime
 from django.utils import timezone
 from django_tenants.utils import schema_context
+import mimetypes
 import os
 import uuid
+
+from iroad_tenants.list_table_utils import (
+    apply_eal_column_filters,
+    apply_eal_column_sort,
+    eal_column_filter_values,
+    paginate_tenant_list,
+    prepare_eal_list,
+)
 from superadmin.billing_helpers import (
     apply_due_scheduled_downgrade_for_tenant,
     build_dual_currency_display,
@@ -163,7 +172,10 @@ from iroad_tenants.forms_tenant_location import TenantLocationMasterForm
 from iroad_tenants.forms_tenant_route import TenantRouteMasterForm
 from iroad_tenants.forms_truck_type import TruckTypeMasterForm
 from iroad_tenants.forms_driver import DriverAttachmentForm, DriverSettingsForm
-from iroad_tenants.forms_driver_master import DriverMasterForm
+from iroad_tenants.forms_driver_master import (
+    DriverMasterForm,
+    driver_current_assigned_truck,
+)
 from iroad_tenants.driver_treasury_ops import (
     DRIVER_TREASURY_AUTO_FORM_CODE,
     DRIVER_TREASURY_AUTO_FORM_LABEL,
@@ -917,14 +929,18 @@ def _tenant_context_from_session(request, *, _debug_label=''):
     sec = TenantSecuritySettings.objects.first()
     timeout_minutes = max(60, int(getattr(sec, 'tenant_web_timeout_hours', 12)) * 60)
     redis_ok = refresh_tenant_session(str(tenant.tenant_id), str(tenant_jti), timeout_minutes)
-    if not redis_ok:
+    if redis_ok is False:
         print(
             f'{_dbg} FAIL: refresh_tenant_session returned False '
             f'(tenant_id={tenant.tenant_id} jti={tenant_jti} timeout_min={timeout_minutes})'
         )
         _clear_tenant_bootstrap_session(request)
         return None
-    
+    if redis_ok is None and not jwt_claims:
+        from iroad_frontend.exceptions import ServiceUnavailableError
+
+        raise ServiceUnavailableError('Session service is temporarily unavailable.')
+
     # Default to tenant owner profile.
     if tenant.first_name or tenant.last_name:
         display_name = f"{tenant.first_name} {tenant.last_name}".strip()
@@ -935,10 +951,26 @@ def _tenant_context_from_session(request, *, _debug_label=''):
     permission_forms = set()
     is_tenant_admin = True
 
+    if redis_ok is None and jwt_claims:
+        display_name = (jwt_claims.get('display_name') or display_name).strip()
+        display_email = (jwt_claims.get('email') or display_email).strip()
+        display_role = (jwt_claims.get('role_name') or display_role).strip()
+        is_tenant_admin = jwt_claims.get('portal_actor') != 'tenant_user'
+
     # If this tenant session belongs to a tenant user, override display identity
     # and collect role permissions for menu-level visibility.
-    session_data = get_tenant_session(str(tenant.tenant_id), str(tenant_jti)) or {}
+    session_data = (
+        get_tenant_session(str(tenant.tenant_id), str(tenant_jti)) or {}
+        if redis_ok is True
+        else {}
+    )
     reference_id = str(session_data.get('reference_id') or '').strip()
+    if (
+        not reference_id
+        and redis_ok is None
+        and jwt_claims.get('portal_actor') == 'tenant_user'
+    ):
+        reference_id = str(jwt_claims.get('tenant_user_id') or '').strip()
     if reference_id and reference_id != str(tenant.tenant_id):
         tenant_registry = _activate_tenant_workspace_schema(request)
         if tenant_registry is not None:
@@ -1198,7 +1230,6 @@ class TenantSupportTicketListView(View):
             return response
 
         tenant = context['tenant']
-        q = (request.GET.get('q') or '').strip()
         status = (request.GET.get('status') or '').strip()
 
         tickets_qs = SupportTicket.objects.filter(
@@ -1207,18 +1238,40 @@ class TenantSupportTicketListView(View):
             'category',
             'assigned_to',
             'tenant',
-        ).order_by('-created_at')
-
-        if q:
-            tickets_qs = tickets_qs.filter(
-                Q(ticket_no__icontains=q) |
-                Q(subject__icontains=q) |
-                Q(category__name_en__icontains=q)
-            )
+        )
         if status:
             tickets_qs = tickets_qs.filter(status=status)
-
-        tickets_list = list(tickets_qs)
+        ticket_column_filters = {
+            1: 'ticket_no',
+            2: 'tenant__company_name',
+            3: 'subject',
+            4: 'category__name_en',
+            5: 'priority',
+            8: 'status',
+        }
+        ticket_sort_cols = {
+            1: 'ticket_no',
+            2: 'tenant__company_name',
+            3: 'subject',
+            4: 'category__name_en',
+            5: 'priority',
+            8: 'status',
+        }
+        tickets_page, list_ctx = prepare_eal_list(
+            request,
+            tickets_qs,
+            search_fields=[
+                'ticket_no',
+                'subject',
+                'category__name_en',
+                'priority',
+                'status',
+            ],
+            column_field_map=ticket_column_filters,
+            sort_col_field_map=ticket_sort_cols,
+            default_order=('-created_at',),
+        )
+        tickets_list = list(tickets_page.object_list)
         created_by_labels = support_ticket_created_by_display_map(tickets_list)
         for ticket in tickets_list:
             created_parts = created_by_labels.get(
@@ -1248,13 +1301,15 @@ class TenantSupportTicketListView(View):
 
         context.update({
             'tickets': tickets_list,
-            'search_q': q,
+            'tickets_page': tickets_page,
+            'search_q': list_ctx['search_q'],
             'status_filter': status,
             'status_choices': SupportTicket.STATUS_CHOICES,
             'total_count': total_count,
             'open_count': open_count,
             'in_progress_count': in_progress_count,
             'closed_count': closed_count,
+            **list_ctx,
         })
         return render(request, self.template_name, context)
 
@@ -1624,37 +1679,43 @@ class TenantCargoMasterListView(View):
         sort_dir = 'desc' if sort_dir_raw == 'desc' else 'asc'
         order_expr = f'-{sort_key}' if sort_dir == 'desc' else sort_key
 
-        qs_ordered = qs.order_by(order_expr, '-created_at')
-        stats = _cargo_master_list_stats(qs_ordered)
-        paginator = Paginator(qs_ordered, 10)
+        cargo_column_filters = {
+            0: 'cargo_code',
+            1: 'client_account__display_name',
+            2: 'cargo_category__name_english',
+            3: 'display_name',
+            4: 'english_label',
+            5: 'arabic_label',
+            6: 'client_sku_external_ref',
+            7: 'status',
+        }
+        cargo_sort_cols = {
+            0: 'cargo_code',
+            1: 'client_account__display_name',
+            2: 'cargo_category__name_english',
+            3: 'display_name',
+            4: 'english_label',
+            5: 'arabic_label',
+            6: 'client_sku_external_ref',
+            7: 'status',
+        }
+        qs = apply_eal_column_filters(qs, request, cargo_column_filters)
         try:
-            page_no = max(1, int(request.GET.get('page') or 1))
-        except ValueError:
-            page_no = 1
-        page = paginator.get_page(page_no)
-
-        total_count = paginator.count
-        if total_count == 0:
-            ps, pe = 0, 0
+            sort_col = int(request.GET.get('sort_col') or 0)
+        except (TypeError, ValueError):
+            sort_col = 0
+        if sort_col in cargo_sort_cols:
+            sort_dir = (request.GET.get('sort_dir') or 'asc').strip().lower()
+            sort_field = cargo_sort_cols[sort_col]
+            order_expr = f'-{sort_field}' if sort_dir == 'desc' else sort_field
+            qs_ordered = qs.order_by(order_expr, '-created_at')
         else:
-            ps = (page.number - 1) * paginator.per_page + 1
-            pe = ps + len(page.object_list) - 1
+            qs_ordered = qs.order_by(order_expr, '-created_at')
 
-        def _page_url(page_num):
-            q = request.GET.copy()
-            try:
-                pn = int(page_num)
-            except (TypeError, ValueError):
-                pn = 1
-            if pn > 1:
-                q['page'] = str(pn)
-            else:
-                q.pop('page', None)
-            return '?' + q.urlencode()
-
-        pagination_page_links = [(n, _page_url(n)) for n in page.paginator.page_range]
-        prev_url = _page_url(page.previous_page_number()) if page.has_previous() else None
-        next_url = _page_url(page.next_page_number()) if page.has_next() else None
+        stats = _cargo_master_list_stats(qs_ordered)
+        page, list_ctx = paginate_tenant_list(request, qs_ordered)
+        list_ctx['search_q'] = sq
+        list_ctx['eal_column_filters'] = eal_column_filter_values(request)
 
         clients = list(
             TenantClientAccount.objects.filter(
@@ -1665,18 +1726,12 @@ class TenantCargoMasterListView(View):
         context.update(
             {
                 'cargos_page': page,
-                'search_q': sq,
                 'filter_status': filter_status,
                 'filter_client_value': filter_client_value,
-                'pagination_page_links': pagination_page_links,
-                'pagination_prev_url': prev_url,
-                'pagination_next_url': next_url,
                 'stats': stats,
-                'pagination_start': ps,
-                'pagination_end': pe,
-                'pagination_total': total_count,
                 'client_filter_choices': clients,
                 'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                **list_ctx,
             }
         )
         try:
@@ -3863,34 +3918,54 @@ class TenantServiceItemMasterListView(View):
             clear_tenant_portal_cookie(response, request=request)
             return response
         try:
-            service_items = list(
-                TenantServiceItemMaster.objects.order_by('-created_at')
+            item_column_filters = {
+                1: 'service_item_code',
+                2: 'english_label',
+                3: 'arabic_label',
+                4: 'service_type',
+                5: 'status',
+            }
+            item_sort_cols = {
+                1: 'service_item_code',
+                2: 'english_label',
+                3: 'arabic_label',
+                4: 'service_type',
+                5: 'status',
+            }
+            items_page, list_ctx = prepare_eal_list(
+                request,
+                TenantServiceItemMaster.objects.all(),
+                search_fields=[
+                    'service_item_code',
+                    'english_label',
+                    'arabic_label',
+                    'service_type',
+                ],
+                column_field_map=item_column_filters,
+                sort_col_field_map=item_sort_cols,
+                default_order=('-created_at',),
             )
-            service_count = sum(
-                1
-                for item in service_items
-                if item.service_type == TenantServiceItemMaster.ServiceType.SERVICE
-            )
-            trip_count = sum(
-                1
-                for item in service_items
-                if item.service_type == TenantServiceItemMaster.ServiceType.TRIP
-            )
-            active_count = sum(
-                1
-                for item in service_items
-                if item.status == TenantServiceItemMaster.Status.ACTIVE
-            )
+            service_items = list(items_page.object_list)
+            all_items_qs = TenantServiceItemMaster.objects.all()
             context.update(
                 {
                     'service_items': service_items,
+                    'service_items_page': items_page,
                     'service_item_stats': {
-                        'total': len(service_items),
-                        'service_type': service_count,
-                        'trip_type': trip_count,
-                        'active': active_count,
+                        'total': all_items_qs.count(),
+                        'service_type': all_items_qs.filter(
+                            service_type=TenantServiceItemMaster.ServiceType.SERVICE,
+                        ).count(),
+                        'trip_type': all_items_qs.filter(
+                            service_type=TenantServiceItemMaster.ServiceType.TRIP,
+                        ).count(),
+                        'active': all_items_qs.filter(
+                            status=TenantServiceItemMaster.Status.ACTIVE,
+                        ).count(),
                     },
+                    'search_q': list_ctx['search_q'],
                     'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                    **list_ctx,
                 }
             )
             return render(request, self.template_name, context)
@@ -20133,23 +20208,47 @@ class TenantClientAccountView(View):
             clear_tenant_portal_cookie(response, request=request)
             return response
         try:
-            search_q = (request.GET.get('q') or '').strip()
-            qs = TenantClientAccount.objects.all()
-            if search_q:
-                qs = qs.filter(
-                    Q(account_no__icontains=search_q)
-                    | Q(name_english__icontains=search_q)
-                    | Q(display_name__icontains=search_q)
-                    | Q(name_arabic__icontains=search_q)
-                    | Q(preferred_currency__icontains=search_q),
-                )
-            client_accounts = list(qs.order_by('account_no'))
+            client_column_filters = {
+                1: 'account_no',
+                2: 'preferred_currency',
+                3: 'name_english',
+                4: 'name_arabic',
+                5: 'client_type',
+                6: 'commercial_registration_no',
+                7: 'tax_registration_no',
+                8: 'status',
+            }
+            client_sort_cols = {
+                1: 'account_no',
+                2: 'preferred_currency',
+                3: 'name_english',
+                4: 'name_arabic',
+                5: 'client_type',
+                6: 'commercial_registration_no',
+                7: 'tax_registration_no',
+                8: 'status',
+            }
+            accounts_page, list_ctx = prepare_eal_list(
+                request,
+                TenantClientAccount.objects.all(),
+                search_fields=[
+                    'account_no',
+                    'name_english',
+                    'display_name',
+                    'name_arabic',
+                    'preferred_currency',
+                ],
+                column_field_map=client_column_filters,
+                sort_col_field_map=client_sort_cols,
+                default_order=('account_no',),
+            )
             context.update(
                 {
-                    'client_accounts': client_accounts,
-                    'client_accounts_count': len(client_accounts),
+                    'client_accounts': list(accounts_page.object_list),
+                    'client_accounts_page': accounts_page,
+                    'client_accounts_count': list_ctx['pagination_total'],
                     'tenant_schema_name': tenant_registry.schema_name,
-                    'search_q': search_q,
+                    **list_ctx,
                 }
             )
             return render(request, self.template_name, context)
@@ -21265,12 +21364,35 @@ class TenantClientAttachmentsListView(View):
             return response
         try:
             att = TenantClientAttachment
-            qs = (
-                TenantClientAttachment.objects.select_related('client_account')
-                .order_by('-created_at')
-                .all()
+            qs = TenantClientAttachment.objects.select_related('client_account')
+            attachment_column_filters = {
+                1: 'attachment_no',
+                2: 'client_account__account_no',
+                5: 'expiry_date',
+                7: 'status',
+            }
+            attachment_sort_cols = {
+                1: 'attachment_no',
+                2: 'client_account__account_no',
+                3: 'attachment_date',
+                5: 'expiry_date',
+                7: 'status',
+            }
+            attachments_page, list_ctx = prepare_eal_list(
+                request,
+                qs,
+                search_fields=[
+                    'attachment_no',
+                    'client_account__account_no',
+                    'client_account__display_name',
+                    'file_notes',
+                    'status',
+                ],
+                column_field_map=attachment_column_filters,
+                sort_col_field_map=attachment_sort_cols,
+                default_order=('-created_at',),
             )
-            rows = list(qs)
+            rows = list(attachments_page.object_list)
             base = _tenant_client_attachments_base_path()
             for row in rows:
                 try:
@@ -21281,20 +21403,23 @@ class TenantClientAttachmentsListView(View):
                 except NoReverseMatch:
                     detail_u = _tenant_client_attachment_detail_path(row.attachment_id)
                 row.list_detail_url = detail_u
+            all_att_qs = TenantClientAttachment.objects.all()
             attachment_stats = {
-                'total': len(rows),
-                'valid': sum(1 for r in rows if r.computed_status == att.Status.VALID),
-                'does_not_expire': sum(
-                    1 for r in rows if r.computed_status == att.Status.DOES_NOT_EXPIRE
-                ),
-                'expired': sum(1 for r in rows if r.computed_status == att.Status.EXPIRED),
+                'total': all_att_qs.count(),
+                'valid': all_att_qs.filter(status=att.Status.VALID).count(),
+                'does_not_expire': all_att_qs.filter(
+                    status=att.Status.DOES_NOT_EXPIRE,
+                ).count(),
+                'expired': all_att_qs.filter(status=att.Status.EXPIRED).count(),
             }
             context.update(
                 {
                     'client_attachments': rows,
-                    'client_attachments_count': len(rows),
+                    'client_attachments_page': attachments_page,
+                    'client_attachments_count': list_ctx['pagination_total'],
                     'attachment_stats': attachment_stats,
                     'tenant_schema_name': tenant_registry.schema_name,
+                    **list_ctx,
                 }
             )
             return render(request, self.template_name, context)
@@ -21759,24 +21884,54 @@ class TenantClientContactsListView(View):
             clear_tenant_portal_cookie(response, request=request)
             return response
         try:
-            all_contacts = list(
-                TenantClientContact.objects.select_related('client_account').order_by(
-                    '-created_at'
-                )
-            )
             chip = (request.GET.get('chip') or 'all').strip().lower()
             if chip not in ('all', 'primary', 'secondary'):
                 chip = 'all'
+            contacts_qs = TenantClientContact.objects.select_related('client_account')
             if chip == 'primary':
-                contacts = [c for c in all_contacts if c.is_primary]
+                contacts_qs = contacts_qs.filter(is_primary=True)
             elif chip == 'secondary':
-                contacts = [c for c in all_contacts if not c.is_primary]
-            else:
-                contacts = list(all_contacts)
+                contacts_qs = contacts_qs.filter(is_primary=False)
+            contact_column_filters = {
+                1: 'client_account__account_no',
+                2: 'name',
+                3: 'email',
+                4: 'mobile_number',
+                5: 'telephone_number',
+                6: 'extension',
+                7: 'position',
+            }
+            contact_sort_cols = {
+                1: 'client_account__account_no',
+                2: 'name',
+                3: 'email',
+                4: 'mobile_number',
+                5: 'telephone_number',
+                6: 'extension',
+                7: 'position',
+                8: 'is_primary',
+            }
+            contacts_page, list_ctx = prepare_eal_list(
+                request,
+                contacts_qs,
+                search_fields=[
+                    'client_account__account_no',
+                    'client_account__display_name',
+                    'name',
+                    'email',
+                    'mobile_number',
+                    'position',
+                ],
+                column_field_map=contact_column_filters,
+                sort_col_field_map=contact_sort_cols,
+                default_order=('-created_at',),
+            )
+            contacts = list(contacts_page.object_list)
+            all_contacts_qs = TenantClientContact.objects.all()
             contact_stats = {
-                'total': len(all_contacts),
-                'primary': sum(1 for c in all_contacts if c.is_primary),
-                'secondary': sum(1 for c in all_contacts if not c.is_primary),
+                'total': all_contacts_qs.count(),
+                'primary': all_contacts_qs.filter(is_primary=True).count(),
+                'secondary': all_contacts_qs.filter(is_primary=False).count(),
                 'client_accounts': TenantClientAccount.objects.count(),
             }
             base = _tenant_client_contacts_base_path()
@@ -21808,10 +21963,12 @@ class TenantClientContactsListView(View):
             context.update(
                 {
                     'client_contacts': contacts,
-                    'client_contacts_count': len(contacts),
+                    'client_contacts_page': contacts_page,
+                    'client_contacts_count': list_ctx['pagination_total'],
                     'contact_stats': contact_stats,
                     'tenant_schema_name': tenant_registry.schema_name,
                     'contacts_list_chip': chip,
+                    **list_ctx,
                 }
             )
             return render(request, self.template_name, context)
@@ -22246,11 +22403,33 @@ class TenantClientContractListView(View):
             clear_tenant_portal_cookie(response, request=request)
             return response
         try:
-            rows = list(
-                TenantClientContract.objects.select_related('client_account').order_by(
-                    '-created_at'
-                )
+            contract_column_filters = {
+                1: 'contract_no',
+                2: 'client_account__account_no',
+                5: 'notes',
+                7: 'status',
+            }
+            contract_sort_cols = {
+                1: 'contract_no',
+                2: 'client_account__account_no',
+                3: 'start_date',
+                4: 'end_date',
+                5: 'notes',
+                7: 'status',
+            }
+            contracts_page, list_ctx = prepare_eal_list(
+                request,
+                TenantClientContract.objects.select_related('client_account'),
+                search_fields=[
+                    'contract_no',
+                    'client_account__account_no',
+                    'client_account__display_name',
+                ],
+                column_field_map=contract_column_filters,
+                sort_col_field_map=contract_sort_cols,
+                default_order=('-created_at',),
             )
+            rows = list(contracts_page.object_list)
             base = _tenant_client_contracts_base_path()
             for row in rows:
                 cid = row.contract_id
@@ -22280,25 +22459,36 @@ class TenantClientContractListView(View):
                 row.list_delete_action_url = del_u
             today = timezone.localdate()
             soon_cutoff = today + timezone.timedelta(days=30)
-            contract_stats = {
-                'total': len(rows),
-                'active': sum(1 for r in rows if r.status == TenantClientContract.Status.ACTIVE),
-                'upcoming': sum(
-                    1 for r in rows if r.status == TenantClientContract.Status.UPCOMING
+            all_contracts = list(
+                TenantClientContract.objects.select_related('client_account').order_by(
+                    '-created_at',
                 ),
-                'expired': sum(1 for r in rows if r.status == TenantClientContract.Status.EXPIRED),
+            )
+            contract_stats = {
+                'total': len(all_contracts),
+                'active': sum(
+                    1 for r in all_contracts if r.status == TenantClientContract.Status.ACTIVE
+                ),
+                'upcoming': sum(
+                    1 for r in all_contracts if r.status == TenantClientContract.Status.UPCOMING
+                ),
+                'expired': sum(
+                    1 for r in all_contracts if r.status == TenantClientContract.Status.EXPIRED
+                ),
                 'expiring_soon': sum(
                     1
-                    for r in rows
+                    for r in all_contracts
                     if r.end_date and today <= r.end_date <= soon_cutoff and r.status != 'Expired'
                 ),
             }
             context.update(
                 {
                     'client_contracts': rows,
-                    'client_contracts_count': len(rows),
+                    'client_contracts_page': contracts_page,
+                    'client_contracts_count': list_ctx['pagination_total'],
                     'contract_stats': contract_stats,
                     'tenant_schema_name': tenant_registry.schema_name,
+                    **list_ctx,
                 }
             )
             return render(request, self.template_name, context)
@@ -24704,7 +24894,7 @@ def _truck_movement_shipment_endpoint_label(movement, endpoint):
 
 def _truck_movement_type_display(movement):
     if movement.shipment_id:
-        return 'Loaded trip', 'loaded'
+        return 'Loaded Trip', 'loaded'
     reason = (movement.empty_move_reason or '').strip()
     if reason:
         return reason, 'empty'
@@ -24741,6 +24931,7 @@ def _truck_movement_detail_row(movement):
     except (TypeError, ValueError):
         has_distance = False
 
+    truck = getattr(movement, 'truck', None)
     return {
         'obj': movement,
         'from_location': from_label or '—',
@@ -24751,7 +24942,9 @@ def _truck_movement_detail_row(movement):
         'status_badge': status_badge,
         'has_distance': has_distance,
         'driver_display': driver_label(movement.driver) or '—',
+        'truck_display': (truck.truck_code if truck else '') or '—',
         'use_start_time': bool(movement.start_time),
+        'use_end_time': bool(not movement.start_time and movement.end_time),
     }
 
 
@@ -24923,7 +25116,14 @@ class DriverMasterListView(View):
             return response
 
         dm = DriverMaster
-        qs = dm.objects.select_related('nationality_country')
+        qs = dm.objects.select_related('nationality_country').prefetch_related(
+            Prefetch(
+                'trucks_as_default_driver',
+                queryset=TruckMaster.objects.select_related('truck_type').order_by(
+                    '-updated_at'
+                ),
+            )
+        )
 
         sq = (request.GET.get('q') or '').strip()
 
@@ -24960,17 +25160,22 @@ class DriverMasterListView(View):
                 | Q(arabic_name__icontains=sq)
                 | Q(english_name__icontains=sq)
                 | Q(mobile_number__icontains=sq)
+                | Q(dl_number__icontains=sq)
+                | Q(nationality_country__name_en__icontains=sq)
             )
 
         sort_key_raw = (request.GET.get('sort') or 'driver_code').strip().lower()
         sort_dir_raw = (request.GET.get('dir') or 'asc').strip().lower()
         sort_map = {
             'driver_code': 'driver_code',
-            'arabic_name': 'arabic_name',
+            'driver_name': 'english_name',
             'english_name': 'english_name',
+            'arabic_name': 'arabic_name',
             'mobile_number': 'mobile_number',
-            'driver_source': 'driver_source',
             'driver_status': 'driver_status',
+            'nationality': 'nationality_country__name_en',
+            'dl_number': 'dl_number',
+            'dl_expiry_date': 'dl_expiry_date',
         }
         sort_key = sort_map.get(sort_key_raw, 'driver_code')
         sort_dir = 'desc' if sort_dir_raw == 'desc' else 'asc'
@@ -25049,11 +25254,12 @@ class DriverMasterListView(View):
                 'sort_key': sort_key_raw if sort_key_raw in sort_map else 'driver_code',
                 'sort_dir': sort_dir,
                 'sort_url_driver_code': _sort_url('driver_code'),
-                'sort_url_arabic_name': _sort_url('arabic_name'),
-                'sort_url_english_name': _sort_url('english_name'),
+                'sort_url_driver_name': _sort_url('driver_name'),
                 'sort_url_mobile_number': _sort_url('mobile_number'),
-                'sort_url_driver_source': _sort_url('driver_source'),
                 'sort_url_driver_status': _sort_url('driver_status'),
+                'sort_url_nationality': _sort_url('nationality'),
+                'sort_url_dl_number': _sort_url('dl_number'),
+                'sort_url_dl_expiry_date': _sort_url('dl_expiry_date'),
                 'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
             }
         )
@@ -25153,8 +25359,8 @@ def _assign_default_truck_for_driver(driver, selected_truck):
             previous_driver_id=prev_driver_id,
         )
 
-    if selected_truck.default_driver_id_id != driver.pk:
-        prev_driver_id = selected_truck.default_driver_id_id
+    prev_driver_id = selected_truck.default_driver_id_id
+    if prev_driver_id != driver.pk:
         selected_truck.default_driver_id = driver
         selected_truck.save(update_fields=['default_driver_id', 'updated_at'])
         _sync_truck_driver_assignment_history(
@@ -25179,6 +25385,320 @@ def _driver_has_any_core_document(driver_obj):
         bool(getattr(driver_obj, fname, None))
         for fname in ('id_image', 'passport_image', 'dl_image', 'card_image')
     )
+
+
+def _tenant_actor_created_by_label(context):
+    """Format actor label as ``Role (Name)`` for audit fields."""
+    name = (context.get('display_name') or '').strip()
+    role = (context.get('display_role') or '').strip()
+    if role and name:
+        return f'{role} ({name})'[:200]
+    return (name or role or '')[:200]
+
+
+def _driver_vendor_company_display(driver):
+    if driver.driver_source == DriverMaster.DriverSource.OUT_SOURCE:
+        vendor = (driver.vendor_account_id or '').strip()
+        if vendor:
+            return vendor
+    if driver.driver_type:
+        return driver.get_driver_type_display()
+    return '—'
+
+
+def _driver_secondary_mobile_display(driver):
+    if driver.whatsapp_same_as_mobile:
+        return (driver.mobile_number or '').strip() or '—'
+    secondary = (driver.whatsapp_number or '').strip()
+    return secondary or '—'
+
+
+def _driver_license_type_display(driver):
+    if (driver.dl_number or '').strip():
+        return 'Heavy Vehicle'
+    return '—'
+
+
+def _driver_attachment_file_display_name(att):
+    """Basename of the stored attachment file, or empty string."""
+    file_field = getattr(att, 'attachment_file', None)
+    stored_name = (getattr(file_field, 'name', None) or '').strip()
+    return os.path.basename(stored_name) if stored_name else ''
+
+
+def _driver_attachment_file_icon_class(file_name):
+    ext = os.path.splitext(file_name or '')[1].lower()
+    if ext == '.pdf':
+        return 'bi-file-earmark-pdf text-danger'
+    if ext in {'.jpg', '.jpeg', '.png'}:
+        return 'bi-file-earmark-image text-info'
+    if ext in {'.doc', '.docx'}:
+        return 'bi-file-earmark-word text-primary'
+    return 'bi-file-earmark text-secondary'
+
+
+def _driver_attachment_stored_file_exists(att):
+    stored_name = (
+        getattr(getattr(att, 'attachment_file', None), 'name', None) or ''
+    ).strip()
+    return bool(stored_name and default_storage.exists(stored_name))
+
+
+def _driver_attachment_is_image_file(att):
+    stored_name = (
+        getattr(getattr(att, 'attachment_file', None), 'name', None) or ''
+    ).strip()
+    ext = os.path.splitext(stored_name)[1].lower()
+    return ext in {'.jpg', '.jpeg', '.png'}
+
+
+def _driver_attachment_file_serve_url(
+    driver_id,
+    attachment_id,
+    *,
+    download=False,
+):
+    url = reverse(
+        'iroad_tenants:driver_attachment_file',
+        kwargs={
+            'driver_id': driver_id,
+            'attachment_id': attachment_id,
+        },
+    )
+    if download:
+        return f'{url}?{urlencode({"download": "1"})}'
+    return url
+
+
+def _driver_attachment_file_context(attachment, driver):
+    file_display_name = _driver_attachment_file_display_name(attachment)
+    file_exists = _driver_attachment_stored_file_exists(attachment)
+    serve_url = ''
+    download_url = ''
+    if file_exists:
+        serve_url = _driver_attachment_file_serve_url(
+            driver.driver_id,
+            attachment.attachment_id,
+        )
+        download_url = _driver_attachment_file_serve_url(
+            driver.driver_id,
+            attachment.attachment_id,
+            download=True,
+        )
+    return {
+        'file_display_name': file_display_name or '—',
+        'file_icon_class': _driver_attachment_file_icon_class(file_display_name),
+        'is_image_file': _driver_attachment_is_image_file(attachment),
+        'attachment_file_exists': file_exists,
+        'attachment_file_url': serve_url,
+        'attachment_file_download_url': download_url,
+    }
+
+
+def _driver_attachment_ensure_uploaded_file_saved(att):
+    if not _driver_attachment_stored_file_exists(att):
+        raise ValidationError(
+            {
+                'attachment_file': (
+                    'The uploaded file could not be saved. Please try again.'
+                ),
+            }
+        )
+
+
+def _driver_attachment_type_display(att):
+    for value in (
+        (att.english_label or '').strip(),
+        (att.file_notes or '').strip(),
+        (att.arabic_label or '').strip(),
+    ):
+        if value:
+            return value
+    return '—'
+
+
+def _driver_attachment_expiry_date_class(att):
+    if att.is_expiry_applicable and att.expiry_date:
+        today = timezone.localdate()
+        if att.expiry_date < today:
+            return 'text-danger fw-600'
+        if (att.expiry_date - today).days <= 90:
+            return 'text-warning fw-600'
+        return 'text-success fw-600'
+    return ''
+
+
+def _driver_shipment_cargo_display(shipment):
+    cargo = getattr(shipment, 'cargo', None)
+    if cargo is not None:
+        label = (cargo.display_name or cargo.english_label or '').strip()
+        if label:
+            return label
+    return (shipment.booking_item_type or '').strip() or '—'
+
+
+def _driver_shipment_status_badge_class(status):
+    return {
+        'In Transit': 'dm-ship-transit',
+        'Delivered': 'dm-ship-delivered',
+        'Cancelled': 'dm-ship-cancelled',
+        'Created': 'dm-ship-created',
+        'Closed': 'dm-ship-closed',
+        'Loaded': 'dm-ship-transit',
+        'At Delivery': 'dm-ship-transit',
+        'POD Submitted': 'dm-ship-delivered',
+    }.get((status or '').strip(), 'dm-ship-default')
+
+
+def _driver_wallet_type_display(tx):
+    desc = (tx.description or '').lower()
+    if any(
+        word in desc
+        for word in ('penalty', 'violation', 'deduction', 'fine', 'speeding')
+    ):
+        return 'Penalty', 'penalty'
+    if tx.transaction_type == DriverTreasuryTransaction.TransactionType.CREDIT:
+        return 'Trip Advance', 'advance'
+    if tx.transaction_type == DriverTreasuryTransaction.TransactionType.DEBIT:
+        return 'Settlement', 'settlement'
+    category = (tx.transaction_category or '').strip()
+    return category or '—', 'default'
+
+
+def _driver_wallet_overview_context(primary_treasury):
+    if primary_treasury is None:
+        return {'current_balance': None}
+    return {'current_balance': primary_treasury.current_balance}
+
+
+def _driver_wallet_transaction_rows(primary_treasury, limit=75):
+    if primary_treasury is None:
+        return []
+    txs_all = list(
+        primary_treasury.transactions.order_by('transaction_date', 'created_at')
+    )
+    balance_by_id = {}
+    running = Decimal('0.00')
+    for tx in txs_all:
+        if tx.transaction_type == DriverTreasuryTransaction.TransactionType.CREDIT:
+            running += tx.amount
+        else:
+            running -= tx.amount
+        balance_by_id[tx.transaction_id] = running
+
+    txs_display = list(
+        primary_treasury.transactions.order_by(
+            '-transaction_date', '-created_at'
+        )[:limit]
+    )
+    rows = []
+    for tx in txs_display:
+        type_label, type_badge = _driver_wallet_type_display(tx)
+        is_credit = (
+            tx.transaction_type
+            == DriverTreasuryTransaction.TransactionType.CREDIT
+        )
+        rows.append(
+            {
+                'obj': tx,
+                'type_label': type_label,
+                'type_badge': type_badge,
+                'debit_amount': None if is_credit else tx.amount,
+                'credit_amount': tx.amount if is_credit else None,
+                'balance_after': balance_by_id.get(tx.transaction_id),
+            }
+        )
+    return rows
+
+
+def _driver_shipment_detail_row(shipment):
+    route = (shipment.route_display or '').strip()
+    if not route:
+        fl, tl = shipment_route_endpoints(shipment)
+        if fl and tl:
+            route = f'{fl} → {tl}'
+        elif fl or tl:
+            route = fl or tl
+        else:
+            route = '—'
+    truck = getattr(shipment, 'truck', None)
+    return {
+        'shipment': shipment,
+        'route': route,
+        'client_display': _truck_shipment_client_display(shipment),
+        'cargo_display': _driver_shipment_cargo_display(shipment),
+        'truck_display': (truck.truck_code if truck else '') or '—',
+        'status_badge': _driver_shipment_status_badge_class(
+            shipment.shipment_status
+        ),
+    }
+
+
+def _driver_attachment_detail_row(att):
+    """Display-ready row dict for driver detail Documents tab."""
+    stored_file_name = _driver_attachment_file_display_name(att)
+    display_name = (
+        stored_file_name
+        or (att.english_label or '').strip()
+        or (att.file_notes or '').strip()
+        or (att.attachment_no or '').strip()
+        or '—'
+    )
+    icon_source = stored_file_name or display_name
+    has_file = bool(getattr(att.attachment_file, 'name', None))
+    return {
+        'obj': att,
+        'file_name': display_name,
+        'document_type': _driver_attachment_type_display(att),
+        'file_icon_class': _driver_attachment_file_icon_class(icon_source),
+        'expiry_date_class': _driver_attachment_expiry_date_class(att),
+        'has_file': has_file,
+    }
+
+
+def _driver_created_by_display(driver):
+    label = (getattr(driver, 'created_by_label', None) or '').strip()
+    return label or '—'
+
+
+def _driver_overview_context(driver):
+    user = driver.user_account_id
+    if driver.driver_source == DriverMaster.DriverSource.IN_SOURCE:
+        employment_type = 'Direct Hire'
+    elif driver.driver_source == DriverMaster.DriverSource.OUT_SOURCE:
+        employment_type = 'Vendor / Out-Source'
+    else:
+        employment_type = driver.driver_source or '—'
+
+    if user and user.status == 'Active':
+        app_access = 'enabled'
+    elif user:
+        app_access = 'disabled'
+    else:
+        app_access = 'none'
+
+    return {
+        'driver_code': driver.driver_code,
+        'status': driver.driver_status,
+        'english_name': (driver.english_name or '').strip() or '—',
+        'arabic_name': (driver.arabic_name or '').strip() or '—',
+        'birth_date': driver.birth_date,
+        'nationality': (
+            driver.nationality_country.name_en
+            if driver.nationality_country
+            else '—'
+        ),
+        'mobile_number': driver.mobile_number or '—',
+        'secondary_mobile': _driver_secondary_mobile_display(driver),
+        'email': (user.email or '').strip() if user else '',
+        'emergency_contact': '—',
+        'vendor_company': _driver_vendor_company_display(driver),
+        'employment_type': employment_type,
+        'joining_date': driver.created_at,
+        'license_type': _driver_license_type_display(driver),
+        'app_access': app_access,
+        'created_by': _driver_created_by_display(driver),
+    }
 
 
 class DriverMasterCreateView(View):
@@ -25313,6 +25833,7 @@ class DriverMasterCreateView(View):
                         )
                         raise ValidationError('Mandatory document rule failed.')
 
+                    obj.created_by_label = _tenant_actor_created_by_label(context)
                     obj.full_clean()
                     obj.save()
                     _assign_default_truck_for_driver(
@@ -25386,7 +25907,11 @@ class DriverMasterCreateView(View):
                 f'Driver profile {obj.driver_code} created successfully.',
                 extra_tags='tenant',
             )
-            redirect_resp = _tenant_redirect(request, 'iroad_tenants:driver_master')
+            redirect_resp = _tenant_redirect(
+                request,
+                'iroad_tenants:driver_master_detail',
+                driver_id=obj.driver_id,
+            )
         finally:
             restore_public_schema(request)
 
@@ -25423,17 +25948,7 @@ class DriverMasterEditView(View):
 
             settings = DriverSettings.get_or_create_singleton()
             form = DriverMasterForm(instance=driver)
-            current_truck = (
-                TruckMaster.objects.filter(default_driver_id=driver)
-                .order_by('-updated_at')
-                .first()
-            )
-            if current_truck:
-                form.fields['default_truck_id'].queryset = (
-                    form.fields['default_truck_id'].queryset
-                    | TruckMaster.objects.filter(pk=current_truck.pk)
-                ).distinct().order_by('truck_code')
-                form.fields['default_truck_id'].initial = current_truck.pk
+            current_truck = driver_current_assigned_truck(driver)
             context.update(
                 {
                     'form': form,
@@ -25475,16 +25990,7 @@ class DriverMasterEditView(View):
             settings = DriverSettings.get_or_create_singleton()
             immutable_code = driver.driver_code
             form = DriverMasterForm(request.POST, request.FILES, instance=driver)
-            current_truck = (
-                TruckMaster.objects.filter(default_driver_id=driver)
-                .order_by('-updated_at')
-                .first()
-            )
-            if current_truck:
-                form.fields['default_truck_id'].queryset = (
-                    form.fields['default_truck_id'].queryset
-                    | TruckMaster.objects.filter(pk=current_truck.pk)
-                ).distinct().order_by('truck_code')
+            current_truck = driver_current_assigned_truck(driver)
             if not form.is_valid():
                 context.update(
                     {
@@ -25592,7 +26098,11 @@ class DriverMasterEditView(View):
                 return render(request, self.template_name, context)
 
             messages.success(request, 'Driver profile updated successfully.', extra_tags='tenant')
-            redirect_resp = _tenant_redirect(request, 'iroad_tenants:driver_master')
+            redirect_resp = _tenant_redirect(
+                request,
+                'iroad_tenants:driver_master_detail',
+                driver_id=obj.driver_id,
+            )
         finally:
             restore_public_schema(request)
 
@@ -25629,7 +26139,10 @@ class DriverMasterDetailView(View):
 
             att_qs = driver.attachments.order_by('-attachment_date', '-created_at')
             attachments_count = att_qs.count()
-            driver_attachments = list(att_qs[:200])
+            driver_attachment_rows = [
+                _driver_attachment_detail_row(att)
+                for att in att_qs[:200]
+            ]
 
             assigned_trucks_qs = (
                 TruckDriverAssignmentHistory.objects.select_related(
@@ -25660,35 +26173,42 @@ class DriverMasterDetailView(View):
             else:
                 assigned_trucks_display = '—'
 
-            driver_shipment_rows = []
-            for s in (
-                TenantShipment.objects.filter(driver=driver)
-                .select_related('truck', 'loading_address', 'delivery_address')
-                .order_by('-shipment_date', '-created_at')[:100]
-            ):
-                route = (s.route_display or '').strip()
-                if not route:
-                    fl, tl = shipment_route_endpoints(s)
-                    if fl and tl:
-                        route = f'{fl} → {tl}'
-                    elif fl or tl:
-                        route = fl or tl
-                    else:
-                        route = '—'
-                driver_shipment_rows.append({'shipment': s, 'route': route})
-
-            driver_movement_rows = list(
-                TenantTruckMovementLog.objects.filter(driver=driver)
-                .select_related(
-                    'truck',
-                    'driver',
-                    'shipment',
-                    'booking',
-                    'from_location_point',
-                    'to_location_point',
+            driver_shipment_rows = [
+                _driver_shipment_detail_row(s)
+                for s in (
+                    TenantShipment.objects.filter(driver=driver)
+                    .select_related(
+                        'truck',
+                        'loading_address',
+                        'delivery_address',
+                        'client_account',
+                        'booking',
+                        'booking__client_account',
+                        'cargo',
+                    )
+                    .order_by('-shipment_date', '-created_at')[:100]
                 )
-                .order_by('-movement_date', '-created_at')[:100]
-            )
+            ]
+
+            driver_movement_rows = [
+                _truck_movement_detail_row(m)
+                for m in (
+                    TenantTruckMovementLog.objects.filter(driver=driver)
+                    .select_related(
+                        'truck',
+                        'driver',
+                        'shipment',
+                        'shipment__loading_address',
+                        'shipment__delivery_address',
+                        'booking',
+                        'booking__loading_address',
+                        'booking__delivery_address',
+                        'from_location_point',
+                        'to_location_point',
+                    )
+                    .order_by('-movement_date', '-created_at')[:100]
+                )
+            ]
 
             primary_treasury = (
                 DriverTreasury.objects.filter(
@@ -25703,32 +26223,24 @@ class DriverMasterDetailView(View):
                     .order_by('-created_at')
                     .first()
                 )
-            if primary_treasury:
-                wallet_transactions = list(
-                    primary_treasury.transactions.select_related(
-                        'driver_treasury'
-                    ).order_by('-transaction_date', '-created_at')[:75]
-                )
-            else:
-                wallet_transactions = list(
-                    DriverTreasuryTransaction.objects.filter(
-                        driver_treasury__driver=driver
-                    )
-                    .select_related('driver_treasury')
-                    .order_by('-transaction_date', '-created_at')[:75]
-                )
+            wallet_overview = _driver_wallet_overview_context(primary_treasury)
+            wallet_transaction_rows = _driver_wallet_transaction_rows(
+                primary_treasury
+            )
 
             context.update(
                 {
                     'driver': driver,
+                    'driver_overview': _driver_overview_context(driver),
                     'attachments_count': attachments_count,
-                    'driver_attachments': driver_attachments,
+                    'driver_attachment_rows': driver_attachment_rows,
                     'assigned_trucks_rows': assigned_trucks_rows,
                     'assigned_trucks_display': assigned_trucks_display,
                     'driver_shipment_rows': driver_shipment_rows,
                     'driver_movement_rows': driver_movement_rows,
                     'primary_treasury': primary_treasury,
-                    'wallet_transactions': wallet_transactions,
+                    'wallet_overview': wallet_overview,
+                    'wallet_transaction_rows': wallet_transaction_rows,
                     'id_document_status': driver.id_status,
                     'passport_document_status': driver.passport_status,
                     'dl_document_status': driver.dl_status,
@@ -26574,6 +27086,88 @@ class DriverTreasuryTransactionDetailView(View):
             restore_public_schema(request)
 
 
+def _driver_attachment_driver_display(driver):
+    if driver is None:
+        return '—'
+    code = (driver.driver_code or '').strip()
+    name = (driver.english_name or driver.arabic_name or '').strip()
+    if code and name:
+        return f'{code} — {name}'
+    return code or name or '—'
+
+
+def _driver_attachment_list_display_status(att):
+    """UI status label + badge class for driver attachment list rows."""
+    record_status = (getattr(att, 'record_status', None) or '').strip()
+    if record_status == DriverAttachment.RecordStatus.INACTIVE:
+        return 'Inactive', 'inactive'
+    if record_status == DriverAttachment.RecordStatus.PENDING:
+        return 'Pending Review', 'pending'
+    if att.status == DriverAttachment.Status.EXPIRED:
+        return 'Expired', 'expired'
+    return 'Active', 'active'
+
+
+def _driver_attachment_display_status_rank(att):
+    label, _badge = _driver_attachment_list_display_status(att)
+    return {
+        'Expired': 0,
+        'Inactive': 1,
+        'Pending Review': 2,
+        'Active': 3,
+    }.get(label, 4)
+
+
+def _driver_attachment_stats_counts(attachments):
+    """Summary cards for the driver attachments list page."""
+    today = timezone.localdate()
+    soon_cutoff = today + timezone.timedelta(days=30)
+    not_expired_count = 0
+    expiring_soon_count = 0
+    expired_count = 0
+    for att in attachments:
+        expiry_st = att.status
+        if expiry_st == DriverAttachment.Status.EXPIRED:
+            expired_count += 1
+        elif (
+            not att.is_expiry_applicable
+            or expiry_st == DriverAttachment.Status.DOES_NOT_EXPIRE
+        ):
+            not_expired_count += 1
+        elif att.expiry_date and today <= att.expiry_date <= soon_cutoff:
+            expiring_soon_count += 1
+        else:
+            not_expired_count += 1
+    return {
+        'total': len(attachments),
+        'not_expired_count': not_expired_count,
+        'expiring_soon_count': expiring_soon_count,
+        'expired_count': expired_count,
+    }
+
+
+def _driver_attachment_all_list_row(att):
+    """Display-ready row for driver attachments list."""
+    file_name = _driver_attachment_file_display_name(att)
+    display_status, status_badge = _driver_attachment_list_display_status(att)
+    driver = getattr(att, 'driver', None)
+    return {
+        'obj': att,
+        'attachment_id': att.attachment_id,
+        'attachment_no': (att.attachment_no or '').strip() or '—',
+        'attachment_date': att.attachment_date,
+        'driver_id': getattr(driver, 'driver_id', None),
+        'driver_label': _driver_attachment_driver_display(driver),
+        'doc_ref_number': (att.doc_ref_number or '').strip() or '—',
+        'arabic_label': (att.arabic_label or '').strip(),
+        'english_label': (att.english_label or '').strip() or '—',
+        'file_name': file_name,
+        'display_status': display_status,
+        'status_badge': status_badge,
+        'has_driver': driver is not None,
+    }
+
+
 class DriverAttachmentAllListView(View):
     """All driver attachments across drivers (tenant sidebar pattern)."""
 
@@ -26592,28 +27186,29 @@ class DriverAttachmentAllListView(View):
             return response
 
         da = DriverAttachment
-        status_param = (request.GET.get('status') or '').strip()
-        allowed = {
-            '',
-            da.Status.VALID,
-            da.Status.EXPIRED,
-            da.Status.DOES_NOT_EXPIRE,
-        }
-        filter_status = status_param if status_param in allowed else ''
         sq = (request.GET.get('q') or '').strip()
 
         allowed_sort = frozenset(
-            {'attachment_no', 'driver', 'attachment_date', 'expiry_date', 'file', 'status'},
+            {
+                'attachment_no',
+                'attachment_date',
+                'driver',
+                'ref_number',
+                'arabic_label',
+                'english_label',
+                'file',
+                'status',
+            },
         )
         raw_sort = (request.GET.get('sort') or '').strip()
         raw_dir = (request.GET.get('dir') or '').strip().lower()
         if raw_dir not in ('asc', 'desc'):
             raw_dir = ''
         if not raw_sort and not raw_dir:
-            sort_field = 'attachment_date'
+            sort_field = 'attachment_no'
             sort_dir = 'desc'
         else:
-            sort_field = raw_sort if raw_sort in allowed_sort else 'attachment_date'
+            sort_field = raw_sort if raw_sort in allowed_sort else 'attachment_no'
             sort_dir = raw_dir if raw_dir in ('asc', 'desc') else 'desc'
         sort_reverse = sort_dir == 'desc'
 
@@ -26621,78 +27216,31 @@ class DriverAttachmentAllListView(View):
             qs = da.objects.select_related('driver')
             if sq:
                 qs = qs.filter(
-                    Q(driver__driver_code__icontains=sq)
-                    | Q(driver__arabic_name__icontains=sq),
+                    Q(attachment_no__icontains=sq)
+                    | Q(doc_ref_number__icontains=sq)
+                    | Q(arabic_label__icontains=sq)
+                    | Q(english_label__icontains=sq)
+                    | Q(file_notes__icontains=sq)
+                    | Q(driver__driver_code__icontains=sq)
+                    | Q(driver__english_name__icontains=sq)
+                    | Q(driver__arabic_name__icontains=sq)
+                    | Q(attachment_file__icontains=sq),
                 )
 
             all_attachments = list(qs)
-            today = timezone.localdate()
-            soon_cutoff = today + timezone.timedelta(days=30)
-            active_count = 0
-            expiring_soon_count = 0
-            expired_count = 0
-            for a in all_attachments:
-                st = a.status
-                if st == da.Status.EXPIRED:
-                    expired_count += 1
-                elif st == da.Status.DOES_NOT_EXPIRE:
-                    active_count += 1
-                elif st == da.Status.VALID:
-                    ed = a.expiry_date
-                    if (
-                        ed is not None
-                        and today <= ed <= soon_cutoff
-                    ):
-                        expiring_soon_count += 1
-                    else:
-                        active_count += 1
-            stats = {
-                'total': len(all_attachments),
-                'active_count': active_count,
-                'expiring_soon_count': expiring_soon_count,
-                'expired_count': expired_count,
-            }
-
+            stats = _driver_attachment_stats_counts(all_attachments)
             filtered = all_attachments
-            if filter_status:
-                filtered = [a for a in all_attachments if a.status == filter_status]
 
             def _sort_file_key(att):
-                if att.attachment_file and att.attachment_file.name:
-                    return os.path.basename(att.attachment_file.name).lower()
-                return ''
-
-            def _status_rank(att):
-                st = att.status
-                if st == da.Status.EXPIRED:
-                    return 0
-                if st == da.Status.VALID:
-                    return 1
-                if st == da.Status.DOES_NOT_EXPIRE:
-                    return 2
-                return 3
-
-            dated = [
-                a
-                for a in filtered
-                if a.is_expiry_applicable and a.expiry_date
-            ]
-            undated = [
-                a
-                for a in filtered
-                if not (a.is_expiry_applicable and a.expiry_date)
-            ]
+                return _driver_attachment_file_display_name(att).lower()
 
             if sort_field == 'attachment_no':
                 filtered = sorted(
                     filtered,
-                    key=lambda a: (a.attachment_no or '').lower(),
-                    reverse=sort_reverse,
-                )
-            elif sort_field == 'driver':
-                filtered = sorted(
-                    filtered,
-                    key=lambda a: (a.driver.driver_code or '').lower(),
+                    key=lambda a: (
+                        not bool((a.attachment_no or '').strip()),
+                        (a.attachment_no or '').lower(),
+                    ),
                     reverse=sort_reverse,
                 )
             elif sort_field == 'attachment_date':
@@ -26701,12 +27249,30 @@ class DriverAttachmentAllListView(View):
                     key=lambda a: a.attachment_date,
                     reverse=sort_reverse,
                 )
-            elif sort_field == 'expiry_date':
-                dated.sort(
-                    key=lambda a: a.expiry_date,
+            elif sort_field == 'driver':
+                filtered = sorted(
+                    filtered,
+                    key=lambda a: _driver_attachment_driver_display(a.driver).lower(),
                     reverse=sort_reverse,
                 )
-                filtered = dated + undated
+            elif sort_field == 'ref_number':
+                filtered = sorted(
+                    filtered,
+                    key=lambda a: (a.doc_ref_number or '').lower(),
+                    reverse=sort_reverse,
+                )
+            elif sort_field == 'arabic_label':
+                filtered = sorted(
+                    filtered,
+                    key=lambda a: (a.arabic_label or '').lower(),
+                    reverse=sort_reverse,
+                )
+            elif sort_field == 'english_label':
+                filtered = sorted(
+                    filtered,
+                    key=lambda a: (a.english_label or '').lower(),
+                    reverse=sort_reverse,
+                )
             elif sort_field == 'file':
                 filtered = sorted(
                     filtered,
@@ -26716,13 +27282,16 @@ class DriverAttachmentAllListView(View):
             elif sort_field == 'status':
                 filtered = sorted(
                     filtered,
-                    key=_status_rank,
+                    key=_driver_attachment_display_status_rank,
                     reverse=sort_reverse,
                 )
             else:
                 filtered = sorted(
                     filtered,
-                    key=lambda a: a.attachment_date,
+                    key=lambda a: (
+                        not bool((a.attachment_no or '').strip()),
+                        (a.attachment_no or '').lower(),
+                    ),
                     reverse=True,
                 )
 
@@ -26733,11 +27302,9 @@ class DriverAttachmentAllListView(View):
                 page_no = 1
             page = paginator.get_page(page_no)
 
-            for att in page.object_list:
-                if att.attachment_file:
-                    att.list_file_name = os.path.basename(att.attachment_file.name)
-                else:
-                    att.list_file_name = ''
+            attachment_rows = [
+                _driver_attachment_all_list_row(att) for att in page.object_list
+            ]
 
             total_count = paginator.count
             if total_count == 0:
@@ -26778,8 +27345,8 @@ class DriverAttachmentAllListView(View):
             context.update(
                 {
                     'attachments_page': page,
+                    'attachment_rows': attachment_rows,
                     'stats': stats,
-                    'filter_status': filter_status,
                     'search_q': sq,
                     'pagination_page_links': pagination_page_links,
                     'pagination_prev_url': prev_url,
@@ -26787,11 +27354,6 @@ class DriverAttachmentAllListView(View):
                     'pagination_start': ps,
                     'pagination_end': pe,
                     'pagination_total': total_count,
-                    'status_choices': [
-                        da.Status.VALID,
-                        da.Status.EXPIRED,
-                        da.Status.DOES_NOT_EXPIRE,
-                    ],
                     'page_title': 'Driver Attachments List',
                     'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
                     'sort_field': sort_field,
@@ -26928,18 +27490,48 @@ class DriverAttachmentCreateView(View):
                 messages.error(request, 'Please fix the highlighted errors.', extra_tags='tenant')
                 return render(request, self.template_name, context)
 
-            with db_transaction.atomic():
-                attachment_no, attachment_seq = _next_auto_number_for_form(
-                    form_code='driver-attachment',
-                    form_label='Driver Attachments',
-                    prefix='DRA',
+            try:
+                with db_transaction.atomic():
+                    attachment_no, attachment_seq = _next_auto_number_for_form(
+                        form_code='driver-attachment',
+                        form_label='Driver Attachments',
+                        prefix='DRA',
+                    )
+                    obj = form.save(commit=False)
+                    obj.driver = driver
+                    obj.attachment_no = attachment_no
+                    obj.attachment_sequence = attachment_seq
+                    obj.full_clean()
+                    obj.save()
+                    if request.FILES.get('attachment_file'):
+                        _driver_attachment_ensure_uploaded_file_saved(obj)
+            except ValidationError as exc:
+                if getattr(exc, 'error_dict', None):
+                    for field, errs in exc.error_dict.items():
+                        for err in errs:
+                            form.add_error(field, err)
+                else:
+                    for msg in exc.messages:
+                        form.add_error(None, msg)
+                context.update(
+                    {
+                        'form': form,
+                        'driver': driver,
+                        'page_title': 'Add Attachment',
+                        'attachment_no_preview': _preview_next_auto_number_for_form(
+                            form_code='driver-attachment',
+                            form_label='Driver Attachments',
+                            prefix='DRA',
+                        ),
+                        'show_driver_selector': show_driver_selector,
+                        'drivers_for_select': drivers_for_select,
+                        'selected_driver_id': selected_driver_id,
+                        'driver_error': driver_error,
+                        'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                    }
                 )
-                obj = form.save(commit=False)
-                obj.driver = driver
-                obj.attachment_no = attachment_no
-                obj.attachment_sequence = attachment_seq
-                obj.full_clean()
-                obj.save()
+                messages.error(request, 'Please fix the highlighted errors.', extra_tags='tenant')
+                return render(request, self.template_name, context)
             messages.success(request, 'Attachment saved.', extra_tags='tenant')
             return redirect('iroad_tenants:driver_attachment_all_list')
         finally:
@@ -27045,10 +27637,38 @@ class DriverAttachmentEditView(View):
                 )
                 return render(request, self.template_name, context)
 
-            obj = form.save(commit=False)
-            obj.driver = driver
-            obj.save()
-            new_file_uploaded = bool(request.FILES.get('attachment_file'))
+            try:
+                obj = form.save(commit=False)
+                obj.driver = driver
+                obj.save()
+                new_file_uploaded = bool(request.FILES.get('attachment_file'))
+                if new_file_uploaded:
+                    _driver_attachment_ensure_uploaded_file_saved(obj)
+            except ValidationError as exc:
+                if getattr(exc, 'error_dict', None):
+                    for field, errs in exc.error_dict.items():
+                        for err in errs:
+                            form.add_error(field, err)
+                else:
+                    for msg in exc.messages:
+                        form.add_error(None, msg)
+                context.update(
+                    {
+                        'form': form,
+                        'driver': driver,
+                        'attachment': attachment,
+                        'page_title': 'Edit Attachment',
+                        'is_edit': True,
+                        'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                    }
+                )
+                messages.error(
+                    request,
+                    'Please fix the highlighted errors.',
+                    extra_tags='tenant',
+                )
+                return render(request, self.template_name, context)
+
             new_file_name = obj.attachment_file.name if obj.attachment_file else ''
             if (
                 new_file_uploaded
@@ -27102,9 +27722,66 @@ class DriverAttachmentDetailView(View):
                     'attachment': attachment,
                     'page_title': 'Attachment Detail',
                     'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                    'edit_attachment_url': reverse(
+                        'iroad_tenants:driver_attachment_edit',
+                        kwargs={
+                            'driver_id': driver.driver_id,
+                            'attachment_id': attachment.attachment_id,
+                        },
+                    ),
+                    'back_to_list_url': reverse(
+                        'iroad_tenants:driver_attachment_all_list'
+                    ),
+                    'driver_detail_url': reverse(
+                        'iroad_tenants:driver_master_detail',
+                        kwargs={'driver_id': driver.driver_id},
+                    ),
+                    **_driver_attachment_file_context(attachment, driver),
                 }
             )
             return render(request, self.template_name, context)
+        finally:
+            restore_public_schema(request)
+
+
+class DriverAttachmentFileView(View):
+    """Serve driver attachment files with correct content-type for inline preview."""
+
+    def get(self, request, driver_id, attachment_id):
+        context = _tenant_context_from_session(request)
+        denied = _tenant_driver_master_access(request, context)
+        if denied:
+            return denied
+
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        if tenant_registry is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+
+        try:
+            attachment = DriverAttachment.objects.filter(
+                pk=attachment_id,
+                driver_id=driver_id,
+            ).first()
+            if not attachment or not _driver_attachment_stored_file_exists(attachment):
+                raise Http404('Attachment file not found.')
+
+            stored_name = attachment.attachment_file.name
+            content_type, _encoding = mimetypes.guess_type(stored_name)
+            file_handle = default_storage.open(stored_name, 'rb')
+            response = FileResponse(
+                file_handle,
+                content_type=content_type or 'application/octet-stream',
+            )
+            filename = os.path.basename(stored_name)
+            disposition = (
+                'attachment' if request.GET.get('download') else 'inline'
+            )
+            response['Content-Disposition'] = (
+                f'{disposition}; filename="{filename}"'
+            )
+            return response
         finally:
             restore_public_schema(request)
 
@@ -28736,7 +29413,6 @@ class TenantLocationMasterListView(View):
             else:
                 serviceable_filter = 'all'
 
-            qs = qs.order_by('-created_at')
             stats = {
                 'total': TenantLocationMaster.objects.count(),
                 'serviceable': TenantLocationMaster.objects.filter(is_serviceable=True).count(),
@@ -28745,12 +29421,35 @@ class TenantLocationMasterListView(View):
                     status=TenantLocationMaster.Status.INACTIVE
                 ).count(),
             }
-            paginator = Paginator(qs, 10)
-            try:
-                page_no = max(1, int(request.GET.get('page') or 1))
-            except ValueError:
-                page_no = 1
-            page = paginator.get_page(page_no)
+            location_column_filters = {
+                1: 'location_code',
+                2: 'country__name_en',
+                3: 'province',
+                4: 'location_name_english',
+                5: 'location_name_arabic',
+                6: 'display_label',
+                7: 'location_type',
+                8: 'status',
+            }
+            location_sort_cols = {
+                1: 'location_code',
+                2: 'country__name_en',
+                3: 'province',
+                4: 'location_name_english',
+                5: 'location_name_arabic',
+                6: 'display_label',
+                7: 'location_type',
+                8: 'status',
+                9: 'is_serviceable',
+            }
+            qs = apply_eal_column_filters(qs, request, location_column_filters)
+            qs = apply_eal_column_sort(
+                qs,
+                request,
+                location_sort_cols,
+                default_order=('-created_at',),
+            )
+            page, list_ctx = paginate_tenant_list(request, qs)
             context.update(
                 {
                     'locations_page': page,
@@ -28759,6 +29458,7 @@ class TenantLocationMasterListView(View):
                     'filter_serviceable': serviceable_filter,
                     'location_stats': stats,
                     'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                    **list_ctx,
                 }
             )
             return render(request, self.template_name, context)
@@ -28909,15 +29609,7 @@ class TenantRouteMasterListView(View):
             return response
         try:
             qs = TenantRouteMaster.objects.select_related('origin_point', 'destination_point')
-            search_q = (request.GET.get('q') or '').strip()
             route_scope = (request.GET.get('scope') or 'all').strip().lower()
-            if search_q:
-                qs = qs.filter(
-                    Q(route_code__icontains=search_q)
-                    | Q(route_label__icontains=search_q)
-                    | Q(origin_point__display_label__icontains=search_q)
-                    | Q(destination_point__display_label__icontains=search_q)
-                )
             if route_scope == 'domestic':
                 qs = qs.filter(route_type=TenantRouteMaster.RouteType.DOMESTIC)
             elif route_scope == 'international':
@@ -29504,36 +30196,55 @@ class TenantUsersAdministrationView(View):
             clear_tenant_portal_cookie(response, request=request)
             return response
         try:
-            search_query = (request.GET.get('q') or '').strip()
-            # List page: hide soft-deleted users (Deletion column / restore UI commented out in template).
+            user_column_filters = {
+                1: 'tenant_ref_no',
+                2: 'full_name',
+                3: 'email',
+                4: 'username',
+                5: 'role_name',
+                7: 'status',
+            }
+            user_sort_cols = {
+                1: 'tenant_ref_no',
+                2: 'full_name',
+                3: 'email',
+                4: 'username',
+                5: 'role_name',
+                6: 'last_login_at',
+                7: 'status',
+            }
             users_qs = TenantUser.objects.all()
-            if search_query:
-                users_qs = users_qs.filter(
-                    Q(full_name__icontains=search_query)
-                    | Q(email__icontains=search_query)
-                    | Q(role_name__icontains=search_query)
-                    | Q(username__icontains=search_query)
-                    | Q(tenant_ref_no__icontains=search_query)
-                )
-            tenant_users = list(users_qs.order_by('-created_at', '-updated_at')[:100])
+            users_page, list_ctx = prepare_eal_list(
+                request,
+                users_qs,
+                search_fields=[
+                    'full_name',
+                    'email',
+                    'role_name',
+                    'username',
+                    'tenant_ref_no',
+                ],
+                column_field_map=user_column_filters,
+                sort_col_field_map=user_sort_cols,
+                default_order=('-created_at', '-updated_at'),
+            )
 
             all_users_qs = TenantUser.objects.all()
             total_users = all_users_qs.count()
-            # Soft-delete stats card temporarily hidden in Users-administration.html
-            # users_deleted_count = TenantUser.all_objects.filter(is_deleted=True).count()
             active_users = all_users_qs.filter(status=TenantUser.Status.ACTIVE).count()
             inactive_users = all_users_qs.filter(status=TenantUser.Status.INACTIVE).count()
             locked_accounts = all_users_qs.filter(login_attempts__gte=3).count()
             context.update(
                 {
-                    'tenant_users': tenant_users,
+                    'tenant_users': list(users_page.object_list),
+                    'tenant_users_page': users_page,
                     'users_total_count': total_users,
-                    # 'users_deleted_count': users_deleted_count,
                     'users_active_count': active_users,
                     'users_inactive_count': inactive_users,
                     'users_locked_count': locked_accounts,
-                    'search_query': search_query,
+                    'search_query': list_ctx['search_q'],
                     'tenant_schema_name': tenant_registry.schema_name,
+                    **list_ctx,
                 }
             )
         finally:
@@ -30226,19 +30937,53 @@ class TenantRolesPermissionsView(View):
             clear_tenant_portal_cookie(response, request=request)
             return response
         try:
-            tenant_roles = list(TenantRole.objects.all().order_by('-created_at', '-updated_at')[:100])
-            total_roles = len(tenant_roles)
-            active_roles = sum(1 for role in tenant_roles if role.status == TenantRole.Status.ACTIVE)
-            inactive_roles = sum(1 for role in tenant_roles if role.status == TenantRole.Status.INACTIVE)
-            draft_roles = sum(1 for role in tenant_roles if role.status == TenantRole.Status.DRAFT)
+            role_column_filters = {
+                1: 'role_name_en',
+                2: 'role_name_ar',
+                3: 'description_en',
+                4: 'created_by_label',
+                5: 'status',
+            }
+            role_sort_cols = {
+                1: 'role_name_en',
+                2: 'role_name_ar',
+                3: 'description_en',
+                4: 'created_by_label',
+                5: 'status',
+            }
+            roles_page, list_ctx = prepare_eal_list(
+                request,
+                TenantRole.objects.all(),
+                search_fields=[
+                    'role_name_en',
+                    'role_name_ar',
+                    'description_en',
+                    'description_ar',
+                    'created_by_label',
+                ],
+                column_field_map=role_column_filters,
+                sort_col_field_map=role_sort_cols,
+                default_order=('-created_at', '-updated_at'),
+            )
+            tenant_roles = list(roles_page.object_list)
+            all_roles_qs = TenantRole.objects.all()
             context.update(
                 {
                     'tenant_roles': tenant_roles,
-                    'roles_total_count': total_roles,
-                    'roles_active_count': active_roles,
-                    'roles_inactive_count': inactive_roles,
-                    'roles_draft_count': draft_roles,
+                    'tenant_roles_page': roles_page,
+                    'roles_total_count': all_roles_qs.count(),
+                    'roles_active_count': all_roles_qs.filter(
+                        status=TenantRole.Status.ACTIVE,
+                    ).count(),
+                    'roles_inactive_count': all_roles_qs.filter(
+                        status=TenantRole.Status.INACTIVE,
+                    ).count(),
+                    'roles_draft_count': all_roles_qs.filter(
+                        status=TenantRole.Status.DRAFT,
+                    ).count(),
+                    'search_q': list_ctx['search_q'],
                     'tenant_schema_name': tenant_registry.schema_name,
+                    **list_ctx,
                 }
             )
         finally:

@@ -1,7 +1,7 @@
 {% extends 'iroad_tenants/base.html' %}
 {% load static %}
 
-{% block title %}Driver Attachments | iRoad{% endblock %}
+{% block title %}Driver Attachments List | iRoad{% endblock %}
 {% block breadcrumb %}{% endblock %}
 
 {% block content %}
@@ -10,15 +10,15 @@
     <ol class="breadcrumb">
       <li class="breadcrumb-item"><a href="{% url 'iroad_tenants:tenant_dashboard' %}">Dashboard</a></li>
       <li class="breadcrumb-item">Operations</li>
-      <li class="breadcrumb-item"><a href="{% url 'iroad_tenants:driver_master' %}">Drivers Management</a></li>
-      <li class="breadcrumb-item active" aria-current="page">Driver Attachments</li>
+      <li class="breadcrumb-item">Fleet Management</li>
+      <li class="breadcrumb-item active" aria-current="page">Driver Attachments List</li>
     </ol>
   </nav>
   <div class="page-header-row">
     <div class="page-header-left">
-      <h1 class="page-title">Driver Attachments</h1>
+      <h1 class="page-title">Driver Attachments List</h1>
       <p class="page-subtitle">
-        Manage and view all driver attachment documents. Search by driver code or Arabic name.
+        Manage and view all driver attachment documents.
       </p>
     </div>
     <div class="page-header-right">
@@ -27,9 +27,9 @@
           <i class="bi bi-download"></i>
           <span>Export</span>
         </button>
-        <a href="{% url 'iroad_tenants:driver_attachment_create_any' %}" class="eal-btn eal-btn-primary" title="Add a new attachment">
+        <a href="{% url 'iroad_tenants:driver_attachment_create_any' %}" class="eal-btn eal-btn-primary" title="Add a new driver attachment">
           <i class="bi bi-plus-lg"></i>
-          <span>Add Attachment</span>
+          <span>Add Driver Attachment</span>
         </a>
       </div>
     </div>
@@ -43,7 +43,7 @@
     </div>
     <div>
       <div class="eal-stat-value">{{ stats.total }}</div>
-      <div class="eal-stat-label">Total Attachments</div>
+      <div class="eal-stat-label">Total</div>
     </div>
   </div>
   <div class="eal-stat-card">
@@ -51,8 +51,8 @@
       <i class="bi bi-check-circle"></i>
     </div>
     <div>
-      <div class="eal-stat-value">{{ stats.active_count }}</div>
-      <div class="eal-stat-label">Active</div>
+      <div class="eal-stat-value">{{ stats.not_expired_count }}</div>
+      <div class="eal-stat-label">Not Expired</div>
     </div>
   </div>
   <div class="eal-stat-card">
@@ -76,203 +76,205 @@
 </div>
 
 <div class="eal-table-card">
-  <form method="get" class="eal-toolbar eal-toolbar--inline-filters">
+  <form method="get" class="eal-toolbar">
     <div class="eal-toolbar-left w-100">
-      <div class="eal-toolbar-filters-row flex-wrap gap-2 align-items-end">
-        <input type="hidden" name="sort" value="{{ sort_field }}" />
-        <input type="hidden" name="dir" value="{{ sort_dir }}" />
-        <div class="eal-search eal-search--toolbar-grow">
-          <i class="bi bi-search"></i>
-          <input
-            type="search"
-            name="q"
-            value="{{ search_q }}"
-            placeholder="Search by driver code or Arabic name…"
-            autocomplete="off"
-          />
-        </div>
-        <div class="eal-toolbar-filter-pair">
-          <label class="form-label mb-0 small text-nowrap text-muted" for="daAllStatus">Status</label>
-          <select name="status" id="daAllStatus" class="form-select form-select-sm">
-            <option value="" {% if not filter_status %}selected{% endif %}>All</option>
-            {% for s in status_choices %}
-            <option value="{{ s }}" {% if filter_status == s %}selected{% endif %}>{{ s }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <button type="submit" class="btn btn-sm btn-primary eal-toolbar-apply">Apply</button>
+      <input type="hidden" name="sort" value="{{ sort_field }}" />
+      <input type="hidden" name="dir" value="{{ sort_dir }}" />
+      <div class="eal-search eal-search--toolbar-grow">
+        <i class="bi bi-search"></i>
+        <input
+          type="search"
+          name="q"
+          value="{{ search_q }}"
+          placeholder="Search driver attachments…"
+          autocomplete="off"
+          aria-label="Search driver attachments"
+        />
       </div>
     </div>
   </form>
 
-  <div class="eal-table-wrap">
-    <table class="eal-table">
+  <div class="eal-table-wrap da-att-table-scroll" tabindex="0" aria-label="Driver attachments — scroll horizontally to view all columns">
+    <table class="eal-table da-att-table">
       <thead>
         <tr>
-          <th class="eal-col-check">
+          <th class="eal-col-check da-att-col-check">
             <input type="checkbox" class="eal-custom-check" id="daListSelectAll" aria-label="Select all rows" />
           </th>
-          <th>#</th>
-          <th>
-            <a href="{{ sort_urls.attachment_no }}" class="tm-sort-link{% if sort_field == 'attachment_no' %} is-active{% endif %}">
-              Attachment No
-              <span class="tm-sort-indicator">
-                <i class="bi bi-caret-up-fill{% if sort_field == 'attachment_no' and sort_dir == 'asc' %} active{% endif %}"></i>
-                <i class="bi bi-caret-down-fill{% if sort_field == 'attachment_no' and sort_dir == 'desc' %} active{% endif %}"></i>
+          <th class="da-att-col-no">
+            <a href="{{ sort_urls.attachment_no }}" class="eal-sort-link">
+              <span>Attachment No</span>
+              <span class="sort-indicator" role="presentation">
+                <i class="bi bi-caret-up-fill eal-sort-caret eal-sort-caret--up{% if sort_field == 'attachment_no' and sort_dir == 'asc' %} is-active{% endif %}"></i>
+                <i class="bi bi-caret-down-fill eal-sort-caret eal-sort-caret--down{% if sort_field == 'attachment_no' and sort_dir == 'desc' %} is-active{% endif %}"></i>
               </span>
             </a>
           </th>
-          <th>
-            <a href="{{ sort_urls.driver }}" class="tm-sort-link{% if sort_field == 'driver' %} is-active{% endif %}">
-              Driver Code
-              <span class="tm-sort-indicator">
-                <i class="bi bi-caret-up-fill{% if sort_field == 'driver' and sort_dir == 'asc' %} active{% endif %}"></i>
-                <i class="bi bi-caret-down-fill{% if sort_field == 'driver' and sort_dir == 'desc' %} active{% endif %}"></i>
+          <th class="da-att-col-date">
+            <a href="{{ sort_urls.attachment_date }}" class="eal-sort-link">
+              <span>Date</span>
+              <span class="sort-indicator" role="presentation">
+                <i class="bi bi-caret-up-fill eal-sort-caret eal-sort-caret--up{% if sort_field == 'attachment_date' and sort_dir == 'asc' %} is-active{% endif %}"></i>
+                <i class="bi bi-caret-down-fill eal-sort-caret eal-sort-caret--down{% if sort_field == 'attachment_date' and sort_dir == 'desc' %} is-active{% endif %}"></i>
               </span>
             </a>
           </th>
-          <th>Driver Name</th>
-          <th>
-            <a href="{{ sort_urls.attachment_date }}" class="tm-sort-link{% if sort_field == 'attachment_date' %} is-active{% endif %}">
-              Date
-              <span class="tm-sort-indicator">
-                <i class="bi bi-caret-up-fill{% if sort_field == 'attachment_date' and sort_dir == 'asc' %} active{% endif %}"></i>
-                <i class="bi bi-caret-down-fill{% if sort_field == 'attachment_date' and sort_dir == 'desc' %} active{% endif %}"></i>
+          <th class="da-att-col-driver">
+            <a href="{{ sort_urls.driver }}" class="eal-sort-link">
+              <span>Driver</span>
+              <span class="sort-indicator" role="presentation">
+                <i class="bi bi-caret-up-fill eal-sort-caret eal-sort-caret--up{% if sort_field == 'driver' and sort_dir == 'asc' %} is-active{% endif %}"></i>
+                <i class="bi bi-caret-down-fill eal-sort-caret eal-sort-caret--down{% if sort_field == 'driver' and sort_dir == 'desc' %} is-active{% endif %}"></i>
               </span>
             </a>
           </th>
-          <th>Expiry Applicable</th>
-          <th>
-            <a href="{{ sort_urls.expiry_date }}" class="tm-sort-link{% if sort_field == 'expiry_date' %} is-active{% endif %}">
-              Expiry Date
-              <span class="tm-sort-indicator">
-                <i class="bi bi-caret-up-fill{% if sort_field == 'expiry_date' and sort_dir == 'asc' %} active{% endif %}"></i>
-                <i class="bi bi-caret-down-fill{% if sort_field == 'expiry_date' and sort_dir == 'desc' %} active{% endif %}"></i>
+          <th class="da-att-col-ref">
+            <a href="{{ sort_urls.ref_number }}" class="eal-sort-link">
+              <span>Ref Number</span>
+              <span class="sort-indicator" role="presentation">
+                <i class="bi bi-caret-up-fill eal-sort-caret eal-sort-caret--up{% if sort_field == 'ref_number' and sort_dir == 'asc' %} is-active{% endif %}"></i>
+                <i class="bi bi-caret-down-fill eal-sort-caret eal-sort-caret--down{% if sort_field == 'ref_number' and sort_dir == 'desc' %} is-active{% endif %}"></i>
               </span>
             </a>
           </th>
-          <th>
-            <a href="{{ sort_urls.status }}" class="tm-sort-link{% if sort_field == 'status' %} is-active{% endif %}">
-              Status
-              <span class="tm-sort-indicator">
-                <i class="bi bi-caret-up-fill{% if sort_field == 'status' and sort_dir == 'asc' %} active{% endif %}"></i>
-                <i class="bi bi-caret-down-fill{% if sort_field == 'status' and sort_dir == 'desc' %} active{% endif %}"></i>
+          <th class="da-att-col-arabic">
+            <a href="{{ sort_urls.arabic_label }}" class="eal-sort-link">
+              <span>Arabic Label</span>
+              <span class="sort-indicator" role="presentation">
+                <i class="bi bi-caret-up-fill eal-sort-caret eal-sort-caret--up{% if sort_field == 'arabic_label' and sort_dir == 'asc' %} is-active{% endif %}"></i>
+                <i class="bi bi-caret-down-fill eal-sort-caret eal-sort-caret--down{% if sort_field == 'arabic_label' and sort_dir == 'desc' %} is-active{% endif %}"></i>
               </span>
             </a>
           </th>
-          <th>Notes</th>
-          <th>
-            <a href="{{ sort_urls.file }}" class="tm-sort-link{% if sort_field == 'file' %} is-active{% endif %}">
-              File
-              <span class="tm-sort-indicator">
-                <i class="bi bi-caret-up-fill{% if sort_field == 'file' and sort_dir == 'asc' %} active{% endif %}"></i>
-                <i class="bi bi-caret-down-fill{% if sort_field == 'file' and sort_dir == 'desc' %} active{% endif %}"></i>
+          <th class="da-att-col-english">
+            <a href="{{ sort_urls.english_label }}" class="eal-sort-link">
+              <span>English Label</span>
+              <span class="sort-indicator" role="presentation">
+                <i class="bi bi-caret-up-fill eal-sort-caret eal-sort-caret--up{% if sort_field == 'english_label' and sort_dir == 'asc' %} is-active{% endif %}"></i>
+                <i class="bi bi-caret-down-fill eal-sort-caret eal-sort-caret--down{% if sort_field == 'english_label' and sort_dir == 'desc' %} is-active{% endif %}"></i>
               </span>
             </a>
           </th>
-          <th>Actions</th>
+          <th class="da-att-col-file">
+            <a href="{{ sort_urls.file }}" class="eal-sort-link">
+              <span>File Attached</span>
+              <span class="sort-indicator" role="presentation">
+                <i class="bi bi-caret-up-fill eal-sort-caret eal-sort-caret--up{% if sort_field == 'file' and sort_dir == 'asc' %} is-active{% endif %}"></i>
+                <i class="bi bi-caret-down-fill eal-sort-caret eal-sort-caret--down{% if sort_field == 'file' and sort_dir == 'desc' %} is-active{% endif %}"></i>
+              </span>
+            </a>
+          </th>
+          <th class="da-att-col-status">
+            <a href="{{ sort_urls.status }}" class="eal-sort-link">
+              <span>Status</span>
+              <span class="sort-indicator" role="presentation">
+                <i class="bi bi-caret-up-fill eal-sort-caret eal-sort-caret--up{% if sort_field == 'status' and sort_dir == 'asc' %} is-active{% endif %}"></i>
+                <i class="bi bi-caret-down-fill eal-sort-caret eal-sort-caret--down{% if sort_field == 'status' and sort_dir == 'desc' %} is-active{% endif %}"></i>
+              </span>
+            </a>
+          </th>
+          <th class="da-att-col-actions">Actions</th>
         </tr>
       </thead>
       <tbody>
-        {% for row in attachments_page %}
+        {% for row in attachment_rows %}
         <tr>
-          <td class="eal-col-check">
+          <td class="eal-col-check da-att-col-check">
             <input type="checkbox" class="eal-custom-check da-row-check" aria-label="Select row" />
           </td>
-          <td class="text-muted small">{{ attachments_page.start_index|add:forloop.counter0 }}</td>
-          <td><span class="eal-entity-id">{{ row.attachment_no|default:"—" }}</span></td>
-          <td><span class="eal-entity-id">{{ row.driver.driver_code }}</span></td>
-          <td><span class="arabic-text d-inline-block" dir="rtl" lang="ar">{{ row.driver.arabic_name }}</span></td>
-          <td>{{ row.attachment_date|date:"j M Y" }}</td>
-          <td>
-            {% if row.is_expiry_applicable %}
-            <span class="badge rounded-pill bg-success bg-opacity-10 text-success">Yes</span>
+          <td class="da-att-col-no da-att-col-clip">
+            {% if row.has_driver %}
+            <a
+              href="{% url 'iroad_tenants:driver_attachment_detail' driver_id=row.driver_id attachment_id=row.attachment_id %}"
+              class="eal-entity-id text-decoration-none da-att-cell-text"
+              title="{{ row.attachment_no }}"
+            >{{ row.attachment_no }}</a>
             {% else %}
-            <span class="badge rounded-pill bg-secondary bg-opacity-10 text-secondary">No</span>
+            <span class="eal-entity-id da-att-cell-text" title="{{ row.attachment_no }}">{{ row.attachment_no }}</span>
             {% endif %}
           </td>
-          <td>
-            {% if row.is_expiry_applicable and row.expiry_date %}
-              {{ row.expiry_date|date:"j M Y" }}
+          <td class="da-att-col-date da-att-col-clip">{{ row.attachment_date|date:"j M Y" }}</td>
+          <td class="da-att-col-driver da-att-col-clip">
+            <span class="da-att-cell-text eal-name-text" title="{{ row.driver_label }}">{{ row.driver_label }}</span>
+          </td>
+          <td class="da-att-col-ref da-att-col-clip">
+            <span class="da-att-cell-text" title="{{ row.doc_ref_number }}">{{ row.doc_ref_number }}</span>
+          </td>
+          <td class="da-att-col-arabic da-att-col-clip">
+            {% if row.arabic_label %}
+            <span class="da-att-cell-text da-att-arabic" dir="rtl" lang="ar" title="{{ row.arabic_label }}">{{ row.arabic_label }}</span>
             {% else %}
-              &mdash;
+            &mdash;
             {% endif %}
           </td>
-          <td>
-            {% if row.status == 'Valid' %}
-            <span class="status-badge da-att-valid"><i class="bi bi-check2-circle"></i> Valid</span>
-            {% elif row.status == 'Expired' %}
-            <span class="status-badge da-att-expired"><i class="bi bi-x-circle"></i> Expired</span>
+          <td class="da-att-col-english da-att-col-clip">
+            <span class="da-att-cell-text" title="{{ row.english_label }}">{{ row.english_label }}</span>
+          </td>
+          <td class="da-att-col-file da-att-col-clip">
+            {% if row.file_name %}
+            <span class="da-att-cell-text" title="{{ row.file_name }}">{{ row.file_name }}</span>
             {% else %}
-            <span class="status-badge da-att-dne"><i class="bi bi-infinity"></i> Does Not Expire</span>
+            &mdash;
             {% endif %}
           </td>
-          <td><span class="text-break small">{{ row.file_notes|truncatechars:64|default:"—" }}</span></td>
-          <td>
-            {% if row.list_file_name %}
-              <span class="text-break small">{{ row.list_file_name }}</span>
-            {% else %}
-              &mdash;
-            {% endif %}
+          <td class="da-att-col-status">
+            <span class="status-badge {{ row.status_badge }}">{{ row.display_status }}</span>
           </td>
-          <td>
-            <div class="dropdown eal-actions-cell" onclick="event.stopPropagation();">
+          <td class="da-att-col-actions">
+            {% if row.has_driver %}
+            <div class="dropdown eal-actions-cell">
               <button
                 class="eal-row-btn"
                 type="button"
                 data-bs-toggle="dropdown"
+                data-bs-boundary="viewport"
                 aria-expanded="false"
                 title="Actions"
               >
                 <i class="bi bi-three-dots-vertical"></i>
               </button>
-              <ul class="dropdown-menu dropdown-menu-end shadow-sm" style="border-radius: 8px; border-color: #e2e8f0">
+              <ul
+                class="dropdown-menu dropdown-menu-end shadow-sm"
+                style="border-radius: 8px; border-color: #e2e8f0; min-width: 180px;"
+              >
                 <li>
                   <a
-                    href="{% url 'iroad_tenants:driver_attachment_detail' driver_id=row.driver.driver_id attachment_id=row.attachment_id %}"
                     class="dropdown-item"
+                    href="{% url 'iroad_tenants:driver_attachment_detail' driver_id=row.driver_id attachment_id=row.attachment_id %}"
                   >
-                    <i class="bi bi-eye me-2 text-info"></i>View
+                    <i class="bi bi-eye text-info me-2"></i>View
                   </a>
                 </li>
                 <li>
                   <a
-                    href="{% url 'iroad_tenants:driver_attachment_edit' driver_id=row.driver.driver_id attachment_id=row.attachment_id %}"
                     class="dropdown-item"
+                    href="{% url 'iroad_tenants:driver_attachment_edit' driver_id=row.driver_id attachment_id=row.attachment_id %}"
                   >
-                    <i class="bi bi-pencil me-2 text-primary"></i>Edit
+                    <i class="bi bi-pencil text-primary me-2"></i>Edit
                   </a>
                 </li>
-                {% if row.attachment_file %}
-                <li>
-                  <a
-                    href="{{ row.attachment_file.url }}"
-                    download
-                    class="dropdown-item"
-                  >
-                    <i class="bi bi-download me-2 text-success"></i>Download
-                  </a>
-                </li>
-                {% endif %}
-                <li><hr class="dropdown-divider"></li>
+                <li><hr class="dropdown-divider" /></li>
                 <li>
                   <button
                     type="button"
                     class="dropdown-item text-danger da-delete-trigger"
-                    data-delete-url="{% url 'iroad_tenants:driver_attachment_delete' row.driver.driver_id row.attachment_id %}"
+                    data-delete-url="{% url 'iroad_tenants:driver_attachment_delete' row.driver_id row.attachment_id %}"
                   >
                     <i class="bi bi-trash3 me-2"></i>Delete
                   </button>
                 </li>
               </ul>
             </div>
+            {% else %}
+            <span class="text-muted small">—</span>
+            {% endif %}
           </td>
         </tr>
         {% empty %}
         <tr>
-          <td colspan="11" class="text-center text-muted py-5">
-            {% if search_q or filter_status %}
-            No attachments match your search or filters.
+          <td colspan="10" class="text-center text-muted py-5">
+            {% if search_q %}
+            No attachments match your search.
             {% else %}
             No driver attachments recorded yet. Add an attachment to get started.
             {% endif %}
@@ -334,46 +336,125 @@
 
 <style>
   .page-subtitle { max-width: 720px; }
-  .arabic-text { font-family: inherit; }
-  .eal-table thead th {
+  .da-att-table-scroll {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+    scrollbar-width: thin;
+    scrollbar-color: #94a3b8 #f1f5f9;
+  }
+  .da-att-table-scroll::-webkit-scrollbar {
+    height: 8px;
+  }
+  .da-att-table-scroll::-webkit-scrollbar-track {
+    background: #f1f5f9;
+  }
+  .da-att-table-scroll::-webkit-scrollbar-thumb {
+    background: #94a3b8;
+    border-radius: 4px;
+  }
+  .da-att-table {
+    table-layout: fixed;
+    min-width: 1200px;
+    width: 100%;
+  }
+  .da-att-col-check { width: 44px; }
+  .da-att-col-no { width: 120px; }
+  .da-att-col-date { width: 108px; }
+  .da-att-col-driver { width: 200px; }
+  .da-att-col-ref { width: 110px; }
+  .da-att-col-arabic { width: 150px; }
+  .da-att-col-english { width: 160px; }
+  .da-att-col-file { width: 180px; }
+  .da-att-col-status { width: 120px; }
+  .da-att-col-actions { width: 72px; }
+  .da-att-table .eal-table thead th {
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.03em;
     color: #7f8aa3;
+    font-weight: 600;
+    cursor: default;
   }
-  .eal-table td { vertical-align: middle; }
-  .eal-table .eal-row-btn { min-width: 42px; }
-  .tm-sort-link {
+  .da-att-table .eal-table thead th:hover {
+    color: #7f8aa3;
+  }
+  .da-att-table .eal-table td {
+    vertical-align: middle;
+  }
+  .da-att-table .eal-table tbody td.da-att-col-clip {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 0;
+  }
+  .da-att-cell-text {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+  }
+  .da-att-arabic {
+    direction: rtl;
+    font-family: "Segoe UI", sans-serif;
+    text-align: right;
+  }
+  a.da-att-cell-text.eal-entity-id {
+    display: block;
+  }
+  .da-att-table .status-badge {
     display: inline-flex;
     align-items: center;
-    color: inherit;
-    text-decoration: none;
+    width: auto;
+    max-width: max-content;
+    white-space: nowrap;
+    box-shadow: none;
   }
-  .tm-sort-link:hover {
-    color: inherit;
-    text-decoration: none;
+  .da-att-table .status-badge.active {
+    background: #e6f8ef;
+    color: #0d894f;
+    border: 1px solid rgba(13, 137, 79, 0.25);
   }
-  .tm-sort-link.is-active .tm-sort-indicator {
-    opacity: 0.9;
+  .da-att-table .status-badge.pending {
+    background: #fff7ed;
+    color: #ea580c;
+    border: 1px solid rgba(234, 88, 12, 0.25);
   }
-  .tm-sort-indicator {
+  .da-att-table .status-badge.expired {
+    background: #fef2f2;
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.25);
+  }
+  .da-att-table .status-badge.inactive {
+    background: #fce7f3;
+    color: #be185d;
+    border: 1px solid rgba(190, 24, 93, 0.2);
+  }
+  .da-att-col-actions .eal-actions-cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .eal-sort-link {
     display: inline-flex;
-    flex-direction: column;
-    margin-left: 6px;
-    vertical-align: middle;
-    opacity: 0.45;
-    line-height: 0.75;
+    align-items: center;
+    gap: 6px;
+    color: inherit;
+    text-decoration: none;
+    font-weight: inherit;
   }
-  .tm-sort-indicator i {
-    font-size: 9px;
+  .da-att-table .eal-sort-link:hover { color: #5051f9; }
+  .eal-sort-caret {
     opacity: 0.35;
+    font-size: 0.65em;
+    line-height: 1;
   }
-  .tm-sort-indicator i.active {
+  .eal-sort-caret.is-active {
     opacity: 1;
+    color: #5051f9;
   }
-  .status-badge.da-att-valid { background: #198754; color: #fff; border: 0; }
-  .status-badge.da-att-expired { background: #dc3545; color: #fff; border: 0; }
-  .status-badge.da-att-dne { background: #0d6efd; color: #fff; border: 0; }
 </style>
 {% endblock %}
 
@@ -406,6 +487,19 @@
       cb.addEventListener("change", syncSelectAll);
     });
     syncSelectAll();
+  }
+
+  var searchInput = document.querySelector('.eal-toolbar input[name="q"]');
+  if (searchInput) {
+    var searchForm = searchInput.closest("form");
+    var searchTimer = null;
+    searchInput.addEventListener("input", function () {
+      if (!searchForm) return;
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(function () {
+        searchForm.requestSubmit();
+      }, 400);
+    });
   }
 
   var modalEl = document.getElementById("driverAttachmentDeleteModal");

@@ -29,6 +29,7 @@ Variables:
       type="text"
       class="form-control eal-column-filter-input"
       placeholder="{{ filter_placeholder|default:'Filter…' }}"
+      {% if filter_value %}value="{{ filter_value }}"{% endif %}
     />
     <div class="eal-filter-actions">
       <button type="button" class="eal-filter-action" data-sort="asc">A to Z</button>

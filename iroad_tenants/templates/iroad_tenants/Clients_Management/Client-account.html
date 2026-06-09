@@ -64,8 +64,10 @@
       <div
         class="eal-table-card"
         data-eal-filterable-table
+        data-eal-server-paginated="1"
         data-eal-empty-colspan="10"
         data-eal-empty-filter-message="No client accounts match the selected search/filter criteria."
+        data-eal-global-search-columns="1,2,3,4,5,6,7,8"
       >
         <div class="client-table-toolbar">
           <div class="d-flex align-items-center gap-2 flex-wrap flex-grow-1" role="search" style="min-width: 0">
@@ -364,25 +366,7 @@
           </table>
         </div>
 
-        <!-- Pagination -->
-        <div class="eal-pagination">
-          <div class="eal-pagination-info">
-            Showing
-            <strong>{% if client_accounts_count %}1-{{ client_accounts_count }}{% else %}0-0{% endif %}</strong>
-            of
-            <strong>{{ client_accounts_count }}</strong>
-            client accounts
-          </div>
-          <div class="eal-pagination-controls">
-            <button class="eal-page-btn" title="Previous">
-              <i class="bi bi-chevron-left"></i>
-            </button>
-            <button class="eal-page-btn active">1</button>
-            <button class="eal-page-btn" title="Next">
-              <i class="bi bi-chevron-right"></i>
-            </button>
-          </div>
-        </div>
+        {% include 'iroad_tenants/partials/eal_list_pagination.html' with page_obj=client_accounts_page pagination_label='client accounts' %}
       </div>
       <!-- ========== END NEW TABLE UI DESIGN ========== -->
 {% endblock %}
@@ -393,32 +377,20 @@
   var inp = document.getElementById("clientTableSearch");
   var btn = document.getElementById("clientAccountSearchClear");
   var listUrl = "{% url 'iroad_tenants:tenant_client_account' %}";
-  if (!inp) return;
-  function hasServerQ() {
-    try {
-      return new URLSearchParams(window.location.search).has("q");
-    } catch (e) {
-      return false;
-    }
-  }
+  if (!inp || !btn) return;
   function syncClear() {
-    if (!btn) return;
     var v = (inp.value || "").trim();
-    btn.style.display = v || hasServerQ() ? "" : "none";
+    btn.style.display = v ? "" : "none";
   }
   inp.addEventListener("input", syncClear);
   syncClear();
-  if (btn) {
-    btn.addEventListener("click", function () {
-      if (hasServerQ()) {
-        window.location.href = listUrl;
-        return;
-      }
-      inp.value = "";
-      inp.dispatchEvent(new Event("input", { bubbles: true }));
-      syncClear();
-    });
-  }
+  btn.addEventListener("click", function () {
+    var params = new URLSearchParams(window.location.search);
+    params.delete("q");
+    params.delete("page");
+    var qs = params.toString();
+    window.location.href = listUrl + (qs ? "?" + qs : "");
+  });
 })();
 </script>
 {% endblock %}

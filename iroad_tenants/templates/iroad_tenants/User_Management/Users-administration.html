@@ -107,6 +107,7 @@
 <div
   class="eal-table-card"
   data-eal-filterable-table
+  data-eal-server-paginated="1"
   data-eal-empty-colspan="9"
   data-eal-empty-filter-message="No users match the selected search/filter criteria."
   data-eal-global-search-columns="1,2,3,4,5,6,7"
@@ -263,14 +264,7 @@
     </table>
   </div>
 
-  <div class="eal-pagination">
-    <div class="eal-pagination-info">Showing <strong>{% if tenant_users %}1-{{ tenant_users|length }}{% else %}0{% endif %}</strong> of <strong>{{ tenant_users|length }}</strong> users</div>
-    <div class="eal-pagination-controls">
-      <button class="eal-page-btn" title="Previous"><i class="bi bi-chevron-left"></i></button>
-      <button class="eal-page-btn active">1</button>
-      <button class="eal-page-btn" title="Next"><i class="bi bi-chevron-right"></i></button>
-    </div>
-  </div>
+  {% include 'iroad_tenants/partials/eal_list_pagination.html' with page_obj=tenant_users_page pagination_label='users' %}
 </div>
 {% endblock %}
 
@@ -299,20 +293,14 @@
   inp.addEventListener("input", syncClear);
   syncClear();
 
-  if ((inp.value || "").trim()) {
-    inp.dispatchEvent(new Event("input", { bubbles: true }));
-  }
-
   if (btn) {
     btn.addEventListener("click", function () {
-      if (hasServerQ()) {
-        window.location.href = listUrl;
-        return;
-      }
-      inp.value = "";
-      inp.dispatchEvent(new Event("input", { bubbles: true }));
-      syncClear();
-      inp.focus();
+      var url = new URL(listUrl, window.location.origin);
+      var params = new URLSearchParams(window.location.search);
+      params.delete("q");
+      params.delete("page");
+      var qs = params.toString();
+      window.location.href = listUrl + (qs ? "?" + qs : "");
     });
   }
 })();

@@ -1549,6 +1549,7 @@ class DriverMaster(models.Model):
     whatsapp_same_as_mobile = models.BooleanField(default=False)
 
     # ── Audit ─────────────────────────────────────────
+    created_by_label = models.CharField(max_length=200, blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

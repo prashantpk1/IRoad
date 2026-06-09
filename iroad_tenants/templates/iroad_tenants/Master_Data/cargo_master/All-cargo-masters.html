@@ -98,6 +98,7 @@
 <div
   class="eal-table-card"
   data-eal-filterable-table
+  data-eal-server-paginated="1"
   data-eal-empty-colspan="9"
   data-eal-empty-filter-message="{% translate 'No cargo records match the selected search/filter criteria.' %}"
   data-eal-global-search-columns="0,1,2,3,4,5,6,7"
@@ -243,25 +244,7 @@
     </table>
   </div>
 
-  {% if cargos_page.paginator.num_pages > 1 %}
-  <div class="eal-pagination">
-    <div class="eal-pagination-info">
-      {% translate "Showing" %} <strong>{{ pagination_start }}-{{ pagination_end }}</strong> {% translate "of" %}
-      <strong>{{ pagination_total }}</strong>
-    </div>
-    <div class="eal-pagination-controls">
-      {% if pagination_prev_url %}
-      <a class="eal-page-btn" href="{{ pagination_prev_url }}" title="{% translate 'Previous' %}"><i class="bi bi-chevron-left"></i></a>
-      {% endif %}
-      {% for n, href in pagination_page_links %}
-      <a class="eal-page-btn {% if n == cargos_page.number %}active{% endif %}" href="{{ href }}">{{ n }}</a>
-      {% endfor %}
-      {% if pagination_next_url %}
-      <a class="eal-page-btn" href="{{ pagination_next_url }}" title="{% translate 'Next' %}"><i class="bi bi-chevron-right"></i></a>
-      {% endif %}
-    </div>
-  </div>
-  {% endif %}
+  {% include 'iroad_tenants/partials/eal_list_pagination.html' with page_obj=cargos_page %}
 </div>
 {% endblock %}
 

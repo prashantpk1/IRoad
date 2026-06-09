@@ -35,4 +35,7 @@ if settings.DEBUG:
 
     urlpatterns += staticfiles_urlpatterns()
 
-handler404 = 'iroad_frontend.views.page_not_found'
+handler400 = 'iroad_frontend.error_views.bad_request'
+handler403 = 'iroad_frontend.error_views.permission_denied'
+handler404 = 'iroad_frontend.error_views.page_not_found'
+handler500 = 'iroad_frontend.error_views.server_error'

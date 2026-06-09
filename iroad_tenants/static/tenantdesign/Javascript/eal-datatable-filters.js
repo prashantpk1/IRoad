@@ -156,6 +156,47 @@
     window.location.assign(url.toString());
   }
 
+  function navigateServerPaginatedFilter(columnIndex, value) {
+    var url = new URL(window.location.href);
+    var v = String(value || "").trim();
+    if (v) {
+      url.searchParams.set("filter_" + columnIndex, v);
+    } else {
+      url.searchParams.delete("filter_" + columnIndex);
+    }
+    url.searchParams.delete("page");
+    window.location.assign(url.toString());
+  }
+
+  function clearServerPaginatedColumn(columnIndex) {
+    var url = new URL(window.location.href);
+    url.searchParams.delete("filter_" + String(columnIndex));
+    var activeCol = url.searchParams.get("sort_col");
+    if (activeCol && Number(activeCol) === columnIndex) {
+      url.searchParams.delete("sort_col");
+      url.searchParams.delete("sort_dir");
+    }
+    url.searchParams.delete("page");
+    window.location.assign(url.toString());
+  }
+
+  function syncServerFilterInputs(filterHeaders) {
+    var params;
+    try {
+      params = new URLSearchParams(window.location.search);
+    } catch (e) {
+      return;
+    }
+    filterHeaders.forEach(function (header) {
+      var columnIndex = Number(header.getAttribute("data-column-index"));
+      var input = header.querySelector(".eal-column-filter-input");
+      var menuButton = header.querySelector(".eal-filter-menu-btn");
+      var val = params.get("filter_" + columnIndex) || "";
+      if (input) input.value = val;
+      if (menuButton) menuButton.classList.toggle("active", Boolean(val));
+    });
+  }
+
   function initFilterableTable(root) {
     if (!root || root.getAttribute("data-eal-filter-skip") === "1") return;
 
@@ -329,10 +370,27 @@
     }
 
     if (globalSearchInput) {
-      globalSearchInput.addEventListener("input", function () {
-        state.globalSearch = normalizeText(globalSearchInput.value);
-        applyTableState();
-      });
+      if (serverPaginated) {
+        var globalSearchDebounce;
+        globalSearchInput.addEventListener("input", function () {
+          clearTimeout(globalSearchDebounce);
+          globalSearchDebounce = setTimeout(function () {
+            var url = new URL(window.location.href);
+            var v = (globalSearchInput.value || "").trim();
+            var cur = url.searchParams.get("q") || "";
+            if (v === cur) return;
+            if (v) url.searchParams.set("q", v);
+            else url.searchParams.delete("q");
+            url.searchParams.delete("page");
+            window.location.replace(url.toString());
+          }, 450);
+        });
+      } else {
+        globalSearchInput.addEventListener("input", function () {
+          state.globalSearch = normalizeText(globalSearchInput.value);
+          applyTableState();
+        });
+      }
     }
 
     if (chipGroup && (chipRowPrimaryAttr || !isNaN(chipColumn))) {
@@ -400,10 +458,41 @@
       });
 
       if (input) {
-        input.addEventListener("input", function () {
-          state.columnFilters[columnIndex] = input.value;
-          applyTableState();
-        });
+        if (serverPaginated) {
+          var filterDebounce;
+          var params;
+          try {
+            params = new URLSearchParams(window.location.search);
+          } catch (e) {
+            params = null;
+          }
+          if (params) {
+            var initialVal = params.get("filter_" + columnIndex) || "";
+            if (initialVal) input.value = initialVal;
+          }
+          input.addEventListener("input", function () {
+            clearTimeout(filterDebounce);
+            filterDebounce = setTimeout(function () {
+              var urlVal = "";
+              try {
+                urlVal =
+                  new URLSearchParams(window.location.search).get(
+                    "filter_" + columnIndex
+                  ) || "";
+              } catch (e) {
+                urlVal = "";
+              }
+              var nextVal = (input.value || "").trim();
+              if (nextVal === urlVal) return;
+              navigateServerPaginatedFilter(columnIndex, nextVal);
+            }, 450);
+          });
+        } else {
+          input.addEventListener("input", function () {
+            state.columnFilters[columnIndex] = input.value;
+            applyTableState();
+          });
+        }
       }
 
       Array.prototype.slice.call(menu.querySelectorAll("[data-sort]")).forEach(function (button) {
@@ -425,7 +514,7 @@
       Array.prototype.slice.call(menu.querySelectorAll("[data-clear]")).forEach(function (button) {
         button.addEventListener("click", function () {
           if (serverPaginated) {
-            clearServerPaginatedSort(columnIndex);
+            clearServerPaginatedColumn(columnIndex);
             return;
           }
           if (input) input.value = "";
@@ -469,7 +558,11 @@
       initFloatingActionDropdowns(root);
     }
 
-    applyTableState();
+    if (serverPaginated) {
+      syncServerFilterInputs(filterHeaders);
+    } else {
+      applyTableState();
+    }
   }
 
   function autoInit() {

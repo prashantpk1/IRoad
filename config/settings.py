@@ -29,6 +29,14 @@ SECRET_KEY = config('SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=False, cast=bool)
 
+# Branded 400/403/404/500 pages (designer layout). On by default in all environments.
+# Set USE_CUSTOM_ERROR_PAGES=False in .env to restore Django yellow debug pages.
+USE_CUSTOM_ERROR_PAGES = config(
+    'USE_CUSTOM_ERROR_PAGES',
+    default=True,
+    cast=bool,
+)
+
 # ALLOWED_HOSTS: comma-separated; use explicit hostnames in production (never '*').
 # Leading dot = subdomain wildcard (e.g. `.trycloudflare.com` → any `*.trycloudflare.com`).
 _allowed_hosts_raw = config('ALLOWED_HOSTS', default='*', cast=str).strip()
@@ -110,6 +118,7 @@ SHARED_APPS = [
     'django.contrib.messages',
     'django.contrib.admin',
     'django.contrib.staticfiles',
+    'django.contrib.humanize',
     'django_celery_results',
     'django_celery_beat',
     'superadmin',
@@ -138,6 +147,7 @@ SHOW_PUBLIC_IF_NO_TENANT_FOUND = True
 DATABASE_ROUTERS = ('django_tenants.routers.TenantSyncRouter',)
 
 MIDDLEWARE = [
+    'iroad_frontend.middleware.CustomErrorPageMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django_tenants.middleware.main.TenantMainMiddleware',
     'superadmin.middleware.TenantApiSchemaMiddleware',

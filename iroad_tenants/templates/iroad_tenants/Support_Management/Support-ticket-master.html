@@ -87,6 +87,7 @@
       <div
         class="eal-table-card"
         data-eal-filterable-table
+        data-eal-server-paginated="1"
         data-eal-empty-colspan="10"
         data-eal-empty-filter-message="No support tickets match the selected search or column filters."
         data-eal-global-search-columns="1,2,3,4,5,6,7,8"
@@ -224,24 +225,7 @@
           </table>
         </div>
 
-        <div class="eal-pagination">
-          <div class="eal-pagination-info" data-eal-pagination-info>
-            Showing
-            <strong>{% if tickets %}1&ndash;{{ tickets|length }}{% else %}0{% endif %}</strong>
-            of
-            <strong>{{ tickets|length }}</strong>
-            support tickets
-          </div>
-          <div class="eal-pagination-controls">
-            <button class="eal-page-btn" type="button" title="Previous" disabled>
-              <i class="bi bi-chevron-left"></i>
-            </button>
-            <button class="eal-page-btn active" type="button">1</button>
-            <button class="eal-page-btn" type="button" title="Next" disabled>
-              <i class="bi bi-chevron-right"></i>
-            </button>
-          </div>
-        </div>
+        {% include 'iroad_tenants/partials/eal_list_pagination.html' with page_obj=tickets_page pagination_label='support tickets' %}
       </div>
 
 {% endblock %}

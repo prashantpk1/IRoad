@@ -1,0 +1,67 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="{{ lang|default:'en' }}" dir="{{ dir|default:'ltr' }}">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{ page_title }}</title>
+    <link rel="icon" href="{% static 'landing/images/favicon.png' %}" />
+    <link rel="preconnect" href="https://fonts.googleapis.com/" />
+    <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,200..800&amp;family=Manrope:wght@200..800&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="{% static 'landing/css/bootstrap.min.css' %}" />
+    <link rel="stylesheet" href="{% static 'landing/css/custom.css' %}" />
+  </head>
+  <body>
+    <div class="page-header bg-section parallaxie">
+      <div class="container">
+        <div class="row">
+          <div class="col-lg-12">
+            <div class="page-header-box">
+              <h1>{{ header_title }}</h1>
+              <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                  <li class="breadcrumb-item">
+                    <a href="{{ home_url }}">{{ home_label }}</a>
+                  </li>
+                  <li class="breadcrumb-item active" aria-current="page">
+                    {{ error_code }} Error
+                  </li>
+                </ol>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="error-page">
+      <div class="container">
+        <div class="row">
+          <div class="col-lg-12">
+            <div class="error-page-image">
+              <img
+                src="{% static 'landing/images/404-error-img.png' %}"
+                alt="{{ error_code }} error"
+              />
+            </div>
+            <div class="error-page-content">
+              <div class="section-title">
+                <h2>{{ heading }}</h2>
+              </div>
+              <div class="error-page-content-body">
+                <p>{{ message }}</p>
+                <a class="btn-default" href="{{ home_url }}">
+                  <span>{{ home_label }}</span>
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

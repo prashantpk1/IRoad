@@ -13,6 +13,31 @@ from tenant_workspace.models import DriverMaster, TenantUser, TruckMaster
 from iroad_tenants.forms_tenant_address import PublicCountryChoiceField
 
 
+def driver_current_assigned_truck(driver):
+    if not driver or not getattr(driver, 'pk', None):
+        return None
+    return (
+        TruckMaster.objects.filter(default_driver_id=driver)
+        .order_by('-updated_at')
+        .first()
+    )
+
+
+def driver_default_truck_queryset(*, driver=None, extra_truck_pks=None):
+    """Active trucks plus any currently assigned or submitted truck choices."""
+    qs = TruckMaster.active_objects.all()
+    extra_pks = {str(pk).strip() for pk in (extra_truck_pks or []) if pk}
+    if driver and driver.pk:
+        extra_pks.update(
+            str(pk)
+            for pk in TruckMaster.objects.filter(default_driver_id=driver)
+            .values_list('pk', flat=True)
+        )
+    if extra_pks:
+        qs = (qs | TruckMaster.objects.filter(pk__in=extra_pks)).distinct()
+    return qs.order_by('truck_code')
+
+
 class DriverMasterForm(forms.ModelForm):
     """
     Driver master create/edit. ``driver_code`` is never collected here (auto /
@@ -166,8 +191,16 @@ class DriverMasterForm(forms.ModelForm):
         if instance_user and instance_user.pk:
             self.fields['user_account_id'].initial = instance_user.pk
 
-        # Truck assignment lookup (optional, managed in view layer)
-        trucks_qs = TruckMaster.active_objects.all().order_by('truck_code')
+        # Truck assignment (optional; persisted via view after driver save)
+        extra_truck_pks = []
+        if self.is_bound:
+            submitted_truck = (self.data.get('default_truck_id') or '').strip()
+            if submitted_truck:
+                extra_truck_pks.append(submitted_truck)
+        trucks_qs = driver_default_truck_queryset(
+            driver=self.instance if self.instance.pk else None,
+            extra_truck_pks=extra_truck_pks,
+        )
         # Materialize once to avoid lazy server-side cursor issues at template render time.
         list(trucks_qs)
         self.fields['default_truck_id'] = forms.ModelChoiceField(
@@ -177,6 +210,12 @@ class DriverMasterForm(forms.ModelForm):
             empty_label=_('— Select Truck —'),
             widget=forms.Select(attrs={'class': 'form-select'}),
         )
+        self.fields['default_truck_id'].label_from_instance = (
+            lambda truck: f'{truck.truck_code} — {truck.plate_number}'
+        )
+        assigned_truck = driver_current_assigned_truck(self.instance)
+        if assigned_truck:
+            self.fields['default_truck_id'].initial = assigned_truck.pk
 
         self.fields.pop('nationality_country', None)
         country_pairs = self._build_country_choices()

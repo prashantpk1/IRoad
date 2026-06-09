@@ -91,6 +91,7 @@
       <div
         class="eal-table-card"
         data-eal-filterable-table
+        data-eal-server-paginated="1"
         data-eal-empty-colspan="9"
         data-eal-empty-filter-message="No attachments match the selected search/filter criteria."
         data-eal-global-search-columns="1,2,3,4,5,6,7"
@@ -100,7 +101,7 @@
           <div class="eal-toolbar-left">
             <div class="eal-search">
               <i class="bi bi-search"></i>
-              <input type="text" data-eal-global-search placeholder="Search attachments..." />
+              <input type="search" data-eal-global-search value="{{ search_q|default:'' }}" placeholder="Search attachments..." />
             </div>
             <div class="eal-chip-group">
               <button class="eal-chip active">All</button>
@@ -246,25 +247,7 @@
           </table>
         </div>
 
-        <!-- Pagination -->
-        <div class="eal-pagination">
-          <div class="eal-pagination-info">
-            Showing
-            <strong>{% if client_attachments_count %}1-{{ client_attachments_count }}{% else %}0-0{% endif %}</strong>
-            of
-            <strong>{{ client_attachments_count|default:0 }}</strong>
-            attachments
-          </div>
-          <div class="eal-pagination-controls">
-            <button class="eal-page-btn" title="Previous">
-              <i class="bi bi-chevron-left"></i>
-            </button>
-            <button class="eal-page-btn active">1</button>
-            <button class="eal-page-btn" title="Next">
-              <i class="bi bi-chevron-right"></i>
-            </button>
-          </div>
-        </div>
+        {% include 'iroad_tenants/partials/eal_list_pagination.html' with page_obj=client_attachments_page pagination_label='attachments' %}
       </div>
       <!-- ========== END NEW TABLE UI DESIGN ========== -->
 {% endblock %}

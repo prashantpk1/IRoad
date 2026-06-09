@@ -1,4 +1,5 @@
 import json
+import logging
 import uuid
 
 import redis
@@ -7,9 +8,24 @@ from datetime import timedelta
 from django.conf import settings
 from django.utils import timezone
 
+logger = logging.getLogger(__name__)
+
 
 def get_redis_client():
     return redis.from_url(settings.REDIS_URL, decode_responses=True)
+
+
+def _redis_call(action, fallback=None):
+    """Run a Redis operation; return fallback when Redis is unavailable."""
+    try:
+        return action()
+    except (redis.RedisError, OSError, ConnectionError) as exc:
+        logger.warning(
+            'Redis unavailable during %s (%s)',
+            action.__name__,
+            exc,
+        )
+        return fallback
 
 
 def redis_health_check():
@@ -228,16 +244,21 @@ def create_tenant_session(
 
 
 def refresh_tenant_session(tenant_id, jti, timeout_minutes):
-    client = get_redis_client()
-    key = f'tenant:{tenant_id}:session:{jti}'
-    data = client.get(key)
-    if not data:
-        return False
-    session_data = json.loads(data)
-    session_data['last_activity'] = timezone.now().isoformat()
-    ttl_seconds = max(60, int(timeout_minutes) * 60)
-    client.setex(key, ttl_seconds, json.dumps(session_data))
-    return True
+    def _refresh():
+        client = get_redis_client()
+        key = f'tenant:{tenant_id}:session:{jti}'
+        data = client.get(key)
+        if not data:
+            return False
+        session_data = json.loads(data)
+        session_data['last_activity'] = timezone.now().isoformat()
+        ttl_seconds = max(60, int(timeout_minutes) * 60)
+        client.setex(key, ttl_seconds, json.dumps(session_data))
+        return True
+
+    _refresh.__name__ = 'refresh_tenant_session'
+    # None = Redis unavailable (caller may fall back to JWT). False = session missing.
+    return _redis_call(_refresh, fallback=None)
 
 
 def revoke_tenant_session_key(tenant_id, jti):
@@ -330,8 +351,13 @@ def get_tenant_session(tenant_id, jti):
     """Get one tenant session payload by tenant id + jti."""
     if not tenant_id or not jti:
         return None
-    client = get_redis_client()
-    key = f'tenant:{tenant_id}:session:{jti}'
-    data = client.get(key)
-    return json.loads(data) if data else None
+
+    def _fetch():
+        client = get_redis_client()
+        key = f'tenant:{tenant_id}:session:{jti}'
+        data = client.get(key)
+        return json.loads(data) if data else None
+
+    _fetch.__name__ = 'get_tenant_session'
+    return _redis_call(_fetch, fallback=None)
 
