@@ -31,7 +31,7 @@ from mobile_api.permissions import (
 )
 from mobile_api.rbac import get_mobile_jwt_payload
 from mobile_api.throttling import MobileUserThrottle
-from mobile_api.utils.file_upload_handler import process_media_files
+from mobile_api.utils.file_upload_handler import merge_multipart_media_with_json_hints
 from mobile_api.views.base import MobileAPIView
 
 logger = logging.getLogger('mobile_api.execution')
@@ -59,17 +59,14 @@ class ExecuteActionAPIView(MobileAPIView):
         self._orchestrator = ExecuteActionOrchestrator()
 
     def post(self, request, job_type: str, job_id: str, action_code: str):
-        serializer_data = request.data
-        if any(str(k).startswith('media[') for k in request.FILES.keys()):
-            processed = process_media_files(
-                request.FILES,
-                request.data,
-                subfolder='evidence',
-            )
-            if processed:
-                merged_data = {k: request.data.get(k) for k in request.data.keys()}
-                merged_data['media'] = processed
-                serializer_data = merged_data
+        serializer_data = {key: request.data.get(key) for key in request.data.keys()}
+        processed_media = merge_multipart_media_with_json_hints(
+            request,
+            prefix='media',
+            subfolder='evidence',
+        )
+        if processed_media:
+            serializer_data['media'] = processed_media
 
         serializer = ExecuteActionRequestSerializer(data=serializer_data)
         if not serializer.is_valid():

@@ -8,12 +8,13 @@ from __future__ import annotations
 from typing import Any, TypedDict
 
 
-class ExecutionValidationErrorBody(TypedDict):
+class ExecutionValidationErrorBody(TypedDict, total=False):
     """Machine-readable validation failure returned to mobile clients."""
 
     error_code: str
     message: str
     refresh_required: bool
+    next_action_hint: dict[str, Any]
 
 
 def build_validation_error(
@@ -21,12 +22,16 @@ def build_validation_error(
     error_code: str,
     message: str,
     refresh_required: bool = True,
+    next_action_hint: dict[str, Any] | None = None,
 ) -> ExecutionValidationErrorBody:
-    return ExecutionValidationErrorBody(
+    body: ExecutionValidationErrorBody = ExecutionValidationErrorBody(
         error_code=(error_code or 'execute_validation_failed').strip(),
         message=(message or 'Validation failed.').strip(),
         refresh_required=bool(refresh_required),
     )
+    if next_action_hint:
+        body['next_action_hint'] = dict(next_action_hint)
+    return body
 
 
 def validation_error_as_details(body: ExecutionValidationErrorBody) -> dict[str, Any]:

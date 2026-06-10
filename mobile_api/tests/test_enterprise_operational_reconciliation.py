@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from unittest.mock import patch
 from uuid import uuid4
 
 from mobile_api.tests.transaction_test_case import TransactionTestCase
@@ -97,7 +98,8 @@ class HardPodExecuteIntegrationTests(TransactionTestCase):
             ExecutionValidationService().validate_pre_execute_after_idempotency(context)
         self.assertEqual(exc.exception.code, 'stale_workflow')
 
-    def test_hard_pod_execute_links_submission_to_action_log(self) -> None:
+    @patch('iroad_tenants.operation_runtime.pod_action.apply_a7h_hard_pod_physical_posting')
+    def test_hard_pod_execute_links_submission_to_action_log(self, _mock_a7h_posting) -> None:
         context = ExecuteActionContext(
             driver=self.driver,
             tenant_schema=self.tenant_schema,

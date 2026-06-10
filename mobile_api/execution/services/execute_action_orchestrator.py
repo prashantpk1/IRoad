@@ -41,6 +41,10 @@ from mobile_api.execution.services.execution_reconcile_service import (
 from mobile_api.execution.services.execution_response_service import (
     ExecutionResponseService,
 )
+from mobile_api.execution.services.a7_pod_evidence_resolver import (
+    prepare_a7_execute_evidence,
+    promote_merged_a7_media,
+)
 from mobile_api.execution.services.execution_validation_service import (
     ExecutionValidationService,
 )
@@ -229,6 +233,9 @@ class ExecuteActionOrchestrator:
             request=request,
             idempotency_keys=keys,
         )
+
+        # 7.5 A7 — merge fragmented POD captures (photo / video) before evidence checks
+        prepare_a7_execute_evidence(context, request=request)
 
         # 8. evidence + media security
         self._evidence_service.validate_required_evidence(context)
@@ -673,6 +680,12 @@ class ExecuteActionOrchestrator:
             )
         except PodCaptureError as exc:
             raise EvidenceValidationService._map_pod_capture_error(exc) from exc
+
+        promote_merged_a7_media(
+            context,
+            primary_bundle_id=bundle_id,
+            action_log=context.action_log,
+        )
 
         staging = EvidencePromotionService()._staging  # noqa: SLF001
         media_rows = staging.get_media(bundle_id)

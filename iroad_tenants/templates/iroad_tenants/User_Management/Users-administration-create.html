@@ -158,7 +158,7 @@
     </div>
 
     <!-- Security & Access -->
-    <div class="form-card" data-section="2">
+    <div class="form-card mt-4" data-section="2">
       <div class="form-card-header">
         <div class="form-card-icon green">
           <i class="bi bi-shield-lock"></i>
@@ -169,8 +169,11 @@
         </div>
       </div>
       <div class="form-card-body">
-        <div class="pod-status-grid">
-          <div class="pod-status-tile">
+        <p class="small text-uppercase fw-semibold text-secondary mb-3" style="letter-spacing: 0.06em">
+          Authentication Status
+        </p>
+        <div class="fields-grid cols-3">
+          <div class="field">
             <label class="form-label">Account Status</label>
             <p class="detail-view-value">
               <span class="status-badge {% if form_data.status == 'Active' %}active{% else %}pending{% endif %}">
@@ -183,7 +186,7 @@
             </p>
           </div>
           {% if is_deleted_user %}
-          <div class="pod-status-tile">
+          <div class="field">
             <label class="form-label">Account State</label>
             <p class="detail-view-value">
               <span class="status-badge pending">
@@ -191,13 +194,46 @@
               </span>
             </p>
           </div>
+          {% else %}
+          <div class="field">
+            <label class="form-label">Last Login</label>
+            <p class="detail-view-value">
+              {% if editing_user.last_login_at %}
+                {{ editing_user.last_login_at|date:'d M Y, h:i A' }}
+              {% else %}
+                N/A
+              {% endif %}
+            </p>
+          </div>
           {% endif %}
+          <div class="field">
+            <label class="form-label">Login Attempts</label>
+            <p class="detail-view-value">{{ editing_user.login_attempts|default:'0' }}</p>
+          </div>
         </div>
+        {% if is_deleted_user %}
+        <div class="fields-grid cols-2 mt-3">
+          <div class="field">
+            <label class="form-label">Deleted At</label>
+            <p class="detail-view-value">
+              {% if editing_user.deleted_at %}
+                {{ editing_user.deleted_at|date:'d M Y, h:i A' }}
+              {% else %}
+                &mdash;
+              {% endif %}
+            </p>
+          </div>
+          <div class="field">
+            <label class="form-label">Deleted By</label>
+            <p class="detail-view-value">{{ deleted_by_display|default:'—' }}</p>
+          </div>
+        </div>
+        {% endif %}
 
         <p class="small text-uppercase fw-semibold text-secondary mb-3 mt-4" style="letter-spacing: 0.06em">
           Role Assignment
         </p>
-        <div class="fields-grid cols-1">
+        <div class="fields-grid cols-2">
           <div class="field">
             <label class="form-label">System Roles</label>
             <p class="detail-view-value">
@@ -213,79 +249,6 @@
             </p>
           </div>
         </div>
-      </div>
-    </div>
-
-    <!-- System & Audit -->
-    <div class="form-card" data-section="3">
-      <div class="form-card-header">
-        <div class="form-card-icon amber">
-          <i class="bi bi-clock-history"></i>
-        </div>
-        <div class="form-card-header-text">
-          <h2 class="form-card-title">System &amp; Audit</h2>
-          <p class="form-card-desc">System generated tracking and logs.</p>
-        </div>
-      </div>
-      <div class="form-card-body">
-        <p class="small text-uppercase fw-semibold text-secondary mb-3" style="letter-spacing: 0.06em">
-          Audit Details
-        </p>
-        <div class="fields-grid cols-3">
-          <div class="field">
-            <label class="form-label">Last Login</label>
-            <p class="detail-view-value">
-              {% if editing_user and editing_user.last_login_at %}
-                {{ editing_user.last_login_at|date:'d M Y, h:i A' }}
-              {% else %}
-                N/A
-              {% endif %}
-            </p>
-          </div>
-          <div class="field">
-            <label class="form-label">Login Attempts</label>
-            <p class="detail-view-value">
-              {% if editing_user %}{{ editing_user.login_attempts }}{% else %}0{% endif %}
-            </p>
-          </div>
-          <div class="field">
-            <label class="form-label">Created By</label>
-            <p class="detail-view-value">
-              {% if editing_user and editing_user.created_by_label %}
-                {{ editing_user.created_by_label }}
-              {% else %}
-                {{ display_name }} (Tenant Admin)
-              {% endif %}
-            </p>
-          </div>
-        </div>
-
-        {% if editing_user %}
-        <div class="fields-grid cols-3" style="margin-top: 20px">
-          <div class="field">
-            <label class="form-label">Soft-deleted</label>
-            <p class="detail-view-value">
-              <span class="status-badge {% if editing_user.is_deleted %}pending{% else %}active{% endif %}">
-                {% if editing_user.is_deleted %}Yes{% else %}No{% endif %}
-              </span>
-            </p>
-          </div>
-          <div class="field">
-            <label class="form-label">Deleted at</label>
-            <p class="detail-view-value">
-              {% if editing_user.deleted_at %}
-                {{ editing_user.deleted_at|date:'d M Y, h:i A' }}
-              {% else %}
-                &mdash;
-              {% endif %}
-            </p>
-          </div>
-          <div class="field">
-            <label class="form-label">Deleted by</label>
-            <p class="detail-view-value">{{ deleted_by_display|default:'—' }}</p>
-          </div>
-        </div>
-        {% endif %}
       </div>
     </div>
   </div>
@@ -354,65 +317,46 @@
       </div>
     </div>
 
-    <!-- Activity Log -->
-    <div class="form-card">
+    <!-- System & Audit -->
+    <div class="form-card mt-4">
       <div class="form-card-header">
         <div class="form-card-icon amber">
           <i class="bi bi-clock-history"></i>
         </div>
         <div class="form-card-header-text">
-          <h2 class="form-card-title">Activity Log</h2>
+          <h2 class="form-card-title">System &amp; Audit</h2>
+          <p class="form-card-desc">Historical activity and audit trail for this user account.</p>
         </div>
       </div>
       <div class="form-card-body">
+        <p class="small text-uppercase fw-semibold text-secondary mb-3" style="letter-spacing: 0.06em">
+          Activity History
+        </p>
         <div style="display: flex; flex-direction: column; gap: 16px">
-          {% if editing_user.is_deleted %}
+          {% for item in activity_log %}
           <div style="display: flex; gap: 12px; align-items: flex-start">
-            <div style="width: 8px; height: 8px; border-radius: 50%; background: #dc3545; margin-top: 6px; flex-shrink: 0"></div>
+            <div
+              style="
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                background: {{ item.color }};
+                margin-top: 6px;
+                flex-shrink: 0;
+              "
+            ></div>
             <div>
-              <div style="font-size: 13px; font-weight: 600; color: #333">Soft-deleted</div>
+              <div style="font-size: 13px; font-weight: 600; color: #333">{{ item.title }}</div>
               <div style="font-size: 12px; color: #888">
-                {% if editing_user.deleted_at %}{{ editing_user.deleted_at|date:'d M Y, g:i A' }}{% else %}—{% endif %}
-                &mdash; {{ deleted_by_display|default:'System' }}
+                {{ item.timestamp|date:'d M Y, g:i A' }}
+                {% if item.actor %}&mdash; {{ item.actor }}{% endif %}
+                {% if item.note %}<br>{{ item.note }}{% endif %}
               </div>
             </div>
           </div>
-          {% endif %}
-
-          {% if editing_user.last_login_at %}
-          <div style="display: flex; gap: 12px; align-items: flex-start">
-            <div style="width: 8px; height: 8px; border-radius: 50%; background: #0d6efd; margin-top: 6px; flex-shrink: 0"></div>
-            <div>
-              <div style="font-size: 13px; font-weight: 600; color: #333">Last Login</div>
-              <div style="font-size: 12px; color: #888">
-                {{ editing_user.last_login_at|date:'d M Y, g:i A' }}
-              </div>
-            </div>
-          </div>
-          {% endif %}
-
-          {% if editing_user.updated_at and editing_user.updated_at != editing_user.created_at %}
-          <div style="display: flex; gap: 12px; align-items: flex-start">
-            <div style="width: 8px; height: 8px; border-radius: 50%; background: #28a745; margin-top: 6px; flex-shrink: 0"></div>
-            <div>
-              <div style="font-size: 13px; font-weight: 600; color: #333">Updated</div>
-              <div style="font-size: 12px; color: #888">
-                {{ editing_user.updated_at|date:'d M Y, g:i A' }} &mdash; User record was modified.
-              </div>
-            </div>
-          </div>
-          {% endif %}
-
-          <div style="display: flex; gap: 12px; align-items: flex-start">
-            <div style="width: 8px; height: 8px; border-radius: 50%; background: var(--primary-color); margin-top: 6px; flex-shrink: 0"></div>
-            <div>
-              <div style="font-size: 13px; font-weight: 600; color: #333">Created</div>
-              <div style="font-size: 12px; color: #888">
-                {% if editing_user.created_at %}{{ editing_user.created_at|date:'d M Y, g:i A' }}{% endif %}
-                {% if editing_user.created_by_label %}&mdash; {{ editing_user.created_by_label }}{% endif %}
-              </div>
-            </div>
-          </div>
+          {% empty %}
+          <div class="text-muted">No activity recorded yet for this user.</div>
+          {% endfor %}
         </div>
       </div>
     </div>
@@ -632,75 +576,6 @@
                                     {% endif %}
                                 </div>
                             </div>
-                        </div>
-                    </div>
-                </div>
-
-  <div class="form-card" data-section="3">
-                    <div class="form-card-header">
-                        <div class="form-card-icon amber">
-                            <i class="bi bi-clock-history"></i>
-                        </div>
-                        <div class="form-card-header-text">
-                            <h2 class="form-card-title">System &amp; Audit</h2>
-                            <p class="form-card-desc">System generated tracking and logs.</p>
-                        </div>
-                    </div>
-                    <div class="form-card-body">
-                        <div class="field-group">
-                            <h3 class="field-group-title">
-                                <i class="bi bi-journal-text"></i>
-                                Audit Details
-                            </h3>
-                            <div class="fields-grid cols-3">
-                                <div class="field">
-                                    <label class="form-label">Last Login</label>
-                                    <div class="input-icon-wrapper">
-                                        <i class="bi bi-box-arrow-in-right"></i>
-                                        <input type="text" class="form-control has-icon bg-light" value="{% if editing_user and editing_user.last_login_at %}{{ editing_user.last_login_at|date:'d M Y, h:i A' }}{% else %}N/A (New User){% endif %}" readonly/>
-                                    </div>
-                                </div>
-                                <div class="field">
-                                    <label class="form-label">Login Attempts</label>
-                                    <div class="input-icon-wrapper">
-                                        <i class="bi bi-123"></i>
-                                        <input type="text" class="form-control has-icon bg-light" value="{% if editing_user %}{{ editing_user.login_attempts }}{% else %}0{% endif %}" readonly/>
-                                    </div>
-                                    <span class="field-hint">Auto-resets on successful login</span>
-                                </div>
-                                <div class="field">
-                                    <label class="form-label">Created By</label>
-                                    <div class="input-icon-wrapper">
-                                        <i class="bi bi-person-badge"></i>
-                                        <input type="text" class="form-control has-icon bg-light" value="{% if editing_user and editing_user.created_by_label %}{{ editing_user.created_by_label }}{% else %}{{ display_name }} (Tenant Admin){% endif %}" readonly/>
-                                    </div>
-                                </div>
-                            </div>
-                            {% if editing_user %}
-                            <div class="fields-grid cols-3 mt-3">
-                                <div class="field">
-                                    <label class="form-label">Soft-deleted</label>
-                                    <div class="input-icon-wrapper">
-                                        <i class="bi bi-trash"></i>
-                                        <input type="text" class="form-control has-icon bg-light" value="{% if editing_user.is_deleted %}Yes{% else %}No{% endif %}" readonly/>
-                                    </div>
-                                </div>
-                                <div class="field">
-                                    <label class="form-label">Deleted at</label>
-                                    <div class="input-icon-wrapper">
-                                        <i class="bi bi-calendar-x"></i>
-                                        <input type="text" class="form-control has-icon bg-light" value="{% if editing_user.deleted_at %}{{ editing_user.deleted_at|date:'d M Y, h:i A' }}{% else %}—{% endif %}" readonly/>
-                                    </div>
-                                </div>
-                                <div class="field">
-                                    <label class="form-label">Deleted by</label>
-                                    <div class="input-icon-wrapper">
-                                        <i class="bi bi-person-x"></i>
-                                        <input type="text" class="form-control has-icon bg-light" value="{{ deleted_by_display|default:'—' }}" readonly/>
-                                    </div>
-                                </div>
-                            </div>
-                            {% endif %}
                         </div>
                     </div>
                 </div>

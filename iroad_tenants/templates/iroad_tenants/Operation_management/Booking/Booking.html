@@ -1065,6 +1065,12 @@
           { value: "{{ d.driver_id }}", label: "{{ d.driver_code|escapejs }} - {{ d.arabic_name|escapejs }}" },
           {% endfor %}
         ];
+        var savedPriceListId = "{{ booking_form_data.sales_order_no|default:''|escapejs }}";
+        var savedServiceLookup = "{{ booking_form_data.service_lookup|default:''|escapejs }}";
+        var savedRouteLookup = "{{ booking_form_data.route_lookup|default:''|escapejs }}";
+        var restoreSavedBookingLookups = Boolean(
+          savedPriceListId || savedServiceLookup || savedRouteLookup,
+        );
         var selectedBookingLineTruck = "{{ booking_form_data.booking_line_truck_1|default:''|escapejs }}";
         var selectedBookingLineDriver = "{{ booking_form_data.booking_line_driver_1|default:''|escapejs }}";
         var selectedBookingLineCod = "{{ booking_form_data.booking_line_cod_amount_1|default:''|escapejs }}";
@@ -1136,7 +1142,12 @@
         function applyPriceListFilter() {
           if (!clientAccountSelect || !priceListSelect) return;
           var selectedClientId = clientAccountSelect.value || "";
-          var previousPriceList = priceListSelect.value || "";
+          var previousPriceList = priceListSelect.value
+            || (restoreSavedBookingLookups ? savedPriceListId : "")
+            || "";
+          var previousService = serviceSelect
+            ? (serviceSelect.value || (restoreSavedBookingLookups ? savedServiceLookup : "") || "")
+            : (restoreSavedBookingLookups ? savedServiceLookup : "") || "";
           var visibleCount = 0;
           Array.prototype.forEach.call(priceListSelect.options, function (opt, idx) {
             if (idx === 0) {
@@ -1162,24 +1173,27 @@
             : null;
           if (!priceListSelect.disabled && previousPriceOption && !previousPriceOption.hidden) {
             priceListSelect.value = previousPriceList;
-            applyServiceFilter();
+            applyServiceFilter(previousService);
             deriveSellPrice();
           } else {
             resetSelectToPlaceholder(priceListSelect);
           }
           if (!priceListSelect.disabled && priceListSelect.selectedIndex <= 0 && autoSelectSingleVisibleOption(priceListSelect)) {
-            applyServiceFilter();
+            applyServiceFilter(previousService);
             deriveSellPrice();
           } else if (priceListSelect.selectedIndex <= 0 && sellPriceInput) {
             sellPriceInput.value = "";
           }
-          applyRouteFilter();
+          applyRouteFilter(restoreSavedBookingLookups ? savedRouteLookup : "");
         }
 
-        function applyServiceFilter() {
+        function applyServiceFilter(forcedPreviousService) {
           if (!priceListSelect || !serviceSelect) return;
           var selectedPriceListId = priceListSelect.value || "";
-          var previousService = serviceSelect.value || "";
+          var previousService = forcedPreviousService
+            || serviceSelect.value
+            || (restoreSavedBookingLookups ? savedServiceLookup : "")
+            || "";
           var visibleCount = 0;
           Array.prototype.forEach.call(serviceSelect.options, function (opt, idx) {
             if (idx === 0) {
@@ -1201,17 +1215,17 @@
             : null;
           if (!serviceSelect.disabled && previousServiceOption && !previousServiceOption.hidden) {
             serviceSelect.value = previousService;
-            applyRouteFilter();
+            applyRouteFilter(restoreSavedBookingLookups ? savedRouteLookup : "");
             deriveSellPrice();
           } else {
             resetSelectToPlaceholder(serviceSelect);
-            applyRouteFilter();
+            applyRouteFilter(restoreSavedBookingLookups ? savedRouteLookup : "");
           }
           if (!serviceSelect.disabled && serviceSelect.selectedIndex <= 0 && autoSelectSingleVisibleOption(serviceSelect)) {
-            applyRouteFilter();
+            applyRouteFilter(restoreSavedBookingLookups ? savedRouteLookup : "");
             deriveSellPrice();
           } else if (serviceSelect.selectedIndex <= 0) {
-            applyRouteFilter();
+            applyRouteFilter(restoreSavedBookingLookups ? savedRouteLookup : "");
             if (sellPriceInput) {
               sellPriceInput.value = "";
             }
@@ -1879,7 +1893,7 @@
           return serviceSelect.options[serviceSelect.selectedIndex];
         }
 
-        function applyRouteFilter() {
+        function applyRouteFilter(forcedPreviousRoute) {
           if (!routeSelect || !serviceSelect) return;
           var selectedOption = getSelectedServiceOption();
           var hasServiceSelected = Boolean(selectedOption);
@@ -1890,7 +1904,10 @@
             ? (selectedOption.getAttribute("data-route-id") || "").trim()
             : "";
           var restrictToServiceRoute = serviceType === "Trip" && Boolean(serviceRouteId);
-          var previousRoute = routeSelect.value || "";
+          var previousRoute = forcedPreviousRoute
+            || routeSelect.value
+            || (restoreSavedBookingLookups ? savedRouteLookup : "")
+            || "";
           var visibleCount = 0;
 
           Array.prototype.forEach.call(routeSelect.options, function (opt, idx) {
@@ -1962,9 +1979,13 @@
         }
 
         if (clientAccountSelect && priceListSelect && serviceSelect) {
-          priceListSelect.disabled = true;
-          serviceSelect.disabled = true;
-          applyRouteFilter();
+          if (!clientAccountSelect.value) {
+            priceListSelect.disabled = true;
+            serviceSelect.disabled = true;
+            if (routeSelect) {
+              routeSelect.disabled = true;
+            }
+          }
           clientAccountSelect.addEventListener("change", applyPriceListFilter);
           priceListSelect.addEventListener("change", function () {
             applyServiceFilter();
@@ -1986,15 +2007,8 @@
           applyAddressAndCargoFilter();
           if (clientAccountSelect.value) {
             applyPriceListFilter();
-            if (priceListSelect.value) {
-              applyServiceFilter();
-            }
-            if (serviceSelect.value) {
-              syncRouteFromService();
-            } else if (tripTypeSelect && tripTypeSelect.value) {
-              rebuildBookingLines();
-            }
             deriveSellPrice();
+            restoreSavedBookingLookups = false;
           } else if (tripTypeSelect && tripTypeSelect.value) {
             rebuildBookingLines();
           }

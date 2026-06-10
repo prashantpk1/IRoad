@@ -8,6 +8,7 @@ from __future__ import annotations
 from typing import Any
 
 from django.db import transaction
+from django_tenants.utils import schema_context
 
 from mobile_api.execution.exceptions import ExecuteActionError
 from mobile_api.hard_pod.guards.hard_pod_replay_guard import HardPodReplayGuard
@@ -121,6 +122,17 @@ class HardPodExecuteIntegrationService:
             self._attach_submission(context, submission, action_log_id)
             return submission
 
+        confirmed_pages = self._confirmed_pages_payload(submission)
+
+        # Tenant DN tables first — public custody row is promoted only after posting succeeds.
+        with schema_context(tenant_schema):
+            self._apply_physical_posting(
+                action_log=action_log,
+                shipment=shipment,
+                confirmed_pages=confirmed_pages,
+                tenant_schema=tenant_schema,
+            )
+
         with transaction.atomic():
             submission.promoted_at = submission.promoted_at or getattr(action_log, 'log_date', None)
             submission.promotion_action_log_id = action_log_id
@@ -174,6 +186,38 @@ class HardPodExecuteIntegrationService:
                 return existing
 
         return None
+
+    @staticmethod
+    def _confirmed_pages_payload(submission: HardPODCustodySubmission) -> list[dict[str, Any]]:
+        return [
+            {
+                'page_id': (row.page_id or '').strip(),
+                'document_id': (row.document_id or '').strip(),
+                'line_no': row.line_no,
+                'physical_page_no': row.physical_page_no,
+                'label': (row.label or '').strip(),
+            }
+            for row in submission.confirmed_pages.order_by('line_no', 'created_at')
+        ]
+
+    @staticmethod
+    def _apply_physical_posting(
+        *,
+        action_log: Any,
+        shipment: Any,
+        confirmed_pages: list[dict[str, Any]],
+        tenant_schema: str = '',
+    ) -> None:
+        from iroad_tenants.operation_runtime.pod_action import (
+            apply_a7h_hard_pod_physical_posting,
+        )
+
+        apply_a7h_hard_pod_physical_posting(
+            action_log=action_log,
+            shipment=shipment,
+            confirmed_pages=confirmed_pages,
+            tenant_schema=(tenant_schema or '').strip(),
+        )
 
     def _attach_submission(self, context: Any, submission: HardPODCustodySubmission, action_log_id: str) -> None:
         context.resolver_meta = dict(getattr(context, 'resolver_meta', None) or {})

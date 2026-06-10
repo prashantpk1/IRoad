@@ -148,6 +148,34 @@ class ExecutionValidationTests(SimpleTestCase):
         self.assertTrue(exc.exception.refresh_required)
         self.assertEqual(exc.exception.validation_error['error_code'], 'action_not_allowed')
 
+    def test_forbidden_action_includes_next_action_hint(self):
+        ctx = _context(action_code='A7')
+        ctx.workflow = {'allowed_actions': [], 'current_stage': 'Completed'}
+        ctx.pod_cod = {'pod_pending': False, 'pod_compliant': True}
+        ctx.shipment = SimpleNamespace(
+            shipment_status='Closed',
+            order_type='COD',
+        )
+        action = SimpleNamespace(action_code='A7', pk='act-7')
+        svc = ExecutionValidationService(operation_action_model=MagicMock())
+        svc._operation_action_model.objects.filter.return_value.first.return_value = action
+
+        p_replay, p_keys, p_overlay, p_issues = _validation_patches()
+        with p_replay, p_keys, p_overlay, p_issues, patch.object(
+            OperationExecutionService,
+            'validate_operation_action_allowed',
+            return_value=None,
+        ), patch.object(
+            svc,
+            '_action_in_allowed_list',
+            return_value=False,
+        ):
+            with self.assertRaises(ExecuteActionError) as exc:
+                svc.validate_action_master(ctx)
+        hint = exc.exception.validation_error.get('next_action_hint') or {}
+        self.assertEqual(hint.get('action'), 'go_to_dashboard')
+        self.assertTrue(hint.get('job_closed'))
+
     def test_stale_content_hash(self):
         ctx = _context(
             payload={

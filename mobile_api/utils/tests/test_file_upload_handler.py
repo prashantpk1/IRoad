@@ -23,13 +23,32 @@ class InferMediaTypeTests(TestCase):
             'video',
         )
 
-    def test_respects_explicit_photo(self):
+    def test_video_extension_overrides_wrong_explicit_photo(self):
         self.assertEqual(
             infer_media_type(
                 explicit='photo',
                 file_ref='mobile/pod_evidence/abc.mp4',
             ),
+            'video',
+        )
+
+    def test_respects_explicit_photo_for_image_extension(self):
+        self.assertEqual(
+            infer_media_type(
+                explicit='photo',
+                file_ref='mobile/pod_evidence/abc.jpg',
+            ),
             'photo',
+        )
+
+    def test_duration_seconds_implies_video(self):
+        self.assertEqual(
+            infer_media_type(
+                explicit='photo',
+                file_ref='mobile/pod_evidence/clip',
+                duration_seconds=5,
+            ),
+            'video',
         )
 
     def test_infers_video_from_explicit_token(self):

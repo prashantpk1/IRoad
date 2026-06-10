@@ -32,6 +32,7 @@ from mobile_api.hard_pod.services.hard_pod_execute_integration import (
 )
 from mobile_api.job_detail.projections.workflow_projection import build_workflow_section
 from mobile_api.execution.services.execution_context_adapter import to_job_detail_context
+from mobile_api.utils.next_action_hint_builder import build_next_action_hint
 from tenant_workspace.models import TenantOperationAction
 
 
@@ -137,11 +138,17 @@ class ExecutionValidationService:
                 booking_item_type=self._booking_item_type(context),
             )
             if policy_error:
-                raise self._forbidden_action(policy_error)
+                raise self._forbidden_action(
+                    policy_error,
+                    context=context,
+                    request=request,
+                )
 
             if not self._action_in_allowed_list(context, operation_action, request=request):
                 raise self._forbidden_action(
                     str(_('mobile.jobs.execute.action_not_allowed')),
+                    context=context,
+                    request=request,
                 )
 
     def resolve_operation_action(self, context: ExecuteActionContext) -> Any:
@@ -268,11 +275,42 @@ class ExecutionValidationService:
         return str(getattr(context.shipment, 'booking_item_type', '') or '').strip()
 
     @staticmethod
-    def _forbidden_action(message: str) -> ExecuteActionError:
+    def _build_next_action_hint_for_context(
+        context: ExecuteActionContext,
+        *,
+        request: Any | None = None,
+    ) -> dict[str, Any]:
+        _ = request
+        order_type = ''
+        if context.shipment is not None:
+            order_type = str(getattr(context.shipment, 'order_type', '') or '')
+        return build_next_action_hint(
+            workflow=dict(context.workflow or {}),
+            pod_cod=dict(context.pod_cod or {}),
+            action_code=context.action_code,
+            order_type=order_type,
+            shipment=context.shipment,
+            booking=context.booking,
+        )
+
+    @staticmethod
+    def _forbidden_action(
+        message: str,
+        *,
+        context: ExecuteActionContext | None = None,
+        request: Any | None = None,
+    ) -> ExecuteActionError:
+        next_hint: dict[str, Any] | None = None
+        if context is not None:
+            next_hint = ExecutionValidationService._build_next_action_hint_for_context(
+                context,
+                request=request,
+            )
         body = build_validation_error(
             error_code='action_not_allowed',
             message=message,
             refresh_required=True,
+            next_action_hint=next_hint,
         )
         return ExecuteActionError(
             message,

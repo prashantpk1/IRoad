@@ -161,7 +161,7 @@ def mobile_exception_handler(exc, context):
 
     logger.exception(
         'Unhandled Mobile API exception: %s',
-        str(exc),
+        exc.__class__.__name__,
         extra={
             'view': context.get('view'),
             'request': context.get('request'),

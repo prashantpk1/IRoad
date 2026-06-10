@@ -159,8 +159,12 @@
       {% endif %}
     </div>
     <div class="form-actions-right">
-      <a href="{% url 'iroad_tenants:tenant_roles_permissions' %}" class="eal-btn eal-btn-outline">{% if is_view_mode %}Back{% else %}Cancel{% endif %}</a>
-      {% if not is_view_mode %}
+      {% if is_view_mode and editing_role %}
+      <a href="{% url 'iroad_tenants:tenant_roles_permissions_edit' editing_role.role_id %}" class="eal-btn eal-btn-primary">
+        <i class="bi bi-pencil-square"></i><span>Edit Role</span>
+      </a>
+      {% else %}
+      <a href="{% url 'iroad_tenants:tenant_roles_permissions' %}" class="eal-btn eal-btn-outline">Cancel</a>
       <button type="submit" class="eal-btn eal-btn-primary"><i class="bi bi-check2-circle"></i><span>{% if is_edit_mode %}Update Role{% else %}Save Role{% endif %}</span></button>
       {% endif %}
     </div>

@@ -165,6 +165,32 @@ class AutoAttachPodBundleTests(SimpleTestCase):
         self.assertEqual(bundle_id, 'bundle-ready-1')
         self.assertEqual(ctx.payload['capture_bundle_id'], 'bundle-ready-1')
 
+    def test_auto_attach_when_media_rows_are_placeholders_only(self) -> None:
+        ctx = ExecuteActionContext(
+            driver=_driver(),
+            tenant_schema='tenant_a',
+            user_id='u1',
+            job_type='shipment',
+            job_id='ship-1',
+            action_code='A7',
+            payload={
+                'latitude': '25.0',
+                'longitude': '55.0',
+                'media': [{'media_type': 'photo'}, {'media_type': 'video'}],
+            },
+        )
+        ctx.shipment = _shipment()
+        ctx.operation_action = SimpleNamespace(action_code='A7', auto_pod_post=True)
+        service = EvidenceValidationService()
+        with patch.object(
+            service,
+            '_find_latest_ready_pod_bundle_id',
+            return_value='bundle-from-capture',
+        ):
+            bundle_id = service._auto_attach_staged_pod_bundle(ctx)
+        self.assertEqual(bundle_id, 'bundle-from-capture')
+        self.assertEqual(ctx.payload['capture_bundle_id'], 'bundle-from-capture')
+
     def test_does_not_override_explicit_capture_bundle_id(self) -> None:
         ctx = ExecuteActionContext(
             driver=_driver(),
@@ -211,6 +237,16 @@ class EvidencePodBundleValidationTests(SimpleTestCase):
                     client_capture_id=self.scope.client_capture_id,
                     media_type='photo',
                     file_ref=f'{self.scope.storage_prefix()}p.jpg',
+                ),
+                PODCaptureMedia(
+                    media_id='m2',
+                    bundle_id=self.bundle.bundle_id,
+                    shipment_id=self.scope.shipment_id,
+                    driver_id=self.scope.driver_id,
+                    tenant_schema=self.scope.tenant_schema,
+                    client_capture_id=self.scope.client_capture_id,
+                    media_type='video',
+                    file_ref=f'{self.scope.storage_prefix()}clip.mp4',
                 ),
             ],
         )
@@ -304,18 +340,30 @@ class ExecutePodBundleOrchestratorTests(TransactionTestCase):
         )
         self.bundle = _ready_bundle(self.scope)
         self.store.save_bundle(self.bundle)
-        media = PODCaptureMedia(
-            media_id='m1',
-            bundle_id=self.bundle.bundle_id,
-            shipment_id=self.scope.shipment_id,
-            driver_id=self.scope.driver_id,
-            tenant_schema=self.scope.tenant_schema,
-            client_capture_id=self.scope.client_capture_id,
-            media_type='photo',
-            file_ref=f'{self.scope.storage_prefix()}p.jpg',
-        )
-        self.store.save_media(self.bundle.bundle_id, [media])
-        self.store.register_file_refs([media], replace_bundle_id=self.bundle.bundle_id)
+        media = [
+            PODCaptureMedia(
+                media_id='m1',
+                bundle_id=self.bundle.bundle_id,
+                shipment_id=self.scope.shipment_id,
+                driver_id=self.scope.driver_id,
+                tenant_schema=self.scope.tenant_schema,
+                client_capture_id=self.scope.client_capture_id,
+                media_type='photo',
+                file_ref=f'{self.scope.storage_prefix()}p.jpg',
+            ),
+            PODCaptureMedia(
+                media_id='m2',
+                bundle_id=self.bundle.bundle_id,
+                shipment_id=self.scope.shipment_id,
+                driver_id=self.scope.driver_id,
+                tenant_schema=self.scope.tenant_schema,
+                client_capture_id=self.scope.client_capture_id,
+                media_type='video',
+                file_ref=f'{self.scope.storage_prefix()}clip.mp4',
+            ),
+        ]
+        self.store.save_media(self.bundle.bundle_id, media)
+        self.store.register_file_refs(media, replace_bundle_id=self.bundle.bundle_id)
 
         # Promotion audit rows have a FK to the durable ORM bundle row.
         # These orchestrator tests are wired with in-memory staging, so we

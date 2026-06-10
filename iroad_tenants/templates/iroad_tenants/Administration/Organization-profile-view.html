@@ -169,7 +169,7 @@
             </div>
             {% endif %}
           </div>
-         
+
         </div>
       </div>
     </div>
@@ -374,7 +374,7 @@
         <div class="fields-grid cols-2">
           <div class="field">
             <label for="baseCurrency" class="form-label"
-              >Base Currency</label
+              >System Currency</label
             >
             <input
               type="text"
@@ -385,7 +385,7 @@
               readonly
             />
           </div>
-          <div class="field">
+          <!--<div class="field">
             <label for="secondaryCurrency" class="form-label"
               >Secondary Currency</label
             >
@@ -395,7 +395,7 @@
               <option value="{{ currency.currency_code }}" {% if org.secondary_currency_code == currency.currency_code %}selected{% endif %}>{{ currency.currency_code }} – {{ currency.name_en }}</option>
               {% endfor %}
             </select>
-          </div>
+          </div>-->
           <div class="field">
             <label for="systemLanguage" class="form-label"
               >System Language</label

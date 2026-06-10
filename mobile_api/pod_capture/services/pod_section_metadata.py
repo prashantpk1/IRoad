@@ -43,10 +43,19 @@ def _shipment_has_delivery_note(shipment: Any | None, *, tenant_schema: str) -> 
         with schema_context(schema):
             from tenant_workspace.models import TenantShipmentDocument
 
-            return TenantShipmentDocument.objects.filter(
-                shipment_id=getattr(shipment, 'pk', None),
+            shipment_pk = getattr(shipment, 'pk', None)
+            if TenantShipmentDocument.objects.filter(
+                shipment_id=shipment_pk,
                 is_delivery_note=True,
-            ).exists()
+            ).exists():
+                return True
+            booking_id = getattr(shipment, 'booking_id', None)
+            if booking_id:
+                return TenantShipmentDocument.objects.filter(
+                    booking_id=booking_id,
+                    is_delivery_note=True,
+                ).exists()
+            return False
     except Exception:
         return False
 

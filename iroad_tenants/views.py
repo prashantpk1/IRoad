@@ -11933,6 +11933,17 @@ def _tenant_booking_form_options_context(tenant_registry, booking=None, form_dat
             status=TenantServiceItemMaster.Status.ACTIVE,
         ).order_by('service_code')
     )
+    if booking is not None and booking.service_item_id:
+        saved_service_ids = {item.service_item_id for item in service_items}
+        if booking.service_item_id not in saved_service_ids:
+            saved_service = (
+                TenantServiceItemMaster.objects.filter(pk=booking.service_item_id).first()
+                if has_table('tenant_service_item_master')
+                else None
+            )
+            if saved_service is not None:
+                service_items.append(saved_service)
+                service_items.sort(key=lambda item: item.service_code or '')
     routes = []
     if has_table('tenant_route_master') and has_table('tenant_location_master'):
         routes = list(
@@ -11941,6 +11952,20 @@ def _tenant_booking_form_options_context(tenant_registry, booking=None, form_dat
                 'destination_point',
             ).order_by('route_code')
         )
+        if booking is not None and booking.route_id:
+            saved_route_ids = {route.route_id for route in routes}
+            if booking.route_id not in saved_route_ids:
+                saved_route = (
+                    TenantRouteMaster.objects.select_related(
+                        'origin_point',
+                        'destination_point',
+                    )
+                    .filter(pk=booking.route_id)
+                    .first()
+                )
+                if saved_route is not None:
+                    routes.append(saved_route)
+                    routes.sort(key=lambda route: route.route_code or '')
 
     loading_addresses = []
     delivery_addresses = []
@@ -11987,9 +12012,22 @@ def _tenant_booking_form_options_context(tenant_registry, booking=None, form_dat
         for service_id in service_ids:
             service_item_price_lists.setdefault(service_id, set()).add(price_list_id)
 
+    booking_price_list_id = (
+        str(booking.price_list_id)
+        if booking is not None and booking.price_list_id
+        else ''
+    )
+    booking_service_id = (
+        str(booking.service_item_id)
+        if booking is not None and booking.service_item_id
+        else ''
+    )
     booking_service_options = []
     for service_item in service_items:
         service_key = str(service_item.service_item_id)
+        linked_price_list_ids = set(service_item_price_lists.get(service_key, set()))
+        if booking_price_list_id and service_key == booking_service_id:
+            linked_price_list_ids.add(booking_price_list_id)
         booking_service_options.append(
             {
                 'service_item_id': service_key,
@@ -11998,7 +12036,7 @@ def _tenant_booking_form_options_context(tenant_registry, booking=None, form_dat
                 'service_type': service_item.service_type,
                 'route_id': str(service_item.route_id or ''),
                 'base_sell_price': str(service_item.sell_price or '0'),
-                'price_list_ids_csv': ','.join(sorted(list(service_item_price_lists.get(service_key, set())))),
+                'price_list_ids_csv': ','.join(sorted(linked_price_list_ids)),
             }
         )
 
@@ -13352,11 +13390,14 @@ def _tenant_booking_display_status(booking_status):
 def _tenant_booking_route_from_lookup(route_lookup):
     route_lookup = (route_lookup or '').strip()
     route_id, route_direction = (route_lookup.split('|', 1) + ['forward'])[:2] if route_lookup else ('', 'forward')
-    route = TenantRouteMaster.objects.filter(route_id=route_id).select_related(
-        'origin_point',
-        'destination_point',
-    ).first()
+    route = None
     route_display = ''
+    route_uuid = _coerce_uuid(route_id)
+    if route_uuid is not None:
+        route = TenantRouteMaster.objects.filter(route_id=route_uuid).select_related(
+            'origin_point',
+            'destination_point',
+        ).first()
     if route:
         forward_label = f'{route.origin_point.display_label} To {route.destination_point.display_label}'
         reverse_label = f'{route.destination_point.display_label} To {route.origin_point.display_label}'
@@ -14196,7 +14237,8 @@ class TenantOperationBookingEditView(View):
                 'client_account',
                 'price_list',
                 'service_item',
-                'route',
+                'route__origin_point',
+                'route__destination_point',
             )
             .filter(pk=booking_id)
             .first()
@@ -28885,11 +28927,11 @@ class TenantMyAccountView(View):
             return response
 
         tenant = context['tenant']
-        
+
         # Personal Info (Only name and password are now editable)
         first_name = request.POST.get('first_name', '').strip()
         last_name = request.POST.get('last_name', '').strip()
-        
+
         # Password Change
         password = request.POST.get('password', '')
 
@@ -28903,13 +28945,13 @@ class TenantMyAccountView(View):
             # Update Names
             tenant.first_name = first_name
             tenant.last_name = last_name
-            
+
             # Update Password if provided
             if password:
                 tenant.portal_bootstrap_password_hash = make_password(password)
-            
+
             tenant.save()
-            
+
             messages.success(request, "Profile updated successfully.", extra_tags='tenant')
             # Refresh context to show new values
             context = _tenant_context_from_session(request)
@@ -30196,37 +30238,15 @@ class TenantUsersAdministrationView(View):
             clear_tenant_portal_cookie(response, request=request)
             return response
         try:
-            user_column_filters = {
-                1: 'tenant_ref_no',
-                2: 'full_name',
-                3: 'email',
-                4: 'username',
-                5: 'role_name',
-                7: 'status',
-            }
-            user_sort_cols = {
-                1: 'tenant_ref_no',
-                2: 'full_name',
-                3: 'email',
-                4: 'username',
-                5: 'role_name',
-                6: 'last_login_at',
-                7: 'status',
-            }
-            users_qs = TenantUser.objects.all()
-            users_page, list_ctx = prepare_eal_list(
-                request,
-                users_qs,
-                search_fields=[
-                    'full_name',
-                    'email',
-                    'role_name',
-                    'username',
-                    'tenant_ref_no',
-                ],
-                column_field_map=user_column_filters,
-                sort_col_field_map=user_sort_cols,
-                default_order=('-created_at', '-updated_at'),
+            users_qs = _tenant_users_administration_queryset(request)
+            users_page, list_ctx = paginate_tenant_list(request, users_qs)
+            list_ctx.update(
+                {
+                    'search_q': (request.GET.get('q') or '').strip(),
+                    'eal_column_filters': eal_column_filter_values(request),
+                    'sort_col': request.GET.get('sort_col', ''),
+                    'sort_dir': request.GET.get('sort_dir', ''),
+                }
             )
 
             all_users_qs = TenantUser.objects.all()
@@ -30257,6 +30277,81 @@ class TenantUsersAdministrationView(View):
 
 
 TENANT_USER_ROLE_OPTIONS = ['Administrator', 'Finance Manager', 'Operations Staff', 'Sales Executive']
+
+TENANT_USERS_ADMIN_COLUMN_FILTERS = {
+    1: 'tenant_ref_no',
+    2: 'full_name',
+    3: 'email',
+    4: 'username',
+    5: 'role_name',
+    7: 'status',
+}
+TENANT_USERS_ADMIN_SORT_COLS = {
+    1: 'tenant_ref_no',
+    2: 'full_name',
+    3: 'email',
+    4: 'username',
+    5: 'role_name',
+    6: 'last_login_at',
+    7: 'status',
+}
+TENANT_USERS_ADMIN_SEARCH_FIELDS = [
+    'full_name',
+    'email',
+    'role_name',
+    'username',
+    'tenant_ref_no',
+]
+
+
+def _tenant_users_administration_queryset(request):
+    """Filtered/sorted tenant users queryset (list + export)."""
+    queryset = TenantUser.objects.all()
+    search_q = (request.GET.get('q') or '').strip()
+    if search_q:
+        q_obj = Q()
+        for field in TENANT_USERS_ADMIN_SEARCH_FIELDS:
+            q_obj |= Q(**{f'{field}__icontains': search_q})
+        queryset = queryset.filter(q_obj)
+    queryset = apply_eal_column_filters(
+        queryset,
+        request,
+        TENANT_USERS_ADMIN_COLUMN_FILTERS,
+    )
+    return apply_eal_column_sort(
+        queryset,
+        request,
+        TENANT_USERS_ADMIN_SORT_COLS,
+        default_order=('-created_at', '-updated_at'),
+    )
+
+
+def _tenant_users_administration_export_csv(tenant_users):
+    """Build UTF-8 CSV bytes for tenant user export."""
+    output = io.StringIO()
+    output.write('\ufeff')
+    writer = csv.writer(output)
+    writer.writerow([
+        'User Ref No',
+        'Full Name',
+        'Email',
+        'Username',
+        'Role',
+        'Status',
+        'Created At',
+
+    ])
+    for tenant_user in tenant_users:
+        writer.writerow([
+            tenant_user.tenant_ref_no,
+            tenant_user.full_name,
+            tenant_user.email,
+            tenant_user.username,
+            tenant_user.role_name,
+            tenant_user.status,
+            tenant_user.created_at.isoformat() if tenant_user.created_at else '',
+         ])
+    return output.getvalue()
 
 
 def _tenant_role_name_options():
@@ -30350,6 +30445,78 @@ def _tenant_user_deleted_by_display(tenant_user):
     if email and email.lower() not in name.lower():
         return f'{name} ({email})'
     return name
+
+
+def _tenant_user_activity_entries(tenant_user, *, deleted_by_display=''):
+    """Timeline entries for tenant user detail System & Audit section."""
+    entries = []
+    seen = set()
+
+    def add_entry(title, timestamp, actor='', color='#5051f9', note=''):
+        if timestamp is None:
+            return
+        dedupe_key = (title, timestamp)
+        if dedupe_key in seen:
+            return
+        seen.add(dedupe_key)
+        entries.append(
+            {
+                'title': title,
+                'timestamp': timestamp,
+                'actor': (actor or '').strip() or 'System',
+                'color': color,
+                'note': (note or '').strip(),
+            }
+        )
+
+    add_entry(
+        'Account created',
+        tenant_user.created_at,
+        tenant_user.created_by_label,
+        'var(--primary-color)',
+    )
+    if (
+        tenant_user.updated_at
+        and tenant_user.created_at
+        and tenant_user.updated_at != tenant_user.created_at
+    ):
+        add_entry(
+            'Profile updated',
+            tenant_user.updated_at,
+            '',
+            '#28a745',
+            'User record was modified.',
+        )
+    if tenant_user.last_login_at:
+        login_note = ''
+        login_ip = (getattr(tenant_user, 'last_login_ip', None) or '').strip()
+        if login_ip:
+            login_note = f'IP: {login_ip}'
+        add_entry(
+            'Successful login',
+            tenant_user.last_login_at,
+            tenant_user.full_name or tenant_user.email,
+            '#0d6efd',
+            login_note,
+        )
+    if int(tenant_user.login_attempts or 0) > 0 and tenant_user.last_failed_login_at:
+        add_entry(
+            f'Failed login attempts ({tenant_user.login_attempts})',
+            tenant_user.last_failed_login_at,
+            tenant_user.full_name or tenant_user.email,
+            '#dc3545',
+            'Counter resets on successful login.',
+        )
+    if tenant_user.is_deleted:
+        add_entry(
+            'Account soft-deleted',
+            tenant_user.deleted_at,
+            deleted_by_display,
+            '#dc3545',
+        )
+
+    entries.sort(key=lambda row: row['timestamp'], reverse=True)
+    return entries
 
 
 def _tenant_user_deleted_by_for_soft_delete(request):
@@ -30553,6 +30720,7 @@ class TenantUsersAdministrationEditView(View):
             is_view_mode = request.GET.get('mode') == 'view'
             is_deleted_user = bool(tenant_user.is_deleted)
             is_effective_readonly = is_view_mode or is_deleted_user
+            deleted_by_display = _tenant_user_deleted_by_display(tenant_user)
             role_options = _tenant_role_name_options()
             if tenant_user.role_name and tenant_user.role_name not in role_options:
                 role_options = [tenant_user.role_name, *role_options]
@@ -30566,8 +30734,14 @@ class TenantUsersAdministrationEditView(View):
                     'is_view_mode': is_view_mode,
                     'is_deleted_user': is_deleted_user,
                     'is_effective_readonly': is_effective_readonly,
-                    'deleted_by_display': _tenant_user_deleted_by_display(tenant_user),
+                    'deleted_by_display': deleted_by_display,
                     'editing_user': tenant_user,
+                    'activity_log': _tenant_user_activity_entries(
+                        tenant_user,
+                        deleted_by_display=deleted_by_display,
+                    )
+                    if is_view_mode or is_deleted_user
+                    else [],
                 }
             )
             return render(
@@ -30779,7 +30953,7 @@ class TenantUsersAdministrationRestoreView(View):
 
 
 class TenantUsersAdministrationExportView(View):
-    """Export current tenant users as CSV."""
+    """Export tenant users as CSV (honours current list search/filters/sort)."""
 
     def get(self, request):
         context = _tenant_context_from_session(request)
@@ -30793,50 +30967,12 @@ class TenantUsersAdministrationExportView(View):
             clear_tenant_portal_cookie(response, request=request)
             return response
         try:
-            tenant_users = (
-                TenantUser.all_objects.select_related('deleted_by')
-                .all()
-                .order_by('created_at', 'updated_at')
+            tenant_users = list(_tenant_users_administration_queryset(request))
+            response = HttpResponse(
+                _tenant_users_administration_export_csv(tenant_users),
+                content_type='text/csv; charset=utf-8',
             )
-            response = HttpResponse(content_type='text/csv')
             response['Content-Disposition'] = 'attachment; filename="tenant_users_export.csv"'
-
-            writer = csv.writer(response)
-            writer.writerow([
-                'User Ref No',
-                'User ID',
-                'Full Name',
-                'Email',
-                'Username',
-                'Role',
-                'Status',
-                'Is Deleted',
-                'Deleted At',
-                'Deleted By',
-                'Last Login',
-                'Login Attempts',
-                'Created By',
-                'Created At',
-                'Updated At',
-            ])
-            for tenant_user in tenant_users:
-                writer.writerow([
-                    tenant_user.tenant_ref_no,
-                    str(tenant_user.user_id),
-                    tenant_user.full_name,
-                    tenant_user.email,
-                    tenant_user.username,
-                    tenant_user.role_name,
-                    tenant_user.status,
-                    'Yes' if tenant_user.is_deleted else 'No',
-                    tenant_user.deleted_at.isoformat() if tenant_user.deleted_at else '',
-                    _tenant_user_deleted_by_display(tenant_user),
-                    tenant_user.last_login_at.isoformat() if tenant_user.last_login_at else '',
-                    tenant_user.login_attempts,
-                    tenant_user.created_by_label,
-                    tenant_user.created_at.isoformat() if tenant_user.created_at else '',
-                    tenant_user.updated_at.isoformat() if tenant_user.updated_at else '',
-                ])
             return response
         finally:
             restore_public_schema(request)

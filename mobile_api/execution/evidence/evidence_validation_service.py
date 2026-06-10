@@ -30,6 +30,21 @@ from mobile_api.helpers.action_execution_metadata import build_execution_require
 from mobile_api.pod_capture.policy.canonical_pod_action_registry import (
     is_pod_upload_action,
 )
+from mobile_api.utils.file_upload_handler import infer_media_type
+
+
+def _inline_media_blocks_bundle_attach(payload: dict[str, Any] | None) -> bool:
+    """
+  Only treat inline ``media[]`` as authoritative when rows carry real file refs.
+
+  Mobile often sends placeholder ``media`` rows on Execute A7 while evidence
+  lives in a staged ``PODCaptureBundle`` from ``POST .../pod/capture/``.
+  """
+    items = normalize_media_items(list((payload or {}).get('media') or []))
+    return any(
+        (item.file_ref or '').strip() or item.upload or (item.media_id or '').strip()
+        for item in items
+    )
 
 
 def extract_capture_bundle_id(payload: dict[str, Any] | None) -> str:
@@ -135,7 +150,17 @@ class EvidenceValidationService:
                 bundle_id,
                 scope=scope,
             )
-            bundle_media = bundle_service._staging.get_media(bundle.bundle_id)  # noqa: SLF001
+            merged_media = list(
+                (context.resolver_meta or {}).get('pod_capture_merged_bundle_media') or []
+            )
+            if merged_media:
+                bundle_media = EvidenceValidationService._normalize_bundle_media_rows(
+                    merged_media,
+                )
+            else:
+                bundle_media = EvidenceValidationService._normalize_bundle_media_rows(
+                    bundle_service._staging.get_media(bundle.bundle_id),  # noqa: SLF001
+                )
         except PodCaptureError as exc:
             raise self._map_pod_capture_error(exc) from exc
 
@@ -167,9 +192,12 @@ class EvidenceValidationService:
             return ''
         if context.job_type != 'shipment':
             return ''
-        inline_media = normalize_media_items(list((context.payload or {}).get('media') or []))
-        if inline_media:
-            return ''
+        merged = list(
+            (context.resolver_meta or {}).get('pod_capture_merged_bundle_media') or []
+        )
+        if _inline_media_blocks_bundle_attach(context.payload) and not merged:
+            if not self._inline_media_missing_staged_evidence(context):
+                return ''
         bundle_id = self._find_latest_ready_pod_bundle_id(context)
         if not bundle_id:
             return ''
@@ -196,23 +224,76 @@ class EvidenceValidationService:
 
         tenant = (context.tenant_schema or '').strip()
         driver_pk = EvidenceValidationService._driver_pk(context.driver)
-        shipment_pk = EvidenceValidationService._shipment_key(context)
-        if not (tenant and driver_pk and shipment_pk):
+        if not (tenant and driver_pk):
             return ''
-        bundle = (
-            PODCaptureBundle.objects.filter(
-                tenant_schema=tenant,
-                shipment_id=shipment_pk,
-                driver_id=driver_pk,
-                bundle_status=PODCaptureBundle.BundleStatus.READY,
-                expires_at__gt=timezone.now(),
+
+        shipment_keys: list[str] = []
+        for candidate in (
+            EvidenceValidationService._shipment_key(context),
+            str(context.job_id or '').strip(),
+            str(getattr(context.shipment, 'pk', '') or '').strip(),
+            str(getattr(context.shipment, 'shipment_id', '') or '').strip(),
+            str(getattr(context.shipment, 'shipment_no', '') or '').strip(),
+        ):
+            if candidate and candidate not in shipment_keys:
+                shipment_keys.append(candidate)
+        if not shipment_keys:
+            return ''
+
+        base_qs = PODCaptureBundle.objects.filter(
+            tenant_schema=tenant,
+            driver_id=driver_pk,
+            bundle_status=PODCaptureBundle.BundleStatus.READY,
+            expires_at__gt=timezone.now(),
+        ).order_by('-created_at')
+
+        for shipment_id in shipment_keys:
+            bundle = base_qs.filter(shipment_id=shipment_id).first()
+            if bundle is not None:
+                return str(bundle.pk)
+        return ''
+
+    @staticmethod
+    def _normalize_bundle_media_rows(rows: list[Any] | None) -> list[Any]:
+        """Correct mislabeled staged media (photo → video) before A7 validation."""
+        normalized: list[Any] = []
+        for row in list(rows or []):
+            resolved = EvidenceValidationService._resolve_row_media_type(row)
+            if isinstance(row, dict):
+                row = dict(row)
+                row['media_type'] = resolved
+            else:
+                current = str(getattr(row, 'media_type', '') or '').strip().casefold()
+                if resolved != current and hasattr(row, 'media_type'):
+                    row.media_type = resolved
+            normalized.append(row)
+        return normalized
+
+    @staticmethod
+    def _row_file_ref(row: Any) -> str:
+        if isinstance(row, dict):
+            return str(row.get('file_ref') or '').strip()
+        return str(getattr(row, 'file_ref', '') or '').strip()
+
+    @staticmethod
+    def _resolve_row_media_type(row: Any) -> str:
+        if isinstance(row, dict):
+            duration_seconds = row.get('duration_seconds')
+            return infer_media_type(
+                explicit=str(row.get('media_type') or ''),
+                content_type=str(row.get('mime_type') or ''),
+                file_ref=str(row.get('file_ref') or ''),
+                file_name=str(row.get('file_name') or ''),
+                duration_seconds=duration_seconds,
             )
-            .order_by('-created_at')
-            .first()
+        duration_seconds = getattr(row, 'duration_seconds', None)
+        return infer_media_type(
+            explicit=str(getattr(row, 'media_type', '') or ''),
+            content_type=str(getattr(row, 'mime_type', '') or ''),
+            file_ref=str(getattr(row, 'file_ref', '') or ''),
+            file_name=str(getattr(row, 'file_name', '') or ''),
+            duration_seconds=duration_seconds,
         )
-        if bundle is None:
-            return ''
-        return str(bundle.pk)
 
     @staticmethod
     def _driver_pk(driver: Any) -> str:
@@ -288,25 +369,120 @@ class EvidenceValidationService:
                 message=str(_('mobile.jobs.execute.notes_required')),
             )
 
+    @staticmethod
+    def _evidence_row_as_dict(row: Any) -> dict[str, Any]:
+        if isinstance(row, dict):
+            return dict(row)
+        return {
+            'media_type': str(getattr(row, 'media_type', '') or ''),
+            'file_ref': str(getattr(row, 'file_ref', '') or '').strip(),
+            'file_name': str(getattr(row, 'file_name', '') or ''),
+            'mime_type': str(getattr(row, 'mime_type', '') or ''),
+            'line_no': int(getattr(row, 'line_no', None) or 0),
+            'duration_seconds': getattr(row, 'duration_seconds', None),
+        }
+
+    @staticmethod
+    def _collect_evidence_media_items(context: ExecuteActionContext) -> list[Any]:
+        """Merge staged POD rows with inline execute media for validation."""
+        from mobile_api.execution.services.a7_pod_evidence_resolver import (
+            _merge_media_dicts,
+        )
+
+        resolver_meta = context.resolver_meta or {}
+        merged_rows = resolver_meta.get('pod_capture_merged_bundle_media')
+        if merged_rows:
+            staged_rows = [
+                EvidenceValidationService._evidence_row_as_dict(row)
+                for row in merged_rows
+            ]
+        else:
+            staged_rows = [
+                EvidenceValidationService._evidence_row_as_dict(row)
+                for row in list(resolver_meta.get('pod_capture_bundle_media') or [])
+            ]
+        inline_rows = []
+        for item in normalize_media_items(
+            list((context.payload or {}).get('media') or [])
+        ):
+            file_ref = (item.file_ref or '').strip()
+            if not file_ref and not item.upload and not (item.media_id or '').strip():
+                continue
+            inline_rows.append(
+                {
+                    'media_type': item.media_type,
+                    'file_ref': file_ref,
+                    'file_name': item.file_name,
+                    'line_no': item.line_no,
+                    'duration_seconds': item.duration_seconds,
+                }
+            )
+        merged_rows = _merge_media_dicts(staged_rows, inline_rows)
+        if merged_rows:
+            return [
+                SimpleNamespace(
+                    media_type=EvidenceValidationService._resolve_row_media_type(row),
+                    file_ref=EvidenceValidationService._row_file_ref(row),
+                    upload=None,
+                    media_id='',
+                    duration_seconds=row.get('duration_seconds')
+                    if isinstance(row, dict)
+                    else getattr(row, 'duration_seconds', None),
+                )
+                for row in merged_rows
+            ]
+        return normalize_media_items(list((context.payload or {}).get('media') or []))
+
+    @staticmethod
+    def _inline_media_missing_staged_evidence(context: ExecuteActionContext) -> bool:
+        """True when inline execute media lacks video/signature that staging may hold."""
+        from mobile_api.execution.evidence.constants import VIDEO_MEDIA_TYPES
+
+        operation_action = context.operation_action
+        if operation_action is None:
+            return False
+        try:
+            from mobile_api.pod_capture.policy.pod_capture_policy import (
+                build_pod_capture_requirements,
+            )
+
+            requirements = build_pod_capture_requirements(
+                operation_action,
+                pod_capture_type='digital',
+                shipment=context.shipment,
+            )
+        except Exception:
+            return True
+
+        items = normalize_media_items(list((context.payload or {}).get('media') or []))
+        video_min = int(requirements.get('video_min_count') or 0)
+        requires_video = bool(requirements.get('video')) or video_min > 0
+        requires_signature = bool(requirements.get('signature'))
+        video_count = sum(
+            1 for item in items if (item.media_type or '') in VIDEO_MEDIA_TYPES
+        )
+        signature_count = sum(
+            1 for item in items if (item.media_type or '').casefold() == 'signature'
+        )
+        if requires_video and video_count < max(video_min, 1):
+            return True
+        if requires_signature and signature_count < 1:
+            return True
+        return False
+
     def _validate_media(
         self,
         context: ExecuteActionContext,
         requirements: dict[str, Any],
     ) -> None:
-        bundle_id = extract_capture_bundle_id(context.payload or {})
-        if bundle_id:
-            bundle_media = list((context.resolver_meta or {}).get('pod_capture_bundle_media') or [])
-            items = [
-                SimpleNamespace(
-                    media_type=str(getattr(row, 'media_type', '') or ''),
-                    file_ref=str(getattr(row, 'file_ref', '') or ''),
-                    upload=None,
-                    media_id='',
-                )
-                for row in bundle_media
-            ]
-        else:
-            items = normalize_media_items(list((context.payload or {}).get('media') or []))
+        from mobile_api.execution.evidence.pod_evidence_consolidation import (
+            consolidate_pod_evidence_items,
+        )
+
+        items = consolidate_pod_evidence_items(
+            self._collect_evidence_media_items(context),
+            requirements,
+        )
         photo_min = int(requirements.get('photo_min_count') or 0)
         video_min = int(requirements.get('video_min_count') or 0)
         requires_photo = bool(requirements.get('photo')) or photo_min > 0
@@ -344,14 +520,15 @@ class EvidenceValidationService:
 
             if media_type == 'signature':
                 signature_count += 1
-            if media_type in PHOTO_MEDIA_TYPES:
+            elif media_type == 'photo':
                 photo_count += 1
             elif media_type in VIDEO_MEDIA_TYPES:
                 video_count += 1
             elif media_type == 'document':
                 document_count += 1
 
-        if photo_count > EXECUTION_MEDIA_MAX_PHOTOS:
+        photo_max = int(requirements.get('photo_max_count') or 0) or EXECUTION_MEDIA_MAX_PHOTOS
+        if photo_count > photo_max:
             raise self._evidence_error(
                 error_code='photo_limit_exceeded',
                 message=str(_('mobile.jobs.execute.photo_limit_exceeded')),
@@ -394,6 +571,44 @@ class EvidenceValidationService:
                         error_code='invalid_media_type',
                         message=str(_('mobile.jobs.execute.invalid_media_type')),
                     )
+
+        self._validate_video_duration(items, requirements)
+
+    def _validate_video_duration(
+        self,
+        items: list[Any],
+        requirements: dict[str, Any],
+    ) -> None:
+        from mobile_api.execution.evidence.constants import (
+            POD_CAPTURE_VIDEO_MAX_DURATION_SECONDS,
+        )
+        from mobile_api.execution.evidence.video_duration_validation import (
+            is_video_duration_exceeded,
+            video_duration_exceeded_message,
+        )
+
+        requires_video = bool(requirements.get('video')) or int(
+            requirements.get('video_min_count') or 0
+        ) > 0
+        max_duration_raw = requirements.get('video_max_duration_seconds')
+        if max_duration_raw is None and not requires_video:
+            return
+        max_duration = int(max_duration_raw or POD_CAPTURE_VIDEO_MAX_DURATION_SECONDS)
+        if max_duration <= 0:
+            return
+        for item in items:
+            duration = getattr(item, 'duration_seconds', None)
+            if is_video_duration_exceeded(
+                media_type=getattr(item, 'media_type', '') or '',
+                duration_seconds=duration,
+                max_duration_seconds=max_duration,
+            ):
+                raise self._evidence_error(
+                    error_code='video_duration_exceeded',
+                    message=video_duration_exceeded_message(
+                        max_duration_seconds=max_duration,
+                    ),
+                )
 
     @staticmethod
     def _evidence_error(

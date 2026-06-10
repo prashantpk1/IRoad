@@ -89,14 +89,26 @@ def _load_delivery_note_documents(
 ) -> list[dict[str, Any]]:
     from tenant_workspace.models import TenantShipmentDocument
 
+    shipment_pk = getattr(shipment, 'pk', None)
     documents = list(
         TenantShipmentDocument.objects.filter(
-            shipment_id=getattr(shipment, 'pk', None),
+            shipment_id=shipment_pk,
             is_delivery_note=True,
         )
         .prefetch_related('document_pages', 'pod_pages')
         .order_by('-updated_at', '-created_at')[:10]
     )
+    if not documents:
+        booking_id = getattr(shipment, 'booking_id', None)
+        if booking_id:
+            documents = list(
+                TenantShipmentDocument.objects.filter(
+                    booking_id=booking_id,
+                    is_delivery_note=True,
+                )
+                .prefetch_related('document_pages', 'pod_pages')
+                .order_by('-updated_at', '-created_at')[:10]
+            )
     if not documents:
         return [_synthetic_document_from_shipment(shipment, limit=limit)]
 

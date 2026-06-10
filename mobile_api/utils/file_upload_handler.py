@@ -61,34 +61,46 @@ def infer_media_type(
     content_type: str = '',
     file_name: str = '',
     file_ref: str = '',
+    duration_seconds: float | None = None,
 ) -> str:
     """
-    Resolve mobile ``media_type`` when clients omit it on multipart uploads.
+    Resolve mobile ``media_type`` when clients omit or mislabel uploads.
 
-    Defaults used to be always ``photo``, which caused ``video_required`` even
-    when a video file was uploaded.
+    Mobile clients often send ``media_type=photo`` for video clips (same picker
+    UI). MIME type, file extension, and ``duration_seconds`` override that.
     """
     token = (explicit or '').strip().casefold()
-    if token in {'photo', 'video', 'document', 'signature'}:
+    if token in {'signature', 'document'}:
         return token
 
     content = (content_type or '').strip().casefold()
+    detected = ''
     if content.startswith('video/'):
-        return 'video'
-    if content.startswith('image/'):
-        return 'photo'
+        detected = 'video'
+    elif content.startswith('image/'):
+        detected = 'photo'
+    else:
+        for candidate in (file_name, file_ref):
+            _, ext = os.path.splitext((candidate or '').strip().lower())
+            if ext in VIDEO_EXTENSIONS:
+                detected = 'video'
+                break
+            if ext in PHOTO_EXTENSIONS:
+                detected = 'photo'
+                break
 
-    for candidate in (file_name, file_ref):
-        _, ext = os.path.splitext((candidate or '').strip().lower())
-        if ext in VIDEO_EXTENSIONS:
-            return 'video'
-        if ext in PHOTO_EXTENSIONS:
-            return 'photo'
+    if duration_seconds is not None:
+        try:
+            if float(duration_seconds) > 0:
+                detected = 'video'
+        except (TypeError, ValueError):
+            pass
 
-    _, ext = os.path.splitext((file_ref or file_name or '').strip().lower())
-    if ext in VIDEO_EXTENSIONS:
+    if detected == 'video':
         return 'video'
-    if ext in PHOTO_EXTENSIONS:
+    if token in {'photo', 'video', 'document', 'signature'}:
+        return token
+    if detected == 'photo':
         return 'photo'
     return 'photo'
 
@@ -171,6 +183,16 @@ def process_media_files(
             f'{prefix}[{index}][media_type]',
         )
 
+        duration_raw = _form_field_value(
+            request_data,
+            f'{prefix}[{index}][duration_seconds]',
+        )
+        duration_seconds = None
+        if duration_raw:
+            try:
+                duration_seconds = float(duration_raw)
+            except (TypeError, ValueError):
+                duration_seconds = None
         item = {
             'file_ref': saved_path,
             'file_name': _form_field_value(
@@ -183,7 +205,9 @@ def process_media_files(
                 content_type=str(getattr(uploaded_file, 'content_type', '') or ''),
                 file_name=str(getattr(uploaded_file, 'name', '') or ''),
                 file_ref=saved_path,
+                duration_seconds=duration_seconds,
             ),
+            'duration_seconds': duration_seconds,
             'description': _form_field_value(
                 request_data,
                 f'{prefix}[{index}][description]',
@@ -245,11 +269,22 @@ def merge_multipart_media_with_json_hints(
 
     for index, item in enumerate(processed):
         if index < len(json_rows):
-            explicit = str(json_rows[index].get('media_type') or '').strip()
-            if explicit:
-                item['media_type'] = infer_media_type(
-                    explicit=explicit,
-                    file_ref=item.get('file_ref', ''),
-                    file_name=item.get('file_name', ''),
-                )
+            json_row = json_rows[index]
+            explicit = str(json_row.get('media_type') or '').strip()
+            duration_seconds = item.get('duration_seconds')
+            if duration_seconds is None:
+                raw_duration = json_row.get('duration_seconds')
+                if raw_duration is not None and str(raw_duration).strip() != '':
+                    try:
+                        duration_seconds = float(raw_duration)
+                    except (TypeError, ValueError):
+                        duration_seconds = None
+            item['media_type'] = infer_media_type(
+                explicit=explicit,
+                file_ref=item.get('file_ref', ''),
+                file_name=item.get('file_name', ''),
+                duration_seconds=duration_seconds,
+            )
+            if duration_seconds is not None:
+                item['duration_seconds'] = duration_seconds
     return processed

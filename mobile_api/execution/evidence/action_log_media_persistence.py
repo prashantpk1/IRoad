@@ -20,6 +20,7 @@ from mobile_api.execution.evidence.constants import (
     MEDIA_DESCRIPTION_MAX_LENGTH,
     MEDIA_TYPE_MAX_LENGTH,
 )
+from mobile_api.utils.file_upload_handler import infer_media_type
 from tenant_workspace.models import TenantOperationActionMedia
 
 
@@ -34,6 +35,7 @@ class ActionLogMediaItem:
     file_ref: str = ''
     file_name: str = ''
     line_no: int = 0
+    duration_seconds: float | None = None
     upload: Any | None = field(default=None, repr=False)
 
 
@@ -45,7 +47,21 @@ def normalize_media_items(raw_items: list[Any] | None) -> list[ActionLogMediaIte
     for idx, row in enumerate(raw_items):
         if not isinstance(row, dict):
             continue
-        media_type = str(row.get('media_type') or '').strip().casefold()
+        file_ref = str(row.get('file_ref') or '').strip()
+        file_name = str(row.get('file_name') or '').strip()
+        duration_seconds = None
+        duration_raw = row.get('duration_seconds')
+        if duration_raw is not None and str(duration_raw).strip() != '':
+            try:
+                duration_seconds = float(duration_raw)
+            except (TypeError, ValueError):
+                duration_seconds = None
+        media_type = infer_media_type(
+            explicit=str(row.get('media_type') or ''),
+            file_ref=file_ref,
+            file_name=file_name,
+            duration_seconds=duration_seconds,
+        )
         captured_at = None
         captured_raw = str(
             row.get('captured_at') or row.get('timestamp') or ''
@@ -63,9 +79,10 @@ def normalize_media_items(raw_items: list[Any] | None) -> list[ActionLogMediaIte
                 description=str(row.get('description') or '').strip(),
                 captured_at=captured_at,
                 media_id=str(row.get('media_id') or '').strip(),
-                file_ref=str(row.get('file_ref') or '').strip(),
-                file_name=str(row.get('file_name') or '').strip(),
+                file_ref=file_ref,
+                file_name=file_name,
                 line_no=int(row.get('sort_order') or row.get('line_no') or (idx + 1)),
+                duration_seconds=duration_seconds,
                 upload=row.get('file'),
             )
         )

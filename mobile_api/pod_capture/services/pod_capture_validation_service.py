@@ -29,6 +29,12 @@ from mobile_api.pod_capture.policy.pod_capture_policy import (
 from mobile_api.pod_capture.services.pod_capture_action_resolver import (
     resolve_default_pod_action,
 )
+from mobile_api.execution.services.execution_reconcile_service import (
+    ExecutionReconcileService,
+)
+from mobile_api.execution.services.execution_validation_service import (
+    ExecutionValidationService,
+)
 from mobile_api.pod_capture.services.pod_evidence_adapter import (
     map_execute_error,
     media_items_to_action_log_rows,
@@ -61,6 +67,7 @@ class PodCaptureValidationService:
 
         self._validate_capture_metadata(context)
         self.resolve_target_action(context)
+        self.validate_workflow_action_allowed(context)
         self.validate_pod_compliance(context)
 
     def resolve_target_action(self, context: PodCaptureContext) -> None:
@@ -91,6 +98,25 @@ class PodCaptureValidationService:
 
         context.operation_action = action
         self._assert_pod_capture_action(action)
+
+    def validate_workflow_action_allowed(self, context: PodCaptureContext) -> None:
+        """
+        Reject staging when target action is not in Job Detail ``allowed_actions``.
+
+        Prevents pod/capture success followed by execute ``action_not_allowed`` on closed jobs.
+        """
+        from mobile_api.execution.exceptions import ExecuteActionError
+
+        exec_ctx = to_execute_action_context(context)
+        reconcile = ExecutionReconcileService()
+        reconcile.prepare_pre_execute(exec_ctx, request=context.request)
+        context.sync_metadata = dict(exec_ctx.sync_metadata or context.sync_metadata or {})
+        try:
+            ExecutionValidationService(
+                reconcile_service=reconcile,
+            ).validate_action_master(exec_ctx, request=context.request)
+        except ExecuteActionError as exc:
+            raise map_execute_error(exc) from exc
 
     @staticmethod
     def _assert_pod_capture_action(action) -> None:
@@ -207,25 +233,24 @@ class PodCaptureValidationService:
         items: list[PODCaptureMediaItemInput],
         requirements: dict,
     ) -> None:
+        from mobile_api.execution.evidence.video_duration_validation import (
+            is_video_duration_exceeded,
+            video_duration_exceeded_message,
+        )
+
         max_duration = int(
             requirements.get('video_max_duration_seconds')
             or POD_CAPTURE_VIDEO_MAX_DURATION_SECONDS
         )
         for item in items:
-            media_type = (item.media_type or '').strip().casefold()
-            if media_type not in VIDEO_MEDIA_TYPES:
-                continue
-            duration = item.duration_seconds
-            if duration is None:
-                continue
-            if float(duration) > float(max_duration):
+            if is_video_duration_exceeded(
+                media_type=item.media_type or '',
+                duration_seconds=item.duration_seconds,
+                max_duration_seconds=max_duration,
+            ):
                 raise PodCaptureValidationService._validation_error(
                     'video_duration_exceeded',
-                    str(
-                        _(
-                            'mobile.pod_capture.video_duration_exceeded',
-                        )
-                    ),
+                    video_duration_exceeded_message(max_duration_seconds=max_duration),
                 )
 
     @staticmethod

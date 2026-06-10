@@ -8,7 +8,13 @@ from __future__ import annotations
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
-from mobile_api.execution.evidence.constants import EXECUTION_MEDIA_MAX_ITEMS
+from mobile_api.execution.evidence.constants import (
+    EXECUTION_MEDIA_MAX_ITEMS,
+    POD_CAPTURE_VIDEO_MAX_DURATION_SECONDS,
+)
+from mobile_api.execution.evidence.video_duration_validation import (
+    video_duration_exceeded_message,
+)
 
 
 class PodCaptureMediaItemSerializer(serializers.Serializer):
@@ -29,6 +35,18 @@ class PodCaptureMediaItemSerializer(serializers.Serializer):
         min_value=0,
         help_text='Video clip length in seconds (max 15 for POD capture).',
     )
+
+    def validate(self, attrs: dict) -> dict:
+        duration = attrs.get('duration_seconds')
+        media_type = (attrs.get('media_type') or '').strip().casefold()
+        if duration is not None and media_type in {'video', ''}:
+            if float(duration) > float(POD_CAPTURE_VIDEO_MAX_DURATION_SECONDS):
+                raise serializers.ValidationError(
+                    {
+                        'duration_seconds': video_duration_exceeded_message(),
+                    }
+                )
+        return attrs
 
 
 class PodCaptureRequestSerializer(serializers.Serializer):

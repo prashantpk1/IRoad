@@ -263,6 +263,11 @@ urlpatterns = [
         name='tenant_users_administration_create',
     ),
     path(
+        'administration/users/export/',
+        TenantUsersAdministrationExportView.as_view(),
+        name='tenant_users_administration_export',
+    ),
+    path(
         'administration/users/<uuid:user_id>/edit/',
         TenantUsersAdministrationEditView.as_view(),
         name='tenant_users_administration_edit',
@@ -281,11 +286,6 @@ urlpatterns = [
         'administration/users/<uuid:user_id>/restore/',
         TenantUsersAdministrationRestoreView.as_view(),
         name='tenant_users_administration_restore',
-    ),
-    path(
-        'administration/users/export/',
-        TenantUsersAdministrationExportView.as_view(),
-        name='tenant_users_administration_export',
     ),
     path(
         'administration/roles/export/',

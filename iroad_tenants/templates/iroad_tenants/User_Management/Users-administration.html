@@ -65,7 +65,11 @@
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
-        <a class="eal-btn eal-btn-outline" href="{% url 'iroad_tenants:tenant_users_administration_export' %}">
+        <a
+          class="eal-btn eal-btn-outline"
+          href="{% url 'iroad_tenants:tenant_users_administration_export' %}{% if request.GET %}?{{ request.GET.urlencode }}{% endif %}"
+          download="tenant_users_export.csv"
+        >
           <i class="bi bi-download"></i>
           <span>Export</span>
         </a>

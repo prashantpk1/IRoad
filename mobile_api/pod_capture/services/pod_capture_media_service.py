@@ -78,11 +78,6 @@ class PodCaptureMediaService:
                     )
             file_ref = str(row.get('file_ref') or '').strip()
             file_name = str(row.get('file_name') or '').strip()
-            media_type = infer_media_type(
-                explicit=str(row.get('media_type') or ''),
-                file_ref=file_ref,
-                file_name=file_name,
-            )
             duration_raw = row.get('duration_seconds')
             duration_seconds = None
             if duration_raw is not None and str(duration_raw).strip() != '':
@@ -90,6 +85,12 @@ class PodCaptureMediaService:
                     duration_seconds = float(duration_raw)
                 except (TypeError, ValueError):
                     duration_seconds = None
+            media_type = infer_media_type(
+                explicit=str(row.get('media_type') or ''),
+                file_ref=file_ref,
+                file_name=file_name,
+                duration_seconds=duration_seconds,
+            )
             normalized.append(
                 PODCaptureMediaItemInput(
                     media_type=media_type,
@@ -132,6 +133,13 @@ class PodCaptureMediaService:
             mime = mimetypes.guess_type(file_ref)[0] or ''
             if item.upload is not None:
                 mime = str(getattr(item.upload, 'content_type', '') or mime)
+            resolved_type = infer_media_type(
+                explicit=item.media_type,
+                content_type=mime,
+                file_ref=file_ref,
+                file_name=item.file_name,
+                duration_seconds=item.duration_seconds,
+            )
             rows.append(
                 PODCaptureMedia(
                     media_id=PODCaptureMedia.new_id(),
@@ -140,7 +148,7 @@ class PodCaptureMediaService:
                     driver_id=scope.driver_id,
                     tenant_schema=scope.tenant_schema,
                     client_capture_id=scope.client_capture_id,
-                    media_type=item.media_type,
+                    media_type=resolved_type,
                     file_ref=file_ref,
                     mime_type=mime,
                     uploaded_at=now,
