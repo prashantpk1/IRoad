@@ -29,7 +29,7 @@
     </div>
     <div class="page-header-right ms-auto">
       <a
-        href="{% url 'iroad_tenants:tenant_address_master' %}"
+        href="{{ address_cancel_url|default:'#' }}"
         class="btn btn-outline-secondary"
       >
         <i class="bi bi-arrow-left me-1"></i>{% translate "Back" %}
@@ -48,7 +48,9 @@
   data-placeholder-city="{% translate 'Select city...' %}"
 >
   {% csrf_token %}
-  
+  {% if address_return_to %}
+  <input type="hidden" name="return_to" value="{{ address_return_to }}" />
+  {% endif %}
 
   {% if form.non_field_errors %}
   <div class="alert alert-danger" role="alert">{{ form.non_field_errors }}</div>
@@ -86,7 +88,22 @@
           <label class="form-label" for="{{ form.client_account.id_for_label }}">
             {% translate "Client Account" %} <span class="required">*</span>
           </label>
+          {% if client_account_locked %}
+          <input type="hidden" name="client_account" value="{{ form.client_account.value }}" />
+          <select
+            class="form-select"
+            id="{{ form.client_account.id_for_label }}"
+            disabled
+            aria-readonly="true"
+          >
+            {% for value, label in form.client_account.field.choices %}
+            <option value="{{ value }}" {% if form.client_account.value|stringformat:"s" == value|stringformat:"s" %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+          <span class="field-hint">{% translate "Locked to the client you opened from." %}</span>
+          {% else %}
           {{ form.client_account }}
+          {% endif %}
           {% if form.client_account.errors %}<div class="text-danger small">{{ form.client_account.errors }}</div>{% endif %}
         </div>
       </div>
@@ -448,6 +465,25 @@
       });
 
       loadLocationOptions({ resetCity: false });
+    })();
+
+    (function () {
+      function bindDigitsOnlyInput(el) {
+        if (!el) return;
+        el.addEventListener("input", function () {
+          var cleaned = el.value.replace(/\D/g, "");
+          if (el.value !== cleaned) {
+            el.value = cleaned;
+          }
+        });
+        el.addEventListener("paste", function (event) {
+          event.preventDefault();
+          var pasted = (event.clipboardData || window.clipboardData).getData("text") || "";
+          el.value = pasted.replace(/\D/g, "");
+        });
+      }
+      bindDigitsOnlyInput(document.getElementById("{{ form.building_no.id_for_label }}"));
+      document.querySelectorAll("#addressForm .phone-number").forEach(bindDigitsOnlyInput);
     })();
   </script>
 {% endblock %}

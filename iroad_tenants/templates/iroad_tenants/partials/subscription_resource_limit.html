@@ -1,0 +1,9 @@
+{% if subscription_resource_limit and subscription_resource_limit.show_banner %}
+<div class="alert alert-warning d-flex align-items-start gap-2 mb-3" role="alert">
+  <i class="bi bi-exclamation-triangle mt-1"></i>
+  <div>
+    {{ subscription_resource_limit.message }}
+    <a href="{% url 'iroad_tenants:tenant_subscription_plan' %}" class="alert-link">Upgrade or renew plan</a>
+  </div>
+</div>
+{% endif %}

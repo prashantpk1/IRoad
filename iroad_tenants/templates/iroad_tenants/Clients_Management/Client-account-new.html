@@ -112,19 +112,6 @@
                   {% if form_errors.national_id %}<div class="invalid-feedback d-block">{{ form_errors.national_id }}</div>{% endif %}
                 </div>
                 <div class="field">
-                  <label for="createdAt" class="form-label">Created At</label>
-                  <input
-                    type="text"
-                    class="form-control"
-                    id="createdAt"
-                    name="created_at"
-                    placeholder="—"
-                    value="{{ form_data.created_at|default:'' }}"
-                    readonly
-                  />
-                  <span class="field-hint">Set on save</span>
-                </div>
-                <div class="field">
                   <label for="status" class="form-label"
                     >Status
                     <span class="required">*</span>

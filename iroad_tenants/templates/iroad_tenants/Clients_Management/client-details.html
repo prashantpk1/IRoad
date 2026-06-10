@@ -370,10 +370,10 @@
           <a href="{% url 'iroad_tenants:tenant_client_sales_report' client_account.account_no %}" class="ch-action-btn">
             <i class="bi bi-file-earmark-text"></i> Create Sales Report
           </a>
-          <a href="{% url 'iroad_tenants:tenant_client_contacts_create' %}?account={{ client_account.account_no|urlencode }}" class="ch-action-btn">
+          <a href="{% url 'iroad_tenants:tenant_client_contacts_create' %}?account={{ client_account.account_no|urlencode }}&amp;return_to=details" class="ch-action-btn">
             <i class="bi bi-person-plus"></i> Add Contact
           </a>
-          <a href="{% url 'iroad_tenants:tenant_client_attachments' %}?account={{ client_account.account_no|urlencode }}" class="ch-action-btn">
+          <a href="{% url 'iroad_tenants:tenant_client_attachments' %}?account={{ client_account.account_no|urlencode }}&amp;return_to=details" class="ch-action-btn">
             <i class="bi bi-paperclip"></i> Add Attachment
           </a>
           {% if client_account.status == 'Active' %}
@@ -596,7 +596,7 @@
               {% if client_account %}
               <div class="d-flex justify-content-between align-items-center mb-3">
                 <h4 class="m-0" style="font-size: 1.1rem; font-weight: 600; color: #1a1a1a">Client Addresses</h4>
-                <a href="{% url 'iroad_tenants:tenant_address_master_create' %}?client={{ client_account.account_id }}" class="btn btn-primary btn-sm">
+                <a href="{% url 'iroad_tenants:tenant_address_master_create' %}?client={{ client_account.account_id }}&amp;return_to=details" class="btn btn-primary btn-sm">
                   <i class="bi bi-plus-lg"></i> Add Address
                 </a>
               </div>
@@ -734,7 +734,7 @@
                 >
                   Client Contracts
                 </h4>
-                <a href="{% url 'iroad_tenants:tenant_client_contract_create' %}?account={{ client_account.account_no|urlencode }}" class="btn btn-primary btn-sm">
+                <a href="{% url 'iroad_tenants:tenant_client_contract_create' %}?account={{ client_account.account_no|urlencode }}&amp;return_to=details" class="btn btn-primary btn-sm">
                   <i class="bi bi-plus-lg"></i> Add Contract
                 </a>
               </div>
@@ -857,7 +857,7 @@
               <div class="d-flex justify-content-between align-items-center mb-3">
                 <h4 class="m-0" style="font-size: 1.1rem; font-weight: 600; color: #1a1a1a">Client Contacts</h4>
                 {% if client_account %}
-                <a href="{% url 'iroad_tenants:tenant_client_contacts_create' %}?account={{ client_account.account_no|urlencode }}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Add Contact</a>
+                <a href="{% url 'iroad_tenants:tenant_client_contacts_create' %}?account={{ client_account.account_no|urlencode }}&amp;return_to=details" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Add Contact</a>
                 {% else %}
                 <a href="{% url 'iroad_tenants:tenant_client_contacts_create' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Add Contact</a>
                 {% endif %}
@@ -876,7 +876,11 @@
                     <span style="font-weight: 600; color: #1a1a1a">{{ contact.name }}</span>
                   </div>
                   <div class="eal-actions-cell pt-0 pb-0" onclick="event.stopPropagation()">
-                    <button type="button" class="eal-row-btn" title="Edit" disabled><i class="bi bi-pencil"></i></button>
+                    <a
+                      href="{% url 'iroad_tenants:tenant_client_contact_edit' contact.contact_id %}?return_to=details"
+                      class="eal-row-btn"
+                      title="Edit"
+                    ><i class="bi bi-pencil"></i></a>
                   </div>
                 </div>
                 <div class="collapse{% if forloop.first %} show{% endif %}" id="contactCollapse{{ contact.contact_id }}">
@@ -929,7 +933,7 @@
               <div class="d-flex justify-content-between align-items-center mb-3">
                 <h4 class="m-0" style="font-size: 1.1rem; font-weight: 600; color: #1a1a1a">Attachments & Documents</h4>
                 {% if client_account %}
-                <a href="{% url 'iroad_tenants:tenant_client_attachments' %}?account={{ client_account.account_no|urlencode }}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Upload File</a>
+                <a href="{% url 'iroad_tenants:tenant_client_attachments' %}?account={{ client_account.account_no|urlencode }}&amp;return_to=details" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Upload File</a>
                 {% else %}
                 <a href="{% url 'iroad_tenants:tenant_client_attachments' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Upload File</a>
                 {% endif %}
@@ -1313,6 +1317,27 @@
             }
           });
         });
+
+        (function activateTabFromQuery() {
+          var params = new URLSearchParams(window.location.search);
+          var tabKey = (params.get("tab") || "").trim().toLowerCase();
+          var tabMap = {
+            overview: "#pane-overview",
+            contacts: "#pane-contacts",
+            attachments: "#pane-attachments",
+            addresses: "#pane-addresses",
+            contracts: "#pane-contracts",
+            "price-lists": "#pane-price-lists",
+            cargo: "#pane-cargo",
+          };
+          var target = tabMap[tabKey];
+          if (!target) return;
+          var tabBtn = document.querySelector(
+            '.cd-tab[data-bs-target="' + target + '"]',
+          );
+          if (!tabBtn || !window.bootstrap || !bootstrap.Tab) return;
+          bootstrap.Tab.getOrCreateInstance(tabBtn).show();
+        })();
       })();
     </script>
 {% endblock %}

@@ -1,0 +1,460 @@
+{% extends 'iroad_tenants/base.html' %}
+{% load static %}
+
+{% block title %}{{ ticket_page_title }} | iRoad Admin{% endblock %}
+
+{% block content %}
+
+      <div class="page-header">
+        <nav aria-label="breadcrumb">
+          <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+              <a href="{% url 'iroad_tenants:tenant_dashboard' %}">Dashboard</a>
+            </li>
+            <li class="breadcrumb-item">Administration</li>
+            <li class="breadcrumb-item">
+              <a href="{% url 'iroad_tenants:tenant_support_ticket_list' %}">Support Management</a>
+            </li>
+            <li class="breadcrumb-item active" aria-current="page">New Ticket Reply</li>
+          </ol>
+        </nav>
+        <div class="page-header-row">
+          <div class="page-header-left">
+            <h1 class="page-title">{{ ticket_page_title }}</h1>
+          </div>
+          <div class="page-header-right">
+            <a href="{% url 'iroad_tenants:tenant_support_ticket_list' %}" class="eal-btn eal-btn-outline">
+              <i class="bi bi-arrow-left"></i>
+              <span>Back</span>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      {% if form_errors %}
+      <div class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
+        Please fix the highlighted errors before sending your reply.
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+      {% endif %}
+
+      <div class="ticket-detail-summary card border-0 mb-4">
+        <div class="ticket-detail-summary-header">Ticket Details Summary</div>
+        <div class="ticket-detail-summary-body">
+          <div class="row mb-4">
+            <div class="col-md-4">
+              <div class="ticket-detail-label">Ticket No.</div>
+              <div class="ticket-detail-value">{{ ticket.ticket_no }}</div>
+            </div>
+            <div class="col-md-4">
+              <div class="ticket-detail-label">Priority</div>
+              <div class="ticket-detail-value ticket-detail-priority" style="color: {{ ticket_priority_color }};">
+                {{ ticket.priority|upper }}
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="ticket-detail-label">Creation Date &amp; Time</div>
+              <div class="ticket-detail-value">{{ ticket_created_at_display }}</div>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-4">
+              <div class="ticket-detail-label">Category</div>
+              <div class="ticket-detail-value">{{ ticket.category.name_en }}</div>
+            </div>
+            <div class="col-md-8">
+              <div class="ticket-detail-label">Subject</div>
+              <div class="ticket-detail-value">{{ ticket.subject }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ticket-detail-card card border-0">
+        <div class="ticket-detail-tabs" id="ticketTabs">
+          <button type="button" class="ticket-tab active" data-target="conversations-pane">
+            <i class="bi bi-chat-dots"></i> Conversation &amp; Replies
+          </button>
+          <button type="button" class="ticket-tab" data-target="attachments-pane">
+            <i class="bi bi-paperclip"></i> Attachments
+          </button>
+        </div>
+
+        <div class="ticket-detail-card-body">
+          <div id="conversations-pane" class="ticket-pane ticket-conversation-thread">
+            {% for reply in replies %}
+            <div class="ticket-message-row ticket-message-row-{{ reply.display_sender_kind }}">
+              <div class="ticket-message ticket-message-{{ reply.display_sender_kind }}">
+                <div class="ticket-message-main">
+                  <div class="ticket-message-sender ticket-message-sender-{{ reply.display_sender_kind }}">
+                    {{ reply.display_sender_label }}
+                  </div>
+                  <div class="ticket-message-body{% if reply.display_sender_kind == 'tenant' %} ticket-message-body-tenant{% endif %}">
+                    {{ reply.message_body }}
+                  </div>
+                </div>
+                <div class="ticket-message-time">{{ reply.display_timestamp }}</div>
+              </div>
+            </div>
+            {% empty %}
+            <div class="ticket-message-row ticket-message-row-tenant">
+              <div class="ticket-message ticket-message-tenant">
+                <div class="ticket-message-main">
+                  <div class="ticket-message-sender ticket-message-sender-tenant">{{ ticket_page_title|upper }}</div>
+                  <div class="ticket-message-body ticket-message-body-tenant">
+                    No conversation messages yet.
+                  </div>
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+
+          <div id="attachments-pane" class="ticket-pane" hidden>
+            {% if ticket_attachments %}
+            <div class="ticket-attachments-list">
+              {% for item in ticket_attachments %}
+              <div class="ticket-attachment-row">
+                <a href="{{ item.url }}" target="_blank" rel="noopener" class="ticket-attachment-link">
+                  <i class="bi bi-file-earmark-arrow-down"></i>
+                  {{ item.filename }}
+                </a>
+                <span class="ticket-attachment-time">{{ item.uploaded_at }}</span>
+              </div>
+              {% endfor %}
+            </div>
+            {% else %}
+            <div class="ticket-attachments-empty">
+              <i class="bi bi-folder2-open"></i>
+              <div>No documents attached yet.</div>
+            </div>
+            {% endif %}
+          </div>
+
+          {% if not is_view_only and ticket.status != 'Closed' %}
+          <form
+            id="reply-section"
+            class="ticket-reply-form"
+            method="post"
+            enctype="multipart/form-data"
+            novalidate
+          >
+            {% csrf_token %}
+            <div class="ticket-reply-heading">
+              <span class="ticket-reply-dot"></span>
+              <span>ADD YOUR REPLY</span>
+            </div>
+            <textarea
+              class="form-control ticket-reply-textarea{% if form_errors.message_body %} is-invalid{% endif %}"
+              id="message_body"
+              name="message_body"
+              rows="5"
+              placeholder="Type your additional details or reply here..."
+            >{{ form_data.message_body|default:'' }}</textarea>
+            {% if form_errors.message_body %}<div class="invalid-feedback d-block">{{ form_errors.message_body }}</div>{% endif %}
+            {% if form_errors.attachment %}<div class="invalid-feedback d-block">{{ form_errors.attachment }}</div>{% endif %}
+
+            <div class="ticket-reply-actions">
+              <div>
+                <input
+                  type="file"
+                  class="d-none"
+                  id="attachment"
+                  name="attachment"
+                  accept="image/*,.pdf,.log"
+                />
+                <button type="button" class="ticket-attach-btn" id="attachEvidenceBtn">
+                  <i class="bi bi-camera"></i>
+                  ATTACH EVIDENCE (PDF/IMAGE)
+                </button>
+                <span class="ticket-attach-filename" id="attachmentFilename"></span>
+              </div>
+              <button type="submit" class="btn btn-primary ticket-send-reply-btn">
+                Send Reply
+              </button>
+            </div>
+          </form>
+          {% elif ticket.status == 'Closed' %}
+          <div class="ticket-reply-closed-note">
+            This ticket is closed. Please create a new support ticket if you need further assistance.
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  .ticket-detail-summary,
+  .ticket-detail-card {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+  }
+  .ticket-detail-summary-header {
+    padding: 16px 24px;
+    border-bottom: 1px solid #f1f5f9;
+    font-weight: 700;
+    color: #475569;
+    font-size: 14px;
+  }
+  .ticket-detail-summary-body {
+    padding: 24px;
+  }
+  .ticket-detail-label {
+    font-size: 11px;
+    color: #94a3b8;
+    text-transform: capitalize;
+    margin-bottom: 4px;
+  }
+  .ticket-detail-value {
+    font-weight: 700;
+    color: #1e293b;
+    font-size: 15px;
+  }
+  .ticket-detail-value:first-child {
+    font-size: 16px;
+  }
+  .ticket-detail-priority {
+    text-transform: uppercase;
+  }
+  .ticket-detail-tabs {
+    display: flex;
+    border-bottom: 1px solid #f1f5f9;
+    padding: 0 8px;
+  }
+  .ticket-tab {
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    padding: 16px;
+    color: #64748b;
+    font-weight: 600;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: 0.2s;
+  }
+  .ticket-tab.active {
+    border-bottom-color: #3b82f6;
+    color: #3b82f6;
+  }
+  .ticket-detail-card-body {
+    padding: 32px 24px;
+  }
+  .ticket-conversation-thread {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+  .ticket-message-row {
+    display: flex;
+    width: 100%;
+  }
+  .ticket-message-row-tenant {
+    justify-content: flex-end;
+  }
+  .ticket-message-row-support {
+    justify-content: flex-start;
+  }
+  .ticket-message {
+    max-width: 78%;
+    min-width: 280px;
+    padding: 16px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    border-radius: 0 8px 8px 0;
+  }
+  .ticket-message-tenant {
+    background: #f8fafc;
+    border-left: 3px solid #cbd5e1;
+  }
+  .ticket-message-support {
+    background: #ffffff;
+    border-left: 3px solid #3b82f6;
+  }
+  .ticket-message-row-support:last-child {
+    margin-bottom: 16px;
+  }
+  .ticket-message-main {
+    flex: 1;
+    min-width: 0;
+  }
+  .ticket-message-sender {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    letter-spacing: 0.5px;
+  }
+  .ticket-message-sender-tenant {
+    color: #64748b;
+  }
+  .ticket-message-sender-support {
+    color: #10b981;
+  }
+  .ticket-message-body {
+    font-size: 14px;
+    color: #334155;
+    white-space: pre-wrap;
+  }
+  .ticket-message-body-tenant {
+    color: #64748b;
+    font-style: italic;
+  }
+  .ticket-message-time {
+    font-size: 11px;
+    color: #94a3b8;
+    white-space: nowrap;
+  }
+  .ticket-attachments-empty {
+    text-align: center;
+    padding: 60px 0;
+    color: #64748b;
+    font-style: italic;
+    font-size: 16px;
+  }
+  .ticket-attachments-empty i {
+    font-size: 48px;
+    color: #cbd5e1;
+    margin-bottom: 16px;
+    display: block;
+  }
+  .ticket-attachment-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid #f1f5f9;
+  }
+  .ticket-attachment-link {
+    color: #3b82f6;
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .ticket-attachment-time {
+    font-size: 11px;
+    color: #94a3b8;
+    white-space: nowrap;
+  }
+  .ticket-reply-form {
+    margin-top: 32px;
+  }
+  .ticket-reply-heading {
+    display: flex;
+    align-items: center;
+    margin-bottom: 12px;
+    gap: 8px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #3b82f6;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .ticket-reply-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #3b82f6;
+    display: inline-block;
+  }
+  .ticket-reply-textarea {
+    resize: none;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    box-shadow: none;
+    font-size: 14px;
+    color: #475569;
+    padding: 16px;
+  }
+  .ticket-reply-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 16px;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .ticket-attach-btn {
+    background: none;
+    border: none;
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0;
+  }
+  .ticket-attach-filename {
+    font-size: 12px;
+    color: #64748b;
+    margin-left: 8px;
+  }
+  .ticket-send-reply-btn {
+    background: #3b82f6;
+    border-color: #3b82f6;
+    padding: 8px 24px;
+    font-weight: 600;
+    font-size: 14px;
+    border-radius: 6px;
+  }
+  .ticket-reply-closed-note {
+    margin-top: 32px;
+    padding: 16px;
+    background: #f8fafc;
+    border-radius: 8px;
+    color: #64748b;
+    font-size: 14px;
+  }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  var tabs = document.querySelectorAll(".ticket-tab");
+  var panes = document.querySelectorAll(".ticket-pane");
+  tabs.forEach(function (tab) {
+    tab.addEventListener("click", function () {
+      tabs.forEach(function (item) {
+        item.classList.remove("active");
+      });
+      tab.classList.add("active");
+      var targetId = tab.getAttribute("data-target");
+      panes.forEach(function (pane) {
+        pane.hidden = pane.id !== targetId;
+      });
+    });
+  });
+
+  var attachBtn = document.getElementById("attachEvidenceBtn");
+  var attachmentInput = document.getElementById("attachment");
+  var attachmentFilename = document.getElementById("attachmentFilename");
+  if (attachBtn && attachmentInput) {
+    attachBtn.addEventListener("click", function () {
+      attachmentInput.click();
+    });
+    attachmentInput.addEventListener("change", function () {
+      if (!attachmentFilename) return;
+      var file = attachmentInput.files && attachmentInput.files[0];
+      attachmentFilename.textContent = file ? file.name : "";
+    });
+  }
+
+  if (window.location.hash === "#reply-section") {
+    var textarea = document.getElementById("message_body");
+    if (textarea) {
+      textarea.scrollIntoView({ behavior: "smooth", block: "center" });
+      textarea.focus();
+    }
+  }
+})();
+</script>
+{% endblock %}

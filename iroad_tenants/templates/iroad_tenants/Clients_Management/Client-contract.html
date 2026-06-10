@@ -37,16 +37,14 @@
               {% endif %}
             </p>
           </div>
-          {% if is_edit_mode and back_to_list_url %}
           <div class="page-header-right">
             <div class="eal-header-actions">
-              <a href="{{ back_to_list_url }}" class="eal-btn eal-btn-outline">
+              <a href="{{ contract_cancel_url|default:'#' }}" class="eal-btn eal-btn-outline">
                 <i class="bi bi-arrow-left"></i>
                 <span>Back</span>
               </a>
             </div>
           </div>
-          {% endif %}
         </div>
       </div>
 
@@ -65,7 +63,11 @@
         action="{{ contract_form_action }}"
         novalidate
       >
-        {% csrf_token %}        {% if contract_settings.pre_expiry_notification_days %}
+        {% csrf_token %}
+        {% if contract_return_to %}
+        <input type="hidden" name="return_to" value="{{ contract_return_to }}" />
+        {% endif %}
+        {% if contract_settings.pre_expiry_notification_days %}
         <div class="alert alert-info d-flex align-items-start gap-2 py-2 px-3 mb-3" role="status" style="font-size: 0.9rem; border-radius: 8px;">
           <i class="bi bi-info-circle flex-shrink-0 mt-1"></i>
           <div>
@@ -133,7 +135,15 @@
                   </select>
                   <span class="field-hint">Client account cannot be changed after the contract is created.</span>
                   {% else %}
-                  <select class="form-select {% if form_errors.client_account %}is-invalid{% endif %}" id="clientAccount" name="client_account">
+                  {% if client_account_locked %}
+                  <input type="hidden" name="client_account" value="{{ form_data.client_account }}" />
+                  {% endif %}
+                  <select
+                    class="form-select {% if form_errors.client_account %}is-invalid{% endif %}"
+                    id="clientAccount"
+                    {% if not client_account_locked %}name="client_account"{% endif %}
+                    {% if client_account_locked %}disabled aria-readonly="true"{% endif %}
+                  >
                     <option value="" {% if not form_data.client_account %}selected{% endif %} disabled>
                       -Select client account-
                     </option>
@@ -144,9 +154,13 @@
                     {% endfor %}
                   </select>
                   {% if form_errors.client_account %}<div class="invalid-feedback d-block">{{ form_errors.client_account }}</div>{% endif %}
+                  {% if client_account_locked %}
+                  <span class="field-hint">Locked to the client you opened from.</span>
+                  {% else %}
                   <span class="field-hint">
                     The contract will be linked to this account
                   </span>
+                  {% endif %}
                   {% endif %}
                 </div>
                 <div class="field">

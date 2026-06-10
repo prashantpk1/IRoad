@@ -133,7 +133,12 @@ class TenantAddressMasterForm(forms.ModelForm):
                 attrs={'class': 'form-control', 'placeholder': _('Street name')}
             ),
             'building_no': forms.TextInput(
-                attrs={'class': 'form-control', 'placeholder': _('e.g. 42')}
+                attrs={
+                    'class': 'form-control',
+                    'placeholder': _('e.g. 42'),
+                    'inputmode': 'numeric',
+                    'pattern': '[0-9]*',
+                }
             ),
             'postal_code': forms.TextInput(
                 attrs={'class': 'form-control', 'placeholder': _('Postal code')}
@@ -164,20 +169,43 @@ class TenantAddressMasterForm(forms.ModelForm):
                 attrs={'class': 'form-control', 'placeholder': _('Job title')}
             ),
             'mobile_no_1': forms.TextInput(
-                attrs={'class': 'form-control phone-number', 'placeholder': _('Mobile number')}
+                attrs={
+                    'class': 'form-control phone-number',
+                    'placeholder': _('Mobile number'),
+                    'type': 'tel',
+                    'inputmode': 'numeric',
+                    'pattern': '[0-9]*',
+                    'autocomplete': 'tel-national',
+                }
             ),
             'mobile_no_2': forms.TextInput(
-                attrs={'class': 'form-control phone-number', 'placeholder': _('Mobile number')}
+                attrs={
+                    'class': 'form-control phone-number',
+                    'placeholder': _('Mobile number'),
+                    'type': 'tel',
+                    'inputmode': 'numeric',
+                    'pattern': '[0-9]*',
+                    'autocomplete': 'tel-national',
+                }
             ),
             'whatsapp_no': forms.TextInput(
-                attrs={'class': 'form-control phone-number', 'placeholder': _('WhatsApp number')}
+                attrs={
+                    'class': 'form-control phone-number',
+                    'placeholder': _('WhatsApp number'),
+                    'type': 'tel',
+                    'inputmode': 'numeric',
+                    'pattern': '[0-9]*',
+                    'autocomplete': 'tel-national',
+                }
             ),
             'phone_no': forms.TextInput(
                 attrs={
                     'class': 'form-control phone-number',
                     'placeholder': _('Landline'),
-                    'autocomplete': 'tel',
+                    'type': 'tel',
+                    'autocomplete': 'tel-national',
                     'inputmode': 'numeric',
+                    'pattern': '[0-9]*',
                 }
             ),
             'email': forms.EmailInput(
@@ -319,12 +347,7 @@ class TenantAddressMasterForm(forms.ModelForm):
         return v
 
     def clean_building_no(self):
-        raw = self.cleaned_data.get('building_no') or ''
-        if not raw.strip():
-            return ''
-        if not raw.strip().isdigit():
-            raise ValidationError(_('Numeric only.'))
-        return raw.strip()
+        return _digits_only(self.cleaned_data.get('building_no'), required=False)
 
     def clean_mobile_no_1(self):
         return _digits_only(self.cleaned_data.get('mobile_no_1'), required=True)

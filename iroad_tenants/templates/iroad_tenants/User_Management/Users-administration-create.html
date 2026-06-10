@@ -390,7 +390,13 @@
 </div>
 
 <div id="tenantFormBannerHost" class="page-content px-3 pt-2">
-  {% if form_errors %}
+  {% include 'iroad_tenants/partials/subscription_resource_limit.html' %}
+  {% if form_non_field_error %}
+  <div class="alert alert-danger alert-dismissible fade show mb-2" role="alert">
+    {{ form_non_field_error }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+  </div>
+  {% elif form_errors %}
   <div class="alert alert-danger alert-dismissible fade show mb-2" role="alert">
     Please fix the highlighted errors.
     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
@@ -588,7 +594,7 @@
                         </button>
                     </div>
                     <div class="form-actions-right">
-                        <button type="submit" class="btn btn-primary">
+                        <button type="submit" class="btn btn-primary"{% if not is_edit_mode %}{% if subscription_resource_limit.show_banner %} disabled title="Plan limit reached — upgrade or renew your plan"{% endif %}{% endif %}>
                             <i class="bi bi-check-circle"></i>
                             {% if is_edit_mode %}Update User{% else %}Create User{% endif %}
                         </button>

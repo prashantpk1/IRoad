@@ -28,6 +28,10 @@
   </div>
 </div>
 
+{% if not is_edit %}
+{% include 'iroad_tenants/partials/subscription_resource_limit.html' %}
+{% endif %}
+
 <form id="truckMasterForm" method="post" enctype="multipart/form-data" class="needs-validation" novalidate>
   {% csrf_token %}
   {{ form.sourcing_mode }}
@@ -433,7 +437,7 @@
       {% endif %}
     </div>
     <div class="form-actions-right">
-      <button type="submit" class="btn btn-primary">
+      <button type="submit" class="btn btn-primary"{% if not is_edit %}{% if subscription_resource_limit.show_banner %} disabled title="Plan limit reached — upgrade or renew your plan"{% endif %}{% endif %}>
         <i class="bi bi-check-circle"></i>
         Save Truck
       </button>

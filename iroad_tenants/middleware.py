@@ -4,12 +4,12 @@ Middleware for the tenant web portal (``/tenant/`` URLs).
 from __future__ import annotations
 
 from django.contrib import messages
+from django.db import connection
 from django.shortcuts import redirect
 from django.urls import reverse
 
 from iroad_tenants.subscription_access import (
-    SUBSCRIPTION_SETUP_URL_NAMES,
-    subscription_setup_url_name,
+    is_subscription_setup_request,
     tenant_has_active_subscription,
     tenant_portal_is_owner_admin,
 )
@@ -67,8 +67,7 @@ class TenantSubscriptionGateMiddleware:
         if not request.path.startswith(self.PREFIX):
             return self.get_response(request)
 
-        url_name = subscription_setup_url_name(request)
-        if url_name in SUBSCRIPTION_SETUP_URL_NAMES:
+        if is_subscription_setup_request(request):
             return self.get_response(request)
 
         auth_payload = get_tenant_portal_cookie_payload(request) or {}
@@ -77,7 +76,16 @@ class TenantSubscriptionGateMiddleware:
         if not tenant_id or not tenant_jti:
             return self.get_response(request)
 
-        tenant = TenantProfile.objects.filter(pk=tenant_id).first()
+        # TenantProfile lives in the public schema; portal schema may already be active.
+        prior_tenant = getattr(connection, 'tenant', None)
+        connection.set_schema_to_public()
+        try:
+            tenant = TenantProfile.objects.filter(pk=tenant_id).first()
+        finally:
+            if prior_tenant is not None:
+                connection.set_tenant(prior_tenant)
+            else:
+                connection.set_schema_to_public()
         if tenant is None or tenant.account_status != 'Active':
             return self.get_response(request)
 

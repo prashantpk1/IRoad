@@ -33,6 +33,10 @@
   </div>
 </div>
 
+{% if not is_edit %}
+{% include 'iroad_tenants/partials/subscription_resource_limit.html' %}
+{% endif %}
+
 <form id="driverMasterForm" method="post" enctype="multipart/form-data" novalidate>
   {% csrf_token %}
   {{ form.vendor_account_id }}
@@ -381,7 +385,7 @@
       </a>
     </div>
     <div class="form-actions-right">
-      <button type="submit" class="btn btn-primary">
+      <button type="submit" class="btn btn-primary"{% if not is_edit %}{% if subscription_resource_limit.show_banner %} disabled title="Plan limit reached — upgrade or renew your plan"{% endif %}{% endif %}>
         <i class="bi bi-check-circle"></i>
         Save Driver
       </button>

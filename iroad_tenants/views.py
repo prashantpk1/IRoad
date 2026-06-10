@@ -151,6 +151,15 @@ from tenant_workspace.models import (
     TenantBooking,
 )
 from iroad_tenants.models import TenantPaymentCard, TenantRegistry
+from iroad_tenants.subscription_limits import (
+    RESOURCE_DRIVERS,
+    RESOURCE_INTERNAL_TRUCKS,
+    RESOURCE_USERS,
+    check_subscription_resource_limit,
+    counts_toward_driver_limit,
+    counts_toward_internal_truck_limit,
+    subscription_limit_status,
+)
 from iroad_tenants.tenant_dashboard_overview import build_tenant_dashboard_overview
 from iroad_tenants.tenant_permission_matrix import (
     TENANT_PERMISSION_MATRIX,
@@ -560,8 +569,25 @@ def _validate_support_attachment_upload(upload, *, allow_empty=True):
     return ''
 
 
+def _tenant_support_ticket_default_ticket_date():
+    return timezone.localtime().strftime('%Y-%m-%dT%H:%M')
+
+
+def _parse_tenant_support_ticket_datetime(raw_value):
+    raw = (raw_value or '').strip()
+    if not raw:
+        return None, 'Ticket date is required.'
+    parsed = parse_datetime(raw)
+    if parsed is None:
+        return None, 'Enter a valid ticket date and time.'
+    if timezone.is_naive(parsed):
+        parsed = timezone.make_aware(parsed, timezone.get_current_timezone())
+    return parsed, ''
+
+
 def _tenant_support_ticket_form_data_from_post(request):
     return {
+        'ticket_date': (request.POST.get('ticket_date') or '').strip(),
         'subject': (request.POST.get('subject') or '').strip(),
         'category_id': (request.POST.get('category_id') or '').strip(),
         'message_body': (request.POST.get('message_body') or '').strip(),
@@ -572,6 +598,14 @@ def _tenant_support_ticket_validate_create(request):
     form_data = _tenant_support_ticket_form_data_from_post(request)
     form_errors = {}
     attachment = request.FILES.get('attachment')
+
+    parsed_ticket_date, ticket_date_error = _parse_tenant_support_ticket_datetime(
+        form_data['ticket_date'],
+    )
+    if ticket_date_error:
+        form_errors['ticket_date'] = ticket_date_error
+    else:
+        form_data['ticket_date_parsed'] = parsed_ticket_date
 
     if not form_data['subject']:
         form_errors['subject'] = 'Subject is required.'
@@ -630,16 +664,46 @@ def _tenant_support_ticket_validate_reply(request):
 
 
 def _tenant_support_ticket_detail_page_context(request, ticket, *, form_data=None, form_errors=None):
-    replies = ticket.replies.filter(
-        is_internal=False,
-    ).order_by('created_at')
+    from superadmin.support_ticket_display import (
+        format_support_ticket_datetime,
+        support_ticket_attachment_rows,
+        support_ticket_created_by_display_map,
+        support_ticket_priority_tone,
+        support_ticket_reply_display_map,
+    )
+
+    replies = list(
+        ticket.replies.filter(
+            is_internal=False,
+        ).order_by('created_at')
+    )
     assignee_parts = support_ticket_assignee_display_parts(ticket)
     is_view_only = (request.GET.get('mode') or '').strip().lower() == 'view'
+    created_by_parts = support_ticket_created_by_display_map([ticket]).get(
+        ticket.pk,
+        {'username': '-', 'role': '-'},
+    )
+    creator_username = created_by_parts.get('username') or '-'
+    creator_role = created_by_parts.get('role') or '-'
+    if creator_role and creator_role != '-':
+        ticket_page_title = f'{creator_username} ({creator_role})'
+    else:
+        ticket_page_title = creator_username
+    reply_labels = support_ticket_reply_display_map(ticket, replies)
+    for reply in replies:
+        parts = reply_labels.get(reply.pk, {})
+        reply.display_sender_label = parts.get('sender_label', reply.sender_type)
+        reply.display_sender_kind = parts.get('sender_kind', 'tenant')
+        reply.display_timestamp = parts.get('timestamp_display', '')
     return {
         'ticket': ticket,
         'replies': replies,
         'is_ticket_detail': True,
         'is_view_only': is_view_only,
+        'ticket_page_title': ticket_page_title,
+        'ticket_created_at_display': format_support_ticket_datetime(ticket.created_at),
+        'ticket_priority_color': support_ticket_priority_tone(ticket.priority),
+        'ticket_attachments': support_ticket_attachment_rows(replies),
         'assigned_to_display': support_ticket_assignee_display(ticket),
         'assigned_to_username': assignee_parts['username'],
         'assigned_to_role': assignee_parts['role'],
@@ -857,6 +921,31 @@ def _format_client_contact_phone(country_code, number):
     if cc and num:
         return f'{cc} {num}'
     return num or cc
+
+
+def _validate_client_contact_phone_digits(raw_value, field_key, field_label, form_errors):
+    """Reject alphabetic or other non-digit characters in optional phone fields."""
+    value = (raw_value or '').strip()
+    if not value:
+        return value
+    if not re.fullmatch(r'\d+', value):
+        form_errors[field_key] = f'{field_label} must contain digits only.'
+    return value
+
+
+def _validate_client_contact_form_phones(form_data, form_errors):
+    form_data['mobile_number'] = _validate_client_contact_phone_digits(
+        form_data.get('mobile_number'),
+        'mobile_number',
+        'Mobile Number',
+        form_errors,
+    )
+    form_data['telephone_number'] = _validate_client_contact_phone_digits(
+        form_data.get('telephone_number'),
+        'telephone_number',
+        'Telephone Number',
+        form_errors,
+    )
 
 
 def _client_contact_form_data_from_contact(contact):
@@ -1329,6 +1418,7 @@ class TenantSupportTicketCreateView(View):
                 is_active=True
             ).order_by('name_en'),
             'next_ticket_no_preview': _preview_next_support_ticket_no(request),
+            'default_ticket_date': _tenant_support_ticket_default_ticket_date(),
         })
         return render(request, self.template_name, context)
 
@@ -1347,6 +1437,7 @@ class TenantSupportTicketCreateView(View):
                     is_active=True,
                 ).order_by('name_en'),
                 'next_ticket_no_preview': _preview_next_support_ticket_no(request),
+                'default_ticket_date': _tenant_support_ticket_default_ticket_date(),
                 'form_data': form_data,
                 'form_errors': form_errors,
             })
@@ -1366,6 +1457,7 @@ class TenantSupportTicketCreateView(View):
             priority='Medium',
             status='New',
             created_by=actor_id,
+            created_at=form_data['ticket_date_parsed'],
             description=form_data['message_body'],
         )
 
@@ -1509,7 +1601,7 @@ class TenantSupportTicketDeleteView(View):
 
 
 class TenantSupportTicketDetailView(View):
-    template_name = 'iroad_tenants/Support_Management/Support-ticket-master-edit.html'
+    template_name = 'iroad_tenants/Support_Management/Ticket-replies.html'
 
     def get(self, request, ticket_id):
         context = _tenant_context_from_session(request)
@@ -20431,7 +20523,6 @@ class TenantClientAccountCreateView(View):
     def _base_form_data(self):
         return {
             'account_no': '',
-            'created_at': timezone.localtime().strftime('%b %d, %Y, %I:%M %p'),
             'client_type': TenantClientAccount.ClientType.INDIVIDUAL,
             'status': TenantClientAccount.Status.ACTIVE,
             'name_arabic': '',
@@ -20635,7 +20726,6 @@ class TenantClientAccountEditView(TenantClientAccountCreateView):
     def _form_data_from_account(self, account):
         return {
             'account_no': account.account_no,
-            'created_at': timezone.localtime(account.created_at).strftime('%b %d, %Y, %I:%M %p'),
             'client_type': account.client_type,
             'status': account.status,
             'name_arabic': account.name_arabic or '',
@@ -20920,6 +21010,116 @@ class TenantClientSalesReportView(View):
             restore_public_schema(request)
 
 
+def _client_form_return_to_details(request):
+    return (request.POST.get('return_to') or request.GET.get('return_to') or '').strip() == 'details'
+
+
+_client_contact_return_to_details = _client_form_return_to_details
+
+
+def _client_details_tab_url(account_no, tab):
+    q = {'id': (account_no or '').strip(), 'tab': tab}
+    return f"{reverse('iroad_tenants:tenant_client_details')}?{urlencode(q)}"
+
+
+def _redirect_client_details_tab(account_no, tab):
+    return redirect(_client_details_tab_url(account_no, tab))
+
+
+def _client_detail_cancel_url(request, account_no, tab, list_url_name):
+    if _client_form_return_to_details(request) and (account_no or '').strip():
+        return _client_details_tab_url(account_no, tab)
+    return reverse(list_url_name)
+
+
+def _redirect_after_client_detail_save(request, account_no, tab, list_redirect):
+    if _client_form_return_to_details(request) and (account_no or '').strip():
+        return _redirect_client_details_tab(account_no, tab)
+    return list_redirect(request)
+
+
+def _client_attachment_form_extras(request, form_data, *, from_create_get=False):
+    pre = ''
+    if from_create_get:
+        pre = (request.GET.get('account') or request.GET.get('client') or '').strip()
+    return_to_details = _client_form_return_to_details(request) or (from_create_get and bool(pre))
+    acc_no = (form_data.get('client_account') or '').strip()
+    return {
+        'attachment_return_to': 'details' if return_to_details else '',
+        'client_account_locked': bool(return_to_details and acc_no),
+        'attachment_cancel_url': _client_detail_cancel_url(
+            request,
+            acc_no,
+            'attachments',
+            'iroad_tenants:tenant_client_attachments_list',
+        ),
+    }
+
+
+def _client_contract_form_extras(request, form_data, *, from_create_get=False):
+    pre = ''
+    if from_create_get:
+        pre = (request.GET.get('account') or request.GET.get('client') or '').strip()
+    return_to_details = _client_form_return_to_details(request) or (from_create_get and bool(pre))
+    acc_no = (form_data.get('client_account') or '').strip()
+    return {
+        'contract_return_to': 'details' if return_to_details else '',
+        'client_account_locked': bool(return_to_details and acc_no),
+        'contract_cancel_url': _client_detail_cancel_url(
+            request,
+            acc_no,
+            'contracts',
+            'iroad_tenants:tenant_client_contract_list',
+        ),
+    }
+
+
+def _address_master_form_extras(request, form, instance=None):
+    pre_client = (request.GET.get('client') or '').strip()
+    pre_account = (request.GET.get('account') or '').strip()
+    return_to_details = (
+        _client_form_return_to_details(request)
+        or bool(pre_client)
+        or bool(pre_account)
+    )
+    client_pk = ''
+    if instance and instance.pk and instance.client_account_id:
+        client_pk = str(instance.client_account_id)
+    else:
+        raw = form['client_account'].value() if form.is_bound else form.initial.get('client_account')
+        if raw not in (None, ''):
+            client_pk = str(raw)
+    account_no = ''
+    if instance and getattr(instance, 'client_account', None):
+        account_no = (instance.client_account.account_no or '').strip()
+    elif client_pk:
+        acc = TenantClientAccount.objects.filter(pk=client_pk).first()
+        if acc:
+            account_no = (acc.account_no or '').strip()
+    if not account_no and pre_account:
+        account_no = pre_account.strip()
+    if not account_no and pre_client:
+        acc = TenantClientAccount.objects.filter(pk=pre_client).first()
+        if acc:
+            account_no = (acc.account_no or '').strip()
+    return {
+        'address_return_to': 'details' if return_to_details else '',
+        'client_account_locked': bool(return_to_details and client_pk),
+        'address_cancel_url': _client_detail_cancel_url(
+            request,
+            account_no,
+            'addresses',
+            'iroad_tenants:tenant_address_master',
+        ),
+    }
+
+
+def _redirect_after_address_save(request, account_no):
+    if _client_form_return_to_details(request) and (account_no or '').strip():
+        return _redirect_client_details_tab(account_no, 'addresses')
+    return _tenant_redirect(request, 'iroad_tenants:tenant_address_master')
+
+
 class TenantClientAttachmentsView(View):
     """Create client attachment (POST) bound to ``TenantClientAccount``."""
 
@@ -20976,6 +21176,11 @@ class TenantClientAttachmentsView(View):
                     ),
                     'is_edit_mode': False,
                     'editing_attachment': None,
+                    **_client_attachment_form_extras(
+                        request,
+                        form_data,
+                        from_create_get=True,
+                    ),
                 }
             )
             return render(request, self.template_name, context)
@@ -21042,6 +21247,7 @@ class TenantClientAttachmentsView(View):
                     ),
                     'is_edit_mode': False,
                     'editing_attachment': None,
+                    **_client_attachment_form_extras(request, form_data),
                 }
             )
             try:
@@ -21080,6 +21286,7 @@ class TenantClientAttachmentsView(View):
                     ),
                     'is_edit_mode': False,
                     'editing_attachment': None,
+                    **_client_attachment_form_extras(request, form_data),
                 }
             )
             messages.error(request, 'Upload failed.', extra_tags='tenant')
@@ -21094,8 +21301,12 @@ class TenantClientAttachmentsView(View):
             extra_tags='tenant',
         )
         restore_public_schema(request)
-        list_url = reverse('iroad_tenants:tenant_client_attachments_list')
-        return redirect(list_url)
+        return _redirect_after_client_detail_save(
+            request,
+            account.account_no,
+            'attachments',
+            _redirect_client_attachment_list,
+        )
 
 
 def _redirect_client_attachment_list(request):
@@ -21116,6 +21327,28 @@ def _tenant_client_attachment_detail_path(attachment_id):
 def _redirect_client_contact_list(request):
     url = reverse('iroad_tenants:tenant_client_contacts_list')
     return redirect(url)
+
+
+def _redirect_client_details_contacts_tab(account_no):
+    return _redirect_client_details_tab(account_no, 'contacts')
+
+
+def _client_contact_cancel_url(request, account_no=''):
+    return _client_detail_cancel_url(
+        request,
+        account_no,
+        'contacts',
+        'iroad_tenants:tenant_client_contacts_list',
+    )
+
+
+def _redirect_after_client_contact_save(request, account_no):
+    return _redirect_after_client_detail_save(
+        request,
+        account_no,
+        'contacts',
+        _redirect_client_contact_list,
+    )
 
 
 def _tenant_client_contacts_base_path():
@@ -21191,6 +21424,7 @@ class TenantClientAttachmentEditView(View):
                     ),
                     'is_edit_mode': True,
                     'editing_attachment': att,
+                    **_client_attachment_form_extras(request, form_data),
                 }
             )
             return render(request, self.template_name, context)
@@ -21267,6 +21501,7 @@ class TenantClientAttachmentEditView(View):
                 ),
                 'is_edit_mode': True,
                 'editing_attachment': att,
+                **_client_attachment_form_extras(request, form_data),
             }
 
             if form_errors:
@@ -21303,7 +21538,12 @@ class TenantClientAttachmentEditView(View):
                 f'Attachment {att.attachment_no} updated.',
                 extra_tags='tenant',
             )
-            return _redirect_client_attachment_list(request)
+            return _redirect_after_client_detail_save(
+                request,
+                account.account_no,
+                'attachments',
+                _redirect_client_attachment_list,
+            )
         finally:
             restore_public_schema(request)
 
@@ -21520,6 +21760,7 @@ class TenantClientContactsView(View):
                 return redirect(list_url)
             if pre:
                 form_data['client_account'] = pre
+            return_to_details = _client_contact_return_to_details(request) or bool(pre)
             context.update(
                 {
                     'form_data': form_data,
@@ -21528,6 +21769,14 @@ class TenantClientContactsView(View):
                     'tenant_schema_name': tenant_registry.schema_name,
                     'contact_form_action': reverse(
                         'iroad_tenants:tenant_client_contacts_create',
+                    ),
+                    'contact_return_to': 'details' if return_to_details else '',
+                    'client_account_locked': bool(
+                        return_to_details and form_data.get('client_account'),
+                    ),
+                    'contact_cancel_url': _client_contact_cancel_url(
+                        request,
+                        form_data.get('client_account'),
                     ),
                     **_client_contact_form_extra_context(form_data),
                 }
@@ -21586,6 +21835,8 @@ class TenantClientContactsView(View):
             except ValidationError:
                 form_errors['email'] = 'Enter a valid email address.'
 
+        _validate_client_contact_form_phones(form_data, form_errors)
+
         if form_errors:
             context.update(
                 {
@@ -21595,6 +21846,17 @@ class TenantClientContactsView(View):
                     'tenant_schema_name': tenant_registry.schema_name,
                     'contact_form_action': reverse(
                         'iroad_tenants:tenant_client_contacts_create',
+                    ),
+                    'contact_return_to': (
+                        'details' if _client_contact_return_to_details(request) else ''
+                    ),
+                    'client_account_locked': bool(
+                        _client_contact_return_to_details(request)
+                        and form_data.get('client_account')
+                    ),
+                    'contact_cancel_url': _client_contact_cancel_url(
+                        request,
+                        form_data.get('client_account'),
                     ),
                     **_client_contact_form_extra_context(form_data),
                 }
@@ -21636,6 +21898,17 @@ class TenantClientContactsView(View):
                     'contact_form_action': reverse(
                         'iroad_tenants:tenant_client_contacts_create',
                     ),
+                    'contact_return_to': (
+                        'details' if _client_contact_return_to_details(request) else ''
+                    ),
+                    'client_account_locked': bool(
+                        _client_contact_return_to_details(request)
+                        and form_data.get('client_account')
+                    ),
+                    'contact_cancel_url': _client_contact_cancel_url(
+                        request,
+                        form_data.get('client_account'),
+                    ),
                     **_client_contact_form_extra_context(form_data),
                 }
             )
@@ -21651,8 +21924,7 @@ class TenantClientContactsView(View):
             extra_tags='tenant',
         )
         restore_public_schema(request)
-        list_url = reverse('iroad_tenants:tenant_client_contacts_list')
-        return redirect(list_url)
+        return _redirect_after_client_contact_save(request, account.account_no)
 
 
 class TenantClientContactEditView(View):
@@ -21710,6 +21982,17 @@ class TenantClientContactEditView(View):
                     ),
                     'is_edit_mode': True,
                     'editing_contact': contact,
+                    'contact_return_to': (
+                        'details' if _client_contact_return_to_details(request) else ''
+                    ),
+                    'client_account_locked': bool(
+                        _client_contact_return_to_details(request)
+                        and form_data.get('client_account')
+                    ),
+                    'contact_cancel_url': _client_contact_cancel_url(
+                        request,
+                        form_data.get('client_account'),
+                    ),
                     **_client_contact_form_extra_context(form_data),
                 }
             )
@@ -21776,6 +22059,8 @@ class TenantClientContactEditView(View):
                 except ValidationError:
                     form_errors['email'] = 'Enter a valid email address.'
 
+            _validate_client_contact_form_phones(form_data, form_errors)
+
             _edit_ctx = {
                 'form_data': form_data,
                 'client_account_options': list(self._account_queryset()),
@@ -21785,6 +22070,17 @@ class TenantClientContactEditView(View):
                 ),
                 'is_edit_mode': True,
                 'editing_contact': contact,
+                'contact_return_to': (
+                    'details' if _client_contact_return_to_details(request) else ''
+                ),
+                'client_account_locked': bool(
+                    _client_contact_return_to_details(request)
+                    and form_data.get('client_account')
+                ),
+                'contact_cancel_url': _client_contact_cancel_url(
+                    request,
+                    form_data.get('client_account'),
+                ),
                 **_client_contact_form_extra_context(form_data),
             }
 
@@ -21827,7 +22123,7 @@ class TenantClientContactEditView(View):
                 f'Contact {form_data["name"]} updated.',
                 extra_tags='tenant',
             )
-            return _redirect_client_contact_list(request)
+            return _redirect_after_client_contact_save(request, account.account_no)
         finally:
             restore_public_schema(request)
 
@@ -22033,7 +22329,15 @@ class TenantClientContractView(View):
             'notes': '',
         }
 
-    def _build_create_context(self, request, tenant_registry, form_data, form_errors):
+    def _build_create_context(
+        self,
+        request,
+        tenant_registry,
+        form_data,
+        form_errors,
+        *,
+        from_create_get=False,
+    ):
         form_data = dict(form_data)
         if not form_data.get('contract_no'):
             form_data['contract_no'] = _preview_next_contract_code()
@@ -22047,6 +22351,11 @@ class TenantClientContractView(View):
                 'iroad_tenants:tenant_client_contract_create',
             ),
             'contract_settings': _client_contract_settings_template_dict(settings_row),
+            **_client_contract_form_extras(
+                request,
+                form_data,
+                from_create_get=from_create_get,
+            ),
         }
 
     def get(self, request):
@@ -22077,7 +22386,15 @@ class TenantClientContractView(View):
                 return redirect(list_url)
             if pre:
                 form_data['client_account'] = pre
-            context.update(self._build_create_context(request, tenant_registry, form_data, {}))
+            context.update(
+                self._build_create_context(
+                    request,
+                    tenant_registry,
+                    form_data,
+                    {},
+                    from_create_get=True,
+                )
+            )
             return render(request, self.template_name, context)
         finally:
             restore_public_schema(request)
@@ -22167,8 +22484,12 @@ class TenantClientContractView(View):
                 f'Contract {contract_no} created for {account.account_no}.',
                 extra_tags='tenant',
             )
-            list_url = reverse('iroad_tenants:tenant_client_contract_list')
-            return redirect(list_url)
+            return _redirect_after_client_detail_save(
+                request,
+                account.account_no,
+                'contracts',
+                _redirect_client_contract_list,
+            )
         except Exception:
             logger.exception('Tenant client contract create failed')
             context.update(
@@ -22254,14 +22575,12 @@ class TenantClientContractEditView(View):
         form_data,
         form_errors,
     ):
-        list_url = reverse('iroad_tenants:tenant_client_contract_list')
         settings_row = _get_singleton_client_contract_settings()
         return {
             'form_data': form_data,
             'form_errors': form_errors,
             'client_account_options': list(self._account_queryset()),
             'tenant_schema_name': tenant_registry.schema_name,
-            'back_to_list_url': list_url,
             'contract_form_action': reverse(
                 'iroad_tenants:tenant_client_contract_edit',
                 kwargs={'contract_id': contract.contract_id},
@@ -22269,6 +22588,7 @@ class TenantClientContractEditView(View):
             'is_edit_mode': True,
             'editing_contract': contract,
             'contract_settings': _client_contract_settings_template_dict(settings_row),
+            **_client_contract_form_extras(request, form_data),
         }
 
     def get(self, request, contract_id):
@@ -22398,7 +22718,12 @@ class TenantClientContractEditView(View):
                 f'Contract {contract.contract_no} updated.',
                 extra_tags='tenant',
             )
-            return _redirect_client_contract_list(request)
+            return _redirect_after_client_detail_save(
+                request,
+                contract.client_account.account_no,
+                'contracts',
+                _redirect_client_contract_list,
+            )
         finally:
             restore_public_schema(request)
 
@@ -22767,7 +23092,7 @@ class TenantClientDetailsView(View):
                             edit_u = (
                                 f'/master-data/addresses/{addr.address_code}/edit/'
                             )
-                        addr.list_edit_url = edit_u
+                        addr.list_edit_url = f'{edit_u}?return_to=details'
             client_cargo_masters = []
             client_contract = None
             client_price_lists = []
@@ -22846,7 +23171,7 @@ class TenantClientDetailsView(View):
                         )
                     except NoReverseMatch:
                         edit_u = _tenant_client_contract_edit_path(cid)
-                    client_contract.list_edit_url = edit_u
+                    client_contract.list_edit_url = f'{edit_u}?return_to=details'
                     try:
                         del_u = reverse(
                             'iroad_tenants:tenant_client_contract_delete',
@@ -23291,11 +23616,16 @@ class TenantAddressMasterCreateView(View):
 
             initial = {}
             cid = (request.GET.get('client') or '').strip()
+            account_no_param = (request.GET.get('account') or '').strip()
             if cid:
                 try:
                     initial['client_account'] = uuid.UUID(cid)
                 except ValueError:
                     pass
+            elif account_no_param:
+                acc = TenantClientAccount.objects.filter(account_no=account_no_param).first()
+                if acc:
+                    initial['client_account'] = acc.pk
 
             form = TenantAddressMasterForm(
                 initial=initial,
@@ -23306,6 +23636,7 @@ class TenantAddressMasterCreateView(View):
                     'preview_address_code': preview,
                     'is_edit': False,
                     'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                    **_address_master_form_extras(request, form),
                 }
             )
             return render(request, self.template_name, context)
@@ -23346,6 +23677,7 @@ class TenantAddressMasterCreateView(View):
                         'preview_address_code': preview,
                         'is_edit': False,
                         'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                        **_address_master_form_extras(request, form),
                     }
                 )
                 messages.error(request, 'Please fix the highlighted errors.', extra_tags='tenant')
@@ -23378,6 +23710,7 @@ class TenantAddressMasterCreateView(View):
                         'preview_address_code': preview,
                         'is_edit': False,
                         'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                        **_address_master_form_extras(request, form),
                     }
                 )
                 messages.error(request, 'Could not save the address.', extra_tags='tenant')
@@ -23398,6 +23731,7 @@ class TenantAddressMasterCreateView(View):
                         'preview_address_code': preview,
                         'is_edit': False,
                         'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                        **_address_master_form_extras(request, form),
                     }
                 )
                 messages.error(request, 'Could not save the address.', extra_tags='tenant')
@@ -23418,6 +23752,7 @@ class TenantAddressMasterCreateView(View):
                         'preview_address_code': preview,
                         'is_edit': False,
                         'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                        **_address_master_form_extras(request, form),
                     }
                 )
                 messages.error(request, 'Could not save the address.', extra_tags='tenant')
@@ -23429,7 +23764,8 @@ class TenantAddressMasterCreateView(View):
                 extra_tags='tenant',
             )
 
-            redirect_resp = _tenant_redirect(request, 'iroad_tenants:tenant_address_master')
+            account_no = (form.cleaned_data['client_account'].account_no or '').strip()
+            redirect_resp = _redirect_after_address_save(request, account_no)
         finally:
             restore_public_schema(request)
 
@@ -23482,6 +23818,7 @@ class TenantAddressMasterEditView(View):
                     'is_edit': True,
                     'address_record': instance,
                     'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                    **_address_master_form_extras(request, form, instance=instance),
                 }
             )
             return render(request, self.template_name, context)
@@ -23529,6 +23866,7 @@ class TenantAddressMasterEditView(View):
                         'is_edit': True,
                         'address_record': instance,
                         'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                        **_address_master_form_extras(request, form, instance=instance),
                     }
                 )
                 messages.error(request, 'Please fix the highlighted errors.', extra_tags='tenant')
@@ -23552,6 +23890,7 @@ class TenantAddressMasterEditView(View):
                         'is_edit': True,
                         'address_record': instance,
                         'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                        **_address_master_form_extras(request, form, instance=instance),
                     }
                 )
                 messages.error(request, 'Could not save changes.', extra_tags='tenant')
@@ -23571,6 +23910,7 @@ class TenantAddressMasterEditView(View):
                         'is_edit': True,
                         'address_record': instance,
                         'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                        **_address_master_form_extras(request, form, instance=instance),
                     }
                 )
                 messages.error(request, 'Could not save changes.', extra_tags='tenant')
@@ -23590,13 +23930,15 @@ class TenantAddressMasterEditView(View):
                         'is_edit': True,
                         'address_record': instance,
                         'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                        **_address_master_form_extras(request, form, instance=instance),
                     }
                 )
                 messages.error(request, 'Could not save changes.', extra_tags='tenant')
                 return render(request, self.template_name, context)
 
             messages.success(request, 'Address updated successfully.', extra_tags='tenant')
-            redirect_resp = _tenant_redirect(request, 'iroad_tenants:tenant_address_master')
+            account_no = (instance.client_account.account_no or '').strip()
+            redirect_resp = _redirect_after_address_save(request, account_no)
         finally:
             restore_public_schema(request)
 
@@ -24342,6 +24684,28 @@ class TruckMasterListView(View):
             row = TruckMaster.objects.filter(pk=truck_pk).first()
             if not row:
                 messages.error(request, 'Truck not found.', extra_tags='tenant')
+            elif (
+                new_status == TruckMaster.Status.ACTIVE
+                and row.status != TruckMaster.Status.ACTIVE
+                and counts_toward_internal_truck_limit(
+                    status=new_status,
+                    sourcing_mode=row.sourcing_mode,
+                )
+            ):
+                allowed, limit_msg = check_subscription_resource_limit(
+                    context['tenant'],
+                    RESOURCE_INTERNAL_TRUCKS,
+                )
+                if not allowed:
+                    messages.error(request, limit_msg, extra_tags='tenant')
+                else:
+                    row.status = new_status
+                    row.save(update_fields=['status', 'updated_at'])
+                    messages.success(
+                        request,
+                        f'Truck set to {new_status.lower()}.',
+                        extra_tags='tenant',
+                    )
             else:
                 # TODO: Check active bookings when Booking module is built
                 # For now: allow deactivate freely
@@ -24409,6 +24773,8 @@ class TruckMasterCreateView(View):
             return response
 
         try:
+            schema_name = getattr(tenant_registry, 'schema_name', '')
+
             settings = TruckSettings.get_or_create_singleton()
             code_preview = _preview_next_auto_number_for_form(
                 form_code='truck-master',
@@ -24432,7 +24798,12 @@ class TruckMasterCreateView(View):
                     'settings_driver_assignment_required': bool(settings.driver_assignment_required),
                     'page_title': 'Add Truck',
                     'is_edit': False,
-                    'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                    'tenant_schema_name': schema_name,
+                    'subscription_resource_limit': subscription_limit_status(
+                        context['tenant'],
+                        RESOURCE_INTERNAL_TRUCKS,
+                        schema_name=schema_name,
+                    ),
                 }
             )
             return render(request, self.template_name, context)
@@ -24505,6 +24876,50 @@ class TruckMasterCreateView(View):
                 messages.error(request, 'Please fix the highlighted errors.', extra_tags='tenant')
                 return render(request, self.template_name, context)
 
+            effective_status = _settings_effective_truck_status(
+                settings.default_truck_status
+            )
+            sourcing_mode = (
+                form.cleaned_data.get('sourcing_mode')
+                or TruckMaster.SourcingMode.IN_SOURCE
+            )
+            if counts_toward_internal_truck_limit(
+                status=effective_status,
+                sourcing_mode=sourcing_mode,
+            ):
+                allowed, limit_msg = check_subscription_resource_limit(
+                    context['tenant'],
+                    RESOURCE_INTERNAL_TRUCKS,
+                )
+                if not allowed:
+                    form.add_error(None, limit_msg)
+                    code_preview = _preview_next_auto_number_for_form(
+                        form_code='truck-master',
+                        form_label='Truck Master',
+                        prefix='TR',
+                    )
+                    context.update(
+                        {
+                            'form': form,
+                            'code_preview': code_preview,
+                            'settings_default_status_effective': effective_status,
+                            'settings_driver_assignment_required': bool(
+                                settings.driver_assignment_required
+                            ),
+                            'page_title': 'Add Truck',
+                            'is_edit': False,
+                            'tenant_schema_name': getattr(
+                                tenant_registry, 'schema_name', ''
+                            ),
+                            'subscription_resource_limit': subscription_limit_status(
+                                context['tenant'],
+                                RESOURCE_INTERNAL_TRUCKS,
+                            ),
+                        }
+                    )
+                    messages.error(request, limit_msg, extra_tags='tenant')
+                    return render(request, self.template_name, context)
+
             try:
                 with db_transaction.atomic():
                     code, seq = _next_auto_number_for_form(
@@ -24515,9 +24930,7 @@ class TruckMasterCreateView(View):
                     obj = form.save(commit=False)
                     obj.truck_code = code
                     obj.truck_sequence = seq
-                    obj.status = _settings_effective_truck_status(
-                        settings.default_truck_status
-                    )
+                    obj.status = effective_status
                     obj.full_clean()
                     obj.save()
                     _sync_truck_driver_assignment_history(obj, previous_driver_id=None)
@@ -25356,6 +25769,24 @@ class DriverMasterListView(View):
                         if rq:
                             return redirect(f'{base}?{rq}')
                         return _tenant_redirect(request, 'iroad_tenants:driver_master')
+                    if (
+                        row.driver_status != DriverMaster.Status.ACTIVE
+                        and counts_toward_driver_limit(
+                            driver_status=new_status,
+                            driver_source=row.driver_source,
+                        )
+                    ):
+                        allowed, limit_msg = check_subscription_resource_limit(
+                            context['tenant'],
+                            RESOURCE_DRIVERS,
+                        )
+                        if not allowed:
+                            messages.error(request, limit_msg, extra_tags='tenant')
+                            rq = (request.POST.get('redirect_query') or '').strip()
+                            base = reverse('iroad_tenants:driver_master')
+                            if rq:
+                                return redirect(f'{base}?{rq}')
+                            return _tenant_redirect(request, 'iroad_tenants:driver_master')
                 # TODO: Check active bookings when built
                 row.driver_status = new_status
                 row.save(update_fields=['driver_status', 'updated_at'])
@@ -25759,6 +26190,8 @@ class DriverMasterCreateView(View):
             return response
 
         try:
+            schema_name = getattr(tenant_registry, 'schema_name', '')
+
             settings = DriverSettings.get_or_create_singleton()
             code_preview = _preview_next_auto_number_for_form(
                 form_code='driver-master',
@@ -25785,7 +26218,12 @@ class DriverMasterCreateView(View):
                     'settings_document_upload_mandatory': bool(settings.document_upload_mandatory),
                     'page_title': 'Create Driver Profile',
                     'is_edit': False,
-                    'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                    'tenant_schema_name': schema_name,
+                    'subscription_resource_limit': subscription_limit_status(
+                        context['tenant'],
+                        RESOURCE_DRIVERS,
+                        schema_name=schema_name,
+                    ),
                 }
             )
             return render(request, self.template_name, context)
@@ -25832,6 +26270,54 @@ class DriverMasterCreateView(View):
                 messages.error(request, 'Please fix the highlighted errors.', extra_tags='tenant')
                 return render(request, self.template_name, context)
 
+            effective_driver_status = _settings_effective_driver_status(
+                settings.default_driver_status
+            )
+            driver_source = (
+                form.cleaned_data.get('driver_source')
+                or DriverMaster.DriverSource.IN_SOURCE
+            )
+            if counts_toward_driver_limit(
+                driver_status=effective_driver_status,
+                driver_source=driver_source,
+            ):
+                allowed, limit_msg = check_subscription_resource_limit(
+                    context['tenant'],
+                    RESOURCE_DRIVERS,
+                )
+                if not allowed:
+                    form.add_error(None, limit_msg)
+                    code_preview = _preview_next_auto_number_for_form(
+                        form_code='driver-master',
+                        form_label='Driver Master',
+                        prefix='DR',
+                    )
+                    context.update(
+                        {
+                            'form': form,
+                            'code_preview': code_preview,
+                            'assigned_truck_date': None,
+                            'settings_default_status_effective': effective_driver_status,
+                            'settings_driver_assignment_required': bool(
+                                settings.driver_assignment_required
+                            ),
+                            'settings_document_upload_mandatory': bool(
+                                settings.document_upload_mandatory
+                            ),
+                            'page_title': 'Create Driver Profile',
+                            'is_edit': False,
+                            'tenant_schema_name': getattr(
+                                tenant_registry, 'schema_name', ''
+                            ),
+                            'subscription_resource_limit': subscription_limit_status(
+                                context['tenant'],
+                                RESOURCE_DRIVERS,
+                            ),
+                        }
+                    )
+                    messages.error(request, limit_msg, extra_tags='tenant')
+                    return render(request, self.template_name, context)
+
             try:
                 with db_transaction.atomic():
                     selected_truck = form.cleaned_data.get('default_truck_id')
@@ -25856,9 +26342,7 @@ class DriverMasterCreateView(View):
                             setattr(obj, fname, upl)
 
                     # Enforce default status from Driver Settings for new driver creation.
-                    obj.driver_status = _settings_effective_driver_status(
-                        settings.default_driver_status
-                    )
+                    obj.driver_status = effective_driver_status
 
                     if (
                         settings.document_upload_mandatory
@@ -29651,7 +30135,15 @@ class TenantRouteMasterListView(View):
             return response
         try:
             qs = TenantRouteMaster.objects.select_related('origin_point', 'destination_point')
+            search_q = (request.GET.get('q') or '').strip()
             route_scope = (request.GET.get('scope') or 'all').strip().lower()
+            if search_q:
+                qs = qs.filter(
+                    Q(route_code__icontains=search_q)
+                    | Q(route_label__icontains=search_q)
+                    | Q(origin_point__display_label__icontains=search_q)
+                    | Q(destination_point__display_label__icontains=search_q)
+                )
             if route_scope == 'domestic':
                 qs = qs.filter(route_type=TenantRouteMaster.RouteType.DOMESTIC)
             elif route_scope == 'international':
@@ -30551,6 +31043,8 @@ class TenantUsersAdministrationCreateView(View):
             clear_tenant_portal_cookie(response, request=request)
             return response
         try:
+            schema_name = tenant_registry.schema_name
+
             context.update(
                 {
                     'role_options': _tenant_role_name_options(),
@@ -30560,12 +31054,18 @@ class TenantUsersAdministrationCreateView(View):
                         'roles': [],
                     },
                     'form_errors': {},
-                    'tenant_schema_name': tenant_registry.schema_name,
+                    'form_non_field_error': '',
+                    'tenant_schema_name': schema_name,
                     'is_edit_mode': False,
                     'is_view_mode': False,
                     'is_deleted_user': False,
                     'is_effective_readonly': False,
                     'deleted_by_display': '',
+                    'subscription_resource_limit': subscription_limit_status(
+                        context['tenant'],
+                        RESOURCE_USERS,
+                        schema_name=schema_name,
+                    ),
                 }
             )
             return render(
@@ -30621,21 +31121,60 @@ class TenantUsersAdministrationCreateView(View):
                     'Tenant user email cannot be the same as the tenant primary login email.'
                 )
 
+            schema_name = tenant_registry.schema_name
             if form_errors:
                 context.update(
                     {
                         'role_options': role_options,
                         'form_data': form_data,
                         'form_errors': form_errors,
-                        'tenant_schema_name': tenant_registry.schema_name,
+                        'form_non_field_error': '',
+                        'tenant_schema_name': schema_name,
                         'is_edit_mode': False,
                         'is_view_mode': False,
                         'is_deleted_user': False,
                         'is_effective_readonly': False,
                         'deleted_by_display': '',
+                        'subscription_resource_limit': subscription_limit_status(
+                            context['tenant'],
+                            RESOURCE_USERS,
+                            schema_name=schema_name,
+                        ),
                     }
                 )
                 messages.error(request, 'Please fix the highlighted errors.', extra_tags='tenant')
+                return render(
+                    request,
+                    'iroad_tenants/User_Management/Users-administration-create.html',
+                    context,
+                )
+
+            allowed, limit_msg = check_subscription_resource_limit(
+                context['tenant'],
+                RESOURCE_USERS,
+                schema_name=schema_name,
+            )
+            if not allowed:
+                context.update(
+                    {
+                        'role_options': role_options,
+                        'form_data': form_data,
+                        'form_errors': {},
+                        'form_non_field_error': limit_msg,
+                        'tenant_schema_name': schema_name,
+                        'is_edit_mode': False,
+                        'is_view_mode': False,
+                        'is_deleted_user': False,
+                        'is_effective_readonly': False,
+                        'deleted_by_display': '',
+                        'subscription_resource_limit': subscription_limit_status(
+                            context['tenant'],
+                            RESOURCE_USERS,
+                            schema_name=schema_name,
+                        ),
+                    }
+                )
+                messages.error(request, limit_msg, extra_tags='tenant')
                 return render(
                     request,
                     'iroad_tenants/User_Management/Users-administration-create.html',
@@ -30935,6 +31474,13 @@ class TenantUsersAdministrationRestoreView(View):
                 return _tenant_redirect(request, 'iroad_tenants:tenant_users_administration')
             if not tenant_user.is_deleted:
                 messages.warning(request, 'This user is not deleted.', extra_tags='tenant')
+                return _tenant_redirect(request, 'iroad_tenants:tenant_users_administration')
+            allowed, limit_msg = check_subscription_resource_limit(
+                context['tenant'],
+                RESOURCE_USERS,
+            )
+            if not allowed:
+                messages.error(request, limit_msg, extra_tags='tenant')
                 return _tenant_redirect(request, 'iroad_tenants:tenant_users_administration')
             tenant_user.restore()
             messages.success(
