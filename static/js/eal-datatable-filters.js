@@ -223,12 +223,18 @@
   function discoverFilterableRoots() {
     var roots = [];
     var seen = new Set();
-    Array.prototype.forEach.call(document.querySelectorAll("[data-eal-filterable-table]"), function (root) {
-      if (!seen.has(root)) {
-        seen.add(root);
-        roots.push(root);
+    Array.prototype.forEach.call(
+      document.querySelectorAll("[data-eal-filterable-table], [data-eal-server-paginated='1']"),
+      function (root) {
+        if (!root.hasAttribute("data-eal-filterable-table")) {
+          root.setAttribute("data-eal-filterable-table", "");
+        }
+        if (!seen.has(root)) {
+          seen.add(root);
+          roots.push(root);
+        }
       }
-    });
+    );
     Array.prototype.forEach.call(document.querySelectorAll(".eal-table-card"), function (card) {
       if (card.getAttribute("data-eal-filterable") === "0") return;
       if (!card.querySelector("table.eal-table thead")) return;
@@ -241,6 +247,48 @@
       }
     });
     return roots;
+  }
+
+  function ensureServerSearchInput(root) {
+    if (!root || root.getAttribute("data-eal-server-paginated") !== "1") return null;
+
+    var inp = root.querySelector("[data-eal-global-search]");
+    if (!inp) {
+      inp = root.querySelector(
+        ".eal-search input[type='search'], .eal-search input[name='q'], .eal-search input[name='search'], .eal-toolbar .eal-search input"
+      );
+    }
+    if (!inp) return null;
+
+    if (!inp.hasAttribute("data-eal-global-search")) {
+      inp.setAttribute("data-eal-global-search", "");
+    }
+    if (inp.getAttribute("name") === "search") {
+      inp.removeAttribute("name");
+    }
+
+    var form = inp.closest("form");
+    if (form && form.getAttribute("data-eal-search-form-wired") !== "1") {
+      form.setAttribute("data-eal-search-form-wired", "1");
+      form.addEventListener("submit", function (event) {
+        event.preventDefault();
+        inp.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+    }
+
+    try {
+      var params = new URLSearchParams(window.location.search);
+      var paramPrefix = root.getAttribute("data-eal-param-prefix") || "";
+      var fromUrl =
+        params.get(listParamKey(paramPrefix, "q")) || params.get("search") || "";
+      if (!((inp.value || "").trim()) && fromUrl) {
+        inp.value = fromUrl;
+      }
+    } catch (e) {
+      /* ignore */
+    }
+
+    return inp;
   }
 
   function initSelectAllCheckboxes(root) {
@@ -387,58 +435,218 @@
     });
   }
 
-  function navigateServerPaginatedSort(columnIndex, direction) {
-    var url = new URL(window.location.href);
-    url.searchParams.set("sort_col", String(columnIndex));
-    url.searchParams.set("sort_dir", direction || "asc");
-    url.searchParams.delete("page");
-    window.location.assign(url.toString());
+  function listParamKey(paramPrefix, name) {
+    return (paramPrefix || "") + name;
   }
 
-  function clearServerPaginatedSort(columnIndex) {
-    var url = new URL(window.location.href);
-    var activeCol = url.searchParams.get("sort_col");
-    if (!activeCol || Number(activeCol) === columnIndex) {
-      url.searchParams.delete("sort_col");
-      url.searchParams.delete("sort_dir");
+  function applyClientDetailsTabParam(url, root) {
+    if (!root || !url || !url.searchParams) return;
+    var tabParam = (root.getAttribute("data-eal-tab-param") || "").trim();
+    if (tabParam) {
+      url.searchParams.set("tab", tabParam);
     }
-    url.searchParams.delete("page");
+  }
+
+  function wireServerFilterSelects(root, paramPrefix) {
+    if (!root || root.getAttribute("data-eal-filter-selects-wired") === "1") return;
+    root.setAttribute("data-eal-filter-selects-wired", "1");
+
+    var listUrl =
+      (root.getAttribute("data-eal-list-url") || "").trim() ||
+      window.location.pathname;
+
+    function navigateWithFilters() {
+      var params = new URLSearchParams(window.location.search);
+      params.delete(listParamKey(paramPrefix, "page"));
+      root.querySelectorAll("[data-query-param]").forEach(function (el) {
+        var key = el.getAttribute("data-query-param");
+        if (!key) return;
+        var val = (el.value || "").trim();
+        if (!val) params.delete(key);
+        else params.set(key, val);
+      });
+      var tabParam = (root.getAttribute("data-eal-tab-param") || "").trim();
+      if (tabParam) {
+        params.set("tab", tabParam);
+      }
+      var qs = params.toString();
+      window.location.replace(listUrl + (qs ? "?" + qs : ""));
+    }
+
+    root.querySelectorAll("[data-query-param]").forEach(function (el) {
+      if (el.getAttribute("data-eal-filter-select-wired") === "1") return;
+      el.setAttribute("data-eal-filter-select-wired", "1");
+      el.addEventListener("change", navigateWithFilters);
+    });
+  }
+
+  function wireServerLiveSearch(root, globalSearchInput, searchClearBtn, paramPrefix) {
+    if (!globalSearchInput) return;
+    if (globalSearchInput.getAttribute("data-eal-live-search-wired") === "1") return;
+    globalSearchInput.setAttribute("data-eal-live-search-wired", "1");
+
+    var pfx = paramPrefix || "";
+    var listUrl =
+      (root && (root.getAttribute("data-eal-list-url") || "").trim()) ||
+      window.location.pathname;
+
+    function p(name) {
+      return listParamKey(pfx, name);
+    }
+
+    function hasServerQ() {
+      try {
+        var params = new URLSearchParams(window.location.search);
+        return params.has(p("q")) || params.has("search");
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function buildListUrl() {
+      var params = new URLSearchParams(window.location.search);
+      params.delete(p("page"));
+      params.delete("search");
+      var q = (globalSearchInput.value || "").trim();
+      if (q) params.set(p("q"), q);
+      else params.delete(p("q"));
+      if (root) {
+        var filterEls = root.querySelectorAll("[data-query-param]");
+        filterEls.forEach(function (el) {
+          var key = el.getAttribute("data-query-param");
+          if (!key) return;
+          var val = (el.value || "").trim();
+          if (!val) params.delete(key);
+          else params.set(key, val);
+        });
+      }
+      if (root) {
+        var tabParam = (root.getAttribute("data-eal-tab-param") || "").trim();
+        if (tabParam) params.set("tab", tabParam);
+      }
+      var qs = params.toString();
+      return listUrl + (qs ? "?" + qs : "");
+    }
+
+    function navigateList() {
+      window.location.replace(buildListUrl());
+    }
+
+    function syncClear() {
+      if (!searchClearBtn) return;
+      var value = (globalSearchInput.value || "").trim();
+      searchClearBtn.hidden = !(value || hasServerQ());
+    }
+
+    var debounceTimer;
+    globalSearchInput.addEventListener("input", function () {
+      syncClear();
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(function () {
+        var v = (globalSearchInput.value || "").trim();
+        var cur = "";
+        try {
+          var liveParams = new URLSearchParams(window.location.search);
+          cur = liveParams.get(p("q")) || liveParams.get("search") || "";
+        } catch (e) {
+          cur = "";
+        }
+        if (v === cur) return;
+        navigateList();
+      }, 450);
+    });
+
+    globalSearchInput.addEventListener("keydown", function (event) {
+      if (event.key !== "Enter") return;
+      event.preventDefault();
+      clearTimeout(debounceTimer);
+      navigateList();
+    });
+
+    syncClear();
+    if ((globalSearchInput.value || "").trim() || hasServerQ()) {
+      syncClear();
+    }
+
+    if (searchClearBtn) {
+      searchClearBtn.addEventListener("click", function () {
+        if (hasServerQ()) {
+          var params = new URLSearchParams(window.location.search);
+          params.delete(p("q"));
+          params.delete("search");
+          params.delete(p("page"));
+          var qs = params.toString();
+          window.location.href = listUrl + (qs ? "?" + qs : "");
+          return;
+        }
+        globalSearchInput.value = "";
+        globalSearchInput.dispatchEvent(new Event("input", { bubbles: true }));
+        syncClear();
+        globalSearchInput.focus();
+      });
+    }
+  }
+
+  function navigateServerPaginatedSort(columnIndex, direction, paramPrefix, root) {
+    var p = paramPrefix || "";
+    var url = new URL(window.location.href);
+    url.searchParams.set(listParamKey(p, "sort_col"), String(columnIndex));
+    url.searchParams.set(listParamKey(p, "sort_dir"), direction || "asc");
+    url.searchParams.delete(listParamKey(p, "page"));
+    applyClientDetailsTabParam(url, root);
     window.location.assign(url.toString());
   }
 
-  function navigateServerPaginatedFilter(columnIndex, value) {
+  function clearServerPaginatedSort(columnIndex, paramPrefix) {
+    var p = paramPrefix || "";
+    var url = new URL(window.location.href);
+    var activeCol = url.searchParams.get(listParamKey(p, "sort_col"));
+    if (!activeCol || Number(activeCol) === columnIndex) {
+      url.searchParams.delete(listParamKey(p, "sort_col"));
+      url.searchParams.delete(listParamKey(p, "sort_dir"));
+    }
+    url.searchParams.delete(listParamKey(p, "page"));
+    window.location.assign(url.toString());
+  }
+
+  function navigateServerPaginatedFilter(columnIndex, value, paramPrefix, root) {
+    var p = paramPrefix || "";
     var url = new URL(window.location.href);
     var v = String(value || "").trim();
+    var filterKey = listParamKey(p, "filter_" + columnIndex);
     if (v) {
-      url.searchParams.set("filter_" + columnIndex, v);
+      url.searchParams.set(filterKey, v);
     } else {
-      url.searchParams.delete("filter_" + columnIndex);
+      url.searchParams.delete(filterKey);
     }
-    url.searchParams.delete("page");
+    url.searchParams.delete(listParamKey(p, "page"));
+    applyClientDetailsTabParam(url, root);
     window.location.assign(url.toString());
   }
 
-  function clearServerPaginatedColumn(columnIndex) {
+  function clearServerPaginatedColumn(columnIndex, paramPrefix) {
+    var p = paramPrefix || "";
     var url = new URL(window.location.href);
-    url.searchParams.delete("filter_" + String(columnIndex));
-    var activeCol = url.searchParams.get("sort_col");
+    url.searchParams.delete(listParamKey(p, "filter_" + String(columnIndex)));
+    var activeCol = url.searchParams.get(listParamKey(p, "sort_col"));
     if (activeCol && Number(activeCol) === columnIndex) {
-      url.searchParams.delete("sort_col");
-      url.searchParams.delete("sort_dir");
+      url.searchParams.delete(listParamKey(p, "sort_col"));
+      url.searchParams.delete(listParamKey(p, "sort_dir"));
     }
-    url.searchParams.delete("page");
+    url.searchParams.delete(listParamKey(p, "page"));
     window.location.assign(url.toString());
   }
 
-  function syncServerSortIndicators(filterHeaders) {
+  function syncServerSortIndicators(filterHeaders, paramPrefix) {
+    var p = paramPrefix || "";
     var params;
     try {
       params = new URLSearchParams(window.location.search);
     } catch (e) {
       return;
     }
-    var sortCol = params.get("sort_col");
-    var sortDir = (params.get("sort_dir") || "").toLowerCase();
+    var sortCol = params.get(listParamKey(p, "sort_col"));
+    var sortDir = (params.get(listParamKey(p, "sort_dir")) || "").toLowerCase();
     filterHeaders.forEach(function (header) {
       var columnIndex = String(header.getAttribute("data-column-index") || "");
       var label = header.querySelector(".eal-th-filter-label");
@@ -450,7 +658,8 @@
     });
   }
 
-  function syncServerFilterInputs(filterHeaders) {
+  function syncServerFilterInputs(filterHeaders, paramPrefix) {
+    var p = paramPrefix || "";
     var params;
     try {
       params = new URLSearchParams(window.location.search);
@@ -461,7 +670,7 @@
       var columnIndex = Number(header.getAttribute("data-column-index"));
       var input = header.querySelector(".eal-column-filter-input");
       var menuButton = header.querySelector(".eal-filter-menu-btn");
-      var val = params.get("filter_" + columnIndex) || "";
+      var val = params.get(listParamKey(p, "filter_" + columnIndex)) || "";
       if (input) input.value = val;
       if (menuButton) menuButton.classList.toggle("active", Boolean(val));
     });
@@ -471,6 +680,7 @@
     if (!root || root.getAttribute("data-eal-filter-skip") === "1") return;
 
     var serverPaginated = root.getAttribute("data-eal-server-paginated") === "1";
+    var paramPrefix = root.getAttribute("data-eal-param-prefix") || "";
     var table = root.querySelector("table.eal-table");
     if (!table) return;
     var tbody = table.querySelector("tbody");
@@ -490,7 +700,8 @@
       if (descBtn) descBtn.textContent = sorts.desc;
     }
 
-    var globalSearchInput = root.querySelector("[data-eal-global-search]");
+    var globalSearchInput =
+      ensureServerSearchInput(root) || root.querySelector("[data-eal-global-search]");
     var emptyColspan = parseInt(root.getAttribute("data-eal-empty-colspan") || "10", 10);
     var emptyMsg =
       root.getAttribute("data-eal-empty-filter-message") ||
@@ -593,13 +804,14 @@
     function serverPaginatedUrlFiltersActive() {
       try {
         var params = new URLSearchParams(window.location.search);
-        if ((params.get("q") || "").trim()) {
+        if ((params.get(listParamKey(paramPrefix, "q")) || "").trim()) {
           return true;
         }
+        var filterPrefix = listParamKey(paramPrefix, "filter_");
         var active = false;
         params.forEach(function (val, key) {
           if (active) return;
-          if (key.indexOf("filter_") === 0 && (val || "").trim()) {
+          if (key.indexOf(filterPrefix) === 0 && (val || "").trim()) {
             active = true;
           }
         });
@@ -722,17 +934,32 @@
 
     var syncSelectAllCheckboxes = initSelectAllCheckboxes(root);
 
-    var searchClearBtn =
-      globalSearchInput && globalSearchInput.parentElement
-        ? globalSearchInput.parentElement.querySelector(".eal-search-clear-btn")
-        : null;
+    var searchClearBtn = null;
+    if (globalSearchInput) {
+      if (globalSearchInput.parentElement) {
+        searchClearBtn = globalSearchInput.parentElement.querySelector(
+          ".eal-search-clear-btn"
+        );
+      }
+      if (!searchClearBtn) {
+        var searchToolbar = globalSearchInput.closest(
+          ".eal-toolbar, .client-table-toolbar"
+        );
+        if (searchToolbar) {
+          searchClearBtn = searchToolbar.querySelector(".eal-search-clear-btn");
+        }
+      }
+    }
 
     function syncGlobalSearchClearBtn() {
       if (!searchClearBtn || !globalSearchInput) return;
       var value = (globalSearchInput.value || "").trim();
       if (serverPaginated) {
         try {
-          var activeQ = new URLSearchParams(window.location.search).get("q") || "";
+          var activeQ =
+            new URLSearchParams(window.location.search).get(
+              listParamKey(paramPrefix, "q")
+            ) || "";
           searchClearBtn.hidden = !(value || activeQ);
         } catch (e) {
           searchClearBtn.hidden = !value;
@@ -742,40 +969,29 @@
       searchClearBtn.hidden = !value;
     }
 
+    if (serverPaginated) {
+      wireServerFilterSelects(root, paramPrefix);
+    }
+
     if (globalSearchInput) {
       if (serverPaginated) {
-        var globalSearchDebounce;
-        globalSearchInput.addEventListener("input", function () {
-          syncGlobalSearchClearBtn();
-          clearTimeout(globalSearchDebounce);
-          globalSearchDebounce = setTimeout(function () {
-            var url = new URL(window.location.href);
-            var v = (globalSearchInput.value || "").trim();
-            var cur = url.searchParams.get("q") || "";
-            if (v === cur) return;
-            if (v) url.searchParams.set("q", v);
-            else url.searchParams.delete("q");
-            url.searchParams.delete("page");
-            window.location.replace(url.toString());
-          }, 450);
-        });
-      } else {
+        wireServerLiveSearch(root, globalSearchInput, searchClearBtn, paramPrefix);
+      } else if (globalSearchInput.getAttribute("data-eal-live-search-wired") !== "1") {
         globalSearchInput.addEventListener("input", function () {
           state.globalSearch = normalizeText(globalSearchInput.value);
           syncGlobalSearchClearBtn();
           applyTableState();
         });
-      }
-      syncGlobalSearchClearBtn();
-    }
-
-    if (searchClearBtn && globalSearchInput) {
-      searchClearBtn.addEventListener("click", function () {
-        globalSearchInput.value = "";
-        globalSearchInput.dispatchEvent(new Event("input", { bubbles: true }));
         syncGlobalSearchClearBtn();
-        globalSearchInput.focus();
-      });
+        if (searchClearBtn) {
+          searchClearBtn.addEventListener("click", function () {
+            globalSearchInput.value = "";
+            globalSearchInput.dispatchEvent(new Event("input", { bubbles: true }));
+            syncGlobalSearchClearBtn();
+            globalSearchInput.focus();
+          });
+        }
+      }
     }
 
     if (chipGroup && (chipRowPrimaryAttr || !isNaN(chipColumn))) {
@@ -852,25 +1068,34 @@
             params = null;
           }
           if (params) {
-            var initialVal = params.get("filter_" + columnIndex) || "";
+            var initialVal =
+              params.get(listParamKey(paramPrefix, "filter_" + columnIndex)) || "";
             if (initialVal) input.value = initialVal;
           }
+          function applyServerColumnFilter() {
+            var urlVal = "";
+            try {
+              urlVal =
+                new URLSearchParams(window.location.search).get(
+                  listParamKey(paramPrefix, "filter_" + columnIndex)
+                ) || "";
+            } catch (e) {
+              urlVal = "";
+            }
+            var nextVal = (input.value || "").trim();
+            if (nextVal === urlVal) return;
+            navigateServerPaginatedFilter(columnIndex, nextVal, paramPrefix, root);
+          }
+
           input.addEventListener("input", function () {
             clearTimeout(filterDebounce);
-            filterDebounce = setTimeout(function () {
-              var urlVal = "";
-              try {
-                urlVal =
-                  new URLSearchParams(window.location.search).get(
-                    "filter_" + columnIndex
-                  ) || "";
-              } catch (e) {
-                urlVal = "";
-              }
-              var nextVal = (input.value || "").trim();
-              if (nextVal === urlVal) return;
-              navigateServerPaginatedFilter(columnIndex, nextVal);
-            }, 450);
+            filterDebounce = setTimeout(applyServerColumnFilter, 450);
+          });
+          input.addEventListener("keydown", function (event) {
+            if (event.key !== "Enter") return;
+            event.preventDefault();
+            clearTimeout(filterDebounce);
+            applyServerColumnFilter();
           });
         } else {
           input.addEventListener("input", function () {
@@ -884,7 +1109,7 @@
         button.addEventListener("click", function () {
           var direction = button.getAttribute("data-sort");
           if (serverPaginated) {
-            navigateServerPaginatedSort(columnIndex, direction);
+            navigateServerPaginatedSort(columnIndex, direction, paramPrefix, root);
             return;
           }
           state.sort.columnIndex = columnIndex;
@@ -899,7 +1124,7 @@
       Array.prototype.slice.call(menu.querySelectorAll("[data-clear]")).forEach(function (button) {
         button.addEventListener("click", function () {
           if (serverPaginated) {
-            clearServerPaginatedColumn(columnIndex);
+            clearServerPaginatedColumn(columnIndex, paramPrefix);
             return;
           }
           if (input) input.value = "";
@@ -951,8 +1176,8 @@
     }
 
     if (serverPaginated) {
-      syncServerFilterInputs(filterHeaders);
-      syncServerSortIndicators(filterHeaders);
+      syncServerFilterInputs(filterHeaders, paramPrefix);
+      syncServerSortIndicators(filterHeaders, paramPrefix);
     } else {
       applyTableState();
     }

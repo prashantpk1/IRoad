@@ -223,12 +223,18 @@
   function discoverFilterableRoots() {
     var roots = [];
     var seen = new Set();
-    Array.prototype.forEach.call(document.querySelectorAll("[data-eal-filterable-table]"), function (root) {
-      if (!seen.has(root)) {
-        seen.add(root);
-        roots.push(root);
+    Array.prototype.forEach.call(
+      document.querySelectorAll("[data-eal-filterable-table], [data-eal-server-paginated='1']"),
+      function (root) {
+        if (!root.hasAttribute("data-eal-filterable-table")) {
+          root.setAttribute("data-eal-filterable-table", "");
+        }
+        if (!seen.has(root)) {
+          seen.add(root);
+          roots.push(root);
+        }
       }
-    });
+    );
     Array.prototype.forEach.call(document.querySelectorAll(".eal-table-card"), function (card) {
       if (card.getAttribute("data-eal-filterable") === "0") return;
       if (!card.querySelector("table.eal-table thead")) return;
@@ -241,6 +247,48 @@
       }
     });
     return roots;
+  }
+
+  function ensureServerSearchInput(root) {
+    if (!root || root.getAttribute("data-eal-server-paginated") !== "1") return null;
+
+    var inp = root.querySelector("[data-eal-global-search]");
+    if (!inp) {
+      inp = root.querySelector(
+        ".eal-search input[type='search'], .eal-search input[name='q'], .eal-search input[name='search'], .eal-toolbar .eal-search input"
+      );
+    }
+    if (!inp) return null;
+
+    if (!inp.hasAttribute("data-eal-global-search")) {
+      inp.setAttribute("data-eal-global-search", "");
+    }
+    if (inp.getAttribute("name") === "search") {
+      inp.removeAttribute("name");
+    }
+
+    var form = inp.closest("form");
+    if (form && form.getAttribute("data-eal-search-form-wired") !== "1") {
+      form.setAttribute("data-eal-search-form-wired", "1");
+      form.addEventListener("submit", function (event) {
+        event.preventDefault();
+        inp.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+    }
+
+    try {
+      var params = new URLSearchParams(window.location.search);
+      var paramPrefix = root.getAttribute("data-eal-param-prefix") || "";
+      var fromUrl =
+        params.get(listParamKey(paramPrefix, "q")) || params.get("search") || "";
+      if (!((inp.value || "").trim()) && fromUrl) {
+        inp.value = fromUrl;
+      }
+    } catch (e) {
+      /* ignore */
+    }
+
+    return inp;
   }
 
   function initSelectAllCheckboxes(root) {
@@ -399,6 +447,39 @@
     }
   }
 
+  function wireServerFilterSelects(root, paramPrefix) {
+    if (!root || root.getAttribute("data-eal-filter-selects-wired") === "1") return;
+    root.setAttribute("data-eal-filter-selects-wired", "1");
+
+    var listUrl =
+      (root.getAttribute("data-eal-list-url") || "").trim() ||
+      window.location.pathname;
+
+    function navigateWithFilters() {
+      var params = new URLSearchParams(window.location.search);
+      params.delete(listParamKey(paramPrefix, "page"));
+      root.querySelectorAll("[data-query-param]").forEach(function (el) {
+        var key = el.getAttribute("data-query-param");
+        if (!key) return;
+        var val = (el.value || "").trim();
+        if (!val) params.delete(key);
+        else params.set(key, val);
+      });
+      var tabParam = (root.getAttribute("data-eal-tab-param") || "").trim();
+      if (tabParam) {
+        params.set("tab", tabParam);
+      }
+      var qs = params.toString();
+      window.location.replace(listUrl + (qs ? "?" + qs : ""));
+    }
+
+    root.querySelectorAll("[data-query-param]").forEach(function (el) {
+      if (el.getAttribute("data-eal-filter-select-wired") === "1") return;
+      el.setAttribute("data-eal-filter-select-wired", "1");
+      el.addEventListener("change", navigateWithFilters);
+    });
+  }
+
   function wireServerLiveSearch(root, globalSearchInput, searchClearBtn, paramPrefix) {
     if (!globalSearchInput) return;
     if (globalSearchInput.getAttribute("data-eal-live-search-wired") === "1") return;
@@ -415,7 +496,8 @@
 
     function hasServerQ() {
       try {
-        return new URLSearchParams(window.location.search).has(p("q"));
+        var params = new URLSearchParams(window.location.search);
+        return params.has(p("q")) || params.has("search");
       } catch (e) {
         return false;
       }
@@ -424,6 +506,7 @@
     function buildListUrl() {
       var params = new URLSearchParams(window.location.search);
       params.delete(p("page"));
+      params.delete("search");
       var q = (globalSearchInput.value || "").trim();
       if (q) params.set(p("q"), q);
       else params.delete(p("q"));
@@ -463,7 +546,8 @@
         var v = (globalSearchInput.value || "").trim();
         var cur = "";
         try {
-          cur = new URLSearchParams(window.location.search).get(p("q")) || "";
+          var liveParams = new URLSearchParams(window.location.search);
+          cur = liveParams.get(p("q")) || liveParams.get("search") || "";
         } catch (e) {
           cur = "";
         }
@@ -489,6 +573,7 @@
         if (hasServerQ()) {
           var params = new URLSearchParams(window.location.search);
           params.delete(p("q"));
+          params.delete("search");
           params.delete(p("page"));
           var qs = params.toString();
           window.location.href = listUrl + (qs ? "?" + qs : "");
@@ -615,7 +700,8 @@
       if (descBtn) descBtn.textContent = sorts.desc;
     }
 
-    var globalSearchInput = root.querySelector("[data-eal-global-search]");
+    var globalSearchInput =
+      ensureServerSearchInput(root) || root.querySelector("[data-eal-global-search]");
     var emptyColspan = parseInt(root.getAttribute("data-eal-empty-colspan") || "10", 10);
     var emptyMsg =
       root.getAttribute("data-eal-empty-filter-message") ||
@@ -883,6 +969,10 @@
       searchClearBtn.hidden = !value;
     }
 
+    if (serverPaginated) {
+      wireServerFilterSelects(root, paramPrefix);
+    }
+
     if (globalSearchInput) {
       if (serverPaginated) {
         wireServerLiveSearch(root, globalSearchInput, searchClearBtn, paramPrefix);
@@ -982,22 +1072,30 @@
               params.get(listParamKey(paramPrefix, "filter_" + columnIndex)) || "";
             if (initialVal) input.value = initialVal;
           }
+          function applyServerColumnFilter() {
+            var urlVal = "";
+            try {
+              urlVal =
+                new URLSearchParams(window.location.search).get(
+                  listParamKey(paramPrefix, "filter_" + columnIndex)
+                ) || "";
+            } catch (e) {
+              urlVal = "";
+            }
+            var nextVal = (input.value || "").trim();
+            if (nextVal === urlVal) return;
+            navigateServerPaginatedFilter(columnIndex, nextVal, paramPrefix, root);
+          }
+
           input.addEventListener("input", function () {
             clearTimeout(filterDebounce);
-            filterDebounce = setTimeout(function () {
-              var urlVal = "";
-              try {
-                urlVal =
-                  new URLSearchParams(window.location.search).get(
-                    listParamKey(paramPrefix, "filter_" + columnIndex)
-                  ) || "";
-              } catch (e) {
-                urlVal = "";
-              }
-              var nextVal = (input.value || "").trim();
-              if (nextVal === urlVal) return;
-              navigateServerPaginatedFilter(columnIndex, nextVal, paramPrefix, root);
-            }, 450);
+            filterDebounce = setTimeout(applyServerColumnFilter, 450);
+          });
+          input.addEventListener("keydown", function (event) {
+            if (event.key !== "Enter") return;
+            event.preventDefault();
+            clearTimeout(filterDebounce);
+            applyServerColumnFilter();
           });
         } else {
           input.addEventListener("input", function () {

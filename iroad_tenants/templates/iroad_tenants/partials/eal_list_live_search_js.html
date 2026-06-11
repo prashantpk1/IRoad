@@ -107,6 +107,8 @@
   }
 
   filterEls.forEach(function (el) {
+    if (el.getAttribute("data-eal-filter-select-wired") === "1") return;
+    el.setAttribute("data-eal-filter-select-wired", "1");
     el.addEventListener("change", navigateList);
   });
 })();

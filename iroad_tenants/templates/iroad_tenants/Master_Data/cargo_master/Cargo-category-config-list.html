@@ -24,10 +24,7 @@
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
-        <button type="button" class="eal-btn eal-btn-outline" disabled title="{% translate 'Export (coming soon)' %}">
-          <i class="bi bi-download"></i>
-          <span>{% translate "Export" %}</span>
-        </button>
+        {% include 'iroad_tenants/partials/eal_export_link.html' with export_url_name='iroad_tenants:tenant_cargo_category_export' export_filename='cargo_categories_export.csv' %}
         <a href="{% url 'iroad_tenants:tenant_cargo_category_create' %}" class="eal-btn eal-btn-primary">
           <i class="bi bi-plus-lg"></i>
           <span>{% translate "New Category" %}</span>
@@ -70,16 +67,34 @@
 <div
   class="eal-table-card"
   data-eal-filterable-table
+  data-eal-server-paginated="1"
   data-eal-empty-colspan="6"
   data-eal-empty-filter-message="{% translate 'No categories match the selected search/filter criteria.' %}"
+  data-eal-global-search-columns="1,2,3,4,5"
 >
-  <form method="get" class="eal-toolbar">
-    
-    <input type="hidden" name="scope" value="{{ category_scope }}" />
+  <div class="eal-toolbar">
     <div class="eal-toolbar-left">
       <div class="eal-search" style="min-width: 220px">
         <i class="bi bi-search"></i>
-        <input type="text" name="q" value="{{ search_q }}" placeholder="{% translate 'Search categories...' %}" />
+        <input
+          type="search"
+          id="cargoCategorySearch"
+          data-eal-global-search
+          value="{{ search_q|default:'' }}"
+          autocomplete="off"
+          placeholder="{% translate 'Search categories...' %}"
+          aria-label="{% translate 'Search categories' %}"
+        />
+        <button
+          type="button"
+          class="eal-search-clear-btn"
+          id="cargoCategorySearchClear"
+          title="{% translate 'Clear search' %}"
+          aria-label="{% translate 'Clear search' %}"
+          hidden
+        >
+          <i class="bi bi-x-lg"></i>
+        </button>
       </div>
       <div class="eal-chip-group">
         <a
@@ -95,9 +110,8 @@
           class="eal-chip text-decoration-none{% if category_scope == 'inactive' %} active{% endif %}"
         >{% translate "Inactive" %}</a>
       </div>
-      <button type="submit" class="btn btn-sm btn-primary ms-2">{% translate "Search" %}</button>
     </div>
-  </form>
+  </div>
 
   <div class="eal-table-wrap">
     <table class="eal-table">

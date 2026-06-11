@@ -199,6 +199,29 @@ from .views import (
     TenantPriceListMasterEditView,
 
 )
+from iroad_tenants.list_exports import (
+    DriverAttachmentAllExportView,
+    DriverMasterExportView,
+    TenantAddressMasterExportView,
+    TenantCargoCategoryExportView,
+    TenantCargoMasterExportView,
+    TenantClientContactsExportView,
+    TenantClientContractExportView,
+    TenantLocationMasterExportView,
+    TenantOperationBookingExportView,
+    TenantOperationDocumentHandoverExportView,
+    TenantOperationShipmentDocumentsExportView,
+    TenantOperationShipmentExportView,
+    TenantOperationShipmentPodExportView,
+    TenantOperationSurchargeSalesExportView,
+    TenantOperationTruckMovementLogExportView,
+    TenantPriceListMasterExportView,
+    TenantRouteMasterExportView,
+    TenantServiceItemMasterExportView,
+    TruckAttachmentAllExportView,
+    TruckMasterExportView,
+    TruckTypeMasterExportView,
+)
 
 app_name = 'iroad_tenants'
 
@@ -451,6 +474,11 @@ urlpatterns = [
         name='tenant_client_contacts_list',
     ),
     path(
+        'crm/clients/contacts/export/',
+        TenantClientContactsExportView.as_view(),
+        name='tenant_client_contacts_export',
+    ),
+    path(
         'crm/clients/contacts/<uuid:contact_id>/detail/',
         TenantClientContactDetailView.as_view(),
         name='tenant_client_contact_detail',
@@ -479,6 +507,11 @@ urlpatterns = [
         'crm/clients/contracts/list/',
         TenantClientContractListView.as_view(),
         name='tenant_client_contract_list',
+    ),
+    path(
+        'crm/clients/contracts/export/',
+        TenantClientContractExportView.as_view(),
+        name='tenant_client_contract_export',
     ),
     path(
         'crm/clients/contracts/<uuid:contract_id>/detail/',
@@ -521,6 +554,11 @@ urlpatterns = [
         name='tenant_address_master',
     ),
     path(
+        'master-data/addresses/export/',
+        TenantAddressMasterExportView.as_view(),
+        name='tenant_address_master_export',
+    ),
+    path(
         'master-data/addresses/create/',
         TenantAddressMasterCreateView.as_view(),
         name='tenant_address_master_create',
@@ -546,6 +584,11 @@ urlpatterns = [
         name='truck_type_master',
     ),
     path(
+        'fleet/truck-types/export/',
+        TruckTypeMasterExportView.as_view(),
+        name='truck_type_master_export',
+    ),
+    path(
         'fleet/truck-types/create/',
         TruckTypeMasterCreateView.as_view(),
         name='truck_type_master_create',
@@ -561,6 +604,11 @@ urlpatterns = [
         name='truck_attachment_all_list',
     ),
     path(
+        'fleet/attachments/export/',
+        TruckAttachmentAllExportView.as_view(),
+        name='truck_attachment_all_export',
+    ),
+    path(
         'fleet/attachments/select-truck/',
         TruckAttachmentCreateView.as_view(),
         name='truck_attachment_select_truck',
@@ -574,6 +622,11 @@ urlpatterns = [
         'fleet/trucks/',
         TruckMasterListView.as_view(),
         name='truck_master',
+    ),
+    path(
+        'fleet/trucks/export/',
+        TruckMasterExportView.as_view(),
+        name='truck_master_export',
     ),
     path(
         'fleet/trucks/create/',
@@ -625,6 +678,11 @@ urlpatterns = [
         'fleet/drivers/',
         DriverMasterListView.as_view(),
         name='driver_master',
+    ),
+    path(
+        'fleet/drivers/export/',
+        DriverMasterExportView.as_view(),
+        name='driver_master_export',
     ),
     path(
         'fleet/drivers/create/',
@@ -700,6 +758,11 @@ urlpatterns = [
         name='driver_attachment_all_list',
     ),
     path(
+        'fleet/drivers/attachments/export/',
+        DriverAttachmentAllExportView.as_view(),
+        name='driver_attachment_all_export',
+    ),
+    path(
         'fleet/drivers/<uuid:driver_id>/attachments/add/',
         DriverAttachmentCreateView.as_view(),
         name='driver_attachment_create',
@@ -736,6 +799,11 @@ urlpatterns = [
         name='tenant_cargo_master_list',
     ),
     path(
+        'master-data/cargo/export/',
+        TenantCargoMasterExportView.as_view(),
+        name='tenant_cargo_master_export',
+    ),
+    path(
         'master-data/cargo/create/',
         TenantCargoMasterCreateView.as_view(),
         name='tenant_cargo_master_create',
@@ -761,6 +829,11 @@ urlpatterns = [
         name='tenant_cargo_category_list',
     ),
     path(
+        'master-data/cargo/categories/export/',
+        TenantCargoCategoryExportView.as_view(),
+        name='tenant_cargo_category_export',
+    ),
+    path(
         'master-data/cargo/categories/create/',
         TenantCargoCategoryCreateView.as_view(),
         name='tenant_cargo_category_create',
@@ -784,6 +857,11 @@ urlpatterns = [
         'master-data/route-management/locations/',
         TenantLocationMasterListView.as_view(),
         name='tenant_location_master_list',
+    ),
+    path(
+        'master-data/route-management/locations/export/',
+        TenantLocationMasterExportView.as_view(),
+        name='tenant_location_master_export',
     ),
     path(
         'master-data/route-management/locations/create/',
@@ -816,6 +894,11 @@ urlpatterns = [
         name='tenant_route_master_list',
     ),
     path(
+        'master-data/route-management/routes/export/',
+        TenantRouteMasterExportView.as_view(),
+        name='tenant_route_master_export',
+    ),
+    path(
         'master-data/route-management/routes/create/',
         TenantRouteMasterCreateView.as_view(),
         name='tenant_route_master_create',
@@ -839,6 +922,11 @@ urlpatterns = [
         'master-data/services/service-items/',
         TenantServiceItemMasterListView.as_view(),
         name='tenant_service_item_master_list',
+    ),
+    path(
+        'master-data/services/service-items/export/',
+        TenantServiceItemMasterExportView.as_view(),
+        name='tenant_service_item_master_export',
     ),
     path(
         'master-data/services/service-items/create/',
@@ -869,6 +957,11 @@ urlpatterns = [
         'master-data/services/price-lists/',
         TenantPriceListMasterListView.as_view(),
         name='tenant_price_list_master_list',
+    ),
+    path(
+        'master-data/services/price-lists/export/',
+        TenantPriceListMasterExportView.as_view(),
+        name='tenant_price_list_master_export',
     ),
     path(
         'master-data/services/price-lists/create/from-client/',
@@ -905,6 +998,11 @@ urlpatterns = [
         'operations/booking/list/',
         TenantOperationBookingListView.as_view(),
         name='tenant_operation_booking_list',
+    ),
+    path(
+        'operations/booking/export/',
+        TenantOperationBookingExportView.as_view(),
+        name='tenant_operation_booking_export',
     ),
     path(
         'operations/booking/<uuid:booking_id>/',
@@ -997,6 +1095,11 @@ urlpatterns = [
         name='tenant_operation_shipment_list',
     ),
     path(
+        'operations/shipment/export/',
+        TenantOperationShipmentExportView.as_view(),
+        name='tenant_operation_shipment_export',
+    ),
+    path(
         'operations/shipment/create/',
         TenantOperationShipmentCreateView.as_view(),
         name='tenant_operation_shipment_create',
@@ -1025,6 +1128,11 @@ urlpatterns = [
         'operations/shipment-documents/list/',
         TenantOperationShipmentDocumentsListView.as_view(),
         name='tenant_operation_shipment_documents_list',
+    ),
+    path(
+        'operations/shipment-documents/export/',
+        TenantOperationShipmentDocumentsExportView.as_view(),
+        name='tenant_operation_shipment_documents_export',
     ),
     path(
         'operations/shipment-documents/create/',
@@ -1057,6 +1165,11 @@ urlpatterns = [
         name='tenant_operation_surcharge_sales_list',
     ),
     path(
+        'operations/surcharge-sales/export/',
+        TenantOperationSurchargeSalesExportView.as_view(),
+        name='tenant_operation_surcharge_sales_export',
+    ),
+    path(
         'operations/surcharge-sales/create/',
         TenantOperationSurchargeSalesCreateView.as_view(),
         name='tenant_operation_surcharge_sales_create',
@@ -1079,6 +1192,11 @@ urlpatterns = [
         name='tenant_operation_shipment_pod_list',
     ),
     path(
+        'operations/shipment-pod/export/',
+        TenantOperationShipmentPodExportView.as_view(),
+        name='tenant_operation_shipment_pod_export',
+    ),
+    path(
         'operations/shipment-pod/create/',
         TenantOperationShipmentPodCreateView.as_view(),
         name='tenant_operation_shipment_pod_create',
@@ -1099,6 +1217,11 @@ urlpatterns = [
         name='tenant_operation_document_handover_list',
     ),
     path(
+        'operations/document-handover/export/',
+        TenantOperationDocumentHandoverExportView.as_view(),
+        name='tenant_operation_document_handover_export',
+    ),
+    path(
         'operations/document-handover/create/',
         TenantOperationDocumentHandoverCreateView.as_view(),
         name='tenant_operation_document_handover_create',
@@ -1107,6 +1230,11 @@ urlpatterns = [
         'operations/truck-movement-log/list/',
         TenantOperationTruckMovementLogListView.as_view(),
         name='tenant_operation_truck_movement_log_list',
+    ),
+    path(
+        'operations/truck-movement-log/export/',
+        TenantOperationTruckMovementLogExportView.as_view(),
+        name='tenant_operation_truck_movement_log_export',
     ),
     path(
         'operations/truck-movement-log/create/',

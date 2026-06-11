@@ -47,17 +47,40 @@
   </div>
 </div>
 
-<div class="eal-table-card">
-  <form method="get" class="eal-toolbar eal-toolbar--inline-filters">
+<div
+  class="eal-table-card"
+  data-eal-filterable-table
+  data-eal-server-paginated="1"
+  data-eal-global-search-columns="1,2,3,4,5,6,7"
+>
+  <div class="eal-toolbar eal-toolbar--inline-filters">
     <div class="eal-toolbar-left w-100">
       <div class="eal-toolbar-filters-row flex-wrap gap-2">
         <div class="eal-search eal-search--toolbar-grow">
           <i class="bi bi-search"></i>
-          <input type="text" name="q" value="{{ search_q }}" placeholder="Search sales invoice reports..." />
+          <input
+            type="search"
+            id="salesInvoiceReportSearch"
+            data-eal-global-search
+            value="{{ search_q|default:'' }}"
+            autocomplete="off"
+            placeholder="Search sales invoice reports..."
+            aria-label="Search sales invoice reports"
+          />
+          <button
+            type="button"
+            class="eal-search-clear-btn"
+            id="salesInvoiceReportSearchClear"
+            title="Clear search"
+            aria-label="Clear search"
+            hidden
+          >
+            <i class="bi bi-x-lg"></i>
+          </button>
         </div>
         <div class="eal-toolbar-filter-pair">
           <label class="form-label mb-0 small text-nowrap text-muted" for="sirStatus">Status</label>
-          <select class="form-select form-select-sm" id="sirStatus" name="status">
+          <select class="form-select form-select-sm" id="sirStatus" name="status" data-query-param="status">
             <option value="">All Status</option>
             <option value="Draft" {% if status_filter == 'Draft' %}selected{% endif %}>Draft</option>
             <option value="Verified" {% if status_filter == 'Verified' %}selected{% endif %}>Verified</option>
@@ -66,7 +89,7 @@
         </div>
         <div class="eal-toolbar-filter-pair">
           <label class="form-label mb-0 small text-nowrap text-muted" for="sirClient">Client</label>
-          <select class="form-select form-select-sm" id="sirClient" name="client">
+          <select class="form-select form-select-sm" id="sirClient" name="client" data-query-param="client">
             <option value="">All Clients</option>
             {% for c in client_choices %}
             <option value="{{ c.account_id }}" {% if client_filter == c.account_id|stringformat:'s' %}selected{% endif %}>{{ c.account_no }} - {{ c.display_name }}</option>
@@ -75,17 +98,16 @@
         </div>
         <div class="eal-toolbar-filter-pair">
           <label class="form-label mb-0 small text-nowrap text-muted" for="sirFromDate">From</label>
-          <input class="form-control form-control-sm" id="sirFromDate" type="date" name="date_from" value="{{ date_from }}" />
+          <input class="form-control form-control-sm" id="sirFromDate" type="date" name="date_from" data-query-param="date_from" value="{{ date_from }}" />
         </div>
         <div class="eal-toolbar-filter-pair">
           <label class="form-label mb-0 small text-nowrap text-muted" for="sirToDate">To</label>
-          <input class="form-control form-control-sm" id="sirToDate" type="date" name="date_to" value="{{ date_to }}" />
+          <input class="form-control form-control-sm" id="sirToDate" type="date" name="date_to" data-query-param="date_to" value="{{ date_to }}" />
         </div>
-        <button class="btn btn-sm btn-primary eal-toolbar-apply" type="submit">Apply</button>
         <a href="{% url 'iroad_tenants:sales_invoice_report_list' %}" class="btn btn-sm btn-outline-secondary">Reset</a>
       </div>
     </div>
-  </form>
+  </div>
 
   <div class="eal-table-wrap">
     <table class="eal-table">

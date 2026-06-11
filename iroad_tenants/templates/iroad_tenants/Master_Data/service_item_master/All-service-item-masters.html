@@ -82,10 +82,7 @@
           </div>
           <div class="page-header-right">
             <div class="eal-header-actions">
-              <button class="eal-btn eal-btn-outline">
-                <i class="bi bi-download"></i>
-                <span>Export</span>
-              </button>
+              {% include 'iroad_tenants/partials/eal_export_link.html' with export_url_name='iroad_tenants:tenant_service_item_master_export' export_filename='service_items_export.csv' %}
               <a
                 href="{% url 'iroad_tenants:tenant_service_item_master_create' %}"
                 class="eal-btn eal-btn-primary"

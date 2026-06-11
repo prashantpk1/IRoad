@@ -29,10 +29,7 @@
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
-        <button type="button" class="eal-btn eal-btn-outline">
-          <i class="bi bi-download"></i>
-          <span>Export</span>
-        </button>
+        {% include 'iroad_tenants/partials/eal_export_link.html' with export_url_name='iroad_tenants:truck_master_export' export_filename='truck_master_export.csv' %}
         <a href="{% url 'iroad_tenants:truck_master_create' %}" class="eal-btn eal-btn-primary">
           <i class="bi bi-plus-lg"></i>
           <span>Add Truck</span>
@@ -84,6 +81,7 @@
 <div
   class="eal-table-card"
   data-eal-filterable-table
+  data-eal-server-paginated="1"
   data-eal-empty-colspan="9"
   data-eal-empty-filter-message="No trucks match the selected search/filter criteria."
   data-eal-global-search-columns="1,2,3,4,5,6,7"

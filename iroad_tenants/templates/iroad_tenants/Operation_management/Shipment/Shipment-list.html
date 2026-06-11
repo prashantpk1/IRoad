@@ -27,10 +27,7 @@
           </div>
           <div class="page-header-right">
             <div class="eal-header-actions">
-              <button class="eal-btn eal-btn-outline">
-                <i class="bi bi-download"></i>
-                <span>Export</span>
-              </button>
+              {% include 'iroad_tenants/partials/eal_export_link.html' with export_url_name='iroad_tenants:tenant_operation_shipment_export' export_filename='shipments_export.csv' %}
               <!-- <a href="{% url 'iroad_tenants:tenant_operation_action_log_create' %}" class="eal-btn eal-btn-outline">
                 <i class="bi bi-journal-check"></i>
                 <span>Action Log</span>
@@ -123,14 +120,35 @@
       <!-- Main Content -->
       <div class="page-content">
         <!-- Table Card -->
-        <div class="eal-table-card">
-          <!-- Toolbar -->
+        <div
+          class="eal-table-card"
+          data-eal-filterable-table
+          data-eal-server-paginated="1"
+          data-eal-global-search-columns="1,2,3,4,5,6,7,8"
+        >
           <div class="eal-toolbar">
             <div class="eal-toolbar-left">
               <div class="eal-search">
                 <i class="bi bi-search"></i>
-                <input type="text" placeholder="search will be by, shipment, booking, truck
-&hellip;" />
+                <input
+                  type="search"
+                  id="shipmentListSearch"
+                  data-eal-global-search
+                  value="{{ shipment_search_query|default:'' }}"
+                  autocomplete="off"
+                  placeholder="Search shipment, booking, truck&hellip;"
+                  aria-label="Search shipments"
+                />
+                <button
+                  type="button"
+                  class="eal-search-clear-btn"
+                  id="shipmentListSearchClear"
+                  title="Clear search"
+                  aria-label="Clear search"
+                  hidden
+                >
+                  <i class="bi bi-x-lg"></i>
+                </button>
               </div>
             </div>
           </div>
@@ -309,7 +327,7 @@
               <a
                 class="eal-page-btn"
                 title="Previous"
-                href="?{% if shipment_search_query %}search={{ shipment_search_query|urlencode }}&{% endif %}page={{ shipment_page.previous_page_number }}"
+                href="?{% if shipment_search_query %}q={{ shipment_search_query|urlencode }}&{% endif %}page={{ shipment_page.previous_page_number }}"
               >
                 <i class="bi bi-chevron-left"></i>
               </a>
@@ -323,7 +341,7 @@
               <a
                 class="eal-page-btn"
                 title="Next"
-                href="?{% if shipment_search_query %}search={{ shipment_search_query|urlencode }}&{% endif %}page={{ shipment_page.next_page_number }}"
+                href="?{% if shipment_search_query %}q={{ shipment_search_query|urlencode }}&{% endif %}page={{ shipment_page.next_page_number }}"
               >
                 <i class="bi bi-chevron-right"></i>
               </a>

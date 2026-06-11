@@ -26,10 +26,7 @@
           </div>
           <div class="page-header-right">
             <div class="eal-header-actions">
-              <button class="eal-btn eal-btn-outline">
-                <i class="bi bi-download"></i>
-                <span>Export</span>
-              </button>
+              {% include 'iroad_tenants/partials/eal_export_link.html' with export_url_name='iroad_tenants:tenant_operation_document_handover_export' export_filename='document_handovers_export.csv' %}
               <a href="{% url 'iroad_tenants:tenant_operation_document_handover_create' %}" class="eal-btn eal-btn-primary">
                 <i class="bi bi-plus-lg"></i>
                 <span>Add Handover</span>
@@ -80,19 +77,36 @@
       </div>
 
       <!-- Table Card -->
-      <div class="eal-table-card">
-        <!-- Toolbar -->
+      <div
+        class="eal-table-card"
+        data-eal-filterable-table
+        data-eal-server-paginated="1"
+        data-eal-global-search-columns="1,2,3,4,5,6,7"
+      >
         <div class="eal-toolbar">
           <div class="eal-toolbar-left">
-            <form method="get" class="eal-search">
+            <div class="eal-search">
               <i class="bi bi-search"></i>
               <input
-                type="text"
-                name="q"
-                value="{{ handover_search_q }}"
+                type="search"
+                id="documentHandoverSearch"
+                data-eal-global-search
+                value="{{ handover_search_q|default:'' }}"
+                autocomplete="off"
                 placeholder="Search document handovers&hellip;"
+                aria-label="Search document handovers"
               />
-            </form>
+              <button
+                type="button"
+                class="eal-search-clear-btn"
+                id="documentHandoverSearchClear"
+                title="Clear search"
+                aria-label="Clear search"
+                hidden
+              >
+                <i class="bi bi-x-lg"></i>
+              </button>
+            </div>
           </div>
         </div>
 

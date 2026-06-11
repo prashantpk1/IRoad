@@ -1,0 +1,9 @@
+{% load i18n %}
+<a
+  class="eal-btn eal-btn-outline"
+  href="{% url export_url_name %}{% if request.GET %}?{{ request.GET.urlencode }}{% endif %}"
+  {% if export_filename %}download="{{ export_filename }}"{% endif %}
+>
+  <i class="bi bi-download"></i>
+  <span>{% if export_label %}{{ export_label }}{% else %}{% translate "Export" %}{% endif %}</span>
+</a>

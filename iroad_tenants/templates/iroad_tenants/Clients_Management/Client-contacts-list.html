@@ -34,10 +34,7 @@
           </div>
           <div class="page-header-right">
             <div class="eal-header-actions">
-              <button class="eal-btn eal-btn-outline">
-                <i class="bi bi-download"></i>
-                <span>Export</span>
-              </button>
+              {% include 'iroad_tenants/partials/eal_export_link.html' with export_url_name='iroad_tenants:tenant_client_contacts_export' export_filename='client_contacts_export.csv' %}
               <a href="{% url 'iroad_tenants:tenant_client_contacts_create' %}" class="eal-btn eal-btn-primary">
                 <i class="bi bi-plus-lg"></i>
                 <span>Add Contact</span>
@@ -123,18 +120,18 @@
             </div>
             <div class="eal-chip-group">
               <a
-                href="{% url 'iroad_tenants:tenant_client_contacts_list' %}"
+                href="{{ contacts_chip_all_url }}"
                 class="eal-chip text-decoration-none text-reset{% if contacts_list_chip == 'all' %} active{% endif %}"
                 >All</a>
               <a
-                href="{% url 'iroad_tenants:tenant_client_contacts_list' %}?chip=primary"
+                href="{{ contacts_chip_primary_url }}"
                 class="eal-chip text-decoration-none text-reset{% if contacts_list_chip == 'primary' %} active{% endif %}"
               >
                 <i class="bi bi-star"></i>
                 Primary
               </a>
               <a
-                href="{% url 'iroad_tenants:tenant_client_contacts_list' %}?chip=secondary"
+                href="{{ contacts_chip_secondary_url }}"
                 class="eal-chip text-decoration-none text-reset{% if contacts_list_chip == 'secondary' %} active{% endif %}"
               >
                 <i class="bi bi-person"></i>

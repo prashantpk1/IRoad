@@ -80,17 +80,40 @@
   </div>
 </div>
 
-<div class="eal-table-card">
-  <form method="get" class="eal-toolbar eal-toolbar--inline-filters">
+<div
+  class="eal-table-card"
+  data-eal-filterable-table
+  data-eal-server-paginated="1"
+  data-eal-global-search-columns="1,2,3,4,5,6,7"
+>
+  <div class="eal-toolbar eal-toolbar--inline-filters">
     <div class="eal-toolbar-left w-100">
       <div class="eal-toolbar-filters-row flex-wrap gap-2">
         <div class="eal-search eal-search--toolbar-grow">
           <i class="bi bi-search"></i>
-          <input type="text" name="q" value="{{ search_q }}" placeholder="Search transaction no or driver..." />
+          <input
+            type="search"
+            id="driverTreasuryTxnSearch"
+            data-eal-global-search
+            value="{{ search_q|default:'' }}"
+            autocomplete="off"
+            placeholder="Search transaction no or driver..."
+            aria-label="Search transactions"
+          />
+          <button
+            type="button"
+            class="eal-search-clear-btn"
+            id="driverTreasuryTxnSearchClear"
+            title="Clear search"
+            aria-label="Clear search"
+            hidden
+          >
+            <i class="bi bi-x-lg"></i>
+          </button>
         </div>
         <div class="eal-toolbar-filter-pair">
           <label class="form-label mb-0 small text-nowrap text-muted" for="dttType">Transaction Type</label>
-          <select name="transaction_type" id="dttType" class="form-select form-select-sm">
+          <select name="transaction_type" id="dttType" class="form-select form-select-sm" data-query-param="transaction_type">
             <option value="all" {% if filter_transaction_type == 'all' %}selected{% endif %}>All</option>
             <option value="Credit" {% if filter_transaction_type == 'Credit' %}selected{% endif %}>Credit</option>
             <option value="Debit" {% if filter_transaction_type == 'Debit' %}selected{% endif %}>Debit</option>
@@ -98,16 +121,15 @@
         </div>
         <div class="eal-toolbar-filter-pair">
           <label class="form-label mb-0 small text-nowrap text-muted" for="dttCategory">Transaction Category</label>
-          <select name="transaction_category" id="dttCategory" class="form-select form-select-sm">
+          <select name="transaction_category" id="dttCategory" class="form-select form-select-sm" data-query-param="transaction_category">
             <option value="all" {% if filter_transaction_category == 'all' %}selected{% endif %}>All</option>
             <option value="Client Collection" {% if filter_transaction_category == 'Client Collection' %}selected{% endif %}>Client Collection</option>
             <option value="Custody Collection" {% if filter_transaction_category == 'Custody Collection' %}selected{% endif %}>Custody Collection</option>
           </select>
         </div>
-        <button type="submit" class="btn btn-sm btn-primary eal-toolbar-apply">Apply</button>
       </div>
     </div>
-  </form>
+  </div>
 
   <div class="eal-table-wrap">
     <table class="eal-table">

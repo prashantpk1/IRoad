@@ -26,7 +26,7 @@
           </div>
           <div class="page-header-right">
             <div class="eal-header-actions">
-        <button class="eal-btn eal-btn-outline"><i class="bi bi-download"></i><span>Export</span></button>
+        {% include 'iroad_tenants/partials/eal_export_link.html' with export_url_name='iroad_tenants:tenant_location_master_export' export_filename='location_master_export.csv' %}
         <a href="{% url 'iroad_tenants:tenant_location_master_create' %}" class="eal-btn eal-btn-primary"><i class="bi bi-plus-lg"></i><span>{% translate "Add Location" %}</span></a>
             </div>
           </div>

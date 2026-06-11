@@ -24,10 +24,7 @@
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
-        <button type="button" class="eal-btn eal-btn-outline" disabled title="{% translate 'Export (coming soon)' %}">
-          <i class="bi bi-download"></i>
-          <span>{% translate "Export" %}</span>
-        </button>
+        {% include 'iroad_tenants/partials/eal_export_link.html' with export_url_name='iroad_tenants:tenant_address_master_export' export_filename='address_master_export.csv' %}
         <a
           href="{% url 'iroad_tenants:tenant_address_master_create' %}"
           class="eal-btn eal-btn-primary"
@@ -82,19 +79,39 @@
 <div
   class="eal-table-card"
   data-eal-filterable-table
+  data-eal-server-paginated="1"
   data-eal-empty-colspan="9"
   data-eal-empty-filter-message="{% translate 'No addresses match the selected search/filter criteria.' %}"
+  data-eal-global-search-columns="1,2,3,4,5,6,7"
 >
-  <form method="get" class="eal-toolbar eal-toolbar--inline-filters">
+  <div class="eal-toolbar eal-toolbar--inline-filters">
     <div class="eal-toolbar-left w-100">
       <div class="eal-toolbar-filters-row">
         <div class="eal-search eal-search--toolbar-grow">
           <i class="bi bi-search"></i>
-          <input type="text" name="q" value="{{ search_q }}" placeholder="{% translate 'Search addresses...' %}" />
+          <input
+            type="search"
+            id="addressMasterSearch"
+            data-eal-global-search
+            value="{{ search_q|default:'' }}"
+            autocomplete="off"
+            placeholder="{% translate 'Search addresses...' %}"
+            aria-label="{% translate 'Search addresses' %}"
+          />
+          <button
+            type="button"
+            class="eal-search-clear-btn"
+            id="addressMasterSearchClear"
+            title="{% translate 'Clear search' %}"
+            aria-label="{% translate 'Clear search' %}"
+            hidden
+          >
+            <i class="bi bi-x-lg"></i>
+          </button>
         </div>
         <div class="eal-toolbar-filter-pair">
           <label class="form-label mb-0 small text-nowrap text-muted" for="addrListStatus">{% translate "Status" %}</label>
-          <select name="status" id="addrListStatus" class="form-select form-select-sm">
+          <select id="addrListStatus" data-query-param="status" class="form-select form-select-sm">
             <option value="active" {% if filter_status == '' or filter_status == 'active' %}selected{% endif %}>
               {% translate "Active" %}
             </option>
@@ -104,7 +121,7 @@
         </div>
         <div class="eal-toolbar-filter-pair">
           <label class="form-label mb-0 small text-nowrap text-muted" for="addrListClient">{% translate "Client" %}</label>
-          <select name="client" id="addrListClient" class="form-select form-select-sm">
+          <select id="addrListClient" data-query-param="client" class="form-select form-select-sm">
             <option value="">{% translate "All clients" %}</option>
             {% for ca in client_filter_choices %}
             <option value="{{ ca.account_no }}" {% if filter_client_value and ca.account_no == filter_client_value %}selected{% endif %}>
@@ -113,10 +130,9 @@
             {% endfor %}
           </select>
         </div>
-        <button type="submit" class="btn btn-sm btn-primary eal-toolbar-apply">{% translate "Apply" %}</button>
       </div>
     </div>
-  </form>
+  </div>
 
   <div class="eal-table-wrap">
     <table class="eal-table">

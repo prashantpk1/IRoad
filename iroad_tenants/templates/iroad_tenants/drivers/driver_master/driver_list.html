@@ -23,10 +23,7 @@
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
-        <button type="button" class="eal-btn eal-btn-outline">
-          <i class="bi bi-download"></i>
-          <span>Export</span>
-        </button>
+        {% include 'iroad_tenants/partials/eal_export_link.html' with export_url_name='iroad_tenants:driver_master_export' export_filename='drivers_export.csv' %}
         <a href="{% url 'iroad_tenants:driver_master_create' %}" class="eal-btn eal-btn-primary">
           <i class="bi bi-plus-lg"></i>
           <span>Add Driver</span>
@@ -75,15 +72,38 @@
   </div>
 </div>
 
-<div class="eal-table-card">
-  <form method="get" class="eal-toolbar">
+<div
+  class="eal-table-card"
+  data-eal-filterable-table
+  data-eal-server-paginated="1"
+  data-eal-global-search-columns="1,2,3,4,5,6,7,8"
+>
+  <div class="eal-toolbar">
     <div class="eal-toolbar-left w-100">
       <div class="eal-search">
         <i class="bi bi-search"></i>
-        <input type="text" name="q" value="{{ search_q }}" placeholder="Search drivers..." aria-label="Search drivers" />
+        <input
+          type="search"
+          id="driverMasterSearch"
+          data-eal-global-search
+          value="{{ search_q|default:'' }}"
+          autocomplete="off"
+          placeholder="Search drivers..."
+          aria-label="Search drivers"
+        />
+        <button
+          type="button"
+          class="eal-search-clear-btn"
+          id="driverMasterSearchClear"
+          title="Clear search"
+          aria-label="Clear search"
+          hidden
+        >
+          <i class="bi bi-x-lg"></i>
+        </button>
       </div>
     </div>
-  </form>
+  </div>
 
   <div class="eal-table-wrap">
     <table class="eal-table">

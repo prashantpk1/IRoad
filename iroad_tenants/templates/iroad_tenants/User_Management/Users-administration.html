@@ -102,7 +102,7 @@
           type="text"
           id="usersAdminSearch"
           data-eal-global-search
-          value="{{ search_query|default:'' }}"
+          value="{{ search_q|default:search_query|default:'' }}"
           autocomplete="off"
           placeholder="Search users by name, email, or role&hellip;"
           aria-label="Search users by name, email, or role"

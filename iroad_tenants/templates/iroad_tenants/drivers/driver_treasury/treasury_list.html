@@ -71,26 +71,48 @@
   </div>
 </div>
 
-<div class="eal-table-card">
-  <form method="get" class="eal-toolbar eal-toolbar--inline-filters">
+<div
+  class="eal-table-card"
+  data-eal-filterable-table
+  data-eal-server-paginated="1"
+  data-eal-global-search-columns="1,2,3,4,5"
+>
+  <div class="eal-toolbar eal-toolbar--inline-filters">
     <div class="eal-toolbar-left w-100">
       <div class="eal-toolbar-filters-row flex-wrap gap-2">
         <div class="eal-search eal-search--toolbar-grow">
           <i class="bi bi-search"></i>
-          <input type="text" name="q" value="{{ search_q }}" placeholder="Search treasury code or driver..." />
+          <input
+            type="search"
+            id="driverTreasurySearch"
+            data-eal-global-search
+            value="{{ search_q|default:'' }}"
+            autocomplete="off"
+            placeholder="Search treasury code or driver..."
+            aria-label="Search treasury"
+          />
+          <button
+            type="button"
+            class="eal-search-clear-btn"
+            id="driverTreasurySearchClear"
+            title="Clear search"
+            aria-label="Clear search"
+            hidden
+          >
+            <i class="bi bi-x-lg"></i>
+          </button>
         </div>
         <div class="eal-toolbar-filter-pair">
           <label class="form-label mb-0 small text-nowrap text-muted" for="dtListStatus">Status</label>
-          <select name="status" id="dtListStatus" class="form-select form-select-sm">
+          <select name="status" id="dtListStatus" class="form-select form-select-sm" data-query-param="status">
             <option value="all" {% if filter_status == 'all' %}selected{% endif %}>All</option>
             <option value="active" {% if filter_status == '' or filter_status == 'active' %}selected{% endif %}>Active</option>
             <option value="inactive" {% if filter_status == 'inactive' %}selected{% endif %}>Inactive</option>
           </select>
         </div>
-        <button type="submit" class="btn btn-sm btn-primary eal-toolbar-apply">Apply</button>
       </div>
     </div>
-  </form>
+  </div>
 
   <div class="eal-table-wrap">
     <table class="eal-table eal-table--compact">

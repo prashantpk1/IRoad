@@ -35,13 +35,36 @@
   <div class="eal-stat-card"><div class="eal-stat-icon red"><i class="bi bi-x-octagon"></i></div><div><div class="eal-stat-value">{{ action_stats.inactive|default:0 }}</div><div class="eal-stat-label">Inactive</div></div></div>
 </div>
 
-<div class="eal-table-card">
+<div
+  class="eal-table-card"
+  data-eal-filterable-table
+  data-eal-server-paginated="1"
+  data-eal-global-search-columns="1,2,3,4,5,6"
+>
   <div class="eal-toolbar">
     <div class="eal-toolbar-left">
-      <form method="get" class="eal-search">
+      <div class="eal-search">
         <i class="bi bi-search"></i>
-        <input type="text" name="q" value="{{ action_search_q|default:'' }}" placeholder="Search operation actions&hellip;" />
-      </form>
+        <input
+          type="search"
+          id="operationActionsSearch"
+          data-eal-global-search
+          value="{{ action_search_q|default:'' }}"
+          autocomplete="off"
+          placeholder="Search operation actions&hellip;"
+          aria-label="Search operation actions"
+        />
+        <button
+          type="button"
+          class="eal-search-clear-btn"
+          id="operationActionsSearchClear"
+          title="Clear search"
+          aria-label="Clear search"
+          hidden
+        >
+          <i class="bi bi-x-lg"></i>
+        </button>
+      </div>
     </div>
   </div>
 

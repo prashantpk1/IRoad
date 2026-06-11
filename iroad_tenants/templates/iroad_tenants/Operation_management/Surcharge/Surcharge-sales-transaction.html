@@ -42,10 +42,7 @@
           </div>
           <div class="page-header-right">
             <div class="eal-header-actions">
-              <button class="eal-btn eal-btn-outline">
-                <i class="bi bi-download"></i>
-                <span>Export</span>
-              </button>
+              {% include 'iroad_tenants/partials/eal_export_link.html' with export_url_name='iroad_tenants:tenant_operation_surcharge_sales_export' export_filename='surcharge_transactions_export.csv' %}
               <a href="{% url 'iroad_tenants:tenant_operation_surcharge_sales_create' %}" class="eal-btn eal-btn-primary">
                 <i class="bi bi-plus-lg"></i>
                 <span>Create Surcharge Transaction</span>
@@ -104,19 +101,36 @@
         </div>
       </div>
       <!-- Table Card -->
-      <div class="eal-table-card">
-        <!-- Toolbar -->
+      <div
+        class="eal-table-card"
+        data-eal-filterable-table
+        data-eal-server-paginated="1"
+        data-eal-global-search-columns="1,2,3,4,5,6,7"
+      >
         <div class="eal-toolbar">
           <div class="eal-toolbar-left">
-            <form method="get" class="eal-search">
+            <div class="eal-search">
               <i class="bi bi-search"></i>
               <input
-                type="text"
-                name="q"
+                type="search"
+                id="surchargeSalesSearch"
+                data-eal-global-search
                 value="{{ surcharge_search_q|default:'' }}"
+                autocomplete="off"
                 placeholder="Search surcharge transactions&hellip;"
+                aria-label="Search surcharge transactions"
               />
-            </form>
+              <button
+                type="button"
+                class="eal-search-clear-btn"
+                id="surchargeSalesSearchClear"
+                title="Clear search"
+                aria-label="Clear search"
+                hidden
+              >
+                <i class="bi bi-x-lg"></i>
+              </button>
+            </div>
           </div>
         </div>
 

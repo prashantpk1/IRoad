@@ -25,7 +25,7 @@ from django.db import IntegrityError, ProgrammingError, connection
 from iroad_tenants.tenant_schema import restore_public_schema
 from django.db.models.deletion import ProtectedError
 from django.db import transaction as db_transaction
-from django.db.models import Prefetch, Q, Sum
+from django.db.models import Count, F, Prefetch, Q, Sum
 from django.utils.dateparse import parse_date, parse_datetime
 from django.utils.formats import date_format
 from django.utils import timezone
@@ -38,7 +38,9 @@ from iroad_tenants.list_table_utils import (
     apply_eal_column_filters,
     apply_eal_column_sort,
     build_eal_list_queryset,
+    copy_eal_list_params,
     eal_column_filter_values,
+    get_list_search_q,
     paginate_tenant_list,
     prepare_eal_list,
 )
@@ -1861,7 +1863,6 @@ class TenantCargoMasterListView(View):
             return response
 
         qs = TenantCargoMaster.objects.select_related('client_account', 'cargo_category')
-        sq = request.GET.get('q', '').strip()
         cid = request.GET.get('client', '').strip()
         filter_client_value = ''
 
@@ -1884,15 +1885,6 @@ class TenantCargoMasterListView(View):
             qs = qs.filter(status=TenantCargoMaster.Status.ACTIVE)
             filter_status = 'active'
 
-        if sq:
-            qs = qs.filter(
-                Q(display_name__icontains=sq)
-                | Q(cargo_code__icontains=sq)
-                | Q(client_sku_external_ref__icontains=sq)
-                | Q(client_account__display_name__icontains=sq)
-                | Q(cargo_category__name_english__icontains=sq)
-                | Q(cargo_category__category_code__icontains=sq)
-            )
         if cid:
             filter_client_value = cid
             try:
@@ -1900,22 +1892,6 @@ class TenantCargoMasterListView(View):
                 qs = qs.filter(client_account_id=cid_uuid)
             except ValueError:
                 qs = qs.filter(client_account__account_no__iexact=cid)
-
-        sort_key_raw = (request.GET.get('sort') or 'cargo_code').strip().lower()
-        sort_dir_raw = (request.GET.get('dir') or 'asc').strip().lower()
-        sort_map = {
-            'cargo_code': 'cargo_code',
-            'client_account': 'client_account__account_no',
-            'category': 'cargo_category__name_english',
-            'display_name': 'display_name',
-            'english_label': 'english_label',
-            'arabic_label': 'arabic_label',
-            'client_sku_external_ref': 'client_sku_external_ref',
-            'status': 'status',
-        }
-        sort_key = sort_map.get(sort_key_raw, 'cargo_code')
-        sort_dir = 'desc' if sort_dir_raw == 'desc' else 'asc'
-        order_expr = f'-{sort_key}' if sort_dir == 'desc' else sort_key
 
         cargo_column_filters = {
             0: 'cargo_code',
@@ -1937,23 +1913,35 @@ class TenantCargoMasterListView(View):
             6: 'client_sku_external_ref',
             7: 'status',
         }
-        qs = apply_eal_column_filters(qs, request, cargo_column_filters)
-        try:
-            sort_col = int(request.GET.get('sort_col') or 0)
-        except (TypeError, ValueError):
-            sort_col = 0
-        if sort_col in cargo_sort_cols:
-            sort_dir = (request.GET.get('sort_dir') or 'asc').strip().lower()
-            sort_field = cargo_sort_cols[sort_col]
-            order_expr = f'-{sort_field}' if sort_dir == 'desc' else sort_field
-            qs_ordered = qs.order_by(order_expr, '-created_at')
-        else:
-            qs_ordered = qs.order_by(order_expr, '-created_at')
-
-        stats = _cargo_master_list_stats(qs_ordered)
-        page, list_ctx = paginate_tenant_list(request, qs_ordered)
-        list_ctx['search_q'] = sq
-        list_ctx['eal_column_filters'] = eal_column_filter_values(request)
+        cargo_search_fields = [
+            'display_name',
+            'cargo_code',
+            'client_sku_external_ref',
+            'client_account__display_name',
+            'client_account__account_no',
+            'cargo_category__name_english',
+            'cargo_category__category_code',
+            'english_label',
+            'arabic_label',
+        ]
+        page, list_ctx = prepare_eal_list(
+            request,
+            qs,
+            search_fields=cargo_search_fields,
+            column_field_map=cargo_column_filters,
+            sort_col_field_map=cargo_sort_cols,
+            default_order=('cargo_code',),
+        )
+        stats = _cargo_master_list_stats(
+            build_eal_list_queryset(
+                request,
+                qs,
+                search_fields=cargo_search_fields,
+                column_field_map=cargo_column_filters,
+                sort_col_field_map=cargo_sort_cols,
+                default_order=('cargo_code',),
+            )
+        )
 
         clients = list(
             TenantClientAccount.objects.filter(
@@ -2372,19 +2360,12 @@ class TenantCargoCategoryListView(View):
             elif scope == 'inactive':
                 qs = qs.filter(status=TenantCargoCategory.Status.INACTIVE)
 
-            sq = request.GET.get('q', '').strip()
-            if sq:
-                qs = qs.filter(
-                    Q(name_english__icontains=sq)
-                    | Q(name_arabic__icontains=sq)
-                    | Q(category_code__icontains=sq)
-                )
-            paginator = Paginator(qs, 10)
-            try:
-                page_no = max(1, int(request.GET.get('page') or 1))
-            except ValueError:
-                page_no = 1
-            page = paginator.get_page(page_no)
+            page, list_ctx = prepare_eal_list(
+                request,
+                qs,
+                search_fields=['name_english', 'name_arabic', 'category_code'],
+                default_order=('-created_at',),
+            )
             stats = {
                 'total': TenantCargoCategory.objects.count(),
                 'active': TenantCargoCategory.objects.filter(
@@ -2397,10 +2378,10 @@ class TenantCargoCategoryListView(View):
             context.update(
                 {
                     'categories_page': page,
-                    'search_q': sq,
                     'category_scope': scope,
                     'category_stats': stats,
                     'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                    **list_ctx,
                 }
             )
             return render(request, self.template_name, context)
@@ -4202,6 +4183,15 @@ def _build_critical_account_changes_context(request):
         if matching_user_ids:
             performed_q |= Q(record_id__in=matching_user_ids)
         critical_qs = critical_qs.filter(performed_q)
+    critical_account_search_q = get_list_search_q(request)
+    if critical_account_search_q:
+        critical_qs = critical_qs.filter(
+            Q(module_name__icontains=critical_account_search_q)
+            | Q(action_type__icontains=critical_account_search_q)
+            | Q(admin__email__icontains=critical_account_search_q)
+            | Q(admin__first_name__icontains=critical_account_search_q)
+            | Q(admin__last_name__icontains=critical_account_search_q)
+        )
     critical_qs = critical_qs.order_by(
         *_critical_account_audit_order_by(
             audit_filters['sort_col'],
@@ -4273,6 +4263,7 @@ def _build_critical_account_changes_context(request):
         'critical_account_filter_performed_by': audit_filters['performed_by_filter'],
         'critical_account_filters_active': audit_filters['filters_active'],
         'critical_account_filters_qs': audit_filters['filters_qs'],
+        'critical_account_search_q': critical_account_search_q,
         'eal_column_filters': eal_column_filter_values(request),
     }
 
@@ -4350,16 +4341,16 @@ class TenantServiceItemMasterListView(View):
             return response
         try:
             item_column_filters = {
-                1: 'service_item_code',
-                2: 'english_label',
-                3: 'arabic_label',
+                1: 'service_code',
+                2: 'english_name',
+                3: 'arabic_name',
                 4: 'service_type',
                 5: 'status',
             }
             item_sort_cols = {
-                1: 'service_item_code',
-                2: 'english_label',
-                3: 'arabic_label',
+                1: 'service_code',
+                2: 'english_name',
+                3: 'arabic_name',
                 4: 'service_type',
                 5: 'status',
             }
@@ -4367,10 +4358,11 @@ class TenantServiceItemMasterListView(View):
                 request,
                 TenantServiceItemMaster.objects.all(),
                 search_fields=[
-                    'service_item_code',
-                    'english_label',
-                    'arabic_label',
+                    'service_code',
+                    'english_name',
+                    'arabic_name',
                     'service_type',
+                    'category_name',
                 ],
                 column_field_map=item_column_filters,
                 sort_col_field_map=item_sort_cols,
@@ -5000,19 +4992,12 @@ class TenantPriceListMasterListView(View):
             expiring_threshold = today + timezone.timedelta(days=30)
             qs = (
                 TenantPriceList.objects.select_related('client_account')
-                .prefetch_related('trip_lines', 'service_lines')
-                .order_by('-created_at')
-            )
-
-            search_q = (request.GET.get('q') or '').strip()
-            if search_q:
-                qs = qs.filter(
-                    Q(price_list_code__icontains=search_q)
-                    | Q(price_list_name__icontains=search_q)
-                    | Q(client_account__account_no__icontains=search_q)
-                    | Q(client_account__display_name__icontains=search_q)
-                    | Q(base_currency__icontains=search_q)
+                .annotate(
+                    _trip_line_count=Count('trip_lines', distinct=True),
+                    _service_line_count=Count('service_lines', distinct=True),
                 )
+                .annotate(_line_count=F('_trip_line_count') + F('_service_line_count'))
+            )
 
             status_raw = (request.GET.get('status') or 'all').strip().lower()
             if status_raw == 'draft':
@@ -5037,15 +5022,55 @@ class TenantPriceListMasterListView(View):
                 except (ValueError, TypeError):
                     filter_client_id = ''
 
-            paginator = Paginator(qs, 10)
-            try:
-                page_no = max(1, int(request.GET.get('page') or 1))
-            except ValueError:
-                page_no = 1
-            page = paginator.get_page(page_no)
+            price_column_filters = {
+                1: 'price_list_code',
+                2: 'price_list_name',
+                3: 'client_account__account_no',
+                4: '_line_count',
+                5: 'effective_from',
+                6: 'effective_to',
+                7: 'status',
+            }
+            price_column_filter_types = {
+                4: 'number',
+                5: 'date',
+                6: 'date',
+            }
+
+            def _price_list_client_column_filter(queryset, val):
+                return queryset.filter(
+                    Q(client_account__account_no__icontains=val)
+                    | Q(client_account__display_name__icontains=val)
+                )
+
+            price_sort_cols = {
+                1: 'price_list_code',
+                2: 'price_list_name',
+                3: 'client_account__account_no',
+                4: '_line_count',
+                5: 'effective_from',
+                6: 'effective_to',
+                7: 'status',
+            }
+            page, list_ctx = prepare_eal_list(
+                request,
+                qs,
+                search_fields=[
+                    'price_list_code',
+                    'price_list_name',
+                    'client_account__account_no',
+                    'client_account__display_name',
+                    'base_currency',
+                ],
+                column_field_map=price_column_filters,
+                sort_col_field_map=price_sort_cols,
+                default_order=('-created_at',),
+                column_filter_types=price_column_filter_types,
+                column_filter_hooks={3: _price_list_client_column_filter},
+            )
 
             for item in page.object_list:
-                item.line_count = len(item.trip_lines.all()) + len(item.service_lines.all())
+                item.line_count = getattr(item, '_line_count', 0)
 
             all_lists_for_stats = list(
                 TenantPriceList.objects.select_related('client_account')
@@ -5055,7 +5080,6 @@ class TenantPriceListMasterListView(View):
             context.update(
                 {
                     'price_lists_page': page,
-                    'search_q': search_q,
                     'filter_status': filter_status,
                     'filter_client_id': filter_client_id,
                     'client_filter_choices': list(
@@ -5063,20 +5087,6 @@ class TenantPriceListMasterListView(View):
                             status=TenantClientAccount.Status.ACTIVE,
                         ).order_by('display_name')[:500]
                     ),
-                    'pagination_page_links': [],
-                    'pagination_prev_url': None,
-                    'pagination_next_url': None,
-                    'pagination_start': (
-                        0
-                        if paginator.count == 0
-                        else (page.number - 1) * paginator.per_page + 1
-                    ),
-                    'pagination_end': (
-                        0
-                        if paginator.count == 0
-                        else (page.number - 1) * paginator.per_page + len(page.object_list)
-                    ),
-                    'pagination_total': paginator.count,
                     'price_list_stats': {
                         'total': len(all_lists_for_stats),
                         'active': sum(
@@ -5096,30 +5106,8 @@ class TenantPriceListMasterListView(View):
                         ),
                     },
                     'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                    **list_ctx,
                 }
-            )
-            def _page_url(page_num):
-                q = request.GET.copy()
-                q.pop('stype', None)
-                try:
-                    pn = int(page_num)
-                except (TypeError, ValueError):
-                    pn = 1
-                if pn > 1:
-                    q['page'] = str(pn)
-                else:
-                    q.pop('page', None)
-                encoded = q.urlencode()
-                return f'?{encoded}' if encoded else '?'
-
-            context['pagination_page_links'] = [
-                (n, _page_url(n)) for n in page.paginator.page_range
-            ]
-            context['pagination_prev_url'] = (
-                _page_url(page.previous_page_number()) if page.has_previous() else None
-            )
-            context['pagination_next_url'] = (
-                _page_url(page.next_page_number()) if page.has_next() else None
             )
             return render(request, self.template_name, context)
         finally:
@@ -7162,7 +7150,7 @@ class TenantOperationBookingListView(View):
             clear_tenant_portal_cookie(response, request=request)
             return response
         try:
-            search_q = (request.GET.get('search') or '').strip()
+            search_q = get_list_search_q(request, 'search')
             qs = TenantBooking.objects.select_related(
                 'client_account',
                 'price_list',
@@ -7251,7 +7239,7 @@ class TenantOperationShipmentListView(View):
             clear_tenant_portal_cookie(response, request=request)
             return response
         try:
-            search_q = (request.GET.get('search') or '').strip()
+            search_q = get_list_search_q(request, 'search')
             shipment_qs = TenantShipment.objects.select_related(
                 'truck',
                 'driver',
@@ -14804,7 +14792,7 @@ class TenantOperationBookingListView(View):
             clear_tenant_portal_cookie(response, request=request)
             return response
         try:
-            search_q = (request.GET.get('search') or '').strip()
+            search_q = get_list_search_q(request, 'search')
             qs = TenantBooking.objects.select_related(
                 'client_account',
                 'price_list',
@@ -15155,7 +15143,7 @@ class TenantOperationShipmentListView(View):
             clear_tenant_portal_cookie(response, request=request)
             return response
         try:
-            search_q = (request.GET.get('search') or '').strip()
+            search_q = get_list_search_q(request, 'search')
             shipment_qs = TenantShipment.objects.select_related(
                 'truck',
                 'driver',
@@ -20681,6 +20669,18 @@ TENANT_CLIENT_ACCOUNT_SEARCH_FIELDS = [
 ]
 
 
+def _tenant_client_account_column_filter_hooks():
+    def _client_type_filter(queryset, val):
+        v = val.strip().lower()
+        if 'corporate' in v or 'business' in v:
+            return queryset.filter(client_type=TenantClientAccount.ClientType.BUSINESS)
+        if 'individual' in v or 'ind' in v:
+            return queryset.filter(client_type=TenantClientAccount.ClientType.INDIVIDUAL)
+        return queryset.filter(client_type__icontains=val)
+
+    return {5: _client_type_filter}
+
+
 def _tenant_client_account_filtered_queryset(request):
     """Client account queryset with the same search/filters/sort as the list page."""
     return build_eal_list_queryset(
@@ -20690,6 +20690,7 @@ def _tenant_client_account_filtered_queryset(request):
         column_field_map=TENANT_CLIENT_ACCOUNT_COLUMN_FILTERS,
         sort_col_field_map=TENANT_CLIENT_ACCOUNT_SORT_COLS,
         default_order=('account_no',),
+        column_filter_hooks=_tenant_client_account_column_filter_hooks(),
     )
 
 
@@ -20753,6 +20754,7 @@ class TenantClientAccountView(View):
                 column_field_map=TENANT_CLIENT_ACCOUNT_COLUMN_FILTERS,
                 sort_col_field_map=TENANT_CLIENT_ACCOUNT_SORT_COLS,
                 default_order=('account_no',),
+                column_filter_hooks=_tenant_client_account_column_filter_hooks(),
             )
             context.update(
                 {
@@ -22175,14 +22177,22 @@ class TenantClientAttachmentDetailView(View):
 TENANT_CLIENT_ATTACHMENT_COLUMN_FILTERS = {
     1: 'attachment_no',
     2: 'client_account__account_no',
+    3: 'attachment_date',
+    4: 'is_expiry_applicable',
     5: 'expiry_date',
     6: 'attachment_file_title',
     7: 'status',
+}
+TENANT_CLIENT_ATTACHMENT_COLUMN_FILTER_TYPES = {
+    3: 'date',
+    4: 'boolean',
+    5: 'date',
 }
 TENANT_CLIENT_ATTACHMENT_SORT_COLS = {
     1: 'attachment_no',
     2: 'client_account__account_no',
     3: 'attachment_date',
+    4: 'is_expiry_applicable',
     5: 'expiry_date',
     6: 'attachment_file_title',
     7: 'status',
@@ -22207,6 +22217,7 @@ def _tenant_client_attachment_filtered_queryset(request):
         column_field_map=TENANT_CLIENT_ATTACHMENT_COLUMN_FILTERS,
         sort_col_field_map=TENANT_CLIENT_ATTACHMENT_SORT_COLS,
         default_order=('-created_at',),
+        column_filter_types=TENANT_CLIENT_ATTACHMENT_COLUMN_FILTER_TYPES,
     )
 
 
@@ -22298,6 +22309,7 @@ class TenantClientAttachmentsListView(View):
                 column_field_map=TENANT_CLIENT_ATTACHMENT_COLUMN_FILTERS,
                 sort_col_field_map=TENANT_CLIENT_ATTACHMENT_SORT_COLS,
                 default_order=('-created_at',),
+                column_filter_types=TENANT_CLIENT_ATTACHMENT_COLUMN_FILTER_TYPES,
             )
             rows = list(attachments_page.object_list)
             base = _tenant_client_attachments_base_path()
@@ -22863,7 +22875,17 @@ class TenantClientContactsListView(View):
                 5: 'telephone_number',
                 6: 'extension',
                 7: 'position',
+                8: 'is_primary',
             }
+
+            def _contact_primary_column_filter(queryset, val):
+                v = val.strip().lower()
+                if 'primary' in v and 'secondary' not in v:
+                    return queryset.filter(is_primary=True)
+                if 'secondary' in v:
+                    return queryset.filter(is_primary=False)
+                return queryset
+
             contact_sort_cols = {
                 1: 'client_account__account_no',
                 2: 'name',
@@ -22888,6 +22910,7 @@ class TenantClientContactsListView(View):
                 column_field_map=contact_column_filters,
                 sort_col_field_map=contact_sort_cols,
                 default_order=('-created_at',),
+                column_filter_hooks={8: _contact_primary_column_filter},
             )
             contacts = list(contacts_page.object_list)
             all_contacts_qs = TenantClientContact.objects.all()
@@ -22923,6 +22946,7 @@ class TenantClientContactsListView(View):
                 except NoReverseMatch:
                     detail_u = _tenant_client_contact_detail_path(contact.contact_id)
                 contact.list_detail_url = detail_u
+            contacts_list_base = reverse('iroad_tenants:tenant_client_contacts_list')
             context.update(
                 {
                     'client_contacts': contacts,
@@ -22931,6 +22955,18 @@ class TenantClientContactsListView(View):
                     'contact_stats': contact_stats,
                     'tenant_schema_name': tenant_registry.schema_name,
                     'contacts_list_chip': chip,
+                    'contacts_chip_all_url': contacts_list_base + copy_eal_list_params(
+                        request,
+                        remove=['chip'],
+                    ),
+                    'contacts_chip_primary_url': contacts_list_base + copy_eal_list_params(
+                        request,
+                        set_params={'chip': 'primary'},
+                    ),
+                    'contacts_chip_secondary_url': contacts_list_base + copy_eal_list_params(
+                        request,
+                        set_params={'chip': 'secondary'},
+                    ),
                     **list_ctx,
                 }
             )
@@ -23398,8 +23434,16 @@ class TenantClientContractListView(View):
             contract_column_filters = {
                 1: 'contract_no',
                 2: 'client_account__account_no',
+                3: 'start_date',
+                4: 'end_date',
                 5: 'notes',
+                6: 'contract_attachment',
                 7: 'status',
+            }
+            contract_column_filter_types = {
+                3: 'date',
+                4: 'date',
+                6: 'file',
             }
             contract_sort_cols = {
                 1: 'contract_no',
@@ -23416,10 +23460,12 @@ class TenantClientContractListView(View):
                     'contract_no',
                     'client_account__account_no',
                     'client_account__display_name',
+                    'notes',
                 ],
                 column_field_map=contract_column_filters,
                 sort_col_field_map=contract_sort_cols,
                 default_order=('-created_at',),
+                column_filter_types=contract_column_filter_types,
             )
             rows = list(contracts_page.object_list)
             base = _tenant_client_contracts_base_path()
@@ -24125,9 +24171,9 @@ class TenantAddressMasterListView(View):
             return response
 
         qs = TenantAddressMaster.objects.select_related('client_account')
-        sq = request.GET.get('q', '').strip()
         cid = request.GET.get('client', '').strip()
         filter_client_id = ''
+        filter_client_value = ''
 
         # AD-001: default list = Active only; All / Inactive only when explicitly requested.
         status_raw = (request.GET.get('status') or '').strip().lower()
@@ -24149,105 +24195,95 @@ class TenantAddressMasterListView(View):
             qs = qs.filter(status=TenantAddressMaster.Status.ACTIVE)
             filter_status = 'active'
 
-        if sq:
-            qs = qs.filter(
-                Q(display_name__icontains=sq)
-                | Q(address_code__icontains=sq)
-                | Q(city__icontains=sq)
-                | Q(client_account__display_name__icontains=sq)
-            )
         if cid:
             try:
                 cid_uuid = uuid.UUID(cid)
                 qs = qs.filter(client_account_id=cid_uuid)
                 filter_client_id = str(cid_uuid)
             except ValueError:
-                filter_client_id = ''
+                client_row = TenantClientAccount.objects.filter(account_no__iexact=cid).first()
+                if client_row:
+                    qs = qs.filter(client_account_id=client_row.account_id)
+                    filter_client_id = str(client_row.account_id)
+                filter_client_value = cid
 
-        sort_key_raw = (request.GET.get('sort') or 'address_code').strip().lower()
-        sort_dir_raw = (request.GET.get('dir') or 'asc').strip().lower()
-        sort_map = {
-            'address_code': 'address_code',
-            'client_account': 'client_account__account_no',
-            'display_name': 'display_name',
-            'city_country': 'city',
-            'contact_name': 'contact_name',
-            'phone': 'phone_no',
-            'status': 'status',
+        address_column_filters = {
+            1: 'address_code',
+            2: 'client_account__account_no',
+            3: 'display_name',
+            4: 'address_category',
+            5: 'city',
+            6: 'contact_name',
+            7: 'phone_no',
         }
-        sort_key = sort_map.get(sort_key_raw, 'address_code')
-        sort_dir = 'desc' if sort_dir_raw == 'desc' else 'asc'
-        order_expr = f'-{sort_key}' if sort_dir == 'desc' else sort_key
-
-        qs_ordered = qs.order_by(order_expr, '-created_at')
-        stats = _address_master_list_stats(qs_ordered)
-        paginator = Paginator(qs_ordered, 10)
-        try:
-            page_no = max(1, int(request.GET.get('page') or 1))
-        except ValueError:
-            page_no = 1
-        page = paginator.get_page(page_no)
+        address_sort_cols = {
+            1: 'address_code',
+            2: 'client_account__account_no',
+            3: 'display_name',
+            4: 'address_category',
+            5: 'city',
+            6: 'contact_name',
+            7: 'phone_no',
+        }
+        page, list_ctx = prepare_eal_list(
+            request,
+            qs,
+            search_fields=[
+                'display_name',
+                'address_code',
+                'city',
+                'client_account__display_name',
+                'client_account__account_no',
+                'contact_name',
+                'phone_no',
+            ],
+            column_field_map=address_column_filters,
+            sort_col_field_map=address_sort_cols,
+            default_order=('address_code',),
+        )
         _hydrate_address_master_list_rows(page)
-
-        total_count = paginator.count
-        if total_count == 0:
-            ps, pe = 0, 0
-        else:
-            ps = (page.number - 1) * paginator.per_page + 1
-            pe = ps + len(page.object_list) - 1
-
-        def _page_url(page_num):
-            q = request.GET.copy()
-            q.pop('stype', None)
-            try:
-                pn = int(page_num)
-            except (TypeError, ValueError):
-                pn = 1
-            if pn > 1:
-                q['page'] = str(pn)
-            else:
-                q.pop('page', None)
-            return '?' + q.urlencode()
-
-        def _sort_url(col_key):
-            q = request.GET.copy()
-            q.pop('stype', None)
-            current_key = sort_key_raw if sort_key_raw in sort_map else 'address_code'
-            current_dir = sort_dir
-            if col_key == current_key:
-                next_dir = 'desc' if current_dir == 'asc' else 'asc'
-            else:
-                next_dir = 'asc'
-            q['sort'] = col_key
-            q['dir'] = next_dir
-            q.pop('page', None)
-            return '?' + q.urlencode()
-
-        pagination_page_links = [(n, _page_url(n)) for n in page.paginator.page_range]
-        prev_url = _page_url(page.previous_page_number()) if page.has_previous() else None
-        next_url = _page_url(page.next_page_number()) if page.has_next() else None
+        stats = _address_master_list_stats(
+            build_eal_list_queryset(
+                request,
+                qs,
+                search_fields=[
+                    'display_name',
+                    'address_code',
+                    'city',
+                    'client_account__display_name',
+                    'client_account__account_no',
+                    'contact_name',
+                    'phone_no',
+                ],
+                column_field_map=address_column_filters,
+                sort_col_field_map=address_sort_cols,
+                default_order=('address_code',),
+            )
+        )
 
         clients = list(
             TenantClientAccount.objects.filter(
                 status=TenantClientAccount.Status.ACTIVE,
             ).order_by('display_name')[:500]
         )
+        if filter_client_id and not filter_client_value:
+            matched_client = next(
+                (ca for ca in clients if str(ca.account_id) == filter_client_id),
+                None,
+            )
+            if matched_client:
+                filter_client_value = matched_client.account_no
 
         context.update(
             {
                 'addresses_page': page,
-                'search_q': sq,
                 'filter_status': filter_status,
                 'filter_client_id': filter_client_id,
-                'pagination_page_links': pagination_page_links,
-                'pagination_prev_url': prev_url,
-                'pagination_next_url': next_url,
+                'filter_client_value': filter_client_value,
                 'stats': stats,
-                'pagination_start': ps,
-                'pagination_end': pe,
-                'pagination_total': total_count,
                 'client_filter_choices': clients,
                 'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                **list_ctx,
             }
         )
         try:
@@ -24729,7 +24765,6 @@ class TruckTypeMasterListView(View):
 
         tt = TruckTypeMaster
         qs = tt.objects.all()
-        sq = request.GET.get('q', '').strip()
 
         status_raw = (request.GET.get('status') or '').strip().lower()
         if 'status' not in request.GET:
@@ -24748,13 +24783,6 @@ class TruckTypeMasterListView(View):
         else:
             filter_status = 'all'
 
-        if sq:
-            qs = qs.filter(
-                Q(truck_type_code__icontains=sq)
-                | Q(english_label__icontains=sq)
-                | Q(arabic_label__icontains=sq)
-            )
-
         sort_key_raw = (request.GET.get('sort') or 'truck_type_code').strip().lower()
         sort_dir_raw = (request.GET.get('dir') or 'asc').strip().lower()
         sort_map = {
@@ -24767,25 +24795,18 @@ class TruckTypeMasterListView(View):
         sort_dir = 'desc' if sort_dir_raw == 'desc' else 'asc'
         order_expr = f'-{sort_key}' if sort_dir == 'desc' else sort_key
 
-        qs_ordered = qs.order_by(order_expr)
+        qs_filtered = build_eal_list_queryset(
+            request,
+            qs,
+            search_fields=['truck_type_code', 'english_label', 'arabic_label'],
+        )
+        qs_ordered = qs_filtered.order_by(order_expr)
         stats = {
             'total_count': tt.objects.count(),
             'active_count': tt.objects.filter(status=tt.Status.ACTIVE).count(),
             'inactive_count': tt.objects.filter(status=tt.Status.INACTIVE).count(),
         }
-        paginator = Paginator(qs_ordered, 10)
-        try:
-            page_no = max(1, int(request.GET.get('page') or 1))
-        except ValueError:
-            page_no = 1
-        page = paginator.get_page(page_no)
-
-        total_count = paginator.count
-        if total_count == 0:
-            ps, pe = 0, 0
-        else:
-            ps = (page.number - 1) * paginator.per_page + 1
-            pe = ps + len(page.object_list) - 1
+        page, list_ctx = paginate_tenant_list(request, qs_ordered)
 
         def _page_url(page_num):
             q = request.GET.copy()
@@ -24798,7 +24819,8 @@ class TruckTypeMasterListView(View):
                 q['page'] = str(pn)
             else:
                 q.pop('page', None)
-            return '?' + q.urlencode()
+            encoded = q.urlencode()
+            return f'?{encoded}' if encoded else ''
 
         def _sort_url(col_key):
             q = request.GET.copy()
@@ -24814,22 +24836,11 @@ class TruckTypeMasterListView(View):
             q.pop('page', None)
             return '?' + q.urlencode()
 
-        pagination_page_links = [(n, _page_url(n)) for n in page.paginator.page_range]
-        prev_url = _page_url(page.previous_page_number()) if page.has_previous() else None
-        next_url = _page_url(page.next_page_number()) if page.has_next() else None
-
         context.update(
             {
                 'truck_types_page': page,
-                'search_q': sq,
                 'filter_status': filter_status,
                 'stats': stats,
-                'pagination_page_links': pagination_page_links,
-                'pagination_prev_url': prev_url,
-                'pagination_next_url': next_url,
-                'pagination_start': ps,
-                'pagination_end': pe,
-                'pagination_total': total_count,
                 'sort_key': sort_key,
                 'sort_dir': sort_dir,
                 'sort_urls': {
@@ -24839,6 +24850,7 @@ class TruckTypeMasterListView(View):
                     'status': _sort_url('status'),
                 },
                 'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                **list_ctx,
             }
         )
         try:
@@ -25211,8 +25223,6 @@ class TruckMasterListView(View):
         tm = TruckMaster
         qs = tm.objects.select_related('truck_type', 'default_driver_id')
 
-        sq = (request.GET.get('q') or '').strip()
-
         status_raw = (request.GET.get('status') or '').strip().lower()
         if 'status' not in request.GET:
             filter_status = 'all'
@@ -25250,29 +25260,40 @@ class TruckMasterListView(View):
             except ValueError:
                 filter_truck_type_id = ''
 
-        if sq:
-            qs = qs.filter(
-                Q(truck_code__icontains=sq)
-                | Q(plate_number__icontains=sq)
-                | Q(owner_name__icontains=sq)
-            )
-
-        sort_key_raw = (request.GET.get('sort') or 'truck_code').strip().lower()
-        sort_dir_raw = (request.GET.get('dir') or 'asc').strip().lower()
-        sort_map = {
-            'truck_code': 'truck_code',
-            'owner_name': 'owner_name',
-            'default_driver_id': 'default_driver_id',
-            'sourcing_mode': 'sourcing_mode',
-            'truck_type': 'truck_type__english_label',
-            'plate_number': 'plate_number',
-            'status': 'status',
+        truck_column_filters = {
+            1: 'truck_code',
+            2: 'owner_name',
+            3: 'default_driver_id',
+            4: 'sourcing_mode',
+            5: 'truck_type__english_label',
+            6: 'plate_number',
+            7: 'status',
         }
-        sort_key = sort_map.get(sort_key_raw, 'truck_code')
-        sort_dir = 'desc' if sort_dir_raw == 'desc' else 'asc'
-        order_expr = f'-{sort_key}' if sort_dir == 'desc' else sort_key
-
-        qs_ordered = qs.order_by(order_expr, '-created_at')
+        truck_sort_cols = {
+            1: 'truck_code',
+            2: 'owner_name',
+            3: 'default_driver_id',
+            4: 'sourcing_mode',
+            5: 'truck_type__english_label',
+            6: 'plate_number',
+            7: 'status',
+        }
+        truck_search_fields = [
+            'truck_code',
+            'plate_number',
+            'owner_name',
+            'truck_type__english_label',
+            'default_driver_id',
+        ]
+        page, list_ctx = prepare_eal_list(
+            request,
+            qs,
+            search_fields=truck_search_fields,
+            column_field_map=truck_column_filters,
+            sort_col_field_map=truck_sort_cols,
+            default_order=('truck_code',),
+        )
+        _hydrate_truck_master_list_rows(page)
         stats = {
             'total_count': tm.objects.count(),
             'active_count': tm.objects.filter(status=tm.Status.ACTIVE).count(),
@@ -25281,81 +25302,58 @@ class TruckMasterListView(View):
             'inactive_count': tm.objects.filter(status=tm.Status.INACTIVE).count(),
         }
 
-        paginator = Paginator(qs_ordered, 10)
-        try:
-            page_no = max(1, int(request.GET.get('page') or 1))
-        except ValueError:
-            page_no = 1
-        page = paginator.get_page(page_no)
-        _hydrate_truck_master_list_rows(page)
-
-        total_count = paginator.count
-        if total_count == 0:
-            ps, pe = 0, 0
-        else:
-            ps = (page.number - 1) * paginator.per_page + 1
-            pe = ps + len(page.object_list) - 1
-
-        def _page_url(page_num):
-            q = request.GET.copy()
-            q.pop('stype', None)
-            try:
-                pn = int(page_num)
-            except (TypeError, ValueError):
-                pn = 1
-            if pn > 1:
-                q['page'] = str(pn)
-            else:
-                q.pop('page', None)
-            return '?' + q.urlencode()
-
-        def _sort_url(col_key):
-            q = request.GET.copy()
-            q.pop('stype', None)
-            current_key = sort_key_raw if sort_key_raw in sort_map else 'truck_code'
-            current_dir = sort_dir
-            if col_key == current_key:
-                next_dir = 'desc' if current_dir == 'asc' else 'asc'
-            else:
-                next_dir = 'asc'
-            q['sort'] = col_key
-            q['dir'] = next_dir
-            q.pop('page', None)
-            return '?' + q.urlencode()
-
-        pagination_page_links = [(n, _page_url(n)) for n in page.paginator.page_range]
-        prev_url = _page_url(page.previous_page_number()) if page.has_previous() else None
-        next_url = _page_url(page.next_page_number()) if page.has_next() else None
-
         truck_type_choices = list(
             TruckTypeMaster.objects.order_by('english_label')[:500]
         )
 
+        truck_sort_col_keys = {
+            1: 'truck_code',
+            2: 'owner_name',
+            3: 'default_driver_id',
+            4: 'sourcing_mode',
+            5: 'truck_type',
+            6: 'plate_number',
+            7: 'status',
+        }
+
+        def _truck_sort_url(col_index):
+            q = request.GET.copy()
+            q.pop('stype', None)
+            q.pop('page', None)
+            current_col = (q.get('sort_col') or '').strip()
+            current_dir = (q.get('sort_dir') or 'asc').strip().lower()
+            if current_col == str(col_index):
+                q['sort_dir'] = 'desc' if current_dir == 'asc' else 'asc'
+            else:
+                q['sort_dir'] = 'asc'
+            q['sort_col'] = str(col_index)
+            encoded = q.urlencode()
+            return f'?{encoded}' if encoded else ''
+
+        try:
+            active_sort_col = int(list_ctx.get('sort_col') or 1)
+        except (TypeError, ValueError):
+            active_sort_col = 1
+
         context.update(
             {
                 'trucks_page': page,
-                'search_q': sq,
                 'filter_status': filter_status,
                 'filter_sourcing_mode': filter_sourcing_mode,
                 'filter_truck_type_id': filter_truck_type_id,
                 'truck_type_filter_choices': truck_type_choices,
                 'stats': stats,
-                'pagination_page_links': pagination_page_links,
-                'pagination_prev_url': prev_url,
-                'pagination_next_url': next_url,
-                'pagination_start': ps,
-                'pagination_end': pe,
-                'pagination_total': total_count,
-                'sort_key': sort_key_raw if sort_key_raw in sort_map else 'truck_code',
-                'sort_dir': sort_dir,
-                'sort_url_truck_code': _sort_url('truck_code'),
-                'sort_url_owner_name': _sort_url('owner_name'),
-                'sort_url_default_driver_id': _sort_url('default_driver_id'),
-                'sort_url_sourcing_mode': _sort_url('sourcing_mode'),
-                'sort_url_truck_type': _sort_url('truck_type'),
-                'sort_url_plate_number': _sort_url('plate_number'),
-                'sort_url_status': _sort_url('status'),
+                'sort_key': truck_sort_col_keys.get(active_sort_col, 'truck_code'),
+                'sort_dir': (list_ctx.get('sort_dir') or 'asc').lower(),
+                'sort_url_truck_code': _truck_sort_url(1),
+                'sort_url_owner_name': _truck_sort_url(2),
+                'sort_url_default_driver_id': _truck_sort_url(3),
+                'sort_url_sourcing_mode': _truck_sort_url(4),
+                'sort_url_truck_type': _truck_sort_url(5),
+                'sort_url_plate_number': _truck_sort_url(6),
+                'sort_url_status': _truck_sort_url(7),
                 'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                **list_ctx,
             }
         )
         try:
@@ -26288,8 +26286,6 @@ class DriverMasterListView(View):
             )
         )
 
-        sq = (request.GET.get('q') or '').strip()
-
         status_raw = (request.GET.get('status') or '').strip().lower()
         if 'status' not in request.GET:
             filter_status = 'all'
@@ -26317,15 +26313,14 @@ class DriverMasterListView(View):
         else:
             filter_driver_source = 'all'
 
-        if sq:
-            qs = qs.filter(
-                Q(driver_code__icontains=sq)
-                | Q(arabic_name__icontains=sq)
-                | Q(english_name__icontains=sq)
-                | Q(mobile_number__icontains=sq)
-                | Q(dl_number__icontains=sq)
-                | Q(nationality_country__name_en__icontains=sq)
-            )
+        driver_search_fields = [
+            'driver_code',
+            'arabic_name',
+            'english_name',
+            'mobile_number',
+            'dl_number',
+            'nationality_country__name_en',
+        ]
 
         sort_key_raw = (request.GET.get('sort') or 'driver_code').strip().lower()
         sort_dir_raw = (request.GET.get('dir') or 'asc').strip().lower()
@@ -26344,7 +26339,12 @@ class DriverMasterListView(View):
         sort_dir = 'desc' if sort_dir_raw == 'desc' else 'asc'
         order_expr = f'-{sort_key}' if sort_dir == 'desc' else sort_key
 
-        qs_ordered = qs.order_by(order_expr, '-created_at')
+        qs_filtered = build_eal_list_queryset(
+            request,
+            qs,
+            search_fields=driver_search_fields,
+        )
+        qs_ordered = qs_filtered.order_by(order_expr, '-created_at')
         stats = {
             'total_count': dm.objects.count(),
             'active_count': dm.objects.filter(
@@ -26356,32 +26356,7 @@ class DriverMasterListView(View):
             ).count(),
         }
 
-        paginator = Paginator(qs_ordered, 10)
-        try:
-            page_no = max(1, int(request.GET.get('page') or 1))
-        except ValueError:
-            page_no = 1
-        page = paginator.get_page(page_no)
-
-        total_count = paginator.count
-        if total_count == 0:
-            ps, pe = 0, 0
-        else:
-            ps = (page.number - 1) * paginator.per_page + 1
-            pe = ps + len(page.object_list) - 1
-
-        def _page_url(page_num):
-            q = request.GET.copy()
-            q.pop('stype', None)
-            try:
-                pn = int(page_num)
-            except (TypeError, ValueError):
-                pn = 1
-            if pn > 1:
-                q['page'] = str(pn)
-            else:
-                q.pop('page', None)
-            return '?' + q.urlencode()
+        page, list_ctx = paginate_tenant_list(request, qs_ordered)
 
         def _sort_url(col_key):
             q = request.GET.copy()
@@ -26397,23 +26372,12 @@ class DriverMasterListView(View):
             q.pop('page', None)
             return '?' + q.urlencode()
 
-        pagination_page_links = [(n, _page_url(n)) for n in page.paginator.page_range]
-        prev_url = _page_url(page.previous_page_number()) if page.has_previous() else None
-        next_url = _page_url(page.next_page_number()) if page.has_next() else None
-
         context.update(
             {
                 'drivers_page': page,
-                'search_q': sq,
                 'filter_status': filter_status,
                 'filter_driver_source': filter_driver_source,
                 'stats': stats,
-                'pagination_page_links': pagination_page_links,
-                'pagination_prev_url': prev_url,
-                'pagination_next_url': next_url,
-                'pagination_start': ps,
-                'pagination_end': pe,
-                'pagination_total': total_count,
                 'sort_key': sort_key_raw if sort_key_raw in sort_map else 'driver_code',
                 'sort_dir': sort_dir,
                 'sort_url_driver_code': _sort_url('driver_code'),
@@ -26424,6 +26388,7 @@ class DriverMasterListView(View):
                 'sort_url_dl_number': _sort_url('dl_number'),
                 'sort_url_dl_expiry_date': _sort_url('dl_expiry_date'),
                 'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                **list_ctx,
             }
         )
         try:
@@ -30620,16 +30585,6 @@ class TenantLocationMasterListView(View):
 
         try:
             qs = TenantLocationMaster.objects.select_related('country')
-            search_q = (request.GET.get('q') or '').strip()
-            if search_q:
-                qs = qs.filter(
-                    Q(location_code__icontains=search_q)
-                    | Q(display_label__icontains=search_q)
-                    | Q(location_name_english__icontains=search_q)
-                    | Q(location_name_arabic__icontains=search_q)
-                    | Q(province__icontains=search_q)
-                    | Q(country__name_en__icontains=search_q)
-                )
 
             status_filter = (request.GET.get('status') or 'all').strip().lower()
             if status_filter == 'active':
@@ -30664,6 +30619,10 @@ class TenantLocationMasterListView(View):
                 6: 'display_label',
                 7: 'location_type',
                 8: 'status',
+                9: 'is_serviceable',
+            }
+            location_column_filter_types = {
+                9: 'boolean',
             }
             location_sort_cols = {
                 1: 'location_code',
@@ -30676,18 +30635,26 @@ class TenantLocationMasterListView(View):
                 8: 'status',
                 9: 'is_serviceable',
             }
-            qs = apply_eal_column_filters(qs, request, location_column_filters)
-            qs = apply_eal_column_sort(
-                qs,
+            location_search_fields = [
+                'location_code',
+                'display_label',
+                'location_name_english',
+                'location_name_arabic',
+                'province',
+                'country__name_en',
+            ]
+            page, list_ctx = prepare_eal_list(
                 request,
-                location_sort_cols,
+                qs,
+                search_fields=location_search_fields,
+                column_field_map=location_column_filters,
+                sort_col_field_map=location_sort_cols,
                 default_order=('-created_at',),
+                column_filter_types=location_column_filter_types,
             )
-            page, list_ctx = paginate_tenant_list(request, qs)
             context.update(
                 {
                     'locations_page': page,
-                    'search_q': search_q,
                     'filter_status': status_filter,
                     'filter_serviceable': serviceable_filter,
                     'location_stats': stats,
@@ -30843,15 +30810,7 @@ class TenantRouteMasterListView(View):
             return response
         try:
             qs = TenantRouteMaster.objects.select_related('origin_point', 'destination_point')
-            search_q = (request.GET.get('q') or '').strip()
             route_scope = (request.GET.get('scope') or 'all').strip().lower()
-            if search_q:
-                qs = qs.filter(
-                    Q(route_code__icontains=search_q)
-                    | Q(route_label__icontains=search_q)
-                    | Q(origin_point__display_label__icontains=search_q)
-                    | Q(destination_point__display_label__icontains=search_q)
-                )
             if route_scope == 'domestic':
                 qs = qs.filter(route_type=TenantRouteMaster.RouteType.DOMESTIC)
             elif route_scope == 'international':
@@ -30867,10 +30826,9 @@ class TenantRouteMasterListView(View):
                 7: 'distance_km',
                 8: 'estimated_duration_h',
             }
-            qs = build_eal_list_queryset(
+            routes_page, route_pagination = prepare_eal_list(
                 request,
                 qs,
-                search_q=search_q,
                 search_fields=[
                     'route_code',
                     'route_label',
@@ -30880,8 +30838,11 @@ class TenantRouteMasterListView(View):
                 column_field_map=route_column_field_map,
                 sort_col_field_map=route_column_field_map,
                 default_order=('-created_at',),
+                column_filter_types={
+                    7: 'number',
+                    8: 'number',
+                },
             )
-            routes_page, route_pagination = paginate_tenant_list(request, qs, per_page=25)
             stats_qs = TenantRouteMaster.objects.all()
             route_stats = {
                 'total': stats_qs.count(),
@@ -30892,11 +30853,9 @@ class TenantRouteMasterListView(View):
             context.update(
                 {
                     'routes_page': routes_page,
-                    'search_q': search_q,
                     'route_scope': route_scope,
                     'route_stats': route_stats,
                     'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
-                    'eal_column_filters': eal_column_filter_values(request),
                     **route_pagination,
                 }
             )
@@ -31462,15 +31421,14 @@ class TenantUsersAdministrationView(View):
             clear_tenant_portal_cookie(response, request=request)
             return response
         try:
-            users_qs = _tenant_users_administration_queryset(request)
-            users_page, list_ctx = paginate_tenant_list(request, users_qs)
-            list_ctx.update(
-                {
-                    'search_q': (request.GET.get('q') or '').strip(),
-                    'eal_column_filters': eal_column_filter_values(request),
-                    'sort_col': request.GET.get('sort_col', ''),
-                    'sort_dir': request.GET.get('sort_dir', ''),
-                }
+            users_page, list_ctx = prepare_eal_list(
+                request,
+                TenantUser.objects.all(),
+                search_fields=TENANT_USERS_ADMIN_SEARCH_FIELDS,
+                column_field_map=TENANT_USERS_ADMIN_COLUMN_FILTERS,
+                sort_col_field_map=TENANT_USERS_ADMIN_SORT_COLS,
+                default_order=('-created_at', '-updated_at'),
+                column_filter_types=TENANT_USERS_ADMIN_COLUMN_FILTER_TYPES,
             )
 
             all_users_qs = TenantUser.objects.all()
@@ -31510,7 +31468,11 @@ TENANT_USERS_ADMIN_COLUMN_FILTERS = {
     3: 'email',
     4: 'username',
     5: 'role_name',
+    6: 'last_login_at',
     7: 'status',
+}
+TENANT_USERS_ADMIN_COLUMN_FILTER_TYPES = {
+    6: 'datetime',
 }
 TENANT_USERS_ADMIN_SORT_COLS = {
     1: 'tenant_ref_no',
@@ -31532,23 +31494,14 @@ TENANT_USERS_ADMIN_SEARCH_FIELDS = [
 
 def _tenant_users_administration_queryset(request):
     """Filtered/sorted tenant users queryset (list + export)."""
-    queryset = TenantUser.objects.all()
-    search_q = (request.GET.get('q') or '').strip()
-    if search_q:
-        q_obj = Q()
-        for field in TENANT_USERS_ADMIN_SEARCH_FIELDS:
-            q_obj |= Q(**{f'{field}__icontains': search_q})
-        queryset = queryset.filter(q_obj)
-    queryset = apply_eal_column_filters(
-        queryset,
+    return build_eal_list_queryset(
         request,
-        TENANT_USERS_ADMIN_COLUMN_FILTERS,
-    )
-    return apply_eal_column_sort(
-        queryset,
-        request,
-        TENANT_USERS_ADMIN_SORT_COLS,
+        TenantUser.objects.all(),
+        search_fields=TENANT_USERS_ADMIN_SEARCH_FIELDS,
+        column_field_map=TENANT_USERS_ADMIN_COLUMN_FILTERS,
+        sort_col_field_map=TENANT_USERS_ADMIN_SORT_COLS,
         default_order=('-created_at', '-updated_at'),
+        column_filter_types=TENANT_USERS_ADMIN_COLUMN_FILTER_TYPES,
     )
 
 
@@ -32422,7 +32375,7 @@ class TenantRolesPermissionsView(View):
         try:
             roles_page, list_ctx = prepare_eal_list(
                 request,
-                _tenant_roles_permissions_queryset(request),
+                TenantRole.objects.all(),
                 search_fields=TENANT_ROLES_PERMISSIONS_SEARCH_FIELDS,
                 column_field_map=TENANT_ROLES_PERMISSIONS_COLUMN_FILTERS,
                 sort_col_field_map=TENANT_ROLES_PERMISSIONS_SORT_COLS,

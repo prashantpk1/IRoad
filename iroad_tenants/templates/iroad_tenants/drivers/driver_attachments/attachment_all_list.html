@@ -23,10 +23,7 @@
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
-        <button type="button" class="eal-btn eal-btn-outline">
-          <i class="bi bi-download"></i>
-          <span>Export</span>
-        </button>
+        {% include 'iroad_tenants/partials/eal_export_link.html' with export_url_name='iroad_tenants:driver_attachment_all_export' export_filename='driver_attachments_export.csv' %}
         <a href="{% url 'iroad_tenants:driver_attachment_create_any' %}" class="eal-btn eal-btn-primary" title="Add a new driver attachment">
           <i class="bi bi-plus-lg"></i>
           <span>Add Driver Attachment</span>
@@ -75,24 +72,38 @@
   </div>
 </div>
 
-<div class="eal-table-card">
-  <form method="get" class="eal-toolbar">
+<div
+  class="eal-table-card"
+  data-eal-filterable-table
+  data-eal-server-paginated="1"
+  data-eal-global-search-columns="1,2,3,4,5,6,7"
+>
+  <div class="eal-toolbar">
     <div class="eal-toolbar-left w-100">
-      <input type="hidden" name="sort" value="{{ sort_field }}" />
-      <input type="hidden" name="dir" value="{{ sort_dir }}" />
       <div class="eal-search eal-search--toolbar-grow">
         <i class="bi bi-search"></i>
         <input
           type="search"
-          name="q"
-          value="{{ search_q }}"
+          id="driverAttachmentListSearch"
+          data-eal-global-search
+          value="{{ search_q|default:'' }}"
           placeholder="Search driver attachments…"
           autocomplete="off"
           aria-label="Search driver attachments"
         />
+        <button
+          type="button"
+          class="eal-search-clear-btn"
+          id="driverAttachmentListSearchClear"
+          title="Clear search"
+          aria-label="Clear search"
+          hidden
+        >
+          <i class="bi bi-x-lg"></i>
+        </button>
       </div>
     </div>
-  </form>
+  </div>
 
   <div class="eal-table-wrap da-att-table-scroll" tabindex="0" aria-label="Driver attachments — scroll horizontally to view all columns">
     <table class="eal-table da-att-table">
@@ -487,19 +498,6 @@
       cb.addEventListener("change", syncSelectAll);
     });
     syncSelectAll();
-  }
-
-  var searchInput = document.querySelector('.eal-toolbar input[name="q"]');
-  if (searchInput) {
-    var searchForm = searchInput.closest("form");
-    var searchTimer = null;
-    searchInput.addEventListener("input", function () {
-      if (!searchForm) return;
-      clearTimeout(searchTimer);
-      searchTimer = setTimeout(function () {
-        searchForm.requestSubmit();
-      }, 400);
-    });
   }
 
   var modalEl = document.getElementById("driverAttachmentDeleteModal");
