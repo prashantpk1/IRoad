@@ -1,0 +1,63 @@
+{% if client_account and client_addresses_tab %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="m-0" style="font-size: 1.1rem; font-weight: 600; color: #1a1a1a">Client Addresses</h4>
+  <a href="{% url 'iroad_tenants:tenant_address_master_create' %}?client={{ client_account.account_id }}&amp;return_to=details" class="btn btn-primary btn-sm">
+    <i class="bi bi-plus-lg"></i> Add Address
+  </a>
+</div>
+<div class="eal-table-card">
+  <div class="eal-table-wrap">
+    <table class="eal-table mb-0">
+      <thead>
+        <tr>
+          <th>Code</th>
+          <th>Display Name</th>
+          <th>Category</th>
+          <th>Location</th>
+          <th>Defaults</th>
+          <th>Status</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for addr in client_addresses_tab.items %}
+        <tr>
+          <td><span class="eal-entity-id">{{ addr.address_code }}</span></td>
+          <td>{{ addr.display_name }}</td>
+          <td>{{ addr.address_category }}</td>
+          <td>{% if addr.city %}{{ addr.city }}{% if addr.country %}, {{ addr.country.name_en }}{% endif %}{% else %}—{% endif %}</td>
+          <td>
+            {% if addr.default_pickup_address %}<span class="badge bg-light text-dark border me-1">Pickup Default</span>{% endif %}
+            {% if addr.default_delivery_address %}<span class="badge bg-light text-dark border">Delivery Default</span>{% endif %}
+            {% if not addr.default_pickup_address and not addr.default_delivery_address %}—{% endif %}
+          </td>
+          <td>
+            {% if addr.status == 'Active' %}
+            <span class="status-badge active" style="background:#e6f8ef;color:#0d894f">Active</span>
+            {% else %}
+            <span class="status-badge inactive" style="background:#f1f5f9;color:#64748b">Inactive</span>
+            {% endif %}
+          </td>
+          <td>
+            <div class="eal-actions-cell">
+              <a href="{{ addr.list_edit_url }}" class="eal-row-btn" title="Edit"><i class="bi bi-pencil"></i></a>
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="7" class="text-center text-muted py-4">No addresses for this client yet.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% with tab=client_addresses_tab %}
+  {% include 'iroad_tenants/partials/eal_list_pagination.html' with page_obj=tab.page pagination_start=tab.pagination_start pagination_end=tab.pagination_end pagination_total=tab.pagination_total pagination_prev_url=tab.pagination_prev_url pagination_next_url=tab.pagination_next_url pagination_page_links=tab.pagination_page_links pagination_label='addresses' %}
+  {% endwith %}
+</div>
+{% elif client_account %}
+<p class="text-muted mb-0">No addresses yet for this client. Use <strong>Add Address</strong> to create one.</p>
+{% else %}
+<p class="text-muted mb-0">Open a client from the client list to view or add addresses.</p>
+{% endif %}

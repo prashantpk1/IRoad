@@ -3,7 +3,7 @@ import json
 import re
 from datetime import timedelta
 from decimal import Decimal
-from urllib.parse import urlencode
+from urllib.parse import parse_qsl, urlencode
 import subprocess
 
 import logging
@@ -27,6 +27,7 @@ from django.db.models.deletion import ProtectedError
 from django.db import transaction as db_transaction
 from django.db.models import Prefetch, Q, Sum
 from django.utils.dateparse import parse_date, parse_datetime
+from django.utils.formats import date_format
 from django.utils import timezone
 from django_tenants.utils import schema_context
 import mimetypes
@@ -36,6 +37,7 @@ import uuid
 from iroad_tenants.list_table_utils import (
     apply_eal_column_filters,
     apply_eal_column_sort,
+    build_eal_list_queryset,
     eal_column_filter_values,
     paginate_tenant_list,
     prepare_eal_list,
@@ -164,6 +166,7 @@ from iroad_tenants.tenant_dashboard_overview import build_tenant_dashboard_overv
 from iroad_tenants.tenant_permission_matrix import (
     TENANT_PERMISSION_MATRIX,
     enrich_permission_matrix_rows,
+    resolve_canonical_form_name,
 )
 from iroad_tenants.tenant_dashboard_search import (
     _empty_results,
@@ -665,11 +668,11 @@ def _tenant_support_ticket_validate_reply(request):
 
 def _tenant_support_ticket_detail_page_context(request, ticket, *, form_data=None, form_errors=None):
     from superadmin.support_ticket_display import (
+        enrich_support_ticket_replies_for_display,
         format_support_ticket_datetime,
         support_ticket_attachment_rows,
         support_ticket_created_by_display_map,
         support_ticket_priority_tone,
-        support_ticket_reply_display_map,
     )
 
     replies = list(
@@ -689,12 +692,7 @@ def _tenant_support_ticket_detail_page_context(request, ticket, *, form_data=Non
         ticket_page_title = f'{creator_username} ({creator_role})'
     else:
         ticket_page_title = creator_username
-    reply_labels = support_ticket_reply_display_map(ticket, replies)
-    for reply in replies:
-        parts = reply_labels.get(reply.pk, {})
-        reply.display_sender_label = parts.get('sender_label', reply.sender_type)
-        reply.display_sender_kind = parts.get('sender_kind', 'tenant')
-        reply.display_timestamp = parts.get('timestamp_display', '')
+    enrich_support_ticket_replies_for_display(ticket, replies)
     return {
         'ticket': ticket,
         'replies': replies,
@@ -809,25 +807,39 @@ def _tenant_client_contract_delete_path(contract_id):
     return f'{_tenant_client_contracts_base_path()}{contract_id}/delete/'
 
 
-def _client_account_bootstrap_dict(account: TenantClientAccount, primary_contact=None):
+def _client_header_contact_fields(contact):
+    """Email and formatted phone for client-details header from a contact row."""
+    if contact is None:
+        return '', ''
+    email = (getattr(contact, 'email', None) or '').strip()
+    mob = _format_client_contact_phone(
+        getattr(contact, 'mobile_country_code', ''),
+        getattr(contact, 'mobile_number', None),
+    )
+    tel = _format_client_contact_phone(
+        getattr(contact, 'telephone_country_code', ''),
+        getattr(contact, 'telephone_number', None),
+    )
+    return email, mob or tel
+
+
+def _resolve_client_header_contact(contacts):
+    """Primary contact for header; if none marked primary, use first contact."""
+    if not contacts:
+        return None
+    for contact in contacts:
+        if getattr(contact, 'is_primary', False):
+            return contact
+    return contacts[0]
+
+
+def _client_account_bootstrap_dict(account: TenantClientAccount, header_contact=None):
     """JSON-serializable client header/overview for client-details.js bootstrap."""
     created = getattr(account, 'created_at', None)
     created_label = ''
     if created:
         created_label = timezone.localtime(created).strftime('%b %d, %Y, %I:%M %p')
-    header_email = ''
-    header_phone = ''
-    if primary_contact is not None:
-        header_email = (getattr(primary_contact, 'email', None) or '').strip()
-        mob = _format_client_contact_phone(
-            getattr(primary_contact, 'mobile_country_code', ''),
-            getattr(primary_contact, 'mobile_number', None),
-        )
-        tel = _format_client_contact_phone(
-            getattr(primary_contact, 'telephone_country_code', ''),
-            getattr(primary_contact, 'telephone_number', None),
-        )
-        header_phone = mob or tel
+    header_email, header_phone = _client_header_contact_fields(header_contact)
     return {
         'account_no': account.account_no,
         'client_type': account.client_type,
@@ -930,6 +942,16 @@ def _validate_client_contact_phone_digits(raw_value, field_key, field_label, for
         return value
     if not re.fullmatch(r'\d+', value):
         form_errors[field_key] = f'{field_label} must contain digits only.'
+    return value
+
+
+def _validate_organization_profile_phone_digits(raw_value, field_label):
+    """Reject alphabetic or other non-digit characters in org profile phone fields."""
+    value = (raw_value or '').strip()
+    if not value:
+        return value
+    if not re.fullmatch(r'\d+', value):
+        raise ValueError(f'{field_label} must contain digits only.')
     return value
 
 
@@ -1079,12 +1101,13 @@ def _tenant_context_from_session(request, *, _debug_label=''):
                         role_name_en__iexact=(tenant_user.role_name or '').strip()
                     ).first()
                     if role:
-                        permission_forms = set(
-                            TenantRolePermission.objects.filter(
+                        permission_forms = {
+                            resolve_canonical_form_name(form_name)
+                            for form_name in TenantRolePermission.objects.filter(
                                 role=role,
                                 can_view=True,
                             ).values_list('form_name', flat=True)
-                        )
+                        }
             finally:
                 restore_public_schema(request)
 
@@ -1160,6 +1183,35 @@ def _organization_base_currency(request):
     try:
         org = OrganizationProfile.objects.order_by('-updated_at').first()
         return (getattr(org, 'base_currency_code', '') or '').strip().upper()
+    finally:
+        restore_public_schema(request)
+
+
+def _organization_support_contact(request):
+    """Organization profile support contact for tenant-facing help CTAs."""
+    registry = _activate_tenant_workspace_schema(request)
+    empty = {
+        'org_support_email': '',
+        'org_support_phone': '',
+        'org_support_phone_tel': '',
+    }
+    if registry is None:
+        return empty
+    try:
+        org = OrganizationProfile.objects.order_by('-updated_at').first()
+        if not org:
+            return empty
+        email = (getattr(org, 'support_email', '') or '').strip()
+        phone = (
+            (getattr(org, 'support_mobile_1', '') or '').strip()
+            or (getattr(org, 'support_mobile_2', '') or '').strip()
+        )
+        phone_tel = f'tel:+{phone}' if phone else ''
+        return {
+            'org_support_email': email,
+            'org_support_phone': phone,
+            'org_support_phone_tel': phone_tel,
+        }
     finally:
         restore_public_schema(request)
 
@@ -1308,6 +1360,111 @@ class TenantDashboardSearchResultsView(View):
         return render(request, self.template_name, context)
 
 
+TENANT_SUPPORT_TICKET_COLUMN_FILTERS = {
+    1: 'ticket_no',
+    2: 'tenant__company_name',
+    3: 'subject',
+    4: 'category__name_en',
+    5: 'priority',
+    6: 'assigned_to__email',
+    7: 'created_by',
+    8: 'status',
+}
+TENANT_SUPPORT_TICKET_SORT_COLS = {
+    1: 'ticket_no',
+    2: 'tenant__company_name',
+    3: 'subject',
+    4: 'category__name_en',
+    5: 'priority',
+    6: 'assigned_to__email',
+    7: 'created_by',
+    8: 'status',
+}
+TENANT_SUPPORT_TICKET_SEARCH_FIELDS = [
+    'ticket_no',
+    'subject',
+    'description',
+    'tenant__company_name',
+    'category__name_en',
+    'priority',
+    'status',
+    'assigned_to__email',
+    'assigned_to__first_name',
+    'assigned_to__last_name',
+    'created_by',
+]
+
+
+def _tenant_support_ticket_base_queryset(tenant, *, status=''):
+    tickets_qs = SupportTicket.objects.filter(
+        tenant=tenant,
+    ).select_related(
+        'category',
+        'assigned_to',
+        'tenant',
+    )
+    if status:
+        tickets_qs = tickets_qs.filter(status=status)
+    return tickets_qs
+
+
+def _tenant_support_ticket_filtered_queryset(request, tenant):
+    """Support ticket queryset with the same search/filters/sort as the list page."""
+    status = (request.GET.get('status') or '').strip()
+    tickets_qs = _tenant_support_ticket_base_queryset(tenant, status=status)
+    return build_eal_list_queryset(
+        request,
+        tickets_qs,
+        search_fields=TENANT_SUPPORT_TICKET_SEARCH_FIELDS,
+        column_field_map=TENANT_SUPPORT_TICKET_COLUMN_FILTERS,
+        sort_col_field_map=TENANT_SUPPORT_TICKET_SORT_COLS,
+        default_order=('-created_at',),
+    )
+
+
+def _support_ticket_person_csv_label(parts):
+    username = (parts.get('username') or '-').strip() or '-'
+    role = (parts.get('role') or '-').strip()
+    if role and role != '-':
+        return f'{username} ({role})'
+    return username
+
+
+def _tenant_support_ticket_export_csv(tickets):
+    """Build UTF-8 CSV for support tickets (columns match the list table)."""
+    output = io.StringIO()
+    output.write('\ufeff')
+    writer = csv.writer(output)
+    writer.writerow([
+        'Ticket No',
+        'Tenant',
+        'Subject',
+        'Category',
+        'Priority',
+        'Assigned To',
+        'Created By',
+        'Status',
+    ])
+    created_by_labels = support_ticket_created_by_display_map(tickets)
+    for ticket in tickets:
+        assignee_parts = support_ticket_assignee_display_parts(ticket)
+        created_parts = created_by_labels.get(
+            ticket.pk,
+            {'username': '-', 'role': '-'},
+        )
+        writer.writerow([
+            ticket.ticket_no,
+            ticket.tenant.company_name if ticket.tenant_id else '',
+            ticket.subject,
+            ticket.category.name_en if ticket.category_id else '',
+            ticket.priority,
+            _support_ticket_person_csv_label(assignee_parts),
+            _support_ticket_person_csv_label(created_parts),
+            ticket.get_status_display(),
+        ])
+    return output.getvalue()
+
+
 class TenantSupportTicketListView(View):
     template_name = 'iroad_tenants/Support_Management/Support-ticket-master.html'
 
@@ -1321,43 +1478,12 @@ class TenantSupportTicketListView(View):
         tenant = context['tenant']
         status = (request.GET.get('status') or '').strip()
 
-        tickets_qs = SupportTicket.objects.filter(
-            tenant=tenant,
-        ).select_related(
-            'category',
-            'assigned_to',
-            'tenant',
-        )
-        if status:
-            tickets_qs = tickets_qs.filter(status=status)
-        ticket_column_filters = {
-            1: 'ticket_no',
-            2: 'tenant__company_name',
-            3: 'subject',
-            4: 'category__name_en',
-            5: 'priority',
-            8: 'status',
-        }
-        ticket_sort_cols = {
-            1: 'ticket_no',
-            2: 'tenant__company_name',
-            3: 'subject',
-            4: 'category__name_en',
-            5: 'priority',
-            8: 'status',
-        }
         tickets_page, list_ctx = prepare_eal_list(
             request,
-            tickets_qs,
-            search_fields=[
-                'ticket_no',
-                'subject',
-                'category__name_en',
-                'priority',
-                'status',
-            ],
-            column_field_map=ticket_column_filters,
-            sort_col_field_map=ticket_sort_cols,
+            _tenant_support_ticket_base_queryset(tenant, status=status),
+            search_fields=TENANT_SUPPORT_TICKET_SEARCH_FIELDS,
+            column_field_map=TENANT_SUPPORT_TICKET_COLUMN_FILTERS,
+            sort_col_field_map=TENANT_SUPPORT_TICKET_SORT_COLS,
             default_order=('-created_at',),
         )
         tickets_list = list(tickets_page.object_list)
@@ -1401,6 +1527,26 @@ class TenantSupportTicketListView(View):
             **list_ctx,
         })
         return render(request, self.template_name, context)
+
+
+class TenantSupportTicketExportView(View):
+    """Export support tickets as CSV (honours current list search/filters/sort)."""
+
+    def get(self, request):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+
+        tenant = context['tenant']
+        tickets = list(_tenant_support_ticket_filtered_queryset(request, tenant))
+        response = HttpResponse(
+            _tenant_support_ticket_export_csv(tickets),
+            content_type='text/csv; charset=utf-8',
+        )
+        response['Content-Disposition'] = 'attachment; filename="support_tickets_export.csv"'
+        return response
 
 
 class TenantSupportTicketCreateView(View):
@@ -2716,6 +2862,7 @@ class TenantSubscriptionPlanView(View):
             'has_yearly_option': has_yearly_option,
             'subscription_faqs': faqs,
             'has_default_payment_card': has_default_payment_card,
+            **_organization_support_contact(request),
         }
 
     def get(self, request):
@@ -3330,9 +3477,21 @@ def _audit_list_filter_params(request):
     return params
 
 
+def _audit_table_query_params(request):
+    """GET params for audit table toolbar search and column filters (excludes page)."""
+    params = {}
+    search_q = (request.GET.get('q') or '').strip()
+    if search_q:
+        params['q'] = search_q
+    for col_index, val in eal_column_filter_values(request).items():
+        params[f'filter_{col_index}'] = val
+    return params
+
+
 def _audit_list_query_params(request):
     """GET query params for audit list filters and column sort (excludes page)."""
     params = _audit_list_filter_params(request)
+    params.update(_audit_table_query_params(request))
     if request.GET.get('sort_col') and request.GET.get('sort_dir'):
         sort_col, sort_dir = _parse_audit_table_sort(request)
         params['sort_col'] = str(sort_col)
@@ -3358,13 +3517,144 @@ def _parse_audit_table_sort(request):
     return sort_col, sort_dir
 
 
+LOGIN_SESSION_EVENTS_GLOBAL_SEARCH_COLUMNS = (2, 3, 4, 5)
+
+
+def _audit_event_display_timestamp(event):
+    ts = event.get('timestamp')
+    if ts is None:
+        return ''
+    try:
+        return date_format(ts, 'd M Y, h:i A')
+    except (TypeError, ValueError, AttributeError):
+        return str(ts)
+
+
+def _audit_event_table_cell_text(event, col_index, *, sl_no=None):
+    if col_index == 1:
+        return str(sl_no) if sl_no is not None else ''
+    if col_index == 2:
+        return _audit_event_display_timestamp(event)
+    if col_index == 3:
+        return event.get('action') or ''
+    if col_index == 4:
+        return event.get('module') or ''
+    if col_index == 5:
+        return event.get('performed_by') or ''
+    return ''
+
+
+def _audit_event_matches_table_search(event, search_q, search_columns):
+    needle = (search_q or '').strip().lower()
+    if not needle:
+        return True
+    for col_index in search_columns:
+        haystack = _audit_event_table_cell_text(event, col_index).lower()
+        if needle in haystack:
+            return True
+    if 2 in search_columns:
+        ts = event.get('timestamp')
+        if ts is not None:
+            for extra in (str(ts), getattr(ts, 'isoformat', lambda: '')()):
+                if needle in str(extra).lower():
+                    return True
+    return False
+
+
+def _audit_event_matches_table_column_filters(event, column_filters, *, sl_no=None):
+    for col_index, raw_val in column_filters.items():
+        val = (raw_val or '').strip().lower()
+        if not val:
+            continue
+        if col_index == 1 and sl_no is None:
+            continue
+        haystack = _audit_event_table_cell_text(event, col_index, sl_no=sl_no).lower()
+        if val not in haystack:
+            return False
+    return True
+
+
+def _apply_audit_table_search_and_column_filters(events, request, *, global_search_columns):
+    """Apply EAL toolbar search and column-header filters (except Sl No.) to audit rows."""
+    search_q = (request.GET.get('q') or '').strip()
+    column_filters = {
+        col_index: value
+        for col_index, value in eal_column_filter_values(request).items()
+        if col_index != 1
+    }
+
+    if search_q:
+        events = [
+            event
+            for event in events
+            if _audit_event_matches_table_search(event, search_q, global_search_columns)
+        ]
+    if column_filters:
+        events = [
+            event
+            for event in events
+            if _audit_event_matches_table_column_filters(event, column_filters)
+        ]
+    table_filters_active = bool(search_q or eal_column_filter_values(request))
+    return events, search_q, table_filters_active
+
+
+def _sl_no_matches_filter(assigned_sl_no, raw_filter):
+    text = (raw_filter or '').strip()
+    if not text:
+        return True
+    if text.isdigit():
+        return assigned_sl_no == int(text)
+    return text.lower() in str(assigned_sl_no).lower()
+
+
+def _assign_audit_event_sl_numbers(events):
+    """Assign display serial numbers (1..N) on the current filtered/sorted list."""
+    for index, event in enumerate(events, start=1):
+        event['sl_no'] = index
+    return events
+
+
+def _apply_audit_sl_no_column_filter(events, request):
+    """Apply Sl No. column filter using assigned display serial numbers."""
+    sl_no_filter = (eal_column_filter_values(request).get(1) or '').strip()
+    if not sl_no_filter:
+        return events
+    return [
+        event
+        for event in events
+        if _sl_no_matches_filter(event.get('sl_no'), sl_no_filter)
+    ]
+
+
+def _prepare_audit_events_for_pagination(events, request, *, sort_col, sort_dir):
+    """Sort audit rows and apply Sl No. column filter (display SL is set per page)."""
+    sl_no_filter = (eal_column_filter_values(request).get(1) or '').strip()
+    _sort_audit_events_in_place(events, sort_col, sort_dir)
+    if sl_no_filter:
+        _assign_audit_event_sl_numbers(events)
+    events = _apply_audit_sl_no_column_filter(events, request)
+    return events
+
+
+def _audit_page_row_sl_no(page_obj, row_index, *, sort_col, sort_dir):
+    """Sl No. for one row on the current paginated page (0-based row index)."""
+    start_index = page_obj.start_index()
+    end_index = page_obj.end_index()
+    if sort_col == 1 and sort_dir == 'desc':
+        return end_index - row_index
+    return start_index + row_index
+
+
 def _sort_audit_events_in_place(events, sort_col, sort_dir):
     """Sort full in-memory audit event lists before server pagination."""
     if sort_col == 1:
         events.sort(
             key=lambda event: event.get('timestamp') or timezone.now(),
-            reverse=(sort_dir == 'asc'),
+            reverse=True,
         )
+        if sort_dir == 'desc':
+            events.reverse()
         return
     if sort_col == 2:
         events.sort(
@@ -3387,7 +3677,8 @@ def _sort_audit_events_in_place(events, sort_col, sort_dir):
 def _critical_account_audit_order_by(sort_col, sort_dir):
     """Map audit table column sort to AuditLog queryset order_by fields."""
     if sort_col == 1:
-        return ('timestamp',) if sort_dir == 'desc' else ('-timestamp',)
+        # Sl No. sort only reverses display numbers on the page (see _audit_page_row_sl_no).
+        return ('-timestamp',)
     if sort_col == 2:
         return ('-timestamp',) if sort_dir == 'desc' else ('timestamp',)
     if sort_col == 3:
@@ -3568,10 +3859,16 @@ def _build_login_session_events_context(request):
             )
         ]
 
-    _sort_audit_events_in_place(
+    events, search_q, table_filters_active = _apply_audit_table_search_and_column_filters(
         events,
-        audit_filters['sort_col'],
-        audit_filters['sort_dir'],
+        request,
+        global_search_columns=LOGIN_SESSION_EVENTS_GLOBAL_SEARCH_COLUMNS,
+    )
+    events = _prepare_audit_events_for_pagination(
+        events,
+        request,
+        sort_col=audit_filters['sort_col'],
+        sort_dir=audit_filters['sort_dir'],
     )
     paginator = Paginator(events, 10)
     page_obj = paginator.get_page(request.GET.get('page'))
@@ -3587,11 +3884,17 @@ def _build_login_session_events_context(request):
         failed_attempts += int(match.group(1)) if match else 1
 
     rows = []
-    start_index = (page_obj.number - 1) * paginator.per_page
-    for index, event in enumerate(page_obj.object_list, start=start_index + 1):
+    sort_col = audit_filters['sort_col']
+    sort_dir = audit_filters['sort_dir']
+    for index, event in enumerate(page_obj.object_list):
         rows.append(
             {
-                'sl_no': index,
+                'sl_no': _audit_page_row_sl_no(
+                    page_obj,
+                    index,
+                    sort_col=sort_col,
+                    sort_dir=sort_dir,
+                ),
                 'timestamp': event.get('timestamp'),
                 'action': event.get('action'),
                 'module': event.get('module'),
@@ -3612,6 +3915,12 @@ def _build_login_session_events_context(request):
         'login_session_filter_performed_by': performed_by_filter,
         'login_session_filters_active': audit_filters['filters_active'],
         'login_session_filters_qs': audit_filters['filters_qs'],
+        'login_session_search_q': search_q,
+        'login_session_table_filters_active': table_filters_active,
+        'login_session_list_has_filters': (
+            audit_filters['filters_active'] or table_filters_active
+        ),
+        'eal_column_filters': eal_column_filter_values(request),
     }
 
 
@@ -3622,6 +3931,8 @@ def _build_role_permission_changes_context(request):
     active_roles = 0
     permissions_updated = 0
     roles_deleted = 0
+    role_permission_search_q = ''
+    role_permission_table_filters_active = False
     page_obj = Paginator([], 10).get_page(1)
 
     tenant_registry = _activate_tenant_workspace_schema(request)
@@ -3702,6 +4013,14 @@ def _build_role_permission_changes_context(request):
                     )
                 ]
 
+            raw_events, role_permission_search_q, role_permission_table_filters_active = (
+                _apply_audit_table_search_and_column_filters(
+                    raw_events,
+                    request,
+                    global_search_columns=LOGIN_SESSION_EVENTS_GLOBAL_SEARCH_COLUMNS,
+                )
+            )
+
             total_changes = len(raw_events)
             permissions_updated = sum(
                 1 for event in raw_events if 'Permission' in (event.get('action') or '')
@@ -3710,18 +4029,25 @@ def _build_role_permission_changes_context(request):
                 1 for event in raw_events if (event.get('action') or '') == 'Role Disabled'
             )
 
-            _sort_audit_events_in_place(
+            raw_events = _prepare_audit_events_for_pagination(
                 raw_events,
-                audit_filters['sort_col'],
-                audit_filters['sort_dir'],
+                request,
+                sort_col=audit_filters['sort_col'],
+                sort_dir=audit_filters['sort_dir'],
             )
             paginator = Paginator(raw_events, 10)
             page_obj = paginator.get_page(request.GET.get('page'))
-            start_index = (page_obj.number - 1) * paginator.per_page
-            for index, event in enumerate(page_obj.object_list, start=start_index + 1):
+            sort_col = audit_filters['sort_col']
+            sort_dir = audit_filters['sort_dir']
+            for index, event in enumerate(page_obj.object_list):
                 rows.append(
                     {
-                        'sl_no': index,
+                        'sl_no': _audit_page_row_sl_no(
+                            page_obj,
+                            index,
+                            sort_col=sort_col,
+                            sort_dir=sort_dir,
+                        ),
                         'timestamp': event.get('timestamp'),
                         'action': event.get('action'),
                         'module': event.get('module'),
@@ -3744,6 +4070,12 @@ def _build_role_permission_changes_context(request):
         'role_permission_filter_performed_by': audit_filters['performed_by_filter'],
         'role_permission_filters_active': audit_filters['filters_active'],
         'role_permission_filters_qs': audit_filters['filters_qs'],
+        'role_permission_search_q': role_permission_search_q,
+        'role_permission_table_filters_active': role_permission_table_filters_active,
+        'role_permission_list_has_filters': (
+            audit_filters['filters_active'] or role_permission_table_filters_active
+        ),
+        'eal_column_filters': eal_column_filter_values(request),
     }
 
 
@@ -3888,8 +4220,9 @@ def _build_critical_account_changes_context(request):
     ).count()
 
     rows = []
-    start_index = (page_obj.number - 1) * paginator.per_page
-    for index, log in enumerate(logs, start=start_index + 1):
+    sort_col = audit_filters['sort_col']
+    sort_dir = audit_filters['sort_dir']
+    for index, log in enumerate(logs):
         module_name = (log.module_name or '').strip() or 'System'
         module_lower = module_name.lower()
         if any(key in module_lower for key in ('billing', 'invoice', 'payment', 'subscription')):
@@ -3914,7 +4247,12 @@ def _build_critical_account_changes_context(request):
         )
         rows.append(
             {
-                'sl_no': index,
+                'sl_no': _audit_page_row_sl_no(
+                    page_obj,
+                    index,
+                    sort_col=sort_col,
+                    sort_dir=sort_dir,
+                ),
                 'timestamp': log.timestamp,
                 'action': f'{log.action_type} ({module_name})',
                 'module': normalized_module,
@@ -3935,6 +4273,7 @@ def _build_critical_account_changes_context(request):
         'critical_account_filter_performed_by': audit_filters['performed_by_filter'],
         'critical_account_filters_active': audit_filters['filters_active'],
         'critical_account_filters_qs': audit_filters['filters_qs'],
+        'eal_column_filters': eal_column_filter_values(request),
     }
 
 
@@ -5877,18 +6216,14 @@ class TenantSalesInvoiceReportCreateView(View):
                 return JsonResponse(payload)
 
             bundle = _sales_invoice_report_forms_with_preview()
+            _prefill_sales_invoice_report_client_from_request(request, bundle['report_form'])
             context.update(
-                {
-                    **bundle,
-                    'is_edit': False,
-                    'page_title': 'Create Sales Invoice Report',
-                    'auto_post_enabled': False,
-                    'lock_state': 'editable',
-                    'booking_lines': [],
-                    'surcharge_lines': [],
-                    'shipment_lines': [],
-                    'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
-                }
+                _sales_invoice_report_create_page_context(
+                    request,
+                    bundle,
+                    tenant_registry=tenant_registry,
+                    from_create_get=True,
+                )
             )
             return render(request, self.template_name, context)
         finally:
@@ -5908,20 +6243,14 @@ class TenantSalesInvoiceReportCreateView(View):
             auto_post = _post_flag_enabled(request.POST, 'auto_post')
             bundle = _sales_invoice_report_forms_with_preview(data=request.POST)
             form = bundle['report_form']
+            page_ctx = lambda: _sales_invoice_report_create_page_context(
+                request,
+                bundle,
+                tenant_registry=tenant_registry,
+                auto_post=auto_post,
+            )
             if not form.is_valid():
-                context.update(
-                    {
-                        **bundle,
-                        'is_edit': False,
-                        'page_title': 'Create Sales Invoice Report',
-                        'auto_post_enabled': auto_post,
-                        'lock_state': 'editable',
-                        'booking_lines': [],
-                        'surcharge_lines': [],
-                        'shipment_lines': [],
-                        'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
-                    }
-                )
+                context.update(page_ctx())
                 messages.error(request, 'Please fix the highlighted errors.', extra_tags='tenant')
                 return render(request, self.template_name, context)
 
@@ -5933,26 +6262,24 @@ class TenantSalesInvoiceReportCreateView(View):
                     post_data=request.POST,
                 )
             except ValidationError as exc:
-                context.update(
-                    {
-                        **bundle,
-                        'is_edit': False,
-                        'page_title': 'Create Sales Invoice Report',
-                        'auto_post_enabled': auto_post,
-                        'lock_state': 'editable',
-                        'booking_lines': [],
-                        'surcharge_lines': [],
-                        'shipment_lines': [],
-                        'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
-                    }
-                )
+                context.update(page_ctx())
                 messages.error(request, _validation_error_summary(exc), extra_tags='tenant')
                 return render(request, self.template_name, context)
+            account_no = (request.POST.get('sir_client_account_no') or '').strip()
+            if not account_no and obj.client_id:
+                account_no = (
+                    TenantClientAccount.objects.filter(pk=obj.client_id)
+                    .values_list('account_no', flat=True)
+                    .first()
+                    or ''
+                )
             messages.success(
                 request,
                 f'Sales Invoice Report {obj.report_no} created successfully.',
                 extra_tags='tenant',
             )
+            if _client_form_return_to_details(request) and account_no:
+                return _redirect_after_sales_invoice_report_save(request, account_no)
             return _tenant_redirect(
                 request,
                 'iroad_tenants:sales_invoice_report_detail',
@@ -20325,6 +20652,83 @@ def _merge_validation_error_into_form_errors(exc, form_errors):
         form_errors.setdefault('__all__', joined)
 
 
+TENANT_CLIENT_ACCOUNT_COLUMN_FILTERS = {
+    1: 'account_no',
+    2: 'preferred_currency',
+    3: 'name_english',
+    4: 'name_arabic',
+    5: 'client_type',
+    6: 'commercial_registration_no',
+    7: 'tax_registration_no',
+    8: 'status',
+}
+TENANT_CLIENT_ACCOUNT_SORT_COLS = {
+    1: 'account_no',
+    2: 'preferred_currency',
+    3: 'name_english',
+    4: 'name_arabic',
+    5: 'client_type',
+    6: 'commercial_registration_no',
+    7: 'tax_registration_no',
+    8: 'status',
+}
+TENANT_CLIENT_ACCOUNT_SEARCH_FIELDS = [
+    'account_no',
+    'name_english',
+    'display_name',
+    'name_arabic',
+    'preferred_currency',
+]
+
+
+def _tenant_client_account_filtered_queryset(request):
+    """Client account queryset with the same search/filters/sort as the list page."""
+    return build_eal_list_queryset(
+        request,
+        TenantClientAccount.objects.all(),
+        search_fields=TENANT_CLIENT_ACCOUNT_SEARCH_FIELDS,
+        column_field_map=TENANT_CLIENT_ACCOUNT_COLUMN_FILTERS,
+        sort_col_field_map=TENANT_CLIENT_ACCOUNT_SORT_COLS,
+        default_order=('account_no',),
+    )
+
+
+def _client_account_type_export_label(client_type):
+    if client_type == TenantClientAccount.ClientType.BUSINESS:
+        return 'Corporate'
+    return 'Individual'
+
+
+def _tenant_client_account_export_csv(client_accounts):
+    """Build UTF-8 CSV for client accounts (columns match the list table)."""
+    output = io.StringIO()
+    output.write('\ufeff')
+    writer = csv.writer(output)
+    writer.writerow([
+        'Account No',
+        'Preferred Currency',
+        'English Name',
+        'Arabic Name',
+        'Client Type',
+        'Commercial Reg. No.',
+        'Tax Reg. No.',
+        'Status',
+    ])
+    for account in client_accounts:
+        english_name = account.name_english or account.display_name or ''
+        writer.writerow([
+            account.account_no,
+            account.preferred_currency or '',
+            english_name,
+            account.name_arabic or '',
+            _client_account_type_export_label(account.client_type),
+            account.commercial_registration_no or '',
+            account.tax_registration_no or '',
+            account.status,
+        ])
+    return output.getvalue()
+
+
 class TenantClientAccountView(View):
     """List client accounts from the current tenant workspace schema."""
 
@@ -20342,38 +20746,12 @@ class TenantClientAccountView(View):
             clear_tenant_portal_cookie(response, request=request)
             return response
         try:
-            client_column_filters = {
-                1: 'account_no',
-                2: 'preferred_currency',
-                3: 'name_english',
-                4: 'name_arabic',
-                5: 'client_type',
-                6: 'commercial_registration_no',
-                7: 'tax_registration_no',
-                8: 'status',
-            }
-            client_sort_cols = {
-                1: 'account_no',
-                2: 'preferred_currency',
-                3: 'name_english',
-                4: 'name_arabic',
-                5: 'client_type',
-                6: 'commercial_registration_no',
-                7: 'tax_registration_no',
-                8: 'status',
-            }
             accounts_page, list_ctx = prepare_eal_list(
                 request,
                 TenantClientAccount.objects.all(),
-                search_fields=[
-                    'account_no',
-                    'name_english',
-                    'display_name',
-                    'name_arabic',
-                    'preferred_currency',
-                ],
-                column_field_map=client_column_filters,
-                sort_col_field_map=client_sort_cols,
+                search_fields=TENANT_CLIENT_ACCOUNT_SEARCH_FIELDS,
+                column_field_map=TENANT_CLIENT_ACCOUNT_COLUMN_FILTERS,
+                sort_col_field_map=TENANT_CLIENT_ACCOUNT_SORT_COLS,
                 default_order=('account_no',),
             )
             context.update(
@@ -20386,6 +20764,32 @@ class TenantClientAccountView(View):
                 }
             )
             return render(request, self.template_name, context)
+        finally:
+            restore_public_schema(request)
+
+
+class TenantClientAccountExportView(View):
+    """Export client accounts as CSV (honours current list search/filters/sort)."""
+
+    def get(self, request):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        if tenant_registry is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        try:
+            client_accounts = list(_tenant_client_account_filtered_queryset(request))
+            response = HttpResponse(
+                _tenant_client_account_export_csv(client_accounts),
+                content_type='text/csv; charset=utf-8',
+            )
+            response['Content-Disposition'] = 'attachment; filename="client_accounts_export.csv"'
+            return response
         finally:
             restore_public_schema(request)
 
@@ -20926,7 +21330,7 @@ class TenantClientAccountToggleStatusView(View):
             account.save(update_fields=['status', 'updated_at'])
             messages.success(request, f'Status changed to {account.status}.', extra_tags='tenant')
             if (request.POST.get('return_to') or '').strip() == 'details':
-                q = {'id': account.account_no}
+                q = {'id': str(account.account_id)}
                 return redirect(
                     f"{reverse('iroad_tenants:tenant_client_details')}?{urlencode(q)}"
                 )
@@ -21017,8 +21421,25 @@ def _client_form_return_to_details(request):
 _client_contact_return_to_details = _client_form_return_to_details
 
 
-def _client_details_tab_url(account_no, tab):
-    q = {'id': (account_no or '').strip(), 'tab': tab}
+def _client_details_id_for_url(account_ref):
+    """Resolve account_no or UUID to canonical account_id string for detail URLs."""
+    ref = (account_ref or '').strip()
+    if not ref:
+        return ''
+    try:
+        return str(uuid.UUID(str(ref)))
+    except (ValueError, TypeError, AttributeError):
+        pass
+    account_id = (
+        TenantClientAccount.objects.filter(account_no=ref)
+        .values_list('account_id', flat=True)
+        .first()
+    )
+    return str(account_id) if account_id else ref
+
+
+def _client_details_tab_url(account_ref, tab):
+    q = {'id': _client_details_id_for_url(account_ref), 'tab': tab}
     return f"{reverse('iroad_tenants:tenant_client_details')}?{urlencode(q)}"
 
 
@@ -21107,7 +21528,7 @@ def _address_master_form_extras(request, form, instance=None):
         'client_account_locked': bool(return_to_details and client_pk),
         'address_cancel_url': _client_detail_cancel_url(
             request,
-            account_no,
+            client_pk or account_no,
             'addresses',
             'iroad_tenants:tenant_address_master',
         ),
@@ -21133,6 +21554,7 @@ class TenantClientAttachmentsView(View):
             'attachment_date': timezone.localdate().isoformat(),
             'is_expiry_applicable': 'false',
             'expiry_date': '',
+            'attachment_file_title': '',
             'file_notes': '',
             'client_account': '',
         }
@@ -21204,6 +21626,9 @@ class TenantClientAttachmentsView(View):
         form_data['attachment_date'] = (request.POST.get('attachment_date') or '').strip()
         form_data['is_expiry_applicable'] = (request.POST.get('is_expiry_applicable') or '').strip()
         form_data['expiry_date'] = (request.POST.get('expiry_date') or '').strip()
+        form_data['attachment_file_title'] = (
+            request.POST.get('attachment_file_title') or ''
+        ).strip()
         form_data['file_notes'] = (request.POST.get('file_notes') or '').strip()
 
         form_errors = {}
@@ -21220,6 +21645,9 @@ class TenantClientAttachmentsView(View):
         ad = parse_date(form_data['attachment_date']) if form_data['attachment_date'] else None
         if not ad:
             form_errors['attachment_date'] = 'Enter a valid attachment date.'
+
+        if not form_data['attachment_file_title']:
+            form_errors['attachment_file_title'] = 'Enter an attachment file title.'
 
         is_expiry = form_data['is_expiry_applicable'] == 'true'
         ex = None
@@ -21269,6 +21697,7 @@ class TenantClientAttachmentsView(View):
                     is_expiry_applicable=is_expiry,
                     expiry_date=ex,
                     attachment_file=upload,
+                    attachment_file_title=form_data['attachment_file_title'],
                     file_notes=form_data['file_notes'],
                     created_by_label=(context.get('display_name') or '').strip(),
                     client_account=account,
@@ -21303,7 +21732,7 @@ class TenantClientAttachmentsView(View):
         restore_public_schema(request)
         return _redirect_after_client_detail_save(
             request,
-            account.account_no,
+            str(account.account_id),
             'attachments',
             _redirect_client_attachment_list,
         )
@@ -21351,6 +21780,112 @@ def _redirect_after_client_contact_save(request, account_no):
     )
 
 
+def _sales_invoice_report_cancel_url(request, account_no=''):
+    return _client_detail_cancel_url(
+        request,
+        account_no,
+        'overview',
+        'iroad_tenants:sales_invoice_report_list',
+    )
+
+
+def _sales_invoice_report_form_extras(
+    request,
+    *,
+    client_account_id='',
+    client_account_no='',
+    from_create_get=False,
+):
+    pre = ''
+    if from_create_get:
+        pre = (
+            (request.GET.get('client') or '').strip()
+            or (request.GET.get('account') or '').strip()
+        )
+    return_to_details = _client_form_return_to_details(request) or (from_create_get and bool(pre))
+    acc_no = (client_account_no or '').strip()
+    client_id = (client_account_id or '').strip()
+    if not acc_no and client_id:
+        acc_no = (
+            TenantClientAccount.objects.filter(pk=client_id)
+            .values_list('account_no', flat=True)
+            .first()
+            or ''
+        )
+    return {
+        'sir_return_to': 'details' if return_to_details else '',
+        'sir_client_account_no': acc_no,
+        'sir_client_account_locked': bool(return_to_details and client_id),
+        'sir_cancel_url': _sales_invoice_report_cancel_url(request, acc_no),
+    }
+
+
+def _sales_invoice_report_create_page_context(
+    request,
+    bundle,
+    *,
+    tenant_registry,
+    auto_post=False,
+    from_create_get=False,
+):
+    account_no = (
+        (request.GET.get('account') or '').strip()
+        or (request.POST.get('sir_client_account_no') or '').strip()
+    )
+    client_id = (
+        (request.GET.get('client') or '').strip()
+        or (request.POST.get('client') or '').strip()
+    )
+    if not client_id and account_no:
+        account = TenantClientAccount.objects.filter(account_no=account_no).first()
+        if account is not None:
+            client_id = str(account.account_id)
+    return {
+        **bundle,
+        'is_edit': False,
+        'page_title': 'Create Sales Invoice Report',
+        'auto_post_enabled': auto_post,
+        'lock_state': 'editable',
+        'booking_lines': [],
+        'surcharge_lines': [],
+        'shipment_lines': [],
+        'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+        **_sales_invoice_report_form_extras(
+            request,
+            client_account_id=client_id,
+            client_account_no=account_no,
+            from_create_get=from_create_get,
+        ),
+    }
+
+
+def _prefill_sales_invoice_report_client_from_request(request, report_form):
+    """Set client initial from ``?client=`` (UUID or account no) or ``?account=``."""
+    client_ref = (request.GET.get('client') or '').strip()
+    account_no = (request.GET.get('account') or '').strip()
+    account = None
+    if client_ref:
+        try:
+            uuid.UUID(client_ref)
+            account = TenantClientAccount.objects.filter(pk=client_ref).first()
+        except (ValueError, TypeError, AttributeError):
+            account = TenantClientAccount.objects.filter(account_no=client_ref).first()
+    elif account_no:
+        account = TenantClientAccount.objects.filter(account_no=account_no).first()
+    if account is not None:
+        report_form.initial['client'] = account.pk
+    return account
+
+
+def _redirect_after_sales_invoice_report_save(request, account_no):
+    return _redirect_after_client_detail_save(
+        request,
+        account_no,
+        'overview',
+        lambda req: _tenant_redirect(req, 'iroad_tenants:sales_invoice_report_list'),
+    )
+
+
 def _tenant_client_contacts_base_path():
     """Path prefix for contact CRUD URLs, ending with ``/`` (from ``tenant_client_contacts``)."""
     p = reverse('iroad_tenants:tenant_client_contacts')
@@ -21382,6 +21917,7 @@ class TenantClientAttachmentEditView(View):
             'attachment_date': timezone.localdate().isoformat(),
             'is_expiry_applicable': 'false',
             'expiry_date': '',
+            'attachment_file_title': '',
             'file_notes': '',
             'client_account': '',
         }
@@ -21411,6 +21947,7 @@ class TenantClientAttachmentEditView(View):
             form_data['attachment_date'] = att.attachment_date.isoformat()
             form_data['is_expiry_applicable'] = 'true' if att.is_expiry_applicable else 'false'
             form_data['expiry_date'] = att.expiry_date.isoformat() if att.expiry_date else ''
+            form_data['attachment_file_title'] = att.attachment_file_title or ''
             form_data['file_notes'] = att.file_notes or ''
             context.update(
                 {
@@ -21459,6 +21996,9 @@ class TenantClientAttachmentEditView(View):
                 request.POST.get('is_expiry_applicable') or ''
             ).strip()
             form_data['expiry_date'] = (request.POST.get('expiry_date') or '').strip()
+            form_data['attachment_file_title'] = (
+                request.POST.get('attachment_file_title') or ''
+            ).strip()
             form_data['file_notes'] = (request.POST.get('file_notes') or '').strip()
 
             form_errors = {}
@@ -21475,6 +22015,9 @@ class TenantClientAttachmentEditView(View):
             ad = parse_date(form_data['attachment_date']) if form_data['attachment_date'] else None
             if not ad:
                 form_errors['attachment_date'] = 'Enter a valid attachment date.'
+
+            if not form_data['attachment_file_title']:
+                form_errors['attachment_file_title'] = 'Enter an attachment file title.'
 
             is_expiry = form_data['is_expiry_applicable'] == 'true'
             ex = None
@@ -21514,6 +22057,7 @@ class TenantClientAttachmentEditView(View):
                     att.attachment_date = ad
                     att.is_expiry_applicable = is_expiry
                     att.expiry_date = ex
+                    att.attachment_file_title = form_data['attachment_file_title']
                     att.file_notes = form_data['file_notes']
                     if upload:
                         if att.attachment_file:
@@ -21540,7 +22084,7 @@ class TenantClientAttachmentEditView(View):
             )
             return _redirect_after_client_detail_save(
                 request,
-                account.account_no,
+                str(account.account_id),
                 'attachments',
                 _redirect_client_attachment_list,
             )
@@ -21628,6 +22172,107 @@ class TenantClientAttachmentDetailView(View):
             restore_public_schema(request)
 
 
+TENANT_CLIENT_ATTACHMENT_COLUMN_FILTERS = {
+    1: 'attachment_no',
+    2: 'client_account__account_no',
+    5: 'expiry_date',
+    6: 'attachment_file_title',
+    7: 'status',
+}
+TENANT_CLIENT_ATTACHMENT_SORT_COLS = {
+    1: 'attachment_no',
+    2: 'client_account__account_no',
+    3: 'attachment_date',
+    5: 'expiry_date',
+    6: 'attachment_file_title',
+    7: 'status',
+}
+TENANT_CLIENT_ATTACHMENT_SEARCH_FIELDS = [
+    'attachment_no',
+    'client_account__account_no',
+    'client_account__display_name',
+    'client_account__name_english',
+    'attachment_file_title',
+    'file_notes',
+    'status',
+]
+
+
+def _tenant_client_attachment_filtered_queryset(request):
+    """Client attachment queryset with the same search/filters/sort as the list page."""
+    return build_eal_list_queryset(
+        request,
+        TenantClientAttachment.objects.select_related('client_account'),
+        search_fields=TENANT_CLIENT_ATTACHMENT_SEARCH_FIELDS,
+        column_field_map=TENANT_CLIENT_ATTACHMENT_COLUMN_FILTERS,
+        sort_col_field_map=TENANT_CLIENT_ATTACHMENT_SORT_COLS,
+        default_order=('-created_at',),
+    )
+
+
+def _tenant_client_attachment_export_csv(attachments):
+    """Build UTF-8 CSV for client attachments (columns match the list table)."""
+    output = io.StringIO()
+    output.write('\ufeff')
+    writer = csv.writer(output)
+    writer.writerow([
+        'Attachment ID',
+        'Client Account',
+        'Attachment Date',
+        'Expiry Applicable',
+        'Expiry Date',
+        'File Title',
+        'Status',
+    ])
+    for attachment in attachments:
+        account = attachment.client_account
+        client_label = ''
+        if account is not None:
+            display = account.display_name or account.name_english or ''
+            client_label = f'{account.account_no} - {display}'.strip(' -')
+        file_title = (
+            attachment.attachment_file_title
+            or attachment.file_name
+            or ''
+        )
+        writer.writerow([
+            attachment.attachment_no,
+            client_label,
+            attachment.attachment_date.strftime('%Y-%m-%d') if attachment.attachment_date else '',
+            'Yes' if attachment.is_expiry_applicable else 'No',
+            attachment.expiry_date.strftime('%Y-%m-%d') if attachment.expiry_date else '',
+            file_title,
+            attachment.computed_status,
+        ])
+    return output.getvalue()
+
+
+class TenantClientAttachmentExportView(View):
+    """Export client attachments as CSV (honours current list search/filters/sort)."""
+
+    def get(self, request):
+        context = _tenant_context_from_session(request)
+        if context is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        tenant_registry = _activate_tenant_workspace_schema(request)
+        if tenant_registry is None:
+            response = redirect('login')
+            clear_tenant_portal_cookie(response, request=request)
+            return response
+        try:
+            attachments = list(_tenant_client_attachment_filtered_queryset(request))
+            response = HttpResponse(
+                _tenant_client_attachment_export_csv(attachments),
+                content_type='text/csv; charset=utf-8',
+            )
+            response['Content-Disposition'] = 'attachment; filename="client_attachments_export.csv"'
+            return response
+        finally:
+            restore_public_schema(request)
+
+
 class TenantClientAttachmentsListView(View):
     """List all tenant client attachments with summary stats."""
 
@@ -21646,32 +22291,12 @@ class TenantClientAttachmentsListView(View):
             return response
         try:
             att = TenantClientAttachment
-            qs = TenantClientAttachment.objects.select_related('client_account')
-            attachment_column_filters = {
-                1: 'attachment_no',
-                2: 'client_account__account_no',
-                5: 'expiry_date',
-                7: 'status',
-            }
-            attachment_sort_cols = {
-                1: 'attachment_no',
-                2: 'client_account__account_no',
-                3: 'attachment_date',
-                5: 'expiry_date',
-                7: 'status',
-            }
             attachments_page, list_ctx = prepare_eal_list(
                 request,
-                qs,
-                search_fields=[
-                    'attachment_no',
-                    'client_account__account_no',
-                    'client_account__display_name',
-                    'file_notes',
-                    'status',
-                ],
-                column_field_map=attachment_column_filters,
-                sort_col_field_map=attachment_sort_cols,
+                TenantClientAttachment.objects.select_related('client_account'),
+                search_fields=TENANT_CLIENT_ATTACHMENT_SEARCH_FIELDS,
+                column_field_map=TENANT_CLIENT_ATTACHMENT_COLUMN_FILTERS,
+                sort_col_field_map=TENANT_CLIENT_ATTACHMENT_SORT_COLS,
                 default_order=('-created_at',),
             )
             rows = list(attachments_page.object_list)
@@ -21924,7 +22549,7 @@ class TenantClientContactsView(View):
             extra_tags='tenant',
         )
         restore_public_schema(request)
-        return _redirect_after_client_contact_save(request, account.account_no)
+        return _redirect_after_client_contact_save(request, str(account.account_id))
 
 
 class TenantClientContactEditView(View):
@@ -22123,7 +22748,7 @@ class TenantClientContactEditView(View):
                 f'Contact {form_data["name"]} updated.',
                 extra_tags='tenant',
             )
-            return _redirect_after_client_contact_save(request, account.account_no)
+            return _redirect_after_client_contact_save(request, str(account.account_id))
         finally:
             restore_public_schema(request)
 
@@ -22486,7 +23111,7 @@ class TenantClientContractView(View):
             )
             return _redirect_after_client_detail_save(
                 request,
-                account.account_no,
+                str(account.account_id),
                 'contracts',
                 _redirect_client_contract_list,
             )
@@ -22720,7 +23345,7 @@ class TenantClientContractEditView(View):
             )
             return _redirect_after_client_detail_save(
                 request,
-                contract.client_account.account_no,
+                str(contract.client_account.account_id),
                 'contracts',
                 _redirect_client_contract_list,
             )
@@ -23020,6 +23645,64 @@ class TenantClientContractSettingsView(View):
             restore_public_schema(request)
 
 
+CLIENT_DETAIL_ADDR_PREFIX = 'addr_'
+CLIENT_DETAIL_ATT_PREFIX = 'att_'
+CLIENT_DETAIL_PL_PREFIX = 'pl_'
+CLIENT_DETAIL_CARGO_PREFIX = 'cargo_'
+
+CLIENT_DETAIL_TAB_BY_PREFIX = {
+    CLIENT_DETAIL_ADDR_PREFIX: 'addresses',
+    CLIENT_DETAIL_ATT_PREFIX: 'attachments',
+    CLIENT_DETAIL_PL_PREFIX: 'price-lists',
+    CLIENT_DETAIL_CARGO_PREFIX: 'cargo',
+}
+
+
+def _client_detail_pagination_url_with_tab(href, tab_key):
+    if not href or not tab_key:
+        return href
+    q = href[1:] if href.startswith('?') else href
+    pairs = dict(parse_qsl(q, keep_blank_values=True))
+    pairs['tab'] = tab_key
+    return '?' + urlencode(pairs)
+
+
+def _client_detail_tab_context(prefix, page, list_ctx, *, items_key='items'):
+    tab_key = CLIENT_DETAIL_TAB_BY_PREFIX.get(prefix, '')
+    page_links = list_ctx['pagination_page_links']
+    if tab_key:
+        page_links = [
+            (num, _client_detail_pagination_url_with_tab(href, tab_key))
+            for num, href in page_links
+        ]
+    return {
+        items_key: list(page.object_list),
+        'page': page,
+        'pagination_start': list_ctx['pagination_start'],
+        'pagination_end': list_ctx['pagination_end'],
+        'pagination_total': list_ctx['pagination_total'],
+        'pagination_prev_url': _client_detail_pagination_url_with_tab(
+            list_ctx['pagination_prev_url'],
+            tab_key,
+        ),
+        'pagination_next_url': _client_detail_pagination_url_with_tab(
+            list_ctx['pagination_next_url'],
+            tab_key,
+        ),
+        'pagination_page_links': page_links,
+        'tab_key': tab_key,
+    }
+
+
+def _client_detail_paginated_tab(request, queryset, prefix, *, order_by=('-created_at',)):
+    if isinstance(order_by, str):
+        qs = queryset.order_by(order_by)
+    else:
+        qs = queryset.order_by(*order_by)
+    page, list_ctx = paginate_tenant_list(request, qs, prefix=prefix)
+    return _client_detail_tab_context(prefix, page, list_ctx)
+
+
 class TenantClientDetailsView(View):
     """Load client account from tenant schema when ``?id=`` or ``?ref=`` matches (account_no or UUID)."""
 
@@ -23039,10 +23722,15 @@ class TenantClientDetailsView(View):
         try:
             lookup = (request.GET.get('id') or request.GET.get('ref') or '').strip()
             client_account = None
-            client_attachments = []
-            client_addresses = []
+            client_addresses_tab = None
+            client_attachments_tab = None
+            client_price_lists_tab = None
+            client_cargo_tab = None
             client_contacts = []
             primary_contact = None
+            header_contact = None
+            header_contact_email = ''
+            header_contact_phone = ''
             client_account_bootstrap = None
             if lookup:
                 client_account = TenantClientAccount.objects.filter(
@@ -23057,6 +23745,15 @@ class TenantClientDetailsView(View):
                     except (ValueError, TypeError, AttributeError):
                         client_account = None
                 if client_account:
+                    canonical_id = str(client_account.account_id)
+                    if lookup != canonical_id:
+                        q = {'id': canonical_id}
+                        tab = (request.GET.get('tab') or '').strip()
+                        if tab:
+                            q['tab'] = tab
+                        return redirect(
+                            f"{reverse('iroad_tenants:tenant_client_details')}?{urlencode(q)}"
+                        )
                     client_contacts = list(
                         TenantClientContact.objects.filter(
                             client_account=client_account,
@@ -23066,43 +23763,61 @@ class TenantClientDetailsView(View):
                         (c for c in client_contacts if c.is_primary),
                         None,
                     )
+                    header_contact = _resolve_client_header_contact(client_contacts)
+                    header_contact_email, header_contact_phone = _client_header_contact_fields(
+                        header_contact,
+                    )
                     client_account_bootstrap = _client_account_bootstrap_dict(
                         client_account,
-                        primary_contact,
+                        header_contact,
                     )
-                    client_attachments = list(
-                        TenantClientAttachment.objects.filter(
-                            client_account=client_account,
-                        ).order_by('-attachment_date', '-created_at')
-                    )
-                    client_addresses = list(
-                        TenantAddressMaster.objects.filter(
-                            client_account=client_account,
-                        )
-                        .select_related('country', 'client_account')
-                        .order_by('-created_at')
-                    )
-                    for addr in client_addresses:
-                        try:
-                            edit_u = reverse(
-                                'iroad_tenants:tenant_address_master_edit',
-                                kwargs={'address_ref': addr.address_code},
-                            )
-                        except NoReverseMatch:
-                            edit_u = (
-                                f'/master-data/addresses/{addr.address_code}/edit/'
-                            )
-                        addr.list_edit_url = f'{edit_u}?return_to=details'
-            client_cargo_masters = []
             client_contract = None
-            client_price_lists = []
             if client_account:
-                request.session[PRICE_LIST_CREATE_PREFILL_CLIENT_SESSION_KEY] = str(client_account.account_id)
-                client_price_lists = list(
-                    TenantPriceList.objects.filter(client_account=client_account)
-                    .order_by('-created_at')
+                request.session[PRICE_LIST_CREATE_PREFILL_CLIENT_SESSION_KEY] = str(
+                    client_account.account_id,
                 )
-                for pl in client_price_lists:
+
+                addr_tab = _client_detail_paginated_tab(
+                    request,
+                    TenantAddressMaster.objects.filter(
+                        client_account=client_account,
+                    ).select_related('country', 'client_account'),
+                    CLIENT_DETAIL_ADDR_PREFIX,
+                )
+                for addr in addr_tab['items']:
+                    try:
+                        edit_u = reverse(
+                            'iroad_tenants:tenant_address_master_edit',
+                            kwargs={'address_ref': addr.address_code},
+                        )
+                    except NoReverseMatch:
+                        edit_u = f'/master-data/addresses/{addr.address_code}/edit/'
+                    addr.list_edit_url = f'{edit_u}?return_to=details'
+                    try:
+                        detail_u = reverse(
+                            'iroad_tenants:tenant_address_master_detail',
+                            kwargs={'address_ref': addr.address_code},
+                        )
+                    except NoReverseMatch:
+                        detail_u = f'/master-data/addresses/{addr.address_code}/'
+                    addr.list_detail_url = detail_u
+                client_addresses_tab = addr_tab
+
+                client_attachments_tab = _client_detail_paginated_tab(
+                    request,
+                    TenantClientAttachment.objects.filter(
+                        client_account=client_account,
+                    ),
+                    CLIENT_DETAIL_ATT_PREFIX,
+                    order_by=('-attachment_date', '-created_at'),
+                )
+
+                pl_tab = _client_detail_paginated_tab(
+                    request,
+                    TenantPriceList.objects.filter(client_account=client_account),
+                    CLIENT_DETAIL_PL_PREFIX,
+                )
+                for pl in pl_tab['items']:
                     try:
                         detail_u = reverse(
                             'iroad_tenants:tenant_price_list_master_detail',
@@ -23118,13 +23833,17 @@ class TenantClientDetailsView(View):
                         )
                     except NoReverseMatch:
                         edit_u = f'/master-data/services/price-lists/{pl.price_list_code}/edit/'
-                    pl.list_edit_url = edit_u
-                client_cargo_masters = list(
-                    TenantCargoMaster.objects.filter(client_account=client_account)
-                    .select_related('cargo_category')
-                    .order_by('-created_at')
+                    pl.list_edit_url = f'{edit_u}?return_to=details'
+                client_price_lists_tab = pl_tab
+
+                cargo_tab = _client_detail_paginated_tab(
+                    request,
+                    TenantCargoMaster.objects.filter(
+                        client_account=client_account,
+                    ).select_related('cargo_category'),
+                    CLIENT_DETAIL_CARGO_PREFIX,
                 )
-                for c in client_cargo_masters:
+                for c in cargo_tab['items']:
                     try:
                         edit_u = reverse(
                             'iroad_tenants:tenant_cargo_master_edit',
@@ -23132,23 +23851,9 @@ class TenantClientDetailsView(View):
                         )
                     except NoReverseMatch:
                         edit_u = f'/master-data/cargo/{c.cargo_id}/edit/'
-                    c.list_edit_url = edit_u
-                    try:
-                        detail_u = reverse(
-                            'iroad_tenants:tenant_cargo_master_detail',
-                            kwargs={'cargo_id': c.cargo_id},
-                        )
-                    except NoReverseMatch:
-                        detail_u = f'/master-data/cargo/{c.cargo_id}/'
-                    c.list_detail_url = detail_u
-                    try:
-                        del_u = reverse(
-                            'iroad_tenants:tenant_cargo_master_delete',
-                            kwargs={'cargo_id': c.cargo_id},
-                        )
-                    except NoReverseMatch:
-                        del_u = f'/master-data/cargo/{c.cargo_id}/delete/'
-                    c.list_delete_action_url = del_u
+                    c.list_edit_url = f'{edit_u}?return_to=details'
+                client_cargo_tab = cargo_tab
+
                 client_contract = (
                     TenantClientContract.objects.filter(client_account=client_account)
                     .select_related('client_account')
@@ -23194,15 +23899,18 @@ class TenantClientDetailsView(View):
                 {
                     'tenant_schema_name': tenant_registry.schema_name,
                     'client_account': client_account,
-                    'client_attachments': client_attachments,
+                    'client_addresses_tab': client_addresses_tab,
+                    'client_attachments_tab': client_attachments_tab,
+                    'client_price_lists_tab': client_price_lists_tab,
+                    'client_cargo_tab': client_cargo_tab,
                     'client_contacts': client_contacts,
                     'primary_contact': primary_contact if client_account else None,
+                    'header_contact': header_contact if client_account else None,
+                    'header_contact_email': header_contact_email if client_account else '',
+                    'header_contact_phone': header_contact_phone if client_account else '',
                     'client_account_bootstrap': client_account_bootstrap,
                     'client_lookup_failed': client_lookup_failed,
                     'client_contract': client_contract,
-                    'client_addresses': client_addresses,
-                    'client_price_lists': client_price_lists,
-                    'client_cargo_masters': client_cargo_masters,
                     'client_ref': (client_account.account_no if client_account else '') or lookup,
                 }
             )
@@ -23764,8 +24472,8 @@ class TenantAddressMasterCreateView(View):
                 extra_tags='tenant',
             )
 
-            account_no = (form.cleaned_data['client_account'].account_no or '').strip()
-            redirect_resp = _redirect_after_address_save(request, account_no)
+            account_id = str(form.cleaned_data['client_account'].account_id)
+            redirect_resp = _redirect_after_address_save(request, account_id)
         finally:
             restore_public_schema(request)
 
@@ -23937,8 +24645,8 @@ class TenantAddressMasterEditView(View):
                 return render(request, self.template_name, context)
 
             messages.success(request, 'Address updated successfully.', extra_tags='tenant')
-            account_no = (instance.client_account.account_no or '').strip()
-            redirect_resp = _redirect_after_address_save(request, account_no)
+            account_id = str(instance.client_account.account_id)
+            redirect_resp = _redirect_after_address_save(request, account_id)
         finally:
             restore_public_schema(request)
 
@@ -30149,9 +30857,31 @@ class TenantRouteMasterListView(View):
             elif route_scope == 'international':
                 qs = qs.filter(route_type=TenantRouteMaster.RouteType.INTERNATIONAL)
 
-            routes_page = Paginator(qs.order_by('-created_at'), 25).get_page(
-                request.GET.get('page') or 1
+            route_column_field_map = {
+                1: 'route_code',
+                2: 'route_label',
+                3: 'route_type',
+                4: 'origin_point__display_label',
+                5: 'destination_point__display_label',
+                6: 'status',
+                7: 'distance_km',
+                8: 'estimated_duration_h',
+            }
+            qs = build_eal_list_queryset(
+                request,
+                qs,
+                search_q=search_q,
+                search_fields=[
+                    'route_code',
+                    'route_label',
+                    'origin_point__display_label',
+                    'destination_point__display_label',
+                ],
+                column_field_map=route_column_field_map,
+                sort_col_field_map=route_column_field_map,
+                default_order=('-created_at',),
             )
+            routes_page, route_pagination = paginate_tenant_list(request, qs, per_page=25)
             stats_qs = TenantRouteMaster.objects.all()
             route_stats = {
                 'total': stats_qs.count(),
@@ -30166,6 +30896,8 @@ class TenantRouteMasterListView(View):
                     'route_scope': route_scope,
                     'route_stats': route_stats,
                     'tenant_schema_name': getattr(tenant_registry, 'schema_name', ''),
+                    'eal_column_filters': eal_column_filter_values(request),
+                    **route_pagination,
                 }
             )
             return render(request, self.template_name, context)
@@ -30755,6 +31487,8 @@ class TenantUsersAdministrationView(View):
                     'users_inactive_count': inactive_users,
                     'users_locked_count': locked_accounts,
                     'search_query': list_ctx['search_q'],
+                    'users_list_has_filters': bool(list_ctx['search_q'])
+                    or any(list_ctx['eal_column_filters'].values()),
                     'tenant_schema_name': tenant_registry.schema_name,
                     **list_ctx,
                 }
@@ -31565,11 +32299,29 @@ def _permissions_payload_from_post(request):
     return rows
 
 
+def _merge_permission_flags(existing, incoming):
+    """Combine permission flags when legacy and canonical rows coexist."""
+    return {
+        flag: existing.get(flag, False) or incoming.get(flag, False)
+        for flag in (
+            'can_view',
+            'can_create',
+            'can_edit',
+            'can_delete',
+            'can_post',
+            'can_approve',
+            'can_export',
+            'can_print',
+        )
+    }
+
+
 def _permissions_by_key(role):
     perms = {}
     for permission in role.permissions.all():
-        key = f'{permission.module_name}|{permission.form_name}'
-        perms[key] = {
+        form_name = resolve_canonical_form_name(permission.form_name)
+        key = f'{permission.module_name}|{form_name}'
+        incoming = {
             'can_view': permission.can_view,
             'can_create': permission.can_create,
             'can_edit': permission.can_edit,
@@ -31579,6 +32331,10 @@ def _permissions_by_key(role):
             'can_export': permission.can_export,
             'can_print': permission.can_print,
         }
+        if key in perms:
+            perms[key] = _merge_permission_flags(perms[key], incoming)
+        else:
+            perms[key] = incoming
     return perms
 
 
@@ -31604,6 +32360,51 @@ def _permission_matrix_with_values(permission_map=None):
     return enrich_permission_matrix_rows(matrix_rows)
 
 
+TENANT_ROLES_PERMISSIONS_COLUMN_FILTERS = {
+    1: 'role_name_en',
+    2: 'role_name_ar',
+    3: 'description_en',
+    4: 'created_by_label',
+    5: 'status',
+}
+TENANT_ROLES_PERMISSIONS_SORT_COLS = {
+    1: 'role_name_en',
+    2: 'role_name_ar',
+    3: 'description_en',
+    4: 'created_by_label',
+    5: 'status',
+}
+TENANT_ROLES_PERMISSIONS_SEARCH_FIELDS = [
+    'role_name_en',
+    'role_name_ar',
+    'description_en',
+    'description_ar',
+    'created_by_label',
+]
+
+
+def _tenant_roles_permissions_queryset(request):
+    """Filtered/sorted tenant roles queryset (list + export)."""
+    queryset = TenantRole.objects.all()
+    search_q = (request.GET.get('q') or '').strip()
+    if search_q:
+        q_obj = Q()
+        for field in TENANT_ROLES_PERMISSIONS_SEARCH_FIELDS:
+            q_obj |= Q(**{f'{field}__icontains': search_q})
+        queryset = queryset.filter(q_obj)
+    queryset = apply_eal_column_filters(
+        queryset,
+        request,
+        TENANT_ROLES_PERMISSIONS_COLUMN_FILTERS,
+    )
+    return apply_eal_column_sort(
+        queryset,
+        request,
+        TENANT_ROLES_PERMISSIONS_SORT_COLS,
+        default_order=('-created_at', '-updated_at'),
+    )
+
+
 class TenantRolesPermissionsView(View):
     """Tenant roles and permissions list page."""
 
@@ -31619,32 +32420,12 @@ class TenantRolesPermissionsView(View):
             clear_tenant_portal_cookie(response, request=request)
             return response
         try:
-            role_column_filters = {
-                1: 'role_name_en',
-                2: 'role_name_ar',
-                3: 'description_en',
-                4: 'created_by_label',
-                5: 'status',
-            }
-            role_sort_cols = {
-                1: 'role_name_en',
-                2: 'role_name_ar',
-                3: 'description_en',
-                4: 'created_by_label',
-                5: 'status',
-            }
             roles_page, list_ctx = prepare_eal_list(
                 request,
-                TenantRole.objects.all(),
-                search_fields=[
-                    'role_name_en',
-                    'role_name_ar',
-                    'description_en',
-                    'description_ar',
-                    'created_by_label',
-                ],
-                column_field_map=role_column_filters,
-                sort_col_field_map=role_sort_cols,
+                _tenant_roles_permissions_queryset(request),
+                search_fields=TENANT_ROLES_PERMISSIONS_SEARCH_FIELDS,
+                column_field_map=TENANT_ROLES_PERMISSIONS_COLUMN_FILTERS,
+                sort_col_field_map=TENANT_ROLES_PERMISSIONS_SORT_COLS,
                 default_order=('-created_at', '-updated_at'),
             )
             tenant_roles = list(roles_page.object_list)
@@ -31974,28 +32755,22 @@ def _build_tenant_roles_permissions_csv_response(tenant_roles):
     writer.writerow(['Roles'])
     writer.writerow(
         [
-            'Role ID',
             'Role Name (English)',
             'Role Name (Arabic)',
             'Description',
             'Created By',
             'Status',
-            'Created At',
-            'Updated At',
         ]
     )
     for tenant_role in tenant_roles:
         description = tenant_role.description_en or tenant_role.description_ar
         writer.writerow(
             [
-                str(tenant_role.role_id),
                 tenant_role.role_name_en,
                 tenant_role.role_name_ar,
                 description,
                 tenant_role.created_by_label or 'N/A',
                 tenant_role.status,
-                tenant_role.created_at.isoformat() if tenant_role.created_at else '',
-                tenant_role.updated_at.isoformat() if tenant_role.updated_at else '',
             ]
         )
 
@@ -32003,7 +32778,6 @@ def _build_tenant_roles_permissions_csv_response(tenant_roles):
     writer.writerow(['Role Permissions'])
     writer.writerow(
         [
-            'Role ID',
             'Role Name (English)',
             'Module',
             'Form / Submodule',
@@ -32022,7 +32796,6 @@ def _build_tenant_roles_permissions_csv_response(tenant_roles):
         for row in _permission_matrix_with_values(permission_map):
             writer.writerow(
                 [
-                    str(tenant_role.role_id),
                     tenant_role.role_name_en,
                     row['module_name'],
                     row['form_name'],
@@ -32058,10 +32831,7 @@ class TenantRolesPermissionsExportView(View):
             return response
         try:
             tenant_roles = list(
-                TenantRole.objects.prefetch_related('permissions').order_by(
-                    '-created_at',
-                    '-updated_at',
-                )
+                _tenant_roles_permissions_queryset(request).prefetch_related('permissions')
             )
             return _build_tenant_roles_permissions_csv_response(tenant_roles)
         finally:
@@ -33680,7 +34450,10 @@ def _apply_organization_profile_post(request, profile):
     street = (post.get('street') or '').strip()
     address_line_1 = (post.get('address_line_1') or '').strip()
     primary_email = (post.get('primary_email') or '').strip()
-    primary_mobile = (post.get('primary_mobile') or '').strip()
+    primary_mobile = _validate_organization_profile_phone_digits(
+        post.get('primary_mobile'),
+        'Mobile',
+    )
 
     # Preserve existing required values when user updates only a subset
     # (e.g. uploading logo), instead of wiping them to empty strings.
@@ -33704,9 +34477,15 @@ def _apply_organization_profile_post(request, profile):
     if 'support_email' in post:
         profile.support_email = (post.get('support_email') or '').strip()
     if 'support_mobile_1' in post:
-        profile.support_mobile_1 = (post.get('support_mobile_1') or '').strip()
+        profile.support_mobile_1 = _validate_organization_profile_phone_digits(
+            post.get('support_mobile_1'),
+            'Support Mobile Number 1',
+        )
     if 'support_mobile_2' in post:
-        profile.support_mobile_2 = (post.get('support_mobile_2') or '').strip()
+        profile.support_mobile_2 = _validate_organization_profile_phone_digits(
+            post.get('support_mobile_2'),
+            'Support Mobile Number 2',
+        )
     if 'driver_instructions' in post:
         profile.driver_instructions = (post.get('driver_instructions') or '').strip()
     profile.system_language = (post.get('system_language') or 'en').strip()

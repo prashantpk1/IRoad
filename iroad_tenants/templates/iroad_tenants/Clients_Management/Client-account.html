@@ -47,10 +47,14 @@
           </div>
           <div class="page-header-right">
             <div class="eal-header-actions">
-              <button class="eal-btn eal-btn-outline">
+              <a
+                class="eal-btn eal-btn-outline"
+                href="{% url 'iroad_tenants:tenant_client_account_export' %}{% if request.GET %}?{{ request.GET.urlencode }}{% endif %}"
+                download="client_accounts_export.csv"
+              >
                 <i class="bi bi-download"></i>
                 <span>Export</span>
-              </button>
+              </a>
               <a href="{% url 'iroad_tenants:tenant_client_account_create' %}" class="eal-btn eal-btn-primary">
                 <i class="bi bi-plus-lg"></i>
                 <span>Add Client Account</span>
@@ -82,10 +86,17 @@
                 placeholder="Search by account no. or name…"
                 aria-label="Search by account no. or name"
               />
+              <button
+                type="button"
+                class="eal-search-clear-btn"
+                id="clientAccountSearchClear"
+                title="Clear search"
+                aria-label="Clear search"
+                hidden
+              >
+                <i class="bi bi-x-lg"></i>
+              </button>
             </div>
-            <button type="button" class="eal-btn eal-btn-outline" id="clientAccountSearchClear" title="Clear search" style="display: none">
-              Clear
-            </button>
           </div>
         </div>
 
@@ -118,8 +129,8 @@
                     <div class="eal-filter-menu-title">Account No.</div>
                     <input type="text" class="form-control eal-column-filter-input" placeholder="Filter by text" />
                     <div class="eal-filter-actions">
-                      <button type="button" class="eal-filter-action" data-sort="asc">Lowest</button>
-                      <button type="button" class="eal-filter-action" data-sort="desc">Highest</button>
+                      <button type="button" class="eal-filter-action" data-sort="asc">A to Z</button>
+                      <button type="button" class="eal-filter-action" data-sort="desc">Z to A</button>
                       <button type="button" class="eal-filter-action" data-clear="true">Clear</button>
                     </div>
                   </div>
@@ -227,8 +238,8 @@
                     <div class="eal-filter-menu-title">Commercial Reg. No.</div>
                     <input type="text" class="form-control eal-column-filter-input" placeholder="Filter by text" />
                     <div class="eal-filter-actions">
-                      <button type="button" class="eal-filter-action" data-sort="asc">Lowest</button>
-                      <button type="button" class="eal-filter-action" data-sort="desc">Highest</button>
+                      <button type="button" class="eal-filter-action" data-sort="asc">A to Z</button>
+                      <button type="button" class="eal-filter-action" data-sort="desc">Z to A</button>
                       <button type="button" class="eal-filter-action" data-clear="true">Clear</button>
                     </div>
                   </div>
@@ -250,8 +261,8 @@
                     <div class="eal-filter-menu-title">Tax Reg. No.</div>
                     <input type="text" class="form-control eal-column-filter-input" placeholder="Filter by text" />
                     <div class="eal-filter-actions">
-                      <button type="button" class="eal-filter-action" data-sort="asc">Lowest</button>
-                      <button type="button" class="eal-filter-action" data-sort="desc">Highest</button>
+                      <button type="button" class="eal-filter-action" data-sort="asc">A to Z</button>
+                      <button type="button" class="eal-filter-action" data-sort="desc">Z to A</button>
                       <button type="button" class="eal-filter-action" data-clear="true">Clear</button>
                     </div>
                   </div>
@@ -329,7 +340,7 @@
                         </a>
                       </li>
                       <li>
-                        <a class="dropdown-item" href="{% url 'iroad_tenants:tenant_client_details' %}?id={{ client.account_no|urlencode }}">
+                        <a class="dropdown-item" href="{% url 'iroad_tenants:tenant_client_details' %}?id={{ client.account_id }}">
                           <i class="bi bi-eye text-info me-2"></i>
                           View
                         </a>
@@ -371,26 +382,3 @@
       <!-- ========== END NEW TABLE UI DESIGN ========== -->
 {% endblock %}
 
-{% block extra_js %}
-<script>
-(function () {
-  var inp = document.getElementById("clientTableSearch");
-  var btn = document.getElementById("clientAccountSearchClear");
-  var listUrl = "{% url 'iroad_tenants:tenant_client_account' %}";
-  if (!inp || !btn) return;
-  function syncClear() {
-    var v = (inp.value || "").trim();
-    btn.style.display = v ? "" : "none";
-  }
-  inp.addEventListener("input", syncClear);
-  syncClear();
-  btn.addEventListener("click", function () {
-    var params = new URLSearchParams(window.location.search);
-    params.delete("q");
-    params.delete("page");
-    var qs = params.toString();
-    window.location.href = listUrl + (qs ? "?" + qs : "");
-  });
-})();
-</script>
-{% endblock %}

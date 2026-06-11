@@ -441,6 +441,7 @@ class TenantClientAttachment(models.Model):
         default=Status.DOES_NOT_EXPIRE,
     )
     attachment_file = models.FileField(upload_to=client_attachment_upload_to)
+    attachment_file_title = models.CharField(max_length=200, blank=True, default='')
     file_notes = models.TextField(blank=True, default='')
     created_by_label = models.CharField(max_length=200, blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)

@@ -10,8 +10,15 @@
   var listUrl = "{{ list_url|escapejs }}";
   var useServerQ = {% if debounce_server_q == False %}false{% else %}true{% endif %};
   if (!inp) return;
+  if (inp.getAttribute("data-eal-live-search-wired") === "1") return;
+  inp.setAttribute("data-eal-live-search-wired", "1");
   var serverTable = inp.closest("[data-eal-server-paginated='1']");
-  if (serverTable) return;
+  var paramPrefix = serverTable
+    ? serverTable.getAttribute("data-eal-param-prefix") || ""
+    : "";
+  function p(name) {
+    return paramPrefix + name;
+  }
 
   var filterEls = [];
   {% if filter_select_ids %}
@@ -25,7 +32,7 @@
 
   function hasServerQ() {
     try {
-      return new URLSearchParams(window.location.search).has("q");
+      return new URLSearchParams(window.location.search).has(p("q"));
     } catch (e) {
       return false;
     }
@@ -38,10 +45,10 @@
 
   function buildListUrl() {
     var params = new URLSearchParams(window.location.search);
-    params.delete("page");
+    params.delete(p("page"));
     var q = (inp.value || "").trim();
-    if (q) params.set("q", q);
-    else params.delete("q");
+    if (q) params.set(p("q"), q);
+    else params.delete(p("q"));
     filterEls.forEach(function (el) {
       var key = el.getAttribute("data-query-param");
       if (!key) return;
@@ -49,6 +56,12 @@
       if (!val) params.delete(key);
       else params.set(key, val);
     });
+    var tabParam = serverTable
+      ? (serverTable.getAttribute("data-eal-tab-param") || "").trim()
+      : "";
+    if (tabParam) {
+      params.set("tab", tabParam);
+    }
     var qs = params.toString();
     return listUrl + (qs ? "?" + qs : "");
   }
@@ -67,8 +80,8 @@
     btn.addEventListener("click", function () {
       if (hasServerQ()) {
         var params = new URLSearchParams(window.location.search);
-        params.delete("q");
-        params.delete("page");
+        params.delete(p("q"));
+        params.delete(p("page"));
         var qs = params.toString();
         window.location.href = listUrl + (qs ? "?" + qs : "");
         return;
@@ -86,7 +99,7 @@
       clearTimeout(debounceTimer);
       debounceTimer = setTimeout(function () {
         var v = (inp.value || "").trim();
-        var cur = new URLSearchParams(window.location.search).get("q") || "";
+        var cur = new URLSearchParams(window.location.search).get(p("q")) || "";
         if (v === cur) return;
         window.location.replace(buildListUrl());
       }, 450);

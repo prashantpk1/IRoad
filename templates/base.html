@@ -40,6 +40,7 @@
     <link rel="stylesheet" href="{% static 'css/style.css' %}" />
     <link rel="stylesheet" href="{% static 'css/dashboard.css' %}" />
     <link rel="stylesheet" href="{% static 'css/responsive.css' %}" />
+    <link rel="stylesheet" href="{% static 'css/eal-datatable-filters.css' %}" />
     {% if lang_code == 'ar' %}
     <link rel="stylesheet" href="{% static 'css/rtl.css' %}" />
     {% endif %}
@@ -213,6 +214,7 @@
 
     <script src="{% static 'js/main.js' %}"></script>
     <script src="{% static 'js/dashboard.js' %}"></script>
+    <script src="{% static 'js/eal-datatable-filters.js' %}"></script>
 
     {# Cross-tab: after login elsewhere, refresh stale /login/ tabs (CSRF rotation). #}
     {% if auth_tab_sync_bump %}

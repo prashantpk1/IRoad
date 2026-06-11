@@ -20,7 +20,7 @@
     <div class="page-header-right">
       <div class="eal-header-actions">
         <a
-          href="{% url 'iroad_tenants:tenant_roles_permissions_export' %}"
+          href="{% url 'iroad_tenants:tenant_roles_permissions_export' %}{% if request.GET %}?{{ request.GET.urlencode }}{% endif %}"
           class="eal-btn eal-btn-outline"
           download="tenant_roles_permissions_export.csv"
         >
@@ -181,29 +181,3 @@
 </style>
 {% endblock %}
 
-{% block extra_js %}
-<script>
-(function () {
-  var inp = document.getElementById("rolesPermissionsSearch");
-  var btn = document.getElementById("rolesPermissionsSearchClear");
-  if (!inp) return;
-
-  function syncClear() {
-    if (!btn) return;
-    btn.hidden = !(inp.value || "").trim();
-  }
-
-  inp.addEventListener("input", syncClear);
-  syncClear();
-
-  if (btn) {
-    btn.addEventListener("click", function () {
-      inp.value = "";
-      inp.dispatchEvent(new Event("input", { bubbles: true }));
-      syncClear();
-      inp.focus();
-    });
-  }
-})();
-</script>
-{% endblock %}

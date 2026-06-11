@@ -112,10 +112,23 @@
               <i class="bi bi-search"></i>
               <input
                 type="search"
+                id="clientContractsListSearch"
                 data-eal-global-search
                 value="{{ search_q|default:'' }}"
+                autocomplete="off"
                 placeholder="Search client contracts&hellip;"
+                aria-label="Search client contracts"
               />
+              <button
+                type="button"
+                class="eal-search-clear-btn"
+                id="clientContractsListSearchClear"
+                title="Clear search"
+                aria-label="Clear search"
+                hidden
+              >
+                <i class="bi bi-x-lg"></i>
+              </button>
             </div>
           </div>
         </div>

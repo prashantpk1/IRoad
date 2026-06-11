@@ -387,181 +387,58 @@
     });
   }
 
-  function listParamKey(paramPrefix, name) {
-    return (paramPrefix || "") + name;
-  }
-
-  function applyClientDetailsTabParam(url, root) {
-    if (!root || !url || !url.searchParams) return;
-    var tabParam = (root.getAttribute("data-eal-tab-param") || "").trim();
-    if (tabParam) {
-      url.searchParams.set("tab", tabParam);
-    }
-  }
-
-  function wireServerLiveSearch(root, globalSearchInput, searchClearBtn, paramPrefix) {
-    if (!globalSearchInput) return;
-    if (globalSearchInput.getAttribute("data-eal-live-search-wired") === "1") return;
-    globalSearchInput.setAttribute("data-eal-live-search-wired", "1");
-
-    var pfx = paramPrefix || "";
-    var listUrl =
-      (root && (root.getAttribute("data-eal-list-url") || "").trim()) ||
-      window.location.pathname;
-
-    function p(name) {
-      return listParamKey(pfx, name);
-    }
-
-    function hasServerQ() {
-      try {
-        return new URLSearchParams(window.location.search).has(p("q"));
-      } catch (e) {
-        return false;
-      }
-    }
-
-    function buildListUrl() {
-      var params = new URLSearchParams(window.location.search);
-      params.delete(p("page"));
-      var q = (globalSearchInput.value || "").trim();
-      if (q) params.set(p("q"), q);
-      else params.delete(p("q"));
-      if (root) {
-        var filterEls = root.querySelectorAll("[data-query-param]");
-        filterEls.forEach(function (el) {
-          var key = el.getAttribute("data-query-param");
-          if (!key) return;
-          var val = (el.value || "").trim();
-          if (!val) params.delete(key);
-          else params.set(key, val);
-        });
-      }
-      if (root) {
-        var tabParam = (root.getAttribute("data-eal-tab-param") || "").trim();
-        if (tabParam) params.set("tab", tabParam);
-      }
-      var qs = params.toString();
-      return listUrl + (qs ? "?" + qs : "");
-    }
-
-    function navigateList() {
-      window.location.replace(buildListUrl());
-    }
-
-    function syncClear() {
-      if (!searchClearBtn) return;
-      var value = (globalSearchInput.value || "").trim();
-      searchClearBtn.hidden = !(value || hasServerQ());
-    }
-
-    var debounceTimer;
-    globalSearchInput.addEventListener("input", function () {
-      syncClear();
-      clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(function () {
-        var v = (globalSearchInput.value || "").trim();
-        var cur = "";
-        try {
-          cur = new URLSearchParams(window.location.search).get(p("q")) || "";
-        } catch (e) {
-          cur = "";
-        }
-        if (v === cur) return;
-        navigateList();
-      }, 450);
-    });
-
-    globalSearchInput.addEventListener("keydown", function (event) {
-      if (event.key !== "Enter") return;
-      event.preventDefault();
-      clearTimeout(debounceTimer);
-      navigateList();
-    });
-
-    syncClear();
-    if ((globalSearchInput.value || "").trim() || hasServerQ()) {
-      syncClear();
-    }
-
-    if (searchClearBtn) {
-      searchClearBtn.addEventListener("click", function () {
-        if (hasServerQ()) {
-          var params = new URLSearchParams(window.location.search);
-          params.delete(p("q"));
-          params.delete(p("page"));
-          var qs = params.toString();
-          window.location.href = listUrl + (qs ? "?" + qs : "");
-          return;
-        }
-        globalSearchInput.value = "";
-        globalSearchInput.dispatchEvent(new Event("input", { bubbles: true }));
-        syncClear();
-        globalSearchInput.focus();
-      });
-    }
-  }
-
-  function navigateServerPaginatedSort(columnIndex, direction, paramPrefix, root) {
-    var p = paramPrefix || "";
+  function navigateServerPaginatedSort(columnIndex, direction) {
     var url = new URL(window.location.href);
-    url.searchParams.set(listParamKey(p, "sort_col"), String(columnIndex));
-    url.searchParams.set(listParamKey(p, "sort_dir"), direction || "asc");
-    url.searchParams.delete(listParamKey(p, "page"));
-    applyClientDetailsTabParam(url, root);
+    url.searchParams.set("sort_col", String(columnIndex));
+    url.searchParams.set("sort_dir", direction || "asc");
+    url.searchParams.delete("page");
     window.location.assign(url.toString());
   }
 
-  function clearServerPaginatedSort(columnIndex, paramPrefix) {
-    var p = paramPrefix || "";
+  function clearServerPaginatedSort(columnIndex) {
     var url = new URL(window.location.href);
-    var activeCol = url.searchParams.get(listParamKey(p, "sort_col"));
+    var activeCol = url.searchParams.get("sort_col");
     if (!activeCol || Number(activeCol) === columnIndex) {
-      url.searchParams.delete(listParamKey(p, "sort_col"));
-      url.searchParams.delete(listParamKey(p, "sort_dir"));
+      url.searchParams.delete("sort_col");
+      url.searchParams.delete("sort_dir");
     }
-    url.searchParams.delete(listParamKey(p, "page"));
+    url.searchParams.delete("page");
     window.location.assign(url.toString());
   }
 
-  function navigateServerPaginatedFilter(columnIndex, value, paramPrefix, root) {
-    var p = paramPrefix || "";
+  function navigateServerPaginatedFilter(columnIndex, value) {
     var url = new URL(window.location.href);
     var v = String(value || "").trim();
-    var filterKey = listParamKey(p, "filter_" + columnIndex);
     if (v) {
-      url.searchParams.set(filterKey, v);
+      url.searchParams.set("filter_" + columnIndex, v);
     } else {
-      url.searchParams.delete(filterKey);
+      url.searchParams.delete("filter_" + columnIndex);
     }
-    url.searchParams.delete(listParamKey(p, "page"));
-    applyClientDetailsTabParam(url, root);
+    url.searchParams.delete("page");
     window.location.assign(url.toString());
   }
 
-  function clearServerPaginatedColumn(columnIndex, paramPrefix) {
-    var p = paramPrefix || "";
+  function clearServerPaginatedColumn(columnIndex) {
     var url = new URL(window.location.href);
-    url.searchParams.delete(listParamKey(p, "filter_" + String(columnIndex)));
-    var activeCol = url.searchParams.get(listParamKey(p, "sort_col"));
+    url.searchParams.delete("filter_" + String(columnIndex));
+    var activeCol = url.searchParams.get("sort_col");
     if (activeCol && Number(activeCol) === columnIndex) {
-      url.searchParams.delete(listParamKey(p, "sort_col"));
-      url.searchParams.delete(listParamKey(p, "sort_dir"));
+      url.searchParams.delete("sort_col");
+      url.searchParams.delete("sort_dir");
     }
-    url.searchParams.delete(listParamKey(p, "page"));
+    url.searchParams.delete("page");
     window.location.assign(url.toString());
   }
 
-  function syncServerSortIndicators(filterHeaders, paramPrefix) {
-    var p = paramPrefix || "";
+  function syncServerSortIndicators(filterHeaders) {
     var params;
     try {
       params = new URLSearchParams(window.location.search);
     } catch (e) {
       return;
     }
-    var sortCol = params.get(listParamKey(p, "sort_col"));
-    var sortDir = (params.get(listParamKey(p, "sort_dir")) || "").toLowerCase();
+    var sortCol = params.get("sort_col");
+    var sortDir = (params.get("sort_dir") || "").toLowerCase();
     filterHeaders.forEach(function (header) {
       var columnIndex = String(header.getAttribute("data-column-index") || "");
       var label = header.querySelector(".eal-th-filter-label");
@@ -573,8 +450,7 @@
     });
   }
 
-  function syncServerFilterInputs(filterHeaders, paramPrefix) {
-    var p = paramPrefix || "";
+  function syncServerFilterInputs(filterHeaders) {
     var params;
     try {
       params = new URLSearchParams(window.location.search);
@@ -585,7 +461,7 @@
       var columnIndex = Number(header.getAttribute("data-column-index"));
       var input = header.querySelector(".eal-column-filter-input");
       var menuButton = header.querySelector(".eal-filter-menu-btn");
-      var val = params.get(listParamKey(p, "filter_" + columnIndex)) || "";
+      var val = params.get("filter_" + columnIndex) || "";
       if (input) input.value = val;
       if (menuButton) menuButton.classList.toggle("active", Boolean(val));
     });
@@ -595,7 +471,6 @@
     if (!root || root.getAttribute("data-eal-filter-skip") === "1") return;
 
     var serverPaginated = root.getAttribute("data-eal-server-paginated") === "1";
-    var paramPrefix = root.getAttribute("data-eal-param-prefix") || "";
     var table = root.querySelector("table.eal-table");
     if (!table) return;
     var tbody = table.querySelector("tbody");
@@ -718,14 +593,13 @@
     function serverPaginatedUrlFiltersActive() {
       try {
         var params = new URLSearchParams(window.location.search);
-        if ((params.get(listParamKey(paramPrefix, "q")) || "").trim()) {
+        if ((params.get("q") || "").trim()) {
           return true;
         }
-        var filterPrefix = listParamKey(paramPrefix, "filter_");
         var active = false;
         params.forEach(function (val, key) {
           if (active) return;
-          if (key.indexOf(filterPrefix) === 0 && (val || "").trim()) {
+          if (key.indexOf("filter_") === 0 && (val || "").trim()) {
             active = true;
           }
         });
@@ -848,32 +722,17 @@
 
     var syncSelectAllCheckboxes = initSelectAllCheckboxes(root);
 
-    var searchClearBtn = null;
-    if (globalSearchInput) {
-      if (globalSearchInput.parentElement) {
-        searchClearBtn = globalSearchInput.parentElement.querySelector(
-          ".eal-search-clear-btn"
-        );
-      }
-      if (!searchClearBtn) {
-        var searchToolbar = globalSearchInput.closest(
-          ".eal-toolbar, .client-table-toolbar"
-        );
-        if (searchToolbar) {
-          searchClearBtn = searchToolbar.querySelector(".eal-search-clear-btn");
-        }
-      }
-    }
+    var searchClearBtn =
+      globalSearchInput && globalSearchInput.parentElement
+        ? globalSearchInput.parentElement.querySelector(".eal-search-clear-btn")
+        : null;
 
     function syncGlobalSearchClearBtn() {
       if (!searchClearBtn || !globalSearchInput) return;
       var value = (globalSearchInput.value || "").trim();
       if (serverPaginated) {
         try {
-          var activeQ =
-            new URLSearchParams(window.location.search).get(
-              listParamKey(paramPrefix, "q")
-            ) || "";
+          var activeQ = new URLSearchParams(window.location.search).get("q") || "";
           searchClearBtn.hidden = !(value || activeQ);
         } catch (e) {
           searchClearBtn.hidden = !value;
@@ -885,23 +744,38 @@
 
     if (globalSearchInput) {
       if (serverPaginated) {
-        wireServerLiveSearch(root, globalSearchInput, searchClearBtn, paramPrefix);
-      } else if (globalSearchInput.getAttribute("data-eal-live-search-wired") !== "1") {
+        var globalSearchDebounce;
+        globalSearchInput.addEventListener("input", function () {
+          syncGlobalSearchClearBtn();
+          clearTimeout(globalSearchDebounce);
+          globalSearchDebounce = setTimeout(function () {
+            var url = new URL(window.location.href);
+            var v = (globalSearchInput.value || "").trim();
+            var cur = url.searchParams.get("q") || "";
+            if (v === cur) return;
+            if (v) url.searchParams.set("q", v);
+            else url.searchParams.delete("q");
+            url.searchParams.delete("page");
+            window.location.replace(url.toString());
+          }, 450);
+        });
+      } else {
         globalSearchInput.addEventListener("input", function () {
           state.globalSearch = normalizeText(globalSearchInput.value);
           syncGlobalSearchClearBtn();
           applyTableState();
         });
-        syncGlobalSearchClearBtn();
-        if (searchClearBtn) {
-          searchClearBtn.addEventListener("click", function () {
-            globalSearchInput.value = "";
-            globalSearchInput.dispatchEvent(new Event("input", { bubbles: true }));
-            syncGlobalSearchClearBtn();
-            globalSearchInput.focus();
-          });
-        }
       }
+      syncGlobalSearchClearBtn();
+    }
+
+    if (searchClearBtn && globalSearchInput) {
+      searchClearBtn.addEventListener("click", function () {
+        globalSearchInput.value = "";
+        globalSearchInput.dispatchEvent(new Event("input", { bubbles: true }));
+        syncGlobalSearchClearBtn();
+        globalSearchInput.focus();
+      });
     }
 
     if (chipGroup && (chipRowPrimaryAttr || !isNaN(chipColumn))) {
@@ -978,8 +852,7 @@
             params = null;
           }
           if (params) {
-            var initialVal =
-              params.get(listParamKey(paramPrefix, "filter_" + columnIndex)) || "";
+            var initialVal = params.get("filter_" + columnIndex) || "";
             if (initialVal) input.value = initialVal;
           }
           input.addEventListener("input", function () {
@@ -989,14 +862,14 @@
               try {
                 urlVal =
                   new URLSearchParams(window.location.search).get(
-                    listParamKey(paramPrefix, "filter_" + columnIndex)
+                    "filter_" + columnIndex
                   ) || "";
               } catch (e) {
                 urlVal = "";
               }
               var nextVal = (input.value || "").trim();
               if (nextVal === urlVal) return;
-              navigateServerPaginatedFilter(columnIndex, nextVal, paramPrefix, root);
+              navigateServerPaginatedFilter(columnIndex, nextVal);
             }, 450);
           });
         } else {
@@ -1011,7 +884,7 @@
         button.addEventListener("click", function () {
           var direction = button.getAttribute("data-sort");
           if (serverPaginated) {
-            navigateServerPaginatedSort(columnIndex, direction, paramPrefix, root);
+            navigateServerPaginatedSort(columnIndex, direction);
             return;
           }
           state.sort.columnIndex = columnIndex;
@@ -1026,7 +899,7 @@
       Array.prototype.slice.call(menu.querySelectorAll("[data-clear]")).forEach(function (button) {
         button.addEventListener("click", function () {
           if (serverPaginated) {
-            clearServerPaginatedColumn(columnIndex, paramPrefix);
+            clearServerPaginatedColumn(columnIndex);
             return;
           }
           if (input) input.value = "";
@@ -1078,8 +951,8 @@
     }
 
     if (serverPaginated) {
-      syncServerFilterInputs(filterHeaders, paramPrefix);
-      syncServerSortIndicators(filterHeaders, paramPrefix);
+      syncServerFilterInputs(filterHeaders);
+      syncServerSortIndicators(filterHeaders);
     } else {
       applyTableState();
     }

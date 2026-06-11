@@ -68,8 +68,19 @@ def apply_premium_styling(form):
 
 
 class LoginForm(forms.Form):
-    email = forms.EmailField(max_length=100)
-    password = forms.CharField(widget=forms.PasswordInput)
+    email = forms.EmailField(
+        max_length=100,
+        error_messages={
+            'required': 'Please enter your email address.',
+            'invalid': 'Please enter a valid email address.',
+        },
+    )
+    password = forms.CharField(
+        widget=forms.PasswordInput,
+        error_messages={
+            'required': 'Please enter your password.',
+        },
+    )
 
 
 class OTPVerificationForm(forms.Form):
@@ -100,6 +111,10 @@ class OTPVerificationForm(forms.Form):
 class ForgotPasswordForm(forms.Form):
     email = forms.EmailField(
         max_length=100,
+        error_messages={
+            'required': 'Please enter your email address.',
+            'invalid': 'Please enter a valid email address.',
+        },
         widget=forms.EmailInput(
             attrs={
                 'class': 'auth-input',
@@ -114,6 +129,9 @@ class ForgotPasswordForm(forms.Form):
 class SetPasswordForm(forms.Form):
     password = forms.CharField(
         label='New Password',
+        error_messages={
+            'required': 'Please enter a new password.',
+        },
         widget=forms.PasswordInput(
             attrs={
                 'autocomplete': 'new-password',
@@ -124,6 +142,9 @@ class SetPasswordForm(forms.Form):
     )
     password_confirm = forms.CharField(
         label='Confirm Password',
+        error_messages={
+            'required': 'Please confirm your password.',
+        },
         widget=forms.PasswordInput(
             attrs={
                 'autocomplete': 'new-password',
@@ -152,7 +173,7 @@ class SetPasswordForm(forms.Form):
         p1 = cleaned.get('password')
         p2 = cleaned.get('password_confirm')
         if p1 and p2 and p1 != p2:
-            raise ValidationError('Passwords do not match.')
+            self.add_error('password_confirm', 'Passwords do not match.')
         return cleaned
 
 class RoleForm(forms.ModelForm):

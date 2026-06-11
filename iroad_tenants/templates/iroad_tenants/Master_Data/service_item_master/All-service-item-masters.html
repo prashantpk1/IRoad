@@ -1212,25 +1212,6 @@
 {% block extra_js %}
 <script>
 (function () {
-  var inp = document.getElementById("serviceItemMasterSearch");
-  var btn = document.getElementById("serviceItemMasterSearchClear");
-  if (inp && btn) {
-    function syncClear() {
-      btn.hidden = !(inp.value || "").trim();
-    }
-    inp.addEventListener("input", syncClear);
-    syncClear();
-    if ((inp.value || "").trim()) {
-      inp.dispatchEvent(new Event("input", { bubbles: true }));
-    }
-    btn.addEventListener("click", function () {
-      inp.value = "";
-      inp.dispatchEvent(new Event("input", { bubbles: true }));
-      syncClear();
-      inp.focus();
-    });
-  }
-
   var chipGroup = document.getElementById("serviceItemChipGroup");
   var tableCard = document.querySelector("[data-eal-filterable-table]");
   if (chipGroup && tableCard) {

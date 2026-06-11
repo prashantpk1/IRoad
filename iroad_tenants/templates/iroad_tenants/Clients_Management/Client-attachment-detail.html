@@ -168,6 +168,14 @@
         </h3>
         <div class="fields-grid cols-2">
           <div class="field">
+            <label class="form-label">File title</label>
+            <div class="view-field-box">
+              <p class="view-value {% if not attachment.attachment_file_title %}empty{% endif %}">
+                {{ attachment.attachment_file_title|default:"—" }}
+              </p>
+            </div>
+          </div>
+          <div class="field">
             <label class="form-label">File name</label>
             <div class="view-field-box">
               <p class="view-value {% if not attachment.file_name %}empty{% endif %}">

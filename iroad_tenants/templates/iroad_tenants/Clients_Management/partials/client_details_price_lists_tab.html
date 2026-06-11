@@ -1,0 +1,57 @@
+{% if client_account and client_price_lists_tab %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="m-0" style="font-size: 1.1rem; font-weight: 600; color: #1a1a1a">Price Lists</h4>
+  <a href="{% url 'iroad_tenants:tenant_price_list_master_create' %}" class="btn btn-primary btn-sm">
+    <i class="bi bi-plus-lg"></i> Add Price List
+  </a>
+</div>
+<div class="eal-table-card">
+  <div class="eal-table-wrap">
+    <table class="eal-table mb-0">
+      <thead>
+        <tr>
+          <th>Code</th>
+          <th>Name</th>
+          <th>Currency</th>
+          <th>Status</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for pl in client_price_lists_tab.items %}
+        <tr>
+          <td><span class="eal-entity-id">{{ pl.price_list_code }}</span></td>
+          <td>{{ pl.price_list_name }}</td>
+          <td>{{ pl.base_currency|default:"SAR" }}</td>
+          <td>
+            {% if pl.status == 'Active' %}
+            <span class="status-badge active" style="background:#e6f8ef;color:#0d894f">Active</span>
+            {% elif pl.status == 'Inactive' %}
+            <span class="status-badge inactive" style="background:#f1f5f9;color:#64748b">Inactive</span>
+            {% else %}
+            <span class="status-badge pending" style="background:#fff8e6;color:#b45309">Draft</span>
+            {% endif %}
+          </td>
+          <td>
+            <div class="eal-actions-cell">
+              <a href="{{ pl.list_edit_url }}" class="eal-row-btn" title="Edit"><i class="bi bi-pencil"></i></a>
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="5" class="text-center text-muted py-4">No price lists for this client yet.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% with tab=client_price_lists_tab %}
+  {% include 'iroad_tenants/partials/eal_list_pagination.html' with page_obj=tab.page pagination_start=tab.pagination_start pagination_end=tab.pagination_end pagination_total=tab.pagination_total pagination_prev_url=tab.pagination_prev_url pagination_next_url=tab.pagination_next_url pagination_page_links=tab.pagination_page_links pagination_label='price lists' %}
+  {% endwith %}
+</div>
+{% elif client_account %}
+<p class="text-muted mb-0">No price lists for this client yet. Use <strong>Add Price List</strong> to create one.</p>
+{% else %}
+<p class="text-muted mb-0">Open client details from the account list to view and add price lists.</p>
+{% endif %}

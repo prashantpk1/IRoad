@@ -344,7 +344,7 @@
               <div class="ch-contact-icon">
                 <i class="bi bi-envelope"></i>
               </div>
-              <div class="ch-contact-text" id="cdHeaderEmail">{% if primary_contact %}{{ primary_contact.email|default:"—" }}{% else %}—{% endif %}</div>
+              <div class="ch-contact-text" id="cdHeaderEmail">{{ header_contact_email|default:"—" }}</div>
               <button type="button" class="ch-contact-copy" title="Copy Email" aria-label="Copy email">
                 <i class="bi bi-files"></i>
               </button>
@@ -353,7 +353,7 @@
               <div class="ch-contact-icon">
                 <i class="bi bi-telephone"></i>
               </div>
-              <div class="ch-contact-text" id="cdHeaderPhone">{% if primary_contact %}{{ primary_contact.mobile_number|default:primary_contact.telephone_number|default:"—" }}{% else %}—{% endif %}</div>
+              <div class="ch-contact-text" id="cdHeaderPhone">{{ header_contact_phone|default:"—" }}</div>
               <button type="button" class="ch-contact-copy" title="Copy Phone" aria-label="Copy phone">
                 <i class="bi bi-files"></i>
               </button>
@@ -367,7 +367,7 @@
           <a href="{% url 'iroad_tenants:tenant_client_account_edit' client_account.account_no %}" class="ch-action-btn">
             <i class="bi bi-pencil"></i> Edit
           </a>
-          <a href="{% url 'iroad_tenants:tenant_client_sales_report' client_account.account_no %}" class="ch-action-btn">
+          <a href="{% url 'iroad_tenants:sales_invoice_report_create' %}?client={{ client_account.account_id }}&amp;account={{ client_account.account_no|urlencode }}&amp;return_to=details" class="ch-action-btn">
             <i class="bi bi-file-earmark-text"></i> Create Sales Report
           </a>
           <a href="{% url 'iroad_tenants:tenant_client_contacts_create' %}?account={{ client_account.account_no|urlencode }}&amp;return_to=details" class="ch-action-btn">
@@ -571,155 +571,8 @@
               </div>
             </div>
 
-            <!-- Addresses mapping (pane-addresses) -->
-            <style>
-              .cd-details-section
-                .cd-details-header[data-bs-toggle="collapse"] {
-                cursor: pointer;
-                user-select: none;
-                transition:
-                  background-color 0.2s ease,
-                  border-color 0.2s ease;
-              }
-              .cd-details-section
-                .cd-details-header[data-bs-toggle="collapse"]:hover {
-                background-color: #f8fafc;
-              }
-              .cd-details-section .collapse-icon {
-                transition: transform 0.3s ease;
-              }
-              .cd-details-section .cd-details-header.collapsed .collapse-icon {
-                transform: rotate(-90deg);
-              }
-            </style>
             <div class="tab-pane fade" id="pane-addresses" role="tabpanel">
-              {% if client_account %}
-              <div class="d-flex justify-content-between align-items-center mb-3">
-                <h4 class="m-0" style="font-size: 1.1rem; font-weight: 600; color: #1a1a1a">Client Addresses</h4>
-                <a href="{% url 'iroad_tenants:tenant_address_master_create' %}?client={{ client_account.account_id }}&amp;return_to=details" class="btn btn-primary btn-sm">
-                  <i class="bi bi-plus-lg"></i> Add Address
-                </a>
-              </div>
-
-              {% for addr in client_addresses %}
-              <div class="cd-details-section {% if not forloop.last %}mb-4{% endif %}">
-                <div class="cd-details-header d-flex justify-content-between align-items-center{% if not forloop.first %} collapsed{% endif %}" data-bs-toggle="collapse" href="#addrCollapse{{ addr.address_id }}" role="button" aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}" aria-controls="addrCollapse{{ addr.address_id }}">
-                  <div class="d-flex align-items-center gap-2 flex-wrap">
-                    <i class="bi bi-chevron-down collapse-icon me-1 text-muted"{% if not forloop.first %} style="transform: rotate(-90deg);"{% endif %}></i>
-                    {% if addr.address_category == 'Pickup Address' %}
-                    <span class="eal-type-badge ind" style="background:#eef2ff;color:#4f46e5;font-size:0.75rem;padding:4px 8px;border-radius:4px;"><i class="bi bi-box-arrow-up"></i> Pickup</span>
-                    {% elif addr.address_category == 'Delivery Address' %}
-                    <span class="eal-type-badge ind" style="background:#eef2ff;color:#4f46e5;font-size:0.75rem;padding:4px 8px;border-radius:4px;"><i class="bi bi-box-arrow-in-down"></i> Delivery</span>
-                    {% else %}
-                    <span class="eal-type-badge ind" style="background:#f0fdf4;color:#15803d;font-size:0.75rem;padding:4px 8px;border-radius:4px;"><i class="bi bi-arrows-expand"></i> Both</span>
-                    {% endif %}
-                    <span style="font-weight: 600; color: #1a1a1a">{{ addr.display_name }} ({{ addr.address_code }})</span>
-                    {% if addr.status == 'Inactive' %}
-                    <span class="badge bg-secondary" style="font-size:0.7rem;">Inactive</span>
-                    {% endif %}
-                  </div>
-                  <div class="eal-actions-cell pt-0 pb-0" onclick="event.stopPropagation()">
-                    <a href="{{ addr.list_edit_url }}" class="eal-row-btn text-decoration-none" title="Edit"><i class="bi bi-pencil"></i></a>
-                  </div>
-                </div>
-                <div class="collapse{% if forloop.first %} show{% endif %}" id="addrCollapse{{ addr.address_id }}">
-                  <div class="cd-details-body" style="padding: 20px;">
-                    <div class="cd-grid-row">
-                      <div class="cd-field">
-                        <span class="cd-field-label">Address Code</span>
-                        <span class="cd-field-value"><a href="{{ addr.list_edit_url }}" class="text-decoration-none">{{ addr.address_code }}</a></span>
-                      </div>
-                      <div class="cd-field">
-                        <span class="cd-field-label">Linked Client</span>
-                        <span class="cd-field-value">{{ client_account.account_no }} — {{ client_account.display_name }}</span>
-                      </div>
-                    </div>
-                    <div class="cd-grid-row">
-                      <div class="cd-field">
-                        <span class="cd-field-label">Category</span>
-                        <span class="cd-field-value">{{ addr.address_category }}</span>
-                      </div>
-                      <div class="cd-field">
-                        <span class="cd-field-label">Defaults</span>
-                        <span class="cd-field-value">
-                          {% if addr.default_pickup_address %}<span class="badge bg-light text-dark border me-1">Default pickup</span>{% endif %}
-                          {% if addr.default_delivery_address %}<span class="badge bg-light text-dark border">Default delivery</span>{% endif %}
-                          {% if not addr.default_pickup_address and not addr.default_delivery_address %}<span class="text-muted">—</span>{% endif %}
-                        </span>
-                      </div>
-                    </div>
-                    <div class="cd-grid-row">
-                      <div class="cd-field">
-                        <span class="cd-field-label">Labels (EN / AR)</span>
-                        <span class="cd-field-value">{% if addr.english_label or addr.arabic_label %}{{ addr.english_label|default:"—" }} / {{ addr.arabic_label|default:"—" }}{% else %}<span class="text-muted">—</span>{% endif %}</span>
-                      </div>
-                      <div class="cd-field">
-                        <span class="cd-field-label">Country / Province / City</span>
-                        <span class="cd-field-value">{% if addr.country %}{{ addr.country.name_en }}{% else %}—{% endif %} / {{ addr.province|default:"—" }} / {{ addr.city|default:"—" }}</span>
-                      </div>
-                    </div>
-                    <div class="cd-grid-row">
-                      <div class="cd-field">
-                        <span class="cd-field-label">District / Street / Building</span>
-                        <span class="cd-field-value">{{ addr.district|default:"—" }} / {{ addr.street|default:"—" }} / {{ addr.building_no|default:"—" }}</span>
-                      </div>
-                      <div class="cd-field">
-                        <span class="cd-field-label">Postal code</span>
-                        <span class="cd-field-value">{{ addr.postal_code|default:"—" }}</span>
-                      </div>
-                    </div>
-                    <div class="cd-grid-row">
-                      <div class="cd-field" style="grid-column: 1 / -1;">
-                        <span class="cd-field-label">Address lines</span>
-                        <span class="cd-field-value">{{ addr.address_line_1 }}{% if addr.address_line_2 %}<br />{{ addr.address_line_2 }}{% endif %}</span>
-                      </div>
-                    </div>
-                    {% if addr.map_link %}
-                    <div class="cd-grid-row">
-                      <div class="cd-field" style="grid-column: 1 / -1;">
-                        <span class="cd-field-label">Map</span>
-                        <span class="cd-field-value"><a href="{{ addr.map_link }}" target="_blank" rel="noopener" class="text-decoration-none"><i class="bi bi-link-45deg"></i> Open map link</a></span>
-                      </div>
-                    </div>
-                    {% endif %}
-                    {% if addr.site_instructions %}
-                    <div class="cd-grid-row">
-                      <div class="cd-field" style="grid-column: 1 / -1;">
-                        <span class="cd-field-label">Site instructions</span>
-                        <span class="cd-field-value" style="font-size: 0.9rem; color: #4a4a4a;">{{ addr.site_instructions|linebreaksbr }}</span>
-                      </div>
-                    </div>
-                    {% endif %}
-                    <div class="cd-grid-row" style="border-bottom: none; margin-bottom: 0; padding-bottom: 0;">
-                      <div class="col-12">
-                        <h5 style="font-size: 0.95rem; font-weight: 600; margin: 16px 0 12px;"><i class="bi bi-telephone text-danger"></i> Contact at site</h5>
-                      </div>
-                      <div class="cd-field">
-                        <span class="cd-field-label">Contact name</span>
-                        <span class="cd-field-value">{{ addr.contact_name|default:"—" }}{% if addr.position %} ({{ addr.position }}){% endif %}</span>
-                      </div>
-                      <div class="cd-field">
-                        <span class="cd-field-label">Email</span>
-                        <span class="cd-field-value">{{ addr.email|default:"—" }}</span>
-                      </div>
-                      <div class="cd-field">
-                        <span class="cd-field-label">Phone</span>
-                        <span class="cd-field-value">{% if addr.phone_no %}{{ addr.phone_no }}{% else %}—{% endif %}</span>
-                      </div>
-                      <div class="cd-field">
-                        <span class="cd-field-label">Mobile / WhatsApp</span>
-                        <span class="cd-field-value">{% if addr.mobile_no_1 %}{{ addr.mobile_no_1 }}{% else %}—{% endif %} / {{ addr.whatsapp_no|default:"—" }}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              {% empty %}
-              <p class="text-muted mb-0">No addresses yet for this client. Use <strong>Add Address</strong> to create one in Address Master (linked to this account).</p>
-              {% endfor %}
-              {% else %}
-              <p class="text-muted mb-0">Open a client from the client list to view or add addresses.</p>
-              {% endif %}
+              {% include 'iroad_tenants/Clients_Management/partials/client_details_addresses_tab.html' %}
             </div>
 
             <!-- Contracts: one row per account (TenantClientContract.client_account is OneToOne) -->
@@ -754,40 +607,11 @@
                     <span style="font-weight: 600; color: #1a1a1a">Contract #{{ client_contract.contract_no }}</span>
                   </div>
                   <div class="eal-actions-cell pt-0 pb-0" onclick="event.stopPropagation()">
-                    <div class="dropdown" data-bs-display="static">
-                      <button class="eal-row-btn" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Actions">
-                        <i class="bi bi-three-dots-vertical"></i>
-                      </button>
-                      <ul class="dropdown-menu dropdown-menu-end shadow-sm" style="border-radius: 8px; border-color: #e2e8f0; min-width: 180px;">
-                        <li>
-                          <a class="dropdown-item" href="{{ client_contract.list_edit_url }}">
-                            <i class="bi bi-pencil text-primary me-2"></i>Edit
-                          </a>
-                        </li>
-                        <li>
-                          <a class="dropdown-item" href="{{ client_contract.list_detail_url }}">
-                            <i class="bi bi-eye text-info me-2"></i>View
-                          </a>
-                        </li>
-                        {% if client_contract.contract_attachment %}
-                        <li>
-                          <a class="dropdown-item" href="{{ client_contract.contract_attachment.url }}" target="_blank" rel="noopener">
-                            <i class="bi bi-box-arrow-up-right me-2"></i>Open file
-                          </a>
-                        </li>
-                        {% endif %}
-                        <li><hr class="dropdown-divider" /></li>
-                        <li>
-                          <form method="post" action="{{ client_contract.list_delete_action_url }}" class="d-inline" onsubmit="return confirm('Delete contract {{ client_contract.contract_no|escapejs }}? This cannot be undone.');">
-                            {% csrf_token %}
-                            
-                            <button type="submit" class="dropdown-item text-danger">
-                              <i class="bi bi-trash3 me-2"></i>Delete
-                            </button>
-                          </form>
-                        </li>
-                      </ul>
-                    </div>
+                    <a
+                      href="{{ client_contract.list_edit_url }}"
+                      class="eal-row-btn"
+                      title="Edit"
+                    ><i class="bi bi-pencil"></i></a>
                   </div>
                 </div>
                 <div class="collapse show" id="contractCollapse{{ client_contract.contract_id }}">
@@ -930,186 +754,17 @@
 
             <!-- Attachments Pane -->
             <div class="tab-pane fade" id="pane-attachments" role="tabpanel">
-              <div class="d-flex justify-content-between align-items-center mb-3">
-                <h4 class="m-0" style="font-size: 1.1rem; font-weight: 600; color: #1a1a1a">Attachments & Documents</h4>
-                {% if client_account %}
-                <a href="{% url 'iroad_tenants:tenant_client_attachments' %}?account={{ client_account.account_no|urlencode }}&amp;return_to=details" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Upload File</a>
-                {% else %}
-                <a href="{% url 'iroad_tenants:tenant_client_attachments' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Upload File</a>
-                {% endif %}
-              </div>
-              <div class="eal-table-card mt-0">
-                  <div class="eal-table-wrap" style="border: none; box-shadow: none;">
-                    <table class="eal-table mb-0">
-                      <thead>
-                        <tr>
-                          <th>Title</th>
-                          <th>Date</th>
-                          <th>Expiry Date</th>
-                          <th>Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {% if client_account %}
-                          {% for a in client_attachments %}
-                          <tr>
-                            <td>
-                              {% with fn=a.file_name|lower %}
-                              {% if ".pdf" in fn %}<i class="bi bi-file-earmark-pdf text-danger mx-1"></i>
-                              {% elif ".png" in fn or ".jpg" in fn or ".jpeg" in fn or ".gif" in fn %}<i class="bi bi-file-earmark-image text-primary mx-1"></i>
-                              {% else %}<i class="bi bi-file-earmark mx-1"></i>{% endif %}
-                              {% endwith %}
-                              {% if a.attachment_file %}<a href="{{ a.attachment_file.url }}" target="_blank" rel="noopener">{{ a.file_name|default:"Attachment" }}</a>{% else %}{{ a.file_name|default:"—" }}{% endif %}
-                            </td>
-                            <td>{{ a.attachment_date|date:"j M Y" }}</td>
-                            <td>{% if a.expiry_date %}{{ a.expiry_date|date:"j M Y" }}{% else %}—{% endif %}</td>
-                            <td>
-                              {% if a.computed_status == 'Expired' %}
-                              <span class="status-badge expired" style="background:#fdecec;color:#c62828">Expired</span>
-                              {% else %}
-                              <span class="status-badge active" style="background:#e6f8ef;color:#0d894f">{% if a.computed_status == 'Does Not Expire' %}Active{% else %}{{ a.computed_status }}{% endif %}</span>
-                              {% endif %}
-                            </td>
-                          </tr>
-                          {% empty %}
-                          <tr>
-                            <td colspan="4" class="text-muted">No attachments yet. Use Upload File to add one.</td>
-                          </tr>
-                          {% endfor %}
-                        {% else %}
-                          <tr>
-                            <td colspan="4" class="text-muted">Open this page from the client list with a saved account ID to view and upload attachments for that client.</td>
-                          </tr>
-                        {% endif %}
-                      </tbody>
-                    </table>
-                  </div>
-              </div>
+              {% include 'iroad_tenants/Clients_Management/partials/client_details_attachments_tab.html' %}
             </div>
 
-            <!-- Price Lists Pane -->
+                        <!-- Price Lists Pane -->
             <div class="tab-pane fade" id="pane-price-lists" role="tabpanel">
-              <div class="d-flex justify-content-between align-items-center mb-3">
-                <h4 class="m-0" style="font-size: 1.1rem; font-weight: 600; color: #1a1a1a">Price Lists</h4>
-                {% if client_account %}
-                <a href="{% url 'iroad_tenants:tenant_price_list_master_create' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Add Price List</a>
-                {% else %}
-                <a href="{% url 'iroad_tenants:tenant_price_list_master_create' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Add Price List</a>
-                {% endif %}
-              </div>
-              <div class="eal-table-card mt-0">
-                <div class="eal-table-wrap" style="border: none; box-shadow: none;">
-                  <table class="eal-table mb-0">
-                    <thead>
-                      <tr>
-                        <th>Code</th>
-                        <th>Name</th>
-                        <th>Currency</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {% if client_account %}
-                      {% for pl in client_price_lists %}
-                      <tr>
-                        <td><span class="eal-entity-id">{{ pl.price_list_code }}</span></td>
-                        <td>{{ pl.price_list_name }}</td>
-                        <td>{{ pl.base_currency|default:"SAR" }}</td>
-                        <td>
-                          <span class="status-badge {% if pl.status == 'Active' %}active{% elif pl.status == 'Inactive' %}inactive{% else %}pending{% endif %}">
-                            {{ pl.status }}
-                          </span>
-                        </td>
-                        <td>
-                          <div class="eal-actions-cell">
-                            <a class="eal-row-btn" href="{{ pl.list_detail_url }}" title="View" aria-label="View">
-                              <i class="bi bi-eye"></i>
-                            </a>
-                            <a class="eal-row-btn" href="{{ pl.list_edit_url }}" title="Edit" aria-label="Edit">
-                              <i class="bi bi-pencil"></i>
-                            </a>
-                          </div>
-                        </td>
-                      </tr>
-                      {% empty %}
-                      <tr>
-                        <td colspan="5" class="text-muted">No price lists for this client yet. Use <strong>Add Price List</strong> to create one.</td>
-                      </tr>
-                      {% endfor %}
-                      {% else %}
-                      <tr>
-                        <td colspan="5" class="text-muted">Open this page from the client list to view and add price lists for that client.</td>
-                      </tr>
-                      {% endif %}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+              {% include 'iroad_tenants/Clients_Management/partials/client_details_price_lists_tab.html' %}
             </div>
 
-            <!-- Cargo Pane -->
+                        <!-- Cargo Pane -->
             <div class="tab-pane fade" id="pane-cargo" role="tabpanel">
-              <div class="d-flex justify-content-between align-items-center mb-3">
-                <h4 class="m-0" style="font-size: 1.1rem; font-weight: 600; color: #1a1a1a">Assigned Cargo Typologies</h4>
-                {% if client_account %}
-                <a href="{% url 'iroad_tenants:tenant_cargo_master_create' %}?client={{ client_account.account_id }}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Register Cargo</a>
-                {% endif %}
-              </div>
-              <div
-                class="eal-table-card mt-0"
-                data-eal-filterable-table
-                data-eal-empty-colspan="7"
-                data-eal-empty-filter-message="No cargo matches the selected filters."
-              >
-                <div class="eal-table-wrap" style="border: none; box-shadow: none;">
-                  <table class="eal-table mb-0">
-                    <thead>
-                      <tr>
-                        <th>Code</th>
-                        <th>Cargo Name</th>
-                        <th>Category</th>
-                        <th>Unit</th>
-                        <th>Weight (kg)</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {% for cargo in client_cargo_masters %}
-                      <tr>
-                        <td><span class="eal-entity-id">{{ cargo.cargo_code }}</span></td>
-                        <td>{{ cargo.display_name }}</td>
-                        <td>{{ cargo.cargo_category.name_english }}</td>
-                        <td>{{ cargo.uom|default:"—" }}</td>
-                        <td>{% if cargo.weight_per_unit is not None %}{{ cargo.weight_per_unit|floatformat:3 }}{% else %}—{% endif %}</td>
-                        <td>
-                          {% if cargo.status == 'Active' %}
-                          <span class="status-badge active" style="background:#e6f8ef;color:#0d894f">Active</span>
-                          {% else %}
-                          <span class="status-badge inactive" style="background:#f1f5f9;color:#64748b">Inactive</span>
-                          {% endif %}
-                        </td>
-                        <td>
-                          <div class="eal-actions-cell">
-                            <a class="eal-row-btn" href="{{ cargo.list_detail_url }}" title="View" aria-label="View">
-                              <i class="bi bi-eye"></i>
-                            </a>
-                            <a class="eal-row-btn" href="{{ cargo.list_edit_url }}" title="Edit" aria-label="Edit">
-                              <i class="bi bi-pencil"></i>
-                            </a>
-                          </div>
-                        </td>
-                      </tr>
-                      {% empty %}
-                      <tr>
-                        <td colspan="7" class="text-center text-muted py-4">No cargo registered for this client yet.</td>
-                      </tr>
-                      {% endfor %}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+              {% include 'iroad_tenants/Clients_Management/partials/client_details_cargo_tab.html' %}
             </div>
           </div>
         </div>
@@ -1270,8 +925,8 @@
           setText("cdAccountNo", client.account_no);
           setText("cdClientType", displayClientType(client.client_type));
           setText("cdStatus", client.status);
-          setTextIfPresent("cdHeaderEmail", client.header_email);
-          setTextIfPresent("cdHeaderPhone", client.header_phone);
+          setText("cdHeaderEmail", client.header_email);
+          setText("cdHeaderPhone", client.header_phone);
 
           setText("v_account_no", client.account_no);
           setText("v_created_at", client.created_at);
@@ -1338,6 +993,29 @@
           if (!tabBtn || !window.bootstrap || !bootstrap.Tab) return;
           bootstrap.Tab.getOrCreateInstance(tabBtn).show();
         })();
+
+        var tabTargetToKey = {
+          "#pane-overview": "overview",
+          "#pane-contacts": "contacts",
+          "#pane-attachments": "attachments",
+          "#pane-addresses": "addresses",
+          "#pane-contracts": "contracts",
+          "#pane-price-lists": "price-lists",
+          "#pane-cargo": "cargo",
+        };
+        document.querySelectorAll(".cd-tab[data-bs-target]").forEach(function (btn) {
+          btn.addEventListener("shown.bs.tab", function () {
+            var target = btn.getAttribute("data-bs-target") || "";
+            var tabKey = tabTargetToKey[target];
+            if (!tabKey) return;
+            try {
+              var url = new URL(window.location.href);
+              url.searchParams.set("tab", tabKey);
+              window.history.replaceState({}, "", url.toString());
+            } catch (e) {}
+          });
+        });
+
       })();
     </script>
 {% endblock %}

@@ -104,6 +104,24 @@
         color: #991b1b;
       }
       .auth-alert-error i { color: #ef4444; font-size: 18px; }
+      .auth-input.is-invalid {
+        border-color: #ef4444;
+        box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.12);
+      }
+      .auth-input-wrapper.is-invalid > i:first-child {
+        color: #ef4444;
+      }
+      .auth-field-error {
+        display: none;
+        margin-top: 6px;
+        font-size: 13px;
+        line-height: 1.4;
+        color: #dc2626;
+        font-weight: 500;
+      }
+      .auth-field-error.is-visible {
+        display: block;
+      }
 
     </style>
   </head>
@@ -135,7 +153,7 @@
             <p class="auth-subtitle">Please enter your details to sign in</p>
           </div>
 
-          <form class="auth-form" method="post" action="{% url 'login' %}">
+          <form class="auth-form" method="post" action="{% url 'login' %}" novalidate>
             {% csrf_token %}
 
             {% if messages %}
@@ -151,29 +169,20 @@
             </div>
             {% endif %}
 
-            {% if form.errors or error or is_locked or attempts_remaining %}
+            {% if error or form.non_field_errors %}
             <div class="auth-field">
-              {% if error or form.errors %}
               <div class="auth-alert auth-alert-error" style="margin-bottom: 15px;">
                 <i class="bi bi-exclamation-circle"></i>
                 <div class="auth-alert-content">
                   {% if error %}
                   <p class="auth-text">{{ error }}</p>
                   {% endif %}
-                  {% if form.non_field_errors %}
-                    {% for error in form.non_field_errors %}
-                    <p class="auth-text">{{ error }}</p>
-                    {% endfor %}
-                  {% endif %}
-                  {% for field in form %}
-                    {% for error in field.errors %}
-                    <p class="auth-text">{{ error }}</p>
-                    {% endfor %}
+                  {% for err in form.non_field_errors %}
+                  <p class="auth-text">{{ err }}</p>
                   {% endfor %}
                 </div>
               </div>
             </div>
-            {% endif %}
             {% endif %}
 
             <!-- Security Context Section -->
@@ -206,30 +215,47 @@
             <!-- Email Field -->
             <div class="auth-field">
               <label for="email" class="auth-label">Email Address</label>
-              <div class="auth-input-wrapper">
+              <div
+                class="auth-input-wrapper{% if form.email.errors %} is-invalid{% endif %}"
+                id="email-input-wrapper"
+              >
                 <i class="bi bi-envelope"></i>
                 <input
                   type="email"
                   id="email"
                   name="email"
-                  class="auth-input"
+                  class="auth-input{% if form.email.errors %} is-invalid{% endif %}"
                   autocomplete="email"
                   value="{{ form.email.value|default:'' }}"
+                  aria-describedby="email-error"
+                  aria-invalid="{% if form.email.errors %}true{% else %}false{% endif %}"
                 />
               </div>
+              <p
+                id="email-error"
+                class="auth-field-error{% if form.email.errors %} is-visible{% endif %}"
+                role="alert"
+              >
+                {% if form.email.errors %}{{ form.email.errors.0 }}{% endif %}
+              </p>
             </div>
 
             <!-- Password Field -->
             <div class="auth-field">
               <label for="password" class="auth-label">Password</label>
-              <div class="auth-input-wrapper">
+              <div
+                class="auth-input-wrapper{% if form.password.errors %} is-invalid{% endif %}"
+                id="password-input-wrapper"
+              >
                 <i class="bi bi-lock"></i>
                 <input
                   type="password"
                   id="password"
                   name="password"
-                  class="auth-input"
+                  class="auth-input{% if form.password.errors %} is-invalid{% endif %}"
                   autocomplete="current-password"
+                  aria-describedby="password-error"
+                  aria-invalid="{% if form.password.errors %}true{% else %}false{% endif %}"
                 />
                 <button
                   type="button"
@@ -240,6 +266,13 @@
                   <i class="bi bi-eye" id="toggleIcon"></i>
                 </button>
               </div>
+              <p
+                id="password-error"
+                class="auth-field-error{% if form.password.errors %} is-visible{% endif %}"
+                role="alert"
+              >
+                {% if form.password.errors %}{{ form.password.errors.0 }}{% endif %}
+              </p>
             </div>
 
             <!-- Forgot Password Link -->
@@ -414,30 +447,93 @@
           }
         });
 
+        function isValidEmail(value) {
+          return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+        }
+
+        function setFieldError(inputId, message) {
+          const input = document.getElementById(inputId);
+          const errorEl = document.getElementById(inputId + "-error");
+          const wrapper = document.getElementById(inputId + "-input-wrapper");
+          if (!input || !errorEl) return;
+          if (message) {
+            input.classList.add("is-invalid");
+            input.setAttribute("aria-invalid", "true");
+            if (wrapper) wrapper.classList.add("is-invalid");
+            errorEl.textContent = message;
+            errorEl.classList.add("is-visible");
+          } else {
+            input.classList.remove("is-invalid");
+            input.setAttribute("aria-invalid", "false");
+            if (wrapper) wrapper.classList.remove("is-invalid");
+            errorEl.textContent = "";
+            errorEl.classList.remove("is-visible");
+          }
+        }
+
+        function validateLoginForm() {
+          const emailInput = document.getElementById("email");
+          const passwordInput = document.getElementById("password");
+          const email = (emailInput && emailInput.value || "").trim();
+          const password = passwordInput ? passwordInput.value : "";
+          let valid = true;
+
+          setFieldError("email", "");
+          setFieldError("password", "");
+
+          if (!email) {
+            setFieldError("email", "Please enter your email address.");
+            valid = false;
+          } else if (!isValidEmail(email)) {
+            setFieldError("email", "Please enter a valid email address.");
+            valid = false;
+          }
+
+          if (!password) {
+            setFieldError("password", "Please enter your password.");
+            valid = false;
+          }
+
+          if (!valid) {
+            const firstInvalid = loginForm.querySelector(".auth-input.is-invalid");
+            if (firstInvalid) firstInvalid.focus();
+          }
+
+          return valid;
+        }
+
+        const emailInput = document.getElementById("email");
+        const passwordInput = document.getElementById("password");
+        if (emailInput) {
+          emailInput.addEventListener("input", function () {
+            setFieldError("email", "");
+          });
+        }
+        if (passwordInput) {
+          passwordInput.addEventListener("input", function () {
+            setFieldError("password", "");
+          });
+        }
+
         if (loginForm && submitBtn) {
           const defaultBtnContent = submitBtn.innerHTML;
-          loginForm.addEventListener('submit', function(e) {
+          loginForm.addEventListener("submit", function (e) {
             if (isLoginSubmitting) {
+              e.preventDefault();
+              return;
+            }
+
+            if (!validateLoginForm()) {
               e.preventDefault();
               return;
             }
 
             isLoginSubmitting = true;
             submitBtn.disabled = true;
-            submitBtn.classList.add('disabled');
-            submitBtn.style.opacity = '0.7';
-            submitBtn.style.cursor = 'not-allowed';
+            submitBtn.classList.add("disabled");
+            submitBtn.style.opacity = "0.7";
+            submitBtn.style.cursor = "not-allowed";
             submitBtn.innerHTML = '<i class="bi bi-arrow-repeat"></i> Signing in...';
-
-            // Restore state if browser-side validation blocks submission.
-            if (!loginForm.checkValidity()) {
-              isLoginSubmitting = false;
-              submitBtn.disabled = false;
-              submitBtn.classList.remove('disabled');
-              submitBtn.style.opacity = '';
-              submitBtn.style.cursor = '';
-              submitBtn.innerHTML = defaultBtnContent;
-            }
           });
         }
       });

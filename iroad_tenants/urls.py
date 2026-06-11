@@ -61,10 +61,12 @@ from .views import (
     TenantClientSalesReportView,
     TenantClientAccountSettingsView,
     TenantClientAccountToggleStatusView,
+    TenantClientAccountExportView,
     TenantClientAccountView,
     TenantClientAttachmentDeleteView,
     TenantClientAttachmentDetailView,
     TenantClientAttachmentEditView,
+    TenantClientAttachmentExportView,
     TenantClientAttachmentsListView,
     TenantClientAttachmentsView,
     TenantClientContactDeleteView,
@@ -88,6 +90,7 @@ from .views import (
     TenantSupportTicketDeleteView,
     TenantSupportTicketDetailView,
     TenantSupportTicketEditView,
+    TenantSupportTicketExportView,
     TenantSupportTicketListView,
     TenantDashboardView,
     TenantDashboardSearchView,
@@ -216,6 +219,11 @@ urlpatterns = [
         'administration/support/tickets/',
         TenantSupportTicketListView.as_view(),
         name='tenant_support_ticket_list',
+    ),
+    path(
+        'administration/support/tickets/export/',
+        TenantSupportTicketExportView.as_view(),
+        name='tenant_support_ticket_export',
     ),
     path(
         'administration/support/tickets/create/',
@@ -358,6 +366,11 @@ urlpatterns = [
         name='tenant_client_account',
     ),
     path(
+        'crm/clients/account/export/',
+        TenantClientAccountExportView.as_view(),
+        name='tenant_client_account_export',
+    ),
+    path(
         'crm/clients/account/create/',
         TenantClientAccountCreateView.as_view(),
         name='tenant_client_account_create',
@@ -401,6 +414,11 @@ urlpatterns = [
         'crm/clients/attachments/list/',
         TenantClientAttachmentsListView.as_view(),
         name='tenant_client_attachments_list',
+    ),
+    path(
+        'crm/clients/attachments/export/',
+        TenantClientAttachmentExportView.as_view(),
+        name='tenant_client_attachment_export',
     ),
     path(
         'crm/clients/attachments/<uuid:attachment_id>/detail/',

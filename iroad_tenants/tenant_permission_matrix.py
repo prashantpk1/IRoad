@@ -1,5 +1,16 @@
 """Tenant role permission matrix — modules and forms/submodules for RBAC."""
 
+# Legacy form labels still stored on older tenant_role_permissions rows.
+TENANT_PERMISSION_FORM_ALIASES = {
+    'Shipment POD Analysis': 'Shipment PODs',
+}
+
+
+def resolve_canonical_form_name(form_name):
+    """Map legacy stored form names to the current matrix label."""
+    return TENANT_PERMISSION_FORM_ALIASES.get(form_name, form_name)
+
+
 TENANT_PERMISSION_MATRIX = [
     # Administration
     {'module_name': 'Administration', 'form_name': 'Organization Profile'},

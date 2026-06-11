@@ -27,10 +27,14 @@
           </div>
           <div class="page-header-right">
             <div class="eal-header-actions">
-              <button class="eal-btn eal-btn-outline" type="button">
+              <a
+                class="eal-btn eal-btn-outline"
+                href="{% url 'iroad_tenants:tenant_support_ticket_export' %}{% if request.GET %}?{{ request.GET.urlencode }}{% endif %}"
+                download="support_tickets_export.csv"
+              >
                 <i class="bi bi-download"></i>
                 <span>Export</span>
-              </button>
+              </a>
               <a
                 href="{% url 'iroad_tenants:tenant_support_ticket_create' %}"
                 class="eal-btn eal-btn-primary"
@@ -100,6 +104,7 @@
                 type="search"
                 id="supportTicketSearch"
                 data-eal-global-search
+                data-eal-live-search-delegate="1"
                 value="{{ search_q|default:'' }}"
                 autocomplete="off"
                 placeholder="Search support tickets&hellip;"
@@ -231,47 +236,6 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
-(function () {
-  var inp = document.getElementById("supportTicketSearch");
-  var btn = document.getElementById("supportTicketSearchClear");
-  var listUrl = "{% url 'iroad_tenants:tenant_support_ticket_list' %}";
-  if (!inp) return;
-
-  function hasServerQ() {
-    try {
-      return new URLSearchParams(window.location.search).has("q");
-    } catch (e) {
-      return false;
-    }
-  }
-
-  function syncClear() {
-    if (!btn) return;
-    var v = (inp.value || "").trim();
-    btn.hidden = !(v || hasServerQ());
-  }
-
-  inp.addEventListener("input", syncClear);
-  syncClear();
-
-  if ((inp.value || "").trim()) {
-    inp.dispatchEvent(new Event("input", { bubbles: true }));
-  }
-
-  if (btn) {
-    btn.addEventListener("click", function () {
-      if (hasServerQ()) {
-        window.location.href = listUrl;
-        return;
-      }
-      inp.value = "";
-      inp.dispatchEvent(new Event("input", { bubbles: true }));
-      syncClear();
-      inp.focus();
-    });
-  }
-})();
-</script>
+{% include 'iroad_tenants/partials/eal_list_live_search_js.html' with search_input_id="supportTicketSearch" clear_btn_id="supportTicketSearchClear" list_url=request.path %}
 {% endblock %}
 

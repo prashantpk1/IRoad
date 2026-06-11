@@ -101,7 +101,25 @@
           <div class="eal-toolbar-left">
             <div class="eal-search">
               <i class="bi bi-search"></i>
-              <input type="search" data-eal-global-search value="{{ search_q|default:'' }}" placeholder="Search contacts..." />
+              <input
+                type="search"
+                id="clientContactsListSearch"
+                data-eal-global-search
+                value="{{ search_q|default:'' }}"
+                autocomplete="off"
+                placeholder="Search contacts..."
+                aria-label="Search contacts"
+              />
+              <button
+                type="button"
+                class="eal-search-clear-btn"
+                id="clientContactsListSearchClear"
+                title="Clear search"
+                aria-label="Clear search"
+                hidden
+              >
+                <i class="bi bi-x-lg"></i>
+              </button>
             </div>
             <div class="eal-chip-group">
               <a

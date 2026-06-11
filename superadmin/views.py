@@ -564,13 +564,7 @@ class LoginView(View):
             })
 
         if not form.is_valid():
-            if form.errors.get('email'):
-                error_msg = 'Please enter a valid email address.'
-            elif form.errors.get('password'):
-                error_msg = 'Please enter your password.'
-            else:
-                error_msg = 'Please enter valid email and password.'
-            return render_login({'error': error_msg})
+            return render_login()
 
         # STEP 2: Check user exists
         try:
@@ -10799,6 +10793,36 @@ def _resolve_support_ticket(identifier):
     return get_object_or_404(SupportTicket, pk=identifier)
 
 
+def _support_ticket_detail_page_context(ticket, replies_qs, *, reply_form, assign_form, priority_form):
+    from superadmin.support_ticket_display import (
+        enrich_support_ticket_replies_for_display,
+        format_support_ticket_datetime,
+        support_ticket_attachment_rows,
+        support_ticket_created_by_display_map,
+        support_ticket_priority_tone,
+    )
+
+    replies = list(replies_qs.order_by('created_at'))
+    enrich_support_ticket_replies_for_display(ticket, replies, mark_internal=True)
+    created_by_parts = support_ticket_created_by_display_map([ticket]).get(
+        ticket.pk,
+        {'username': '-', 'role': '-'},
+    )
+    return {
+        'ticket': ticket,
+        'replies': replies,
+        'reply_form': reply_form,
+        'assign_form': assign_form,
+        'priority_form': priority_form,
+        'ticket_created_at_display': format_support_ticket_datetime(ticket.created_at),
+        'ticket_priority_color': support_ticket_priority_tone(ticket.priority),
+        'ticket_attachments': support_ticket_attachment_rows(replies),
+        'ticket_tenant_name': (ticket.tenant.company_name if ticket.tenant_id else '') or '-',
+        'ticket_created_by_username': created_by_parts.get('username') or '-',
+        'ticket_status_display': ticket.get_status_display(),
+    }
+
+
 class TicketDetailView(LoginRequiredMixin, View):
     template_name = 'support/tickets/ticket_detail.html'
 
@@ -10810,17 +10834,13 @@ class TicketDetailView(LoginRequiredMixin, View):
             'assigned_to',
         ).get(pk=ticket.pk)
         replies = ticket.replies.select_related('ticket').all()
-
-        context = {
-            'ticket': ticket,
-            'replies': replies,
-            'reply_form': AdminReplyForm(),
-            'assign_form': TicketAssignForm(instance=ticket),
-            'priority_form': TicketPriorityForm(instance=ticket),
-            'canned_responses': CannedResponse.objects.filter(
-                is_active=True
-            ).order_by('title'),
-        }
+        context = _support_ticket_detail_page_context(
+            ticket,
+            replies,
+            reply_form=AdminReplyForm(),
+            assign_form=TicketAssignForm(instance=ticket),
+            priority_form=TicketPriorityForm(instance=ticket),
+        )
         return render(request, self.template_name, context)
 
 
@@ -10837,17 +10857,19 @@ class TicketAdminReplyView(LoginRequiredMixin, View):
 
         if not form.is_valid():
             messages.error(request, 'Please correct the reply form errors.')
+            ticket = SupportTicket.objects.select_related(
+                'tenant',
+                'category',
+                'assigned_to',
+            ).get(pk=ticket.pk)
             replies = ticket.replies.select_related('ticket').all()
-            context = {
-                'ticket': ticket,
-                'replies': replies,
-                'reply_form': form,
-                'assign_form': TicketAssignForm(instance=ticket),
-                'priority_form': TicketPriorityForm(instance=ticket),
-                'canned_responses': CannedResponse.objects.filter(
-                    is_active=True
-                ).order_by('title'),
-            }
+            context = _support_ticket_detail_page_context(
+                ticket,
+                replies,
+                reply_form=form,
+                assign_form=TicketAssignForm(instance=ticket),
+                priority_form=TicketPriorityForm(instance=ticket),
+            )
             return render(request, 'support/tickets/ticket_detail.html', context)
 
         reply = form.save(commit=False)

@@ -24,7 +24,12 @@
 
 {% block stats_row %}{% endblock %}
 
-<div class="eal-table-card">
+<div
+  class="eal-table-card"
+  data-eal-filterable-table
+  data-eal-empty-colspan="{% block eal_empty_colspan %}10{% endblock %}"
+  data-eal-empty-filter-message="{% block eal_empty_filter_message %}{% translate 'No rows match the selected search or column filters.' %}{% endblock %}"
+>
   <div class="eal-toolbar">
     <div class="eal-toolbar-left">
       {% block search_box %}{% endblock %}

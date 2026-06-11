@@ -1,0 +1,59 @@
+{% if client_account and client_cargo_tab %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="m-0" style="font-size: 1.1rem; font-weight: 600; color: #1a1a1a">Assigned Cargo Typologies</h4>
+  <a href="{% url 'iroad_tenants:tenant_cargo_master_create' %}?client={{ client_account.account_id }}&amp;return_to=details" class="btn btn-primary btn-sm">
+    <i class="bi bi-plus-lg"></i> Register Cargo
+  </a>
+</div>
+<div class="eal-table-card">
+  <div class="eal-table-wrap">
+    <table class="eal-table mb-0">
+      <thead>
+        <tr>
+          <th>Code</th>
+          <th>Cargo Name</th>
+          <th>Category</th>
+          <th>Unit</th>
+          <th>Weight (kg)</th>
+          <th>Status</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for cargo in client_cargo_tab.items %}
+        <tr>
+          <td><span class="eal-entity-id">{{ cargo.cargo_code }}</span></td>
+          <td>{{ cargo.display_name }}</td>
+          <td>{{ cargo.cargo_category.name_english }}</td>
+          <td>{{ cargo.uom|default:"—" }}</td>
+          <td>{% if cargo.weight_per_unit is not None %}{{ cargo.weight_per_unit|floatformat:3 }}{% else %}—{% endif %}</td>
+          <td>
+            {% if cargo.status == 'Active' %}
+            <span class="status-badge active" style="background:#e6f8ef;color:#0d894f">Active</span>
+            {% else %}
+            <span class="status-badge inactive" style="background:#f1f5f9;color:#64748b">Inactive</span>
+            {% endif %}
+          </td>
+          <td>
+            <div class="eal-actions-cell">
+              <a href="{{ cargo.list_edit_url }}" class="eal-row-btn" title="Edit"><i class="bi bi-pencil"></i></a>
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="7" class="text-center text-muted py-4">No cargo registered for this client yet.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% with tab=client_cargo_tab %}
+  {% include 'iroad_tenants/partials/eal_list_pagination.html' with page_obj=tab.page pagination_start=tab.pagination_start pagination_end=tab.pagination_end pagination_total=tab.pagination_total pagination_prev_url=tab.pagination_prev_url pagination_next_url=tab.pagination_next_url pagination_page_links=tab.pagination_page_links pagination_label='cargo records' %}
+  {% endwith %}
+</div>
+{% elif client_account %}
+<p class="text-muted mb-0">No cargo registered for this client yet. Use <strong>Register Cargo</strong> to add one.</p>
+{% else %}
+<p class="text-muted mb-0">Open client details from the account list to view and register cargo.</p>
+{% endif %}

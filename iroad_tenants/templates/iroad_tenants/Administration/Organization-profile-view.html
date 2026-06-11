@@ -330,10 +330,12 @@
             <label for="mobile" class="form-label">Mobile</label>
             <input
               type="tel"
-              class="form-control"
+              class="form-control org-profile-phone"
               id="mobile"
               name="primary_mobile"
               value="{{ org.primary_mobile }}"
+              inputmode="numeric"
+              pattern="[0-9]*"
               oninput="formatPhoneNumber(this)"
             />
           </div>
@@ -491,22 +493,28 @@
             <label for="supportMobile1" class="form-label">Support Mobile Number 1</label>
             <input
               type="tel"
-              class="form-control"
+              class="form-control org-profile-phone"
               id="supportMobile1"
               name="support_mobile_1"
               value="{{ org.support_mobile_1 }}"
-              placeholder="+966 50 000 0001"
+              inputmode="numeric"
+              pattern="[0-9]*"
+              placeholder="966500000001"
+              oninput="formatPhoneNumber(this)"
             />
           </div>
           <div class="field">
             <label for="supportMobile2" class="form-label">Support Mobile Number 2</label>
             <input
               type="tel"
-              class="form-control"
+              class="form-control org-profile-phone"
               id="supportMobile2"
               name="support_mobile_2"
               value="{{ org.support_mobile_2 }}"
-              placeholder="+966 50 000 0002"
+              inputmode="numeric"
+              pattern="[0-9]*"
+              placeholder="966500000002"
+              oninput="formatPhoneNumber(this)"
             />
           </div>
         </div>
@@ -557,6 +565,13 @@
 {% block extra_js %}
   {% include 'iroad_tenants/partials/organization_driver_instructions_tinymce.html' %}
 <script>
+  // Normalize saved phone values to digits-only on load.
+  document.querySelectorAll(".org-profile-phone").forEach(function (inputEl) {
+    if (typeof formatPhoneNumber === "function") {
+      formatPhoneNumber(inputEl);
+    }
+  });
+
   // Simple format validation for website
   const websiteInput = document.getElementById("website");
   if (websiteInput) {

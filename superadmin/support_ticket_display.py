@@ -157,6 +157,25 @@ def support_ticket_reply_display_map(ticket, replies):
     return out
 
 
+def enrich_support_ticket_replies_for_display(ticket, replies, *, mark_internal=False):
+    """Attach ``display_*`` attributes on reply objects (mutates *replies* in place)."""
+    label_map = support_ticket_reply_display_map(ticket, replies)
+    for reply in replies:
+        parts = label_map.get(reply.pk, {})
+        if mark_internal and reply.is_internal:
+            reply.display_sender_label = str(_('INTERNAL NOTE')).upper()
+            reply.display_sender_kind = 'internal'
+        else:
+            reply.display_sender_label = parts.get('sender_label', reply.sender_type)
+            reply.display_sender_kind = parts.get('sender_kind', 'support')
+        reply.display_timestamp = parts.get(
+            'timestamp_display',
+            format_support_ticket_datetime(reply.created_at),
+        )
+        reply.display_message_body = (reply.message_body or '').strip()
+    return replies
+
+
 def support_ticket_attachment_rows(replies):
     """Non-internal reply attachments for the Attachments tab."""
     rows = []

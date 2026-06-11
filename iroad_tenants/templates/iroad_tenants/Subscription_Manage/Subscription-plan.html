@@ -176,14 +176,44 @@
           </div>
         </div>
         <div class="sub-help-actions">
-          <button class="sub-help-btn sub-help-btn--primary" type="button">
+          {% if org_support_email %}
+          <a
+            href="mailto:{{ org_support_email }}"
+            class="sub-help-btn sub-help-btn--primary"
+          >
+            <i class="bi bi-envelope"></i>
+            Contact Sales
+          </a>
+          {% else %}
+          <button
+            class="sub-help-btn sub-help-btn--primary"
+            type="button"
+            disabled
+            title="Support email not configured in Organization Profile"
+          >
             <i class="bi bi-envelope"></i>
             Contact Sales
           </button>
-          <button class="sub-help-btn sub-help-btn--outline" type="button">
+          {% endif %}
+          {% if org_support_phone_tel %}
+          <a
+            href="{{ org_support_phone_tel }}"
+            class="sub-help-btn sub-help-btn--outline"
+          >
+            <i class="bi bi-telephone"></i>
+            Schedule a Call
+          </a>
+          {% else %}
+          <button
+            class="sub-help-btn sub-help-btn--outline"
+            type="button"
+            disabled
+            title="Support phone not configured in Organization Profile"
+          >
             <i class="bi bi-telephone"></i>
             Schedule a Call
           </button>
+          {% endif %}
         </div>
       </div>
 </div>

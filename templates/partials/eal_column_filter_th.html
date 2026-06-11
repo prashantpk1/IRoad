@@ -1,0 +1,42 @@
+{% load i18n %}
+{% comment %}
+Superadmin/shared column filter header — same contract as tenant partial.
+{% endcomment %}
+<th class="eal-th-filter" data-column-index="{{ col_index }}" data-filter-type="{{ filter_type|default:'text' }}">
+  <div class="eal-th-filter-head">
+    <span class="eal-th-filter-label">
+      {{ title }}
+      {% if not hide_sort %}
+      <span class="sort-indicator">
+        <i class="bi bi-caret-up-fill"></i>
+        <i class="bi bi-caret-down-fill"></i>
+      </span>
+      {% endif %}
+    </span>
+    <button type="button" class="eal-filter-menu-btn" aria-label="{% blocktranslate with col=title %}Filter {{ col }}{% endblocktranslate %}">
+      <i class="bi bi-funnel"></i>
+    </button>
+  </div>
+  <div class="eal-filter-menu">
+    <div class="eal-filter-menu-title">{{ filter_menu_title|default:title }}</div>
+    <input
+      type="text"
+      class="form-control eal-column-filter-input"
+      placeholder="{{ filter_placeholder|default:'Filter…' }}"
+      {% if filter_value %}value="{{ filter_value }}"{% endif %}
+    />
+    <div class="eal-filter-actions">
+      {% if filter_type == 'number' %}
+      <button type="button" class="eal-filter-action" data-sort="asc">{% translate "Lowest" %}</button>
+      <button type="button" class="eal-filter-action" data-sort="desc">{% translate "Highest" %}</button>
+      {% elif filter_type == 'date' %}
+      <button type="button" class="eal-filter-action" data-sort="asc">{% translate "Oldest" %}</button>
+      <button type="button" class="eal-filter-action" data-sort="desc">{% translate "Newest" %}</button>
+      {% else %}
+      <button type="button" class="eal-filter-action" data-sort="asc">{% translate "A to Z" %}</button>
+      <button type="button" class="eal-filter-action" data-sort="desc">{% translate "Z to A" %}</button>
+      {% endif %}
+      <button type="button" class="eal-filter-action" data-clear="true">{% translate "Clear" %}</button>
+    </div>
+  </div>
+</th>

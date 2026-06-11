@@ -107,7 +107,7 @@
     </div>
     <div class="page-header-right">
       <div class="eal-header-actions">
-        <a href="{% url 'iroad_tenants:sales_invoice_report_list' %}" class="eal-btn eal-btn-outline">
+        <a href="{% if sir_cancel_url %}{{ sir_cancel_url }}{% else %}{% url 'iroad_tenants:sales_invoice_report_list' %}{% endif %}" class="eal-btn eal-btn-outline">
           <i class="bi bi-arrow-left"></i><span>Back</span>
         </a>
       </div>
@@ -117,6 +117,12 @@
 
 <form method="post" id="sirForm">
   {% csrf_token %}
+  {% if sir_return_to %}
+  <input type="hidden" name="return_to" value="{{ sir_return_to }}" />
+  {% endif %}
+  {% if sir_client_account_no %}
+  <input type="hidden" name="sir_client_account_no" value="{{ sir_client_account_no }}" />
+  {% endif %}
   <div id="sirDynamicMessage" class="alert d-none" role="alert"></div>
 
   <div class="form-card" data-section="1">
@@ -140,7 +146,19 @@
         </div>
         <div class="fields-grid cols-3">
           <div class="field"><label class="form-label">Status</label>{{ report_form.status }}</div>
-          <div class="field"><label class="form-label">Client Account <span class="required">*</span></label>{{ report_form.client }}</div>
+          <div class="field">
+            <label class="form-label">Client Account <span class="required">*</span></label>
+            {% if sir_client_account_locked %}
+            <input type="hidden" name="client" value="{{ report_form.client.value }}" />
+            <select class="form-select" disabled aria-readonly="true">
+              {% for value, label in report_form.client.field.choices %}
+              <option value="{{ value }}" {% if report_form.client.value|stringformat:"s" == value|stringformat:"s" %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+            {% else %}
+            {{ report_form.client }}
+            {% endif %}
+          </div>
           <div class="field"><label class="form-label">Currency</label>{{ report_form.currency }}<span class="field-hint">Auto fill use SAR</span></div>
         </div>
         <div class="fields-grid cols-2">

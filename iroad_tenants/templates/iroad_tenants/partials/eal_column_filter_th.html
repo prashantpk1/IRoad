@@ -4,11 +4,13 @@ Reusable sortable column header with funnel filter popover.
 Variables:
   col_index (required) — zero-based column index matching <tbody> cells
   title (required) — header label (plain text; use {% translate %} in caller if needed)
+  filter_type (optional) — text | number | date (default text)
   filter_placeholder (optional) — input placeholder
   filter_menu_title (optional) — uppercase title in popover; defaults to title
+  filter_value (optional) — pre-filled filter from query string
   hide_sort (optional) — if true, hide caret sort icons
 {% endcomment %}
-<th class="eal-th-filter" data-column-index="{{ col_index }}" data-filter-type="text">
+<th class="eal-th-filter" data-column-index="{{ col_index }}" data-filter-type="{{ filter_type|default:'text' }}">
   <div class="eal-th-filter-head">
     <span class="eal-th-filter-label">
       {{ title }}
@@ -32,8 +34,16 @@ Variables:
       {% if filter_value %}value="{{ filter_value }}"{% endif %}
     />
     <div class="eal-filter-actions">
+      {% if filter_type == 'number' %}
+      <button type="button" class="eal-filter-action" data-sort="asc">Lowest</button>
+      <button type="button" class="eal-filter-action" data-sort="desc">Highest</button>
+      {% elif filter_type == 'date' %}
+      <button type="button" class="eal-filter-action" data-sort="asc">Oldest</button>
+      <button type="button" class="eal-filter-action" data-sort="desc">Newest</button>
+      {% else %}
       <button type="button" class="eal-filter-action" data-sort="asc">A to Z</button>
       <button type="button" class="eal-filter-action" data-sort="desc">Z to A</button>
+      {% endif %}
       <button type="button" class="eal-filter-action" data-clear="true">Clear</button>
     </div>
   </div>

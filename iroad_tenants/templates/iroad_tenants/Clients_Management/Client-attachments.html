@@ -181,12 +181,13 @@
                 </div>
                 <div class="field">
                   <label for="status" class="form-label">Status</label>
-                  <select class="form-select" id="status" disabled>
-                    <option value="" selected>
-                      Derived automatically (Valid / Expired / Does Not Expire)
-                    </option>
+                  <select class="form-select" id="status" disabled aria-readonly="true">
+                    <option value="" disabled>-Select status-</option>
+                    <option value="Valid" {% if is_edit_mode and editing_attachment.computed_status == 'Valid' %}selected{% endif %}>Valid</option>
+                    <option value="Expired" {% if is_edit_mode and editing_attachment.computed_status == 'Expired' %}selected{% endif %}>Expired</option>
+                    <option value="Does Not Expire" {% if is_edit_mode and editing_attachment.computed_status == 'Does Not Expire' %}selected{% endif %}>Does Not Expire</option>
                   </select>
-                  <span class="field-hint">Derived field (not user editable).</span>
+                  <span class="field-hint">Derived from expiry settings</span>
                 </div>
               </div>
             </div>
@@ -204,37 +205,46 @@
             </div>
           </div>
           <div class="form-card-body">
-            <!-- Row 1: File Upload -->
-            <div class="field-group">
-              <h3 class="field-group-title">
-                <i class="bi bi-cloud-arrow-up"></i>
-                Attachment File
-              </h3>
-              <div class="fields-grid cols-1">
-                <div class="field">
-                  <label for="attachmentFile" class="form-label"
-                    >Attachment File
-                    {% if not is_edit_mode %}<span class="required">*</span>{% endif %}
-                  </label>
-                  {% if is_edit_mode and editing_attachment %}
-                  <p class="mb-2 small">
-                    Current:
-                    <a href="{{ editing_attachment.attachment_file.url }}" target="_blank" rel="noopener">{{ editing_attachment.file_name }}</a>
-                  </p>
-                  {% endif %}
-                  <input
-                    type="file"
-                    class="form-control {% if form_errors.attachment_file %}is-invalid{% endif %}"
-                    id="attachmentFile"
-                    name="attachment_file"
-                    accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif"
-                  />
-                  {% if form_errors.attachment_file %}<div class="invalid-feedback d-block">{{ form_errors.attachment_file }}</div>{% endif %}
-                  <span class="field-hint"
-                    >Supported formats: PDF, DOC, DOCX, XLS, XLSX, JPG, PNG, GIF
-                    (Max 10MB){% if is_edit_mode %} — optional when editing{% endif %}</span
-                  >
-                </div>
+            <!-- Row 1: File Title & Upload -->
+            <div class="fields-grid cols-2">
+              <div class="field">
+                <label for="attachmentFileTitle" class="form-label"
+                  >Attachment File Title
+                  <span class="required">*</span>
+                </label>
+                <input
+                  type="text"
+                  class="form-control {% if form_errors.attachment_file_title %}is-invalid{% endif %}"
+                  id="attachmentFileTitle"
+                  name="attachment_file_title"
+                  placeholder="Enter Attachment File Title"
+                  value="{{ form_data.attachment_file_title|default:'' }}"
+                />
+                {% if form_errors.attachment_file_title %}<div class="invalid-feedback d-block">{{ form_errors.attachment_file_title }}</div>{% endif %}
+              </div>
+              <div class="field">
+                <label for="attachmentFile" class="form-label"
+                  >Attachment File
+                  {% if not is_edit_mode %}<span class="required">*</span>{% endif %}
+                </label>
+                {% if is_edit_mode and editing_attachment %}
+                <p class="mb-2 small">
+                  Current:
+                  <a href="{{ editing_attachment.attachment_file.url }}" target="_blank" rel="noopener">{{ editing_attachment.file_name }}</a>
+                </p>
+                {% endif %}
+                <input
+                  type="file"
+                  class="form-control {% if form_errors.attachment_file %}is-invalid{% endif %}"
+                  id="attachmentFile"
+                  name="attachment_file"
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif"
+                />
+                {% if form_errors.attachment_file %}<div class="invalid-feedback d-block">{{ form_errors.attachment_file }}</div>{% endif %}
+                <span class="field-hint"
+                  >Supported formats: PDF, DOC, DOCX, XLS, XLSX, JPG, PNG, GIF
+                  (Max 10MB){% if is_edit_mode %} — optional when editing{% endif %}</span
+                >
               </div>
             </div>
 
@@ -299,6 +309,29 @@
 
     expiryApplicable.addEventListener("change", syncExpiryDateState);
     syncExpiryDateState();
+
+    var statusSelect = document.getElementById("status");
+    if (statusSelect) {
+      function syncDerivedStatus() {
+        var isEnabled = expiryApplicable.value === "true";
+        var value = "Does Not Expire";
+        if (isEnabled) {
+          var expiryVal = expiryDate.value;
+          if (!expiryVal) {
+            value = "Valid";
+          } else {
+            var today = new Date();
+            today.setHours(0, 0, 0, 0);
+            var expiry = new Date(expiryVal + "T00:00:00");
+            value = expiry < today ? "Expired" : "Valid";
+          }
+        }
+        statusSelect.value = value;
+      }
+      expiryApplicable.addEventListener("change", syncDerivedStatus);
+      expiryDate.addEventListener("change", syncDerivedStatus);
+      syncDerivedStatus();
+    }
   })();
 </script>
 {% endblock %}

@@ -131,9 +131,10 @@
             <div class="eal-search">
               <i class="bi bi-search"></i>
               <input
-                type="search"
+                type="text"
                 id="rolePermissionTableSearch"
                 data-eal-global-search
+                value="{{ role_permission_search_q|default:'' }}"
                 autocomplete="off"
                 placeholder="Search events&hellip;"
                 aria-label="Search events"
@@ -177,7 +178,7 @@
                 <td class="eal-col-check">
                   <input type="checkbox" class="eal-custom-check" />
                 </td>
-                <td>{{ row.sl_no }}</td>
+                <td class="eal-sl-cell">{{ row.sl_no }}</td>
                 <td>{{ row.timestamp|date:"d M Y, h:i A" }}</td>
                 <td>{{ row.action }}</td>
                 <td>{{ row.module }}</td>
@@ -189,7 +190,13 @@
               </tr>
               {% empty %}
               <tr>
-                <td colspan="6" class="text-center text-muted py-4">No role/permission changes found.</td>
+                <td colspan="6" class="text-center text-muted py-4 eal-table-empty">
+                  {% if role_permission_list_has_filters %}
+                    No events match the selected search/filter criteria.
+                  {% else %}
+                    No role/permission changes found.
+                  {% endif %}
+                </td>
               </tr>
               {% endfor %}
             </tbody>
@@ -234,53 +241,3 @@
 </div>
 {% endblock %}
 
-{% block extra_css %}
-<style>
-  .eal-search .eal-search-clear-btn {
-    flex-shrink: 0;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
-    padding: 0;
-    border: none;
-    border-radius: 6px;
-    background: transparent;
-    color: #94a3b8;
-    cursor: pointer;
-    line-height: 1;
-  }
-  .eal-search .eal-search-clear-btn:hover {
-    background: #e2e8f0;
-    color: #64748b;
-  }
-  .eal-search .eal-search-clear-btn[hidden] {
-    display: none !important;
-  }
-</style>
-{% endblock %}
-
-{% block extra_js %}
-<script>
-(function () {
-  var inp = document.getElementById("rolePermissionTableSearch");
-  var btn = document.getElementById("rolePermissionTableSearchClear");
-  if (!inp) return;
-  function syncClear() {
-    if (!btn) return;
-    btn.hidden = !(inp.value || "").trim();
-  }
-  inp.addEventListener("input", syncClear);
-  syncClear();
-  if (btn) {
-    btn.addEventListener("click", function () {
-      inp.value = "";
-      inp.dispatchEvent(new Event("input", { bubbles: true }));
-      syncClear();
-      inp.focus();
-    });
-  }
-})();
-</script>
-{% endblock %}

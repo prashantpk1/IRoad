@@ -83,27 +83,32 @@
         <div class="ticket-detail-card-body">
           <div id="conversations-pane" class="ticket-pane ticket-conversation-thread">
             {% for reply in replies %}
-            <div class="ticket-message-row ticket-message-row-{{ reply.display_sender_kind }}">
-              <div class="ticket-message ticket-message-{{ reply.display_sender_kind }}">
-                <div class="ticket-message-main">
-                  <div class="ticket-message-sender ticket-message-sender-{{ reply.display_sender_kind }}">
-                    {{ reply.display_sender_label }}
-                  </div>
-                  <div class="ticket-message-body{% if reply.display_sender_kind == 'tenant' %} ticket-message-body-tenant{% endif %}">
-                    {{ reply.message_body }}
-                  </div>
+            <div class="ticket-message-row ticket-message-row-{% if reply.display_sender_kind == 'tenant' %}left{% else %}right{% endif %}">
+              <div class="ticket-message-stack">
+                <div class="ticket-message-meta">
+                  <span class="ticket-message-sender ticket-message-sender-{{ reply.display_sender_kind }}">{{ reply.display_sender_label }}</span>
+                  <span class="ticket-message-time">{{ reply.display_timestamp }}</span>
                 </div>
-                <div class="ticket-message-time">{{ reply.display_timestamp }}</div>
+                <div class="ticket-message ticket-message-{{ reply.display_sender_kind }}">
+                  <div class="ticket-message-body{% if reply.display_sender_kind == 'tenant' %} ticket-message-body-tenant{% endif %}">{{ reply.display_message_body }}</div>
+                  {% if reply.attachment %}
+                  <div class="ticket-message-attachment">
+                    <a href="{{ reply.attachment.url }}" target="_blank" rel="noopener">
+                      <i class="bi bi-paperclip"></i> View Attachment
+                    </a>
+                  </div>
+                  {% endif %}
+                </div>
               </div>
             </div>
             {% empty %}
-            <div class="ticket-message-row ticket-message-row-tenant">
-              <div class="ticket-message ticket-message-tenant">
-                <div class="ticket-message-main">
-                  <div class="ticket-message-sender ticket-message-sender-tenant">{{ ticket_page_title|upper }}</div>
-                  <div class="ticket-message-body ticket-message-body-tenant">
-                    No conversation messages yet.
-                  </div>
+            <div class="ticket-message-row ticket-message-row-left">
+              <div class="ticket-message-stack">
+                <div class="ticket-message-meta">
+                  <span class="ticket-message-sender ticket-message-sender-tenant">{{ ticket_page_title|upper }}</span>
+                </div>
+                <div class="ticket-message ticket-message-tenant">
+                  <div class="ticket-message-body ticket-message-body-tenant">No conversation messages yet.</div>
                 </div>
               </div>
             </div>
@@ -248,27 +253,60 @@
   .ticket-conversation-thread {
     display: flex;
     flex-direction: column;
-    gap: 24px;
   }
   .ticket-message-row {
     display: flex;
     width: 100%;
+    margin-bottom: 20px;
   }
-  .ticket-message-row-tenant {
-    justify-content: flex-end;
-  }
-  .ticket-message-row-support {
+  .ticket-message-row-left {
     justify-content: flex-start;
   }
-  .ticket-message {
-    max-width: 78%;
-    min-width: 280px;
-    padding: 16px 20px;
+  .ticket-message-row-right {
+    justify-content: flex-end;
+  }
+  .ticket-conversation-thread .ticket-message-row:last-child {
+    margin-bottom: 32px;
+  }
+  .ticket-message-stack {
     display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 16px;
+    flex-direction: column;
+    gap: 6px;
+    max-width: min(72%, 640px);
+    min-width: 0;
+  }
+  .ticket-message-row-right .ticket-message-stack {
+    align-items: flex-end;
+  }
+  .ticket-message-meta {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    width: 100%;
+  }
+  .ticket-message-row-left .ticket-message-meta {
+    justify-content: flex-start;
+  }
+  .ticket-message-row-right .ticket-message-meta {
+    justify-content: flex-end;
+    text-align: right;
+  }
+  .ticket-message {
+    box-sizing: border-box;
+    width: fit-content;
+    max-width: 100%;
+    padding: 10px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    border-radius: 8px;
+  }
+  .ticket-message-row-left .ticket-message {
     border-radius: 0 8px 8px 0;
+  }
+  .ticket-message-row-right .ticket-message {
+    border-radius: 8px 0 0 8px;
   }
   .ticket-message-tenant {
     background: #f8fafc;
@@ -276,21 +314,19 @@
   }
   .ticket-message-support {
     background: #ffffff;
-    border-left: 3px solid #3b82f6;
-  }
-  .ticket-message-row-support:last-child {
-    margin-bottom: 16px;
-  }
-  .ticket-message-main {
-    flex: 1;
-    min-width: 0;
+    border-right: 3px solid #3b82f6;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
   }
   .ticket-message-sender {
     font-size: 11px;
     font-weight: 700;
     text-transform: uppercase;
-    margin-bottom: 8px;
     letter-spacing: 0.5px;
+    line-height: 1.3;
+  }
+  .ticket-message-row-right .ticket-message-body,
+  .ticket-message-row-right .ticket-message-attachment {
+    text-align: right;
   }
   .ticket-message-sender-tenant {
     color: #64748b;
@@ -300,17 +336,33 @@
   }
   .ticket-message-body {
     font-size: 14px;
+    line-height: 1.4;
     color: #334155;
     white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    margin: 0;
   }
   .ticket-message-body-tenant {
     color: #64748b;
     font-style: italic;
   }
+  .ticket-message-attachment {
+    margin-top: 4px;
+    font-size: 13px;
+  }
+  .ticket-message-attachment a {
+    color: #3b82f6;
+    text-decoration: none;
+    font-weight: 600;
+  }
   .ticket-message-time {
     font-size: 11px;
     color: #94a3b8;
     white-space: nowrap;
+    line-height: 1.3;
+    font-weight: 400;
+    text-transform: none;
   }
   .ticket-attachments-empty {
     text-align: center;
@@ -344,7 +396,9 @@
     white-space: nowrap;
   }
   .ticket-reply-form {
-    margin-top: 32px;
+    margin-top: 0;
+    padding-top: 32px;
+    border-top: 1px solid #f1f5f9;
   }
   .ticket-reply-heading {
     display: flex;
@@ -370,8 +424,14 @@
     border-radius: 6px;
     box-shadow: none;
     font-size: 14px;
+    line-height: 1.5;
     color: #475569;
     padding: 16px;
+    min-height: 120px;
+  }
+  .ticket-reply-textarea:focus {
+    border-color: #3b82f6;
+    box-shadow: none;
   }
   .ticket-reply-actions {
     display: flex;
@@ -406,12 +466,12 @@
     border-radius: 6px;
   }
   .ticket-reply-closed-note {
-    margin-top: 32px;
-    padding: 16px;
-    background: #f8fafc;
-    border-radius: 8px;
+    margin-top: 0;
+    padding: 32px 0 0;
+    border-top: 1px solid #f1f5f9;
     color: #64748b;
     font-size: 14px;
+    line-height: 1.5;
   }
 </style>
 {% endblock %}
