@@ -75,6 +75,29 @@ def scoped_shipment_action_logs(
     return qs[:scan_limit]
 
 
+def scoped_booking_action_logs(
+    booking,
+    *,
+    driver_id=None,
+    exclude_log_id=None,
+    scan_limit: int = 200,
+):
+    """Action logs for booking-only mobile jobs (before shipment birth at A4)."""
+    if booking is None:
+        return TenantOperationActionLog.objects.none()
+    qs = (
+        TenantOperationActionLog.objects.filter(booking_id=booking.pk)
+        .exclude(operation_action__isnull=True)
+        .select_related('operation_action', 'driver')
+        .order_by('-log_date', '-created_at', '-log_id')
+    )
+    if driver_id:
+        qs = qs.filter(Q(driver_id=driver_id) | Q(driver_id__isnull=True))
+    if exclude_log_id:
+        qs = qs.exclude(log_id=exclude_log_id)
+    return qs[:scan_limit]
+
+
 def scoped_movement_action_logs(
     movement,
     *,
